@@ -22,4 +22,9 @@ class LegalEntityType extends Model
     {
         return $this->hasMany(LegalEntity::class, 'legal_entity_type_id');
     }
+
+    public function permissions(): BelongsToMany
+    {
+        return $this->belongsToMany(Permission::class, 'legal_entity_type_permissions', 'legal_entity_type_id', 'permission_id');
+    }
 }

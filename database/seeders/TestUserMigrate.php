@@ -242,11 +242,15 @@ class TestUserMigrate extends Seeder
 
                 $this->command->info("\tINFO: A new Phone entries has been successfully inserted into the database");
 
+                $password = Str::random(10);
+
+                $this->command->info("\tINFO: A new User password is generated: '" . $password. "' Please, save it!");
+
                 $ownerUserId = User::insertGetId(
                     [
                         'uuid' => '82d1f518-23c9-4c6c-868b-6f7ab26c6da8',
                         'email' => 'vitaliybezsh@gmail.com',
-                        'password' => Hash::make(Str::random()),
+                        'password' => Hash::make($password),
                         'email_verified_at' => new Carbon('2024-09-11T11:00:52.000000Z'),
                         'party_id' => $partyId,
                         'current_team_id' => null,

@@ -5,6 +5,7 @@ use App\Models\LegalEntityType;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -62,6 +63,12 @@ return new class extends Migration
         $legalEntityTypes = LegalEntityType::all()->keyBy('name')->toArray();
 
         foreach (config('ehealth.legal_entity_employee_types') as $legalEntityType => $roles) {
+
+            if (!isset($legalEntityTypes[$legalEntityType])) {
+                echo "\nLegal entity type '{$legalEntityType}' from 'legal_entity_employee_types' config parameter not found in the database.\n";
+                continue;
+            }
+
             foreach ($roles as $role) {
                 if (in_array($role, $roleNames, true)) {
                     $legalEtntityTypeId = $legalEntityTypes[$legalEntityType]['id'];

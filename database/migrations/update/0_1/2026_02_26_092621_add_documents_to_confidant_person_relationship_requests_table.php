@@ -14,7 +14,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('confidant_person_relationship_requests', function (Blueprint $table) {
-            $table->jsonb('documents')->nullable()->after('channel');
+            if (! Schema::hasColumn('confidant_person_relationship_requests', 'documents')) {
+                $table->jsonb('documents')->nullable()->after('channel');
+            }
         });
     }
 
@@ -24,7 +26,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('confidant_person_relationship_requests', function (Blueprint $table) {
-            $table->dropColumn('documents');
+            if (Schema::hasColumn('confidant_person_relationship_requests', 'documents')) {
+                $table->dropColumn('documents');
+            }
         });
     }
 };

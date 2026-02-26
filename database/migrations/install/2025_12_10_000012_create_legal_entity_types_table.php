@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Models\LegalEntity;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
@@ -47,23 +47,26 @@ return new class extends Migration
     {
         $now = now();
 
-        $availableTypes = [
-            ['name' => LegalEntity::TYPE_EMERGENCY, 'localized_name' => 'legal-entity.types.emergency'],
-            ['name' => LegalEntity::TYPE_MIS, 'localized_name' => 'legal-entity.types.mis'],
-            ['name' => LegalEntity::TYPE_MSP, 'localized_name' => 'legal-entity.types.msp'],
-            ['name' => LegalEntity::TYPE_MSP_PHARMACY, 'localized_name' => 'legal-entity.types.msp_pharmacy'],
-            ['name' => LegalEntity::TYPE_NHS, 'localized_name' => 'legal-entity.types.nhs'],
-            ['name' => LegalEntity::TYPE_OUTPATIENT, 'localized_name' => 'legal-entity.types.outpatient'],
-            ['name' => LegalEntity::TYPE_PHARMACY, 'localized_name' => 'legal-entity.types.pharmacy'],
-            ['name' => LegalEntity::TYPE_PRIMARY_CARE, 'localized_name' => 'legal-entity.types.primary_care'],
-            ['name' => LegalEntity::TYPE_MSP_LIMITED, 'localized_name' => 'legal-entity.types.msp_limited']
-        ];
+        $availableTypes = [];
 
-        foreach ($availableTypes as $typeRecord) {
+        foreach (config('ehealth.legal_entity_localized_names') as $typeName => $localizedName) {
+            $availableTypes[] = [
+                'name' => $typeName,
+                'localized_name' => $localizedName,
+            ];
+        }
+
+        $configuredTypes = array_keys(config('ehealth.legal_entity_types', []));
+
+        $configuredTypes = array_filter($availableTypes, function ($typeData) use ($configuredTypes) {
+            return in_array($typeData['name'], $configuredTypes, true);
+        });
+
+        foreach ($configuredTypes as $typeRecord) {
             $typeRecord['created_at'] = $now;
             $typeRecord['updated_at'] = $now;
         }
 
-        DB::table('legal_entity_types')->insert($availableTypes);
+        DB::table('legal_entity_types')->insert($configuredTypes);
     }
 };

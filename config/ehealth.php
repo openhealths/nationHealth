@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Models\LegalEntity;
+
 return [
     'api' => [
         'domain' => env('EHEALTH_API_URL', 'private-anon-cb2ce4f7fc-uaehealthapi.apiary-mock.com'),
@@ -31,6 +33,18 @@ return [
     'auth' => [
         'delay_seconds' => 300,     // Amount of the seconds to another login attempt
         'max_login_attempts' => 5   // Amount of the wrong attempt before locking out
+    ],
+
+    'legal_entity_localized_names' => [
+            LegalEntity::TYPE_EMERGENCY => 'legal-entity.types.emergency',
+            LegalEntity::TYPE_MIS => 'legal-entity.types.mis',
+            LegalEntity::TYPE_MSP => 'legal-entity.types.msp',
+            LegalEntity::TYPE_MSP_PHARMACY => 'legal-entity.types.msp_pharmacy',
+            LegalEntity::TYPE_NHS => 'legal-entity.types.nhs',
+            LegalEntity::TYPE_OUTPATIENT => 'legal-entity.types.outpatient',
+            LegalEntity::TYPE_PHARMACY => 'legal-entity.types.pharmacy',
+            LegalEntity::TYPE_PRIMARY_CARE => 'legal-entity.types.primary_care',
+            LegalEntity::TYPE_MSP_LIMITED => 'legal-entity.types.msp_limited'
     ],
 
     'legal_entity_types' => [
@@ -80,7 +94,7 @@ return [
             'person_verification:details', 'person_verification:write', 'device_definition:read', 'device_request:write', 'device_request:read', 'device_request:resend', 'device_request:revoke',
             'specimen:write', 'specimen:read', 'specimen:process', 'specimen:cancel', 'specimen:reject', 'specimen:invalidate', 'service_request:read_impersonal', 'device_request:mark_in_error',
             'device_request:complete', 'device_dispense:read', 'device_association:read', 'detected_issue:read', 'confidant_person_relationship_request:write',
-            'confidant_person_relationship:read', 'personal_data:read', 'care_team:read', 'care_team:write', 'person_request:sign', 'confidant_person_relationship_request:read',
+            'confidant_person_relationship:read', 'personal_data:read', 'care_team:read', 'care_team:write', 'person_request:sign', 'confidant_person_relationship_request:read'
         ],
         'PHARMACY' => [
             'employee_role:write', 'employee_role:read', 'healthcare_service:write', 'healthcare_service:read', 'division:activate', 'division:deactivate', 'division:details', 'division:read',
