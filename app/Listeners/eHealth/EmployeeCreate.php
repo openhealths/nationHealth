@@ -9,6 +9,7 @@ use Throwable;
 use App\Core\Arr;
 use Carbon\Carbon;
 use App\Models\User;
+use App\Models\Relations\Party;
 use App\Classes\eHealth\EHealth;
 use App\Events\EHealthUserLogin;
 use App\Repositories\Repository;
@@ -224,11 +225,33 @@ class EmployeeCreate
 
                 $eHealthDateString = $employee['start_date'] ?? null;
 
-                if (is_null($eHealthDateString) || is_null($employeeRequest->start_date)) {
+                if (is_null($eHealthDateString)) {
                     return false;
                 }
 
-                $datesMatch = Carbon::parse($employeeRequest->start_date)
+                if (is_null($employeeRequest->startDate)) {
+                    switch ($employeeRequest->employeeType) {
+                    case 'OWNER':
+                        $partyUuid = $employee['party']['uuid'] ?? null;
+                        $party = Party::where('uuid', $partyUuid)->first();
+
+                        if (!$party) {
+                            return false;
+                        }
+
+                        $employeeRequest->startDate = Employee::where('legal_entity_uuid', $employeeRequest->legalEntityUuid)
+                            ->where('employee_type', $employeeRequest->employeeType)
+                            ->where('position', $employee['position'])
+                            ->where('employee_type', $employee['employee_type'])
+                            ->where('party_id', $party->id)
+                            ->first()?->startDate;
+                        break;
+                    default:
+                        return false;
+                    }
+                }
+
+                $datesMatch = Carbon::parse($employeeRequest->startDate)
                     ->isSameDay(Carbon::parse($eHealthDateString));
 
                 return $namesMatch && $datesMatch;
