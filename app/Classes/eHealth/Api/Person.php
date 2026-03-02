@@ -168,15 +168,22 @@ class Person extends Request
         string $id,
         string $relationshipId,
         array $documentsRelationship,
-        ?string $authorizeWith
+        ?string $authorizeWith = null
     ): PromiseInterface|EHealthResponse {
+        $this->setValidator($this->validateCreateConfidantRelationship(...));
+
         $payload = [
             'confidant_person_relationship' => [
                 'id' => $relationshipId,
                 'documents_relationship' => $documentsRelationship
-            ],
-            'authorize_with' => $authorizeWith
+            ]
         ];
+
+        if (!is_null($authorizeWith)) {
+            $payload['authorize_with'] = $authorizeWith;
+        }
+
+        $payload = $this->format($payload, ['issued_at', 'active_to']);
 
         return $this->post(self::URL . "/$id/confidant_person_relationship_requests/deactivate", $payload);
     }

@@ -25,6 +25,7 @@ class ConfidantPerson extends Model
     ];
 
     protected $fillable = [
+        'uuid',
         'person_request_id',
         'person_id',
         'subject_person_id',

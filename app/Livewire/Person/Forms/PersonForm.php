@@ -259,6 +259,18 @@ class PersonForm extends BaseForm
         ];
     }
 
+    public function rulesForDeactivateConfidantPerson(): array
+    {
+        return [
+            'confidantPersonRelationUuid' => ['required', 'uuid'],
+            'documents' => ['required', 'array'],
+            'documents.*.type' => ['required', 'string', new InDictionary('DOCUMENT_RELATIONSHIP_TYPE')],
+            'documents.*.number' => ['required', 'string', 'max:255'],
+            'documents.*.issuedBy' => ['required', 'string', 'max:255'],
+            'documents.*.issuedAt' => ['required', 'date_format:d.m.Y']
+        ];
+    }
+
     public function messages(): array
     {
         $messages = [

@@ -6,6 +6,7 @@ namespace App\Repositories;
 
 use App\Core\Arr;
 use App\Enums\JobStatus;
+use App\Enums\Person\AuthenticationMethod;
 use App\Models\Person\Person;
 use App\Models\Relations\Phone;
 use App\Models\Relations\Document;
@@ -34,8 +35,7 @@ class ConfidantPersonRepository
             $phones = Arr::pull($personData, 'phones', []);
             // $relationType = Arr::pull($personData, 'relation_type', null);
 
-            unset($personData['relation_type']);
-            unset($personData['preferred_way_communication']);
+            unset($personData['relation_type'], $personData['preferred_way_communication']);
 
             $query = Person::where('first_name', $personData['first_name'])
                 ->where('last_name', $personData['last_name'])
@@ -128,7 +128,8 @@ class ConfidantPersonRepository
                 'subject_person_id' => $subjectPerson->id,
             ],
             [
-                'sync_status' => JobStatus::COMPLETED
+                'sync_status' => JobStatus::COMPLETED,
+                'uuid' => $responseData['id']
             ]
         );
 
@@ -141,7 +142,7 @@ class ConfidantPersonRepository
                     'number' => $document['number'],
                     'issued_by' => $document['issued_by'],
                     'issued_at' => $document['issued_at'],
-                    'active_to' => $document['active_to']
+                    'active_to' => $document['active_to'] ?? null
                 ]);
             }
         }
@@ -167,12 +168,11 @@ class ConfidantPersonRepository
 
         $syncedConfidantPersons = collect();
 
-        // Group relationships by confidant person UUID to handle multiple documents per person
-        $groupedData = collect($responseData)->groupBy('confidant_person.person_id');
-
-        foreach ($groupedData as $confidantPersonUuid => $relationships) {
-            $firstRelationship = $relationships->first();
-            $confidantPersonData = $firstRelationship['confidant_person'];
+        // Process each relationship individually (don't group by person_id)
+        // Each relationship should be a separate ConfidantPerson record
+        foreach ($responseData as $relationshipData) {
+            $confidantPersonData = $relationshipData['confidant_person'];
+            $confidantPersonUuid = $confidantPersonData['person_id'];
 
             // Find the confidant person
             $confidantPerson = Person::whereUuid($confidantPersonUuid)->first();
@@ -182,36 +182,35 @@ class ConfidantPersonRepository
                 continue;
             }
 
-            // Sync phones if provided
+            // Sync phones if provided (update person data each time)
             if (!empty($confidantPersonData['phones'])) {
                 Repository::phone()->syncPhones($confidantPerson, $confidantPersonData['phones']);
             }
 
-            // Sync documents if provided
+            // Sync documents if provided (update person data each time)
             if (!empty($confidantPersonData['documents_person'])) {
                 Repository::document()->sync($confidantPerson, $confidantPersonData['documents_person']);
             }
 
-            // Create the confidant person relationship (fresh creation since we deleted all above)
+            // Create a separate confidant person relationship for each relationship
             $confidantPersonRelation = ConfidantPerson::create([
+                'uuid' => $relationshipData['id'],
                 'person_id' => $confidantPerson->id,
                 'subject_person_id' => $subjectPerson->id,
-                'active_to' => $firstRelationship['active_to'] ?? null,
+                'active_to' => $relationshipData['active_to'] ?? null,
                 'sync_status' => JobStatus::COMPLETED
             ]);
 
-            // Add all relationship documents for this confidant person
-            foreach ($relationships as $relationshipData) {
-                if (!empty($relationshipData['documents_relationship'])) {
-                    foreach ($relationshipData['documents_relationship'] as $document) {
-                        $confidantPersonRelation->documentsRelationship()->create([
-                            'type' => $document['type'],
-                            'number' => $document['number'],
-                            'issued_by' => $document['issued_by'] ?? null,
-                            'issued_at' => $document['issued_at'] ?? null,
-                            'active_to' => $document['active_to'] ?? null
-                        ]);
-                    }
+            // Add relationship documents for this specific relationship
+            if (!empty($relationshipData['documents_relationship'])) {
+                foreach ($relationshipData['documents_relationship'] as $document) {
+                    $confidantPersonRelation->documentsRelationship()->create([
+                        'type' => $document['type'],
+                        'number' => $document['number'],
+                        'issued_by' => $document['issued_by'] ?? null,
+                        'issued_at' => $document['issued_at'] ?? null,
+                        'active_to' => $document['active_to'] ?? null
+                    ]);
                 }
             }
 
@@ -219,5 +218,52 @@ class ConfidantPersonRepository
         }
 
         return $syncedConfidantPersons;
+    }
+
+    /**
+     * Find suitable authentication method for deactivating a confidant person relationship.
+     *
+     * @param  Person  $mainPerson  The person who has confidant relationships
+     * @param  string  $confidantPersonRelationUuid  UUID of the relationship being deactivated
+     * @return array{auth_method_uuid: string|null, error: string|null}
+     */
+    public function findAuthMethodForDeactivation(Person $mainPerson, string $confidantPersonRelationUuid): array
+    {
+        // Get the confidant person being deactivated
+        $confidantBeingDeactivated = ConfidantPerson::whereUuid($confidantPersonRelationUuid)->first();
+
+        if (!$confidantBeingDeactivated) {
+            return ['auth_method_uuid' => null, 'error' => 'Confidant person relationship not found'];
+        }
+
+        // Find a suitable authentication method from the main person
+        // Must be THIRD_PERSON type, value != confidant person being deactivated, and not expired
+        $authMethod = $mainPerson->authenticationMethods()
+            ->whereType(AuthenticationMethod::THIRD_PERSON)
+            ->where('value', '!=', $confidantBeingDeactivated->person->uuid)
+            ->where(function ($query) {
+                $query->whereNull('ehealth_ended_at')
+                    ->orWhere('ehealth_ended_at', '>', now());
+            })
+            ->first();
+
+        // If no valid auth method found, check if we can proceed without authorization
+        if (!$authMethod) {
+            // Check if the person has only this one confidant relationship
+            $totalConfidantPersons = $mainPerson->confidantPersons()->count();
+
+            if ($totalConfidantPersons === 1) {
+                // Only one confidant person, proceed without authorization
+                return ['auth_method_uuid' => null, 'error' => null];
+            }
+
+            // Multiple confidants but no valid auth method - this shouldn't happen
+            return [
+                'auth_method_uuid' => null,
+                'error' => 'Не знайдено дійсного методу автентифікації для деактивації. Спочатку синхронізуйте методи автентифікації.'
+            ];
+        }
+
+        return ['auth_method_uuid' => $authMethod->uuid, 'error' => null];
     }
 }

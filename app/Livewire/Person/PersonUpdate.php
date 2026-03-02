@@ -128,6 +128,8 @@ class PersonUpdate extends PersonComponent
 
     public bool $showConfidantPersonDrawer = false;
 
+    public bool $showDeactivateConfidantPersonDrawer = false;
+
     /**
      * List of confidant person relationship requests for current person.
      *
@@ -843,7 +845,7 @@ class PersonUpdate extends PersonComponent
             return [
                 'person' => $person,
                 'documentsRelationship' => $relationship['documents_relationship'],
-                'activeTo' => $relationship['active_to']
+                'activeTo' => convertToAppDateFormat($relationship['active_to'])
             ];
         })->toArray();
 
@@ -1063,18 +1065,23 @@ class PersonUpdate extends PersonComponent
 
             // Save confidant person relationship to database using repository
             try {
-                $personData = collect($this->confidantPerson)->firstWhere('id', $this->selectedConfidantPersonId);
-                Repository::confidantPerson()->createFromSignedResponse($response->getData(), $this->uuid, $personData);
+                if ($this->authDrawerMode === 'create') {
+                    $personData = collect($this->confidantPerson)->firstWhere('id', $this->selectedConfidantPersonId);
+                    Repository::confidantPerson()->createFromSignedResponse($response->getData(), $this->uuid, $personData);
 
-                $this->showSignatureDrawer = false;
-                $this->showAuthDrawer = false;
+                    $this->showSignatureDrawer = false;
+                    $this->showAuthDrawer = false;
+                } else {
+                    ConfidantPerson::whereUuid($response->getData()['confidant_person_relationship']['id'])
+                        ->update(['active_to' => now()]);
+
+                    $this->showSignatureDrawer = false;
+                    $this->showTerminateModal = true;
+                }
+
                 Session::flash('success', __('patients.messages.new_confidant_person_added'));
             } catch (Exception $exception) {
-                Log::error('Failed to create confidant person relationship', [
-                    'message' => $exception->getMessage(),
-                    'uuid' => $this->uuid,
-                    'response_data' => $response->getData()
-                ]);
+                $this->logDatabaseErrors($exception, 'Failed to create confidant person relationship');
                 Session::flash('error', 'Виникла помилка при збереженні. Зверніться до адміністратора.');
 
                 return;
@@ -1125,26 +1132,73 @@ class PersonUpdate extends PersonComponent
         }
     }
 
-    public function deactivateConfidantPerson(string $authMethodUuid, array $documents): void
+    /**
+     * Start to deactivate confidant person.
+     *
+     * @param  string  $confidantPersonRelationUuid
+     * @param  array  $documents
+     * @return void
+     */
+    public function deactivateConfidantPerson(string $confidantPersonRelationUuid, array $documents): void
     {
         try {
-            $resp = EHealth::person()->deactivateAuthMethod($this->uuid, $authMethodUuid);
-            $this->requestId = $resp->getData()['id'];
+            $validated = Validator::make([
+                'confidantPersonRelationUuid' => $confidantPersonRelationUuid,
+                'documents' => $documents
+            ], $this->form->rulesForDeactivateConfidantPerson())->validate();
+        } catch (ValidationException $exception) {
+            Session::flash('error', $exception->validator->errors()->first());
+            $this->setErrorBag($exception->validator->getMessageBag());
+
+            return;
+        }
+
+        try {
+            // Find the main person
+            $mainPerson = Person::whereUuid($this->uuid)->firstOrFail();
+
+            // Find suitable authentication method using repository
+            $authResult = Repository::confidantPerson()->findAuthMethodForDeactivation($mainPerson, $confidantPersonRelationUuid);
+
+            if ($authResult['error']) {
+                Session::flash('error', $authResult['error']);
+
+                return;
+            }
+
+            $authMethodUuid = $authResult['auth_method_uuid'];
+
+            $response = EHealth::person()->deactivateConfidantRelationship(
+                $this->uuid,
+                $validated['confidantPersonRelationUuid'],
+                Arr::toSnakeCase($validated['documents']),
+                $authMethodUuid
+            );
+
+            $this->confidantPersonRelationshipRequestId = $response->getData()['id'];
+            $this->uploadedDocuments = $response->getUrgent()['documents'];
+
+            try {
+                $dataForCreate = $response->validate();
+                $dataForCreate['person_id'] = Person::whereUuid($this->uuid)->value('id');
+                $dataForCreate['documents'] = $response->getUrgent()['documents'];
+
+                ConfidantPersonRelationshipRequest::create($dataForCreate);
+            } catch (Throwable $exception) {
+                $this->logDatabaseErrors($exception, 'Failed to create confidant person relationship request');
+                Session::flash('error', 'Виникла помилка при збереженні. Зверніться до адміністратора.');
+
+                return;
+            }
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             $this->handleEHealthExceptions($exception, 'Error when deactivating auth method');
 
             return;
         }
 
-        // Set mode to deactivate and show the auth drawer
+        $this->showDeactivateConfidantPersonDrawer = false;
         $this->authDrawerMode = 'deactivate';
         $this->showAuthDrawer = true;
-    }
-
-    public function deactivateConfidantPersonRelationshipRequest(string $relationshipId): void
-    {
-        // TBD
-        //        $response = EHealth::person()->deactivateConfidantRelationship($this->uuid, $relationshipId);
     }
 
     /**

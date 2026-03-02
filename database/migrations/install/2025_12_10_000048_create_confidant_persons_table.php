@@ -16,6 +16,7 @@ return new class extends Migration
     {
         Schema::create('confidant_persons', static function (Blueprint $table) {
             $table->id();
+            $table->uuid();
             $table->foreignId('person_id')->comment('The person who is confidant')
                 ->nullable()
                 ->constrained('persons');
