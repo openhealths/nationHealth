@@ -44,7 +44,7 @@ class PartyVerificationIndex extends Component
         $filters = [];
 
         if (!empty($this->dracsDeathStatus)) {
-            $filters['verification_status'] = $this->dracsDeathStatus;
+            $filters['dracs_death_verification_status'] = $this->dracsDeathStatus;
         }
 
         // Запит тепер має проходити без 422 Unprocessable Entity
