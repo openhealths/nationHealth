@@ -65,7 +65,7 @@ abstract class MigrationsCommand extends Command
     {
         $isCacheCleared = (bool) ($this->option('clear') ?? false);
 
-        if (! $isCacheCleared) {
+        if (!$isCacheCleared) {
             return;
         }
 
@@ -128,7 +128,7 @@ abstract class MigrationsCommand extends Command
     // Perform the migrations (depends on the $migrationFiles set previously)
     protected function doMigrations(Migrator $migrator): void
     {
-        if($migrator->hasRunAnyMigrations()) {
+        if ($migrator->hasRunAnyMigrations()) {
             // Filter out already run migrations
             $migrationsAlreadyCompleted = $migrator?->getRepository()?->getRan() ?? [];
 

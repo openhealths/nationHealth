@@ -282,8 +282,6 @@ Route::middleware(['auth:web,ehealth', 'verified'])->group(function () {
                     });
                 });
 
-
-
                 Route::name('declaration.')->group(static function () {
                     Route::get('/declaration/{declaration}', DeclarationView::class)
                         ->can('view', 'declaration')

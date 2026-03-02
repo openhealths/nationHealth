@@ -15,8 +15,8 @@ trait ProcessesPartyVerificationResponses
      * Processes party verification statuses using an optimized upsert approach.
      * Updates ONLY the verification_status field.
      *
-     * @param  EHealthResponse  $response   The API response object.
-     * @param  LegalEntity      $legalEntity The legal entity context.
+     * @param  EHealthResponse  $response  The API response object.
+     * @param  LegalEntity  $legalEntity  The legal entity context.
      * @return void
      */
     private function processPartyVerificationResponse(EHealthResponse $response, LegalEntity $legalEntity): void

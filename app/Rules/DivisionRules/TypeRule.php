@@ -57,7 +57,6 @@ class TypeRule implements ValidationRule
      * This method is called when a division type rule fails validation.
      *
      * @return void
-     *
      * @throws CustomValidationException
      */
     protected function throwError(): void
@@ -70,8 +69,7 @@ class TypeRule implements ValidationRule
      *
      * This message will be used when throwing a validation exception.
      *
-     * @param string $message The error message to set.
-     *
+     * @param  string  $message  The error message to set.
      * @return void
      */
     protected function setMessage(string $message): void

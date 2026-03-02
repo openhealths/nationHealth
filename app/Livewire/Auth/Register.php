@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Auth;
 
 use App\Models\User;
@@ -33,7 +35,7 @@ class Register extends Component
         ]);
 
         try {
-            $user = DB::transaction(function() use($userData) {
+            $user = DB::transaction(function () use ($userData) {
                 $user = new User();
                 $user->password = Hash::make($userData['password']);
                 $user->email = $userData['email'];

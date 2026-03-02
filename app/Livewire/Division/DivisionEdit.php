@@ -22,10 +22,10 @@ use App\Exceptions\EHealth\EHealthValidationException;
 
 class DivisionEdit extends DivisionComponent
 {
-    use WorkTimeUtilities,
-        ReceptionAddressSearch,
-        AddressSearch,
-        HasAction;
+    use WorkTimeUtilities;
+    use ReceptionAddressSearch;
+    use AddressSearch;
+    use HasAction;
 
     /**
      * Array containing dictionary names only used within the component.
@@ -101,7 +101,7 @@ class DivisionEdit extends DivisionComponent
         $this->divisionForm->division['addresses'] = $division->addresses->toArray();
 
         if (!empty($this->divisionForm->division['addresses'])) {
-            foreach ( $this->divisionForm->division['addresses'] as $address ) {
+            foreach ($this->divisionForm->division['addresses'] as $address) {
                 $addressType = strtolower($address['type']);
 
                 switch ($addressType) {

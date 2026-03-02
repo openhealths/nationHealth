@@ -443,11 +443,11 @@ class DeclarationIndex extends Component
                             'exception' => $err
                         ]);
 
-                    $user->notify(new DeclarationSyncCompleted($message, 'error'));
-                })
-                ->onQueue('sync')
-                ->name(self::DEPENDENT_BATCH_NAME)
-                ->dispatch();
+                        $user->notify(new DeclarationSyncCompleted($message, 'error'));
+                    })
+                    ->onQueue('sync')
+                    ->name(self::DEPENDENT_BATCH_NAME)
+                    ->dispatch();
 
                 legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_DECLARATION);
 
@@ -467,8 +467,8 @@ class DeclarationIndex extends Component
      * This method handles the continuation of a previously initiated synchronization
      * operation for a specific user using an authentication or session token.
      *
-     * @param User $user The user instance for whom synchronization should be resumed
-     * @param string $token The authentication or session token used to resume the sync process
+     * @param  User  $user  The user instance for whom synchronization should be resumed
+     * @param  string  $token  The authentication or session token used to resume the sync process
      * @return void
      */
     protected function resumeSynchronization(User $user, string $token): void

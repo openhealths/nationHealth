@@ -23,7 +23,7 @@ class Contract extends EHealthRequest
     /**
      * Get the details of the signed contract by ID
      *
-     * @param string $id contract UUID
+     * @param  string  $id  contract UUID
      * @return PromiseInterface|EHealthResponse
      * @throws ConnectionException
      */
@@ -35,7 +35,7 @@ class Contract extends EHealthRequest
     /**
      * Get a list of contracts with validation logic.
      *
-     * @param array $queryParams
+     * @param  array  $queryParams
      * @return PromiseInterface|EHealthResponse
      * @throws ConnectionException
      */
@@ -60,13 +60,14 @@ class Contract extends EHealthRequest
                 $replaced[$name] = $value;
             }
         }
+
         return $replaced;
     }
 
     /**
      * Internal validator for contract list response.
      *
-     * @param EHealthResponse $response
+     * @param  EHealthResponse  $response
      * @return array
      * @throws ValidationException
      * @throws EHealthResponseException

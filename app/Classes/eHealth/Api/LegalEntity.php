@@ -6,9 +6,6 @@ namespace App\Classes\eHealth\Api;
 
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
-use App\Models\LegalEntity as LegalEntityModel;
-use App\Models\Division as DivisionModel;
-use App\Rules\InDictionary;
 use Illuminate\Support\Facades\Log;
 use App\Classes\eHealth\EHealthResponse;
 use GuzzleHttp\Promise\PromiseInterface;
@@ -24,9 +21,7 @@ class LegalEntity extends Request
      * Get full details data of a current legal entity
      *
      * @param  string  $url
-     *
      * @return PromiseInterface|EHealthResponse
-     *
      * @throws ConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function getDetails(string $url = self::URL): PromiseInterface|EHealthResponse
@@ -35,7 +30,6 @@ class LegalEntity extends Request
 
         return $this->get($url . '/' . legalEntity()->uuid);
     }
-
 
     /**
      * Validate healthcare service response (create, activate, deactivate),

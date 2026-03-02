@@ -36,9 +36,9 @@ use Livewire\WithPagination;
 
 class HealthcareServiceIndex extends Component
 {
-    use BatchLegalEntityQueries,
-        WithPagination,
-        FormTrait;
+    use BatchLegalEntityQueries;
+    use WithPagination;
+    use FormTrait;
 
     protected const string BATCH_NAME = 'HealthcareServiceSync';
 
@@ -75,7 +75,7 @@ class HealthcareServiceIndex extends Component
     #[Computed]
     public function isSync(): bool
     {
-       return $this->isSyncProcessing();
+        return $this->isSyncProcessing();
     }
 
     /**
@@ -322,16 +322,16 @@ class HealthcareServiceIndex extends Component
         }
     }
 
-     /**
-     * Resume the synchronization process for a user with the provided token.
-     *
-     * This method handles the continuation of a previously initiated synchronization
-     * operation for a specific user using an authentication or session token.
-     *
-     * @param User $user The user instance for whom synchronization should be resumed
-     * @param string $token The authentication or session token used to resume the sync process
+    /**
+    * Resume the synchronization process for a user with the provided token.
+    *
+    * This method handles the continuation of a previously initiated synchronization
+    * operation for a specific user using an authentication or session token.
+    *
+     * @param  User  $user  The user instance for whom synchronization should be resumed
+     * @param  string  $token  The authentication or session token used to resume the sync process
      * @return void
-     */
+    */
     protected function resumeSynchronization(User $user, string $token): void
     {
         $encryptedToken = Crypt::encryptString($token);
@@ -400,7 +400,7 @@ class HealthcareServiceIndex extends Component
             ->name(self::BATCH_NAME)
             ->dispatch();
 
-            legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_HEALTHCARE_SERVICE);
+        legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_HEALTHCARE_SERVICE);
     }
 
     public function render(): View

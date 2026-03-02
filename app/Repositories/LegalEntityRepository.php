@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Repositories;
 
 use App\Enums\Status;
@@ -16,7 +18,7 @@ class LegalEntityRepository
      *  ['<uuid-2>', 'Legal Entity 2 Name']
      * ]
      *
-     * @param array $legalEntityIds // Optional filter by specific legal entity IDs
+     * @param  array  $legalEntityIds  // Optional filter by specific legal entity IDs
      * @return array
      */
     public function getLegalEntitiesList(array $legalEntityIds = []): array

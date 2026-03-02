@@ -31,9 +31,9 @@ use App\Exceptions\EHealth\EHealthValidationException;
 
 class DivisionIndex extends DivisionComponent
 {
-    use BatchLegalEntityQueries,
-        WithPagination,
-        HasAction;
+    use BatchLegalEntityQueries;
+    use WithPagination;
+    use HasAction;
 
     protected const string BATCH_NAME = 'DivisionSync';
 
@@ -47,7 +47,7 @@ class DivisionIndex extends DivisionComponent
     #[Computed]
     public function isSync(): bool
     {
-       return $this->isSyncProcessing();
+        return $this->isSyncProcessing();
     }
 
     /**
@@ -146,7 +146,7 @@ class DivisionIndex extends DivisionComponent
 
         // Try to resume if previous batch failed or was paused
         if ($this->syncStatus === JobStatus::FAILED->value || $this->syncStatus === JobStatus::PAUSED->value) {
-           $this->resumeSyncronization($user, $token);
+            $this->resumeSyncronization($user, $token);
 
             return;
         }
@@ -208,9 +208,9 @@ class DivisionIndex extends DivisionComponent
                 ->name(self::BATCH_NAME)
                 ->dispatch();
 
-                legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_DIVISION);
+            legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_DIVISION);
 
-                session()->flash('success', __('Синхронізація запущена у фоновому режимі'));
+            session()->flash('success', __('Синхронізація запущена у фоновому режимі'));
         } else {
             legalEntity()?->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_DIVISION);
 
@@ -218,15 +218,14 @@ class DivisionIndex extends DivisionComponent
         }
     }
 
-
     /**
      * Resume the synchronization process for a user with the provided token.
      *
      * This method handles the continuation of a previously initiated synchronization
      * operation for a specific user using an authentication or session token.
      *
-     * @param User $user The user instance for whom synchronization should be resumed
-     * @param string $token The authentication or session token used to resume the sync process
+     * @param  User  $user  The user instance for whom synchronization should be resumed
+     * @param  string  $token  The authentication or session token used to resume the sync process
      * @return void
      */
     protected function resumeSynchronization(User $user, string $token): void

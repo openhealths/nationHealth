@@ -249,7 +249,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
      * An employee cannot have more than one specialty marked 'Main'.
      * - 422 with 'tax_id': The provided Tax ID already exists in the system.
      *
-     * @param EHealthResponseException $e
+     * @param  EHealthResponseException  $e
      * @return void
      */
     protected function handleEHealthResponseException(EHealthResponseException $e): void

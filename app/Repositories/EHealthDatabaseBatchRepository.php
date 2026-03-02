@@ -9,7 +9,6 @@ use Illuminate\Support\Str;
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Bus\DatabaseBatchRepository;
 
-
 class EHealthDatabaseBatchRepository extends DatabaseBatchRepository
 {
     public function store(PendingBatch $batch): Batch

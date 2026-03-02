@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Classes\Cipher;
 
 use App\Classes\Cipher\Errors\ErrorHandler;
@@ -24,7 +26,6 @@ class Request
         $this->params = $params;
     }
 
-
     /**
      * @throws ApiException
      */
@@ -35,12 +36,13 @@ class Request
         $url = $apiBase . $this->url;
 
         $response = Http::acceptJson()
-            ->withBody($this->params )
+            ->withBody($this->params)
             ->{$this->method}($url);
 
         if ($response->successful()) {
             $success = json_decode($response->body(), true);
             $success['status'] = $response->status();
+
             return $success ?? [];
         }
 
@@ -52,6 +54,5 @@ class Request
 
         throw new ApiException(['code' => $response->status()], 'Unexpected response');
     }
-
 
 }

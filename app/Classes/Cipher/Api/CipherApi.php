@@ -26,8 +26,7 @@ class CipherApi
      * @param  string  $base64File  KEYP file in base64 format.
      * @param  string  $knedp  Certificate Authority Identifier (KNEPD).
      * @param  string  $taxId
-     * @param  string|null $edrpou
- *
+     * @param  string|null  $edrpou
      * @return array|string Returns KEYP in base64 format.
      */
     public function sendSession(
@@ -144,8 +143,7 @@ class CipherApi
     /**
      * Get information about the keys to store the key container
      *
-     * @param string $password Password for the session key container
-     *
+     * @param  string  $password  Password for the session key container
      * @return array
      */
     public function getFileContainerInfo(string $password): array
@@ -156,9 +154,8 @@ class CipherApi
     /**
      * Check if some important data received from the forms are have the same value as in the DS FileContainer
      *
-     * @param string $taxId Data from legalEntityForm
-     * @param null|string $edrpou
-     *
+     * @param  string  $taxId  Data from legalEntityForm
+     * @param  null|string  $edrpou
      * @return void
      */
     public function verifyWithFileContainer(string $taxId, ?string $edrpou = null): void

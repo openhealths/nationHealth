@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Auth;
 
 use Livewire\Component;
@@ -63,7 +65,7 @@ class ResetPassword extends Component
          * the application's home authenticated view. If there is an error we can
          * redirect them back to where they came from with their error message.
          */
-        if ($status != Password::PasswordReset) {
+        if ($status !== Password::PasswordReset) {
             Log::error('Reset password:', ['email' => $this->email, 'status' => __($status)]);
 
             session()->flash('error', __('auth.login.error.reset_password'));

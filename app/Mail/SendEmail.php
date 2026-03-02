@@ -1,16 +1,18 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 use App\Dto\EmailDTO;
 
 class SendEmail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use Queueable;
+    use SerializesModels;
 
     public $emailDTO;
 
@@ -32,10 +34,10 @@ class SendEmail extends Mailable
     public function build()
     {
         return $this->subject(trans('Contact Form'))
-                    ->view('emails.contact_form')
-                    ->with([
-                        'name' => $this->emailDTO->name,
-                        'phone' => $this->emailDTO->phone
-                    ]);
+            ->view('emails.contact_form')
+            ->with([
+                'name' => $this->emailDTO->name,
+                'phone' => $this->emailDTO->phone
+            ]);
     }
 }

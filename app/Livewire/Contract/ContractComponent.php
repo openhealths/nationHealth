@@ -45,13 +45,13 @@ abstract class ContractComponent extends Component
 
         $this->legalEntityName = $edrData['name'] ?? 'Невідома назва';
 
-      $this->form->contractorPaymentDetails = [
-            'bankName' => '',
-            'MFO' => '',
-            'payerAccount' => '',
-        ];
+        $this->form->contractorPaymentDetails = [
+              'bankName' => '',
+              'MFO' => '',
+              'payerAccount' => '',
+          ];
 
-       $address = $legalEntity->addresses()->where('type', 'REGISTRATION')->first();
+        $address = $legalEntity->addresses()->where('type', 'REGISTRATION')->first();
 
         if ($address) {
             $this->form->contractorBase = sprintf(
@@ -62,10 +62,10 @@ abstract class ContractComponent extends Component
                 $address->building ?? ''
             );
         } else {
-           $this->form->contractorBase = $edrData['address'] ?? '';
+            $this->form->contractorBase = $edrData['address'] ?? '';
         }
 
-      $contractorData = Auth::user()->employees()
+        $contractorData = Auth::user()->employees()
             ->contractors($legalEntity->id)
             ->with('party')
             ->first();
@@ -133,13 +133,14 @@ abstract class ContractComponent extends Component
             $validatedData = $this->form->validate();
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
+
             return;
         }
 
         // 2.Initialization (API-005-012-0004 Public. Initialize Contract Request)
         // Getting a URL for uploading files
         try {
-            $response    = EHealth::contractRequest()->initialize($this->getContractType());
+            $response = EHealth::contractRequest()->initialize($this->getContractType());
             $eHealthData = $response->getData();
 
             $contractRequestId = $eHealthData['uuid'] ?? $eHealthData['id'] ?? null;
@@ -152,6 +153,7 @@ abstract class ContractComponent extends Component
 
         } catch (\Exception $e) {
             $this->handleEHealthError($e);
+
             return;
         }
 
@@ -201,6 +203,7 @@ abstract class ContractComponent extends Component
 
         } catch (\Exception $e) {
             Session::flash('error', 'Помилка при завантаженні файлів: ' . $e->getMessage());
+
             return;
         }
 
@@ -213,6 +216,7 @@ abstract class ContractComponent extends Component
             $signingData = $this->form->validate($this->form->signingRules());
         } catch (ValidationException $exception) {
             Session::flash('error', 'Помилка параметрів КЕП: ' . $exception->validator->errors()->first());
+
             return;
         }
 
@@ -227,6 +231,7 @@ abstract class ContractComponent extends Component
 
         } catch (\Exception $e) {
             Session::flash('error', 'Помилка накладання КЕП: ' . $e->getMessage());
+
             return;
         }
 

@@ -22,7 +22,7 @@ class ReimbursementContractRequestForm extends BaseContractRequestForm
     {
         $parentRules = parent::rules();
 
-        $parentRules['endDate'][] = function($attribute, $value, $fail) {
+        $parentRules['endDate'][] = function ($attribute, $value, $fail) {
             $startDate = CarbonImmutable::parse($this->startDate);
             $endDate = CarbonImmutable::parse($value);
 

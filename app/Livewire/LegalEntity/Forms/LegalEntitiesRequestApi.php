@@ -1,23 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\LegalEntity\Forms;
 
 use App\Classes\eHealth\Api\LegalEntitiesApi;
-use Livewire\Component;
 
 class LegalEntitiesRequestApi extends LegalEntitiesApi
 {
-
-
     public static function getLegalEntitie($edrpou): array
     {
 
         $legalEntitiesApi = self::_get($edrpou);
 
-
         return !empty($legalEntitiesApi[0]) ? $legalEntitiesApi[0] : [];
     }
-
 
     public static function getLegalEntities($edrpou): array
     {
@@ -49,6 +46,5 @@ class LegalEntitiesRequestApi extends LegalEntitiesApi
 
         return !empty($legalEntitiesApi) ? $legalEntitiesApi : [];
     }
-
 
 }

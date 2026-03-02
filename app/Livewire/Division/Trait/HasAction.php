@@ -18,17 +18,15 @@ trait HasAction
     /**
      * Set 'ACTIVE' action status for specified division
      *
-     * @param int $divisionId
-     *
+     * @param  int  $divisionId
      * @return void
-     *
      * @throws Exception|EHealthResponseException
      */
     public function activate(int $divisionId): void
     {
         $division = $this->getDivision($divisionId);
 
-        if (! $division) {
+        if (!$division) {
             return;
         }
 
@@ -73,17 +71,15 @@ trait HasAction
     /**
      * Set 'INACTIVE' action status for specified division
      *
-     * @param int $divisionId
-     *
+     * @param  int  $divisionId
      * @return void
-     *
      * @throws Exception|EHealthResponseException
      */
     public function deactivate(int $divisionId): void
     {
         $division = $this->getDivision($divisionId);
 
-        if (! $division) {
+        if (!$division) {
             return;
         }
 
@@ -129,17 +125,15 @@ trait HasAction
      * Delete the record from DB for specified division
      * NOTE: only for divsions with DRAFT status!
      *
-     * @param int $divisionId
-     *
+     * @param  int  $divisionId
      * @return void
-     *
      * @throws Exception|Throwable
      */
     public function delete(int $divisionId): void
     {
         $division = $this->getDivision($divisionId);
 
-        if (! $division) {
+        if (!$division) {
             return;
         }
 
@@ -167,15 +161,14 @@ trait HasAction
     /**
      * Retrieves a Division model by its primary key.
      *
-     * @param int $id
-     *
+     * @param  int  $id
      * @return Division|null
      */
     protected function getDivision(int $id): ?Division
     {
         $division = Division::find($id);
 
-        if (! $division) {
+        if (!$division) {
             Log::channel('db_errors')->error(static::class . ':getDivision:', ['message' => "Cannot find model with id=$id"]);
 
             session()->flash('error', __('errors.ehealth.messages.request_error'));

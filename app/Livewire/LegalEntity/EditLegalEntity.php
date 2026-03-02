@@ -96,7 +96,7 @@ class EditLegalEntity extends LegalEntity
      */
     protected function getArchiveForm(): void
     {
-         // if the legal entity has an archive, the 'archivationShow' property is set to true
+        // if the legal entity has an archive, the 'archivationShow' property is set to true
         if (!empty($this->legalEntityForm->archive)) {
             $this->legalEntityForm->archivationShow = true;
         }
@@ -203,7 +203,7 @@ class EditLegalEntity extends LegalEntity
         }
 
         // TODO: until refactoring
-        if (! $result = $this->signLegalEntity()) {
+        if (!$result = $this->signLegalEntity()) {
             return;
         }
 

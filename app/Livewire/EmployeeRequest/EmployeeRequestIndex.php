@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\EmployeeRequest;
 
 use Auth;
-use Throwable;
 use App\Models\User;
 use App\Enums\JobStatus;
 use Illuminate\Bus\Batch;
@@ -31,8 +30,8 @@ use App\Notifications\SyncNotification;
 
 class EmployeeRequestIndex extends EmployeeComponent
 {
-    use WithPagination,
-        BatchLegalEntityQueries;
+    use WithPagination;
+    use BatchLegalEntityQueries;
 
     protected const string BATCH_NAME = 'EmployeeRequestsSyncAll';
     protected const string DEPENDENT_BATCH_NAME = 'EmployeeRequestDetailsSync';
@@ -52,7 +51,7 @@ class EmployeeRequestIndex extends EmployeeComponent
     #[Computed]
     public function isSync(): bool
     {
-       return $this->isSyncProcessing();
+        return $this->isSyncProcessing();
     }
 
     /**
@@ -266,7 +265,7 @@ class EmployeeRequestIndex extends EmployeeComponent
                 ->name(self::BATCH_NAME)
                 ->dispatch();
         } else {
-            $batch= Bus::batch($this->getEmployeeRequestDetailsStartJob($this->legalEntity, null))
+            $batch = Bus::batch($this->getEmployeeRequestDetailsStartJob($this->legalEntity, null))
                 ->withOption('legal_entity_id', $this->legalEntity->id)
                 ->withOption('token', Crypt::encryptString($token))
                 ->withOption('user', $user)
@@ -309,8 +308,8 @@ class EmployeeRequestIndex extends EmployeeComponent
      * This method handles the continuation of a previously initiated synchronization
      * operation for a specific user using an authentication or session token.
      *
-     * @param User $user The user instance for whom synchronization should be resumed
-     * @param string $token The authentication or session token used to resume the sync process
+     * @param  User  $user  The user instance for whom synchronization should be resumed
+     * @param  string  $token  The authentication or session token used to resume the sync process
      * @return void
      */
     protected function resumeSynchronization(User $user, string $token): void

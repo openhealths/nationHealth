@@ -8,7 +8,6 @@ use Throwable;
 use App\Core\EHealthJob;
 use App\Enums\JobStatus;
 use App\Models\LegalEntity;
-use App\Models\Relations\Party;
 use App\Repositories\Repository;
 use App\Classes\eHealth\EHealth;
 use App\Models\Employee\Employee;
@@ -25,8 +24,8 @@ use Illuminate\Http\Client\ConnectionException;
 
 class EmployeeDetailsUpsert extends EHealthJob
 {
-    use Dispatchable,
-        SerializesModels;
+    use Dispatchable;
+    use SerializesModels;
 
     public const string BATCH_NAME = 'EmployeeDetailsSync';
 
@@ -131,22 +130,21 @@ class EmployeeDetailsUpsert extends EHealthJob
             : $this->nextEntity;
     }
 
-
     /**
      * Determine which authentication guards define the given role.
      * Checks only the 'web' and 'ehealth' guards.
      * Queries Spatie\Permission\Models\Role by name and guard_name.
      * Returns an empty collection if the role is not defined for any of the checked guards.
      *
-     * @param string $role The role name to check across guards.
-     *
+     * @param  string  $role  The role name to check across guards.
      * @return Collection<int, string> Collection of guard names that have this role defined.
      */
     protected function getGuardsForRole(string $role): Collection
     {
         $guards = collect(['web', 'ehealth']);
 
-        return $guards->filter(fn ($guard) =>
+        return $guards->filter(
+            fn ($guard) =>
                 Role::where('name', $role)
                     ->where('guard_name', $guard)
                     ->exists()

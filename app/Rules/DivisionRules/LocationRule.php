@@ -25,14 +25,14 @@ class LocationRule implements ValidationRule
     {
         $field = Str::afterLast($attribute, '.');
 
-        $emptyLongitude = ((float) ($this->division['location']['longitude'] ?? 0))=== 0.0;
+        $emptyLongitude = ((float) ($this->division['location']['longitude'] ?? 0)) === 0.0;
         $emptyLatitude = ((float) ($this->division['location']['latitude'] ?? 0)) === 0.0;
 
         if ($emptyLongitude && $emptyLatitude) {
             return;
         }
 
-        if (! preg_match('/^-?([1-8]?[1-9]|[1-9]0|0)\\.\\d{1,6}/', number_format($value, 6, '.', ''))) {
+        if (!preg_match('/^-?([1-8]?[1-9]|[1-9]0|0)\\.\\d{1,6}/', number_format($value, 6, '.', ''))) {
             $fail(__('divisions.errors.location.loсation_misformat'));
 
             return;

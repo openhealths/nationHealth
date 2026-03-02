@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\LegalEntity;
 
 use Arr;
@@ -26,8 +28,8 @@ use App\Livewire\LegalEntity\LegalEntity as LegalEntityComponent;
 
 class LegalEntityDetails extends LegalEntityComponent
 {
-    use BatchLegalEntityQueries,
-        FormTrait;
+    use BatchLegalEntityQueries;
+    use FormTrait;
 
     protected const string BATCH_NAME = 'FirstLoginSync';
 
@@ -59,7 +61,7 @@ class LegalEntityDetails extends LegalEntityComponent
     #[Computed]
     public function isSync(): bool
     {
-       return $this->isSyncProcessing();
+        return $this->isSyncProcessing();
     }
 
     /**
@@ -79,8 +81,7 @@ class LegalEntityDetails extends LegalEntityComponent
     public function boot(
         AddressRepository $addressRepository,
         PhoneRepository $phoneRepository
-    ): void
-    {
+    ): void {
         parent::boot($addressRepository, $phoneRepository);
 
         // This will ensure that the 'isSync' computed property is not cached between requests
@@ -114,7 +115,6 @@ class LegalEntityDetails extends LegalEntityComponent
         return legalEntity()?->loadMissing(['licenses', 'addresses', 'phones', 'revisions']) ?? null;
     }
 
-
     protected function setLegalEntity(): bool
     {
         $isNotNew = parent::setLegalEntity();
@@ -128,9 +128,9 @@ class LegalEntityDetails extends LegalEntityComponent
         return $isNotNew;
     }
 
-   /**
-     * Retrieves the legal entity form data.
-     */
+    /**
+      * Retrieves the legal entity form data.
+      */
     protected function getLegalEntityForm(): void
     {
         $this->setLegalEntity(); // Retrieve basic legal entity data
@@ -252,8 +252,7 @@ class LegalEntityDetails extends LegalEntityComponent
     /**
      * Prepare documents data for display or processing.
      *
-     * @param array $documents The raw documents data to be prepared
-     *
+     * @param  array  $documents  The raw documents data to be prepared
      * @return array
      */
     private function prepareDocumentsData(array $documents): array
@@ -268,12 +267,12 @@ class LegalEntityDetails extends LegalEntityComponent
         return $this->convertArrayKeysToCamelCase($documents[0]);
     }
 
-     /**
-     * Filters the KVED (Classification of Types of Economic Activities) codes.
-     * This method processes and filters the collection of KVED codes associated
-     *
+    /**
+    * Filters the KVED (Classification of Types of Economic Activities) codes.
+    * This method processes and filters the collection of KVED codes associated
+    *
      * @return void
-     */
+    */
     protected function filterKveds(): void
     {
         $mainKved = [];
@@ -401,16 +400,16 @@ class LegalEntityDetails extends LegalEntityComponent
         return;
     }
 
-     /**
-     * Resume the synchronization process for a user with the provided token.
-     *
-     * This method handles the continuation of a previously initiated synchronization
-     * operation for a specific user using an authentication or session token.
-     *
-     * @param User $user The user instance for whom synchronization should be resumed
-     * @param string $token The authentication or session token used to resume the sync process
+    /**
+    * Resume the synchronization process for a user with the provided token.
+    *
+    * This method handles the continuation of a previously initiated synchronization
+    * operation for a specific user using an authentication or session token.
+    *
+     * @param  User  $user  The user instance for whom synchronization should be resumed
+     * @param  string  $token  The authentication or session token used to resume the sync process
      * @return void
-     */
+    */
     protected function resumeSynchronization(User $user, string $token): void
     {
         $encryptedToken = Crypt::encryptString($token);

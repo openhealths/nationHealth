@@ -53,6 +53,7 @@ class ContractIndex extends Component
 
         if ($currentLegalEntity->getEntityStatus(LegalEntity::ENTITY_CONTRACT) === JobStatus::PROCESSING) {
             Session::flash('error', 'Синхронізація вже триває.');
+
             return;
         }
 

@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Repositories;
+declare(strict_types=1);
 
+namespace App\Repositories;
 
 use Arr;
 use Exception;
@@ -19,16 +20,15 @@ class DivisionRepository
     /**
      * Saves a list of divisions to the database.
      *
-     * @param array $divisionsList The list of divisions to be saved
-     * @param LegalEntity|null $legalEntity Optional legal entity associated with the divisions
-     *
+     * @param  array  $divisionsList  The list of divisions to be saved
+     * @param  LegalEntity|null  $legalEntity  Optional legal entity associated with the divisions
      * @return void
      */
     public function saveDivisionsList(array $divisionsList, ?LegalEntity $legalEntity = null): void
     {
         $legalEntity ??= legalEntity();
 
-        DB::transaction(function() use($divisionsList, $legalEntity) {
+        DB::transaction(function () use ($divisionsList, $legalEntity) {
             $uspertData = app(DivisionApi::class)->normalizeResponseDataForUpsert($divisionsList, $legalEntity);
 
             // At first save all the Divisions to teh DB
@@ -46,11 +46,9 @@ class DivisionRepository
     /**
      * Set status for specific action (for activate or deactivate)
      *
-     * @param \App\Models\Division $division
-     * @param string $status
-     *
+     * @param  \App\Models\Division  $division
+     * @param  string  $status
      * @return void
-     *
      * @throws \Exception
      */
     public function setAction(Division $division, string $status): void
@@ -68,14 +66,13 @@ class DivisionRepository
     /**
      * Create instance of Division cclass
      *
-     * @param array $responseData // The data array suitable to do fill on Division Model
-     *
+     * @param  array  $responseData  // The data array suitable to do fill on Division Model
      * @return Division|null
      */
     public function createOrUpdate(array $responseData): ?Division
     {
         $id = $responseData['id'] ?? null;
-        $uuid= $responseData['uuid'] ?? null;
+        $uuid = $responseData['uuid'] ?? null;
 
         Arr::forget($responseData, [
             'id',
@@ -86,7 +83,7 @@ class DivisionRepository
             'legal_entity_uuid'
         ]);
 
-        if (! $id && ! $uuid) {
+        if (!$id && !$uuid) {
             $division = new Division();
         } else {
             /*
@@ -100,7 +97,7 @@ class DivisionRepository
             $division ??= Division::find($id); // For the DRAFT records
         }
 
-        if (! $division) {
+        if (!$division) {
             return null;
         }
 
@@ -115,16 +112,15 @@ class DivisionRepository
     /**
      * Create instance of Division model and save it's data to the DB (with all it's relations aka: Address, Phone and LegalEntity)
      *
-     * @param array $divisionData
-     * @param \App\Models\LegalEntity $legalEntity
-     *
+     * @param  array  $divisionData
+     * @param  \App\Models\LegalEntity  $legalEntity
      * @return ?Division
      */
     public function saveDivisionData(array $divisionData, LegalEntity $legalEntity): ?Division
     {
         $division = $this->createOrUpdate($divisionData);
 
-        if (! $division) {
+        if (!$division) {
             return null;
         }
 
@@ -145,9 +141,8 @@ class DivisionRepository
      * TODO: need more testing on further PRs
      * Create instance of Division model and save it's data to the DB (with all it's relations aka: Address, Phone and LegalEntity)
      *
-     * @param array $divisionData
-     * @param \App\Models\LegalEntity $legalEntity
-     *
+     * @param  array  $divisionData
+     * @param  \App\Models\LegalEntity  $legalEntity
      * @return Division
      */
     public function syncDivisionData(array $divisionData, LegalEntity $legalEntity): Division
@@ -168,9 +163,8 @@ class DivisionRepository
     /**
      * Creates a relation between a Division and a LegalEntity
      *
-     * @param Division $division The division to create the relation for
-     * @param LegalEntity $legalEntity The legal entity to relate to the division
-     *
+     * @param  Division  $division  The division to create the relation for
+     * @param  LegalEntity  $legalEntity  The legal entity to relate to the division
      * @return Division Returns the updated Division instance
      */
     public function createLegalEntityRelation(Division $division, LegalEntity $legalEntity): Division
@@ -182,14 +176,13 @@ class DivisionRepository
      * TODO: it suppose to be useful when do sync via jobs. If not, then just will remove it.
      * Creates a relation between a Division and such models as Employee, EmployeeRequest etc.
      *
-     * @param Division $division The division entity to create relation for
-     * @param Object $model The model to create relation with
-     *
+     * @param  Division  $division  The division entity to create relation for
+     * @param  Object  $model  The model to create relation with
      * @return void
      */
     public function createRelationForDivision(Division $division, Object $model)
     {
-        if (! $model) {
+        if (!$model) {
             return;
         }
 
@@ -212,8 +205,7 @@ class DivisionRepository
      * This method takes a list of division data, extracts the UUIDs,
      * and queries the database to get the corresponding primary keys (IDs).
      *
-     * @param array $divisionList An array of division data, where each element must contain a 'uuid' key.
-     *
+     * @param  array  $divisionList  An array of division data, where each element must contain a 'uuid' key.
      * @return Collection A collection where keys are UUIDs and values are the corresponding division IDs.
      */
     public function getDivisonListIds(array $divisionList): Collection
@@ -231,8 +223,8 @@ class DivisionRepository
      * address and phone records for the given divisions and then bulk-inserting
      * the new relational data. It is designed to be used within a transaction.
      *
-     * @param array $dvisionsData An array containing the relational data.
-     *                            Must include 'divisionIds', 'addresses', and 'phones' keys.
+     * @param  array  $dvisionsData  An array containing the relational data.
+     *                               Must include 'divisionIds', 'addresses', and 'phones' keys.
      * @return void
      */
     protected function setSynDivisionsRelations(array $dvisionsData): void

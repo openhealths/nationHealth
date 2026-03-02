@@ -32,9 +32,9 @@ use App\Exceptions\EHealth\EHealthValidationException;
 
 class EmployeeRoleIndex extends Component
 {
-    use BatchLegalEntityQueries,
-        WithPagination,
-        FormTrait;
+    use BatchLegalEntityQueries;
+    use WithPagination;
+    use FormTrait;
 
     protected const string BATCH_NAME = 'EmployeeRoleSync';
 
@@ -80,7 +80,7 @@ class EmployeeRoleIndex extends Component
     #[Computed]
     public function isSync(): bool
     {
-       return $this->isSyncProcessing();
+        return $this->isSyncProcessing();
     }
 
     /**
@@ -272,8 +272,8 @@ class EmployeeRoleIndex extends Component
      * This method handles the continuation of a previously initiated synchronization
      * operation for a specific user using an authentication or session token.
      *
-     * @param User $user The user instance for whom synchronization should be resumed
-     * @param string $token The authentication or session token used to resume the sync process
+     * @param  User  $user  The user instance for whom synchronization should be resumed
+     * @param  string  $token  The authentication or session token used to resume the sync process
      * @return void
      */
     protected function resumeSynchronization(User $user, string $token): void

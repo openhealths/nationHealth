@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Rules;
 
 use Closure;
@@ -13,6 +15,7 @@ class TaxId implements ValidationRule, DataAwareRule
 {
     /**
      * The entire data array under validation.
+     *
      * @var array
      */
     protected array $data = [];
@@ -21,6 +24,7 @@ class TaxId implements ValidationRule, DataAwareRule
      * Flag indicating if the ID is a passport/national ID instead of a tax ID.
      *
      * This field is used to determine the validation logic.
+     *
      * @var bool
      */
     protected bool $noTaxId = false;
@@ -29,6 +33,7 @@ class TaxId implements ValidationRule, DataAwareRule
      * The email associated with the person, used for additional checks.
      *
      * This email is used to fetch the user's data for comparison.
+     *
      * @var string|null
      */
     protected ?string $email = null;
@@ -68,6 +73,7 @@ class TaxId implements ValidationRule, DataAwareRule
             if (!preg_match('/^([0-9]{9}|[А-ЯЁЇIЄҐ]{2}\\d{6})$/u', $value)) {
                 $fail(__('validation.attributes.errors.invalidNationalId'));
             }
+
             return;
         }
 
@@ -75,6 +81,7 @@ class TaxId implements ValidationRule, DataAwareRule
         // It must be a 10-digit number.
         if (!preg_match('/^[0-9]{10}$/', $value)) {
             $fail(__('validation.attributes.errors.invalidTaxId'));
+
             return;
         }
 
@@ -87,8 +94,8 @@ class TaxId implements ValidationRule, DataAwareRule
     /**
      * Perform additional validation against the database based on the provided email.
      *
-     * @param mixed $value The tax ID from the request.
-     * @param Closure $fail The failure callback.
+     * @param  mixed  $value  The tax ID from the request.
+     * @param  Closure  $fail  The failure callback.
      */
     private function validateWithEmail(mixed $value, Closure $fail): void
     {

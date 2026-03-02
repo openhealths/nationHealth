@@ -52,8 +52,7 @@ class CreateLegalEntity extends LegalEntity
      * For newly created LegalEntity some fields of the owner array must be setted
      * even if it wil be used in further steps.
      *
-     * @param array $initials // Array should contains key(s) and its initial value(s)
-     *
+     * @param  array  $initials  // Array should contains key(s) and its initial value(s)
      * @return array
      */
     private function setInitialOwnerValues(array $initials): array
@@ -503,7 +502,7 @@ class CreateLegalEntity extends LegalEntity
     /**
      * Handle success response from API request.
      *
-     * @param array $response The response from the API request
+     * @param  array  $response  The response from the API request
      * @return void
      */
     protected function handleSuccessResponse(array $response, array $requestData = [])
@@ -557,7 +556,7 @@ class CreateLegalEntity extends LegalEntity
         // Validate All the data from the form
         if ($this->validationRequest()) {
             // TODO: until refactoring
-            if (! $result = $this->signLegalEntity()) {
+            if (!$result = $this->signLegalEntity()) {
                 return;
             }
 

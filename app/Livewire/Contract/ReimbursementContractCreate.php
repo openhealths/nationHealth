@@ -50,6 +50,7 @@ class ReimbursementContractCreate extends ContractComponent
                 return $response->getData();
             } catch (\Exception $e) {
                 Log::error('Medical Programs Fetch Error: ' . $e->getMessage());
+
                 return [];
             }
         });

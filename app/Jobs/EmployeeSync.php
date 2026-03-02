@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Jobs;
 
 use App\Core\EHealthJob;
@@ -34,6 +36,7 @@ class EmployeeSync extends EHealthJob
 
     /**
      * Store or update data in the database.
+     *
      * * @param EHealthResponse|null $response
      */
     protected function processResponse(?EHealthResponse $response): void

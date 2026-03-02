@@ -7,7 +7,6 @@ namespace App\Livewire\Contract\Forms;
 use App\Core\Arr;
 use App\Core\BaseForm;
 use Carbon\CarbonImmutable;
-use Illuminate\Validation\Rule;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 abstract class BaseContractRequestForm extends BaseForm

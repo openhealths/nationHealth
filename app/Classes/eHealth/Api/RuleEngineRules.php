@@ -17,7 +17,7 @@ class RuleEngineRules extends Request
      * Get rule engine rule details filtered by ID with active rules.
      *
      * @param  string  $url
-     * @param $query
+     * @param  $query
      * @return PromiseInterface|EHealthResponse
      * @throws ConnectionException
      */
@@ -30,7 +30,7 @@ class RuleEngineRules extends Request
      * Get a catalog of all active rule engine rules.
      *
      * @param  string  $url
-     * @param $query
+     * @param  $query
      * @return PromiseInterface|EHealthResponse
      * @throws ConnectionException
      */

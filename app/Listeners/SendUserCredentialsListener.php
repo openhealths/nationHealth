@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Listeners;
 
 use Throwable;
@@ -28,6 +30,7 @@ class SendUserCredentialsListener implements ShouldQueue
      * public int $tries = 3;
      *
      * Related Docs:
+     *
      * @see https://laravel.com/docs/queues#retrying-failed-jobs
      *
      * @var int
@@ -47,6 +50,7 @@ class SendUserCredentialsListener implements ShouldQueue
      * public int $tries = 3;
      *
      * Related Docs:
+     *
      * @see https://laravel.com/docs/queues#retrying-failed-jobs
      *
      * @var int
@@ -70,7 +74,7 @@ class SendUserCredentialsListener implements ShouldQueue
         }
 
         // Send a link to the owner's email to verify the given address
-        if ($event->owner instanceof MustVerifyEmail && ! $event->owner->hasVerifiedEmail()) {
+        if ($event->owner instanceof MustVerifyEmail && !$event->owner->hasVerifiedEmail()) {
             Log::info(static::class . ": send email verification LINK: to email: {$event->owner->email}");
 
             $event->owner->sendEmailVerificationNotification();
@@ -88,9 +92,8 @@ class SendUserCredentialsListener implements ShouldQueue
     /**
      * Log when failed
      *
-     * @param LegalEntityCreate $event
-     * @param \Throwable $err
-     *
+     * @param  LegalEntityCreate  $event
+     * @param  \Throwable  $err
      * @return void
      */
     public function failed(LegalEntityCreate $event, Throwable $err): void

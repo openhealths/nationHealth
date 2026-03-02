@@ -18,6 +18,7 @@ use App\Repositories\Repository;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+
 class EmployeeCreate
 {
     /**
@@ -29,25 +30,31 @@ class EmployeeCreate
 
         $employeeRequests = EmployeeRequest::with('revision')
             ->where('email', $user->email)
-            ->where(fn(EloquentBuilder $q) => $q
-                ->where(fn(EloquentBuilder $query) =>
-                    $query->where('status', RequestStatus::SIGNED)
-                )
+            ->where(
+                fn (EloquentBuilder $q) => $q
+                    ->where(
+                        fn (EloquentBuilder $query) =>
+                        $query->where('status', RequestStatus::SIGNED)
+                    )
                 // Sync for requests approved through our system and synced before user's first login
-                ->orWhere(fn(EloquentBuilder $query) =>
-                    $query->where('status', RequestStatus::APPROVED)
-                        ->whereNotNull(['start_date', 'employee_id', 'user_id'])
-                        ->where('user_id', $user->id)
-                        ->whereHas('employee', fn(EloquentBuilder $query) =>
-                            $query->whereNull('user_id')
-                        )
-                )
+                    ->orWhere(
+                        fn (EloquentBuilder $query) =>
+                        $query->where('status', RequestStatus::APPROVED)
+                            ->whereNotNull(['start_date', 'employee_id', 'user_id'])
+                            ->where('user_id', $user->id)
+                            ->whereHas(
+                                'employee',
+                                fn (EloquentBuilder $query) =>
+                                $query->whereNull('user_id')
+                            )
+                    )
                 // Sync for requests that weren't approved through our system, were imported from EHealth
-                ->orWhere(fn(EloquentBuilder $query) =>
-                    $query->where('status', RequestStatus::APPROVED)
-                        ->whereNotNull('start_date')
-                        ->whereNull('employee_id')
-                )
+                    ->orWhere(
+                        fn (EloquentBuilder $query) =>
+                        $query->where('status', RequestStatus::APPROVED)
+                            ->whereNotNull('start_date')
+                            ->whereNull('employee_id')
+                    )
             )
             ->orderBy('created_at', 'desc')
             ->get();
@@ -88,7 +95,8 @@ class EmployeeCreate
         // This filters out only uuids associated with the current user
         $existingUuids = Employee::whereIn('uuid', array_column($employees, 'uuid'))
             ->where('legal_entity_id', $event->legalEntity->id)
-            ->where(fn(EloquentBuilder $employeeQuery) =>
+            ->where(
+                fn (EloquentBuilder $employeeQuery) =>
                 $employeeQuery->whereHas('party.users')
             )
             ->pluck('uuid')

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Traits;
 
 use App\Models\Division;
@@ -16,7 +18,7 @@ trait WorkTimeUtilities
         'sun' => 'Неділя'
     ];
 
-    public array $workingHours =  [
+    public array $workingHours = [
         'mon' => [[Division::WORKING_TIME_DEFAULT_START, Division::WORKING_TIME_DEFAULT_END]],
         'tue' => [[Division::WORKING_TIME_DEFAULT_START, Division::WORKING_TIME_DEFAULT_END]],
         'wed' => [[Division::WORKING_TIME_DEFAULT_START, Division::WORKING_TIME_DEFAULT_END]],
@@ -29,8 +31,7 @@ trait WorkTimeUtilities
     /**
      * Replace colon ':' to dot '.' symbol
      *
-     * @param string $str
-     *
+     * @param  string  $str
      * @return string
      */
     protected function changeColonToDot(string $str): string
@@ -41,8 +42,7 @@ trait WorkTimeUtilities
     /**
      * Replace dot '.' to colon ':' symbol
      *
-     * @param string $str
-     *
+     * @param  string  $str
      * @return string
      */
     protected function changeDotToColon(string $str): string
@@ -54,18 +54,17 @@ trait WorkTimeUtilities
      * Time format commonly divided by colon ':' but in some RARE cases some resources want to see
      * the divider as dot '.'
      *
-     * @param array $arr        // Array with time pairs
-     * @param bool $dotToColon  // Flag to switch replacement from colon ':' to dot '.' and vice versa
-     *
+     * @param  array  $arr  // Array with time pairs
+     * @param  bool  $dotToColon  // Flag to switch replacement from colon ':' to dot '.' and vice versa
      * @return array
      */
     protected function changeTimeFormat(array $arr, bool $dotToColon): array
     {
-        if(empty($arr)) {
+        if (empty($arr)) {
             return [];
         }
 
-        return array_map(function($item) use($dotToColon) {
+        return array_map(function ($item) use ($dotToColon) {
             if (is_array($item)) {
                 return $this->changeTimeFormat($item, $dotToColon);
             }
@@ -77,13 +76,12 @@ trait WorkTimeUtilities
     /**
      * Go through all incoming array values and replace divider for time format for all founded values
      *
-     * @param array $arr        // Array with time data values
-     * @param bool $dotToColon  // Switcher determine what replace and to
-     *
+     * @param  array  $arr  // Array with time data values
+     * @param  bool  $dotToColon  // Switcher determine what replace and to
      * @return array
      */
     public function prepareTimeToRequest(array $arr, bool $dotToColon): array
     {
-        return array_map(fn($item) => $this->changeTimeFormat($item, $dotToColon), $arr);
+        return array_map(fn ($item) => $this->changeTimeFormat($item, $dotToColon), $arr);
     }
 }

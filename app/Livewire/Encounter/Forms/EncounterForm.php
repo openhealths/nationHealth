@@ -180,10 +180,12 @@ class EncounterForm extends Form
                 'array',
                 $this->requiredIfPrimarySourceAndNotGiven(true, false),
                 $this->requiredIfPrimarySourceAndNotGiven(false, true),
-                Rule::prohibitedIf(fn () => collect($this->immunizations)
-                    ->contains(static fn (array $immunization) => $immunization['primarySource'] === true &&
-                        $immunization['notGiven'] === true
-                    )
+                Rule::prohibitedIf(
+                    fn () => collect($this->immunizations)
+                        ->contains(
+                            static fn (array $immunization) => $immunization['primarySource'] === true &&
+                            $immunization['notGiven'] === true
+                        )
                 )
             ],
             'immunizations.explanation.reasons.*.coding.*.code' => [

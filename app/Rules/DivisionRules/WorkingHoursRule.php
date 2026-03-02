@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Rules\DivisionRules;
 
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -73,8 +75,7 @@ class WorkingHoursRule implements ValidationRule
      * - It is null or empty array
      * - Both start and end times are '00:00', which indicates a day off
      *
-     * @param mixed $shift The shift array to check, containing start and end times
-     *
+     * @param  mixed  $shift  The shift array to check, containing start and end times
      * @return bool Returns true if the shift is empty (non-working), false otherwise
      */
     protected function checkEmptyShift(mixed $shift): bool
@@ -107,7 +108,6 @@ class WorkingHoursRule implements ValidationRule
      * This method is called when a address type rule fails validation.
      *
      * @return void
-     *
      * @throws CustomValidationException
      */
     protected function setMessage(string $message): void
@@ -120,8 +120,7 @@ class WorkingHoursRule implements ValidationRule
      *
      * This message will be used when throwing a validation exception.
      *
-     * @param string $message The error message to set.
-     *
+     * @param  string  $message  The error message to set.
      * @return void
      */
     protected function message(string $shiftName = ''): string
@@ -132,8 +131,7 @@ class WorkingHoursRule implements ValidationRule
     /**
      * Check if the beginning of the shift start earlier than one's ending
      *
-     * @param array $day
-     *
+     * @param  array  $day
      * @return bool
      */
     protected function compareTime(string $day, array $shift): bool
@@ -153,9 +151,8 @@ class WorkingHoursRule implements ValidationRule
     /**
      * Check if the beginning of the upcoming shift starts after previous one's ending
      *
-     * @param string $prevShiftEnd      // The time the next shift will start
-     * @param string $currShiftStart    // The time the previous shift ended
-     *
+     * @param  string  $prevShiftEnd  // The time the next shift will start
+     * @param  string  $currShiftStart  // The time the previous shift ended
      * @return bool
      */
     protected function isShiftIntersected(string $prevShiftEnd, string $currShiftStart): bool

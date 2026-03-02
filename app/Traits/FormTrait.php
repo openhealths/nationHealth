@@ -281,8 +281,7 @@ trait FormTrait
     /**
      * Normalize date fields in an array (need for MySQL database)
      *
-     * @param array $data
-     *
+     * @param  array  $data
      * @return array
      */
     protected function normalizeDate(array $data): array

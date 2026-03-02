@@ -17,14 +17,15 @@ use App\Auth\EHealth\Services\TokenStorage;
  */
 class EHealthUserLogin
 {
-    use Dispatchable, SerializesModels;
+    use Dispatchable;
+    use SerializesModels;
 
     public string $token = '';
 
     /**
-     * @param User $user The user model.
-     * @param LegalEntity $legalEntity The legal entity context.
-     * @param string $authUserUUID The user's UUID from the eHealth token.
+     * @param  User  $user  The user model.
+     * @param  LegalEntity  $legalEntity  The legal entity context.
+     * @param  string  $authUserUUID  The user's UUID from the eHealth token.
      */
     public function __construct(
         public User $user,

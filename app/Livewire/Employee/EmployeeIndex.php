@@ -40,8 +40,8 @@ use Throwable;
 #[AllowDynamicProperties]
 class EmployeeIndex extends EmployeeComponent
 {
-    use WithPagination,
-        BatchLegalEntityQueries;
+    use WithPagination;
+    use BatchLegalEntityQueries;
 
     protected const string BATCH_NAME = 'EmployeeFullSync';
     protected const string DEPENDENT_BATCH_NAME = 'EmployeeDetailsSync';
@@ -84,7 +84,7 @@ class EmployeeIndex extends EmployeeComponent
      */
     public string $syncStatus = '';
 
-   #[Computed]
+    #[Computed]
     public function isSync(): bool
     {
         return $this->isSyncProcessing();
@@ -482,8 +482,8 @@ class EmployeeIndex extends EmployeeComponent
      * This method handles the continuation of a previously initiated synchronization
      * operation for a specific user using an authentication or session token.
      *
-     * @param User $user The user instance for whom synchronization should be resumed
-     * @param string $token The authentication or session token used to resume the sync process
+     * @param  User  $user  The user instance for whom synchronization should be resumed
+     * @param  string  $token  The authentication or session token used to resume the sync process
      * @return void
      */
     protected function resumeSynchronization(User $user, string $token): void

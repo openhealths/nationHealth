@@ -17,9 +17,8 @@ class MedicalProgram extends EHealthRequest
      * Receives a list of medical programs.
      * You need this method to select the ID for the contract.
      *
-     * @param array $filters
-     * @param int   $page
-     *
+     * @param  array  $filters
+     * @param  int  $page
      * @return PromiseInterface|EHealthResponse
      * @throws ConnectionException
      */

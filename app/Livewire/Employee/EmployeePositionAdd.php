@@ -70,6 +70,7 @@ class EmployeePositionAdd extends AbstractEmployeeFormManager
             if ($existingRequest && is_null($existingRequest->uuid)) {
                 $existingRequest->fill($employeeRequestData)->save();
                 $existingRequest->revision?->update(['data' => $nestedDataForRevision]);
+
                 return $existingRequest;
             }
         }

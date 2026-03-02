@@ -15,6 +15,7 @@ class CipherApiException extends Exception
 {
     /**
      * The original response object from the HTTP client.
+     *
      * @var Response
      */
     public Response $response;

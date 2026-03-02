@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
-use App\Core\Arr;
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
 use App\Exceptions\EHealth\EHealthResponseException;
@@ -113,7 +112,7 @@ class DeclarationRequest extends Request
      * Obtain list of previously created Declaration Requests.
      *
      * @param  string  $url
-     * @param $query
+     * @param  $query
      * @return PromiseInterface|EHealthResponse
      * @throws ConnectionException|EHealthValidationException|EHealthResponseException
      */
@@ -135,7 +134,7 @@ class DeclarationRequest extends Request
      * Obtain full information about Declaration Request by ID.
      *
      * @param  string  $uuid  Request identifier (UUID)
-     * @param $query
+     * @param  $query
      * @return PromiseInterface|EHealthResponse
      * @throws ConnectionException|EHealthValidationException|EHealthResponseException
      */
@@ -146,12 +145,12 @@ class DeclarationRequest extends Request
         return parent::get(self::URL . "/$uuid", $query);
     }
 
-     /**
-     * Validates the response for a declaration request.
-     *
-     * @param EHealthResponse $response The response from the eHealth API.
+    /**
+    * Validates the response for a declaration request.
+    *
+     * @param  EHealthResponse  $response  The response from the eHealth API.
      * @return array The validated and transformed data.
-     */
+    */
     protected function validateOne(EHealthResponse $response): array
     {
         $transformedData = self::replaceEHealthPropNames($response->getData());
@@ -187,7 +186,7 @@ class DeclarationRequest extends Request
     /**
      * Replaces eHealth property names with the ones used in the application (e.g., id -> uuid).
      *
-     * @param array $properties Raw properties from a single API item.
+     * @param  array  $properties  Raw properties from a single API item.
      * @return array Properties with application-friendly names.
      */
     protected static function replaceEHealthPropNames(array $properties): array

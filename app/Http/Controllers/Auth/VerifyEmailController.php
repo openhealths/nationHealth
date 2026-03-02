@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Auth;
 
 use App\Models\User;
@@ -27,7 +29,7 @@ class VerifyEmailController extends Controller
         $user = User::findOrFail($userId);
 
         // Check if hash compares with its emeail
-        if (! hash_equals((string) $hash, sha1(strtolower($user->getEmailForVerification())))) {
+        if (!hash_equals((string) $hash, sha1(strtolower($user->getEmailForVerification())))) {
             abort(403, 'Invalid verification link');
         }
 

@@ -38,9 +38,8 @@ class AddressRepository
      * Sync Addresses data to currant ($addresses) state.
      * If $addresses is empty the existent data just will delete.
      *
-     * @param object $model
-     * @param array $addresses
-     *
+     * @param  object  $model
+     * @param  array  $addresses
      * @return void
      */
     public function syncAddresses(object $model, array $addresses): void

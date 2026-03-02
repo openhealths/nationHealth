@@ -386,7 +386,7 @@ class EmployeeRequestProcessor
      */
     private function assignUserRoles(Employee $employee, int $legalEntityId): void
     {
-        $users  = $employee->party->users;
+        $users = $employee->party->users;
 
         if ($users->isEmpty()) {
             return;

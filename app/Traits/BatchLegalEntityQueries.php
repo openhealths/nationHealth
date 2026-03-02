@@ -39,16 +39,15 @@ trait BatchLegalEntityQueries
      * If returns true, synchronization cannot proceed; otherwise, it can be start/continue.
      * If returns true the sync entity button's got the "disabled" state.
      *
-     * @param string $entityStatus The synchronization status of the entity to check
-     *
+     * @param  string  $entityStatus  The synchronization status of the entity to check
      * @return bool Returns true if the entity sync status is valid/successful for sync, false otherwise
      */
     protected function isEntitySyncIsInProgress(?string $entityStatus = null, bool $isLegalEntity = false): bool
     {
         return $isLegalEntity
-            ?  $entityStatus !== JobStatus::COMPLETED->value
-            :  (
-               $entityStatus !== JobStatus::COMPLETED->value &&
+            ? $entityStatus !== JobStatus::COMPLETED->value
+            : (
+                $entityStatus !== JobStatus::COMPLETED->value &&
                $entityStatus !== JobStatus::PAUSED->value &&
                $entityStatus !== JobStatus::FAILED->value &&
                !empty($entityStatus)
@@ -58,9 +57,9 @@ trait BatchLegalEntityQueries
     /**
      * Find all batches for a specific legal entity
      *
-     * @param int $legalEntityId
-     * @param int $limit
-     * @param string $orderBy
+     * @param  int  $legalEntityId
+     * @param  int  $limit
+     * @param  string  $orderBy
      * @return Collection<stdClass>
      */
     protected function findBatchesByLegalEntity(int $legalEntityId, int $limit = 50, string $orderBy = 'desc'): Collection
@@ -75,10 +74,9 @@ trait BatchLegalEntityQueries
     /**
      * Find failed batches by legal entity ID
      *
-     * @param int $legalEntityId
-     * @param string $orderBy
-     * @param int $limit
-     *
+     * @param  int  $legalEntityId
+     * @param  string  $orderBy
+     * @param  int  $limit
      * @return Collection<stdClass>
      */
     protected function findFailedBatchesByLegalEntity(int $legalEntityId, string $orderBy = 'desc'): Collection
@@ -93,8 +91,7 @@ trait BatchLegalEntityQueries
     /**
      * Retrieves a failed batch by its name.
      *
-     * @param string $batchName The name of the batch to retrieve
-     *
+     * @param  string  $batchName  The name of the batch to retrieve
      * @return stdClass|null The failed batch object if found, null otherwise
      */
     protected function getFailedBatch(string $batchName): ?stdClass
@@ -105,7 +102,7 @@ trait BatchLegalEntityQueries
             return null;
         }
 
-        $batches = $batches->filter(fn($batch) => $batch->name === $batchName);
+        $batches = $batches->filter(fn ($batch) => $batch->name === $batchName);
 
         return $batches->isNotEmpty() ? $batches->first() : null;
     }
@@ -113,11 +110,10 @@ trait BatchLegalEntityQueries
     /**
      * Restart a failed batch by its batch object
      *
-     * @param stdClass $batch The failed batch object
-     * @param User $user The user context for the new batch execution
-     * @param string $token Encrypted authentication token for API requests
-     * @param LegalEntity|null $legalEntity The legal entity context for the batch (optional)
-     *
+     * @param  stdClass  $batch  The failed batch object
+     * @param  User  $user  The user context for the new batch execution
+     * @param  string  $token  Encrypted authentication token for API requests
+     * @param  LegalEntity|null  $legalEntity  The legal entity context for the batch (optional)
      * @return void
      */
     protected function restartBatch(stdClass $batch, User $user, string $token, ?LegalEntity $legalEntity = null): void
@@ -141,9 +137,8 @@ trait BatchLegalEntityQueries
     /**
      * Find running (not finished, not cancelled) batches by legal entity ID
      *
-     * @param int $legalEntityId
-     * @param int $limit
-     *
+     * @param  int  $legalEntityId
+     * @param  int  $limit
      * @return Collection<stdClass>
      */
     protected function findRunningBatchesByLegalEntity(int $legalEntityId): Collection
@@ -159,7 +154,7 @@ trait BatchLegalEntityQueries
     /**
      * Check if legal entity has any running batches
      *
-     * @param int $legalEntityId
+     * @param  int  $legalEntityId
      * @return bool
      */
     protected function hasRunningBatchesForLegalEntity(int $legalEntityId): bool
@@ -174,14 +169,12 @@ trait BatchLegalEntityQueries
     /**
      * Restart a failed batch by creating a new batch with pending jobs
      *
-     * @param User $user The user context for the new batch execution
-     * @param stdClass $batch The failed batch record from job_batches table
-     * @param string $token Encrypted authentication token for API requests
-     * @param LegalEntity $legalEntity The legal entity context for the batch
-     * @param array $pendingJobs Array of job instances to be re-dispatched
-     *
+     * @param  User  $user  The user context for the new batch execution
+     * @param  stdClass  $batch  The failed batch record from job_batches table
+     * @param  string  $token  Encrypted authentication token for API requests
+     * @param  LegalEntity  $legalEntity  The legal entity context for the batch
+     * @param  array  $pendingJobs  Array of job instances to be re-dispatched
      * @return void
-     *
      * @throws Exception If batch creation or deletion fails
      */
     protected function restartFailedBatch(User $user, stdClass $batch, string $token, LegalEntity $legalEntity, array $pendingJobs): void
@@ -196,7 +189,7 @@ trait BatchLegalEntityQueries
 
         // Here do echo only into the job context where legalEntity() is not set
         if (!legalEntity()) {
-         echo 'Dispatched new batch: ' . $newBatch->name . ' id: ' . $newBatch->id . PHP_EOL;
+            echo 'Dispatched new batch: ' . $newBatch->name . ' id: ' . $newBatch->id . PHP_EOL;
         }
 
         // Delete the old failed batch to prevent clutter
@@ -211,8 +204,7 @@ trait BatchLegalEntityQueries
     /**
      * Extract pending jobs from failed batch by recreating job instances from failed_jobs table
      *
-     * @param stdClass $batch The batch record from job_batches table
-     *
+     * @param  stdClass  $batch  The batch record from job_batches table
      * @return array Array of unserialized job instances ready for re-dispatch
      */
     protected function extractPendingJobsFromBatches(stdClass $batch): array
@@ -247,7 +239,6 @@ trait BatchLegalEntityQueries
         return $pendingJobs;
     }
 
-
     /**
      * Creates a chain of EmployeeDetailsUpsert jobs for all employees with PARTIAL sync status.
      *
@@ -255,9 +246,8 @@ trait BatchLegalEntityQueries
      * Returns the first job in the chain (or null if there are no employees).
      * So the jobs will be executed in the original order one by one.
      *
-     * @param LegalEntity $legalEntity
-     * @param EHealthJob|null $nextEntity The job to be executed after the chain completes (or null)
-     *
+     * @param  LegalEntity  $legalEntity
+     * @param  EHealthJob|null  $nextEntity  The job to be executed after the chain completes (or null)
      * @return EHealthJob|null The first job in the EmployeeDetailsUpsert chain, or null if there are no employees
      */
     protected function getEmployeeDetailsStartJob(LegalEntity $legalEntity, ?EHealthJob $nextEntity): ?EHealthJob
@@ -293,9 +283,8 @@ trait BatchLegalEntityQueries
      * Returns the first job in the chain (or null if there are no employee_requests).
      * So the jobs will be executed in the original order one by one.
      *
-     * @param LegalEntity $legalEntity
-     * @param EHealthJob|null $nextEntity The job to be executed after the chain completes (or null)
-     *
+     * @param  LegalEntity  $legalEntity
+     * @param  EHealthJob|null  $nextEntity  The job to be executed after the chain completes (or null)
      * @return EHealthJob|null The first job in the EmployeeDetailsUpsert chain, or null if there are no employees
      */
     protected function getEmployeeRequestDetailsStartJob(LegalEntity $legalEntity, ?EHealthJob $nextEntity): ?EHealthJob
@@ -330,9 +319,8 @@ trait BatchLegalEntityQueries
      * Returns the first job in the chain (or null if there are no employees).
      * So the jobs will be executed in the original order one by one.
      *
-     * @param LegalEntity $legalEntity
-     * @param EHealthJob|null $nextEntity The job to be executed after the chain completes (or null)
-     *
+     * @param  LegalEntity  $legalEntity
+     * @param  EHealthJob|null  $nextEntity  The job to be executed after the chain completes (or null)
      * @return EHealthJob|null The first job in the EmployeeDetailsUpsert chain, or null if there are no employees
      */
     protected function getDeclarationDataStartJob(LegalEntity $legalEntity, ?EHealthJob $nextEntity): ?EHealthJob
@@ -368,9 +356,8 @@ trait BatchLegalEntityQueries
      * Returns the first job in the chain (or null if there are no declarationRequests).
      * So the jobs will be executed in the original order one by one.
      *
-     * @param LegalEntity $legalEntity
-     * @param EHealthJob|null $nextEntity The job to be executed after the chain completes (or null)
-     *
+     * @param  LegalEntity  $legalEntity
+     * @param  EHealthJob|null  $nextEntity  The job to be executed after the chain completes (or null)
      * @return EHealthJob|null The first job in the EmployeeDetailsUpsert chain, or null if there are no employees
      */
     protected function getDeclarationRequestsStartJob(LegalEntity $legalEntity, ?EHealthJob $nextEntity): ?EHealthJob
@@ -406,9 +393,8 @@ trait BatchLegalEntityQueries
      * Returns the first job in the chain (or null if there are no confidant_persons).
      * So the jobs will be executed in the original order one by one.
      *
-     * @param LegalEntity $legalEntity
-     * @param EHealthJob|null $nextEntity The job to be executed after the chain completes (or null)
-     *
+     * @param  LegalEntity  $legalEntity
+     * @param  EHealthJob|null  $nextEntity  The job to be executed after the chain completes (or null)
      * @return EHealthJob|null The first job in the EmployeeDetailsUpsert chain, or null if there are no employees
      */
     protected function getConfidantPersonStartJob(LegalEntity $legalEntity, ?EHealthJob $nextEntity): ?EHealthJob

@@ -29,7 +29,7 @@ class EHealthResponseException extends Exception
     /**
      * Helper method to extract the most relevant error message.
      *
-     * @param Response $response
+     * @param  Response  $response
      * @return string
      */
     protected function extractErrorMessage(Response $response): string

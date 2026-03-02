@@ -92,13 +92,13 @@ class PartyVerify extends Component
             if (!empty($data['data']['details']) && is_array($data['data']['details'])) {
                 $data['data']['details'] = array_filter(
                     $data['data']['details'],
-                    static fn($key) => in_array($key, $allowedStreams, true),
+                    static fn ($key) => in_array($key, $allowedStreams, true),
                     ARRAY_FILTER_USE_KEY
                 );
             } elseif (!empty($data['details']) && is_array($data['details'])) {
                 $data['details'] = array_filter(
                     $data['details'],
-                    static fn($key) => in_array($key, $allowedStreams, true),
+                    static fn ($key) => in_array($key, $allowedStreams, true),
                     ARRAY_FILTER_USE_KEY
                 );
             }

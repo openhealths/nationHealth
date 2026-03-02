@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Listeners;
 
 use Throwable;
@@ -13,8 +15,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 
 class OnRegularLoginSyncronization implements ShouldQueue
 {
-    use InteractsWithQueue,
-        BatchLegalEntityQueries;
+    use InteractsWithQueue;
+    use BatchLegalEntityQueries;
 
     protected const string FIRST_LOGIN_BATCH_NAME = 'FirstLoginSync';
 
@@ -62,8 +64,8 @@ class OnRegularLoginSyncronization implements ShouldQueue
     /**
      * Handle a job failure.
      *
-     * @param EHealthUserLogin $event
-     * @param Throwable $exception
+     * @param  EHealthUserLogin  $event
+     * @param  Throwable  $exception
      * @return void
      */
     public function failed(EHealthUserLogin $event, Throwable $exception): void

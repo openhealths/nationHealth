@@ -41,7 +41,7 @@ class WorkingHours implements CastsAttributes
         if (is_array($value)) {
             $data = [$key => $value];
         } else {
-            $data = $value ? [$key => json_decode($value,true)] : [$key => [Division::getWorkingTimeTemplate()]];
+            $data = $value ? [$key => json_decode($value, true)] : [$key => [Division::getWorkingTimeTemplate()]];
         }
 
         return json_encode($this->prepareWorkingHours($data[$key]));
@@ -50,9 +50,8 @@ class WorkingHours implements CastsAttributes
     /**
      * Change divider between hours and minutes
      *
-     * @param array $workingHours   // Array with work hours time data
-     * @param bool $dotToColon      // Determine how divider must be switched
-     *
+     * @param  array  $workingHours  // Array with work hours time data
+     * @param  bool  $dotToColon  // Determine how divider must be switched
      * @return array
      */
     public function prepareWorkingHours(array $workingHours, bool $dotToColon = false): array

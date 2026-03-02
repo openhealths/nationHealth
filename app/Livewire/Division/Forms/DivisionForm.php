@@ -81,8 +81,7 @@ class DivisionForm extends Form
      * Set the division's form data.
      * Replaces the current division's form data with the provided array.
      *
-     * @param array $division The division data to set in the form.
-     *
+     * @param  array  $division  The division data to set in the form.
      * @return void
      */
     public function setDivision(array $division)
@@ -108,7 +107,7 @@ class DivisionForm extends Form
 
             if ($this->showReceptionAddress) {
                 $errors1 = $this->component->receptionAddressValidation();
-                $errors = \array_merge( $errors, $errors1 );
+                $errors = \array_merge($errors, $errors1);
             }
 
             $this->validate();
@@ -210,10 +209,10 @@ class DivisionForm extends Form
      */
     protected function checkDefaultAddress(): void
     {
-       foreach ($this->division['addresses'] as &$address) {
-           if (isset($address['area']) && $address['area'] === 'М.КИЇВ' && empty($address['streetType'])) {
-               $address['streetType'] = 'STREET';
-           }
-       }
+        foreach ($this->division['addresses'] as &$address) {
+            if (isset($address['area']) && $address['area'] === 'М.КИЇВ' && empty($address['streetType'])) {
+                $address['streetType'] = 'STREET';
+            }
+        }
     }
 }

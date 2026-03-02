@@ -268,68 +268,69 @@ class EncounterRepository extends BaseRepository
      */
     public function formatConditionsRequest(array $conditions): array
     {
-        $conditionForm = array_map(function (array $condition, int $index) {
-            unset($condition['query']);
-            // set ID same as diagnose
-            $condition['id'] = $this->diagnoseUuids[$index];
+        $conditionForm = array_map(
+            function (array $condition, int $index) {
+                unset($condition['query']);
+                // set ID same as diagnose
+                $condition['id'] = $this->diagnoseUuids[$index];
 
-            $condition['context']['identifier']['type']['coding'][0] = [
-                'system' => 'eHealth/resources',
-                'code' => 'encounter'
-            ];
-            $condition['context']['identifier']['value'] = $this->encounterUuid;
+                $condition['context']['identifier']['type']['coding'][0] = [
+                    'system' => 'eHealth/resources',
+                    'code' => 'encounter'
+                ];
+                $condition['context']['identifier']['value'] = $this->encounterUuid;
 
-            // Remove coding with empty code
-            $condition['code']['coding'] = array_values(
-                array_filter(
-                    $condition['code']['coding'],
-                    static fn (array $coding) => !empty($coding['code']) && trim($coding['code']) !== ''
-                )
-            );
+                // Remove coding with empty code
+                $condition['code']['coding'] = array_values(
+                    array_filter(
+                        $condition['code']['coding'],
+                        static fn (array $coding) => !empty($coding['code']) && trim($coding['code']) !== ''
+                    )
+                );
 
-            // unset if code not provided
-            if ($condition['severity']['coding'][0]['code'] === '') {
-                unset($condition['severity']);
-            }
+                // unset if code not provided
+                if ($condition['severity']['coding'][0]['code'] === '') {
+                    unset($condition['severity']);
+                }
 
-            if ($condition['primarySource']) {
-                $condition['asserter']['identifier']['value'] = $this->employeeUuid;
+                if ($condition['primarySource']) {
+                    $condition['asserter']['identifier']['value'] = $this->employeeUuid;
 
-                unset($condition['reportOrigin']);
-            } else {
-                unset($condition['asserter']);
-            }
+                    unset($condition['reportOrigin']);
+                } else {
+                    unset($condition['asserter']);
+                }
 
-            // convert dates
-            if (isset($condition['onsetTime'])) {
-                $condition['onsetDate'] = convertToISO8601($condition['onsetDate'] . $condition['onsetTime']);
-                $condition['assertedDate'] = convertToISO8601($condition['assertedDate'] . $condition['assertedTime']);
-                unset($condition['onsetTime'], $condition['assertedTime'], $condition['diagnoses']);
-            }
+                // convert dates
+                if (isset($condition['onsetTime'])) {
+                    $condition['onsetDate'] = convertToISO8601($condition['onsetDate'] . $condition['onsetTime']);
+                    $condition['assertedDate'] = convertToISO8601($condition['assertedDate'] . $condition['assertedTime']);
+                    unset($condition['onsetTime'], $condition['assertedTime'], $condition['diagnoses']);
+                }
 
-            if (!empty($condition['evidences'][0]['details'])) {
-                $condition['evidences'][0]['details'] = collect($condition['evidences'][0]['details'])
-                    ->map(static function (array $detail) {
-                        $data = [];
+                if (!empty($condition['evidences'][0]['details'])) {
+                    $condition['evidences'][0]['details'] = collect($condition['evidences'][0]['details'])
+                        ->map(static function (array $detail) {
+                            $data = [];
 
-                        Arr::set($data, 'identifier.type.coding', [
-                            [
-                                'system' => 'eHealth/resources',
-                                'code' => 'condition'
-                            ]
-                        ]);
-                        Arr::set($data, 'identifier.value', $detail['id']);
+                            Arr::set($data, 'identifier.type.coding', [
+                                [
+                                    'system' => 'eHealth/resources',
+                                    'code' => 'condition'
+                                ]
+                            ]);
+                            Arr::set($data, 'identifier.value', $detail['id']);
 
-                        return $data;
-                    })->toArray();
-            }
+                            return $data;
+                        })->toArray();
+                }
 
-            if (empty($condition['evidences'][0]['codes']) && empty($condition['evidences'][0]['details'])) {
-                unset($condition['evidences']);
-            }
+                if (empty($condition['evidences'][0]['codes']) && empty($condition['evidences'][0]['details'])) {
+                    unset($condition['evidences']);
+                }
 
-            return $condition;
-        },
+                return $condition;
+            },
             $conditions,
             array_keys($conditions)
         );

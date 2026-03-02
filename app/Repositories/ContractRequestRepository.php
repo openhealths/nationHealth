@@ -12,8 +12,8 @@ class ContractRequestRepository
     /**
      * Saves or updates a contract request from E-Health data (or local form data).
      *
-     * @param array $eHealthData The raw data payload.
-     * @param string $type The contract type (e.g., REIMBURSEMENT).
+     * @param  array  $eHealthData  The raw data payload.
+     * @param  string  $type  The contract type (e.g., REIMBURSEMENT).
      * @return ContractRequest
      */
     public function saveFromEHealth(array $eHealthData, string $type): ContractRequest

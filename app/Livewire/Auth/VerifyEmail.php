@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Livewire\Auth;
+declare(strict_types=1);
 
+namespace App\Livewire\Auth;
 
 use Exception;
 use App\Models\User;
-use Illuminate\Auth\Events\Registered;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\Log;
@@ -25,7 +25,7 @@ class VerifyEmail extends Component
             return Redirect::route('login')->with('error', __('auth.login.error.wrong_session'));
         }
 
-        try{
+        try {
             $user->sendEmailVerificationNotification();
 
             session()->forget('unverified_user_id');
@@ -34,7 +34,7 @@ class VerifyEmail extends Component
         } catch (Exception $err) {
             Log::error('Failed to send verification email', [$err->getMessage()]);
 
-            session()->flash( 'error', __('auth.login.error.vlink_not_sent'));
+            session()->flash('error', __('auth.login.error.vlink_not_sent'));
         }
     }
 }

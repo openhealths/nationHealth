@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Models\Role;
 use App\Models\LegalEntityType;
 use Illuminate\Support\Facades\Schema;
@@ -53,9 +55,9 @@ return new class extends Migration
         $roleAndTypePairs = [];
 
         $availableRoles = Role::get(['id', 'name'])
-                ->groupBy('name')
-                ->map(fn ($group) => $group->pluck('id')->values()->all())
-                ->toArray();
+            ->groupBy('name')
+            ->map(fn ($group) => $group->pluck('id')->values()->all())
+            ->toArray();
 
         $roleNames = array_keys($availableRoles);
 

@@ -12,6 +12,7 @@ class DeclarationView extends Component
 {
     /**
      * Declaration data with the needed relation data.
+     *
      * @var Declaration
      */
     public Declaration $declaration;
@@ -20,6 +21,7 @@ class DeclarationView extends Component
 
     /**
      * Declaration content.
+     *
      * @var string
      */
     public string $printableContent;
