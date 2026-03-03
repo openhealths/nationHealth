@@ -42,10 +42,7 @@ class EmployeePolicy
             return Response::deny(__('employees.policy.owner_no_edit'));
         }
 
-        // 3. Check if there is a connection with the user (user_id)
-        if (is_null($employee->userId)) {
-            return Response::deny(__('employees.policy.no_user_linked'));
-        }
+
 
         // 4.Status check (dismissed cannot be edited)
         if ($employee->status === Status::DISMISSED) {

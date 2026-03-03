@@ -19,7 +19,7 @@
 
     $showView = $canView;
 
-    $showEdit = $canWrite && $hasUserLinked && !$isOwner && ($isEmployee ? $status !== 'DISMISSED' : $status === 'NEW');
+    $showEdit = $canWrite && !$isOwner && ($isEmployee ? $status !== 'DISMISSED' : $status === 'NEW');
 
     $showSync = $canWrite && ($isEmployee ? !empty($position->uuid) : in_array($status, ['NEW', 'SIGNED', 'APPROVED']));
     $showDelete = $isRequest && $canWrite && $status === 'NEW';
@@ -61,10 +61,17 @@
 
                 @if($showEdit)
                     <li>
-                        <a href="{{ $isEmployee ? route('employee.edit', ['legalEntity' => legalEntity()->id, 'employee' => $position->id]) : route('employee-request.edit', ['legalEntity' => legalEntity()->id, 'employee_request' => $position->id]) }}"
-                           class="flex items-center gap-2 py-2 px-5 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
-                            @icon('edit', 'w-5 h-5') {{ __('forms.edit') }}
-                        </a>
+                        @if($isEmployee && !$hasUserLinked)
+                            <button type="button" wire:click="tryEdit({{ $position->id }})"
+                               class="flex w-full items-center gap-2 py-2 px-5 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors text-left">
+                                @icon('edit', 'w-5 h-5') {{ __('forms.edit') }}
+                            </button>
+                        @else
+                            <a href="{{ $isEmployee ? route('employee.edit', ['legalEntity' => legalEntity()->id, 'employee' => $position->id]) : route('employee-request.edit', ['legalEntity' => legalEntity()->id, 'employee_request' => $position->id]) }}"
+                               class="flex items-center gap-2 py-2 px-5 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                                @icon('edit', 'w-5 h-5') {{ __('forms.edit') }}
+                            </a>
+                        @endif
                     </li>
                 @endif
 

@@ -269,6 +269,11 @@ class EmployeeIndex extends EmployeeComponent
         $this->resetPage();
     }
 
+    public function tryEdit(int $employeeId): void
+    {
+        $this->dispatch('flashMessage', ['message' => 'Користувач має підтвердити вхід', 'type' => 'error']);
+    }
+
     public function deactivate(): void
     {
         // 1. Get the employee record from the database

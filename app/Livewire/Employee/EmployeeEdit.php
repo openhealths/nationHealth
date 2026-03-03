@@ -33,7 +33,19 @@ class EmployeeEdit extends AbstractEmployeeFormManager
         $this->loadDictionaries();
         $this->employee = $employee;
         $this->employeeId = $employee->id;
-        $this->isPersonalDataLocked = true;
+        
+        if (is_null($employee->userId)) {
+            session()?->flash('error', 'Користувач має підтвердити вхід');
+            $this->redirectRoute('employee.index', ['legalEntity' => legalEntity()->id]);
+            return;
+        }
+
+        // Check if the Party of this employee holds the Owner position
+        $isOwnerParty = $employee->party->employees()
+            ->where('employee_type', \App\Enums\User\Role::OWNER->value)
+            ->exists();
+            
+        $this->isPersonalDataLocked = $isOwnerParty;
         $this->isPositionDataLocked = true;
         $this->loadDivisions($legalEntity);
 
