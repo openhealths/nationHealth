@@ -32,16 +32,26 @@
                 <div x-cloak x-show="showFilter" x-transition>
                     <div class="form-row-3">
                         <div class="form-group group"
-                             x-data="{ open: false, selectedTypes: $wire.entangle('typeFilter') }"
+                             x-data="{
+                                 open: false,
+                                 selectedTypes: $wire.entangle('typeFilter'),
+                                 // Dynamically map enum values to their localized labels
+                                 typeLabels: {
+                                     @foreach(\App\Enums\Contract\Type::cases() as $typeCase)
+                                         '{{ $typeCase->value }}': '{{ $typeCase->label() }}',
+                                     @endforeach
+                                 }
+                             }"
                         >
                             <label for="typeFilter" class="label">{{ __('contracts.type_label') }}</label>
                             <div class="relative">
                                 <input type="text"
                                        id="typeFilter"
                                        class="peer input pr-10 cursor-pointer"
-                                       :value="selectedTypes.length === 0 ? '{{ __('forms.all') }}' : selectedTypes.map(v => v === 'capitation' ? '{{ __('contracts.capitation') }}' : '{{ __('contracts.reimbursement') }}').join(', ')"
-                                       @click="open = !open"
-                                       readonly
+                                // Map the selected enum values to their corresponding labels
+                                :value="selectedTypes.length === 0 ? '{{ __('forms.all') }}' : selectedTypes.map(typeValue => typeLabels[typeValue] || typeValue).join(', ')"
+                                @click="open = !open"
+                                readonly
                                 />
                                 @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none')
 
@@ -50,15 +60,16 @@
                                      class="absolute z-10 mt-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg"
                                 >
                                     <ul class="py-2 px-3 space-y-2 text-sm text-gray-700 dark:text-gray-200">
-                                        @foreach(['capitation' => __('contracts.capitation'), 'reimbursement' => __('contracts.reimbursement')] as $value => $label)
+                                        {{-- Iterate through enum cases to render checkboxes --}}
+                                        @foreach(\App\Enums\Contract\Type::cases() as $typeCase)
                                             <li>
                                                 <label class="flex items-center">
                                                     <input type="checkbox"
-                                                           value="{{ $value }}"
+                                                           value="{{ $typeCase->value }}"
                                                            x-model="selectedTypes"
                                                            class="w-4 h-4 text-blue-600 bg-gray-100 dark:bg-gray-600 border-gray-300 rounded focus:ring-blue-500"
                                                     >
-                                                    <span class="ml-2">{{ $label }}</span>
+                                                    <span class="ml-2">{{ $typeCase->label() }}</span>
                                                 </label>
                                             </li>
                                         @endforeach

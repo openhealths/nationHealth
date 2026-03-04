@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Contract;
 
-use App\Classes\eHealth\Api\Contract as ApiContract;
+use App\Classes\eHealth\EHealth;
 use App\Models\Contracts\Contract;
 use App\Models\LegalEntity;
 use Illuminate\Support\Facades\Log;
@@ -30,7 +30,7 @@ class ContractShow extends Component
     private function syncDetailsFromEHealth(): void
     {
         try {
-            $apiClient = app(ApiContract::class);
+            $apiClient = EHealth::contract();
 
             $response = $apiClient
                 ->withToken(session()->get(config('ehealth.api.oauth.bearer_token')))
