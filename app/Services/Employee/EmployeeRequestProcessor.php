@@ -41,8 +41,39 @@ class EmployeeRequestProcessor
 
         DB::transaction(function () use ($request, $eHealthData) {
             // 1. Prepare Local Data (Source of Truth for content)
-            $revisionData = $request->revision->data;
-            $mappedLocalData = EHealth::employeeRequest()->mapCreate($revisionData);
+            $mappedLocalData = [];
+            
+            if ($request->revision) {
+                $revisionData = $request->revision->data;
+                $mappedLocalData = EHealth::employeeRequest()->mapCreate($revisionData);
+            } else {
+                // For requests synced from EHealth (created in another MIS), revision is null.
+                // Map fields directly from the remote response data.
+                $partyData = $eHealthData['party'] ?? [];
+                
+                $mappedLocalData = [
+                    'employee' => [
+                        'position' => $eHealthData['position'] ?? null,
+                        'start_date' => $eHealthData['start_date'] ?? null,
+                        'end_date' => $eHealthData['end_date'] ?? null,
+                        'employee_type' => $eHealthData['employee_type'] ?? null,
+                    ],
+                    'party' => Arr::except($partyData, ['documents', 'phones', 'email']),
+                    'documents' => $partyData['documents'] ?? [],
+                    'phones' => $partyData['phones'] ?? [],
+                ];
+                
+                if (isset($eHealthData['email']) || isset($partyData['email'])) {
+                    $mappedLocalData['party']['email'] = $eHealthData['email'] ?? $partyData['email'];
+                }
+                
+                $professionalData = $eHealthData['doctor'] ?? $eHealthData['med_admin'] ?? $eHealthData['pharmacist'] ?? $eHealthData['specialist'] ?? $eHealthData['laborant'] ?? $eHealthData['assistant'] ?? [];
+                
+                $mappedLocalData['educations'] = $professionalData['educations'] ?? $professionalData['education'] ?? [];
+                $mappedLocalData['specialities'] = $professionalData['specialities'] ?? [];
+                $mappedLocalData['qualifications'] = $professionalData['qualifications'] ?? [];
+                $mappedLocalData['science_degree'] = $professionalData['science_degree'] ?? null;
+            }
 
             $taxId = $mappedLocalData['party']['tax_id'] ?? null;
 
@@ -114,7 +145,6 @@ class EmployeeRequestProcessor
             if ($isNew) {
                 $employee->uuid = $employeeUuid; // Ensure UUID is set
                 $employee->legal_entity_id = $request->legal_entity_id;
-                $employee->user_id = $request->user_id;
                 $employee->status = $systemOverrides['status'] ?? Status::ACTIVE;
 
                 if ($request->party_id) {
@@ -144,7 +174,7 @@ class EmployeeRequestProcessor
                 $mappedLocalData['educations'] ?? null,
                 $mappedLocalData['specialities'] ?? null,
                 $mappedLocalData['qualifications'] ?? null,
-                $mappedLocalData['scienceDegree'] ?? null
+                $mappedLocalData['science_degree'] ?? null
             );
 
             // 10. Assign Roles to User
@@ -358,6 +388,11 @@ class EmployeeRequestProcessor
         $employeeRequestsUpsertData = [];
 
         foreach ($eHealthData as $ehealthEmployeeRequest) {
+            // Prevent combined scopes from polluting other facilities
+            if (isset($ehealthEmployeeRequest['legal_entity_uuid']) && $ehealthEmployeeRequest['legal_entity_uuid'] !== $legalEntity->uuid) {
+                continue;
+            }
+
             if (in_array($ehealthEmployeeRequest['uuid'], $localEmployeeRequestUuids) || $ehealthEmployeeRequest['status'] !== Status::APPROVED->value) {
                 continue;
             }
