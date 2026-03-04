@@ -95,7 +95,7 @@ return [
     'no_tax_id_document_required' => 'Будь ласка, заповніть номер одного з документів: Паспорт, ID-картка або Посвідчення біженця.',
     'created_at' => 'Дата створення',
     'search_name' => 'Пошук за ПІБ',
-    'references' => 'Довідники',
+    'dictionary' => 'Довідники',
 
     // Legal Entity
     'institution' => 'Заклад',

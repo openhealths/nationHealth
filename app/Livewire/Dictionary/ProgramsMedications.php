@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\References;
+namespace App\Livewire\Dictionary;
 
 use Livewire\Component;
 
@@ -8,6 +8,6 @@ class ProgramsMedications extends Component
 {
     public function render()
     {
-        return view('livewire.references.programs-medications');
+        return view('livewire.dictionary.programs-medications');
     }
 }

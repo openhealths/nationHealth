@@ -146,8 +146,11 @@ Route::middleware(['auth:web,ehealth', 'verified'])->group(function () {
         ->group(function () {
             Route::get('/', [HomeController::class, 'dashboard'])->name('dashboard');
 
-            Route::get('/references/programs-medications', \App\Livewire\References\ProgramsMedications::class)
-                ->name('references.index');
+            Route::get('/dictionary/programs-medications', \App\Livewire\Dictionary\ProgramsMedications::class)
+                ->name('dictionary.programs-medications.index');
+
+            Route::get('/dictionary/programs-services', \App\Livewire\Dictionary\ProgramsServices::class)
+                ->name('dictionary.programs-services.index');
 
             Route::get('/edit', EditLegalEntity::class)
                 ->can('edit', 'legalEntity')
