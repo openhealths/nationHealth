@@ -55,6 +55,7 @@ abstract class BaseEmployee extends Model
     protected $casts = [
         'start_date' => EHealthDateCast::class,
         'end_date' => EHealthDateCast::class,
+        'inserted_at' => 'datetime'
     ];
 
     // --- COMMON ACCESSORS ---

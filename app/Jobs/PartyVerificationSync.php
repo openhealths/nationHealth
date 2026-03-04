@@ -52,4 +52,16 @@ class PartyVerificationSync extends EHealthJob
             'trace' => $exception->getTraceAsString(),
         ]);
     }
+
+    /**
+     * Get next entity job if needed.
+     *
+     * @return EHealthJob|null
+     */
+    protected function getNextEntityJob(): ?EHealthJob
+    {
+        return $this->standalone || !$this->nextEntity
+            ? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin)
+            : $this->nextEntity;
+    }
 }

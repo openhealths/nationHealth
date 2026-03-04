@@ -188,7 +188,11 @@ class EHealthLoginController extends Controller
             return null;
         }
 
-        ['id' => $ehealthUserId, 'email' => $ehealthEmail] = $userDetailsValidator->validated();
+        [
+            'id' => $ehealthUserId,
+            'email' => $ehealthEmail,
+            'inserted_at' => $ehealthInsertedAt
+        ] = $userDetailsValidator->validated();
 
         if ($ehealthUserId !== $authUserUUID) {
             Log::error(__('auth.login.error.user_identity', [], 'en'));
@@ -207,6 +211,7 @@ class EHealthLoginController extends Controller
                 'uuid' => $ehealthUserId,
                 'email' => $ehealthEmail,
                 'password' => Hash::make($password),
+                'inserted_at' => $ehealthInsertedAt,
                 'email_verified_at' => now()
             ]);
 
@@ -225,7 +230,7 @@ class EHealthLoginController extends Controller
 
         // User can be created before first ehealth login (e.g. OWNER or any local admin)
         if (!$user->uuid) {
-            $user->update(['uuid' => $ehealthUserId]);
+            $user->update(['uuid' => $ehealthUserId, 'inserted_at' => $ehealthInsertedAt]);
         }
 
         setPermissionsTeamId($legalEntity->id);

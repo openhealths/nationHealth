@@ -12,6 +12,22 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('employees', function (Blueprint $table) {
+            if (!Schema::hasColumn('employees', 'user_id')) {
+                $table->foreignId('user_id')
+                    ->nullable()
+                    ->comment("Determine user created for")
+                    ->constrained('users')
+                    ->onDelete('cascade');
+            }
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+         Schema::table('employees', function (Blueprint $table) {
             // Check if 'user_id' column exists before attempting to drop it
             if (Schema::hasColumn('employees', 'user_id')) {
                 // Check if foreign key exists
@@ -26,18 +42,6 @@ return new class extends Migration
                 }
 
                 $table->dropColumn('user_id');
-            }
-        });
-    }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::table('employees', function (Blueprint $table) {
-            if (!Schema::hasColumn('employees', 'user_id')) {
-                $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade');
             }
         });
     }

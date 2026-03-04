@@ -6,10 +6,12 @@ namespace App\Jobs;
 
 use Throwable;
 use App\Core\Arr;
+use Carbon\Carbon;
 use App\Models\User;
 use App\Core\EHealthJob;
 use App\Enums\JobStatus;
 use App\Models\LegalEntity;
+use App\Models\Relations\Party;
 use App\Repositories\Repository;
 use App\Classes\eHealth\EHealth;
 use Spatie\Permission\Models\Role;
@@ -75,9 +77,16 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
 
         $employeeRequestPartyId = $employeeRequestUser?->partyId;
 
+        $partyId = $this->createNewParty($this->employeeRequest, $validatedData['party'])?->id;
+
         $this->employeeRequest->fill(array_merge(
             $response->map($validatedData, $this->legalEntity, $employeeRequestUser?->id ?? null, $employeeRequestPartyId ?? null),
-            ['sync_status' => JobStatus::COMPLETED->value])
+                [
+                    'sync_status' => JobStatus::COMPLETED->value,
+                    'party_id' => $partyId,
+                    'applied_at' => $validatedData['updated_at'] ?? Carbon::now()
+                ]
+            )
         );
 
         $this->employeeRequest->save();
@@ -87,6 +96,44 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
         $revisionData['status'] = RevisionStatus::APPLIED->value;
 
         Repository::revision()->saveRevision($this->employeeRequest, $revisionData);
+    }
+
+    /**
+     * Find an existing party or create a new one based on the provided data.
+     *
+     * @param EmployeeRequest $model
+     *
+     * @param array $partyData
+     *
+     * @return Party|null
+     */
+    protected function createNewParty(EmployeeRequest $model, array $partyData): ?Party
+    {
+        $documents = Arr::pull($partyData, 'documents', []);
+        $phones = Arr::pull($partyData, 'phones', []);
+
+        unset ($partyData['email']);
+
+        $party = Party::where('tax_id', $partyData['tax_id'])
+            ->where('birth_date', $partyData['birth_date'])
+            ->where('first_name', $partyData['first_name'])
+            ->where('last_name', $partyData['last_name'])
+            ->where('second_name', $partyData['second_name'])
+            ->orWhereNull('second_name')
+            ->first();
+
+        if (!empty($party)) {
+            return $party;
+        };
+
+        $newParty = Party::create($partyData);
+
+        $model->party()->associate($newParty)->save();
+
+        $model->party->syncMany('documents', $documents);
+        $model->party->syncMany('phones', $phones);
+
+        return $newParty;
     }
 
     /**
@@ -108,7 +155,6 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
             ? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin)
             : $this->nextEntity;
     }
-
 
     /**
      * Determine which authentication guards define the given role.

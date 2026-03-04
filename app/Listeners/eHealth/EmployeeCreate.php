@@ -8,16 +8,18 @@ use Log;
 use Throwable;
 use App\Core\Arr;
 use Carbon\Carbon;
+use App\Models\User;
 use App\Classes\eHealth\EHealth;
-use App\Enums\Employee\RequestStatus;
-use App\Enums\Employee\RevisionStatus;
 use App\Events\EHealthUserLogin;
-use App\Models\Employee\Employee;
-use App\Models\Employee\EmployeeRequest;
 use App\Repositories\Repository;
+use App\Models\Employee\Employee;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use App\Enums\Employee\RequestStatus;
+use App\Enums\Employee\RevisionStatus;
+use App\Models\Employee\EmployeeRequest;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+
 class EmployeeCreate
 {
     /**
@@ -78,6 +80,7 @@ class EmployeeCreate
                 'legal_entity_id' => $event->legalEntity->uuid,
                 'tax_id' => $taxId,
                 'status' => 'APPROVED',
+                'page_size' => 500 // Get maximum records at one time allowed by EHealth's API (if page_size in .env will set to smaller value, some of employee may be missed)
             ]
         )->validate();
 
@@ -88,9 +91,7 @@ class EmployeeCreate
         // This filters out only uuids associated with the current user
         $existingUuids = Employee::whereIn('uuid', array_column($employees, 'uuid'))
             ->where('legal_entity_id', $event->legalEntity->id)
-            ->where(fn(EloquentBuilder $employeeQuery) =>
-                $employeeQuery->whereHas('party.users')
-            )
+            ->whereHas('users', fn(EloquentBuilder $query) => $query->where('id', $user->id))
             ->pluck('uuid')
             ->all();
 
@@ -100,8 +101,6 @@ class EmployeeCreate
             return;
         }
 
-        $newRoles = [];
-
         DB::transaction(function () use ($user, $employees, $employeeRequests, $event, &$newRoles) {
             foreach ($employees as $eHealthEmployee) {
 
@@ -110,6 +109,9 @@ class EmployeeCreate
                 if (!$employeeRequest) {
                     continue;
                 }
+
+                // If emloyee has already an associated user, we skip attaching because it means it's already created by the stored user (uer_id)
+                $eHealthEmployee['user_id'] ??= $user->id;
 
                 $dataFromRevision = EHealth::employeeRequest()->mapCreate($employeeRequest->revision->data);
                 $dataFromEHealth = Arr::only(
@@ -122,12 +124,15 @@ class EmployeeCreate
                     array_merge($dataFromRevision['employee'], $dataFromEHealth, [
                         'legal_entity_id' => $event->legalEntity->id,
                         'legal_entity_uuid' => $event->legalEntity->uuid,
+                        'user_id' => $user->id,
                     ])
                 );
 
                 $cleanPartyFromRevision = $dataFromRevision['party'];
                 $cleanPartyFromEHealth = Arr::except($eHealthEmployee['party'] ?? [], ['email']);
                 $mergedCleanPartyData = array_merge($cleanPartyFromRevision, $cleanPartyFromEHealth);
+
+                $newEmployee->users()->syncWithoutDetaching([$user->id]);
 
                 $newEmployee = Repository::employee()->updateDetails(
                     $newEmployee,
@@ -151,7 +156,6 @@ class EmployeeCreate
                     [
                         'employee_id' => $newEmployee->id,
                         'status' => RequestStatus::APPROVED,
-                        'applied_at' => now(),
                         'user_id' => $user->id,
                         'party_id' => $newEmployee->partyId,
                     ]
@@ -159,25 +163,48 @@ class EmployeeCreate
 
                 $employeeRequest->revision->update(['status' => RevisionStatus::APPLIED]);
 
-                if (!$user->hasRole($newEmployee->employeeType)) {
-                    $newRoles[] = $newEmployee->employeeType;
-                }
+                $users = $newEmployee->party->users;
+
+                $newEmployee->users()->syncWithoutDetaching([$user->id]);
+
+                $employeeInsertedTime = $newEmployee->insertedAt ?? $employeeRequest->appliedAt;
+
+                // Get employees in the same party that have users, were created after the current employee,
+                // and are not already associated with the current user.
+                // This ensures that the current user is linked to all relevant employee records in the party
+                // that were created after the user's creation time, while avoiding associations with future records
+                // that may not be relevant to the user's current session.
+                $employeesIds = $newEmployee->party
+                    ->employees()
+                    ->has('users')
+                    ->where('user_id', '!=', $user->id)
+                    ->where('inserted_at', '>', $employeeInsertedTime)
+                    ->get()
+                    ->pluck('id')
+                    ->toArray();
+
+                // Sync current user to older employees in the party
+                $user->employees()->syncWithoutDetaching($employeesIds);
+
+                // Get users associated with the employee's party that were created before the employee record was inserted,
+                // ensuring proper association of existing users to the new employee record without linking future users
+                // that may not be relevant to the current session.
+                $userIds = $users
+                    ->filter(fn($usr) => Carbon::parse($usr->inserted_at)->lessThan($employeeInsertedTime))
+                    ->pluck('id')
+                    ->all();
+
+                // Sync older users to the new employee
+                $newEmployee->users()->syncWithoutDetaching($userIds);
             }
         });
 
-        if (!empty($newRoles)) {
-            $cleanRoles = array_filter($newRoles, static function ($roleName) {
-                return !(empty($roleName) || !is_string($roleName));
-            });
+        $newRoles = $this->getRolesForParty($user);
 
-            if (empty($cleanRoles)) {
-                return;
-            }
+        setPermissionsTeamId($event->legalEntity->id);
+        $user->unsetRelation('roles')->unsetRelation('permissions');
 
-            setPermissionsTeamId($event->legalEntity->id);
-            $user->unsetRelation('roles')->unsetRelation('permissions');
-            $user->assignRole($cleanRoles);
-        }
+        $user->assignRole($newRoles);
     }
 
     /**
@@ -206,5 +233,29 @@ class EmployeeCreate
 
                 return $namesMatch && $datesMatch;
             });
+    }
+
+    /**
+     * Get roles based on employee types associated with the user's party.
+     *
+     * Only includes employee types where the user was created before or at the same time
+     * as the employee record was inserted, ensuring proper role assignment chronology.
+     *
+     * @param  User  $user
+     *
+     * @return array<string> Array of unique employee type role identifiers.
+     */
+    protected function getRolesForParty(User $user): array
+    {
+        $roles = [];
+        $userCreatedTime = Carbon::parse($user->inserted_at) ?? null;
+
+        foreach ($user->party?->employees as $employee) {
+            if ($employee->employeeType && $employee->insertedAt && $userCreatedTime && $userCreatedTime->lessThanOrEqualTo($employee->insertedAt)) {
+                $roles[] = $employee->employeeType;
+            }
+        }
+
+        return array_unique($roles);
     }
 }

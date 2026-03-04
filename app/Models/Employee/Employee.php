@@ -4,20 +4,22 @@ declare(strict_types=1);
 
 namespace App\Models\Employee;
 
-use App\Casts\EHealthDateCast;
-use App\Enums\Party\VerificationStatus;
+use App\Models\User;
 use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Models\Declaration;
+use App\Casts\EHealthDateCast;
 use App\Models\Relations\Education;
+use App\Models\Relations\Speciality;
 use App\Models\Relations\Qualification;
 use App\Models\Relations\ScienceDegree;
-use App\Models\Relations\Speciality;
-use Illuminate\Database\Eloquent\Attributes\Scope;
+use App\Enums\Party\VerificationStatus;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Employee extends BaseEmployee
 {
@@ -33,6 +35,14 @@ class Employee extends BaseEmployee
     ];
 
     // --- EMPLOYEE-SPECIFIC RELATIONS ---
+
+    /**
+     * The users that belong to the employee
+     */
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'employee_users', 'employee_id', 'user_id');
+    }
 
     public function declarations(): HasMany
     {

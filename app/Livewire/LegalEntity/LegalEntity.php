@@ -786,6 +786,9 @@ abstract class LegalEntity extends Component
 
         // Save the EmployeeRequest emulated response data to the local DB (create the revision record at the same time)
         $employeeRequestHelper->applyUpdateLocalRecords($employeeRequest, $employeeRequestEmulatedData, $legalEntity);
+
+        // This value will be replaced with the real one from the server after the request will be sent
+        $employeeRequest->update(["applied_at" => Carbon::now()->format('Y-m-d')]);
     }
 
     /**

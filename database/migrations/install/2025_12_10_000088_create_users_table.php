@@ -30,6 +30,7 @@ return new class extends Migration
             $table->boolean('is_blocked')->nullable();
             $table->string('block_reason')->nullable();
             $table->foreignId('person_id')->nullable()->constrained('persons')->onDelete('set null');
+            $table->timestamp('inserted_at')->nullable();
 
             $table->timestamps();
         });

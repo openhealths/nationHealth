@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Spatie\Permission\Exceptions\PermissionDoesNotExist;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -56,7 +57,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'password',
         'secret_key',
-        'party_id'
+        'party_id',
+        'inserted_at'
     ];
 
     /**
@@ -99,6 +101,14 @@ class User extends Authenticatable implements MustVerifyEmail
     public function person(): BelongsTo
     {
         return $this->belongsTo(Person::class);
+    }
+
+    /**
+     * The employees that belong to the user
+     */
+    public function employees(): BelongsToMany
+    {
+        return $this->belongsToMany(Employee::class, 'employee_users', 'user_id', 'employee_id');
     }
 
     /**

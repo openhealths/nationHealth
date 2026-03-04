@@ -51,13 +51,13 @@ class EmployeeRequestsSyncAll extends EHealthJob
      * Get the next entity job to be scheduled after EmployeeRequestSync completes.
      *
      * If the job is standalone, returns a CompleteSync job for the current legal entity.
-     * Otherwise, returns a chain of EmployeeDetailsUpsert jobs for employees with PARTIAL sync status.
+     * Otherwise, returns a chain of EmployeeRequestDetailsUpsert jobs for employee requests with PARTIAL sync status.
      *
      * @return EHealthJob|null
      */
     protected function getNextEntityJob(): ?EHealthJob
     {
-        $nextEntity = $this->nextEntity ?? $this->getEmployeeRequestDetailsStartJob($this->legalEntity, $this->nextEntity);
+        $nextEntity = $this->getEmployeeRequestDetailsStartJob($this->legalEntity, $this->nextEntity) ?? $this->nextEntity;
 
         return $this->standalone || !$nextEntity
             ? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin)
