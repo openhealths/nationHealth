@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -14,7 +16,7 @@ return new class extends Migration
         Schema::create('specialities', function (Blueprint $table) {
             $table->id();
             $table->string('speciality');
-            $table->boolean('speciality_officio');
+            $table->boolean('speciality_officio')->comment('Is main speciality');
             $table->string('level');
             $table->string('qualification_type')->nullable();
             $table->string('attestation_name');

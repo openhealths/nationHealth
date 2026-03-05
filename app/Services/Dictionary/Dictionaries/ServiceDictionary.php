@@ -8,13 +8,10 @@ use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Services\Dictionary\DictionaryInterface;
-use App\Traits\FormTrait;
 use Illuminate\Http\Client\ConnectionException;
 
 class ServiceDictionary implements DictionaryInterface
 {
-    use FormTrait;
-
     /**
      * Dictionary unique identifier key.
      */
