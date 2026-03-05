@@ -288,7 +288,7 @@
                     </li>
                 @endcan
 
-                    <li x-data="{ open: {{ request()->routeIs('references.index') ? 'true' : 'false' }} }"
+                    <li x-data="{ open: {{ (request()->routeIs('dictionary.programs-medications.index') || request()->routeIs('dictionary.drugs-list.index')) ? 'true' : 'false' }} }"
                         class="space-y-2">
                         <button @click="open = !open"
                                 type="button"
@@ -297,7 +297,7 @@
                                 :aria-expanded="open"
                         >
                             @icon('directory')
-                            <span>{{ __('forms.references') }}</span>
+                            <span>{{ __('forms.dictionary') }}</span>
 
                             <svg fill="currentColor" viewBox="0 0 20 20"
                                  xmlns="http://www.w3.org/2000/svg"
@@ -322,11 +322,19 @@
                             x-transition:leave-end="transform opacity-0 scale-95"
                         >
                             <li>
-                                <a href="{{ route('references.index', [legalEntity()]) }}"
+                                <a href="{{ route('dictionary.programs-medications.index', [legalEntity()]) }}"
                                    class="submenu-item"
                                 >
                                     @icon('boxicons_file')
                                     <span>{{ __('programs-medications.title') }}</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ route('dictionary.drugs-list.index', [legalEntity()]) }}"
+                                   class="submenu-item"
+                                >
+                                    @icon('boxicons_file')
+                                    <span>{{ __('drugs-list.title') }}</span>
                                 </a>
                             </li>
                         </ul>
