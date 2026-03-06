@@ -32,7 +32,7 @@ class ContractIndex extends Component
 
     public function mount(): void
     {
-        $this->typeFilter = Type::values();
+        $this->typeFilter = ['capitation', 'reimbursement'];
     }
 
     public function search(): void
@@ -44,7 +44,7 @@ class ContractIndex extends Component
     public function resetFilters(): void
     {
         $this->reset(['typeFilter', 'isFiltersApplied']);
-        $this->typeFilter = Type::values();
+        $this->typeFilter = ['capitation', 'reimbursement'];
     }
 
     public function sync(): void

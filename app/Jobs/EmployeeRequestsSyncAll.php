@@ -28,7 +28,7 @@ class EmployeeRequestsSyncAll extends EHealthJob
 
         return EHealth::employeeRequest()
             ->withToken($token)
-            ->getMany(['edrpou' => $this->legalEntity->edrpou], $this->page);
+            ->getMany(['legal_entity_id' => $this->legalEntity->uuid], $this->page);
     }
 
     protected function processResponse(?EHealthResponse $response): void

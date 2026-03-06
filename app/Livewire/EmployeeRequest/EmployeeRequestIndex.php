@@ -214,7 +214,7 @@ class EmployeeRequestIndex extends EmployeeComponent
 
         try {
             // 1. Synchronous request for Page 1
-            $response = EHealth::employeeRequest()->getMany(['edrpou' => legalEntity()->edrpou]); // Page 1 is default
+            $response = EHealth::employeeRequest()->getMany(['legal_entity_id' => legalEntity()->uuid]); // Page 1 is default
         } catch (ConnectionException $e) {
             Log::error('Employee Request sync failed: No connection.', ['error' => $e->getMessage()]);
             $this->dispatch('flashMessage', ['message' => 'Немає зв\'язку з ЕСОЗ', 'type' => 'error']);

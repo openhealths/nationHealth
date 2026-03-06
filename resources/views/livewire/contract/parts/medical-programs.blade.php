@@ -4,8 +4,16 @@
             <legend class="legend">{{ __('contracts.medical_programs') }}</legend>
             <div class="flex flex-wrap gap-2">
                 @foreach($data['medical_programs'] as $program)
+                    @php
+                        $key = is_array($program) ? ($program['name'] ?? $program['id']) : $program;
+                        $translationKey = 'contracts.' . strtolower($key);
+                        $translatedName = __($translationKey);
+                        if ($translatedName === $translationKey) {
+                            $translatedName = $key;
+                        }
+                    @endphp
                     <span class="text-gray-900 dark:text-white">
-                        {{ is_array($program) ? ($program['name'] ?? $program['id']) : $program }}
+                        {{ $translatedName }}
                     </span>
                 @endforeach
             </div>

@@ -51,6 +51,12 @@
                         @else
                             {{ $contract->status }}
                         @endif
+                        
+                        @if($contract->status_reason)
+                            <div class="mt-2 p-2 text-xs bg-yellow-50 text-yellow-800 border border-yellow-200 rounded-md">
+                                <strong>Причина:</strong> {{ $contract->status_reason }}
+                            </div>
+                        @endif
                     </dd>
                 </div>
 
