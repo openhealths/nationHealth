@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Livewire\Dictionary\DrugList;
 use App\Livewire\Dictionary\MedicationProgram;
 use App\Livewire\Dictionary\ServiceProgram;
 
@@ -17,6 +18,9 @@ use App\Livewire\Dictionary\ServiceProgram;
 
 Route::prefix('dictionaries')->name('dictionaries.')
     ->group(function () {
+        Route::get('/drug-list', DrugList::class)
+            ->name('drug-list.index');
+
         Route::get('/medication-programs', MedicationProgram::class)
             ->name('medication-programs.index');
 

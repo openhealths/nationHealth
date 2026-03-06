@@ -288,7 +288,7 @@
                     </li>
                 @endcan
 
-                <li x-data="{ open: {{ (request()->routeIs('dictionaries.medication-programs.index') || request()->routeIs('dictionaries.service-programs.index')) ? 'true' : 'false' }} }"
+                <li x-data="{ open: {{ (request()->routeIs('dictionaries.medication-programs.index') || request()->routeIs('dictionaries.service-programs.index') || request()->routeIs('dictionaries.drug-list.index')) ? 'true' : 'false' }} }"
                     class="space-y-2"
                 >
                     <button @click="open = !open"
@@ -338,9 +338,16 @@
                                 <span>{{ __('dictionaries.service_programs.title') }}</span>
                             </a>
                         </li>
+                        <li>
+                            <a href="{{ route('dictionaries.drug-list.index', [legalEntity()]) }}"
+                               class="submenu-item"
+                            >
+                                @icon('boxicons-file')
+                                <span>{{ __('drug-list.title') }}</span>
+                            </a>
+                        </li>
                     </ul>
                 </li>
-            @endif
-        </ul>
+        @endif
     </div>
 </aside>
