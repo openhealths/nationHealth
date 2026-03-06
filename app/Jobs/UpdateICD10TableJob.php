@@ -24,7 +24,7 @@ class UpdateICD10TableJob implements ShouldQueue
         try {
             Log::channel('task_scheduling')->info('Updating ICD-10 codes begins.');
 
-            $dictionary = dictionary()->getLargeDictionary('eHealth/ICD10_AM/condition_codes')['eHealth/ICD10_AM/condition_codes'];
+            $dictionary = dictionary()->basics()->byName('eHealth/ICD10_AM/condition_codes')->asLargeDictionary()->toArray();
 
             $data = [];
             foreach ($dictionary as $key => $value) {

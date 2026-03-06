@@ -40,9 +40,11 @@ class InDictionary implements ValidationRule
 
         foreach ($names as $name) {
             if ($name === 'eHealth/ICF/classifiers') {
-                $dictionaryKeys = array_keys(dictionary()
-                    ->getLargeDictionary('eHealth/ICF/classifiers', false)
-                    ->getFlattenedChildValues());
+                $dictionaryKeys = dictionary()->basics()
+                    ->byName('eHealth/ICF/classifiers')
+                    ->flattenedChildValues()
+                    ->keys()
+                    ->toArray();
             } elseif ($name === 'eHealth/ICD10_AM/condition_codes') {
                 $dictionaryKeys = DB::table('icd_10')
                     ->select(['code'])
@@ -50,12 +52,14 @@ class InDictionary implements ValidationRule
                     ->toArray();
             } elseif ($name === 'device_definition_classification_type') {
                 // Convert all keys to string
-                $dictionaryKeys = dictionary()->getDictionary('device_definition_classification_type', false)
+                $dictionaryKeys = dictionary()->basics()
+                    ->byName('device_definition_classification_type')
+                    ->asCodeDescription()
                     ->keys()
                     ->map(static fn (int|string $key) => (string)$key)
                     ->toArray();
             } else {
-                $dictionaryKeys = array_keys(dictionary()->getDictionary($name));
+                $dictionaryKeys = array_keys(dictionary()->basics()->byName($name)->asCodeDescription()->toArray());
             }
 
             if (in_array($value, $dictionaryKeys, true)) {

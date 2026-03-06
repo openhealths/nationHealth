@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
@@ -48,7 +48,7 @@ return new class extends Migration
      */
     protected function setData(): void
     {
-        $dictionary = dictionary()->getLargeDictionary('eHealth/ICD10_AM/condition_codes')['eHealth/ICD10_AM/condition_codes'];
+        $dictionary = dictionary()->basics()->byName('eHealth/ICD10_AM/condition_codes')->asLargeDictionary()->toArray();
 
         $data = [];
 

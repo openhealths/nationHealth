@@ -241,7 +241,6 @@ abstract class LegalEntity extends Component
      * Livewire lifecycle hook triggered when the beneficiary field is updated.
      *
      * @param  mixed  $value  The new value of the beneficiary field
-     *
      * @return void
      */
     public function updatedLegalEntityFormBeneficiary($value)
@@ -253,7 +252,6 @@ abstract class LegalEntity extends Component
      * Livewire lifecycle hook triggered when the receiverFundsCode field is updated.
      *
      * @param  mixed  $value  The new value of the receiverFundsCode field
-     *
      * @return void
      */
     public function updatedLegalEntityFormReceiverFundsCode($value)
@@ -488,7 +486,7 @@ abstract class LegalEntity extends Component
     {
         // Define an array with consent text and consent status
         return [
-            'consent_text' => __(dictionary()->getDictionary('LE_CONSENT_TEXT')['APPROVED']),
+            'consent_text' => __(dictionary()->basics()->byName('LE_CONSENT_TEXT')->value('description')),
             'consent' => $this->legalEntityForm->publicOffer['consent'] ?? false,
         ];
     }
@@ -511,8 +509,7 @@ abstract class LegalEntity extends Component
      * Optionally filters or adjusts the prepared list based on the provided type,
      * and returns the result in string form suitable for UI rendering/binding.
      *
-     * @param string $type License type discriminator used to tailor the select options.
-     *
+     * @param  string  $type  License type discriminator used to tailor the select options.
      * @return string Prepared license type options representation for the select field.
      */
     public function getLicenseTypesByLegalEntityType(?string $type = null): string
@@ -602,7 +599,9 @@ abstract class LegalEntity extends Component
         // Converting archive to array
         $data['archive'] = $data['archivation_show'] ? $data['archive'] : [];
 
-        Arr::forget($data, [
+        Arr::forget(
+            $data,
+            [
             'archivation_show',
             'accreditation_show',
             'beneficiary_show',

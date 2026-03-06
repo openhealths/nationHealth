@@ -97,7 +97,7 @@ class LicenseForm extends Form
      */
     private function getAllowedLicenseTypes(): array
     {
-        $licenseTypes = dictionary()->getDictionary('LICENSE_TYPE');
+        $licenseTypes = dictionary()->basics()->byName('LICENSE_TYPE')->asCodeDescription()->toArray();
 
         if (
             legalEntity()->type->name === LegalEntity::TYPE_OUTPATIENT ||

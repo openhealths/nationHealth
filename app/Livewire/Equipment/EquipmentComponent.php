@@ -63,8 +63,12 @@ class EquipmentComponent extends Component
     #[Locked]
     public ?int $equipmentId = null;
 
+    public array $dictionaryNames = ['device_definition_classification_type', 'equipment_status_reasons'];
+
     public function baseMount(LegalEntity $legalEntity): void
     {
+        $this->getDictionary();
+
         $this->divisions = $legalEntity->divisions()->active()->get(['uuid', 'name'])->toArray();
         $this->equipments = $legalEntity->equipments()
             ->active()

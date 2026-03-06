@@ -26,7 +26,7 @@ class Service extends Request
      *
      * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-programs/medical-program/get-services-dictionary
      */
-    public function getServiceDictionary(array $query = []): PromiseInterface|EHealthResponse
+    public function getMany(array $query = []): PromiseInterface|EHealthResponse
     {
         $this->setDefaultPageSize();
 

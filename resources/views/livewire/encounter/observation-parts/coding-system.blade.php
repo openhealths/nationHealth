@@ -14,7 +14,7 @@
                    :checked="modalObservation.codingSystem === 'loinc'"
             >
             <label for="loincDictionary" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
-                {{ __('patients.loinc_observation_dictionary') }}
+                {{ __('dictionaries.loinc_observation_dictionary') }}
             </label>
         </div>
 
@@ -28,7 +28,7 @@
                    :checked="modalObservation.codingSystem === 'icf'"
             >
             <label for="icfDictionary" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
-                {{ __('patients.icf_dictionary_condition_patient') }}
+                {{ __('dictionaries.icf_dictionary_condition_patient') }}
             </label>
         </div>
     </div>

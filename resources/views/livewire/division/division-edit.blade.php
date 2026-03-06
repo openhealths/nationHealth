@@ -1,7 +1,7 @@
 @php
     $action = 'update';
     $division = \App\Models\Division::find($divisionForm->division['id']);
-    $divisionType = dictionary()->getDictionary('DIVISION_TYPE', false)->getValue($divisionForm->division['type']);
+    $divisionType = dictionary()->basics()->byName('DIVISION_TYPE')->where('code', $divisionForm->division['type'])->value('description');
     $status = $divisionForm->division['status'];
 @endphp
 

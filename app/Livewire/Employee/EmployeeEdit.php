@@ -72,7 +72,7 @@ class EmployeeEdit extends AbstractEmployeeFormManager
         // We reuse the logic to update it.
 
         $employeeRequestData = Arr::only($preparedData, ['position', 'start_date', 'end_date', 'employee_type', 'division_id', 'email']);
-        $employeeRequestData['user_id'] = $this->employee->user_id;
+        $employeeRequestData['user_id'] = $this->employee->party?->users()->first()?->id;
         $employeeRequestData['party_id'] = $this->employee->party->id;
         $employeeRequestData['employee_id'] = $this->employee->id;
 

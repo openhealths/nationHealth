@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Classes\eHealth\Services\SchemaService;
-use App\Services\DictionaryService;
+use App\Services\Dictionary\DictionaryManager;
 use App\Services\SignatureService;
 use Carbon\CarbonImmutable;
 use App\Models\LegalEntity;
@@ -75,9 +75,9 @@ if (!function_exists('schemaService')) {
 }
 
 if (!function_exists('dictionary')) {
-    function dictionary(): DictionaryService
+    function dictionary(): DictionaryManager
     {
-        return app(DictionaryService::class);
+        return app(DictionaryManager::class);
     }
 }
 

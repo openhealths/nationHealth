@@ -97,10 +97,11 @@ class ProcedureComponent extends Component
         $this->getDictionary();
 
         try {
-            $this->dictionaries['custom/services'] = dictionary()->getServiceDictionary();
-            $this->dictionaries['eHealth/assistive_products'] = dictionary()
-                ->getLargeDictionary('eHealth/assistive_products', false)
-                ->getFlattenedChildValues();
+            $this->dictionaries['custom/services'] = dictionary()->services()->flattened()->toArray();
+            $this->dictionaries['eHealth/assistive_products'] = dictionary()->basics()
+                ->byName('eHealth/assistive_products')
+                ->flattenedChildValues()
+                ->toArray();
         } catch (eHealthApiException) {
             Log::channel('e_health_errors')
                 ->error('Error while loading services and assistive products dictionaries in ProcedureComponent');

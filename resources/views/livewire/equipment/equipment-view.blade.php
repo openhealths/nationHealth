@@ -58,7 +58,7 @@
                         disabled
                 >
                     <option value="" selected>{{ __('forms.select') }}</option>
-                    @foreach(dictionary()->getDictionary('device_definition_classification_type') as $key => $type)
+                        @foreach($this->dictionaries['device_definition_classification_type'] as $key => $type)
                         <option value="{{ $key }}">{{ $type }}</option>
                     @endforeach
                 </select>
@@ -100,7 +100,7 @@
 
             <div class="form-group group">
                 <input type="text"
-                       value="{{ $form->errorReason ? dictionary()->getDictionary('equipment_status_reasons')[$form->errorReason] : '' }}"
+                       value="{{ $form->errorReason ? ($this->dictionaries['device_definition_classification_type'][$form->errorReason] ?? $form->errorReason) : '' }}"
                        name="errorReason"
                        id="errorReason"
                        placeholder=" "

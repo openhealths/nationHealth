@@ -64,7 +64,7 @@ class EmployeeRequestEdit extends AbstractEmployeeFormManager
         // If it's a SIGNED request being corrected -> Create NEW Draft (Standard logic)
         if (!is_null($this->employeeRequest->uuid)) {
             $employeeRequestData = Arr::only($preparedData, ['position', 'start_date', 'end_date', 'employee_type', 'division_id', 'email']);
-            $employeeRequestData['user_id'] = $this->employeeRequest->user_id;
+            $employeeRequestData['user_id'] = $this->employeeRequest->party?->users()->first()?->id;
             $employeeRequestData['party_id'] = $this->employeeRequest->party_id;
             $employeeRequestData['employee_id'] = $this->employeeRequest->employee_id;
 

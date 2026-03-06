@@ -39,7 +39,7 @@ class AddressRule implements ValidationRule
     {
         $this->division = $division;
         $this->message = __('divisions.errors.address.commonError');
-        $this->dictionaries = dictionary()->getDictionaries(['ADDRESS_TYPE', 'SETTLEMENT_TYPE', 'STREET_TYPE']);
+        $this->dictionaries = dictionary()->basics()->getMultipleFormatted(['ADDRESS_TYPE', 'SETTLEMENT_TYPE', 'STREET_TYPE'])->toArray();
     }
 
     /**
@@ -62,7 +62,6 @@ class AddressRule implements ValidationRule
      * This method is called when a address type rule fails validation.
      *
      * @return void
-     *
      * @throws CustomValidationException
      */
     protected function throwError(): void
@@ -75,8 +74,7 @@ class AddressRule implements ValidationRule
      *
      * This message will be used when throwing a validation exception.
      *
-     * @param string $message The error message to set.
-     *
+     * @param  string  $message  The error message to set.
      * @return void
      */
     protected function setMessage(string $message): void
@@ -122,13 +120,13 @@ class AddressRule implements ValidationRule
     protected function checkSettlementType(): bool
     {
         foreach ($this->division['addresses'] as $address) {
-                $settlementType = $address['settlementType'] ?? '';
+            $settlementType = $address['settlementType'] ?? '';
 
-                if (!in_array($settlementType, array_keys($this->dictionaries['SETTLEMENT_TYPE']))) {
-                    $this->setMessage(__('divisions.errors.address.settlementType'));
+            if (!in_array($settlementType, array_keys($this->dictionaries['SETTLEMENT_TYPE']))) {
+                $this->setMessage(__('divisions.errors.address.settlementType'));
 
-                    return false;
-                }
+                return false;
+            }
         }
 
         return true;
@@ -144,7 +142,7 @@ class AddressRule implements ValidationRule
         foreach ($this->division['addresses'] as $address) {
             $streetType = $address['streetType'] ?? '';
 
-            if (!in_array($streetType , array_keys($this->dictionaries['STREET_TYPE']))) {
+            if (!in_array($streetType, array_keys($this->dictionaries['STREET_TYPE']))) {
                 $this->setMessage(__('divisions.errors.address.streetType'));
 
                 return false;
@@ -187,8 +185,8 @@ class AddressRule implements ValidationRule
         foreach ($this->division['addresses'] as $address) {
             $addressType = $address['type'] ?? '';
 
-            if (! in_array($divisionType, Division::getValidDivisionTypes()) ||
-                ! in_array($legalEntityType, Division::getValidLegalEntityTypes()) ||
+            if (!in_array($divisionType, Division::getValidDivisionTypes()) ||
+                !in_array($legalEntityType, Division::getValidLegalEntityTypes()) ||
                 !$this->checkAddressObligation($addressType, $legalEntityType)
             ) {
                 $this->setMessage(__('divisions.errors.address.mapping'));
@@ -203,9 +201,8 @@ class AddressRule implements ValidationRule
     /**
      * Check if an address is obligatory for a given address type and legal entity type.
      *
-     * @param string $addressType The type of address (e.g., 'RESIDENCE', 'RECEPTION')
-     * @param string $legalEntityType The type of legal entity (e.g., 'PRIMARY_CARE', 'OUTPATIENT')
-     *
+     * @param  string  $addressType  The type of address (e.g., 'RESIDENCE', 'RECEPTION')
+     * @param  string  $legalEntityType  The type of legal entity (e.g., 'PRIMARY_CARE', 'OUTPATIENT')
      * @return bool Returns true if the address is mandatory for the specified combination, false otherwise
      */
     protected function checkAddressObligation(string $addressType, string $legalEntityType): bool

@@ -132,7 +132,7 @@
                                         for="public_offer_consent"
                                         class="steps-agreement_label !text-xs cursor-pointer"
                                     >
-                                        {{ __(dictionary()->getDictionary('LE_CONSENT_TEXT')['APPROVED']) }}
+                                        {{ __(dictionary()->basics()->byName('LE_CONSENT_TEXT')->value('description')) }}
                                     </label>
                                 </div>
 

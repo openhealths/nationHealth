@@ -43,7 +43,7 @@ class EmployeePolicy
         }
 
         // 3. Check if there is a connection with the user (user_id)
-        if (is_null($employee->userId)) {
+        if (is_null($employee->party?->users()->first()?->id)) {
             return Response::deny(__('employees.policy.no_user_linked'));
         }
 
@@ -80,7 +80,7 @@ class EmployeePolicy
         }
 
         // 2. State Check
-        if (!$employee->userId || !$employee->partyId || !$employee->uuid) {
+        if (!$employee->party?->users()->first()?->id || !$employee->partyId || !$employee->uuid) {
             return Response::deny(__('employees.policy.sync_missing_data'));
         }
 

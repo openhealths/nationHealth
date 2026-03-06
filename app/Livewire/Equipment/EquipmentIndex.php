@@ -36,10 +36,10 @@ use Throwable;
 
 class EquipmentIndex extends Component
 {
-    use BatchLegalEntityQueries,
-        WithPagination,
-        StatusTrait,
-        FormTrait;
+    use BatchLegalEntityQueries;
+    use WithPagination;
+    use StatusTrait;
+    use FormTrait;
 
     protected const string BATCH_NAME = 'EquipmentSync';
 
@@ -94,12 +94,14 @@ class EquipmentIndex extends Component
      */
     public string $syncStatus = '';
 
+    public array $dictionaryNames = ['device_definition_classification_type', 'equipment_status_reasons'];
+
     private LegalEntity $legalEntity;
 
     #[Computed]
     public function isSync(): bool
     {
-       return $this->isSyncProcessing();
+        return $this->isSyncProcessing();
     }
 
     /**
@@ -154,7 +156,7 @@ class EquipmentIndex extends Component
                $legalEntitySync ||
                $divisionSync ||
                $healthCareServiceSync ||
-               $employeeSync;;
+               $employeeSync;
     }
 
     public function boot(): void
@@ -165,6 +167,8 @@ class EquipmentIndex extends Component
 
     public function mount(LegalEntity $legalEntity): void
     {
+        $this->getDictionary();
+
         $this->divisions = $legalEntity->divisions()->select(['id', 'name'])->get()->toArray();
         $this->statusFilter = Status::values();
         $this->availabilityStatusFilter = AvailabilityStatus::values();
@@ -268,8 +272,8 @@ class EquipmentIndex extends Component
      * This method handles the continuation of a previously initiated synchronization
      * operation for a specific user using an authentication or session token.
      *
-     * @param User $user The user instance for whom synchronization should be resumed
-     * @param string $token The authentication or session token used to resume the sync process
+     * @param  User  $user  The user instance for whom synchronization should be resumed
+     * @param  string  $token  The authentication or session token used to resume the sync process
      * @return void
      */
     protected function resumeSynchronization(User $user, string $token): void

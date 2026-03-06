@@ -143,7 +143,7 @@ class DiagnosticReportComponent extends Component
         $this->getDictionary();
 
         try {
-            $this->dictionaries['custom/services'] = dictionary()->getServiceDictionary();
+            $this->dictionaries['custom/services'] = dictionary()->services()->flattened()->toArray();
             $this->loadObservationDictionaries();
         } catch (RuntimeException) {
             Log::channel('e_health_errors')
@@ -210,9 +210,10 @@ class DiagnosticReportComponent extends Component
     protected function loadObservationDictionaries(): void
     {
         try {
-            $this->dictionaries['eHealth/ICF/classifiers'] = dictionary()
-                ->getLargeDictionary('eHealth/ICF/classifiers', false)
-                ->getFlattenedChildValues();
+            $this->dictionaries['eHealth/ICF/classifiers'] = dictionary()->basics()
+                ->byName('eHealth/ICF/classifiers')
+                ->flattenedChildValues()
+                ->toArray();
         } catch (eHealthApiException) {
             session()?->flash('error', 'Виникла помилка. Зверніться до адміністратора.');
         }

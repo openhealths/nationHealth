@@ -4,30 +4,41 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Services\Dictionary\Dictionaries\BasicDictionary;
+use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
+use App\Services\Dictionary\Dictionaries\ServiceDictionary;
+use App\Services\Dictionary\DictionaryManager;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Support\DeferrableProvider;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
-use App\Services\DictionaryService;
 
 class DictionaryServiceProvider extends ServiceProvider implements DeferrableProvider
 {
     /**
-     * Register DictionaryService.
+     * Register DictionaryManager.
      *
      * @return void
      */
     public function register(): void
     {
-        $this->app->singleton(DictionaryService::class, fn(Application $app) => new DictionaryService());
+        $this->app->singleton(DictionaryManager::class, function (Application $app) {
+            $manager = new DictionaryManager();
+
+            $manager->register($app->make(MedicalProgramDictionary::class));
+            $manager->register($app->make(ServiceDictionary::class));
+            $manager->register($app->make(BasicDictionary::class));
+
+            return $manager;
+        });
     }
 
     /**
-     * Get the DictionaryService provided by the provider.
+     * Get the services provided by the provider.
      *
      * @return array<int, string>
      */
     public function provides(): array
     {
-        return [DictionaryService::class];
+        return [DictionaryManager::class];
     }
 }

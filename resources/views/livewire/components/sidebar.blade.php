@@ -310,25 +310,22 @@
                             </svg>
                         </button>
 
-                        <ul id="dropdown-references"
-                            x-cloak
-                            class="py-2 space-y-2"
-                            x-show="open"
-                            x-transition:enter="transition ease-out duration-100"
-                            x-transition:enter-start="transform opacity-0 scale-95"
-                            x-transition:enter-end="transform opacity-100 scale-100"
-                            x-transition:leave="transition ease-in duration-75"
-                            x-transition:leave-start="transform opacity-100 scale-100"
-                            x-transition:leave-end="transform opacity-0 scale-95"
+                <li x-data="{ open: {{ (request()->routeIs('dictionaries.medication-programs.index') || request()->routeIs('dictionaries.service-programs.index')) ? 'true' : 'false' }} }"
+                    class="space-y-2"
+                >
+                    <button @click="open = !open"
+                            type="button"
+                            class="menu-item"
+                            aria-controls="dropdown-dictionaries"
+                            :aria-expanded="open"
+                    >
+                        @icon('library-linear')
+                        <span>{{ __('dictionaries.label') }}</span>
+
+                        <svg fill="currentColor" viewBox="0 0 20 20"
+                             xmlns="http://www.w3.org/2000/svg"
+                             :class="{ 'rotate-180': open, 'rotate-0': !open }"
                         >
-                            <li>
-                                <a href="{{ route('dictionary.programs-medications.index', [legalEntity()]) }}"
-                                   class="submenu-item"
-                                >
-                                    @icon('boxicons_file')
-                                    <span>{{ __('programs-medications.title') }}</span>
-                                </a>
-                            </li>
                             <li>
                                 <a href="{{ route('dictionary.drugs-list.index', [legalEntity()]) }}"
                                    class="submenu-item"
@@ -340,6 +337,43 @@
                         </ul>
                     </li>
 
+                            <path fill-rule="evenodd"
+                                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                  clip-rule="evenodd"
+                            ></path>
+                        </svg>
+                    </button>
+
+
+                    <ul id="dropdown-dictionaries"
+                        x-cloak
+                        class="py-2 space-y-2"
+                        x-show="open"
+                        x-transition:enter="transition ease-out duration-100"
+                        x-transition:enter-start="transform opacity-0 scale-95"
+                        x-transition:enter-end="transform opacity-100 scale-100"
+                        x-transition:leave="transition ease-in duration-75"
+                        x-transition:leave-start="transform opacity-100 scale-100"
+                        x-transition:leave-end="transform opacity-0 scale-95"
+                    >
+                        <li>
+                            <a href="{{ route('dictionaries.medication-programs.index', [legalEntity()]) }}"
+                               class="submenu-item"
+                            >
+                                @icon('boxicons-file')
+                                <span>{{ __('dictionaries.medication_programs.title') }}</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('dictionaries.service-programs.index', [legalEntity()]) }}"
+                               class="submenu-item"
+                            >
+                                @icon('boxicons-file')
+                                <span>{{ __('dictionaries.service_programs.title') }}</span>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
             @endif
         </ul>
     </div>

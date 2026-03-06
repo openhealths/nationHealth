@@ -12,6 +12,7 @@ class DeclarationView extends Component
 {
     /**
      * Declaration data with the needed relation data.
+     *
      * @var Declaration
      */
     public Declaration $declaration;
@@ -20,13 +21,14 @@ class DeclarationView extends Component
 
     /**
      * Declaration content.
+     *
      * @var string
      */
     public string $printableContent;
 
     public function mount(LegalEntity $legalEntity, Declaration $declaration): void
     {
-        $this->dictionary = dictionary()->getDictionary('POSITION');
+        $this->dictionary = dictionary()->basics()->byName('POSITION')->asCodeDescription()->toArray();
 
         $this->declaration = $declaration->load([
             'declarationRequest:id,data_to_be_signed',

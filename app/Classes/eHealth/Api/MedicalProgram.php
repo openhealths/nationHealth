@@ -6,6 +6,8 @@ namespace App\Classes\eHealth\Api;
 
 use App\Classes\eHealth\EHealthRequest;
 use App\Classes\eHealth\EHealthResponse;
+use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\ConnectionException;
 
@@ -15,22 +17,18 @@ class MedicalProgram extends EHealthRequest
 
     /**
      * Receives a list of medical programs.
-     * You need this method to select the ID for the contract.
      *
-     * @param array $filters
-     * @param int   $page
-     *
+     * @param  array{id?: string, name?: string,is_active?: bool,mr_blank_type?: string,type?: string, page?: int, page_size?: int}  $filters
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException
+     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
      */
-    public function getMany(array $filters = [], int $page = 1): PromiseInterface|EHealthResponse
+    public function getMany(array $filters = []): PromiseInterface|EHealthResponse
     {
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge(
             $this->options['query'] ?? [],
-            $filters,
-            ['page' => $page]
+            $filters
         );
 
         return $this->get(self::URL, $mergedQuery);

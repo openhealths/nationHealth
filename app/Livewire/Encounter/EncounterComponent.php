@@ -266,18 +266,16 @@ class EncounterComponent extends Component
         $this->observationCodeMap = config('ehealth.observation_category_codes');
         $this->observationValueMap = config('ehealth.observation_code_values');
 
-        try {
-            $this->dictionaries['eHealth/ICF/classifiers'] = dictionary()
-                ->getLargeDictionary('eHealth/ICF/classifiers', false)
-                ->getFlattenedChildValues();
-            $this->dictionaries['eHealth/assistive_products'] = dictionary()
-                ->getLargeDictionary('eHealth/assistive_products', false)
-                ->getFlattenedChildValues();
-        } catch (eHealthApiException) {
-            session()?->flash('error', 'Виникла помилка. Зверніться до адміністратора.');
-        }
+        $this->dictionaries['eHealth/ICF/classifiers'] = dictionary()->basics()
+            ->byName('eHealth/ICF/classifiers')
+            ->flattenedChildValues()
+            ->toArray();
+        $this->dictionaries['eHealth/assistive_products'] = dictionary()->basics()
+            ->byName('eHealth/assistive_products')
+            ->flattenedChildValues()
+            ->toArray();
 
-        $this->dictionaries['custom/services'] = dictionary()->getServiceDictionary();
+        $this->dictionaries['custom/services'] = dictionary()->services()->flattened()->toArray();
         $this->loadRuleEngineRules();
 
         $this->codeableConceptValues = collect(config('ehealth.observation_code_values'))

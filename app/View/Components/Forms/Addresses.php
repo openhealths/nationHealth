@@ -66,7 +66,7 @@ abstract class Addresses extends Component
 
         $this->class = $class;
 
-        $this->dictionaries = dictionary()->getDictionaries(['SETTLEMENT_TYPE', 'STREET_TYPE']);
+        $this->dictionaries = dictionary()->basics()->getMultipleFormatted(['SETTLEMENT_TYPE', 'STREET_TYPE'])->toArray();
     }
 
     abstract public static function getAddressRules(array $address): array;

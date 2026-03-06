@@ -266,8 +266,6 @@ return [
     'code' => 'Код',
     'value' => 'Значення',
     'coding_system' => 'Система кодувань',
-    'loinc_observation_dictionary' => 'Довідник спостережень LOINC',
-    'icf_dictionary_condition_patient' => 'Довідник станів пацієнта МКФ',
     'components' => 'Компоненти',
     'extent_or_magnitude_of_impairment' => 'Обсяг або величина порушення',
     'interpretation' => 'Інтерпретація',

@@ -73,7 +73,7 @@ class Employee extends BaseEmployee
 
     public function scopeEmployeeInstance(Builder $query, int $userId, string $legalEntityUUID, array $roles, bool $isInclude = false): void
     {
-        $query->where('user_id', $userId)
+        $query->whereHas('party.users', fn ($q) => $q->where('users.id', $userId))
             ->where('legal_entity_uuid', $legalEntityUUID)
             ->when(
                 $isInclude,
@@ -86,7 +86,7 @@ class Employee extends BaseEmployee
     {
         $query->whereIn('employee_type', $employeeTypes)
             ->where('status', $status)
-            ->where('user_id', $userId)
+            ->whereHas('party.users', fn ($q) => $q->where('users.id', $userId))
             ->where('legal_entity_id', $legalEntityId)
             ->forParty($partyId);
     }

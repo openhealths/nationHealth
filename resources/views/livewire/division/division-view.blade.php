@@ -10,14 +10,14 @@
 
     // Model may be null if not preloaded; use for policy checks only
     $division = $divisionId ? \App\Models\Division::find($divisionId) : null;
-    $divisionType = dictionary()->getDictionary('DIVISION_TYPE', false)->getValue($divisionForm->division['type']);
+    $divisionType = dictionary()->basics()->byName('DIVISION_TYPE')->where('code', $divisionForm->division['type'])->value('description');
     $uuid = $divisionForm->division['uuid'];
 @endphp
 
 @extends('livewire.division.template.division')
 
 @section('title')
-        {{ $divisionType }} "{{ $divisionForm->division["name"] }}"
+    {{ $divisionType }} "{{ $divisionForm->division["name"] }}"
 @endsection
 
 @section('additional-buttons')

@@ -54,7 +54,7 @@ trait FormTrait
      */
     protected function getDictionary(): void
     {
-        $this->dictionaries = dictionary()->getDictionaries($this->dictionaryNames ?? []);
+        $this->dictionaries = dictionary()->basics()->getMultipleFormatted($this->dictionaryNames ?? [])->toArray();
     }
 
     /**
@@ -281,8 +281,7 @@ trait FormTrait
     /**
      * Normalize date fields in an array (need for MySQL database)
      *
-     * @param array $data
-     *
+     * @param  array  $data
      * @return array
      */
     protected function normalizeDate(array $data): array

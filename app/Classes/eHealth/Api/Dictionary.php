@@ -25,7 +25,7 @@ class Dictionary extends Request
      *
      * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/dictionaries/get-dictionaries-v2
      */
-    public function getDictionaries(array $query = []): PromiseInterface|EHealthResponse
+    public function getMany(array $query = []): PromiseInterface|EHealthResponse
     {
         return $this->timeout(300)->get(self::URL, $query);
     }

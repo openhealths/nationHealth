@@ -22,7 +22,7 @@ abstract class LicenseComponent extends Component
 
     public function boot(): void
     {
-        $this->licenseTypes = dictionary()->getDictionary('LICENSE_TYPE');
+        $this->licenseTypes = dictionary()->basics()->byName('LICENSE_TYPE')->asCodeDescription()->toArray();
 
         if (legalEntity()->type->name === 'OUTPATIENT' || legalEntity()->type->name === 'PHARMACY') {
             $this->licenseTypes = ['PHARMACY_DRUGS' => $this->licenseTypes['PHARMACY_DRUGS']];
