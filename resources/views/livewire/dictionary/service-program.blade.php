@@ -1,4 +1,11 @@
-<div>
+<div x-data="{
+        programs: @js($activePrograms),
+        selectedProgramId: '',
+        get selectedProgram() {
+            return this.programs.find(program => program.id === this.selectedProgramId) || null;
+        }
+    }"
+>
     <x-header-navigation x-data="{ showFilter: false }" class="breadcrumb-form">
         <x-slot name="title">
             {{ __('dictionaries.service_programs.title') }}
@@ -16,9 +23,14 @@
                         <select id="program"
                                 name="program"
                                 class="peer input-select"
+                                x-model="selectedProgramId"
                         >
-                            <option value="" selected>{{ __('dictionaries.service_programs.medical_guarantees') }}</option>
+                            <option value="" selected>{{ __('forms.select') }}</option>
+                            <template x-for="program in programs" :key="program.id">
+                                <option :value="program.id" x-text="program.name"></option>
+                            </template>
                         </select>
+
                         <label for="program" class="label peer-focus:text-blue-600 peer-valid:text-blue-600">
                             {{ __('dictionaries.program_label') }}
                         </label>
@@ -29,19 +41,19 @@
     </x-header-navigation>
 
     <section class="shift-content pl-3.5 mt-6 max-w-[1280px]">
-        <fieldset class="fieldset p-6 sm:p-8">
-            <legend class="legend">
-                {{ __('dictionaries.service_programs.medical_guarantees') }}
-            </legend>
+        <template x-if="selectedProgram">
+            <fieldset class="fieldset p-6 sm:p-8">
+                <legend class="legend">
+                    {{ __('dictionaries.service_programs.medical_guarantees') }}
+                </legend>
 
-            <div class="space-y-2 text-gray-900 dark:text-gray-100">
-                <p>{{ __('dictionaries.service_programs.treatment_plan_required_en') }}</p>
-            </div>
-        </fieldset>
-
-        <div class="mt-8 pl-3.5 pb-8 lg:pl-8 2xl:pl-5">
-            {{--{{ $dictionary->links() }}--}}
-        </div>
+                <div class="space-y-2 text-gray-900 dark:text-gray-100">
+                    <p>{{ __('dictionaries.service_programs.care_plan_required') }}:
+                        <span x-text="selectedProgram.medical_program_settings.care_plan_required ? '{{ __('forms.yes') }}' : '{{ __('forms.no') }}'"></span>
+                    </p>
+                </div>
+            </fieldset>
+        </template>
     </section>
 
     <x-forms.loading />

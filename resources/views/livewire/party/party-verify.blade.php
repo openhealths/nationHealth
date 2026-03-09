@@ -166,7 +166,7 @@
                     {{-- 2. Status --}}
                     <div class="form-group group">
                         <select wire:model.defer="status" id="status" class="input peer px-4 py-2">
-                            <option value="">{{ __('forms.select_statuse') }}</option>
+                            <option value="">{{ __('forms.select_status') }}</option>
                             <option value="VERIFIED">{{ __('party_verification.statuses.VERIFIED') }}</option>
                             <option value="NOT_VERIFIED">{{ __('party_verification.statuses.NOT_VERIFIED') }}</option>
                         </select>

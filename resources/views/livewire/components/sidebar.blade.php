@@ -12,7 +12,7 @@
     <div class="overflow-y-auto py-5 px-3 h-full bg-white dark:bg-gray-800">
         <ul class="space-y-2">
 
-            @if(Auth::user()->can('create', LegalEntity::class) || Auth::user()->can('limitedAction', LegalEntity::class)  || legalEntity())
+            @if(legalEntity() || Auth::user()->can('create', LegalEntity::class) || Auth::user()->can('limitedAction', LegalEntity::class))
                 <li x-data="{ open: false }" class="space-y-2">
                     <button @click="open = !open"
                             type="button"
@@ -288,7 +288,7 @@
                     </li>
                 @endcan
 
-                <li x-data="{ open: {{ (request()->routeIs('dictionaries.medication-programs.index') || request()->routeIs('dictionaries.service-programs.index') || request()->routeIs('dictionaries.drug-list.index')) ? 'true' : 'false' }} }"
+                <li x-data="{ open: {{ (request()->routeIs('dictionaries.medication-programs.index') || request()->routeIs('dictionaries.service-programs.index') || request()->routeIs('dictionaries.drug-list.index') || request()->routeIs('dictionaries.service-catalog.index')) ? 'true' : 'false' }} }"
                     class="space-y-2"
                 >
                     <button @click="open = !open"
@@ -344,6 +344,14 @@
                             >
                                 @icon('boxicons-file')
                                 <span>{{ __('drug-list.title') }}</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('dictionaries.service-catalog.index', [legalEntity()]) }}"
+                               class="submenu-item"
+                            >
+                                @icon('boxicons-file')
+                                <span>{{ __('dictionaries.service_catalog.title') }}</span>
                             </a>
                         </li>
                     </ul>
