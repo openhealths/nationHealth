@@ -53,6 +53,16 @@ class EmployeeSync extends EHealthJob
         data_fill($employees, '*.legal_entity_id', $this->legalEntity->id);
         data_fill($employees, '*.sync_status', JobStatus::PARTIAL->value);
 
+        $divisionUuids = collect($employees)->pluck('division_id')->filter(fn($id) => is_string($id) && strlen($id) === 36)->unique();
+        if ($divisionUuids->isNotEmpty()) {
+            $divisions = \App\Models\Division::whereIn('uuid', $divisionUuids)->pluck('id', 'uuid');
+            foreach ($employees as &$emp) {
+                if (!empty($emp['division_id']) && is_string($emp['division_id']) && isset($divisions[$emp['division_id']])) {
+                    $emp['division_id'] = $divisions[$emp['division_id']];
+                }
+            }
+        }
+
         Employee::upsert($employees, uniqueBy: ['uuid']);
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();

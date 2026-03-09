@@ -259,13 +259,13 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
 
         $translatedMessage = match (true) {
             str_contains($errorMessage, 'Forbidden to create OWNER')
-            => __('errors.ehealth.forbidden_create_owner'),
+            => __('errors.ehealth.messages.forbidden_create_owner'),
 
             str_contains($errorMessage, 'employee have more than one speciality with active speciality_officio')
-            => __('errors.ehealth.multiple_primary_specialities'),
+            => __('errors.ehealth.messages.multiple_primary_specialities'),
 
             $errorCode === 422 && str_contains($errorMessage, 'tax_id')
-            => __('errors.ehealth.tax_id_exists'),
+            => __('errors.ehealth.messages.tax_id_exists'),
 
             default => $e->getTranslatedMessage()
         };
@@ -528,6 +528,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
 
         // A map of translatable field sections.
         $sections = [
+            'form.party.phones' => __('forms.phone_number'),
             'form.documents' => __('forms.document'),
             'form.doctor.educations' => __('forms.education'),
             'form.doctor.specialities' => __('forms.specialities'),

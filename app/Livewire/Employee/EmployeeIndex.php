@@ -282,16 +282,15 @@ class EmployeeIndex extends EmployeeComponent
         }
 
         // eHealth requires: end_date >= start_date.
-        $startDate = Carbon::parse($employee->start_date)->startOfDay();
-        $endDate = Carbon::now('UTC')->startOfDay();
+        $startDateStr = $employee->start_date; // 'Y-m-d' string from DB
+        $endDateStr = \Illuminate\Support\Carbon::now('Europe/Kiev')->format('Y-m-d');
 
-        // If 'today' is earlier than 'start_date', use 'start_date' as the dismissal date
-        if ($endDate->lt($startDate)) {
-            $endDate = $startDate;
+        // If 'today' in Kiev is lexicographically earlier than 'start_date', use 'start_date' as the dismissal date
+        if ($startDateStr && $endDateStr < $startDateStr) {
+            $formattedEndDate = $startDateStr;
+        } else {
+            $formattedEndDate = $endDateStr;
         }
-
-        // Standardize the date format for API and Database
-        $formattedEndDate = $endDate->format('Y-m-d');
 
         try {
             // 2. eHealth API Call using formatted string
