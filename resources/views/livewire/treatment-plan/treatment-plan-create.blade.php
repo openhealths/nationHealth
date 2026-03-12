@@ -7,7 +7,7 @@
         </x-slot>
     </x-header-navigation>
 
-    <div class="form shift-content" wire:key="{{ time() }}">
+    <div x-data="{ showSignatureModal: $wire.entangle('showSignatureModal').live }" class="form shift-content" wire:key="{{ time() }}">
 
         @include('livewire.treatment-plan.parts.doctors')
         @include('livewire.treatment-plan.parts.patient_data')
@@ -18,27 +18,24 @@
 
         <div class="mt-6 flex flex-row items-center gap-4 pt-6">
             <div class="flex items-center space-x-3">
-                <a href=" " class="button-primary-outline-red">
-                    {{ __('Видалити') }}
-                </a>
+                <button type="button"
+                        class="button-primary-outline flex items-center gap-2 px-4 py-2"
+                        wire:click="save"
+                >
+                    @icon('archive', 'w-4 h-4')
+                    {{ __('forms.save') }}
+                </button>
 
-                @if(get_class($this) === TreatmentPlanCreate::class)
-                    <button type="submit"
-                            class="button-primary-outline flex items-center gap-2 px-4 py-2"
-                            wire:click="createLocally"
-                    >
-                        @icon('archive', 'w-4 h-4')
-                        {{ __('forms.save') }}
-                    </button>
-                @endif
-
-                <button type="button" wire:click="create" class="button-primary">
-                    {{ __('Створити план лікування') }}
+                <button type="button" @click="showSignatureModal = true" class="button-primary">
+                    {{ __('forms.sign_with_KEP') }}
                 </button>
             </div>
         </div>
+
+        @include('components.signature-modal', ['method' => 'sign'])
     </div>
 
     <x-messages/>
     <x-forms.loading/>
 </section>
+

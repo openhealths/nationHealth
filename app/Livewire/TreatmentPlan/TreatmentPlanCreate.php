@@ -3,87 +3,159 @@
 namespace App\Livewire\TreatmentPlan;
 
 use App\Classes\eHealth\Api\CarePlan;
+use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\EHealth\EHealthValidationException;
+// no request api included
 use App\Models\TreatmentPlan;
 use App\Repositories\TreatmentPlanRepository;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class TreatmentPlanCreate extends Component
 {
-    public $person_id;
-    public $author_id;
-    public $legal_entity_id;
-    public $category;
-    public $title;
-    public $period_start;
-    public $period_end;
-    public $encounter_id;
-    public $addresses = [];
-    public $description;
-    public $supporting_info = [];
-    public $note;
-    public $inform_with;
+    use WithFileUploads;
 
-    public function mount()
-    {
-        $this->period_start = now()->format('Y-m-d');
-        // Retrieve context: current professional, legal entity, patient
-        // $this->author_id = ...
-        // $this->legal_entity_id = ...
-    }
+    public $treatmentPlan = [];
 
-    protected $rules = [
-        'category' => 'required|string',
-        'title' => 'required|string',
-        'period_start' => 'required|date',
-        'period_end' => 'nullable|date|after_or_equal:period_start',
-        'encounter_id' => 'required|integer', // Usually mapped to UUID for eHealth
-        // other rules based on TZ
+    // KEP signature fields
+    public bool $showSignatureModal = false;
+    public array $form = [
+        'knedp' => '',
+        'keyContainerUpload' => null,
+        'password' => ''
     ];
+    public ?object $file = null;
 
-    public function updatedPeriodEnd()
+    /**
+     * @var string
+     */
+    public string $patientUuid;
+
+    /**
+     * Rules for validating KEP signing inputs
+     */
+    protected function rulesForSigning(): array
     {
-        // TZ: 3.10.1.2.4 Display warning message if period_end is provided
-        if ($this->period_end) {
-            $this->dispatch('notify', [
-                'type' => 'warning',
-                'message' => 'Увага! Ви зазначаєте кінцевий термін періоду дійсності плану лікування. Зауважте, що отримання пацієнтом медичних послуг, медичних виробів або лікарських засобів за призначенням з цього плану лікування після цієї дати будуть неможливі!'
-            ]);
-        }
+        return [
+            'form.knedp' => 'required|string',
+            'form.keyContainerUpload' => 'required|file|max:1024',
+            'form.password' => 'required|string',
+            'treatmentPlan.title' => 'required|string',
+            'treatmentPlan.description' => 'nullable|string',
+            'treatmentPlan.status' => 'required|string',
+            'treatmentPlan.intent' => 'required|string',
+            'treatmentPlan.period_start' => 'required|date',
+            'treatmentPlan.period_end' => 'nullable|date|after_or_equal:treatmentPlan.period_start',
+        ];
     }
 
-    public function save(TreatmentPlanRepository $repository)
+    public function mount(string $patientUuid = 'test-patient-uuid'): void
     {
-        $this->validate();
-
-        // 1. Save drafted record locally (status = NEW)
-        $plan = $repository->create([
-            'person_id' => $this->person_id,
-            'author_id' => $this->author_id,
-            'legal_entity_id' => $this->legal_entity_id,
-            'category' => $this->category,
-            'title' => $this->title,
-            'period_start' => $this->period_start,
-            'period_end' => $this->period_end,
-            'encounter_id' => $this->encounter_id,
-            'addresses' => $this->addresses,
-            'description' => $this->description,
-            'supporting_info' => $this->supporting_info,
-            'note' => $this->note,
-            'inform_with' => $this->inform_with,
-            'status' => 'NEW'
-        ]);
-
-        // 2. Prepare payload for eHealth synchronization
-        $payload = [
-            'intent' => 'order',
-            // structure the rest of the payload according to specification
+        $this->patientUuid = $patientUuid;
+        $this->treatmentPlan = [
+            'title' => '',
+            'description' => '',
+            'status' => 'draft',
+            'intent' => 'plan',
+            'period_start' => date('Y-m-d'),
+            'period_end' => '',
         ];
+    }
 
-        // This component prepares data; actual signing with KEP happens via frontend component
-        // Once signed, dispatch 'carePlanSigned' event to handle EHealth API
+    public function updatedFormKeyContainerUpload($val): void
+    {
+        // Livewire automatically handles updating array values, no manual mapping needed if bound correctly
+    }
+
+    public function sign(): void
+    {
+        if (Auth::user()?->cannot('create', TreatmentPlan::class)) {
+            Session::flash('error', 'У вас немає дозволу на створення плану лікування.');
+            return;
+        }
+
+        try {
+            $validated = $this->validate($this->rulesForSigning());
+        } catch (ValidationException $exception) {
+            Session::flash('error', $exception->validator->errors()->first());
+            $this->setErrorBag($exception->validator->getMessageBag());
+            $this->showSignatureModal = false;
+            return;
+        }
+
+        // Generate eHealth array representation natively
+        $formattedData = [
+            'care_plan' => [
+                'title' => $this->treatmentPlan['title'],
+                'description' => $this->treatmentPlan['description'],
+                'status' => 'new',
+                'intent' => $this->treatmentPlan['intent'],
+                'period' => [
+                    'start' => $this->treatmentPlan['period_start'],
+                ]
+            ]
+        ];
         
-        $this->dispatch('plan-saved', ['id' => $plan->id]);
+        if (!empty($this->treatmentPlan['period_end'])) {
+            $formattedData['care_plan']['period']['end'] = $this->treatmentPlan['period_end'];
+        }
+
+        // Format and sign data
+        try {
+            // Depending on architecture, we pass the wrapped payload to sign
+            $signedContent = signatureService()->signData(
+                $formattedData,
+                $this->form['password'],
+                $this->form['knedp'],
+                $this->form['keyContainerUpload'],
+                Auth::user()->party->tax_id
+            );
+
+            // Directly build signed payload wrapper to submit
+            $submitPackage = [
+                'signed_content' => $signedContent, 
+                'signed_content_encoding' => 'base64'
+            ];
+
+            // Send to eHealth API 
+            // eHealth -> care_plans -> CarePlan::create(...) will call the eHealth endpoint via Post
+            $eHealthResponse = (new CarePlan())->create($this->patientUuid, $submitPackage);
+
+            // Store local active record
+            $createdPlan = TreatmentPlanRepository::create(array_merge($this->treatmentPlan, [
+                'status' => 'active',
+                'patient_id' => 1, // Mock patient ID hook or $this->patientId if it was resolved
+                'uuid' => $eHealthResponse->getData()['id'] ?? null // store eHealth UUID
+            ]));
+
+            Session::flash('success', 'План лікування успішно підписано та відправлено.');
+            $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
+
+        } catch (ConnectionException $exception) {
+            Log::error('Error connecting when creating a care plan: ' . $exception->getMessage());
+            Session::flash('error', "Виникла помилка. Відсутній зв'язок із ЕСОЗ.");
+            $this->showSignatureModal = false;
+            return;
+        } catch (EHealthValidationException | EHealthResponseException $exception) {
+            Log::error('Error when creating a care plan: ' . $exception->getMessage());
+            $errorMessage = $exception instanceof EHealthValidationException 
+                ? $exception->getFormattedMessage() 
+                : 'Помилка від ЕСОЗ: ' . $exception->getMessage();
+                
+            Session::flash('error', $errorMessage);
+            $this->showSignatureModal = false;
+            return;
+        } catch (\Throwable $exception) {
+            Log::error('Error saving care plan: ' . $exception->getMessage());
+            Session::flash('error', 'Виникла помилка. Зверніться до адміністратора.');
+            $this->showSignatureModal = false;
+            return;
+        }
     }
 
     public function render()
