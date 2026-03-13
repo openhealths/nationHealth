@@ -338,14 +338,18 @@
                                 <span>{{ __('dictionaries.service_programs.title') }}</span>
                             </a>
                         </li>
-                        <li>
-                            <a href="{{ route('dictionaries.drug-list.index', [legalEntity()]) }}"
-                               class="submenu-item"
-                            >
-                                @icon('boxicons-file')
-                                <span>{{ __('dictionaries.drug_list.title') }}</span>
-                            </a>
-                        </li>
+
+                        @can('drugs')
+                            <li>
+                                <a href="{{ route('dictionaries.drug-list.index', [legalEntity()]) }}"
+                                   class="submenu-item"
+                                >
+                                    @icon('boxicons-file')
+                                    <span>{{ __('dictionaries.drug_list.title') }}</span>
+                                </a>
+                            </li>
+                        @endcan
+
                         <li>
                             <a href="{{ route('dictionaries.service-catalog.index', [legalEntity()]) }}"
                                class="submenu-item"

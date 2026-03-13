@@ -934,5 +934,21 @@ return [
             ],
             'path' => 'database/migrations/update'
         ]
-    ]
+    ],
+
+    // https://docs.google.com/spreadsheets/d/1LeeQv42c3soY2_LLNzaAk7OqG5Hel38X2_n8sclXytA/edit?gid=216664394#gid=216664394
+    'medications_atc_code' => [
+        'A10AE54', 'A10AC01', 'S01ED01', 'N03AG01', 'R03AC02', 'R03АС02', 'C01BD01', 'C09AA02', 'C03AA03', 'A10AE06',
+        'N03AX09', 'S03AA07', 'A10AD01', 'C03DA01', 'L04AD02', 'N05AX08', 'R03AK07', 'C08CA01', 'C08СА01', 'С08СА01',
+        'R03BA02', 'H02AB06', 'C09DA07', 'C03CA04', 'B01AA03', 'A10AB01', 'C07AB07', 'C07АВ07', 'С07АВ07','L04AD01',
+        'B01AC06', 'N05AH02', 'M04AA01', 'N03AF01', 'N05BA01', 'C02AB01', 'N02AB03', 'R03BB01', 'L04AA06', 'C08DA01',
+        'C08CA05', 'C10AA01', 'С10AА01', 'R03BA01', 'N05AH04', 'J01XD01', 'H03AA01', 'A10AE56', 'C01DA02', 'С01DА02',
+        'N06AB10', 'C07AA05', 'B01AC04', 'В01АС04', 'N03AB02', 'A10AE05', 'N02AA01', 'A10AB06', 'N05AD01', 'N06AB06',
+        'N05AX12', 'N06AB03', 'L04AA18', 'S01EE01', 'A10BB09', 'A10BA02', 'А10ВА02', 'C08DА01', 'G02CB03', 'C07AG02',
+        'M01CC01', 'A10AE04', 'C09BA03', 'С07АВ03', 'C09СA01', 'C09CA01', 'С09СА01', 'N06AA09', 'C03BA11', 'A10AB05',
+        'A07DA03', 'B03BB01', 'C01AA05', 'H01BA02', 'R03AK06', 'C07АG02', 'С07AG02', 'S01EC01', 'S01AA26', 'C07AB02',
+        'С07AB02', 'C09АА02', 'С09АА02', 'N04BA02', 'A10AD06', 'N06AB05', 'N02CC01', 'J05AB14', 'N03AA02', 'C09DB04',
+        'N03AX14', 'R03BB04', 'C01DA08', 'A10BB01', 'А10ВВ01', 'N07AA02', 'H02AB09', 'C03CA01', 'С03СА01', 'N04AA02',
+        'C07AB03', 'A03FA01', 'L02BA01', 'L02BG06', 'L02BG04', 'A10AD05',
+    ],
 ];

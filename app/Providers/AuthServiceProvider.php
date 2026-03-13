@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Policies\DrugPolicy;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Gate; // Не забудьте додати цей імпорт
+use Illuminate\Support\Facades\Gate;
 use App\Auth\EHealth\Guards\EHealthGuard;
 use App\Auth\EHealth\Services\TokenStorage;
 use Illuminate\Contracts\Foundation\Application;
@@ -40,5 +41,8 @@ class AuthServiceProvider extends ServiceProvider
         Auth::provider('ehealth_user_provider', static function (Application $app, array $config) {
             return new EHealthUserProvider($app['hash'], $config['model']);
         });
+
+        // Register policies for dictionary access
+        Gate::define('drugs', [DrugPolicy::class, 'view']);
     }
 }

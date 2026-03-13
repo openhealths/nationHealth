@@ -105,7 +105,9 @@
                                 class="peer input-select w-full"
                         >
                             <option value="" selected>{{ __('forms.select') }}</option>
-
+                            @foreach(config('ehealth.medications_atc_code') as $code)
+                                <option value="{{ $code }}">{{ $code }}</option>
+                            @endforeach
                         </select>
                         <label for="medicationCodeAtc" class="label peer-focus:text-blue-600 peer-valid:text-blue-600">
                             {{ __('dictionaries.drug_list.medication_code_atc') }}

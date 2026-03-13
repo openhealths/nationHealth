@@ -30,6 +30,7 @@ Route::prefix('dictionaries')->name('dictionaries.')
             ->name('service-programs.index');
 
         Route::get('/drug-list', DrugList::class)
+            ->can('drugs')
             ->name('drug-list.index');
 
         Route::get('/service-catalog', ServiceCatalog::class)
