@@ -65,13 +65,11 @@ class ContractIndex extends Component
         $this->dispatch('flashMessage', ['message' => 'Синхронізацію контрактів розпочато...', 'type' => 'success']);
 
         try {
-            // Request first page
-            $response = EHealth::contract()
-                ->withToken($token)
-                ->getMany([
-                    // Using the correct filter key according to the Apiary documentation
-                    'contractor_legal_entity_id' => $currentLegalEntity->uuid,
-                ]);
+            // Request first page — token is injected automatically inside EHealthRequest
+            $response = EHealth::contract()->getMany([
+                // Using the correct filter key according to the Apiary documentation
+                'contractor_legal_entity_id' => $currentLegalEntity->uuid,
+            ]);
 
             $contractsData = $response->validate();
 

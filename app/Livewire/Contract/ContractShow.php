@@ -30,11 +30,8 @@ class ContractShow extends Component
     private function syncDetailsFromEHealth(): void
     {
         try {
-            $apiClient = EHealth::contract();
-
-            $response = $apiClient
-                ->withToken(session()->get(config('ehealth.api.oauth.bearer_token')))
-                ->getDetails($this->contract->uuid);
+            // Token is injected automatically inside EHealthRequest
+            $response = EHealth::contract()->getDetails($this->contract->uuid);
 
             $ehealthData = $response->getData();
 
