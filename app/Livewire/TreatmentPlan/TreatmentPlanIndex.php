@@ -1,36 +1,45 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\TreatmentPlan;
 
-use App\Classes\eHealth\Api\CarePlan;
+use App\Classes\eHealth\EHealth;
 use App\Repositories\TreatmentPlanRepository;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
 class TreatmentPlanIndex extends Component
 {
     public $treatmentPlans = [];
+    public string $searchRequisition = '';
 
-    public function mount(TreatmentPlanRepository $repository)
+    public function mount(TreatmentPlanRepository $repository): void
     {
-        // TODO: retrieve context for legal entity id
-        $legalEntityId = auth()->user()->legal_entity_id ?? null;
-        
-        if ($legalEntityId) {
-             // Loading from local DB
-             $this->treatmentPlans = $repository->getByLegalEntity($legalEntityId);
+        $legalEntity = legalEntity();
+
+        if ($legalEntity) {
+            $this->treatmentPlans = $repository->getByLegalEntity($legalEntity->id);
         }
     }
-    
-    // Additional methods for EHealth API sync (e.g. searching globally by Requisition or ID)
-    public function searchEhealthRequisition(string $requisition)
+
+    /**
+     * Search eHealth by public requisition number (per TZ 3.10.3.2.1).
+     */
+    public function searchByRequisition(): void
     {
+        if (empty($this->searchRequisition)) {
+            return;
+        }
+
         try {
-            $api = new CarePlan();
-            $response = $api->getMany(['requisition' => $requisition]);
-            // process and merge data to view
-            return $response->getData();
-        } catch (\Exception $e) {
-            $this->dispatch('notify', ['type' => 'error', 'message' => $e->getMessage()]);
+            $response = EHealth::carePlan()->getMany(['requisition' => $this->searchRequisition]);
+            $data = $response->getData();
+            // Merge eHealth results with local list
+            $this->treatmentPlans = collect($data)->toArray();
+        } catch (\Throwable $e) {
+            Log::error('CarePlan search error: ' . $e->getMessage());
+            session()->flash('error', 'Помилка пошуку планів лікування в ЕСОЗ: ' . $e->getMessage());
         }
     }
 
