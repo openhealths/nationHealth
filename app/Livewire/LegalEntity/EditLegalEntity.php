@@ -158,6 +158,7 @@ class EditLegalEntity extends LegalEntity
         $ownerData['position'] = $owner->position;
         $ownerData['employee_uuid'] = $owner->uuid;
         $ownerData['employee_id'] = $owner->id;
+        $ownerData['party_id'] = $owner->partyId;
 
         // Return or email user logined (if it has OWNER role) or first email attached to the employee with OWNER role
         $ownerData['email'] = $partyUsers
@@ -197,6 +198,7 @@ class EditLegalEntity extends LegalEntity
         }
 
         $this->legalEntityForm->allFieldsValidate();
+        $ownerPartyId = Arr::pull($this->legalEntityForm->owner, 'party_id') ?? null;
 
         if ($this->getErrorBag()->isNotEmpty()) {
             $this->dispatchBrowserEvent('scroll-to-error');
@@ -208,6 +210,11 @@ class EditLegalEntity extends LegalEntity
         }
 
         $data = $result['request'];
+
+        $data['owner']['working_experience'] = $this->legalEntityForm->owner['workingExperience'] ?? null;
+        $data['owner']['about_myself'] = $this->legalEntityForm->owner['aboutMyself'] ?? null;
+        $data['owner']['party_id'] = $ownerPartyId;
+
         $response = $this->filterUnprovidedFields($result['response'], $data);
 
         try {
