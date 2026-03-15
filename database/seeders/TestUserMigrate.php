@@ -260,11 +260,13 @@ class TestUserMigrate extends Seeder
                         'is_blocked' => null,
                         'block_reason' => null,
                         'person_id' => null,
+                        'inserted_at' => new Carbon('2024-06-06T17:07:44Z'),
                         'created_at' => new Carbon('2024-09-11T10:00:52.000000Z'),
                         'updated_at' => new Carbon('2024-09-11T10:03:10.000000Z'),
                         'two_factor_confirmed_at' => null,
                     ]
                 );
+
                 $this->command->info("\tINFO: A new User entry has been successfully inserted into the database");
 
                 $ownerRoleIds = DB::table('roles')->where('name', Role::OWNER)->pluck('id');
@@ -290,9 +292,15 @@ class TestUserMigrate extends Seeder
                     'is_active' => true,
                     'legal_entity_id' => $legalEntityId,
                     'division_id' => null,
+                    'user_id' => $ownerUserId,
                     'party_id' => $partyId,
                     'created_at' => new Carbon('2024-11-14T10:37:35.000000Z'),
                     'updated_at' => new Carbon('2024-11-14T10:37:35.000000Z'),
+                ]);
+
+                DB::table('employee_users')->insert([
+                    'employee_id' => $employeeId,
+                    'user_id' => $ownerUserId,
                 ]);
 
                 $this->command->info("\tINFO: A new Employee entry has been successfully inserted into the database");

@@ -15,6 +15,8 @@ use App\Jobs\LegalEntitySync;
 use App\Jobs\DeclarationsSync;
 use App\Jobs\EmployeeRoleSync;
 use App\Events\EHealthUserLogin;
+use App\Jobs\EmployeeRequestsSyncAll;
+use App\Jobs\PartyVerificationSync;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Bus;
 use App\Notifications\SyncNotification;
@@ -82,6 +84,18 @@ class FirstLoginOwnerSynchronization implements ShouldQueue
         );
 
         $nextJob = new EmployeeSync(
+            legalEntity: $event->legalEntity,
+            nextEntity: $nextJob,
+            isFirstLogin: true
+        );
+
+        $nextJob = new PartyVerificationSync(
+            legalEntity: $event->legalEntity,
+            nextEntity: $nextJob,
+            isFirstLogin: true
+        );
+
+        $nextJob = new EmployeeRequestsSyncAll(
             legalEntity: $event->legalEntity,
             nextEntity: $nextJob,
             isFirstLogin: true

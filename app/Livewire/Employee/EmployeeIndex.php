@@ -14,6 +14,7 @@ use App\Jobs\EmployeeSync;
 use App\Models\Employee\Employee;
 use App\Models\Employee\EmployeeRequest;
 use App\Models\LegalEntity;
+use App\Models\Role as ModelsRole;
 use App\Models\User;
 use App\Notifications\EmployeeSyncCompleted;
 use App\Notifications\SyncNotification;
@@ -23,7 +24,6 @@ use Illuminate\Bus\Batch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Crypt;
@@ -312,11 +312,21 @@ class EmployeeIndex extends EmployeeComponent
                 // This handles cases where email might be 'N/A' or user doesn't exist locally
                 $users = $employee->party->users;
 
+                // Detach all users from the employee to prevent orphaned relationships
+                $employee->users()->detach();
+
+                // Get all specified guards from section 'guards' from file config/auth.php
+                $guards = array_keys((array) config('auth.guards'));
+
                 foreach ($users as $user) {
                     $roleToRemove = $employee->employee_type;
 
-                    if ($user->hasRole($roleToRemove)) {
-                        $user->removeRole($roleToRemove);
+                    foreach ($guards as $guard) {
+                        if ($user->hasRole($roleToRemove, $guard)) {
+                            $user->removeRole(
+                                ModelsRole::findByName($roleToRemove, $guard)
+                            );
+                        }
                     }
                 }
 

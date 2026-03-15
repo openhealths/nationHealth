@@ -296,7 +296,7 @@ trait BatchLegalEntityQueries
      * @param LegalEntity $legalEntity
      * @param EHealthJob|null $nextEntity The job to be executed after the chain completes (or null)
      *
-     * @return EHealthJob|null The first job in the EmployeeDetailsUpsert chain, or null if there are no employees
+     * @return EHealthJob|null The first job in the EmployeeRequestDetailsUpsert chain, or null if there are no employee_requests
      */
     protected function getEmployeeRequestDetailsStartJob(LegalEntity $legalEntity, ?EHealthJob $nextEntity): ?EHealthJob
     {

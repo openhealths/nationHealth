@@ -35,6 +35,11 @@ class PartyVerificationSyncStatusOnLogin
      */
     public function handle(EHealthUserLogin $event): void
     {
+        // Skip if this is the first login
+        if ($event->isFirstLogin) {
+            return;
+        }
+
         $user = $event->user;
         $legalEntity = $event->legalEntity;
 

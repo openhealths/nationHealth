@@ -161,9 +161,9 @@ return [
         'PRIMARY_CARE' => [
             'OWNER', 'HR', 'DOCTOR', 'ASSISTANT', 'ADMIN', 'RECEPTIONIST', 'MED_ADMIN', 'LABORANT'
         ],
-        'MSP_PHARMACY' => [
-            'OWNER', 'HR', 'DOCTOR', 'ADMIN', 'PHARMACIST', 'RECEPTIONIST'
-        ],
+        // 'MSP_PHARMACY' => [
+        //     'OWNER', 'HR', 'DOCTOR', 'ADMIN', 'PHARMACIST', 'RECEPTIONIST'
+        // ],
         'PHARMACY' => [
             'PHARMACY_OWNER', 'OWNER', 'PHARMACIST', 'HR'
         ],

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use Throwable;
+use Carbon\Carbon;
 use App\Core\EHealthJob;
 use App\Enums\JobStatus;
 use App\Models\LegalEntity;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Queue\SerializesModels;
 use App\Classes\eHealth\EHealthResponse;
+use App\Models\Employee\EmployeeRequest;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Middleware\RateLimited;
@@ -84,21 +86,30 @@ class EmployeeDetailsUpsert extends EHealthJob
 
         $users = $this->employee->party->users;
 
-        if ($users->isEmpty()) {
-            Log::info('Employee sync: no any users associated with this employee record yet.', [
-                'employee_id' => $this->employee->id,
-                'employee_uuid' => $this->employee->uuid,
-            ]);
-
-            return;
-        }
-
         $roleName = $this->employee->employee_type;
         $legalEntityId = $this->employee->legal_entity_id;
 
         setPermissionsTeamId($legalEntityId);
 
+        $employeeCreatedTime = EmployeeRequest::where('legal_entity_id', $legalEntityId)
+            ->where('party_id', $this->employee->party->id)
+            ->where("employee_type", $roleName)
+            ->where('division_id', $validatedData['employee']['division_id'] ?? null)
+            ->where('position', $validatedData['employee']['position'])
+            ->where('start_date', $validatedData['employee']['start_date'] ?? null)
+            ->latest('applied_at')->first()?->applied_at;
+
+        $this->employee->update(['inserted_at' => $employeeCreatedTime->format('Y-m-d H:i:s')]);
+
         foreach ($users as $user) {
+            $userCreatedTime = Carbon::parse($user->inserted_at) ?? null;
+
+            if ($userCreatedTime && $userCreatedTime->lessThan($employeeCreatedTime)) {
+                $this->employee->users()->syncWithoutDetaching([$user->id]);
+            } else {
+                continue;
+            }
+
             if (!$user->hasRole($roleName)) {
                 foreach ($this->getGuardsForRole($roleName) as $guard) {
                     Log::info("Assigning role '{$roleName}' to user ID {$user->id} for guard '{$guard}'.");
