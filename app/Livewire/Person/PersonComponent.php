@@ -737,31 +737,6 @@ class PersonComponent extends Component
     }
 
     /**
-     * Handle exceptions with message.
-     *
-     * @param  ConnectionException|EHealthValidationException|EHealthResponseException  $exception
-     * @param  string  $logMessage
-     * @return void
-     */
-    protected function handleEHealthExceptions(
-        ConnectionException|EHealthValidationException|EHealthResponseException $exception,
-        string $logMessage
-    ): void {
-        if ($exception instanceof ConnectionException) {
-            $this->logConnectionError($exception, $logMessage);
-            Session::flash('error', __('messages.connection_exception'));
-
-            return;
-        }
-
-        $this->logEHealthException($exception, $logMessage);
-        $errorMessage = $exception instanceof EHealthValidationException
-            ? $exception->getFormattedMessage()
-            : __('patients.messages.ehealth_error', ['message' => $exception->getMessage()]);
-        Session::flash('error', $errorMessage);
-    }
-
-    /**
      * Approve person request.
      *
      * @param  array  $requestData

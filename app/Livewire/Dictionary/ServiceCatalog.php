@@ -1,8 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Dictionary;
 
+use App\Models\LegalEntity;
 use Illuminate\Support\Collection;
+use Illuminate\View\View;
 use Livewire\Component;
 
 class ServiceCatalog extends Component
@@ -15,7 +19,7 @@ class ServiceCatalog extends Component
 
     public Collection $services;
 
-    public function mount(): void
+    public function mount(LegalEntity $legalEntity): void
     {
         $this->services = $this->fakeServices();
     }
@@ -55,7 +59,7 @@ class ServiceCatalog extends Component
         return [];
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.dictionary.service-catalog', [
             'serviceCategories' => $this->serviceCategories,

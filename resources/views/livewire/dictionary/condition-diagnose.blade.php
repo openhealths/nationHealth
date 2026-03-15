@@ -1,4 +1,4 @@
-<div x-data="{ showCodes: false }">
+<div>
     <x-header-navigation x-data="{ showFilter: false }" class="breadcrumb-form">
         <x-slot name="title">
             {{ __('dictionaries.condition_diagnose.title') }}
@@ -12,37 +12,30 @@
                 </div>
 
                 <div class="form-group group w-full">
-                    <label
-                        for="conditionDiagnoseGroup"
-                        class="default-label mb-2"
-                    >
+                    <label for="conditionDiagnoseGroup" class="default-label mb-2">
                         {{ __('dictionaries.condition_diagnose.group_label') }}
                     </label>
 
-                    <select
-                        id="conditionDiagnoseGroup"
-                        name="conditionDiagnoseGroup"
-                        class="peer input-select w-full"
+                    <select id="conditionDiagnoseGroup"
+                            name="conditionDiagnoseGroup"
+                            class="peer input-select w-full"
+                            wire:model="selectedDiagnoseGroup"
                     >
                         <option value="" selected>{{ __('forms.select') }}</option>
-                        <option value="example">
-                            {{ __('dictionaries.condition_diagnose.example_group') }}
-                        </option>
+                        @foreach($diagnoseGroups as $diagnoseGroup)
+                            <option value="{{ $diagnoseGroup['id'] }}">
+                                {{ $diagnoseGroup['code'] }} - {{ $diagnoseGroup['name'] }}
+                            </option>
+                        @endforeach
                     </select>
                 </div>
 
                 <div class="flex flex-wrap gap-2">
-                    <button
-                        type="button"
-                        class="button-primary flex items-center gap-2"
-                    >
+                    <button type="button" wire:click="search" class="button-primary flex items-center gap-2">
                         @icon('search', 'w-4 h-4')
                         <span>{{ __('forms.search') }}</span>
                     </button>
-                    <button
-                        type="button"
-                        class="button-primary-outline-red"
-                    >
+                    <button type="button" wire:click="resetFilters" class="button-primary-outline-red">
                         {{ __('forms.reset_all_filters') }}
                     </button>
                 </div>
@@ -50,55 +43,26 @@
         </x-slot>
     </x-header-navigation>
 
+    @nonempty($diagnoseDetails)
     <section class="shift-content pl-3.5 mt-6 max-w-[1280px]">
-        <template x-if="!showCodes">
-            <fieldset class="fieldset p-6 sm:p-8">
-                <legend class="legend">
-                    {{ __('dictionaries.condition_diagnose.details_title') }}
-                </legend>
+        <fieldset class="fieldset p-6 sm:p-8">
+            <legend class="legend">
+                {{ $diagnoseDetails['code'] }} - {{ $diagnoseDetails['name'] }}
+            </legend>
 
-                <div class="space-y-4 text-gray-900 dark:text-gray-100">
-                    <p class="text-lg font-semibold">
-                        {{ __('dictionaries.condition_diagnose.example_group') }}
+            <div class="space-y-2 text-gray-900 dark:text-gray-100">
+                @foreach($diagnoseDetails['diagnoses_group_codes'] as $code)
+                    <p class="text-base">
+                        <span class="font-semibold">{{ $code['code'] }}</span>
+                        @if(!empty($code['description']))
+                            <span> - {{ $code['description'] }}</span>
+                        @endif
                     </p>
-
-                    <button
-                        type="button"
-                        class="button-outline-primary"
-                        @click="showCodes = true"
-                    >
-                        {{ __('dictionaries.condition_diagnose.codes_list_button') }}
-                    </button>
-                </div>
-            </fieldset>
-        </template>
-
-        <template x-if="showCodes">
-            <fieldset
-                x-cloak
-                x-transition
-                class="fieldset p-6 sm:p-8"
-            >
-                <div class="space-y-1 text-sm sm:text-base leading-relaxed text-gray-900 dark:text-gray-100">
-                    <p class="text-lg font-semibold mb-4">
-                        {{ __('dictionaries.condition_diagnose.example_group') }}
-                    </p>
-                    <p>B20 - Хвороба, зумовлена вірусом імунодефіциту людини [ВІЛ], яка проявляється інфекційними та паразитарними хворобами</p>
-                    <p>B21 - Хвороба, зумовлена вірусом імунодефіциту людини [ВІЛ], внаслідок чого виникають злоякісні новоутворення</p>
-                    <p>22 - Хвороба, зумовлена вірусом імунодефіциту людини [ВІЛ], з проявами інших уточнених хвороб</p>
-                    <p>B23.0 - Гострий ВІЛ-інфекційний синдром</p>
-                    <p>B23.8 - Хвороба ВІЛ з проявами інших уточнених станів</p>
-                    <p>B24 - Хвороба, зумовлена вірусом імунодефіциту людини [ВІЛ], неуточнена</p>
-                    <p>098.7 - Вірус імунодефіциту людини [ВІЛ] під час вагітності, пологів та післяпологового періоду</p>
-                    <p>R75 - Лабораторне виявлення вірусу імунодефіциту людини [ВІЛ]</p>
-                    <p>Z11.4 - Спеціальне скринінгове обстеження з метою виявлення інфікування вірусом імунодефіциту людини [ВІЛ]</p>
-                    <p>Z20.6 - Контакт з хворим або можливість зараження вірусом імунодефіциту людини [ВІЛ]</p>
-                    <p>Z21 - Безсимптомне носійство вірусу імунодефіциту людини [ВІЛ]</p>
-                    <p>Z71.7 - Консультації з питань, пов’язаних з вірусом імунодефіциту людини [ВІЛ]</p>
-                </div>
-            </fieldset>
-        </template>
+                @endforeach
+            </div>
+        </fieldset>
     </section>
+    @endnonempty
 
     <x-forms.loading />
     <livewire:components.x-message :key="time()" />

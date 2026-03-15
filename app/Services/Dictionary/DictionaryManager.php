@@ -9,10 +9,12 @@ use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Jobs\UpdateDictionaryCache;
 use App\Services\Dictionary\Collections\BasicDictionaryCollection;
+use App\Services\Dictionary\Collections\DiagnoseGroupCollection;
 use App\Services\Dictionary\Collections\DrugCollection;
 use App\Services\Dictionary\Collections\MedicalProgramCollection;
 use App\Services\Dictionary\Collections\ServiceCollection;
 use App\Services\Dictionary\Dictionaries\BasicDictionary;
+use App\Services\Dictionary\Dictionaries\DiagnoseGroupDictionary;
 use App\Services\Dictionary\Dictionaries\DrugDictionary;
 use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
 use App\Services\Dictionary\Dictionaries\ServiceDictionary;
@@ -85,6 +87,16 @@ class DictionaryManager
     public function drugs(): DrugCollection
     {
         return new DrugCollection($this->get(DrugDictionary::KEY));
+    }
+
+    /**
+     * Get diagnose groups dictionary collection.
+     *
+     * @return DiagnoseGroupCollection Collection with diagnose group data
+     */
+    public function diagnoseGroups(): DiagnoseGroupCollection
+    {
+        return new DiagnoseGroupCollection($this->get(DiagnoseGroupDictionary::KEY));
     }
 
     /**
@@ -187,6 +199,7 @@ class DictionaryManager
             ServiceDictionary::KEY => new ServiceDictionary(),
             BasicDictionary::KEY => new BasicDictionary(),
             DrugDictionary::KEY => new DrugDictionary(),
+            DiagnoseGroupDictionary::KEY => new DiagnoseGroupDictionary(),
             default => throw new InvalidArgumentException("Unknown dictionary key: $dictionaryKey")
         };
 

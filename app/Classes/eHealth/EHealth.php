@@ -10,6 +10,7 @@ use App\Classes\eHealth\Api\ContractRequest;
 use App\Classes\eHealth\Api\Declaration;
 use App\Classes\eHealth\Api\DeclarationRequest;
 use App\Classes\eHealth\Api\DeviceDefinition;
+use App\Classes\eHealth\Api\DiagnoseGroup;
 use App\Classes\eHealth\Api\Dictionary;
 use App\Classes\eHealth\Api\Drug;
 use App\Classes\eHealth\Api\Employee;
@@ -191,5 +192,10 @@ final class EHealth
     public static function drug(): Drug
     {
         return app(Drug::class);
+    }
+
+    public static function diagnoseGroup(): DiagnoseGroup
+    {
+        return app(DiagnoseGroup::class);
     }
 }

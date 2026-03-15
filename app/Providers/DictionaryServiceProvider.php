@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Services\Dictionary\Dictionaries\BasicDictionary;
+use App\Services\Dictionary\Dictionaries\DiagnoseGroupDictionary;
 use App\Services\Dictionary\Dictionaries\DrugDictionary;
 use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
 use App\Services\Dictionary\Dictionaries\ServiceDictionary;
@@ -29,6 +30,7 @@ class DictionaryServiceProvider extends ServiceProvider implements DeferrablePro
             $manager->register($app->make(ServiceDictionary::class));
             $manager->register($app->make(BasicDictionary::class));
             $manager->register($app->make(DrugDictionary::class));
+            $manager->register($app->make(DiagnoseGroupDictionary::class));
 
             return $manager;
         });

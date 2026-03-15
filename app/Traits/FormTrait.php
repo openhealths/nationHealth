@@ -11,6 +11,7 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use Exception;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 use Throwable;
@@ -276,6 +277,31 @@ trait FormTrait
             'file' => $exception->getFile(),
             'line' => $exception->getLine()
         ]);
+    }
+
+    /**
+     * Handle exceptions with message.
+     *
+     * @param  ConnectionException|EHealthValidationException|EHealthResponseException  $exception
+     * @param  string  $logMessage
+     * @return void
+     */
+    protected function handleEHealthExceptions(
+        ConnectionException|EHealthValidationException|EHealthResponseException $exception,
+        string $logMessage
+    ): void {
+        if ($exception instanceof ConnectionException) {
+            $this->logConnectionError($exception, $logMessage);
+            Session::flash('error', __('messages.connection_exception'));
+
+            return;
+        }
+
+        $this->logEHealthException($exception, $logMessage);
+        $errorMessage = $exception instanceof EHealthValidationException
+            ? $exception->getFormattedMessage()
+            : __('patients.messages.ehealth_error', ['message' => $exception->getMessage()]);
+        Session::flash('error', $errorMessage);
     }
 
     /**

@@ -9,9 +9,8 @@
 
                 <div class="flex mb-4 flex-col w-full">
                     <div class="w-full lg:w-96">
-                        <label
-                            for="serviceSearchDropdown"
-                            class="text-sm font-medium text-gray-900 dark:text-white block mb-2 flex items-center gap-1"
+                        <label for="serviceSearchDropdown"
+                               class="text-sm font-medium text-gray-900 dark:text-white block mb-2 flex items-center gap-1"
                         >
                             @icon('search-outline', 'w-4.5 h-4.5')
                             <span>{{ __('dictionaries.service_catalog.search_services') }}</span>
@@ -22,24 +21,17 @@
                             x-data="{ open: false }"
                         >
                             <div class="relative">
-                                <div
-                                    class="absolute inset-y-0 left-0 flex items-center ps-0 pointer-events-none"
-                                >
-                                </div>
+                                <div class="absolute inset-y-0 left-0 flex items-center ps-0 pointer-events-none"></div>
 
-                                <input
-                                    type="text"
-                                    id="serviceSearchDropdown"
-                                    class="input peer w-full cursor-pointer text-gray-500 dark:text-gray-400 ps-7 pr-9"
-                                    placeholder=" "
-                                    wire:model="search"
-                                    @click="open = !open"
-                                    readonly
+                                <input type="text"
+                                       id="serviceSearchDropdown"
+                                       class="input peer w-full cursor-pointer text-gray-500 dark:text-gray-400 ps-7 pr-9"
+                                       placeholder=" "
+                                       wire:model="search"
+                                       @click="open = !open"
+                                       readonly
                                 />
-                                <label
-                                    for="serviceSearchDropdown"
-                                    class="label"
-                                >
+                                <label for="serviceSearchDropdown" class="label">
                                     {{ __('dictionaries.service_catalog.search_placeholder') }}
                                 </label>
                                 @icon(
@@ -73,94 +65,83 @@
                 </div>
 
                 <div class="mb-4 mt-6 flex flex-col gap-2 w-full sm:flex-row">
-                    <button
-                        type="button"
-                        wire:click="search"
-                        class="flex items-center gap-2 button-primary"
+                    <button type="button"
+                            wire:click="search"
+                            class="flex items-center gap-2 button-primary"
                     >
                         @icon('search', 'w-4 h-4')
                         <span>{{ __('forms.search') }}</span>
                     </button>
-                    <button
-                        type="button"
-                        wire:click="resetFilters"
-                        class="button-primary-outline-red me-0"
+                    <button type="button"
+                            wire:click="resetFilters"
+                            class="button-primary-outline-red me-0"
                     >
                         {{ __('forms.reset_all_filters') }}
                     </button>
-                    <button
-                        type="button"
-                        class="button-minor flex items-center gap-2"
-                        @click="showFilter = !showFilter"
+                    <button type="button"
+                            class="button-minor flex items-center gap-2"
+                            @click="showFilter = !showFilter"
                     >
                         @icon('adjustments', 'w-4 h-4')
                         <span>{{ __('forms.additional_search_parameters') }}</span>
                     </button>
                 </div>
 
-                <div
-                    x-cloak
-                    x-show="showFilter"
-                    x-transition
-                    class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 w-full mt-4 mb-9 md:mb-5"
+                <div x-cloak
+                     x-show="showFilter"
+                     x-transition
+                     class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 w-full mt-4 mb-9 md:mb-5"
                 >
                     <div class="form-group group">
-                        <select
-                            wire:model="serviceCategory"
-                            id="filterServiceCategory"
-                            class="peer input-select w-full"
+                        <select wire:model="serviceCategory"
+                                id="filterServiceCategory"
+                                class="peer input-select w-full"
                         >
                             <option value="" selected>{{ __('forms.select') }}</option>
                             @foreach($serviceCategories as $value => $label)
                                 <option value="{{ $value }}">{{ $label }}</option>
                             @endforeach
                         </select>
-                        <label
-                            for="filterServiceCategory"
-                            class="label peer-focus:text-blue-600 peer-valid:text-blue-600"
+                        <label for="filterServiceCategory"
+                               class="label peer-focus:text-blue-600 peer-valid:text-blue-600"
                         >
                             {{ __('dictionaries.service_catalog.service_category') }}
                         </label>
                     </div>
                     <div class="form-group group">
-                        <select
-                            wire:model="serviceGroupActive"
-                            id="filterServiceGroupActive"
-                            class="peer input-select w-full"
+                        <select wire:model="serviceGroupActive"
+                                id="filterServiceGroupActive"
+                                class="peer input-select w-full"
                         >
                             <option value="" selected>{{ __('forms.select') }}</option>
                             <option value="1">{{ __('forms.yes') }}</option>
                             <option value="0">{{ __('forms.no') }}</option>
                         </select>
-                        <label
-                            for="filterServiceGroupActive"
-                            class="label peer-focus:text-blue-600 peer-valid:text-blue-600"
+                        <label for="filterServiceGroupActive"
+                               class="label peer-focus:text-blue-600 peer-valid:text-blue-600"
                         >
                             {{ __('dictionaries.service_catalog.service_group_active') }}
                         </label>
                     </div>
                     <div class="form-group group">
-                        <select
-                            wire:model="serviceActive"
-                            id="filterServiceActive"
-                            class="peer input-select w-full"
+                        <select wire:model="serviceActive"
+                                id="filterServiceActive"
+                                class="peer input-select w-full"
                         >
                             <option value="" selected>{{ __('forms.select') }}</option>
                             <option value="1">{{ __('forms.yes') }}</option>
                             <option value="0">{{ __('forms.no') }}</option>
                         </select>
-                        <label
-                            for="filterServiceActive"
-                            class="label peer-focus:text-blue-600 peer-valid:text-blue-600"
+                        <label for="filterServiceActive"
+                               class="label peer-focus:text-blue-600 peer-valid:text-blue-600"
                         >
                             {{ __('dictionaries.service_catalog.service_active') }}
                         </label>
                     </div>
                     <div class="form-group group">
-                        <select
-                            wire:model="allowedForEn"
-                            id="filterAllowedForEn"
-                            class="peer input-select w-full"
+                        <select wire:model="allowedForEn"
+                                id="filterAllowedForEn"
+                                class="peer input-select w-full"
                         >
                             <option value="" selected>{{ __('forms.select') }}</option>
                             <option value="1">{{ __('forms.yes') }}</option>
@@ -199,9 +180,7 @@
                     </tr>
                     </thead>
 
-                    <tbody
-                        x-data="{ openIds: {} }"
-                    >
+                    <tbody x-data="{ openIds: {} }">
                     @forelse($services as $service)
                         @php
                             $serviceId = $service['id'] ?? ('service-' . $loop->index);
@@ -212,11 +191,10 @@
                                 <div class="flex items-start gap-3">
                                     <div class="mt-1 flex-shrink-0 w-6">
                                         @if ($hasChildren)
-                                            <button
-                                                type="button"
-                                                @click="openIds['{{ $serviceId }}'] = !openIds['{{ $serviceId }}']"
-                                                class="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 inline-block"
-                                                :aria-expanded="!!openIds['{{ $serviceId }}']"
+                                            <button type="button"
+                                                    @click="openIds['{{ $serviceId }}'] = !openIds['{{ $serviceId }}']"
+                                                    class="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 inline-block"
+                                                    :aria-expanded="!!openIds['{{ $serviceId }}']"
                                             >
                                                 <span
                                                     class="inline-block transition-transform duration-200"
