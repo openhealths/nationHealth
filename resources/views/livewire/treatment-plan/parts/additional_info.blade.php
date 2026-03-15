@@ -3,64 +3,50 @@
         {{ __('forms.additional_info') }}
     </legend>
 
-    <div class="form-row-2">
-        <div class="form-group group">
-            <label for="based_treatment_plan" class="label">
-                {{ __('treatment-plan.based_treatment_plan') }}
-            </label>
-
-            <select id="based_treatment_plan"
-                    name="based_treatment_plan"
-                    class="input-select peer"
-                    type="text"
-            >
-                <option selected value="">{{ __('treatment-plan.choose_treatment_plan') }}</option>
-            </select>
-
-            @error('treatment-plan.based_treatment_plan')
-            <p class="text-error">{{ $message }}</p>
-            @enderror
-        </div>
-        <div class="form-group group">
-            <label for="part_treatment_plan" class="label">
-                {{ __('treatment-plan.part_treatment_plan') }}
-            </label>
-
-            <select id="part_treatment_plan"
-                    name="part_treatment_plan"
-                    class="input-select peer"
-                    type="text"
-            >
-                <option selected value="">{{ __('treatment-plan.choose_treatment_plan') }}</option>
-            </select>
-
-            @error('treatment-plan.part_treatment_plan')
-            <p class="text-error">{{ $message }}</p>
-            @enderror
-        </div>
-    </div>
     <div class="form-row">
         <div class="form-group">
-            <label for="extended_description"
+            <label for="description"
                    class="peer appearance-none bg-white">{{ __('treatment-plan.extended_description') }}</label>
             <textarea
-                id="extended_description"
+                id="description"
                 class="textarea !text-gray-500 dark:!text-gray-400 mt-1"
-                placeholder="{{ __('forms.comment') }}">
-                </textarea>
-            @error('treatment-plan.extended_description') <p class="text-error">{{ $message }}</p> @enderror
+                placeholder="{{ __('forms.comment') }}"
+                wire:model="form.description">
+            </textarea>
+            @error('form.description') <p class="text-error">{{ $message }}</p> @enderror
         </div>
     </div>
+
     <div class="form-row">
         <div class="form-group">
-            <label for="notes"
+            <label for="note"
                    class="peer appearance-none bg-white">{{ __('treatment-plan.notes') }}</label>
             <textarea
-                id="notes"
+                id="note"
                 class="textarea !text-gray-500 dark:!text-gray-400 mt-1"
-                placeholder="{{ __('forms.comment') }}">
-                </textarea>
-            @error('treatment-plan.notes') <p class="text-error">{{ $message }}</p> @enderror
+                placeholder="{{ __('forms.comment') }}"
+                wire:model="form.note">
+            </textarea>
+            @error('form.note') <p class="text-error">{{ $message }}</p> @enderror
+        </div>
+    </div>
+
+    <div class="form-row-2">
+        <div class="form-group group">
+            <label for="inform_with" class="label">
+                {{ __('treatment-plan.inform_with') }}
+            </label>
+            <select id="inform_with"
+                    name="inform_with"
+                    class="input-select peer"
+                    wire:model="form.inform_with"
+            >
+                <option value="">{{ __('forms.select') }}</option>
+                {{-- Options: authentication methods per TZ 3.7.1.5 --}}
+            </select>
+            @error('form.inform_with')
+            <p class="text-error">{{ $message }}</p>
+            @enderror
         </div>
     </div>
 </fieldset>
