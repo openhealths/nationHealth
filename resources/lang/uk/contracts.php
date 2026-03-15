@@ -99,6 +99,7 @@ return [
     // Types of contracts
     'capitation' => 'Капітація',
     'reimbursement' => 'Реімбурсація',
+    'pmd_1' => 'Первинна медична допомога',
 
     // Table headers (if you don't have them yet)
     'requests_list' => 'Список заявок',

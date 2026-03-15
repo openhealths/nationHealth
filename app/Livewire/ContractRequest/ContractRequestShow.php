@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\ContractRequest;
 
-use App\Classes\eHealth\Api\ContractRequest as ApiContractRequest;
+use App\Classes\eHealth\EHealth;
 use App\Models\Contracts\ContractRequest;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
@@ -33,14 +33,11 @@ class ContractRequestShow extends Component
     private function syncDetailsFromEHealth(): void
     {
         try {
-            $apiClient = app(ApiContractRequest::class);
-
             // Note: type must be lowercase for the URL path (capitation/reimbursement)
             $contractType = strtolower($this->contractRequest->type);
 
-            $response = $apiClient
-                ->withToken(session()->get(config('ehealth.api.oauth.bearer_token')))
-                ->getDetails($contractType, $this->contractRequest->uuid);
+            // Token is injected automatically inside EHealthRequest
+            $response = EHealth::contractRequest()->getDetails($contractType, $this->contractRequest->uuid);
 
             $ehealthData = $response->getData();
 

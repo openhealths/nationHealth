@@ -3,9 +3,14 @@
         <legend class="legend">{{ __('contracts.general_data') }}</legend>
         <div class="form-row-2">
             <div class="form-group group">
+                @php
+                    $typeTranslationKey = 'contracts.' . strtolower($contract->type);
+                    $translatedType = __($typeTranslationKey);
+                    $translatedType = $translatedType === $typeTranslationKey ? ucfirst($contract->type) : $translatedType;
+                @endphp
                 <input id="contract-type-id"
                        type="text"
-                       value="{{ $contract->type }} • {{ $contract->uuid }}"
+                       value="{{ $translatedType }} • {{ $contract->uuid }}"
                        class="input peer"
                        placeholder=" "
                        disabled
