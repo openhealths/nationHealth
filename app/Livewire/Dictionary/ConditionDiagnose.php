@@ -10,6 +10,8 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\LegalEntity;
 use App\Traits\FormTrait;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -39,7 +41,14 @@ class ConditionDiagnose extends Component
 
     public function search(): void
     {
-        $this->validate(['selectedDiagnoseGroup' => 'required']);
+        try {
+            $this->validate(['selectedDiagnoseGroup' => 'required']);
+        } catch (ValidationException $exception) {
+            Session::flash('error', $exception->validator->errors()->first());
+            $this->setErrorBag($exception->validator->getMessageBag());
+
+            return;
+        }
     }
 
     #[Computed]

@@ -367,11 +367,11 @@
                             </a>
                         </li>
                         <li>
-                            <a href="{{ route('dictionaries.sensitive-group.index', [legalEntity()]) }}"
+                            <a href="{{ route('dictionaries.forbidden-group.index', [legalEntity()]) }}"
                                class="submenu-item"
                             >
                                 @icon('boxicons-file')
-                                <span>{{ __('dictionaries.sensitive_group.title') }}</span>
+                                <span>{{ __('dictionaries.forbidden_group.title') }}</span>
                             </a>
                         </li>
                         <li>

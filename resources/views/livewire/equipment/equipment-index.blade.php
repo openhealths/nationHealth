@@ -75,7 +75,7 @@
                                     class="peer input-select"
                             >
                                 <option value="" selected>{{ __('forms.select') }}</option>
-                                @foreach(dictionary()->getDictionary('device_definition_classification_type') as $key => $type)
+                                @foreach($this->dictionaries['device_definition_classification_type'] as $key => $type)
                                     <option value="{{ $key }}">{{ $type }}</option>
                                 @endforeach
                             </select>
@@ -261,7 +261,7 @@
                                     {{ $equipment->inventoryNumber ?? '-' }}
                                 </td>
                                 <td class="index-table-td">
-                                    {{ dictionary()->getDictionary('device_definition_classification_type')[$equipment->type] }}
+                                    {{ $this->dictionaries['device_definition_classification_type'][$equipment->type] }}
                                 </td>
                                 <td class="index-table-td">
                                     {{ $equipment->division?->name ?? '-' }}

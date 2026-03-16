@@ -17,6 +17,7 @@ use App\Classes\eHealth\Api\Employee;
 use App\Classes\eHealth\Api\EmployeeRequest;
 use App\Classes\eHealth\Api\EmployeeRole;
 use App\Classes\eHealth\Api\Equipment;
+use App\Classes\eHealth\Api\ForbiddenGroup;
 use App\Classes\eHealth\Api\License;
 use App\Classes\eHealth\Api\Job;
 use App\Classes\eHealth\Api\Division;
@@ -197,5 +198,10 @@ final class EHealth
     public static function diagnoseGroup(): DiagnoseGroup
     {
         return app(DiagnoseGroup::class);
+    }
+
+    public static function forbiddenGroup(): ForbiddenGroup
+    {
+        return app(ForbiddenGroup::class);
     }
 }

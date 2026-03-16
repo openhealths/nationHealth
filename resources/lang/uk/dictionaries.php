@@ -94,19 +94,14 @@ return [
     'condition_diagnose' => [
         'title' => 'Каталог груп станів/діагнозів',
         'search_title' => 'Пошук груп станів/діагнозів',
-        'group_label' => 'Група діагнозів',
-        'codes_list_button' => 'Список кодів діагнозів'
+        'group_label' => 'Група діагнозів'
     ],
 
-    'sensitive_group' => [
+    'forbidden_group' => [
         'title' => 'Каталог чутливих груп',
         'search_title' => 'Пошук чутливих груп',
         'group_label' => 'Обмежувальна група',
-        'details_title' => 'Чутливі стани',
-        'example_group' => 'Чутливі стани, ВІЛ',
-        'details_button' => 'Переглянути деталі',
-        'codes_list_title' => 'Список кодів діагнозів',
-        'services_list_title' => 'Список послуг',
+        'services_list_title' => 'Список послуг'
     ],
 
     'medical_device' => [

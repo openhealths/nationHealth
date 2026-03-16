@@ -11,11 +11,13 @@ use App\Jobs\UpdateDictionaryCache;
 use App\Services\Dictionary\Collections\BasicDictionaryCollection;
 use App\Services\Dictionary\Collections\DiagnoseGroupCollection;
 use App\Services\Dictionary\Collections\DrugCollection;
+use App\Services\Dictionary\Collections\ForbiddenGroupCollection;
 use App\Services\Dictionary\Collections\MedicalProgramCollection;
 use App\Services\Dictionary\Collections\ServiceCollection;
 use App\Services\Dictionary\Dictionaries\BasicDictionary;
 use App\Services\Dictionary\Dictionaries\DiagnoseGroupDictionary;
 use App\Services\Dictionary\Dictionaries\DrugDictionary;
+use App\Services\Dictionary\Dictionaries\ForbiddenGroupDictionary;
 use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
 use App\Services\Dictionary\Dictionaries\ServiceDictionary;
 use Exception;
@@ -97,6 +99,16 @@ class DictionaryManager
     public function diagnoseGroups(): DiagnoseGroupCollection
     {
         return new DiagnoseGroupCollection($this->get(DiagnoseGroupDictionary::KEY));
+    }
+
+    /**
+     * Get forbidden groups dictionary collection.
+     *
+     * @return ForbiddenGroupCollection Collection with forbidden group data
+     */
+    public function forbiddenGroups(): ForbiddenGroupCollection
+    {
+        return new ForbiddenGroupCollection($this->get(ForbiddenGroupDictionary::KEY));
     }
 
     /**
@@ -200,6 +212,7 @@ class DictionaryManager
             BasicDictionary::KEY => new BasicDictionary(),
             DrugDictionary::KEY => new DrugDictionary(),
             DiagnoseGroupDictionary::KEY => new DiagnoseGroupDictionary(),
+            ForbiddenGroupDictionary::KEY => new ForbiddenGroupDictionary(),
             default => throw new InvalidArgumentException("Unknown dictionary key: $dictionaryKey")
         };
 
