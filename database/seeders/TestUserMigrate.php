@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
-use App\Enums\User\Role;
 use Exception;
 use App\Models\User;
+use App\Enums\JobStatus;
+use App\Enums\User\Role;
 use Illuminate\Support\Str;
 use Illuminate\Support\Carbon;
 use Illuminate\Database\Seeder;
@@ -284,7 +285,7 @@ class TestUserMigrate extends Seeder
                     'division_uuid' => null,
                     'legal_entity_uuid' => config('ehealth.test.client_id'),
                     'position' => 'P2',
-                    'start_date' => new Carbon('2024-09-04T21:00:00.000000Z')->format('Y-m-d'),
+                    'start_date' => '2024-09-05',
                     'end_date' => null,
                     'employee_type' => Role::OWNER->value,
                     'inserted_at' => null,
@@ -310,7 +311,7 @@ class TestUserMigrate extends Seeder
                     'division_uuid' => null,
                     'legal_entity_uuid' => config('ehealth.test.client_id'),
                     'position' => 'P2',
-                    'start_date' => new Carbon('2024-09-04T21:00:00.000000Z')->format('Y-m-d'),
+                    'start_date' => '2024-09-05',
                     'end_date' => null,
                     'employee_type' => Role::OWNER->value,
                     'inserted_at' => new Carbon('2024-09-05T18:56:03.427768Z'),
@@ -321,9 +322,10 @@ class TestUserMigrate extends Seeder
                     'division_id' => null,
                     'user_id' => $ownerUserId,
                     'party_id' => $partyId,
-                    'applied_at' => new Carbon('2024-11-14T10:37:35.000000Z'),
-                    'created_at' => new Carbon('2024-11-14T10:37:35.000000Z'),
-                    'updated_at' => new Carbon('2024-11-14T10:37:35.000000Z'),
+                    'sync_status' => JobStatus::COMPLETED->value,
+                    'applied_at' => new Carbon('2024-09-05T19:03:20.918982Z'),
+                    'created_at' => new Carbon('2024-09-05T18:56:03.427768Z'),
+                    'updated_at' => new Carbon('2024-09-05T18:56:03.427768Z'),
                 ]);
 
                 $this->command->info("\tINFO: A new EmployeeRequest entry has been successfully inserted into the database\n");

@@ -6,6 +6,7 @@ namespace App\Models;
 
 use BackedEnum;
 use Exception;
+use Carbon\Carbon;
 use App\Enums\Status;
 use App\Enums\User\Role;
 use InvalidArgumentException;
@@ -24,6 +25,7 @@ use Spatie\Permission\PermissionRegistrar;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Spatie\Permission\Models\Role as SpatieRole;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -97,6 +99,12 @@ class User extends Authenticatable implements MustVerifyEmail
      * @var array
      */
     protected $with = ['person'];
+
+    // If User is able to consume multiple roles or permissions from different guards
+    // this method helps make sure that User class's operate within all allowed guards defined in config/auth.php
+    public function guardName() {
+        return collect(array_keys((array) config('auth.guards')))->values();
+    }
 
     public function person(): BelongsTo
     {

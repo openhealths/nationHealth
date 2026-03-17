@@ -7,6 +7,7 @@ namespace App\Models\Relations;
 use App\Casts\EHealthDateCast;
 use App\Models\User;
 use App\Models\Employee\Employee;
+use Illuminate\Support\Facades\Auth;
 use App\Traits\SyncsMorphManyRelations;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Employee\EmployeeRequest;

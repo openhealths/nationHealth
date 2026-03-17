@@ -67,6 +67,8 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
     {
         $validatedData = $response->validate();
 
+        $validatedData['inserted_at'] = Carbon::parse($validatedData['inserted_at'] )->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s');
+
         Log::info('Processing EmployeeRequestDetailsUpsert for employee_request:' . $this->employeeRequest->id . ', LE:' . ($this->legalEntity->id ?? 'N/A'));
 
         $this->employeeRequest->legalEntityUuid = $this->legalEntity?->uuid;
@@ -77,14 +79,12 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
 
         $employeeRequestPartyId = $employeeRequestUser?->partyId;
 
-        $partyId = Repository::party()->createPartyByEmployeeRequest($this->employeeRequest, $validatedData['party'])?->id;
-
         $this->employeeRequest->fill(array_merge(
             $response->map($validatedData, $this->legalEntity, $employeeRequestUser?->id ?? null, $employeeRequestPartyId ?? null),
                 [
                     'sync_status' => JobStatus::COMPLETED->value,
-                    'party_id' => $partyId,
-                    'applied_at' => $validatedData['updated_at'] ?? Carbon::now()
+                    'inserted_at' => Carbon::parse($validatedData['inserted_at'] )->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? Carbon::now(),
+                    'applied_at' => Carbon::parse($validatedData['updated_at'] )->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? Carbon::now()
                 ]
             )
         );
@@ -116,26 +116,5 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
         return $this->standalone || !$this->nextEntity
             ? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin)
             : $this->nextEntity;
-    }
-
-    /**
-     * Determine which authentication guards define the given role.
-     * Checks only the 'web' and 'ehealth' guards.
-     * Queries Spatie\Permission\Models\Role by name and guard_name.
-     * Returns an empty collection if the role is not defined for any of the checked guards.
-     *
-     * @param string $role The role name to check across guards.
-     *
-     * @return Collection<int, string> Collection of guard names that have this role defined.
-     */
-    protected function getGuardsForRole(string $role): Collection
-    {
-        $guards = collect(['web', 'ehealth']);
-
-        return $guards->filter(fn ($guard) =>
-                Role::where('name', $role)
-                    ->where('guard_name', $guard)
-                    ->exists()
-        );
     }
 }

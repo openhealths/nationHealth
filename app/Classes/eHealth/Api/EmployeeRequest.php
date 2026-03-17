@@ -104,7 +104,7 @@ class EmployeeRequest extends EHealthRequest
                 case 'division_uuid':
                     $mappedData['division_uuid'] = $value;
 
-                    $mappedData['division_id'] = Division::where('uuid', $value)->first()->id;
+                    $mappedData['division_id'] = Division::where('uuid', $value)->first()?->id;
 
                     break;
                 case 'legal_entity_uuid':
@@ -242,6 +242,7 @@ class EmployeeRequest extends EHealthRequest
 
         $validator = Validator::make($transformedData, [
             "employee_type" => 'required|string',
+            'division_uuid' => 'nullable|uuid',
 		    "uuid" => 'required|uuid',
 		    "inserted_at" => 'required|date',
             "created_at" => 'required|date', // The same as 'inserted_at' date

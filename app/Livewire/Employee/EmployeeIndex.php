@@ -310,7 +310,11 @@ class EmployeeIndex extends EmployeeComponent
 
                 // 4. Safe User Cleanup: Remove a role from a user (if binding exists)
                 // This handles cases where email might be 'N/A' or user doesn't exist locally
-                $users = $employee->party->users;
+                $party = $employee->party;
+                $partyEmployees = $party->employees->where('legal_entity_id', $this->legalEntity->id);
+                $employeesWithUser = $partyEmployees->filter(fn(Employee $employee) => $employee->user_id !== null);
+
+                $partyUsers = $party->users->whereIn('id', $employeesWithUser->pluck('user_id')); // filter by legal entity id
 
                 // Detach all users from the employee to prevent orphaned relationships
                 $employee->users()->detach();
@@ -318,7 +322,8 @@ class EmployeeIndex extends EmployeeComponent
                 // Get all specified guards from section 'guards' from file config/auth.php
                 $guards = array_keys((array) config('auth.guards'));
 
-                foreach ($users as $user) {
+                // Role from dissmisses employee can attached to multiple users, so we need to loop through all of them
+                foreach ($partyUsers as $user) {
                     $roleToRemove = $employee->employee_type;
 
                     foreach ($guards as $guard) {

@@ -153,17 +153,7 @@ readonly class EmployeeRepository
     {
         unset($party['email']);
         $partyUuid = Arr::get($party, 'uuid');
-
-        // After EmployeeRequest being synchronized with EHealth, the party can be created in our system without UUID, but with the same personal data.
-        // To avoid duplicates, we need to check if there is a party with the same personal data, and if there is, use it instead of creating a new one.
-        $partyExist =  Party::where('tax_id', $party['tax_id'])
-            ->where('birth_date', $party['birth_date'])
-            ->where('first_name', $party['first_name'])
-            ->where('last_name', $party['last_name'])
-            ->where('second_name', $party['second_name'] ?? null)
-            ?->first();
-
-        $partyByUuid = $partyExist ?? Party::where('uuid', $partyUuid)->first();
+        $partyByUuid = Party::where('uuid', $partyUuid)->first();
 
         // If the model doesn't have a party and party doesn't exist, create new one. It's a brand-new person
         if (!$partyByUuid && !$model->party) {

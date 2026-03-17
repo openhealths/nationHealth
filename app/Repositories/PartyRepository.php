@@ -1,50 +1,70 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Repositories;
 
-use App\Core\Arr;
 use App\Models\Relations\Party;
-use App\Models\Employee\EmployeeRequest;
+use App\Models\Employee\Employee;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class PartyRepository
 {
-    /**
-     * Find an existing party or create a new one based on the provided data.
-     *
-     * @param EmployeeRequest $model
-     *
-     * @param array $partyData
-     *
-     * @return Party|null
-     */
-    public function createPartyByEmployeeRequest(EmployeeRequest $model, array $partyData): ?Party
+    public function syncUserEmployeesEndRoles(Party $party, int $legalEntityId): void
     {
-        $documents = Arr::pull($partyData, 'documents', []);
-        $phones = Arr::pull($partyData, 'phones', []);
+        $partyEmployees = $party->employees->where('legal_entity_id', $legalEntityId);
+        $employeesWithUser = $partyEmployees->filter(fn(Employee $employee) => $employee->user_id !== null);
 
-        unset ($partyData['email']);
+        $partyUsers = $party->users->whereIn('id', $employeesWithUser->pluck('user_id'));
 
-        $party = Party::where('tax_id', $partyData['tax_id'])
-            ->where('birth_date', $partyData['birth_date'])
-            ->where('first_name', $partyData['first_name'])
-            ->where('last_name', $partyData['last_name'])
-            ->where('second_name', $partyData['second_name'])
-            ->orWhereNull('second_name')
-            ->first();
 
-        if (!empty($party)) {
-            return $party;
-        };
+        $employeesToSync = [];
+        $usersToSync = [];
 
-        $newParty = Party::create($partyData);
+        $guards = collect(array_keys((array) config('auth.guards')))->values();
+        $savedGuard = Auth::getDefaultDriver();
 
-        $model->party()->associate($newParty)->save();
+        setPermissionsTeamId($legalEntityId);
 
-        $model->party->syncMany('documents', $documents);
-        $model->party->syncMany('phones', $phones);
+        // Get the right data structure to perform sync
+        foreach ($partyUsers as $user) {
+            $employeesFiltered = $employeesWithUser->filter(function ($employee) use ($user) {
+                return $employee->isCreatedAtOrAfter($user->insertedAt);
+            });
 
-        return $newParty;
+            $usersToSync[] = $user->id;
+            $employeesToSync = array_merge($employeesToSync, $employeesFiltered->map(fn(Employee $employee) => ['employee_id' => $employee->id, 'user_id' => $user->id])->all());
+
+            // Current Roles for the $user
+            $oldRoles = $user->loadMissing('roles')->roles->pluck('name')->all();
+
+            // Get all suitable roles based on the employee types of the user's party employees
+            $availRoles = $partyEmployees->filter(fn(Employee $employee) => $employee->isCreatedAtOrAfter($user->insertedAt))
+                ->map(fn(Employee $employee) => $employee->employeeType)
+                ->unique()
+                ->values()
+                ->all();
+
+            // Determine which roles are new and need to be assigned
+            $newRoles = collect($availRoles)->diff($oldRoles)->values()->toArray();
+
+            if (empty($newRoles)) {
+                continue;
+            }
+
+            $user->unsetRelation('roles')->unsetRelation('permissions');
+
+            foreach ($guards as $guard) {
+                Auth::shouldUse($guard);
+
+                // Set all roles for the all guards that have the same name as the new roles we want to assign (depends on guard)
+                $user->assignRole($newRoles);
+            }
+        }
+
+        // Sync all employee_users relations
+        DB::table('employee_users')->whereIn('user_id', $usersToSync)->delete();
+        DB::table('employee_users')->insert($employeesToSync);
+
+        Auth::shouldUse($savedGuard);
     }
 }

@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use Throwable;
+use App\Core\Arr;
 use Carbon\Carbon;
+use App\Models\Division;
 use App\Core\EHealthJob;
 use App\Enums\JobStatus;
 use App\Models\LegalEntity;
-use App\Models\Relations\Party;
 use App\Repositories\Repository;
 use App\Classes\eHealth\EHealth;
 use App\Models\Employee\Employee;
@@ -20,6 +21,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Queue\SerializesModels;
 use App\Classes\eHealth\EHealthResponse;
 use App\Models\Employee\EmployeeRequest;
+use App\Services\UserRoleSyncService;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Middleware\RateLimited;
@@ -66,6 +68,9 @@ class EmployeeDetailsUpsert extends EHealthJob
 
         Log::info('Processing EmployeeDetailsUpsert for employee:' . $this->employee->id . ', LE:' . ($this->legalEntity->id ?? 'N/A'));
 
+        $divisionUuid = Arr::get($validatedData['division'], 'uuid');
+        $divisionId = Division::where('uuid', $divisionUuid)->value('id') ?? null;
+
         $this->employee->legalEntityUuid = $this->legalEntity?->uuid;
 
         $this->employee->save();
@@ -91,35 +96,30 @@ class EmployeeDetailsUpsert extends EHealthJob
 
         setPermissionsTeamId($legalEntityId);
 
-        $employeeCreatedTime = EmployeeRequest::where('legal_entity_id', $legalEntityId)
-            ->where('party_id', $this->employee->party->id)
+        $startdate = $validatedData['employee']['start_date'] ?? null;
+
+        $employeeEmployeeRequest = EmployeeRequest::where('legal_entity_id', $legalEntityId)
             ->where("employee_type", $roleName)
-            ->where('division_id', $validatedData['employee']['division_id'] ?? null)
-            ->where('position', $validatedData['employee']['position'])
-            ->where('start_date', $validatedData['employee']['start_date'] ?? null)
-            ->latest('applied_at')->first()?->applied_at;
+            ->where('position', $this->employee->position)
+            ->when(
+                $divisionUuid === null,
+                fn ($query) => $query->whereNull('division_uuid'),
+                fn ($query) => $query->where('division_uuid', $divisionUuid)
+            )
+            ->when(
+                $startdate === null,
+                fn ($query) => $query->whereNull('start_date'),
+                fn ($query) => $query->where('start_date', $startdate)
+            )
+            ->latest('applied_at')->first();
 
-        $this->employee->update(['inserted_at' => $employeeCreatedTime->format('Y-m-d H:i:s')]);
+        $this->employee->update([
+            'division_uuid' => $divisionUuid,
+            'inserted_at' => Carbon::parse($employeeEmployeeRequest?->appliedAt)->format('Y-m-d H:i:s'),
+            'division_id' => $divisionId
+        ]);
 
-        foreach ($users as $user) {
-            $userCreatedTime = Carbon::parse($user->inserted_at) ?? null;
-
-            if ($userCreatedTime && $userCreatedTime->lessThan($employeeCreatedTime)) {
-                $this->employee->users()->syncWithoutDetaching([$user->id]);
-            } else {
-                continue;
-            }
-
-            if (!$user->hasRole($roleName)) {
-                foreach ($this->getGuardsForRole($roleName) as $guard) {
-                    Log::info("Assigning role '{$roleName}' to user ID {$user->id} for guard '{$guard}'.");
-
-                    Auth::shouldUse($guard);
-
-                    $user->assignRole($roleName);
-                }
-            }
-        }
+        Repository::party()->syncUserEmployeesEndRoles($this->employee->party, $this->legalEntity->id);
     }
 
     /**
@@ -140,27 +140,5 @@ class EmployeeDetailsUpsert extends EHealthJob
         return $this->standalone || !$this->nextEntity
             ? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin)
             : $this->nextEntity;
-    }
-
-
-    /**
-     * Determine which authentication guards define the given role.
-     * Checks only the 'web' and 'ehealth' guards.
-     * Queries Spatie\Permission\Models\Role by name and guard_name.
-     * Returns an empty collection if the role is not defined for any of the checked guards.
-     *
-     * @param string $role The role name to check across guards.
-     *
-     * @return Collection<int, string> Collection of guard names that have this role defined.
-     */
-    protected function getGuardsForRole(string $role): Collection
-    {
-        $guards = collect(['web', 'ehealth']);
-
-        return $guards->filter(fn ($guard) =>
-                Role::where('name', $role)
-                    ->where('guard_name', $guard)
-                    ->exists()
-        );
     }
 }

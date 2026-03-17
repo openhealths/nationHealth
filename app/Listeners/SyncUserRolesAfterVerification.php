@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Listeners;
 
+use App\Models\User;
+use Illuminate\Support\Carbon;
 use App\Events\EhealthUserVerified;
-use Spatie\Permission\Models\Role;
+use App\Repositories\Repository;
+use App\Services\UserRoleSyncService;
 
 class SyncUserRolesAfterVerification
 {
@@ -22,28 +25,6 @@ class SyncUserRolesAfterVerification
         $user = $event->user;
         $legalEntityId = $event->legalEntityId;
 
-        setPermissionsTeamId($legalEntityId);
-        $user->unsetRelation('roles');
-
-        $roleNames = $user->party->employees()
-            ->where('legal_entity_id', $legalEntityId)
-            ->where('status', 'APPROVED')
-            ->pluck('employee_type')
-            ->unique()
-            ->toArray();
-
-        if (empty($roleNames)) {
-            $user->syncRoles([]);
-
-            return;
-        }
-
-        $allRoles = Role::whereIn('name', $roleNames)->get();
-
-        if ($allRoles->isEmpty()) {
-            return;
-        }
-
-        $user->syncRoles($allRoles);
+        Repository::party()->syncUserEmployeesEndRoles($user->party, $event->legalEntityId);
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\Employee;
 
+use Carbon\Carbon;
 use App\Models\User;
 use App\Enums\Status;
 use App\Enums\User\Role;
@@ -157,5 +158,19 @@ class Employee extends BaseEmployee
             ->where('employee_type', Role::OWNER)
             ->where('status', Status::APPROVED)
             ->where('is_active', true);
+    }
+
+    /**
+     * Check if the employee was created at or after the given time.
+     *
+     * Used to determine employees that should be available to a user based on their effective creation time.
+     *
+     * @param string $time The reference time to compare against
+     *
+     * @return bool
+     */
+    public function isCreatedAtOrAfter(string $time): bool
+    {
+        return Carbon::parse($this->insertedAt)->greaterThanOrEqualTo(Carbon::parse($time));
     }
 }

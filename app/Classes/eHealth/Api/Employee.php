@@ -144,6 +144,8 @@ class Employee extends EHealthRequest
             'end_date' => 'nullable|date_format:Y-m-d',
             'is_active' => 'required|boolean',
 
+            'division' => 'sometimes|nullable|array',
+
             'party' => 'required|array',
             'party.uuid' => 'required|uuid',
             'party.no_tax_id' => 'required|boolean',
@@ -240,6 +242,7 @@ class Employee extends EHealthRequest
             'specialities' => $doctorData['specialities'] ?? [],
             'qualifications' => $doctorData['qualifications'] ?? [],
             'scienceDegree' => $doctorData['science_degree'] ?? [],
+            'division' => $validated['division'] ?? null,
         ];
     }
 

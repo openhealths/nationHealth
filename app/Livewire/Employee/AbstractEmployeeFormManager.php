@@ -10,6 +10,7 @@ use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Employee\RequestStatus;
 use App\Enums\Employee\RevisionStatus;
+use App\Enums\JobStatus;
 use App\Enums\User\Role;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -167,14 +168,17 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         $legalEntity ??= legalEntity();
 
         $uuid = $eHealthResponse['id'];
+        $insertedAt = Arr::get($eHealthResponse, 'ehealth_response.data.inserted_at', null);
 
         $request->update(
             [
                 'uuid' => $uuid,
                 'legal_entity_uuid' => $legalEntity->uuid,
-                'inserted_at' => Carbon::now(),
+                'inserted_at' => Carbon::parse($insertedAt)->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
                 'status' => RequestStatus::SIGNED,
+                'sync_status' => JobStatus::PARTIAL,
                 'division_id' => $request->division_id,
+                'division_uuid' => Arr::get($eHealthResponse, 'ehealth_response.data.division_id', null),
             ]
         );
 

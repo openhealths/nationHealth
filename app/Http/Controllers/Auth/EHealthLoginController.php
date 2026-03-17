@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
+use Closure;
+use Carbon\Carbon;
 use App\Auth\EHealth\Services\TokenStorage;
 use App\Classes\eHealth\Exceptions\ApiException;
 use App\Events\EHealthUserLogin;
@@ -11,7 +13,6 @@ use App\Http\Controllers\Controller;
 use App\Mail\UserCredentialsMail;
 use App\Models\User;
 use App\Models\LegalEntity;
-use Closure;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
@@ -211,7 +212,7 @@ class EHealthLoginController extends Controller
                 'uuid' => $ehealthUserId,
                 'email' => $ehealthEmail,
                 'password' => Hash::make($password),
-                'inserted_at' => $ehealthInsertedAt,
+                'inserted_at' => Carbon::parse($ehealthInsertedAt)->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
                 'email_verified_at' => now()
             ]);
 
@@ -230,7 +231,7 @@ class EHealthLoginController extends Controller
 
         // User can be created before first ehealth login (e.g. OWNER or any local admin)
         if (!$user->uuid) {
-            $user->update(['uuid' => $ehealthUserId, 'inserted_at' => $ehealthInsertedAt]);
+            $user->update(['uuid' => $ehealthUserId, 'inserted_at' => Carbon::parse($ehealthInsertedAt)->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s')]);
         }
 
         setPermissionsTeamId($legalEntity->id);

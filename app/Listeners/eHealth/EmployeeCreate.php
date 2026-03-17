@@ -8,7 +8,7 @@ use Log;
 use Throwable;
 use App\Core\Arr;
 use Carbon\Carbon;
-use App\Models\User;
+use App\Enums\JobStatus;
 use App\Classes\eHealth\EHealth;
 use App\Events\EHealthUserLogin;
 use App\Repositories\Repository;
@@ -67,7 +67,7 @@ class EmployeeCreate
             $user->refresh();
             Log::info('[EmployeeCreate] Associated new User with existing Party.', ['user_id' => $user->id, 'party_id' => $requestWithParty->partyId]);
         } else {
-            Log::info('[EmployeeCreate] No party_id found on any EmployeeRequest. User will be sent to KEP verification.', ['user_id' => $user->id]);
+            Log::info('[EmployeeCreate] No party_id found on any EmployeeRequest. User may be sent to KEP verification.', ['user_id' => $user->id]);
         }
 
         $taxId = $firstRequest->revision->data['party']['tax_id'] ?? null;
@@ -110,7 +110,7 @@ class EmployeeCreate
                     continue;
                 }
 
-                // If emloyee has already an associated user, we skip attaching because it means it's already created by the stored user (user_id)
+                // If emloyee has already an associated user, skip attaching because it means it's already created by the stored user (user_id)
                 $eHealthEmployee['user_id'] ??= $user->id;
 
                 $dataFromRevision = EHealth::employeeRequest()->mapCreate($employeeRequest->revision->data);
@@ -127,6 +127,10 @@ class EmployeeCreate
                         'user_id' => $user->id,
                     ])
                 );
+
+                $newEmployee->insertedAt ??= ($employeeRequest->appliedAt ?? Carbon::now());
+                $newEmployee->status ??= JobStatus::PARTIAL;
+                $newEmployee->divisionUuid ??= ($employeeRequest->divisionUuid ?? null);
 
                 $cleanPartyFromRevision = $dataFromRevision['party'];
                 $cleanPartyFromEHealth = Arr::except($eHealthEmployee['party'] ?? [], ['email']);
@@ -162,49 +166,22 @@ class EmployeeCreate
                 );
 
                 $employeeRequest->revision->update(['status' => RevisionStatus::APPLIED]);
-
-                $users = $newEmployee->party->users;
-
-                $newEmployee->users()->syncWithoutDetaching([$user->id]);
-
-                $employeeInsertedTime = $newEmployee->insertedAt ?? $employeeRequest->appliedAt;
-
-                // Get employees in the same party that have users, were created after the current employee,
-                // and are not already associated with the current user.
-                // This ensures that the current user is linked to all relevant employee records in the party
-                // that were created after the user's creation time, while avoiding associations with future records
-                // that may not be relevant to the user's current session.
-                $employeesIds = $newEmployee->party
-                    ->employees()
-                    ->has('users')
-                    ->where('user_id', '!=', $user->id)
-                    ->where('inserted_at', '>', $employeeInsertedTime)
-                    ->get()
-                    ->pluck('id')
-                    ->toArray();
-
-                // Sync current user to older employees in the party
-                $user->employees()->syncWithoutDetaching($employeesIds);
-
-                // Get users associated with the employee's party that were created before the employee record was inserted,
-                // ensuring proper association of existing users to the new employee record without linking future users
-                // that may not be relevant to the current session.
-                $userIds = $users
-                    ->filter(fn($usr) => Carbon::parse($usr->inserted_at)->lessThan($employeeInsertedTime))
-                    ->pluck('id')
-                    ->all();
-
-                // Sync older users to the new employee
-                $newEmployee->users()->syncWithoutDetaching($userIds);
             }
         });
 
-        $newRoles = $this->getRolesForParty($user);
+        // This means (if NULL) that procceded the first OWNER's login, so we can skip role sync
+        // because roles are assigned based on employee types and employee types are assigned based on employee records that are just created,
+        // so if it's first login and OWNER, it means that there is no employee record with employee type OWNER before,
+        // so roles will be assigned correctly through EmployeeDetailsUpsert job.
+        if (!$event->legalEntity->employeeRequestSyncStatus) {
+            return;
+        }
 
-        setPermissionsTeamId($event->legalEntity->id);
-        $user->unsetRelation('roles')->unsetRelation('permissions');
-
-        $user->assignRole($newRoles);
+        // All the going on below is need due to the fact that we need to assign roles based on employee types,
+        // and employee types are assigned based on the employee records that are just created.
+        if ($user?->party) {
+            Repository::party()->syncUserEmployeesEndRoles($user->party, $event->legalEntity->id);
+        }
     }
 
     /**
@@ -233,29 +210,5 @@ class EmployeeCreate
 
                 return $namesMatch && $datesMatch;
             });
-    }
-
-    /**
-     * Get roles based on employee types associated with the user's party.
-     *
-     * Only includes employee types where the user was created before or at the same time
-     * as the employee record was inserted, ensuring proper role assignment chronology.
-     *
-     * @param  User  $user
-     *
-     * @return array<string> Array of unique employee type role identifiers.
-     */
-    protected function getRolesForParty(User $user): array
-    {
-        $roles = [];
-        $userCreatedTime = Carbon::parse($user->inserted_at) ?? null;
-
-        foreach ($user->party?->employees as $employee) {
-            if ($employee->employeeType && $employee->insertedAt && $userCreatedTime && $userCreatedTime->lessThanOrEqualTo($employee->insertedAt)) {
-                $roles[] = $employee->employeeType;
-            }
-        }
-
-        return array_unique($roles);
     }
 }

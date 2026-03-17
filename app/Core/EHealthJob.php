@@ -320,10 +320,9 @@ abstract class EHealthJob implements ShouldQueue
             // FIRST CRITERIA: Exclude current user's party from search (if it still logined but does not have valid token)
             ->whereNot('users.party_id', $user->party_id ?? 0)
             // SECOND CRITERIA: User must be employee of this legal entity
-            // This uses nested whereHas to check User -> Party -> Employee relationship
-            // SQL equivalent: EXISTS (SELECT 1 FROM parties JOIN employees ON employees.party_id = parties.id
-            // WHERE parties.id = users.party_id AND employees.legal_entity_id = ?)
-            ->whereHas('party.employees', fn ($query) => $query->where('legal_entity_id', $legalEntity->id))
+            // This uses nested whereHas to check User -> Employee relationship
+            // SQL equivalent: EXISTS (SELECT 1 FROM employees WHERE employees.user_id = users.id AND employees.legal_entity_id = ?)
+            ->whereHas('employees', fn ($query) => $query->where('legal_entity_id', $legalEntity->id))
             // THIRD CRITERIA: User must have active session
             // This creates an EXISTS subquery to check sessions table
             // Using SELECT 1 for performance - we only need to verify existence, not retrieve data
