@@ -16,50 +16,16 @@
                             <span>{{ __('dictionaries.service_catalog.search_services') }}</span>
                         </label>
 
-                        <div
-                            class="form-group group w-full"
-                            x-data="{ open: false }"
-                        >
-                            <div class="relative">
-                                <div class="absolute inset-y-0 left-0 flex items-center ps-0 pointer-events-none"></div>
-
-                                <input type="text"
-                                       id="serviceSearchDropdown"
-                                       class="input peer w-full cursor-pointer text-gray-500 dark:text-gray-400 ps-7 pr-9"
-                                       placeholder=" "
-                                       wire:model="search"
-                                       @click="open = !open"
-                                       readonly
-                                />
-                                <label for="serviceSearchDropdown" class="label">
-                                    {{ __('dictionaries.service_catalog.search_placeholder') }}
-                                </label>
-                                @icon(
-                                    'chevron-down',
-                                    'w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 pointer-events-none'
-                                )
-
-                                <div x-show="open"
-                                     @click.away="open = false"
-                                     x-transition
-                                     x-cloak
-                                     class="absolute z-10 mt-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg"
-                                >
-                                    <ul class="py-2 px-3 space-y-1 text-sm text-gray-700 dark:text-gray-200">
-                                        @foreach($searchSuggestions as $suggestion)
-                                            <li>
-                                                <button type="button"
-                                                        wire:click="selectSearchSuggestion({{ $loop->index }})"
-                                                        @click="open = false"
-                                                        class="flex items-center gap-2 w-full text-left py-2.5 px-3 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                                                >
-                                                    <span>{{ $suggestion }}</span>
-                                                </button>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                </div>
-                            </div>
+                        <div class="form-group group w-full">
+                            <input type="text"
+                                   id="serviceSearch"
+                                   class="input peer w-full"
+                                   placeholder=" "
+                                   wire:model="searchBy"
+                            />
+                            <label for="serviceSearch" class="label">
+                                {{ __('dictionaries.service_catalog.search_placeholder') }}
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -87,6 +53,7 @@
                     </button>
                 </div>
 
+                {{-- Filters --}}
                 <div x-cloak
                      x-show="showFilter"
                      x-transition
@@ -98,9 +65,11 @@
                                 class="peer input-select w-full"
                         >
                             <option value="" selected>{{ __('forms.select') }}</option>
-                            @foreach($serviceCategories as $value => $label)
-                                <option value="{{ $value }}">{{ $label }}</option>
-                            @endforeach
+                            @if(!empty($this->dictionaries['SERVICE_CATEGORY']))
+                                @foreach($this->dictionaries['SERVICE_CATEGORY'] as $key => $value)
+                                    <option value="{{ $key }}">{{ $value }}</option>
+                                @endforeach
+                            @endif
                         </select>
                         <label for="filterServiceCategory"
                                class="label peer-focus:text-blue-600 peer-valid:text-blue-600"
@@ -181,24 +150,27 @@
                     </thead>
 
                     <tbody x-data="{ openIds: {} }">
-                    @forelse($services as $service)
+                    @forelse($services as $item)
                         @php
-                            $serviceId = $service['id'] ?? ('service-' . $loop->index);
-                            $hasChildren = !empty($service['children']) && count($service['children']) > 0;
+                            $itemId = $item['id'] ?? ('item-' . $loop->index);
+                            $hasGroups = !empty($item['groups']);
+                            $hasServices = !empty($item['services']);
+                            $hasChildren = $hasGroups || $hasServices;
                         @endphp
+
+                        {{-- Main category/service --}}
                         <tr class="index-table-tr">
                             <td class="index-table-td-primary">
                                 <div class="flex items-start gap-3">
                                     <div class="mt-1 flex-shrink-0 w-6">
                                         @if ($hasChildren)
                                             <button type="button"
-                                                    @click="openIds['{{ $serviceId }}'] = !openIds['{{ $serviceId }}']"
-                                                    class="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 inline-block"
-                                                    :aria-expanded="!!openIds['{{ $serviceId }}']"
+                                                    @click="openIds['{{ $itemId }}'] = !openIds['{{ $itemId }}']"
+                                                    class="cursor-pointer p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 inline-block"
+                                                    :aria-expanded="!!openIds['{{ $itemId }}']"
                                             >
-                                                <span
-                                                    class="inline-block transition-transform duration-200"
-                                                    :class="openIds['{{ $serviceId }}'] ? 'rotate-0' : '-rotate-90'"
+                                                <span class="inline-block transition-transform duration-200"
+                                                      :class="openIds['{{ $itemId }}'] ? 'rotate-0' : '-rotate-90'"
                                                 >
                                                     @icon('chevron-down', 'w-4 h-4 text-gray-800 dark:text-white')
                                                 </span>
@@ -206,28 +178,22 @@
                                         @endif
                                     </div>
                                     <div class="flex flex-col">
-                                        <span>{{ $service['name'] ?? '' }}</span>
-                                        @if (!empty($service['id']))
-                                            <span class="text-xs text-gray-500">
-                                                id {{ $service['id'] }}
-                                            </span>
-                                        @endif
+                                        <span class="font-semibold">{{ $item['name'] ?? '' }}</span>
                                     </div>
                                 </div>
                             </td>
                             <td class="index-table-td">
-                                @if (!empty($service['allowed_for_en']))
-                                    <span class="text-lg font-semibold">+</span>
+                                @if (!empty($item['request_allowed']))
+                                    <span class="text-lg font-semibold text-green-600">+</span>
+                                @else
+                                    <span class="text-lg font-semibold text-red-600">-</span>
                                 @endif
                             </td>
                             <td class="index-table-td font-semibold">
-                                {{ $service['code'] ?? '-' }}
+                                {{ $item['code'] ?? '-' }}
                             </td>
                             <td class="index-table-td">
-                                @php
-                                    $status = $service['status'] ?? 'active';
-                                @endphp
-                                @if ($status === 'active')
+                                @if (!empty($item['is_active']))
                                     <span class="badge-green">
                                         {{ __('forms.status.active') }}
                                     </span>
@@ -238,35 +204,39 @@
                                 @endif
                             </td>
                         </tr>
-                        @if ($hasChildren)
-                            @foreach ($service['children'] as $child)
-                                <tr
-                                    class="index-table-tr bg-gray-50/50 dark:bg-gray-800/50"
-                                    x-show="openIds['{{ $serviceId }}']"
-                                    x-cloak
+
+                        {{-- Services directly under this item --}}
+                        @if ($hasServices)
+                            @foreach ($item['services'] as $service)
+                                <tr x-cloak
+                                    class="index-table-tr bg-blue-50/50 dark:bg-blue-900/20"
+                                    x-show="openIds['{{ $itemId }}']"
                                     x-transition:enter="transition ease-out duration-150"
                                     x-transition:enter-start="opacity-0"
                                     x-transition:enter-end="opacity-100"
                                 >
                                     <td class="index-table-td-primary">
                                         <div class="flex items-start gap-3">
-                                            <div class="mt-1 flex-shrink-0 w-6"></div>
+                                            <div class="mt-1 flex-shrink-0 w-6 ml-6">
+                                                @icon('chevron-right', 'w-3 h-3 text-gray-400 mt-1')
+                                            </div>
                                             <div class="flex flex-col">
-                                                <span>{{ $child['name'] ?? '' }}</span>
-                                                @if (!empty($child['id'] ?? null))
-                                                    <span class="text-xs text-gray-500">
-                                                        id {{ $child['id'] }}
-                                                    </span>
-                                                @endif
+                                                <span>{{ $service['name'] ?? '' }}</span>
                                             </div>
                                         </div>
                                     </td>
-                                    <td class="index-table-td"></td>
+                                    <td class="index-table-td">
+                                        @if (!empty($service['request_allowed']))
+                                            <span class="text-lg font-semibold text-green-600">+</span>
+                                        @else
+                                            <span class="text-lg font-semibold text-red-600">-</span>
+                                        @endif
+                                    </td>
                                     <td class="index-table-td font-semibold">
-                                        {{ $child['code'] ?? '-' }}
+                                        {{ $service['code'] ?? '-' }}
                                     </td>
                                     <td class="index-table-td">
-                                        @if (($child['status'] ?? 'active') === 'active')
+                                        @if (!empty($service['is_active']))
                                             <span class="badge-green">
                                                 {{ __('forms.status.active') }}
                                             </span>
@@ -277,6 +247,241 @@
                                         @endif
                                     </td>
                                 </tr>
+                            @endforeach
+                        @endif
+
+                        {{-- Groups under this item --}}
+                        @if ($hasGroups)
+                            @foreach ($item['groups'] as $group)
+                                @php
+                                    $groupId = $group['id'] ?? ('group-' . $loop->parent->index . '-' . $loop->index);
+                                    $groupHasGroups = !empty($group['groups']);
+                                    $groupHasServices = !empty($group['services']);
+                                    $groupHasChildren = $groupHasGroups || $groupHasServices;
+                                @endphp
+
+                                {{-- Group row --}}
+                                <tr x-cloak
+                                    class="index-table-tr bg-gray-50/50 dark:bg-gray-800/50"
+                                    x-show="openIds['{{ $itemId }}']"
+                                    x-transition:enter="transition ease-out duration-150"
+                                    x-transition:enter-start="opacity-0"
+                                    x-transition:enter-end="opacity-100"
+                                >
+                                    <td class="index-table-td-primary">
+                                        <div class="flex items-start gap-3">
+                                            <div class="mt-1 flex-shrink-0 w-6 ml-6">
+                                                @if ($groupHasChildren)
+                                                    <button type="button"
+                                                            @click="openIds['{{ $groupId }}'] = !openIds['{{ $groupId }}']"
+                                                            class="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 inline-block"
+                                                            :aria-expanded="!!openIds['{{ $groupId }}']"
+                                                    >
+                                                        <span class="inline-block transition-transform duration-200"
+                                                              :class="openIds['{{ $groupId }}'] ? 'rotate-0' : '-rotate-90'"
+                                                        >
+                                                            @icon('chevron-down', 'w-4 h-4 text-gray-600 dark:text-gray-400')
+                                                        </span>
+                                                    </button>
+                                                @else
+                                                    @icon('chevron-right', 'w-3 h-3 text-gray-400 mt-1')
+                                                @endif
+                                            </div>
+                                            <div class="flex flex-col">
+                                                <span class="font-medium">{{ $group['name'] ?? '' }}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="index-table-td">
+                                        @if (!empty($group['request_allowed']))
+                                            <span class="text-lg font-semibold text-green-600">+</span>
+                                        @else
+                                            <span class="text-lg font-semibold text-red-600">-</span>
+                                        @endif
+                                    </td>
+                                    <td class="index-table-td font-semibold">
+                                        {{ $group['code'] ?? '-' }}
+                                    </td>
+                                    <td class="index-table-td">
+                                        @if (!empty($group['is_active']))
+                                            <span class="badge-green">
+                                                {{ __('forms.status.active') }}
+                                            </span>
+                                        @else
+                                            <span class="badge-red">
+                                                {{ __('forms.status.non_active') }}
+                                            </span>
+                                        @endif
+                                    </td>
+                                </tr>
+
+                                {{-- Subgroups --}}
+                                @if ($groupHasGroups)
+                                    @foreach ($group['groups'] as $subgroup)
+                                        @php
+                                            $subgroupId = $subgroup['id'] ?? ('subgroup-' . $loop->parent->parent->index . '-' . $loop->parent->index . '-' . $loop->index);
+                                            $subgroupHasServices = !empty($subgroup['services']);
+                                        @endphp
+
+                                        {{-- Subgroup row --}}
+                                        <tr x-cloak
+                                            class="index-table-tr bg-yellow-50/50 dark:bg-yellow-900/20"
+                                            x-show="openIds['{{ $itemId }}'] && openIds['{{ $groupId }}']"
+                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter-start="opacity-0"
+                                            x-transition:enter-end="opacity-100"
+                                        >
+                                            <td class="index-table-td-primary">
+                                                <div class="flex items-start gap-3">
+                                                    <div class="mt-1 flex-shrink-0 w-6 ml-12">
+                                                        @if ($subgroupHasServices)
+                                                            <button type="button"
+                                                                    @click="openIds['{{ $subgroupId }}'] = !openIds['{{ $subgroupId }}']"
+                                                                    class="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 inline-block"
+                                                                    :aria-expanded="!!openIds['{{ $subgroupId }}']"
+                                                            >
+                                                                <span
+                                                                    class="inline-block transition-transform duration-200"
+                                                                    :class="openIds['{{ $subgroupId }}'] ? 'rotate-0' : '-rotate-90'"
+                                                                >
+                                                                    @icon('chevron-down', 'w-4 h-4 text-gray-600 dark:text-gray-400')
+                                                                </span>
+                                                            </button>
+                                                        @else
+                                                            @icon('chevron-right', 'w-3 h-3 text-gray-400 mt-1')
+                                                        @endif
+                                                    </div>
+                                                    <div class="flex flex-col">
+                                                        <span>{{ $subgroup['name'] ?? '' }}</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="index-table-td">
+                                                @if (!empty($subgroup['request_allowed']))
+                                                    <span class="text-lg font-semibold text-green-600">+</span>
+                                                @else
+                                                    <span class="text-lg font-semibold text-red-600">-</span>
+                                                @endif
+                                            </td>
+                                            <td class="index-table-td font-semibold">
+                                                {{ $subgroup['code'] ?? '-' }}
+                                            </td>
+                                            <td class="index-table-td">
+                                                @if (!empty($subgroup['is_active']))
+                                                    <span class="badge-green">
+                                                        {{ __('forms.status.active') }}
+                                                    </span>
+                                                @else
+                                                    <span class="badge-red">
+                                                        {{ __('forms.status.non_active') }}
+                                                    </span>
+                                                @endif
+                                            </td>
+                                        </tr>
+
+                                        {{-- Services under subgroup --}}
+                                        @if ($subgroupHasServices)
+                                            @foreach ($subgroup['services'] as $service)
+                                                <tr x-cloak
+                                                    class="index-table-tr bg-green-50/50 dark:bg-green-900/20"
+                                                    x-show="openIds['{{ $itemId }}'] && openIds['{{ $groupId }}'] && openIds['{{ $subgroupId }}']"
+                                                    x-transition:enter="transition ease-out duration-150"
+                                                    x-transition:enter-start="opacity-0"
+                                                    x-transition:enter-end="opacity-100"
+                                                >
+                                                    <td class="index-table-td-primary">
+                                                        <div class="flex items-start gap-3">
+                                                            <div class="mt-1 flex-shrink-0 w-6 ml-18">
+                                                                @icon('chevron-right', 'w-3 h-3 text-gray-400 mt-1')
+                                                            </div>
+                                                            <div class="flex flex-col">
+                                                                <span>{{ $service['name'] ?? '' }}</span>
+                                                                @if (!empty($service['category']))
+                                                                    <span
+                                                                        class="text-xs text-gray-600 bg-gray-100 dark:bg-gray-700 px-1 rounded inline-block w-fit mt-1">
+                                                                        {{ $this->dictionaries['SERVICE_CATEGORY'][$service['category']] }}
+                                                                    </span>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td class="index-table-td">
+                                                        @if (!empty($service['request_allowed']))
+                                                            <span class="text-lg font-semibold text-green-600">+</span>
+                                                        @else
+                                                            <span class="text-lg font-semibold text-red-600">-</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="index-table-td font-semibold">
+                                                        {{ $service['code'] ?? '-' }}
+                                                    </td>
+                                                    <td class="index-table-td">
+                                                        @if (!empty($service['is_active']))
+                                                            <span class="badge-green">
+                                                                {{ __('forms.status.active') }}
+                                                            </span>
+                                                        @else
+                                                            <span class="badge-red">
+                                                                {{ __('forms.status.non_active') }}
+                                                            </span>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        @endif
+                                    @endforeach
+                                @endif
+
+                                {{-- Services directly under group --}}
+                                @if ($groupHasServices && !$groupHasGroups)
+                                    @foreach ($group['services'] as $service)
+                                        <tr x-cloak
+                                            class="index-table-tr bg-green-50/50 dark:bg-green-900/20"
+                                            x-show="openIds['{{ $itemId }}'] && openIds['{{ $groupId }}']"
+                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter-start="opacity-0"
+                                            x-transition:enter-end="opacity-100"
+                                        >
+                                            <td class="index-table-td-primary">
+                                                <div class="flex items-start gap-3">
+                                                    <div class="mt-1 flex-shrink-0 w-6 ml-12">
+                                                        @icon('chevron-right', 'w-3 h-3 text-gray-400 mt-1')
+                                                    </div>
+                                                    <div class="flex flex-col">
+                                                        <span>{{ $service['name'] ?? '' }}</span>
+                                                        @if (!empty($service['category']))
+                                                            <span
+                                                                class="text-xs text-gray-600 bg-gray-100 dark:bg-gray-700 px-1 rounded inline-block w-fit mt-1">
+                                                                {{ $service['category'] }}
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="index-table-td">
+                                                @if (!empty($service['request_allowed']))
+                                                    <span class="text-lg font-semibold text-green-600">+</span>
+                                                @else
+                                                    <span class="text-lg font-semibold text-red-600">-</span>
+                                                @endif
+                                            </td>
+                                            <td class="index-table-td font-semibold">
+                                                {{ $service['code'] ?? '-' }}
+                                            </td>
+                                            <td class="index-table-td">
+                                                @if (!empty($service['is_active']))
+                                                    <span class="badge-green">
+                                                        {{ __('forms.status.active') }}
+                                                    </span>
+                                                @else
+                                                    <span class="badge-red">
+                                                        {{ __('forms.status.non_active') }}
+                                                    </span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                @endif
                             @endforeach
                         @endif
                     @empty
@@ -311,7 +516,7 @@
     </div>
 
     <div class="mt-8 pl-3.5 pb-8 lg:pl-8 2xl:pl-5">
-        {{--{{ $dictionary->links() }}--}}
+        {{ $this->services->links() }}
     </div>
 
     <x-forms.loading />
