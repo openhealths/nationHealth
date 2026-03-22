@@ -67,9 +67,9 @@ use App\Livewire\Person\PersonCreate;
 use App\Livewire\Person\PersonUpdate;
 use App\Livewire\Person\PersonRequestEdit;
 use App\Livewire\Person\PersonIndex;
-use App\Livewire\Person\Records\PersonData;
-use App\Livewire\Person\Records\PersonEpisodes;
-use App\Livewire\Person\Records\PersonSummary;
+use App\Livewire\Person\Records\PatientData;
+use App\Livewire\Person\Records\PatientEpisodes;
+use App\Livewire\Person\Records\PatientSummary;
 use App\Livewire\Procedure\ProcedureCreate;
 use App\Models\Declaration;
 use App\Models\DeclarationRequest;
@@ -278,9 +278,9 @@ Route::middleware(['auth:web,ehealth', 'verified'])->group(function () {
                     Route::get('/update/{person}', PersonUpdate::class)->can('create', PersonRequest::class)->name('update');
 
                     Route::middleware('can:view,' . Person::class)->group(function () {
-                        Route::get('/{patientId}/patient-data', PersonData::class)->name('patient-data');
-                        Route::get('/{patientId}/summary', PersonSummary::class)->name('summary');
-                        Route::get('/{patientId}/episodes', PersonEpisodes::class)->name('episodes');
+                        Route::get('/{id}/patient-data', PatientData::class)->name('patient-data');
+                        Route::get('/{id}/summary', PatientSummary::class)->name('summary');
+                        Route::get('/{id}/episodes', PatientEpisodes::class)->name('episodes');
                     });
                 });
 

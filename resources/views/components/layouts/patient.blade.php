@@ -3,9 +3,7 @@
 
 <section>
     <x-header-navigation x-data="{ showFilter: true }" class="breadcrumb-form">
-        <x-slot name="title">
-            {{ $patientFullName }}
-        </x-slot>
+        <x-slot name="title">{{ $patientFullName }}</x-slot>
 
         <x-slot name="navigation">
             <div class="sm:flex md:divide-x md:divide-gray-100 dark:divide-gray-700 mb-8 gap-2">
@@ -45,7 +43,7 @@
                         @endphp
 
                         @foreach($navItems as $route => $translation)
-                            <option value="{{ route('persons.' . $route, [legalEntity(), 'patientId' => $id]) }}"
+                            <option value="{{ route('persons.' . $route, [legalEntity(), 'id' => $id]) }}"
                                     :selected="currentPath.includes('{{ $route }}')"
                             >
                                 {{ __($translation) }}
@@ -58,8 +56,8 @@
                 <ul class="hidden text-sm font-medium text-center text-gray-500 rounded-lg shadow-sm sm:flex dark:divide-gray-700 dark:text-gray-400">
                     @foreach($navItems as $route => $translation)
                         <li class="w-full focus-within:z-10">
-                            <a href="{{ route('persons.' . $route, [legalEntity(), 'patientId' => $id]) }}"
-                               @click="currentPath = '{{ route('persons.' . $route, [legalEntity(), 'patientId' => $id]) }}'"
+                            <a href="{{ route('persons.' . $route, [legalEntity(), 'id' => $id]) }}"
+                               @click="currentPath = '{{ route('persons.' . $route, [legalEntity(), 'id' => $id]) }}'"
                                class="inline-block w-full p-4 border-gray-200 dark:border-gray-700 focus:ring-4 focus:ring-blue-300 focus:outline-none"
                                :class="currentPath.includes('{{ $route }}')
                                    ? 'text-gray-900 bg-gray-100 dark:bg-gray-700 dark:text-white'

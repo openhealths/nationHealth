@@ -1,4 +1,4 @@
-<x-layouts.patient :id="$patientId" :patientFullName="$patientFullName">
+<x-layouts.patient :id="$id" :patientFullName="$patientFullName">
     <div class="breadcrumb-form p-4 shift-content">
         <button wire:click.prevent=""
                 class="button-primary mb-10"

@@ -128,7 +128,10 @@ return [
         'cancelled' => 'Скасований',
         'completed' => 'Завершений',
         'expired' => 'Прострочений',
-        'rejected' => 'Відхилений'
+        'rejected' => 'Відхилений',
+        'active' => 'Діючий',
+        'closed' => 'Завершений',
+        'entered_in_error' => 'Внесений помилково'
     ],
 
     'source' => [
@@ -287,7 +290,6 @@ return [
     'procedure_end_date_and_time' => 'Дата та час завершення процедури',
     'reason_for_performing' => 'Причина проведення',
     'episode' => 'Епізод',
-    'active' => 'діючий',
     'added' => 'Додано',
     'rehabilitation_aids' => 'Допоміжні засоби реабілітації',
     'complications_arising_during_the_procedure' => 'Ускладнення, що виникли під час процедури',
@@ -406,5 +408,6 @@ return [
         'new_confidant_person_added' => 'Нового законного представника успішно додано.',
         'confidant_requests_list_updated' => 'Список даних про запити на створення законних представників оновлено.',
         'sync_auth_methods_and_try_again' => 'Будь ласка, синхронізуйте методи автентифікації та спробуйте знову.',
+        'episodes_synced_successfully' => 'Епізоди успішно синхронізовані',
     ]
 ];

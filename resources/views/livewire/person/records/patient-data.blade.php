@@ -1,7 +1,7 @@
 @use('App\Enums\Person\AuthenticationMethod')
 @use('App\Enums\Person\VerificationStatus as Status')
 
-<x-layouts.patient :id="$patientId" :patientFullName="$patientFullName">
+<x-layouts.patient :id="$id" :patientFullName="$patientFullName">
     <div class="breadcrumb-form p-4 shift-content">
         <div class="flex items-center gap-14 mb-10">
             <p class="default-p">

@@ -65,4 +65,9 @@ final class Repository
     {
         return app(ClinicalImpressionRepository::class);
     }
+
+    public static function period(): PeriodRepository
+    {
+        return app(PeriodRepository::class);
+    }
 }

@@ -15,6 +15,7 @@ use App\Repositories\MedicalEvents\IdentifierRepository;
 use App\Repositories\MedicalEvents\ImmunizationRepository;
 use App\Repositories\MedicalEvents\ObservationRepository;
 use App\Repositories\MedicalEvents\PaperReferralRepository;
+use App\Repositories\MedicalEvents\PeriodRepository;
 use App\Repositories\MedicalEvents\ProcedureRepository;
 use Illuminate\Contracts\Support\DeferrableProvider;
 use Illuminate\Support\ServiceProvider;
@@ -40,6 +41,7 @@ class MedicalEventsDBServiceProvider extends ServiceProvider implements Deferrab
         $this->bindRepository(ObservationRepository::class);
         $this->bindRepository(ProcedureRepository::class);
         $this->bindRepository(PaperReferralRepository::class);
+        $this->bindRepository(PeriodRepository::class);
         $this->bindRepository(ClinicalImpressionRepository::class);
     }
 
@@ -86,6 +88,7 @@ class MedicalEventsDBServiceProvider extends ServiceProvider implements Deferrab
             ObservationRepository::class,
             ProcedureRepository::class,
             PaperReferralRepository::class,
+            PeriodRepository::class,
             ClinicalImpressionRepository::class
         ];
     }

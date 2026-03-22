@@ -41,13 +41,6 @@ class PersonIndex extends Component
      */
     public array $patients = [];
 
-    /**
-     * Patient data from eHealth response.
-     *
-     * @var array
-     */
-    public array $originalPatients = [];
-
     public Form $form;
 
     /**
@@ -243,7 +236,7 @@ class PersonIndex extends Component
     {
         if (uuid_is_valid($patientId)) {
             // IF UUID is valid, then find for it in DB
-            $patientData = collect($this->getOriginalPatients())->firstWhere('id', $patientId);
+            $patientData = collect($this->patients)->firstWhere('id', $patientId);
             $person = Person::firstWhere('uuid', $patientId);
 
             // Crete person in DB if not exist.
@@ -259,20 +252,10 @@ class PersonIndex extends Component
                 }
             }
 
-            $this->redirectRoute($routeName, [legalEntity(), 'patientId' => $person->id]);
+            $this->redirectRoute($routeName, [legalEntity(), 'id' => $person->id]);
         } else {
-            $this->redirectRoute($routeName, [legalEntity(), 'patientId' => $patientId]);
+            $this->redirectRoute($routeName, [legalEntity(), 'id' => $patientId]);
         }
-    }
-
-    /**
-     * Get the original patient's data.
-     *
-     * @return array
-     */
-    private function getOriginalPatients(): array
-    {
-        return $this->originalPatients;
     }
 
     /**

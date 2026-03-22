@@ -6,7 +6,7 @@ namespace App\Livewire\Person\Records;
 
 use Illuminate\Contracts\View\View;
 
-class PersonEpisodes extends BasePatientComponent
+class PatientEpisodes extends BasePatientComponent
 {
     public function render(): View
     {

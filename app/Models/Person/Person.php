@@ -8,6 +8,7 @@ use App\Models\ConfidantPersonRelationshipRequest;
 use App\Models\Declaration;
 use App\Models\Employee\Employee;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\Relations\ConfidantPerson;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -32,6 +33,11 @@ class Person extends BasePerson
     public function encounters(): HasMany
     {
         return $this->hasMany(Encounter::class);
+    }
+
+    public function episodes(): HasMany
+    {
+        return $this->hasMany(Episode::class);
     }
 
     public function declarations(): HasMany

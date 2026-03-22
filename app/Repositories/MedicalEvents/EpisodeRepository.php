@@ -90,4 +90,30 @@ class EpisodeRepository extends BaseRepository
             ->first()
             ?->toArray();
     }
+
+    /**
+     * Sync episodes from eHealth API to database.
+     *
+     * @param  int  $personId
+     * @param  array  $validatedData
+     */
+    public function sync(int $personId, array $validatedData): void
+    {
+        foreach ($validatedData as $episodeData) {
+            $episode = $this->model::updateOrCreate(
+                [
+                    'uuid' => $episodeData['uuid'],
+                ],
+                [
+                    'person_id' => $personId,
+                    'name' => $episodeData['name'],
+                    'status' => $episodeData['status'],
+                    'ehealth_inserted_at' => $episodeData['ehealth_inserted_at'],
+                    'ehealth_updated_at' => $episodeData['ehealth_updated_at']
+                ]
+            );
+
+            Repository::period()->sync($episode, $episodeData['period']);
+        }
+    }
 }

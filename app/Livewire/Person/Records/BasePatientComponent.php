@@ -14,8 +14,13 @@ abstract class BasePatientComponent extends Component
 {
     use FormTrait;
 
+    /**
+     * Person ID.
+     *
+     * @var int
+     */
     #[Locked]
-    public string $patientId;
+    public int $id;
 
     /**
      * Patient full name.
@@ -35,14 +40,14 @@ abstract class BasePatientComponent extends Component
 
     public function boot(): void
     {
-        if ($this->patientId) {
+        if ($this->id) {
             $this->loadPatientData();
         }
     }
 
-    public function mount(LegalEntity $legalEntity, string $patientId): void
+    public function mount(LegalEntity $legalEntity, int $id): void
     {
-        $this->patientId = $patientId;
+        $this->id = $id;
         $this->initializeComponent();
     }
 
@@ -53,7 +58,7 @@ abstract class BasePatientComponent extends Component
      */
     protected function loadPatientData(): void
     {
-        $patient = Person::whereId($this->patientId)
+        $patient = Person::whereId($this->id)
             ->get(['uuid', 'first_name', 'last_name', 'second_name', 'verification_status'])
             ->firstOrFail();
 
