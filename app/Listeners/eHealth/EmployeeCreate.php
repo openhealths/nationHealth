@@ -167,35 +167,37 @@ class EmployeeCreate
 
                 $newEmployee->users()->syncWithoutDetaching([$user->id]);
 
-                $employeeInsertedTime = $newEmployee->insertedAt ?? $employeeRequest->appliedAt;
+                $employeeInsertedTime = $newEmployee->insertedAt ?? $employeeRequest->appliedAt ?? $newEmployee->createdAt;
 
-                // Get employees in the same party that have users, were created after the current employee,
-                // and are not already associated with the current user.
-                // This ensures that the current user is linked to all relevant employee records in the party
-                // that were created after the user's creation time, while avoiding associations with future records
-                // that may not be relevant to the user's current session.
-                $employeesIds = $newEmployee->party
-                    ->employees()
-                    ->has('users')
-                    ->where('user_id', '!=', $user->id)
-                    ->where('inserted_at', '>', $employeeInsertedTime)
-                    ->get()
-                    ->pluck('id')
-                    ->toArray();
+                if ($employeeInsertedTime) {
+                    // Get employees in the same party that have users, were created after the current employee,
+                    // and are not already associated with the current user.
+                    // This ensures that the current user is linked to all relevant employee records in the party
+                    // that were created after the user's creation time, while avoiding associations with future records
+                    // that may not be relevant to the user's current session.
+                    $employeesIds = $newEmployee->party
+                        ->employees()
+                        ->has('users')
+                        ->where('user_id', '!=', $user->id)
+                        ->where('inserted_at', '>', $employeeInsertedTime)
+                        ->get()
+                        ->pluck('id')
+                        ->toArray();
 
-                // Sync current user to older employees in the party
-                $user->employees()->syncWithoutDetaching($employeesIds);
+                    // Sync current user to older employees in the party
+                    $user->employees()->syncWithoutDetaching($employeesIds);
 
-                // Get users associated with the employee's party that were created before the employee record was inserted,
-                // ensuring proper association of existing users to the new employee record without linking future users
-                // that may not be relevant to the current session.
-                $userIds = $users
-                    ->filter(fn($usr) => Carbon::parse($usr->inserted_at)->lessThan($employeeInsertedTime))
-                    ->pluck('id')
-                    ->all();
+                    // Get users associated with the employee's party that were created before the employee record was inserted,
+                    // ensuring proper association of existing users to the new employee record without linking future users
+                    // that may not be relevant to the current session.
+                    $userIds = $users
+                        ->filter(fn($usr) => Carbon::parse($usr->inserted_at)->lessThan($employeeInsertedTime))
+                        ->pluck('id')
+                        ->all();
 
-                // Sync older users to the new employee
-                $newEmployee->users()->syncWithoutDetaching($userIds);
+                    // Sync older users to the new employee
+                    $newEmployee->users()->syncWithoutDetaching($userIds);
+                }
             }
         });
 
