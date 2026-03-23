@@ -8,7 +8,6 @@
      x-transition:leave-end="opacity-0"
      x-cloak
      @click="showMedicationSearchDrawer = false"
-     data-drawer-hide="medication-search-drawer-right"
      aria-controls="medication-search-drawer-right"
      class="fixed top-0 right-0 h-screen pt-20 w-4/5 bg-gray-900/50"
      style="z-index: 44;"
@@ -153,7 +152,6 @@
     <div class="mt-6">
         <button type="button"
                 class="button-minor"
-                data-drawer-hide="medication-search-drawer-right"
                 aria-controls="medication-search-drawer-right"
                 @click="showMedicationSearchDrawer = false"
         >

@@ -3,6 +3,7 @@
      Backdrop + panel must live in one wrapper or the panel never reaches body and the
      backdrop covers the page alone. --}}
 <template x-teleport="body">
+<<<<<<< HEAD
     <div x-show="showServiceDrawer"
          x-transition:enter="transition ease-out duration-300"
          x-transition:enter-start="opacity-0"
@@ -15,6 +16,20 @@
          style="z-index: 39;"
          role="dialog"
          aria-modal="true"
+=======
+    <div>
+        <div x-show="showServiceDrawer" class="fixed inset-0 z-30 bg-gray-900 bg-opacity-50" x-transition.opacity style="display: none;" @click="showServiceDrawer = false"></div>
+        <div x-show="showServiceDrawer"
+             x-transition:enter="transition-transform ease-out duration-300"
+             x-transition:enter-start="translate-x-full"
+             x-transition:enter-end="translate-x-0"
+             x-transition:leave="transition-transform ease-in duration-300"
+             x-transition:leave-start="translate-x-0"
+             x-transition:leave-end="translate-x-full"
+             class="fixed top-0 right-0 h-screen pt-20 p-4 overflow-y-auto bg-white w-4/5 dark:bg-gray-800"
+         style="z-index: 40;"
+         tabindex="-1"
+>>>>>>> f59619d (feat: complete CarePlanActivity integration and refactor drawers to Alpine)
          aria-labelledby="services-drawer-label"
     >
         {{-- Full-viewport scrim: dims main app; drawer panel stacks above (z-10) --}}
@@ -38,7 +53,7 @@
         </h3>
 
         {{-- Content --}}
-        <form>
+        <form wire:submit.prevent="saveActivity">
             {{-- Main Data Section --}}
             <fieldset class="fieldset">
                 <legend class="legend">
@@ -54,10 +69,6 @@
                         <div class="relative">
                             <button type="button"
                                     class="input-select peer pr-12 w-full text-left text-gray-500"
-                                    data-drawer-target="service-search-drawer-right"
-                                    data-drawer-show="service-search-drawer-right"
-                                    data-drawer-placement="right"
-                                    data-drawer-body-scrolling="false"
                                     aria-controls="service-search-drawer-right"
                                     @click="showServiceSearchDrawer = true"
                             >
@@ -92,12 +103,11 @@
                         <div class="flex gap-2">
                             <input type="number"
                                    id="quantity"
-                                   name="quantity"
                                    class="input peer w-full"
-                                   value="5"
+                                   wire:model="activityForm.quantity"
                             >
-                            <select class="input-select peer w-20">
-                                <option selected value="units">{{ __('care-plan.units') }}</option>
+                            <select class="input-select peer w-20" wire:model="activityForm.quantity_system">
+                                <option value="units">{{ __('care-plan.units') }}</option>
                             </select>
                         </div>
                     </div>
@@ -110,12 +120,12 @@
                                 @icon('calendar-month', 'w-4 h-4 text-gray-500')
                             </div>
                             <input type="text"
-                                   name="start_date"
                                    class="input peer ps-10"
                                    placeholder="02.04.2025"
                                    datepicker-autohide
                                    datepicker-format="dd.mm.yyyy"
                                    datepicker-button="false"
+                                   wire:model.live="activityForm.scheduled_period_start"
                             />
                         </div>
                     </div>
@@ -162,12 +172,12 @@
                                 @icon('calendar-month', 'w-4 h-4 text-gray-500')
                             </div>
                             <input type="text"
-                                   name="end_date"
                                    class="input peer ps-10"
                                    placeholder="02.08.2025"
                                    datepicker-autohide
                                    datepicker-format="dd.mm.yyyy"
                                    datepicker-button="false"
+                                   wire:model.live="activityForm.scheduled_period_end"
                             />
                         </div>
                     </div>
@@ -298,10 +308,10 @@
                         {{ __('care-plan.extended_description') }}
                     </label>
                     <textarea id="description"
-                              name="description"
                               class="input peer w-full"
                               rows="4"
                               placeholder="{{ __('care-plan.description') }}"
+                              wire:model="activityForm.description"
                     ></textarea>
                 </div>
             </fieldset>
@@ -309,24 +319,23 @@
             <div class="mt-6 flex justify-start gap-3">
                 <button type="button"
                         class="button-minor"
+<<<<<<< HEAD
                         aria-controls="services-drawer-right"
+=======
+>>>>>>> f59619d (feat: complete CarePlanActivity integration and refactor drawers to Alpine)
                         @click="showServiceDrawer = false"
                 >
                     {{ __('forms.cancel') }}
                 </button>
 
-                <button type="button"
+                <button type="submit"
                         class="button-primary"
-                        data-drawer-target="service-search-drawer-right"
-                        data-drawer-show="service-search-drawer-right"
-                        data-drawer-placement="right"
-                        aria-controls="service-search-drawer-right"
-                        @click="showServiceSearchDrawer = true"
                 >
-                    {{ __('care-plan.add_service') }}
+                    {{ __('forms.save') }}
                 </button>
             </div>
         </form>
         </div>
+    </div>
     </div>
 </template>

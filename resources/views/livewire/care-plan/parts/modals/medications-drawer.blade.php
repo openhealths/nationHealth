@@ -1,5 +1,6 @@
 {{-- Medications Drawer (single teleport root — Alpine moves only firstElementChild) --}}
 <template x-teleport="body">
+<<<<<<< HEAD
     <div x-show="showMedicationDrawer"
          x-transition:enter="transition ease-out duration-300"
          x-transition:enter-start="opacity-0"
@@ -12,6 +13,20 @@
          style="z-index: 39;"
          role="dialog"
          aria-modal="true"
+=======
+    <div>
+        <div x-show="showMedicationDrawer" class="fixed inset-0 z-30 bg-gray-900 bg-opacity-50" x-transition.opacity style="display: none;" @click="showMedicationDrawer = false"></div>
+        <div x-show="showMedicationDrawer"
+             x-transition:enter="transition-transform ease-out duration-300"
+             x-transition:enter-start="translate-x-full"
+             x-transition:enter-end="translate-x-0"
+             x-transition:leave="transition-transform ease-in duration-300"
+             x-transition:leave-start="translate-x-0"
+             x-transition:leave-end="translate-x-full"
+             class="fixed top-0 right-0 h-screen pt-20 p-4 overflow-y-auto bg-white w-4/5 dark:bg-gray-800"
+         style="z-index: 40;"
+         tabindex="-1"
+>>>>>>> f59619d (feat: complete CarePlanActivity integration and refactor drawers to Alpine)
          aria-labelledby="medications-drawer-label"
     >
         <div class="absolute inset-0 bg-gray-900/50"
@@ -59,7 +74,11 @@
             <div class="mt-6 flex justify-start gap-3">
                 <button type="button"
                         class="button-minor"
+<<<<<<< HEAD
                         aria-controls="medications-drawer-right"
+=======
+                        aria-controls=""
+>>>>>>> f59619d (feat: complete CarePlanActivity integration and refactor drawers to Alpine)
                         @click="showMedicationDrawer = false"
                 >
                     {{ __('forms.cancel') }}
@@ -75,5 +94,6 @@
             </div>
         </form>
         </div>
+    </div>
     </div>
 </template>

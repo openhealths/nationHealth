@@ -7,7 +7,20 @@
         </x-slot>
     </x-header-navigation>
 
-    <div x-data="{ showSignatureModal: $wire.entangle('showSignatureModal').live }" class="form shift-content" wire:key="{{ time() }}">
+    <div x-data="{ 
+        showSignatureModal: $wire.entangle('showSignatureModal').live,
+        openDropdown: false,
+        showServiceDrawer: false,
+        showServiceSearchDrawer: false,
+        showMedicationDrawer: false,
+        showMedicationSearchDrawer: false,
+        showMedicationFormDrawer: false,
+        showMedicalDeviceDrawer: false,
+        showMedicalDeviceSearchDrawer: false,
+        showMedicalDeviceFormDrawer: false
+    }" 
+    @close-drawers.window="showServiceDrawer = false; showServiceSearchDrawer = false; showMedicationDrawer = false; showMedicationSearchDrawer = false; showMedicationFormDrawer = false; showMedicalDeviceDrawer = false; showMedicalDeviceSearchDrawer = false; showMedicalDeviceFormDrawer = false;"
+    class="form shift-content" wire:key="{{ time() }}">
 
         {{-- Plan Header --}}
         <div class="flex items-center gap-3 mb-4">
@@ -64,7 +77,41 @@
 
         {{-- Activities Table --}}
         <fieldset class="fieldset mt-6">
-            <legend class="legend">{{ __('care-plan.activities') }}</legend>
+            <div class="flex items-center justify-between mb-4">
+                <legend class="legend mb-0">{{ __('care-plan.activities') }}</legend>
+                
+                @if(in_array($carePlan->status, ['ACTIVE', 'active']))
+                    {{-- Dropdown for New Prescription --}}
+                    <div class="relative">
+                        <button type="button" 
+                                @click="openDropdown = !openDropdown" 
+                                @click.away="openDropdown = false"
+                                class="button-primary flex items-center gap-2">
+                            <span>+ {{ __('care-plan.new_prescription') }}</span>
+                            <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 9-7 7-7-7"/>
+                            </svg>
+                        </button>
+                        
+                        <div x-show="openDropdown" 
+                             x-transition
+                             style="display: none;"
+                             class="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:bg-gray-700">
+                            <div class="py-1" role="none">
+                                <button type="button" @click="openDropdown = false; showServiceDrawer = true" wire:click="initActivityForm('service_request')" class="text-gray-700 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600">
+                                    {{ __('care-plan.service_prescription') }}
+                                </button>
+                                <button type="button" @click="openDropdown = false; showMedicationDrawer = true" wire:click="initActivityForm('medication_request')" class="text-gray-700 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600">
+                                    {{ __('care-plan.medication_prescription') }}
+                                </button>
+                                <button type="button" @click="openDropdown = false; showMedicalDeviceDrawer = true" wire:click="initActivityForm('device_request')" class="text-gray-700 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600">
+                                    {{ __('care-plan.medical_device_prescription') }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+            </div>
 
             <div class="table-responsive">
                 <table class="table">
@@ -74,19 +121,33 @@
                             <th>{{ __('care-plan.quantity') }}</th>
                             <th>{{ __('forms.start_date') }}</th>
                             <th>{{ __('forms.status') }}</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($carePlan->activities as $activity)
+                        @forelse($carePlan->activities ?? [] as $activity)
                             <tr>
                                 <td>{{ $activity->kind }}</td>
                                 <td>{{ $activity->quantity ?? '-' }}</td>
                                 <td>{{ $activity->scheduled_period_start?->format('d.m.Y') }}</td>
-                                <td>{{ $activity->status }}</td>
+                                <td>
+                                    <span class="badge {{ $activity->status === 'NEW' ? 'badge-warning' : 'badge-success' }}">
+                                        {{ $activity->status }}
+                                    </span>
+                                </td>
+                                <td class="text-right">
+                                    @if($activity->status === 'NEW')
+                                        <button type="button"
+                                                class="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                                wire:click="openSignatureModal('sign_activity', {{ $activity->id }})">
+                                            {{ __('forms.sign') }}
+                                        </button>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="text-center py-4 text-gray-400">
+                                <td colspan="5" class="text-center py-4 text-gray-400">
                                     {{ __('care-plan.no_activities') }}
                                 </td>
                             </tr>
@@ -126,5 +187,15 @@
 
             @include('components.signature-modal', ['method' => 'sign'])
         @endif
+
+        {{-- Drawers --}}
+        @include('livewire.care-plan.parts.modals.services-drawer')
+        @include('livewire.care-plan.parts.modals.service-search-drawer')
+        @include('livewire.care-plan.parts.modals.medications-drawer')
+        @include('livewire.care-plan.parts.modals.medication-search-drawer')
+        @include('livewire.care-plan.parts.modals.medication-form-drawer')
+        @include('livewire.care-plan.parts.modals.medical-devices-drawer')
+        @include('livewire.care-plan.parts.modals.medical-device-search-drawer')
+        @include('livewire.care-plan.parts.modals.medical-device-form-drawer')
     </div>
 </section>

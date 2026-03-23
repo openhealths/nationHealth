@@ -31,7 +31,7 @@
     </h3>
 
     {{-- Content --}}
-    <form>
+    <form wire:submit.prevent="saveActivity">
         {{-- Main Data Section --}}
         <fieldset class="fieldset">
             <legend class="legend">
@@ -80,12 +80,11 @@
                     <div class="flex gap-2">
                         <input type="number"
                                id="device_quantity"
-                               name="device_quantity"
                                class="input peer w-full"
-                               value="5"
+                               wire:model="activityForm.quantity"
                         >
-                        <select class="input-select peer w-20">
-                            <option selected value="units">{{ __('care-plan.units') }}</option>
+                        <select class="input-select peer w-20" wire:model="activityForm.quantity_system">
+                            <option value="units">{{ __('care-plan.units') }}</option>
                         </select>
                     </div>
                 </div>
@@ -98,12 +97,12 @@
                             @icon('calendar-month', 'w-4 h-4 text-gray-500')
                         </div>
                         <input type="text"
-                               name="device_start_date"
                                class="input peer ps-10"
                                placeholder="02.04.2025"
                                datepicker-autohide
                                datepicker-format="dd.mm.yyyy"
                                datepicker-button="false"
+                               wire:model.live="activityForm.scheduled_period_start"
                         />
                     </div>
                 </div>
@@ -150,12 +149,12 @@
                             @icon('calendar-month', 'w-4 h-4 text-gray-500')
                         </div>
                         <input type="text"
-                               name="device_end_date"
                                class="input peer ps-10"
                                placeholder="02.08.2025"
                                datepicker-autohide
                                datepicker-format="dd.mm.yyyy"
                                datepicker-button="false"
+                               wire:model.live="activityForm.scheduled_period_end"
                         />
                     </div>
                 </div>
@@ -288,10 +287,10 @@
                     {{ __('care-plan.extended_description') }}
                 </label>
                 <textarea id="device_description"
-                          name="device_description"
                           class="block w-full p-4 text-sm text-gray-900 bg-white border border-gray-200 rounded-2xl focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
                           rows="5"
                           placeholder="{{ __('care-plan.description') }}"
+                          wire:model="activityForm.description"
                 ></textarea>
             </div>
         </fieldset>
@@ -304,10 +303,10 @@
                 {{ __('forms.cancel') }}
             </button>
 
-            <button type="button"
+            <button type="submit"
                     class="button-primary"
             >
-                {{ __('care-plan.add_service') }}
+                {{ __('forms.save') }}
             </button>
         </div>
     </form>
