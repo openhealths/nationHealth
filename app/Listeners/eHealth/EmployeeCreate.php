@@ -125,7 +125,7 @@ class EmployeeCreate
                     array_merge($dataFromRevision['employee'], $dataFromEHealth, [
                         'legal_entity_id' => $event->legalEntity->id,
                         'legal_entity_uuid' => $event->legalEntity->uuid,
-                        'user_id' => $user->id,
+                        'user_id' => $user->id
                     ])
                 );
 
@@ -242,7 +242,6 @@ class EmployeeCreate
                         $employeeRequest->startDate = Employee::where('legal_entity_uuid', $employeeRequest->legalEntityUuid)
                             ->where('employee_type', $employeeRequest->employeeType)
                             ->where('position', $employee['position'])
-                            ->where('employee_type', $employee['employee_type'])
                             ->where('party_id', $party->id)
                             ->first()?->startDate;
                         break;
@@ -277,6 +276,24 @@ class EmployeeCreate
             if ($employee->employeeType && $employee->insertedAt && $userCreatedTime && $userCreatedTime->lessThanOrEqualTo($employee->insertedAt)) {
                 $roles[] = $employee->employeeType;
             }
+        }
+
+        // Check if the user has an more than one employee with OWNER role.
+        // If so, include all previous OWNER's roles from the party
+        // to ensure proper access for users with multiple OWNER employees in the same party
+        if ($user->employees()->where('employee_type', 'OWNER')->count() > 0) { // If count > 1 it means that OWNER was edited and has new user to work with
+            // Get the already assigned OWNER role(s) for the user
+            // At this time current user is assigned to the employee with OWNER role but
+            // hasn't assigned OWNER role yet to the User model
+            $ownerUser = User::whereHas('employees', function ($query) use ($user) {
+                $query->where('party_id', $user->party_id)
+                    ->where('employee_type', 'OWNER');
+            })->role('OWNER')->first();
+
+            // Add all roles from the first user with OWNER role in the same party
+            // to ensure that if there are multiple OWNER employees in the same party,
+            // the user gets all relevant roles for proper access
+            $roles = array_merge($roles, $ownerUser?->roles->pluck('name')->toArray() ?? []);
         }
 
         return array_unique($roles);
