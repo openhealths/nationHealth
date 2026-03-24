@@ -778,7 +778,7 @@ abstract class LegalEntity extends Component
      */
     protected function createEmployeeRequest(LegalEntityModel $legalEntity, array $requestData, string $employeeRequestId): void
     {
-        // Check if the current user is an already logined and all changes is for edit legal entity, if so - set $isEdit to true, otherwise - it's create legal entity
+        // Check if the current user is an already logined and all changes is for edit legal entity, if so - set $isEdit to true, otherwise - it just create legal entity
         $isEdit = Auth::getDefaultDriver() === 'ehealth';
 
         $preparedData = $this->mapEmployeRequestData($requestData);
@@ -1027,6 +1027,8 @@ abstract class LegalEntity extends Component
             return null;
         }
 
+        $currentDriver = Auth::getDefaultDriver();
+
         Auth::shouldUse('web');
 
         // Assign the 'OWNER' role to the user authenticated via web guard
@@ -1039,6 +1041,9 @@ abstract class LegalEntity extends Component
 
         // Send credentials and email verification link
         event(new LegalEntityCreate($authenticatedUser, $owner, $password));
+
+        // Restore guard logined with
+        Auth::shouldUse($currentDriver);
 
         return $owner;
     }
