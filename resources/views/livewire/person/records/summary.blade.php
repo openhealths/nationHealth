@@ -63,23 +63,43 @@
                 {{ __('patients.observation') }}
             </button>
 
-            <button type="button" disabled class="inline-flex items-center px-2.5 xl:px-3 py-1.5 font-medium text-gray-500 rounded-lg whitespace-nowrap cursor-not-allowed">
+            <button type="button"
+                    @click.prevent="activeTab = 'vaccinations'"
+                    :class="activeTab === 'vaccinations' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700'"
+                    class="inline-flex items-center px-2.5 xl:px-3 py-1.5 font-medium rounded-lg whitespace-nowrap transition-colors"
+            >
                 {{ __('patients.vaccinations') }}
             </button>
 
-            <button type="button" disabled class="inline-flex items-center px-2.5 xl:px-3 py-1.5 font-medium text-gray-500 rounded-lg whitespace-nowrap cursor-not-allowed">
+            <button type="button"
+                    @click.prevent="activeTab = 'procedures'"
+                    :class="activeTab === 'procedures' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700'"
+                    class="inline-flex items-center px-2.5 xl:px-3 py-1.5 font-medium rounded-lg whitespace-nowrap transition-colors"
+            >
                 {{ __('patients.procedures') }}
             </button>
 
-            <button type="button" disabled class="inline-flex items-center px-2.5 xl:px-3 py-1.5 font-medium text-gray-500 rounded-lg whitespace-nowrap cursor-not-allowed">
+            <button type="button"
+                    @click.prevent="activeTab = 'prescriptions'"
+                    :class="activeTab === 'prescriptions' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700'"
+                    class="inline-flex items-center px-2.5 xl:px-3 py-1.5 font-medium rounded-lg whitespace-nowrap transition-colors"
+            >
                 {{ __('patients.prescriptions') }}
             </button>
 
-            <button type="button" disabled class="inline-flex items-center px-2.5 xl:px-3 py-1.5 font-medium text-gray-500 rounded-lg whitespace-nowrap cursor-not-allowed">
+            <button type="button"
+                    @click.prevent="activeTab = 'treatment_plans'"
+                    :class="activeTab === 'treatment_plans' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700'"
+                    class="inline-flex items-center px-2.5 xl:px-3 py-1.5 font-medium rounded-lg whitespace-nowrap transition-colors"
+            >
                 {{ __('patients.treatment_plans') }}
             </button>
 
-            <button type="button" disabled class="inline-flex items-center px-2.5 xl:px-3 py-1.5 font-medium text-gray-500 rounded-lg whitespace-nowrap cursor-not-allowed">
+            <button type="button"
+                    @click.prevent="activeTab = 'diagnostic_reports'"
+                    :class="activeTab === 'diagnostic_reports' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700'"
+                    class="inline-flex items-center px-2.5 xl:px-3 py-1.5 font-medium rounded-lg whitespace-nowrap transition-colors"
+            >
                 {{ __('patients.diagnostic_reports') }}
             </button>
 
