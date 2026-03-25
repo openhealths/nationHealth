@@ -19,6 +19,7 @@ return [
     'patient_legal_representative' => 'Законний представник пацієнта',
     'add_patient' => 'Новий пацієнт',
     'start_interacting' => 'Розпочати взаємодію',
+    'starts_interacting' => 'Нова взаємодія',
     'nobody_found' => 'Нікого не знайдено',
     'try_change_search_parameters' => 'Спробуйте змінити параметри пошуку',
     'contact_data' => 'Контактні дані',
@@ -140,7 +141,7 @@ return [
     ],
 
     // patient-data
-    'patient_data' => 'Дані пацієнта',
+    'patient_data' => 'Персональні дані',
     'verification_in_eHealth' => 'Верифікація в ЕСОЗ',
     'update_status' => 'Оновити статус',
     'passport_data' => 'Паспортні дані',
@@ -172,6 +173,12 @@ return [
     // Summary record
     'summary' => 'Зведені дані',
     'get_access_to_medical_data' => 'Отримати доступ до медичних даних',
+    'data_access' => 'Доступ до даних',
+    'sync_ehealth_data' => 'Синхронізувати дані з ЕСОЗ',
+    'allergies' => 'Алергії',
+    'risk_assessments' => 'Оцінки ризиків',
+    'devices' => 'Пристрої',
+    'medicines' => 'Відомості про ліки',
 
     // Episodes record
     'episodes' => 'Епізоди',

@@ -637,6 +637,19 @@ input:-webkit-autofill {
     .breadcrumb-item-text {
         @apply ms-1 text-sm font-medium text-gray-500 md:ms-2 dark:text-gray-400
     }
+
+    /* Patient Summary Styles */
+    .summary-tab {
+        @apply inline-flex items-center px-2.5 xl:px-3 py-1.5 font-medium rounded-lg whitespace-nowrap transition-colors
+    }
+
+    .summary-card-btn {
+        @apply w-full flex items-center justify-between p-5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-700/80 transition-all
+    }
+
+    .summary-sidebar-btn {
+        @apply w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-colors text-sm font-medium
+    }
 }
 /* SIDEBAR NAVIGATION STYLES */
 
