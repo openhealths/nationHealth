@@ -43,12 +43,12 @@
         if (this.searchType === 'current') {
             this.localMedicalRecords.push({
                 date: new Date().toLocaleDateString('uk-UA'),
-                name: 'Поточна взаємодія (Encounter)'
+                name: '{{ __('care-plan.current_interaction') }}'
             });
         } else {
             this.localMedicalRecords.push({
                 date: new Date().toLocaleDateString('uk-UA'),
-                name: 'Медичний запис з ЕСОЗ (Тест)'
+                name: '{{ __('care-plan.medical_record_from_ehealth') }}'
             });
         }
         this.openMedicalModal = false;
@@ -136,8 +136,8 @@
                 <div @click.stop x-trap.noscroll.inert="openModal"
                      class="modal-content h-fit w-full max-w-2xl rounded-2xl shadow-lg bg-white">
                     <h3 class="modal-header !flex !justify-start gap-2">
-                        <span x-text="isNew ? 'Додати' : 'Редагувати'"></span>
-                        <span x-text="modalTarget === 'episode' ? 'епізод' : 'медичний запис'"></span>
+                        <span x-text="isNew ? '{{ __('forms.add') }}' : '{{ __('forms.edit') }}'"></span>
+                        <span x-text="modalTarget === 'episode' ? '{{ mb_strtolower(__('care-plan.episode')) }}' : '{{ mb_strtolower(__('care-plan.medical_record')) }}'"></span>
                     </h3>
                     <form @submit.prevent="save()">
                         <div class="p-6 space-y-4">
@@ -197,7 +197,7 @@
                                     <input id="current-interaction" type="radio" value="current" x-model="searchType" name="search-type"
                                            class="w-4 h-4 text-neutral-primary border-default-medium bg-neutral-secondary-medium rounded-full checked:border-brand focus:ring-2 focus:outline-none focus:ring-brand-subtle border border-default appearance-none">
                                     <label for="current-interaction" class="select-none ms-2 text-sm font-medium text-heading whitespace-nowrap">
-                                        {{ __('Поточна взаємодія') }}
+                                        {{ __('care-plan.current_interaction') }}
                                     </label>
                                 </div>
 
@@ -205,7 +205,7 @@
                                     <input id="search-ehealth" type="radio" value="ehealth" x-model="searchType" name="search-type"
                                            class="w-4 h-4 text-neutral-primary border-default-medium bg-neutral-secondary-medium rounded-full checked:border-brand focus:ring-2 focus:outline-none focus:ring-brand-subtle border border-default appearance-none">
                                     <label for="search-ehealth" class="select-none ms-2 text-sm font-medium text-heading whitespace-nowrap">
-                                        {{ __('Пошук у ЕСОЗ') }}
+                                        {{ __('care-plan.search_in_ehealth') }}
                                     </label>
                                 </div>
                             </div>

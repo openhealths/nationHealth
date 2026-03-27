@@ -166,4 +166,10 @@ return [
     'no_activity_selected' => 'Не вказано призначення для підпису.',
     'activity_not_found' => 'Призначення не знайдено.',
     'activity_signed' => 'Призначення успішно підписано та створено в ЕСОЗ.',
+    'no_diagnoses' => 'Діагнозів не знайдено',
+    'medical_record' => 'Медичний запис',
+    'current_interaction' => 'Поточна взаємодія',
+    'search_in_ehealth' => 'Пошук у ЕСОЗ',
+    'search_medical_records' => 'Пошук медичних записів',
+    'medical_record_from_ehealth' => 'Медичний запис з ЕСОЗ',
 ];

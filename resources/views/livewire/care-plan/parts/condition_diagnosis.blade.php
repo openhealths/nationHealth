@@ -17,12 +17,18 @@
             </thead>
             <tbody class="divide-y divide-gray-100">
 
-            <template x-for="(item, index) in items" :key="index">
+            @forelse($diagnoses as $item)
                 <tr>
-                    <td class="py-4 px-4 text-sm text-gray-700" x-text="item.date"></td>
-                    <td class="py-4 px-4 text-sm text-gray-900 font-medium" x-text="item.name"></td>
+                    <td class="py-4 px-4 text-sm text-gray-700">{{ $item['date'] }}</td>
+                    <td class="py-4 px-4 text-sm text-gray-900 font-medium">{{ $item['name'] }}</td>
                 </tr>
-            </template>
+            @empty
+                <tr>
+                    <td colspan="2" class="py-4 px-4 text-sm text-gray-400 text-center">
+                        {{ __('care-plan.no_diagnoses') }}
+                    </td>
+                </tr>
+            @endforelse
             </tbody>
         </table>
     </div>

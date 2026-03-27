@@ -49,8 +49,9 @@ class CarePlanCreate extends Component
 
     public string $patientUuid = '';
 
-    /** @var array<string, string> Loaded from eHealth dictionary eHealth/care_plan_categories */
     public array $categories = [];
+    public array $diagnoses = [];
+    public array $authMethods = [];
 
     public function mount(): void
     {
@@ -59,15 +60,29 @@ class CarePlanCreate extends Component
         
         $person = \App\Models\Person\Person::where('uuid', $this->patientUuid)->first();
         if ($person) {
-            $this->form['patient'] = $person->party?->full_name ?? '';
+            $this->form['patient'] = $person->full_name;
+            
+            // Load patient's authentication methods for "inform_with" dropdown
+            $this->authMethods = $person->authenticationMethods()->get()->map(fn($m) => [
+                'value' => $m->type,
+                'label' => \App\Enums\Person\AuthenticationMethod::tryFrom($m->type)?->label() ?? $m->type,
+            ])->toArray();
         }
 
         if ($encounterUuid) {
             $this->form['encounter'] = $encounterUuid;
-            $encounter = \App\Models\MedicalEvents\Sql\Encounter::where('uuid', $encounterUuid)->first();
+            $encounter = \App\Models\MedicalEvents\Sql\Encounter::where('uuid', $encounterUuid)
+                ->with(['diagnoses.condition'])
+                ->first();
             if ($encounter) {
-                // If the user wants a different value for "Medical Record Number", we can change this later
+                // Pre-fill medical number
                 $this->form['medical_number'] = (string) $encounter->id;
+                
+                // Pre-fill diagnoses for the UI list
+                $this->diagnoses = $encounter->diagnoses->map(fn($d) => [
+                    'date' => $d->condition?->asserted_date?->format('d.m.Y') ?? '-',
+                    'name' => $d->condition?->code_display ?? $d->condition?->code ?? '-',
+                ])->toArray();
             }
         }
         $this->form['period_start'] = now()->format('d.m.Y');

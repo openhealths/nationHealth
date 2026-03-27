@@ -42,7 +42,9 @@
                     wire:model="form.inform_with"
             >
                 <option value="">{{ __('forms.select') }}</option>
-                {{-- Options: authentication methods per TZ 3.7.1.5 --}}
+                @foreach($authMethods as $method)
+                    <option value="{{ $method['value'] }}">{{ $method['label'] }}</option>
+                @endforeach
             </select>
             @error('form.inform_with')
             <p class="text-error">{{ $message }}</p>
