@@ -31,12 +31,13 @@ class CarePlanCreate extends Component
 
     // Care Plan form data
     public array $form = [
+        'patient'     => '',
+        'medical_number' => '',
         'author'      => '',
         'coAuthors'   => [],
         'category'    => '',
         'title'       => '',
         'intent'      => 'order',
-        'terms_of_service' => '',
         'period_start' => '',
         'period_end'   => '',
         'encounter'    => '',
@@ -48,15 +49,27 @@ class CarePlanCreate extends Component
 
     public string $patientUuid = '';
 
-    /** @var array<string, string> Loaded from eHealth dictionary CARE_PLAN_CATEGORIES */
+    /** @var array<string, string> Loaded from eHealth dictionary eHealth/care_plan_categories */
     public array $categories = [];
 
-    /** @var array<string, string> Loaded from eHealth dictionary TERMS_OF_SERVICE_TYPES */
-    public array $termsOfService = [];
-
-    public function mount(string $patientUuid = ''): void
+    public function mount(): void
     {
-        $this->patientUuid = $patientUuid;
+        $this->patientUuid = request()->query('patientUuid', '');
+        $encounterUuid = request()->query('encounterUuid', '');
+        
+        $person = \App\Models\Person\Person::where('uuid', $this->patientUuid)->first();
+        if ($person) {
+            $this->form['patient'] = $person->party?->full_name ?? '';
+        }
+
+        if ($encounterUuid) {
+            $this->form['encounter'] = $encounterUuid;
+            $encounter = \App\Models\MedicalEvents\Sql\Encounter::where('uuid', $encounterUuid)->first();
+            if ($encounter) {
+                // If the user wants a different value for "Medical Record Number", we can change this later
+                $this->form['medical_number'] = (string) $encounter->id;
+            }
+        }
         $this->form['period_start'] = now()->format('d.m.Y');
 
         // Pre-fill author from current employee
@@ -70,18 +83,15 @@ class CarePlanCreate extends Component
 
         // Load dictionaries (cached via DictionaryManager)
         try {
-            $this->categories = dictionary()->basics()
-                ->byName('CARE_PLAN_CATEGORIES')
+            $this->categories = app(\App\Services\Dictionary\DictionaryManager::class)
+                ->basics()
+                ->byName('eHealth/care_plan_categories')
                 ->asCodeDescription()
                 ->toArray();
-
-            $this->termsOfService = dictionary()->basics()
-                ->byName('TERMS_OF_SERVICE_TYPES')
-                ->asCodeDescription()
-                ->toArray();
-        } catch (\Throwable $e) {
+        } catch (\Exception $exception) {
+            report($exception);
             // Dictionaries might not be cached yet; log and continue
-            \Illuminate\Support\Facades\Log::warning('CarePlanCreate: failed to load dictionaries: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::warning('CarePlanCreate: failed to load dictionaries: ' . $exception->getMessage());
         }
     }
 
@@ -96,7 +106,6 @@ class CarePlanCreate extends Component
             'form.period_start'     => 'required|string',
             'form.period_end'       => 'nullable|string',
             'form.encounter'        => 'required|string',
-            'form.terms_of_service' => 'nullable|string',
             'form.description'      => 'nullable|string',
             'form.note'             => 'nullable|string',
             'form.inform_with'      => 'nullable|string',
@@ -162,7 +171,6 @@ class CarePlanCreate extends Component
             'period_start'    => convertToYmd($validated['form']['period_start']),
             'period_end'      => !empty($validated['form']['period_end'])
                 ? convertToYmd($validated['form']['period_end']) : null,
-            'terms_of_service' => $validated['form']['terms_of_service'] ?? null,
             'encounter_id'    => $encounterData['id'],
             'addresses'       => $encounterData['addresses'],
             'description'     => $validated['form']['description'] ?? null,
@@ -214,7 +222,6 @@ class CarePlanCreate extends Component
             'description'     => $this->form['description'] ?: null,
             'note'            => $this->form['note'] ?: null,
             'inform_with'     => $this->form['inform_with'] ?: null,
-            'terms_of_service' => $this->form['terms_of_service'] ?: null,
         ]);
 
         try {
@@ -291,23 +298,22 @@ class CarePlanCreate extends Component
         }
 
         $encounter = \App\Models\MedicalEvents\Sql\Encounter::where('uuid', $this->form['encounter'])
-            ->with('diagnoses.condition')
+            ->with(['diagnoses.condition'])
             ->first();
 
         if ($encounter) {
             $data['id'] = $encounter->id;
             
-            // Extract the UUID of the conditions (addresses for the care plan)
+            // Extract the UUID of all conditions (addresses for the care plan)
             $conditionUuids = $encounter->diagnoses
                 ->map(fn($d) => $d->condition?->value)
                 ->filter()
+                ->unique()
                 ->values()
                 ->toArray();
                 
-            // Use the primary condition (first one per eHealth typical usage for 'addresses' in care plan)
-            if (!empty($conditionUuids)) {
-                $primaryCondition = $conditionUuids[0];
-                $data['addresses'][] = ['identifier' => ['value' => $primaryCondition]];
+            foreach ($conditionUuids as $uuid) {
+                $data['addresses'][] = ['identifier' => ['value' => $uuid]];
             }
         }
 

@@ -16,10 +16,6 @@
             </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
-            <tr>
-                <td class="py-4 px-4 text-sm text-gray-700">02.05.2025</td>
-                <td class="py-4 px-4 text-sm text-gray-900 font-medium">A10 Кровотеча / геморагія БДУ</td>
-            </tr>
 
             <template x-for="(item, index) in items" :key="index">
                 <tr>

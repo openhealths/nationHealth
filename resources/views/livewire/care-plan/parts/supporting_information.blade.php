@@ -39,6 +39,21 @@
         this.openModal = false;
     },
 
+    saveMedical() {
+        if (this.searchType === 'current') {
+            this.localMedicalRecords.push({
+                date: new Date().toLocaleDateString('uk-UA'),
+                name: 'Поточна взаємодія (Encounter)'
+            });
+        } else {
+            this.localMedicalRecords.push({
+                date: new Date().toLocaleDateString('uk-UA'),
+                name: 'Медичний запис з ЕСОЗ (Тест)'
+            });
+        }
+        this.openMedicalModal = false;
+    },
+
     removeEntry(type, index) {
         if (type === 'episode') this.localEpisodes.splice(index, 1);
         else this.localMedicalRecords.splice(index, 1);
@@ -171,10 +186,10 @@
                      class="modal-content h-fit w-full max-w-2xl rounded-2xl shadow-lg bg-white">
 
                     <div class="p-6">
-
+                        <form @submit.prevent="saveMedical()">
                         <fieldset class="fieldset">
                             <legend class="legend">
-                                {{ __('Пошук медичних записів') }}
+                                {{ __('care-plan.search_medical_records') ?? 'Пошук медичних записів' }}
                             </legend>
 
                             <div class="flex mt-2">
@@ -272,13 +287,14 @@
                         </div>
 
                         <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 p-6">
-                            <button type="button" @click="openModal = false" class="button-minor">
+                            <button type="button" @click="openMedicalModal = false" class="button-minor">
                                 {{__('forms.cancel')}}
                             </button>
-                            <button type="submit" class="button-primary" :disabled="!modalForm.date || !modalForm.name">
+                            <button type="submit" class="button-primary">
                                 {{__('forms.save')}}
                             </button>
                         </div>
+                        </form>
                     </div>
 
                 </div>

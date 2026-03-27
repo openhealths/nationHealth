@@ -55,7 +55,9 @@
                     class="input-select peer"
                     wire:model="form.intent"
             >
-                <option value="order">{{ __('forms.select') }}</option>
+                <option value="order">{{ __('care-plan.order') ?? 'Призначення' }}</option>
+                <option value="proposal">{{ __('care-plan.proposal') ?? 'Пропозиція' }}</option>
+                <option value="plan">{{ __('care-plan.plan') ?? 'План' }}</option>
             </select>
 
             @error('form.intent')
@@ -63,26 +65,6 @@
             @enderror
         </div>
 
-        <div class="form-group group">
-            <label for="terms_of_service" class="label">
-                {{ __('care-plan.terms_service') }}
-            </label>
-
-            <select id="terms_of_service"
-                    name="terms_of_service"
-                    class="input-select peer"
-                    wire:model="form.terms_of_service"
-            >
-                <option value="">{{ __('forms.select') }}</option>
-                @foreach($termsOfService as $code => $description)
-                    <option value="{{ $code }}">{{ $description }}</option>
-                @endforeach
-            </select>
-
-            @error('form.terms_of_service')
-            <p class="text-error">{{ $message }}</p>
-            @enderror
-        </div>
     </div>
 
     <div class="form-row-2 mt-5">
