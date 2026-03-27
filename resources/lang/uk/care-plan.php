@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 return [
     'new_care_plan' => 'Новий план лікування',
+    'care_plans' => 'Плани лікування',
     'author' => 'Автор',
     'co-author' => 'Співавтор',
     'find_doctor' => 'Знайти лікаря',

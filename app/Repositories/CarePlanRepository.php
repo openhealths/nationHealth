@@ -16,6 +16,14 @@ class CarePlanRepository
             ->latest()
             ->get();
     }
+
+    public function getByPersonId(int $personId): Collection
+    {
+        return CarePlan::where('person_id', $personId)
+            ->with(['person', 'author.party'])
+            ->latest()
+            ->get();
+    }
     
     public function findById(int $id): ?CarePlan
     {
