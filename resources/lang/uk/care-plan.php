@@ -133,18 +133,18 @@ return [
 
 
     // Index view
-    'no_care_plans'          => 'Планів лікування поки немає',
-    'search_by_requisition'  => 'Пошук за реквізиційним номером',
-    'requisition'            => 'Реквізиційний №',
-    'care_plan_details'      => 'Деталі плану лікування',
-    'activities'             => 'Призначення',
-    'no_activities'          => 'Призначень поки немає',
-    'kind'                   => 'Вид',
+    'no_care_plans' => 'Планів лікування поки немає',
+    'search_by_requisition' => 'Пошук за реквізиційним номером',
+    'requisition' => 'Реквізиційний №',
+    'care_plan_details' => 'Деталі плану лікування',
+    'activities' => 'Призначення',
+    'no_activities' => 'Призначень поки немає',
+    'kind' => 'Вид',
 
     // Show view
-    'no_end_date'    => 'Безтерміново',
+    'no_end_date' => 'Безтерміново',
     'cancel_care_plan' => 'Скасувати план (КЕП)',
-    'status_reason'  => 'Обґрунтування зміни статусу',
+    'status_reason' => 'Обґрунтування зміни статусу',
     'print_care_plan' => 'Роздрукувати план лікування',
     'inform_with' => 'Спосіб інформування (Метод автентифікації)',
     'proposal' => 'Пропозиція',
