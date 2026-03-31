@@ -66,6 +66,8 @@ class EmployeeRequest extends EHealthRequest
             ?? $sourceData['med_admin']
             ?? $sourceData['pharmacist']
             ?? $sourceData['specialist'] // Just in case, although it is usually a doctor
+            ?? $sourceData['assistant']
+            ?? $sourceData['laborant']
             ?? [];
 
         // 2.  sometimes the API returns education (singular) instead of educations (plural)

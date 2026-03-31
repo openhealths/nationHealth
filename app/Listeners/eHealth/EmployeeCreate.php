@@ -148,7 +148,7 @@ class EmployeeCreate
                     $dataFromRevision['educations'] ?? null,
                     $dataFromRevision['specialities'] ?? null,
                     $dataFromRevision['qualifications'] ?? null,
-                    $dataFromRevision['scienceDegree'] ?? null
+                    $dataFromRevision['science_degree'] ?? null
                 );
 
                 if (!$user->partyId && $newEmployee->partyId) {
