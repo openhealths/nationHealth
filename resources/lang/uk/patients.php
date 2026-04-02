@@ -267,6 +267,7 @@ return [
     // Diagnoses record
 
     // Observations record
+    'observations' => 'Обстеження',
 
     // Encounter
     'interaction' => 'Взаємодія',

@@ -69,6 +69,7 @@ use App\Livewire\Person\PersonRequestEdit;
 use App\Livewire\Person\PersonIndex;
 use App\Livewire\Person\Records\PatientData;
 use App\Livewire\Person\Records\PatientEpisodes;
+use App\Livewire\Person\Records\PatientObservation;
 use App\Livewire\Person\Records\PatientSummary;
 use App\Livewire\Procedure\ProcedureCreate;
 use App\Models\Declaration;
@@ -281,6 +282,7 @@ Route::middleware(['auth:web,ehealth', 'verified'])->group(function () {
                         Route::get('/{id}/patient-data', PatientData::class)->name('patient-data');
                         Route::get('/{id}/summary', PatientSummary::class)->name('summary');
                         Route::get('/{id}/episodes', PatientEpisodes::class)->name('episodes');
+                        Route::get('/{id}/observations', PatientObservation::class)->name('observations');
                     });
                 });
 
