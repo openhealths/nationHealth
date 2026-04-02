@@ -6,37 +6,40 @@ namespace App\Classes\eHealth;
 
 use App\Classes\eHealth\Api\Address;
 use App\Classes\eHealth\Api\Auth;
-use App\Classes\eHealth\Api\Condition;
+use App\Classes\eHealth\Api\Contract;
 use App\Classes\eHealth\Api\ContractRequest;
 use App\Classes\eHealth\Api\Declaration;
 use App\Classes\eHealth\Api\DeclarationRequest;
 use App\Classes\eHealth\Api\DeviceDefinition;
 use App\Classes\eHealth\Api\DiagnoseGroup;
-use App\Classes\eHealth\Api\DiagnosticReport;
 use App\Classes\eHealth\Api\Dictionary;
+use App\Classes\eHealth\Api\Division;
 use App\Classes\eHealth\Api\Drug;
 use App\Classes\eHealth\Api\Employee;
 use App\Classes\eHealth\Api\EmployeeRequest;
 use App\Classes\eHealth\Api\EmployeeRole;
-use App\Classes\eHealth\Api\Episode;
 use App\Classes\eHealth\Api\Equipment;
 use App\Classes\eHealth\Api\ForbiddenGroup;
-use App\Classes\eHealth\Api\License;
-use App\Classes\eHealth\Api\Job;
-use App\Classes\eHealth\Api\Division;
 use App\Classes\eHealth\Api\HealthcareService;
+use App\Classes\eHealth\Api\Job;
 use App\Classes\eHealth\Api\LegalEntity;
+use App\Classes\eHealth\Api\License;
 use App\Classes\eHealth\Api\MedicalProgram;
-use App\Classes\eHealth\Api\Observation;
 use App\Classes\eHealth\Api\Party;
 use App\Classes\eHealth\Api\Patient;
+use App\Classes\eHealth\Api\Patient\ClinicalImpression;
+use App\Classes\eHealth\Api\Patient\Condition;
+use App\Classes\eHealth\Api\Patient\DiagnosticReport;
+use App\Classes\eHealth\Api\Patient\Encounter;
+use App\Classes\eHealth\Api\Patient\Episode;
+use App\Classes\eHealth\Api\Patient\Immunization;
+use App\Classes\eHealth\Api\Patient\Observation;
+use App\Classes\eHealth\Api\Patient\Procedure;
 use App\Classes\eHealth\Api\Person;
 use App\Classes\eHealth\Api\PersonRequest;
-use App\Classes\eHealth\Api\Procedure;
 use App\Classes\eHealth\Api\RuleEngineRules;
 use App\Classes\eHealth\Api\Service;
 use App\Classes\eHealth\Api\Verification;
-use App\Classes\eHealth\Api\Contract;
 
 final class EHealth
 {
@@ -68,11 +71,6 @@ final class EHealth
     public static function patient(): Patient
     {
         return app(Patient::class);
-    }
-
-    public static function episode(): Episode
-    {
-        return app(Episode::class);
     }
 
     public static function declarationRequest(): DeclarationRequest
@@ -118,26 +116,6 @@ final class EHealth
     public static function equipment(): Equipment
     {
         return app(Equipment::class);
-    }
-
-    public static function procedure(): Procedure
-    {
-        return app(Procedure::class);
-    }
-
-    public static function condition(): Condition
-    {
-        return app(Condition::class);
-    }
-
-    public static function observation(): Observation
-    {
-        return app(Observation::class);
-    }
-
-    public static function diagnosticReport(): DiagnosticReport
-    {
-        return app(DiagnosticReport::class);
     }
 
     public static function party(): Party
@@ -203,5 +181,46 @@ final class EHealth
     public static function forbiddenGroup(): ForbiddenGroup
     {
         return app(ForbiddenGroup::class);
+    }
+
+    // Medical Events
+    public static function episode(): Episode
+    {
+        return app(Episode::class);
+    }
+
+    public static function encounter(): Encounter
+    {
+        return app(Encounter::class);
+    }
+
+    public static function clinicalImpression(): ClinicalImpression
+    {
+        return app(ClinicalImpression::class);
+    }
+
+    public static function immunization(): Immunization
+    {
+        return app(Immunization::class);
+    }
+
+    public static function procedure(): Procedure
+    {
+        return app(Procedure::class);
+    }
+
+    public static function condition(): Condition
+    {
+        return app(Condition::class);
+    }
+
+    public static function observation(): Observation
+    {
+        return app(Observation::class);
+    }
+
+    public static function diagnosticReport(): DiagnosticReport
+    {
+        return app(DiagnosticReport::class);
     }
 }

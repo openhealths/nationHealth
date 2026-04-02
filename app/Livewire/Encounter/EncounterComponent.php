@@ -557,7 +557,7 @@ class EncounterComponent extends Component
         try {
             switch ($type) {
                 case 'encounter':
-                    $this->encounters = EHealth::patient()->getEncounterBySearchParams(
+                    $this->encounters = EHealth::encounter()->getBySearchParams(
                         $this->patientUuid,
                         ['episode_id' => $episodeId, 'managing_organization_id' => legalEntity()->uuid]
                     )->getData();

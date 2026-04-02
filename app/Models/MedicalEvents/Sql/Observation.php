@@ -218,7 +218,9 @@ class Observation extends Model
         return $query->with([
             'code.coding',
             'categories.coding',
+            'diagnosticReport.type.coding',
             'performer.type.coding',
+            'reportOrigin.coding',
             'interpretation.coding',
             'bodySite.coding',
             'method.coding',

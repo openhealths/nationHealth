@@ -11,7 +11,11 @@ class DiagnosticReportResultsInterpreter extends Model
 {
     protected $table = 'diagnostic_report_results_interpreter';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'diagnostic_report_id',
+        'reference_id',
+        'text'
+    ];
 
     protected $hidden = [
         'id',

@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Classes\eHealth\Api;
+namespace App\Classes\eHealth\Api\Patient;
 
-use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\ValidationRuleBuilder;
 use App\Enums\Person\EpisodeStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -15,12 +15,10 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
-class Episode extends Request
+class Episode extends PatientApiBase
 {
-    protected const string URL = '/api/patients';
-
     /**
-     * Create episode
+     * Create episode.
      *
      * @param  string  $id
      * @param  array  $data
@@ -115,7 +113,7 @@ class Episode extends Request
     {
         $replaced = [];
         foreach ($response->getData() as $data) {
-            $replaced[] = self::replaceEHealthPropNames($data);
+            $replaced[] = $this->replaceEHealthPropNames($data);
         }
 
         $rules = collect($this->episodeValidationRules())
@@ -140,37 +138,16 @@ class Episode extends Request
      */
     protected function episodeValidationRules(): array
     {
-        return [
-            'uuid' => ['required', 'uuid'],
-            'name' => ['required', 'string', 'max:255'],
-            'status' => ['required', 'string', Rule::in(EpisodeStatus::values())],
-            'ehealth_inserted_at' => ['required', 'date'],
-            'ehealth_updated_at' => ['required', 'date'],
-            'period' => ['required', 'array'],
-            'period.start' => ['required', 'date'],
-            'period.end' => ['nullable', 'date']
-        ];
-    }
+        return ValidationRuleBuilder::merge(
+            [
+                'uuid' => ['required', 'uuid'],
+                'name' => ['required', 'string', 'max:255'],
+                'status' => ['required', 'string', Rule::in(EpisodeStatus::values())],
+                'ehealth_inserted_at' => ['required', 'date'],
+                'ehealth_updated_at' => ['required', 'date']
+            ],
 
-    /**
-     * Replace eHealth property names with the ones used in the application.
-     * E.g., id => uuid, inserted_at => ehealth_inserted_at.
-     */
-    protected static function replaceEHealthPropNames(array $properties): array
-    {
-        $replaced = [];
-
-        foreach ($properties as $name => $value) {
-            $newName = match ($name) {
-                'id' => 'uuid',
-                'inserted_at' => 'ehealth_inserted_at',
-                'updated_at' => 'ehealth_updated_at',
-                default => $name
-            };
-
-            $replaced[$newName] = $value;
-        }
-
-        return $replaced;
+            ValidationRuleBuilder::periodRules('period')
+        );
     }
 }

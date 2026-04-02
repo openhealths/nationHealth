@@ -136,7 +136,7 @@ class EncounterCreate extends EncounterComponent
         );
 
         try {
-            $resp = EHealth::patient()->submitEncounter($this->patientUuid, $signedSubmitEncounter);
+            $resp = EHealth::encounter()->submit($this->patientUuid, $signedSubmitEncounter);
 
             dd($resp->getData());
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {

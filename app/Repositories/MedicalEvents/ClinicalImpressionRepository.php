@@ -9,7 +9,6 @@ use App\Models\MedicalEvents\Sql\ClinicalImpression;
 use App\Models\MedicalEvents\Sql\ClinicalImpressionFinding;
 use App\Models\MedicalEvents\Sql\ClinicalImpressionProblem;
 use App\Models\MedicalEvents\Sql\ClinicalImpressionSupportingInfo;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
 use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -414,47 +413,24 @@ class ClinicalImpressionRepository extends BaseRepository
      */
     private function cleanupRelations(ClinicalImpression $existing): void
     {
-        if ($existing->code) {
-            $existing->code->coding()->delete();
-            $existing->code->delete();
-        }
+        RelationshipCleaner::cleanRelations($existing, [
+            'encounter' => 'identifier',
+            'assessor' => 'identifier',
+            'previous' => 'identifier',
+            'code' => 'codeable_concept',
+        ]);
 
-        if ($existing->encounter) {
-            $existing->encounter->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->encounter->type()->delete();
-            $existing->encounter->delete();
-        }
-
-        if ($existing->assessor) {
-            $existing->assessor->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->assessor->type()->delete();
-            $existing->assessor->delete();
-        }
-
-        if ($existing->previous) {
-            $existing->previous->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->previous->type()->delete();
-            $existing->previous->delete();
-        }
-
+        // Handle collections with special logic
         foreach ($existing->problems as $problem) {
-            $problem->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $problem->type()->delete();
-            $problem->delete();
+            RelationshipCleaner::cleanIdentifierRelation($problem);
         }
 
         foreach ($existing->findings as $finding) {
-            if ($finding->itemReference) {
-                $finding->itemReference->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-                $finding->itemReference->type()->delete();
-                $finding->itemReference->delete();
-            }
+            RelationshipCleaner::cleanIdentifierRelation($finding->itemReference);
         }
 
         foreach ($existing->supportingInfo as $supportingInfo) {
-            $supportingInfo->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $supportingInfo->type()->delete();
-            $supportingInfo->delete();
+            RelationshipCleaner::cleanIdentifierRelation($supportingInfo);
         }
     }
 }

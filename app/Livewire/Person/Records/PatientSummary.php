@@ -84,7 +84,7 @@ class PatientSummary extends BasePatientComponent
     public function syncEncounters(): void
     {
         try {
-            $response = EHealth::patient()->getShortEncounters($this->uuid);
+            $response = EHealth::encounter()->getShortBySearchParams($this->uuid);
             $validatedData = $response->validate();
 
             try {
@@ -117,7 +117,7 @@ class PatientSummary extends BasePatientComponent
     public function syncClinicalImpressions(): void
     {
         try {
-            $response = EHealth::patient()->getClinicalImpressions($this->uuid);
+            $response = EHealth::clinicalImpression()->getSummary($this->uuid);
             $validatedData = $response->validate();
 
             try {
@@ -150,7 +150,7 @@ class PatientSummary extends BasePatientComponent
     public function syncImmunizations(): void
     {
         try {
-            $response = EHealth::patient()->getImmunizations($this->uuid);
+            $response = EHealth::immunization()->getSummary($this->uuid);
             $validatedData = $response->validate();
 
             try {

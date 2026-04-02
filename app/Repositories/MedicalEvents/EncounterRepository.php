@@ -7,7 +7,6 @@ namespace App\Repositories\MedicalEvents;
 use App\Classes\eHealth\Api\PatientApi;
 use App\Core\Arr;
 use App\Models\MedicalEvents\Mongo\Encounter as EncounterMongo;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\Encounter as EncounterSql;
 use App\Models\MedicalEvents\Sql\EncounterDiagnose;
@@ -927,14 +926,8 @@ class EncounterRepository extends BaseRepository
     {
         $old['class']->delete();
 
-        $old['type']->coding()->delete();
-        $old['type']->delete();
-
-        $old['performerSpeciality']->coding()->delete();
-        $old['performerSpeciality']->delete();
-
-        $old['episode']->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-        $old['episode']->type()->delete();
-        $old['episode']->delete();
+        RelationshipCleaner::cleanCodeableConceptRelation($old['type']);
+        RelationshipCleaner::cleanCodeableConceptRelation($old['performerSpeciality']);
+        RelationshipCleaner::cleanIdentifierRelation($old['episode']);
     }
 }

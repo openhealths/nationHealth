@@ -6,7 +6,6 @@ namespace App\Repositories\MedicalEvents;
 
 use App\Classes\eHealth\Api\PatientApi;
 use App\Core\Arr;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\DiagnosticReportPerformer;
 use App\Models\MedicalEvents\Sql\DiagnosticReportResultsInterpreter;
@@ -489,7 +488,7 @@ class DiagnosticReportRepository extends BaseRepository
                     ]);
                 }
 
-                // Sync specimens (many-to-many relationship)
+                // Sync specimens
                 $specimenIds = [];
                 if (isset($data['specimens'])) {
                     foreach ($data['specimens'] as $specimenData) {
@@ -500,7 +499,7 @@ class DiagnosticReportRepository extends BaseRepository
                 }
                 $diagnosticReport->specimens()->sync($specimenIds);
 
-                // Sync used references (many-to-many relationship)
+                // Sync used references
                 $usedReferenceIds = [];
                 if (isset($data['used_references'])) {
                     foreach ($data['used_references'] as $usedReferenceData) {
@@ -527,92 +526,23 @@ class DiagnosticReportRepository extends BaseRepository
      */
     private function cleanupRelations(DiagnosticReport $existing): void
     {
-        if ($existing->basedOn) {
-            $existing->basedOn->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->basedOn->type()->delete();
-            $existing->basedOn->delete();
-        }
+        RelationshipCleaner::cleanRelations($existing, [
+            'basedOn' => 'identifier',
+            'code' => 'identifier',
+            'encounter' => 'identifier',
+            'division' => 'identifier',
+            'recordedBy' => 'identifier',
+            'managingOrganization' => 'identifier',
+            'originEpisode' => 'identifier',
+            'conclusionCode' => 'codeable_concept',
+            'reportOrigin' => 'codeable_concept',
+            'cancellationReason' => 'codeable_concept',
+            'category' => 'codeable_concept_collection',
+        ]);
 
-        if ($existing->code) {
-            $existing->code->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->code->type()->delete();
-            $existing->code->delete();
-        }
-
-        if ($existing->encounter) {
-            $existing->encounter->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->encounter->type()->delete();
-            $existing->encounter->delete();
-        }
-
-        if ($existing->division) {
-            $existing->division->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->division->type()->delete();
-            $existing->division->delete();
-        }
-
-        if ($existing->conclusionCode) {
-            $existing->conclusionCode->coding()->delete();
-            $existing->conclusionCode->delete();
-        }
-
-        if ($existing->recordedBy) {
-            $existing->recordedBy->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->recordedBy->type()->delete();
-            $existing->recordedBy->delete();
-        }
-
-        if ($existing->managingOrganization) {
-            $existing->managingOrganization->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->managingOrganization->type()->delete();
-            $existing->managingOrganization->delete();
-        }
-
-        if ($existing->reportOrigin) {
-            $existing->reportOrigin->coding()->delete();
-            $existing->reportOrigin->delete();
-        }
-
-        if ($existing->originEpisode) {
-            $existing->originEpisode->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->originEpisode->type()->delete();
-            $existing->originEpisode->delete();
-        }
-
-        if ($existing->cancellationReason) {
-            $existing->cancellationReason->coding()->delete();
-            $existing->cancellationReason->delete();
-        }
-
-        foreach ($existing->category as $category) {
-            $category->coding()->delete();
-            $category->delete();
-        }
-
-        if ($existing->performer && $existing->performer->reference) {
-            $existing->performer->reference->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->performer->reference->type()->delete();
-            $existing->performer->reference->delete();
-        }
-
-        if ($existing->resultsInterpreter && $existing->resultsInterpreter->reference) {
-            $existing->resultsInterpreter->reference->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->resultsInterpreter->reference->type()->delete();
-            $existing->resultsInterpreter->reference->delete();
-        }
-
-        // Cleanup specimens relationships
-        foreach ($existing->specimens as $specimen) {
-            $specimen->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $specimen->type()->delete();
-            $specimen->delete();
-        }
-
-        // Cleanup used references relationships
-        foreach ($existing->usedReferences as $usedReference) {
-            $usedReference->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $usedReference->type()->delete();
-            $usedReference->delete();
-        }
+        RelationshipCleaner::cleanPerformerRelation($existing->performer);
+        RelationshipCleaner::cleanPerformerRelation($existing->resultsInterpreter);
+        RelationshipCleaner::cleanCodeableConceptCollection($existing->specimens);
+        RelationshipCleaner::cleanCodeableConceptCollection($existing->usedReferences);
     }
 }

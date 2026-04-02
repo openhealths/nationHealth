@@ -6,7 +6,6 @@ namespace App\Repositories\MedicalEvents;
 
 use App\Classes\eHealth\Api\PatientApi;
 use App\Core\Arr;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\ObservationComponent;
 use App\Models\MedicalEvents\Sql\Quantity;
@@ -429,7 +428,10 @@ class ObservationRepository extends BaseRepository
                             'device',
                             'interpretation',
                             'body_site',
-                            'method'
+                            'method',
+                            'reference_ranges',
+                            'categories',
+                            'components'
                         ])
                     )
                 );
@@ -485,84 +487,26 @@ class ObservationRepository extends BaseRepository
      */
     private function cleanupRelations(Observation $existing): void
     {
-        if ($existing->code) {
-            $existing->code->coding()->delete();
-            $existing->code->delete();
-        }
+        RelationshipCleaner::cleanRelations($existing, [
+            'context' => 'identifier',
+            'performer' => 'identifier',
+            'diagnosticReport' => 'identifier',
+            'specimen' => 'identifier',
+            'device' => 'identifier',
+            'code' => 'codeable_concept',
+            'reportOrigin' => 'codeable_concept',
+            'interpretation' => 'codeable_concept',
+            'bodySite' => 'codeable_concept',
+            'method' => 'codeable_concept',
+            'valueCodeableConcept' => 'codeable_concept',
+            'categories' => 'codeable_concept_collection',
+        ]);
 
-        if ($existing->context) {
-            $existing->context->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->context->type()->delete();
-            $existing->context->delete();
-        }
-
-        if ($existing->performer) {
-            $existing->performer->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->performer->type()->delete();
-            $existing->performer->delete();
-        }
-
-        if ($existing->reportOrigin) {
-            $existing->reportOrigin->coding()->delete();
-            $existing->reportOrigin->delete();
-        }
-
-        if ($existing->diagnosticReport) {
-            $existing->diagnosticReport->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->diagnosticReport->type()->delete();
-            $existing->diagnosticReport->delete();
-        }
-
-        if ($existing->specimen) {
-            $existing->specimen->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->specimen->type()->delete();
-            $existing->specimen->delete();
-        }
-
-        if ($existing->device) {
-            $existing->device->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->device->type()->delete();
-            $existing->device->delete();
-        }
-
-        if ($existing->interpretation) {
-            $existing->interpretation->coding()->delete();
-            $existing->interpretation->delete();
-        }
-
-        if ($existing->bodySite) {
-            $existing->bodySite->coding()->delete();
-            $existing->bodySite->delete();
-        }
-
-        if ($existing->method) {
-            $existing->method->coding()->delete();
-            $existing->method->delete();
-        }
-
-        if ($existing->valueCodeableConcept) {
-            $existing->valueCodeableConcept->coding()->delete();
-            $existing->valueCodeableConcept->delete();
-        }
-
-        foreach ($existing->categories as $category) {
-            $category->coding()->delete();
-            $category->delete();
-        }
-
+        // Handle components
         foreach ($existing->components as $component) {
-            if ($component->code) {
-                $component->code->coding()->delete();
-                $component->code->delete();
-            }
-            if ($component->interpretation) {
-                $component->interpretation->coding()->delete();
-                $component->interpretation->delete();
-            }
-            if ($component->valueCodeableConcept) {
-                $component->valueCodeableConcept->coding()->delete();
-                $component->valueCodeableConcept->delete();
-            }
+            RelationshipCleaner::cleanCodeableConceptRelation($component->code);
+            RelationshipCleaner::cleanCodeableConceptRelation($component->interpretation);
+            RelationshipCleaner::cleanCodeableConceptRelation($component->valueCodeableConcept);
         }
     }
 }

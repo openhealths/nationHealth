@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Repositories\MedicalEvents;
 
 use App\Core\Arr;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Immunization;
 use App\Models\MedicalEvents\Sql\ImmunizationDoseQuantity;
 use App\Models\MedicalEvents\Sql\ImmunizationExplanation;
@@ -257,9 +256,9 @@ class ImmunizationRepository extends BaseRepository
                         'person_id' => $personId,
                         'vaccine_code_id' => $vaccineCode->id,
                         'context_id' => $context->id,
-                        'performer_id' => $performer->id,
-                        'report_origin_id' => $reportOrigin->id,
-                        'site_id' => $site->id,
+                        'performer_id' => $performer?->id,
+                        'report_origin_id' => $reportOrigin?->id,
+                        'site_id' => $site?->id,
                         'route_id' => $route?->id,
                     ],
                         Arr::except($data, [
@@ -369,66 +368,28 @@ class ImmunizationRepository extends BaseRepository
      */
     private function cleanupRelations(Immunization $existing): void
     {
-        if ($existing->vaccineCode) {
-            $existing->vaccineCode->coding()->delete();
-            $existing->vaccineCode->delete();
-        }
+        RelationshipCleaner::cleanRelations($existing, [
+            'context' => 'identifier',
+            'performer' => 'identifier',
+            'vaccineCode' => 'codeable_concept',
+            'reportOrigin' => 'codeable_concept',
+            'site' => 'codeable_concept',
+            'route' => 'codeable_concept',
+        ]);
 
-        if ($existing->context) {
-            $existing->context->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->context->type()->delete();
-            $existing->context->delete();
-        }
-
-        if ($existing->performer) {
-            $existing->performer->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-            $existing->performer->type()->delete();
-            $existing->performer->delete();
-        }
-
-        if ($existing->reportOrigin) {
-            $existing->reportOrigin->coding()->delete();
-            $existing->reportOrigin->delete();
-        }
-
-        if ($existing->site) {
-            $existing->site->coding()->delete();
-            $existing->site->delete();
-        }
-
-        if ($existing->route) {
-            $existing->route->coding()->delete();
-            $existing->route->delete();
-        }
-
+        // Handle complex nested collections
         foreach ($existing->explanations as $explanation) {
-            if ($explanation->reasons) {
-                $explanation->reasons->coding()->delete();
-                $explanation->reasons->delete();
-            }
-            if ($explanation->reasonsNotGiven) {
-                $explanation->reasonsNotGiven->coding()->delete();
-                $explanation->reasonsNotGiven->delete();
-            }
+            RelationshipCleaner::cleanCodeableConceptRelation($explanation->reasons);
+            RelationshipCleaner::cleanCodeableConceptRelation($explanation->reasonsNotGiven);
         }
 
         foreach ($existing->vaccinationProtocols as $protocol) {
-            if ($protocol->authority) {
-                $protocol->authority->coding()->delete();
-                $protocol->authority->delete();
-            }
-            foreach ($protocol->targetDiseases as $targetDisease) {
-                $targetDisease->coding()->delete();
-                $targetDisease->delete();
-            }
+            RelationshipCleaner::cleanCodeableConceptRelation($protocol->authority);
+            RelationshipCleaner::cleanCodeableConceptCollection($protocol->targetDiseases);
         }
 
         foreach ($existing->reactions as $reaction) {
-            if ($reaction->detail) {
-                $reaction->detail->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
-                $reaction->detail->type()->delete();
-                $reaction->detail->delete();
-            }
+            RelationshipCleaner::cleanIdentifierRelation($reaction->detail);
         }
     }
 }

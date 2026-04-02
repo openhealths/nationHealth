@@ -2,19 +2,16 @@
 
 declare(strict_types=1);
 
-namespace App\Classes\eHealth\Api;
+namespace App\Classes\eHealth\Api\Patient;
 
-use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\ConnectionException;
 
-class Condition extends Request
+class Condition extends PatientApiBase
 {
-    protected const string URL = '/api/patients';
-
     /**
      * Return a condition context record by IDs.
      *
