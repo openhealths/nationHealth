@@ -68,14 +68,13 @@
                             </div>
 
                             <div class="flex items-center gap-4 text-sm font-medium">
-                                <button x-show="activeSection === '{{ $item['id'] }}'"
-                                      wire:click.prevent="{{ $item['syncAction'] }}"
-                                      class="hidden sm:flex text-blue-600 dark:text-blue-400 items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-                                      @click.stop=""
+                                <span x-show="activeSection === '{{ $item['id'] }}'"
+                                      @click.stop="$wire.{{ $item['syncAction'] }}()"
+                                      class="hidden sm:flex text-blue-600 dark:text-blue-400 cursor-pointer items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                                 >
                                     @icon('refresh', 'w-4 h-4')
                                     {{ __('patients.sync_ehealth_data') }}
-                                </button>
+                                </span>
                                 <div class="shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-300"
                                      :class="activeSection === '{{ $item['id'] }}' ? '' : '-rotate-90'"
                                 >
