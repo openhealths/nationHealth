@@ -268,6 +268,7 @@ return [
 
     // Observations record
     'observations' => 'Обстеження',
+    'vaccination_search' => 'Пошук вакцинації',
 
     // Encounter
     'interaction' => 'Взаємодія',
