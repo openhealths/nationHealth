@@ -47,14 +47,14 @@
                     {{ __('patients.episodes') }}
                 </a>
 
-                <a href="{{ route('persons.examinations', [legalEntity(), 'id' => $id]) }}"
-                   class="summary-tab {{ request()->routeIs('persons.examinations') ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                <a href="{{ route('persons.observations', [legalEntity(), 'id' => $id]) }}"
+                   class="summary-tab {{ request()->routeIs('persons.observations') ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                 >
                     {{ __('patients.observation') }}
                 </a>
 
-                <a href="javascript:void(0)"
-                   class="summary-tab summary-tab-inactive cursor-not-allowed opacity-60"
+                <a href="{{ route('persons.vaccination', [legalEntity(), 'id' => $id]) }}"
+                   class="summary-tab {{ request()->routeIs('persons.vaccination') ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                 >
                     {{ __('patients.vaccinations') }}
                 </a>

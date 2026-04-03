@@ -29,18 +29,18 @@
 
         @php
             $navItems = [
-                ['id' => 'episodes', 'action' => 'getEpisodes', 'label' => __('patients.episodes'), 'icon' => 'book'],
-                ['id' => 'interaction', 'action' => '', 'label' => __('patients.interaction'), 'icon' => 'users'],
-                ['id' => 'clinical_impressions', 'action' => '', 'label' => __('patients.clinical_impressions'), 'icon' => 'check'],
-                ['id' => 'vaccinations', 'action' => '', 'label' => __('patients.vaccinations'), 'icon' => 'shield'],
-                ['id' => 'observation', 'action' => 'getObservations', 'label' => __('patients.observation'), 'icon' => 'heart'],
-                ['id' => 'diagnoses', 'action' => 'getDiagnoses', 'label' => __('patients.diagnoses'), 'icon' => 'file'],
-                ['id' => 'condition', 'action' => '', 'label' => __('patients.condition'), 'icon' => 'file-minus'],
-                ['id' => 'diagnostic_reports', 'action' => '', 'label' => __('patients.diagnostic_reports'), 'icon' => 'activity'],
-                ['id' => 'allergies', 'action' => '', 'label' => __('patients.allergies'), 'icon' => 'alert'],
-                ['id' => 'risk_assessments', 'action' => '', 'label' => __('patients.risk_assessments'), 'icon' => 'alert-octagon'],
-                ['id' => 'devices', 'action' => '', 'label' => __('patients.devices'), 'icon' => 'equipment'],
-                ['id' => 'medicines', 'action' => '', 'label' => __('patients.medicines'), 'icon' => 'pill-outline'],
+                ['id' => 'episodes', 'action' => 'getEpisodes', 'syncAction' => 'syncEpisodes', 'label' => __('patients.episodes'), 'icon' => 'book'],
+                ['id' => 'interaction', 'action' => 'getEncounters', 'syncAction' => 'syncEncounters', 'label' => __('patients.interaction'), 'icon' => 'users'],
+                ['id' => 'clinical_impressions', 'action' => 'getClinicalImpressions', 'syncAction' => 'syncClinicalImpressions', 'label' => __('patients.clinical_impressions'), 'icon' => 'check'],
+                ['id' => 'vaccinations', 'action' => 'getImmunizations', 'syncAction' => 'syncImmunizations', 'label' => __('patients.vaccinations'), 'icon' => 'shield'],
+                ['id' => 'observation', 'action' => 'syncObservations', 'syncAction' => 'getObservations', 'label' => __('patients.observation'), 'icon' => 'heart'],
+                ['id' => 'diagnoses', 'action' => 'getConditions', 'syncAction' => 'syncConditions', 'label' => __('patients.diagnoses'), 'icon' => 'file'],
+                ['id' => 'condition', 'action' => 'getConditions', 'syncAction' => 'syncConditions', 'label' => __('patients.condition'), 'icon' => 'file-minus'],
+                ['id' => 'diagnostic_reports', 'action' => 'getDiagnosticReports', 'syncAction' => 'syncDiagnosticReports', 'label' => __('patients.diagnostic_reports'), 'icon' => 'activity'],
+                ['id' => 'allergies', 'action' => 'syncAllergyIntolerances', 'syncAction' => 'syncAllergyIntolerances', 'label' => __('patients.allergies'), 'icon' => 'alert'],
+                ['id' => 'risk_assessments', 'action' => 'syncRiskAssessments', 'syncAction' => 'syncRiskAssessments', 'label' => __('patients.risk_assessments'), 'icon' => 'alert-octagon'],
+                ['id' => 'devices', 'action' => 'syncDevices', 'syncAction' => 'syncDevices', 'label' => __('patients.devices'), 'icon' => 'equipment'],
+                ['id' => 'medicines', 'action' => 'syncMedicationStatements', 'syncAction' => 'syncMedicationStatements', 'label' => __('patients.medicines'), 'icon' => 'pill-outline'],
             ];
         @endphp
 
@@ -68,13 +68,14 @@
                             </div>
 
                             <div class="flex items-center gap-4 text-sm font-medium">
-                                <span x-show="activeSection === '{{ $item['id'] }}'"
+                                <button x-show="activeSection === '{{ $item['id'] }}'"
+                                      wire:click.prevent="{{ $item['syncAction'] }}"
                                       class="hidden sm:flex text-blue-600 dark:text-blue-400 items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                                       @click.stop=""
                                 >
                                     @icon('refresh', 'w-4 h-4')
                                     {{ __('patients.sync_ehealth_data') }}
-                                </span>
+                                </button>
                                 <div class="shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-300"
                                      :class="activeSection === '{{ $item['id'] }}' ? '' : '-rotate-90'"
                                 >
