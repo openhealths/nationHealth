@@ -10,7 +10,7 @@
         </div>
 
         <div class="record-inner-column-bordered w-full md:w-36 shrink-0">
-            <div class="record-inner-label">{{ __('patients.status_label') }}</div>
+            <div class="record-inner-label">{{ __('forms.status.label') }}</div>
             <div>
                 <span class="badge-yellow">
                     Підписано
@@ -30,7 +30,7 @@
             <div
                 class="grid grid-cols-2 xl:grid-cols-3 gap-y-4 gap-x-4 w-full [&>div]:min-w-0 [&_.record-inner-subvalue]:break-words">
                 <div>
-                    <div class="record-inner-label">{{ __('patients.category') }}</div>
+                    <div class="record-inner-label">{{ __('forms.category') }}</div>
                     <div class="record-inner-subvalue">Візуальні дослідження</div>
                 </div>
                 <div>
@@ -43,7 +43,7 @@
                 </div>
 
                 <div>
-                    <div class="record-inner-label">{{ __('patients.referral') }}</div>
+                    <div class="record-inner-label">{{ __('patients.referrals') }}</div>
                     <div class="record-inner-subvalue">1232132131123</div>
                 </div>
                 <div>

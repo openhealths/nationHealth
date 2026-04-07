@@ -12,10 +12,14 @@ class IdentifierRepository extends BaseRepository
      * Create identifier in DB.
      *
      * @param  string  $value
+     * @param  string|null  $displayValue
      * @return SqlIdentifier
      */
-    public function store(string $value): SqlIdentifier
+    public function store(string $value, ?string $displayValue = null): SqlIdentifier
     {
-        return $this->model::create(['value' => $value]);
+        return $this->model::create([
+            'value' => $value,
+            'display_value' => $displayValue
+        ]);
     }
 }

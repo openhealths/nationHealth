@@ -73,7 +73,7 @@
                         <option value="1">Шевченко Т.Г.</option>
                     </select>
                     <label for="filterDoctor" class="label">
-                        {{ __('patients.filter_doctor') }}
+                        {{ __('patients.doctor') }}
                     </label>
                 </div>
             </div>
@@ -157,7 +157,7 @@
                             <option value="cancelled">Скасований</option>
                         </select>
                         <label for="filterStatus" class="label">
-                            {{ __('patients.filter_status') }}
+                            {{ __('forms.status.label') }}
                         </label>
                     </div>
 
@@ -171,7 +171,7 @@
                             <option value="lab">Лабораторні дослідження</option>
                         </select>
                         <label for="filterCategory" class="label">
-                            {{ __('patients.category') }}
+                            {{ __('forms.category') }}
                         </label>
                     </div>
                 </div>
@@ -201,7 +201,7 @@
                             <option value="85329-1">85329-1</option>
                         </select>
                         <label for="filterCode" class="label">
-                            {{ __('patients.code') }}
+                            {{ __('forms.code') }}
                         </label>
                     </div>
 
@@ -267,7 +267,7 @@
                         </div>
 
                         <div class="record-inner-column-bordered w-full md:w-36 shrink-0">
-                            <div class="record-inner-label">{{ __('patients.status_label') }}</div>
+                            <div class="record-inner-label">{{ __('forms.status.label') }}</div>
                             <div>
                                 <span class="badge-green">
                                     {{ __('patients.status_valid') }}

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
+use App\Casts\EHealthDateCast;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
@@ -23,8 +24,8 @@ class Period extends Model
     ];
 
     protected $casts = [
-        'start' => 'datetime',
-        'end' => 'datetime'
+        'start' => EHealthDateCast::class,
+        'end' => EHealthDateCast::class
     ];
 
     public function periodable(): MorphTo

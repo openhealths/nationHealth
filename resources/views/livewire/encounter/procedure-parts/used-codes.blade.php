@@ -17,7 +17,7 @@
         <table class="table-input w-inherit">
             <thead class="thead-input">
             <tr>
-                <th scope="col" class="th-input">{{ __('patients.code') }}</th>
+                <th scope="col" class="th-input">{{ __('forms.code') }}</th>
                 <th scope="col" class="th-input">{{ __('patients.code_and_name') }}</th>
                 <th scope="col" class="th-input">{{ __('forms.action') }}</th>
             </tr>

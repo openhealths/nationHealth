@@ -914,6 +914,7 @@ class EncounterRepository extends BaseRepository
      * @param  int  $personId
      * @param  array  $apiUuids
      * @return void
+     * @throws Throwable
      */
     private function deleteOrphaned(int $personId, array $apiUuids): void
     {

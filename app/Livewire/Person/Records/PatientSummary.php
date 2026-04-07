@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Person\Records;
 
 use App\Classes\eHealth\EHealth;
+use App\Core\Arr;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\MedicalEvents\Sql\ClinicalImpression;
@@ -22,11 +23,11 @@ use Throwable;
 
 class PatientSummary extends BasePatientComponent
 {
-    public array $episodes;
+    public array $episodes = [];
 
-    public array $encounters;
+    public array $encounters = [];
 
-    public array $clinicalImpressions;
+    public array $clinicalImpressions = [];
 
     public array $immunizations;
 
@@ -45,6 +46,18 @@ class PatientSummary extends BasePatientComponent
     public array $devices;
 
     public array $medicationStatements;
+
+    protected array $dictionaryNames = [
+        'eHealth/encounter_classes',
+        'eHealth/encounter_types',
+        'SPECIALITY_TYPE',
+        'eHealth/clinical_impression_patient_categories',
+    ];
+
+    protected function initializeComponent(): void
+    {
+        $this->getDictionary();
+    }
 
     /**
      * Sync patient episodes from eHealth API to database.
@@ -68,7 +81,7 @@ class PatientSummary extends BasePatientComponent
             }
 
             // Refresh data for display
-            $this->episodes = $validatedData;
+            $this->episodes = Arr::toCamelCase($this->formatDatesForDisplay($validatedData));
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             $this->handleEHealthExceptions($exception, 'Error when syncing episodes');
 
@@ -131,7 +144,7 @@ class PatientSummary extends BasePatientComponent
             }
 
             // Refresh data for display
-            $this->clinicalImpressions = $validatedData;
+            $this->clinicalImpressions = Arr::toCamelCase($this->formatDatesForDisplay($validatedData));
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             $this->handleEHealthExceptions($exception, 'Error when getting clinical impressions');
 

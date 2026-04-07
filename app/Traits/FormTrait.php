@@ -8,6 +8,7 @@ use App\Classes\Cipher\Exceptions\CipherApiException;
 use App\Classes\eHealth\EHealthResponse;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use Carbon\CarbonImmutable;
 use Exception;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
@@ -361,5 +362,35 @@ trait FormTrait
 
             return $item;
         }, $data);
+    }
+
+    /**
+     * Format date fields for display using app date format
+     *
+     * @param  array  $items
+     * @param  string  $format
+     * @return array
+     */
+    protected function formatDatesForDisplay(array $items, string $format = 'd.m.Y'): array
+    {
+        return array_map(fn (array $item) => $this->formatDateValues($item, $format), $items);
+    }
+
+    private function formatDateValues(array $data, string $format): array
+    {
+        foreach ($data as $key => $value) {
+            if (is_array($value)) {
+                $data[$key] = $this->formatDateValues($value, $format);
+            } elseif (is_string($value) && $this->isDate($value)) {
+                $data[$key] = CarbonImmutable::parse($value)->format($format);
+            }
+        }
+
+        return $data;
+    }
+
+    private function isDate(string $value): bool
+    {
+        return (bool) preg_match('/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/', $value);
     }
 }

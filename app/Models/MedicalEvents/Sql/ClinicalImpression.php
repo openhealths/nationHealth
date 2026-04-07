@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
+use App\Casts\EHealthDateCast;
 use App\Enums\Person\ClinicalImpressionStatus;
 use Carbon\CarbonImmutable;
 use Eloquence\Behaviours\HasCamelCasing;
@@ -51,8 +52,8 @@ class ClinicalImpression extends Model
 
     protected $casts = [
         'status' => ClinicalImpressionStatus::class,
-        'ehealth_inserted_at' => 'datetime',
-        'ehealth_updated_at' => 'datetime'
+        'ehealth_inserted_at' => EHealthDateCast::class,
+        'ehealth_updated_at' => EHealthDateCast::class
     ];
 
     protected $appends = [

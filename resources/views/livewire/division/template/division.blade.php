@@ -545,7 +545,7 @@
                                                                                         class="label !text-xs !text-gray-500 dark:!text-gray-400"
                                                                                     >
                                                                                         <span
-                                                                                            x-text="shift ? '{{ __('Початок') }}' : '{{ __('forms.opened_by') }}'"></span>
+                                                                                            x-text="shift ? '{{ __('forms.start') }}' : '{{ __('forms.opened_by') }}'"></span>
                                                                                     </label>
                                                                                     <div class="relative w-full">
                                                                                         <div
@@ -585,7 +585,7 @@
                                                                                         class="label !text-xs !text-gray-500 dark:!text-gray-400"
                                                                                     >
                                                                                         <span
-                                                                                            x-text="shift ? '{{ __('Кінець') }}' : '{{ __('forms.closed_by') }}'"></span>
+                                                                                            x-text="shift ? '{{ __('forms.end') }}' : '{{ __('forms.closed_by') }}'"></span>
                                                                                     </label>
                                                                                     <div class="relative w-full">
                                                                                         <div

@@ -18,7 +18,7 @@
                        autocomplete="off"
                 >
                 <label for="date" class="wrapped-label">
-                    {{ __('patients.date') }}
+                    {{ __('forms.date') }}
                 </label>
             </div>
 

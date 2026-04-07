@@ -88,7 +88,10 @@ abstract class BaseRepository
      */
     protected function updateIdentifier(Model $identifier, array $newData): void
     {
-        $identifier->update(['value' => $newData['identifier']['value']]);
+        $identifier->update([
+            'value' => $newData['identifier']['value'],
+            'display_value' => $newData['identifier']['display_value'] ?? null
+        ]);
 
         $typeData = $newData['identifier']['type'] ?? null;
         if ($typeData && $identifier->type->isNotEmpty()) {
@@ -125,7 +128,10 @@ abstract class BaseRepository
             return $identifier;
         }
 
-        $identifier = Repository::identifier()->store($newData['identifier']['value']);
+        $identifier = Repository::identifier()->store(
+            $newData['identifier']['value'],
+            $newData['identifier']['display_value'] ?? null
+        );
         Repository::codeableConcept()->attach($identifier, $newData);
 
         return $identifier;
@@ -157,14 +163,20 @@ abstract class BaseRepository
                     $this->updateIdentifier($existingIdentifier, $item);
                     $identifierIds[] = $existingIdentifier->id;
                 } else {
-                    $identifier = Repository::identifier()->store($item['identifier']['value']);
+                    $identifier = Repository::identifier()->store(
+                        $item['identifier']['value'],
+                        $item['identifier']['display_value'] ?? null
+                    );
                     Repository::codeableConcept()->attach($identifier, $item);
                     $identifierIds[] = $identifier->id;
                 }
             }
         } else {
             foreach ($items as $item) {
-                $identifier = Repository::identifier()->store($item['identifier']['value']);
+                $identifier = Repository::identifier()->store(
+                    $item['identifier']['value'],
+                    $item['identifier']['display_value'] ?? null
+                );
                 Repository::codeableConcept()->attach($identifier, $item);
                 $identifierIds[] = $identifier->id;
             }

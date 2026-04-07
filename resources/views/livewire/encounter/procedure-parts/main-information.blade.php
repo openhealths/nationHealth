@@ -160,7 +160,7 @@
                                            autocomplete="off"
                                     >
                                     <label for="serviceRequestDate" class="wrapped-label">
-                                        {{ __('patients.date') }}
+                                        {{ __('forms.date') }}
                                     </label>
 
                                     @error('form.procedures.paperReferral.serviceRequestDate')

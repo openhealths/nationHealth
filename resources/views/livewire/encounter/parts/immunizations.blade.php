@@ -23,7 +23,7 @@
                 <th scope="col" class="th-input">{{ __('patients.dosage') }}</th>
                 <th scope="col" class="th-input">{{ __('patients.execution_state') }}</th>
                 <th scope="col" class="th-input">{{ __('patients.reason') }}</th>
-                <th scope="col" class="th-input">{{ __('patients.date') }}</th>
+                <th scope="col" class="th-input">{{ __('forms.date') }}</th>
                 <th scope="col" class="th-input">{{ __('forms.action') }}</th>
             </tr>
             </thead>

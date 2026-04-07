@@ -15,8 +15,7 @@
             {{ __('patients.data_access') }}
         </button>
 
-        <button wire:click.prevent="syncEpisodes"
-                type="button"
+        <button type="button"
                 class="button-sync flex items-center gap-2 whitespace-nowrap px-5 py-2 text-sm shadow-sm"
         >
             @icon('refresh', 'w-4 h-4')
@@ -25,13 +24,11 @@
     </x-slot>
 
     <div class="breadcrumb-form p-4 shift-content">
-
-
         @php
             $navItems = [
                 ['id' => 'episodes', 'action' => 'getEpisodes', 'syncAction' => 'syncEpisodes', 'label' => __('patients.episodes'), 'icon' => 'book'],
-                ['id' => 'interaction', 'action' => 'getEncounters', 'syncAction' => 'syncEncounters', 'label' => __('patients.interaction'), 'icon' => 'users'],
-                ['id' => 'clinical_impressions', 'action' => 'getClinicalImpressions', 'syncAction' => 'syncClinicalImpressions', 'label' => __('patients.clinical_impressions'), 'icon' => 'check'],
+                ['id' => 'encounter', 'action' => 'getEncounters', 'syncAction' => 'syncEncounters', 'label' => __('patients.encounters'), 'icon' => 'users'],
+                ['id' => 'clinicalImpressions', 'action' => 'getClinicalImpressions', 'syncAction' => 'syncClinicalImpressions', 'label' => __('patients.clinical_impressions'), 'icon' => 'check'],
                 ['id' => 'vaccinations', 'action' => 'getImmunizations', 'syncAction' => 'syncImmunizations', 'label' => __('patients.vaccinations'), 'icon' => 'shield'],
                 ['id' => 'observation', 'action' => 'syncObservations', 'syncAction' => 'getObservations', 'label' => __('patients.observation'), 'icon' => 'heart'],
                 ['id' => 'diagnoses', 'action' => 'getConditions', 'syncAction' => 'syncConditions', 'label' => __('patients.diagnoses'), 'icon' => 'file'],
@@ -45,8 +42,6 @@
         @endphp
 
         <div x-data="{ activeSection: '' }" class="flex flex-col lg:flex-row gap-8 lg:gap-12">
-
-
             <div class="flex-1 space-y-4">
                 @foreach($navItems as $item)
                     <div id="block-{{ $item['id'] }}"
@@ -87,9 +82,9 @@
 
                             @if($item['id'] === 'episodes')
                                 @include('livewire.person.records.parts.episodes')
-                            @elseif($item['id'] === 'interaction')
-                                @include('livewire.person.records.parts.interaction')
-                            @elseif($item['id'] === 'clinical_impressions')
+                            @elseif($item['id'] === 'encounter')
+                                @include('livewire.person.records.parts.encounters')
+                            @elseif($item['id'] === 'clinicalImpressions')
                                 @include('livewire.person.records.parts.clinical-impressions')
                             @elseif($item['id'] === 'vaccinations')
                                 @include('livewire.person.records.parts.vaccinations')
@@ -120,7 +115,6 @@
                                     </div>
                                 </div>
                             @endif
-
                         </div>
                     </div>
                 @endforeach
@@ -130,7 +124,7 @@
             <div class="w-full lg:w-[320px] flex-shrink-0 space-y-1 mt-4 lg:mt-0 sticky top-6 self-start">
                 @foreach($navItems as $item)
                     <button @if($item['action']) wire:click.once="{{ $item['action'] }}" @endif
-                    @click="
+                            @click="
                                 activeSection = '{{ $item['id'] }}';
                                 setTimeout(() => { document.getElementById('block-{{ $item['id'] }}').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
                             "
@@ -145,7 +139,6 @@
                     </button>
                 @endforeach
             </div>
-
         </div>
     </div>
 

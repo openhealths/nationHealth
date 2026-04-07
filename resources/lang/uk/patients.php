@@ -27,7 +27,6 @@ return [
     'icpc-2_status_code' => 'Код стану за ICPC-2',
     'code_and_name' => 'Код та назва',
     'diagnoses' => 'Діагнози',
-    'date' => 'Дата',
     'observation' => 'Обстеження',
     'information_source' => 'Джерело інформації',
     'other_source' => 'Інше джерело',
@@ -42,9 +41,8 @@ return [
     'patient_full_name' => 'ПІБ пацієнта',
     'resend_again_in_seconds' => 'Відправити ще раз (через',
     'seconds_short' => 'с)',
-    
+
     // Summary sections fields
-    'status_label' => 'Статус',
     'status_clinical' => 'Статус клінічний',
     'active_status' => 'Активний',
     'date_opened' => 'Дата відкриття',
@@ -58,11 +56,8 @@ return [
     'doctor_speciality' => 'Спеціалізація лікаря',
     'inpatient_care' => 'Стаціонарна медична допомога',
     'health_facility_interaction' => 'Взаємодія в закладі охорони здоров\'я',
-    'surgery' => 'Хірургія',
     'status_completed' => 'Завершена',
     'created' => 'Створено',
-    'start' => 'Початок',
-    'end' => 'Кінець',
     'clinical_impression_conclusion' => 'Заключення по оцінці',
     'conducted' => 'Проведена',
     'vaccine' => 'Вакцина',
@@ -86,24 +81,17 @@ return [
     'final' => 'Заключний',
     'head' => 'Голова',
     'moderate_severity' => 'Середньої тяжкості',
-
-    // New keys for remaining 6 sections
-    'category' => 'Категорія',
-    'referral' => 'Направлення',
     'code_and_type' => 'Код та тип',
     'criticality' => 'Критичність',
     'source_label' => 'Джерело',
     'code_and_method' => 'Код та метод',
     'result' => 'Результат',
     'qualitative_analysis' => 'Якісний аналіз',
-    'name' => 'Назва',
     'model_number' => '№ моделі',
-    'lot_number' => 'Lot_number',
     'manufacture_date' => 'Дата виготовлення',
     'comment' => 'Коментар',
     'properties' => 'Властивості',
     'manufacturer_and_serial' => 'Виробник, серійний',
-    'expiration_date' => 'Термін придатності',
     'status_change_reason' => 'Причина зміни статусу',
     'frequency' => 'Частота прийому',
     'start_of_intake' => 'Початок прийому',
@@ -254,14 +242,12 @@ return [
     'search_episode' => 'Пошук епізоду',
     'filter_name' => 'Назва',
     'filter_code' => 'ЕСОЗ ID',
-    'filter_doctor' => 'Лікар',
     'search_button' => 'Шукати',
     'reset_filters' => 'Скинути фільтри',
     'additional_params' => 'Додаткові параметри пошуку',
     'group_actions' => 'Групові дії',
     'revoke_access' => 'Відкликати доступ до записів',
     'filter_created_at_range' => 'Створено від - до',
-    'filter_status' => 'Статус',
     'filter_icd_diagnosis' => 'Діагноз за МКХ',
     'filter_icpc_diagnosis' => 'Діагноз за ICPC',
     'filter_type' => 'Тип',
@@ -275,7 +261,7 @@ return [
     'vaccination_search' => 'Пошук вакцинації',
 
     // Encounter
-    'interaction' => 'Взаємодія',
+    'encounters' => 'Взаємодії',
     'main_data' => 'Основні дані',
     'reasons_for_visit' => 'Причини звернення',
     'vaccinations' => 'Вакцинації',
@@ -284,7 +270,6 @@ return [
     'medical_reports' => 'Медичні висновки',
     'procedures' => 'Процедури',
     'treatment_plans' => 'Плани лікування',
-    'clinical_impressions' => 'Клінічні оцінки',
 
     // Main data
     'referral_available' => 'Є направлення',
@@ -391,6 +376,7 @@ return [
 
     // Clinical impressions
     'clinical_impression' => 'Клінічна оцінка',
+    'clinical_impressions' => 'Клінічні оцінки',
     'set_of_rule_engines' => 'Набір механізмів правил',
     'previous_clinical_impression' => 'Попередня клінічна оцінка',
     'appropriate_patient_assessment' => 'Відповідна оцінка стану пацієнта',

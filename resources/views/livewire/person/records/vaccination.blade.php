@@ -214,7 +214,7 @@
                             <option value="done">{{ __('patients.status_done') }}</option>
                         </select>
                         <label for="filterStatus" class="label">
-                            {{ __('patients.status_label') }}
+                            {{ __('forms.status.label') }}
                         </label>
                     </div>
 
@@ -379,7 +379,7 @@
                         </div>
 
                         <div class="record-inner-column-bordered w-full md:w-[180px] shrink-0">
-                            <div class="record-inner-label">{{ __('patients.status_label') }}</div>
+                            <div class="record-inner-label">{{ __('forms.status.label') }}</div>
                             <div>
                                 <span class="badge-green">
                                     {{ __('patients.status_done') }}

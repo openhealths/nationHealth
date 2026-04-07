@@ -10,7 +10,10 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Identifier extends Model
 {
-    protected $fillable = ['value'];
+    protected $fillable = [
+        'value',
+        'display_value'
+    ];
 
     protected $appends = ['identifier'];
 
@@ -27,10 +30,10 @@ class Identifier extends Model
     {
         return Attribute::make(
             get: fn () => [
-                'type' => $this->type->map(fn (CodeableConcept $codeableConcept) => [
-                    'coding' => $codeableConcept->coding->toArray(),
-                    'text' => $codeableConcept->text
-                ])->toArray(),
+                'type' => $this->type->first() ? [
+                    'coding' => $this->type->first()->coding->toArray(),
+                    'text' => $this->type->first()->text
+                ] : null,
                 'value' => $this->value
             ]
         );

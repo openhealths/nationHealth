@@ -13,13 +13,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('immunization_reactions', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('immunization_id')->constrained('immunizations')->cascadeOnDelete();
-            $table->foreignId('detail_id')->constrained('identifiers')->cascadeOnDelete();
-            $table->string('display_value')->nullable();
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('immunization_reactions')) {
+            Schema::create('immunization_reactions', static function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('immunization_id')->constrained('immunizations')->cascadeOnDelete();
+                $table->foreignId('detail_id')->constrained('identifiers')->cascadeOnDelete();
+                $table->string('display_value')->nullable();
+                $table->timestamps();
+            });
+        }
     }
 
     /**

@@ -16,6 +16,7 @@ return new class extends Migration
         Schema::create('identifiers', static function (Blueprint $table) {
             $table->id();
             $table->uuid('value')->index();
+            $table->string('display_value')->nullable();
             $table->timestamps();
         });
     }

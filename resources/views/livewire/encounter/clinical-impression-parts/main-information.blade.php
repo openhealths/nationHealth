@@ -13,7 +13,7 @@
                     required
             >
                 <option selected value="">
-                    {{ __('forms.select') }} {{ mb_strtolower(__('patients.code')) }} *
+                    {{ __('forms.select') }} {{ mb_strtolower(__('forms.code')) }} *
                 </option>
                 @foreach($this->dictionaries['eHealth/clinical_impression_patient_categories'] as $key => $clinicalImpressionPatientCategory)
                     <option value="{{ $key }}">{{ $clinicalImpressionPatientCategory }}</option>

@@ -10,7 +10,7 @@
         </div>
 
         <div class="record-inner-column-bordered w-full md:w-36 shrink-0">
-            <div class="record-inner-label">{{ __('patients.status_label') }}</div>
+            <div class="record-inner-label">{{ __('forms.status.label') }}</div>
             <div>
                 <span class="badge-green">
                     {{ __('patients.status_valid') }}

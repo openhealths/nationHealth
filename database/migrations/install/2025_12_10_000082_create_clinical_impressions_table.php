@@ -18,7 +18,7 @@ return new class extends Migration
             $table->id();
             $table->uuid()->unique();
             $table->foreignId('person_id')->nullable()->constrained('persons');
-            $table->foreignId('encounter_internal_id')->constrained('encounters');
+            $table->foreignId('encounter_internal_id')->nullable()->constrained('encounters');
             $table->enum('status', ClinicalImpressionStatus::values());
             $table->text('description')->nullable()->comment('Some description of the clinical impression');
             $table->foreignId('code_id')->constrained('codeable_concepts');

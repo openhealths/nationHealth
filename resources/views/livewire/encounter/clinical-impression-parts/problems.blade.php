@@ -20,7 +20,7 @@
         <table class="table-input w-inherit">
             <thead class="thead-input">
             <tr>
-                <th scope="col" class="th-input">{{ __('patients.date') }}</th>
+                <th scope="col" class="th-input">{{ __('forms.date') }}</th>
                 <th scope="col" class="th-input">{{ __('patients.code_and_name') }}</th>
                 <th scope="col" class="th-input">{{ __('forms.action') }}</th>
             </tr>
@@ -205,7 +205,7 @@
                                             <table class="table-base">
                                                 <thead class="table-header">
                                                 <tr>
-                                                    <th scope="col" class="th-input">{{ __('patients.date') }}</th>
+                                                    <th scope="col" class="th-input">{{ __('forms.date') }}</th>
                                                     <th scope="col"
                                                         class="th-input">{{ __('patients.code_and_name') }}</th>
                                                     <th scope="col" class="th-input">{{ __('forms.action') }}</th>

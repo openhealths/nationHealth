@@ -73,7 +73,7 @@
                         <option value="1">Шевченко Т.Г.</option>
                     </select>
                     <label for="filterDoctor" class="label">
-                        {{ __('patients.filter_doctor') }}
+                        {{ __('patients.doctor') }}
                     </label>
                 </div>
             </div>
@@ -157,7 +157,7 @@
                             <option value="cancelled">Скасований</option>
                         </select>
                         <label for="filterStatus" class="label">
-                            {{ __('patients.filter_status') }}
+                            {{ __('forms.status.label') }}
                         </label>
                     </div>
                 </div>

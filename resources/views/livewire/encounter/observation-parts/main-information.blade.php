@@ -104,7 +104,7 @@
 
             <div>
                 <label for="performerCode" class="label-modal">
-                    {{ __('patients.code') }}
+                    {{ __('forms.code') }}
                 </label>
 
                 {{-- Show select2 when code is laboratory --}}
@@ -378,7 +378,7 @@
             <div class="form-row-3">
                 <div>
                     <label for="valueDate" class="label-modal">
-                        {{ __('patients.date') }}
+                        {{ __('forms.date') }}
                     </label>
                     <div class="relative flex items-center">
                         @icon('calendar-week', 'svg-input absolute left-2.5 pointer-events-none')
