@@ -269,13 +269,22 @@
                 @if(Auth::user()->can('viewAny', Person::class) || Auth::user()->can('viewAny', PersonRequest::class))
                     <li>
                         <a href="{{ route('persons.index', [legalEntity()]) }}"
-                           class="menu-item-simple"
+                           class="menu-item-simple {{ (request()->routeIs('persons.*') && !request()->routeIs('care-plan.*') && !request()->routeIs('persons.care-plans') && !request()->routeIs('persons.treatment-plans')) ? 'menu-item-active' : '' }}"
                         >
                             @icon('patients')
                             <span>{{ __('patients.patients') }}</span>
                         </a>
                     </li>
                 @endif
+
+                <li>
+                    <a href="{{ route('care-plan.index', [legalEntity()]) }}"
+                       class="menu-item-simple {{ (request()->routeIs('care-plan.*') || request()->routeIs('persons.care-plans')) ? 'menu-item-active' : '' }}"
+                    >
+                        @icon('hugeicons-contracts')
+                        <span>{{ __('care-plan.care_plan') }}</span>
+                    </a>
+                </li>
 
                 @can('viewAny', Equipment::class)
                     <li>

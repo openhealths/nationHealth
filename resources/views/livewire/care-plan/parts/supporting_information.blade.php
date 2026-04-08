@@ -1,6 +1,6 @@
 <fieldset class="fieldset" x-data="{
-    localEpisodes: [],
-    localMedicalRecords: [],
+    localEpisodes: $wire.entangle('form.episodes'),
+    localMedicalRecords: $wire.entangle('form.medical_records'),
 
     openModal: false,
     openMedicalModal: false,
@@ -39,13 +39,28 @@
         this.openModal = false;
     },
 
+    saveMedical() {
+        if (this.searchType === 'current') {
+            this.localMedicalRecords.push({
+                date: new Date().toLocaleDateString('uk-UA'),
+                name: '{{ __('care-plan.current_interaction') }}'
+            });
+        } else {
+            this.localMedicalRecords.push({
+                date: new Date().toLocaleDateString('uk-UA'),
+                name: '{{ __('care-plan.medical_record_from_ehealth') }}'
+            });
+        }
+        this.openMedicalModal = false;
+    },
+
     removeEntry(type, index) {
         if (type === 'episode') this.localEpisodes.splice(index, 1);
         else this.localMedicalRecords.splice(index, 1);
     }
 }">
     <legend class="legend">
-        {{ __('treatment-plan.supporting_information') }}
+        {{ __('care-plan.supporting_information') }}
     </legend>
 
     <div class="mt-4 space-y-10">
@@ -54,9 +69,9 @@
                 <table class="w-full mb-4 text-left border-collapse">
                     <thead>
                     <tr class="text-xs uppercase text-gray-400 border-b border-gray-100">
-                        <th class="py-3 px-2 font-medium w-32">Дата</th>
-                        <th class="py-3 px-2 font-medium">Назва епізоду</th>
-                        <th class="py-3 px-2 font-medium w-24 text-right">Дія</th>
+                        <th class="py-3 px-2 font-medium w-32">{{ __('care-plan.date') }}</th>
+                        <th class="py-3 px-2 font-medium">{{ __('care-plan.name_episode') }}</th>
+                        <th class="py-3 px-2 font-medium w-24 text-right">{{ __('forms.action') }}</th>
                     </tr>
                     </thead>
                     <tbody class="text-sm">
@@ -75,7 +90,7 @@
                 </table>
             </template>
             <button type="button" @click="initAdd('episode')" class="item-add flex items-center">
-                Додати епізод
+                {{ __('care-plan.add_episode') }}
             </button>
         </div>
 
@@ -84,9 +99,9 @@
                 <table class="w-full mb-4 text-left border-collapse">
                     <thead>
                     <tr class="text-xs uppercase text-gray-400 border-b border-gray-100">
-                        <th class="py-3 px-2 font-medium w-32">Дата</th>
-                        <th class="py-3 px-2 font-medium">Медичний запис</th>
-                        <th class="py-3 px-2 font-medium w-24 text-right">Дія</th>
+                        <th class="py-3 px-2 font-medium w-32">{{ __('care-plan.date') }}</th>
+                        <th class="py-3 px-2 font-medium">{{ __('care-plan.medical_record') }}</th>
+                        <th class="py-3 px-2 font-medium w-24 text-right">{{ __('forms.action') }}</th>
                     </tr>
                     </thead>
                     <tbody class="text-sm">
@@ -105,7 +120,7 @@
                 </table>
             </template>
             <button type="button" @click="openMedicalModal = true" class="item-add flex items-center">
-                Додати медичний запис
+                {{ __('care-plan.add_medical_record') }}
             </button>
         </div>
     </div>
@@ -121,8 +136,8 @@
                 <div @click.stop x-trap.noscroll.inert="openModal"
                      class="modal-content h-fit w-full max-w-2xl rounded-2xl shadow-lg bg-white">
                     <h3 class="modal-header !flex !justify-start gap-2">
-                        <span x-text="isNew ? 'Додати' : 'Редагувати'"></span>
-                        <span x-text="modalTarget === 'episode' ? 'епізод' : 'медичний запис'"></span>
+                        <span x-text="isNew ? '{{ __('forms.add') }}' : '{{ __('forms.edit') }}'"></span>
+                        <span x-text="modalTarget === 'episode' ? '{{ mb_strtolower(__('care-plan.episode')) }}' : '{{ mb_strtolower(__('care-plan.medical_record')) }}'"></span>
                     </h3>
                     <form @submit.prevent="save()">
                         <div class="p-6 space-y-4">
@@ -139,9 +154,9 @@
                                        autocomplete="off">
                             </div>
                             <div>
-                                <label class="label-modal">Назва / Опис <span class="text-red-600">*</span></label>
+                                <label class="label-modal">{{ __('care-plan.name_description') }} <span class="text-red-600">*</span></label>
                                 <input type="text" x-model="modalForm.name"
-                                       :placeholder="modalTarget === 'episode' ? 'Назва епізоду...' : 'Назва запису...'"
+                                       :placeholder="modalTarget === 'episode' ? '{{ __('care-plan.episode_name_placeholder') }}' : '{{ __('care-plan.record_name_placeholder') }}'"
                                        class="input-modal w-full" required>
                             </div>
                         </div>
@@ -171,10 +186,10 @@
                      class="modal-content h-fit w-full max-w-2xl rounded-2xl shadow-lg bg-white">
 
                     <div class="p-6">
-
+                        <form @submit.prevent="saveMedical()">
                         <fieldset class="fieldset">
                             <legend class="legend">
-                                {{ __('Пошук медичних записів') }}
+                                {{ __('care-plan.search_medical_records') ?? 'Пошук медичних записів' }}
                             </legend>
 
                             <div class="flex mt-2">
@@ -182,7 +197,7 @@
                                     <input id="current-interaction" type="radio" value="current" x-model="searchType" name="search-type"
                                            class="w-4 h-4 text-neutral-primary border-default-medium bg-neutral-secondary-medium rounded-full checked:border-brand focus:ring-2 focus:outline-none focus:ring-brand-subtle border border-default appearance-none">
                                     <label for="current-interaction" class="select-none ms-2 text-sm font-medium text-heading whitespace-nowrap">
-                                        {{ __('Поточна взаємодія') }}
+                                        {{ __('care-plan.current_interaction') }}
                                     </label>
                                 </div>
 
@@ -190,7 +205,7 @@
                                     <input id="search-ehealth" type="radio" value="ehealth" x-model="searchType" name="search-type"
                                            class="w-4 h-4 text-neutral-primary border-default-medium bg-neutral-secondary-medium rounded-full checked:border-brand focus:ring-2 focus:outline-none focus:ring-brand-subtle border border-default appearance-none">
                                     <label for="search-ehealth" class="select-none ms-2 text-sm font-medium text-heading whitespace-nowrap">
-                                        {{ __('Пошук у ЕСОЗ') }}
+                                        {{ __('care-plan.search_in_ehealth') }}
                                     </label>
                                 </div>
                             </div>
@@ -201,7 +216,7 @@
 
                                 <div class="mb-8 flex items-center gap-1 font-semibold text-gray-900 dark:text-white">
                                     @icon('search-outline', 'w-4.5 h-4.5')
-                                    <p>{{ __('treatment-plan.search') }}</p>
+                                    <p>{{ __('care-plan.search') }}</p>
                                 </div>
 
                                 <div class="form-row-2" x-data="{
@@ -218,7 +233,7 @@
                                                id="recordTypeFilter"
                                                class="input peer w-full cursor-pointer text-gray-500 dark:text-gray-400"
                                                x-on:click="open = !open"
-                                               :value="types[selectedType] || 'Оберіть тип'"
+                                               :value="types[selectedType] || '{{ __('forms.select_type') }}'"
                                                readonly />
 
                                         <svg class="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 pointer-events-none"
@@ -240,19 +255,19 @@
                                             <ul class="py-2 text-sm text-gray-700 dark:text-gray-200">
                                                 <li class="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer"
                                                     @click="selectedType = 'CONDITION'; open = false">
-                                                    Стани/діагнози
+                                                    {{ __('care-plan.conditions/diagnoses') }}
                                                 </li>
 
                                                 <li class="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer"
                                                     @click="selectedType = 'OBSERVATION'; open = false">
-                                                    Спостереження
+                                                    {{ __('care-plan.observations') }}
                                                 </li>
                                             </ul>
                                         </div>
                                     </div>
                                     <div class="form-group group">
                                         <label for="episode" class="label">
-                                            {{ __('treatment-plan.episode') }}
+                                            {{ __('care-plan.episode') }}
                                         </label>
 
                                         <select id="episode"
@@ -263,7 +278,7 @@
                                             <option selected value="">{{ __('forms.select') }}</option>
                                         </select>
 
-                                        @error('treatment-plan.episode')
+                                        @error('care-plan.episode')
                                         <p class="text-error">{{ $message }}</p>
                                         @enderror
                                     </div>
@@ -272,13 +287,14 @@
                         </div>
 
                         <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 p-6">
-                            <button type="button" @click="openModal = false" class="button-minor">
+                            <button type="button" @click="openMedicalModal = false" class="button-minor">
                                 {{__('forms.cancel')}}
                             </button>
-                            <button type="submit" class="button-primary" :disabled="!modalForm.date || !modalForm.name">
+                            <button type="submit" class="button-primary">
                                 {{__('forms.save')}}
                             </button>
                         </div>
+                        </form>
                     </div>
 
                 </div>

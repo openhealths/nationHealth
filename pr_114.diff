@@ -1,0 +1,26 @@
+diff --git a/app/Classes/eHealth/Api/EmployeeRequest.php b/app/Classes/eHealth/Api/EmployeeRequest.php
+index 02ad3eb..5c470cc 100644
+--- a/app/Classes/eHealth/Api/EmployeeRequest.php
++++ b/app/Classes/eHealth/Api/EmployeeRequest.php
+@@ -66,6 +66,8 @@ public function mapCreate(array $sourceData): array
+             ?? $sourceData['med_admin']
+             ?? $sourceData['pharmacist']
+             ?? $sourceData['specialist'] // Just in case, although it is usually a doctor
++            ?? $sourceData['assistant']
++            ?? $sourceData['laborant']
+             ?? [];
+ 
+         // 2.  sometimes the API returns education (singular) instead of educations (plural)
+diff --git a/app/Listeners/eHealth/EmployeeCreate.php b/app/Listeners/eHealth/EmployeeCreate.php
+index a822509..adda768 100644
+--- a/app/Listeners/eHealth/EmployeeCreate.php
++++ b/app/Listeners/eHealth/EmployeeCreate.php
+@@ -148,7 +148,7 @@ public function handle(EHealthUserLogin $event): void
+                     $dataFromRevision['educations'] ?? null,
+                     $dataFromRevision['specialities'] ?? null,
+                     $dataFromRevision['qualifications'] ?? null,
+-                    $dataFromRevision['scienceDegree'] ?? null
++                    $dataFromRevision['science_degree'] ?? null
+                 );
+ 
+                 if (!$user->partyId && $newEmployee->partyId) {

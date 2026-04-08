@@ -8,7 +8,6 @@
      x-transition:leave-end="opacity-0"
      x-cloak
      @click="showMedicationSearchDrawer = false"
-     data-drawer-hide="medication-search-drawer-right"
      aria-controls="medication-search-drawer-right"
      class="fixed top-0 right-0 h-screen pt-20 w-4/5 bg-gray-900/50"
      style="z-index: 44;"
@@ -31,7 +30,7 @@
      x-data="{ showFilter: false }"
 >
     <h3 class="modal-header" id="medication-search-drawer-label">
-        {{ __('treatment-plan.new_medication_prescription') }}
+        {{ __('care-plan.new_medication_prescription') }}
     </h3>
 
     {{-- Search Input --}}
@@ -42,7 +41,7 @@
             </div>
             <input type="text"
                    class="input peer ps-10 w-full"
-                   placeholder="{{ __('treatment-plan.medication_search_placeholder') }}"
+                   placeholder="{{ __('care-plan.medication_search_placeholder') }}"
             />
         </div>
     </div>
@@ -69,34 +68,34 @@
     <div x-show="showFilter" x-cloak x-transition class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div class="form-group group">
             <label class="label">
-                {{ __('treatment-plan.inn_name') }}
+                {{ __('care-plan.inn_name') }}
             </label>
             <select class="input-select peer w-full">
-                <option selected value="">{{ __('treatment-plan.medication_search_placeholder') }}</option>
+                <option selected value="">{{ __('care-plan.medication_search_placeholder') }}</option>
             </select>
         </div>
         <div class="form-group group">
             <label class="label">
-                {{ __('treatment-plan.atc_code') }}
+                {{ __('care-plan.atc_code') }}
             </label>
             <select class="input-select peer w-full">
-                <option selected value="">{{ __('treatment-plan.code') }}</option>
+                <option selected value="">{{ __('care-plan.code') }}</option>
             </select>
         </div>
         <div class="form-group group">
             <label class="label">
-                {{ __('treatment-plan.dosage_form') }}
+                {{ __('care-plan.dosage_form') }}
             </label>
             <select class="input-select peer w-full">
-                <option selected value="">{{ __('treatment-plan.tablets') }}</option>
+                <option selected value="">{{ __('care-plan.tablets') }}</option>
             </select>
         </div>
         <div class="form-group group">
             <label class="label">
-                {{ __('treatment-plan.prescription_form_type') }}
+                {{ __('care-plan.prescription_form_type') }}
             </label>
             <select class="input-select peer w-full">
-                <option selected value="">{{ __('treatment-plan.type') }}</option>
+                <option selected value="">{{ __('care-plan.type') }}</option>
             </select>
         </div>
     </div>
@@ -105,18 +104,18 @@
     <div class="space-y-4 mb-6">
         <fieldset class="fieldset">
             <legend class="legend">
-                {{ __('treatment-plan.example_medication_name') }}
+                {{ __('care-plan.example_medication_name') }}
             </legend>
 
             <div class="space-y-1 text-sm text-gray-700 dark:text-gray-300 mb-4">
-                <p><span class="text-gray-500">{{ __('treatment-plan.inn_basic') }}:</span> дротаверин (drotaverine), 20.0 мг/мл/</p>
-                <p><span class="text-gray-500">{{ __('treatment-plan.dosage_form') }}:</span> розчин для ін'єкцій</p>
-                <p><span class="text-gray-500">{{ __('treatment-plan.release_form') }}:</span> ампула</p>
-                <p><span class="text-gray-500">{{ __('treatment-plan.package_quantity') }}:</span> №10, №20, №50, №200</p>
-                <p><span class="text-gray-500">{{ __('treatment-plan.otc_sign') }}:</span> так</p>
-                <p><span class="text-gray-500">{{ __('treatment-plan.maintenance_dose') }}:</span></p>
-                <p><span class="text-gray-500">{{ __('treatment-plan.max_daily_dose') }}:</span></p>
-                <p><span class="text-gray-500">{{ __('treatment-plan.prescription_form_type') }}:</span> Ф-1</p>
+                <p><span class="text-gray-500">{{ __('care-plan.inn_basic') }}:</span> дротаверин (drotaverine), 20.0 мг/мл/</p>
+                <p><span class="text-gray-500">{{ __('care-plan.dosage_form') }}:</span> розчин для ін'єкцій</p>
+                <p><span class="text-gray-500">{{ __('care-plan.release_form') }}:</span> ампула</p>
+                <p><span class="text-gray-500">{{ __('care-plan.package_quantity') }}:</span> №10, №20, №50, №200</p>
+                <p><span class="text-gray-500">{{ __('care-plan.otc_sign') }}:</span> так</p>
+                <p><span class="text-gray-500">{{ __('care-plan.maintenance_dose') }}:</span></p>
+                <p><span class="text-gray-500">{{ __('care-plan.max_daily_dose') }}:</span></p>
+                <p><span class="text-gray-500">{{ __('care-plan.prescription_form_type') }}:</span> Ф-1</p>
             </div>
 
             <button type="button" class="button-primary" @click="showMedicationFormDrawer = true">
@@ -126,18 +125,18 @@
 
         <fieldset class="fieldset">
             <legend class="legend">
-                {{ __('treatment-plan.example_medication_name') }}
+                {{ __('care-plan.example_medication_name') }}
             </legend>
 
             <div class="space-y-1 text-sm text-gray-700 dark:text-gray-300 mb-4">
-                <p><span class="text-gray-500">{{ __('treatment-plan.inn_basic') }}:</span> дротаверин (drotaverine), 20.0 мг/мл/</p>
-                <p><span class="text-gray-500">{{ __('treatment-plan.dosage_form') }}:</span> розчин для ін'єкцій</p>
-                <p><span class="text-gray-500">{{ __('treatment-plan.release_form') }}:</span> ампула</p>
-                <p><span class="text-gray-500">{{ __('treatment-plan.package_quantity') }}:</span> №10, №20, №50, №200</p>
-                <p><span class="text-gray-500">{{ __('treatment-plan.otc_sign') }}:</span> так</p>
-                <p><span class="text-gray-500">{{ __('treatment-plan.maintenance_dose') }}:</span></p>
-                <p><span class="text-gray-500">{{ __('treatment-plan.max_daily_dose') }}:</span></p>
-                <p><span class="text-gray-500">{{ __('treatment-plan.prescription_form_type') }}:</span> Ф-1</p>
+                <p><span class="text-gray-500">{{ __('care-plan.inn_basic') }}:</span> дротаверин (drotaverine), 20.0 мг/мл/</p>
+                <p><span class="text-gray-500">{{ __('care-plan.dosage_form') }}:</span> розчин для ін'єкцій</p>
+                <p><span class="text-gray-500">{{ __('care-plan.release_form') }}:</span> ампула</p>
+                <p><span class="text-gray-500">{{ __('care-plan.package_quantity') }}:</span> №10, №20, №50, №200</p>
+                <p><span class="text-gray-500">{{ __('care-plan.otc_sign') }}:</span> так</p>
+                <p><span class="text-gray-500">{{ __('care-plan.maintenance_dose') }}:</span></p>
+                <p><span class="text-gray-500">{{ __('care-plan.max_daily_dose') }}:</span></p>
+                <p><span class="text-gray-500">{{ __('care-plan.prescription_form_type') }}:</span> Ф-1</p>
             </div>
 
             <button type="button" class="button-primary" @click="showMedicationFormDrawer = true">
@@ -147,13 +146,12 @@
     </div>
 
     <div class="mt-8 pl-3.5 pb-8 lg:pl-8 2xl:pl-5">
-        {{--{{ $treatment-plan->links() }}--}}
+        {{--{{ $care-plan->links() }}--}}
     </div>
 
     <div class="mt-6">
         <button type="button"
                 class="button-minor"
-                data-drawer-hide="medication-search-drawer-right"
                 aria-controls="medication-search-drawer-right"
                 @click="showMedicationSearchDrawer = false"
         >

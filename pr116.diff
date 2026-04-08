@@ -1,0 +1,3512 @@
+diff --git a/app/Classes/eHealth/Api/DiagnosticReport.php b/app/Classes/eHealth/Api/DiagnosticReport.php
+deleted file mode 100644
+index af66539..0000000
+--- a/app/Classes/eHealth/Api/DiagnosticReport.php
++++ /dev/null
+@@ -1,78 +0,0 @@
+-<?php
+-
+-declare(strict_types=1);
+-
+-namespace App\Classes\eHealth\Api;
+-
+-use App\Classes\eHealth\EHealthRequest as Request;
+-use App\Classes\eHealth\EHealthResponse;
+-use App\Exceptions\EHealth\EHealthResponseException;
+-use App\Exceptions\EHealth\EHealthValidationException;
+-use GuzzleHttp\Promise\PromiseInterface;
+-use Illuminate\Http\Client\ConnectionException;
+-
+-class DiagnosticReport extends Request
+-{
+-    protected const string URL = '/api/patients';
+-
+-    /**
+-     * Create the diagnostic report for patient.
+-     *
+-     * @param  string  $uuid  Person UUID
+-     * @param  array  $data
+-     * @return EHealthResponse|PromiseInterface
+-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+-     *
+-     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/diagnostic-report-data-package/submit-diagnostic-report-package
+-     */
+-    public function create(string $uuid, array $data = []): PromiseInterface|EHealthResponse
+-    {
+-        return $this->post(self::URL . "/$uuid/diagnostic_report_package", $data);
+-    }
+-
+-    /**
+-     * Get a diagnostic report by ID.
+-     *
+-     * @param  string  $patientId
+-     * @param  string  $diagnosticReportId
+-     * @return PromiseInterface|EHealthResponse
+-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+-     *
+-     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/diagnostic-report/get-diagnostic-report-by-id
+-     */
+-    public function getById(string $patientId, string $diagnosticReportId): PromiseInterface|EHealthResponse
+-    {
+-        return $this->get(self::URL . "/$patientId/diagnostic_reports/$diagnosticReportId");
+-    }
+-
+-    /**
+-     * Get a list of info filtered by search params.
+-     *
+-     * @param  string  $patientId
+-     * @param  array{
+-     *     code?: string,
+-     *     encounter_id?: string,
+-     *     context_episode_id?: string,
+-     *     origin_episode_id?: string,
+-     *     issued_from?: string,
+-     *     issued_to?: string,
+-     *     based_on?: string,
+-     *     managing_organization_id?: string,
+-     *     specimen_id?: string,
+-     *     page?: int,
+-     *     page_size?: int
+-     *     }  $query
+-     * @return PromiseInterface|EHealthResponse
+-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+-     *
+-     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/diagnostic-report/get-diagnostic-report-by-search-params
+-     */
+-    public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
+-    {
+-        $this->setDefaultPageSize();
+-
+-        $mergedQuery = array_merge($this->options['query'], $query ?? []);
+-
+-        return $this->get(self::URL . "/$patientId/diagnostic_reports", $mergedQuery);
+-    }
+-}
+diff --git a/app/Classes/eHealth/Api/Observation.php b/app/Classes/eHealth/Api/Observation.php
+deleted file mode 100644
+index 5d4580e..0000000
+--- a/app/Classes/eHealth/Api/Observation.php
++++ /dev/null
+@@ -1,314 +0,0 @@
+-<?php
+-
+-declare(strict_types=1);
+-
+-namespace App\Classes\eHealth\Api;
+-
+-use App\Classes\eHealth\EHealthRequest as Request;
+-use App\Classes\eHealth\EHealthResponse;
+-use App\Enums\Person\ObservationStatus;
+-use App\Exceptions\EHealth\EHealthResponseException;
+-use App\Exceptions\EHealth\EHealthValidationException;
+-use GuzzleHttp\Promise\PromiseInterface;
+-use Illuminate\Http\Client\ConnectionException;
+-use Illuminate\Support\Facades\Log;
+-use Illuminate\Support\Facades\Validator;
+-use Illuminate\Validation\Rule;
+-
+-class Observation extends Request
+-{
+-    protected const string URL = '/api/patients';
+-
+-    /**
+-     * Return an observation context record by IDs.
+-     *
+-     * @param  string  $patientUuid
+-     * @param  string  $episodeUuid
+-     * @param  array  $data
+-     * @return PromiseInterface|EHealthResponse
+-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+-     */
+-    public function getInEpisodeContext(
+-        string $patientUuid,
+-        string $episodeUuid,
+-        array $data = []
+-    ): PromiseInterface|EHealthResponse {
+-        return $this->get(self::URL . "/$patientUuid/episodes/$episodeUuid/observations", $data);
+-    }
+-
+-    /**
+-     * Get observation by ID.
+-     *
+-     * @param  string  $patientId
+-     * @param  string  $observationId
+-     * @return PromiseInterface|EHealthResponse
+-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+-     *
+-     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/observation/get-observation-by-id
+-     */
+-    public function getById(string $patientId, string $observationId): PromiseInterface|EHealthResponse
+-    {
+-        return $this->get(self::URL . "/$patientId/episodes/$observationId");
+-    }
+-
+-    /**
+-     * Get a list of summary info about observations.
+-     *
+-     * @param  string  $patientId
+-     * @param  array{code?: string, issued_from?: string, issued_to?: string, page?: int, page_size?: int}  $query
+-     * @return PromiseInterface|EHealthResponse
+-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+-     *
+-     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/patient-summary/get-observations
+-     */
+-    public function getSummary(string $patientId, array $query = []): PromiseInterface|EHealthResponse
+-    {
+-        $this->setDefaultPageSize();
+-
+-        $mergedQuery = array_merge($this->options['query'], $query ?? []);
+-
+-        return $this->get(self::URL . "/$patientId/summary/observations", $mergedQuery);
+-    }
+-
+-    /**
+-     * Get a list of observations.
+-     *
+-     * @param  string  $patientId
+-     * @param  array{
+-     *     code?: string,
+-     *     encounter_id?: string,
+-     *     diagnostic_report_id?: string,
+-     *     episode_id?: string,
+-     *     issued_from?: string,
+-     *     issued_to?: string,
+-     *     device_id?: string,
+-     *     managing_organization_id?: string,
+-     *     specimen_id?: string,
+-     *     page?: int,
+-     *     page_size?: int
+-     * }  $query
+-     * @return PromiseInterface|EHealthResponse
+-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+-     *
+-     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/observation/get-observations-by-searh-params
+-     */
+-    public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
+-    {
+-        $this->setValidator($this->validateObservations(...));
+-        $this->setDefaultPageSize();
+-
+-        $mergedQuery = array_merge($this->options['query'], $query ?? []);
+-
+-        return $this->get(self::URL . "/$patientId/observations", $mergedQuery);
+-    }
+-
+-    /**
+-     * Get a detail info about observation summary.
+-     *
+-     * @param  string  $patientId
+-     * @param  string  $id  Observation ID
+-     * @return PromiseInterface|EHealthResponse
+-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+-     *
+-     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/patient-summary/get-observation-by-id
+-     */
+-    public function getSummaryById(string $patientId, string $id): PromiseInterface|EHealthResponse
+-    {
+-        return $this->get(self::URL . "/$patientId/summary/observations/$id");
+-    }
+-
+-    /**
+-     * Validate observations response from eHealth API.
+-     *
+-     * @param  EHealthResponse  $response
+-     * @return array
+-     */
+-    protected function validateObservations(EHealthResponse $response): array
+-    {
+-        $replaced = [];
+-        foreach ($response->getData() as $data) {
+-            $replaced[] = self::replaceEHealthPropNames($data);
+-        }
+-
+-        $rules = collect($this->observationValidationRules())
+-            ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
+-            ->toArray();
+-
+-        $validator = Validator::make($replaced, $rules);
+-
+-        if ($validator->fails()) {
+-            Log::channel('e_health_errors')->error(
+-                'Observation validation failed: ' . implode(', ', $validator->errors()->all())
+-            );
+-        }
+-
+-        return $validator->validate();
+-    }
+-
+-    /**
+-     * Validation rules for observation data.
+-     *
+-     * @return array
+-     */
+-    protected function observationValidationRules(): array
+-    {
+-        return [
+-            'uuid' => ['required', 'string'],
+-            'status' => ['required', Rule::in(ObservationStatus::values())],
+-
+-            'diagnostic_report' => ['nullable', 'array'],
+-            'diagnostic_report.identifier' => ['nullable', 'array'],
+-            'diagnostic_report.identifier.type' => ['nullable', 'array'],
+-            'diagnostic_report.identifier.type.coding' => ['nullable', 'array'],
+-            'diagnostic_report.identifier.type.coding.*.code' => ['nullable', 'string'],
+-            'diagnostic_report.identifier.type.coding.*.system' => ['nullable', 'string'],
+-            'diagnostic_report.identifier.value' => ['nullable', 'string'],
+-
+-            'context' => ['nullable', 'array'],
+-            'context.identifier' => ['nullable', 'array'],
+-            'context.identifier.type' => ['nullable', 'array'],
+-            'context.identifier.type.coding' => ['nullable', 'array'],
+-            'context.identifier.type.coding.*.code' => ['nullable', 'string'],
+-            'context.identifier.type.coding.*.system' => ['nullable', 'string'],
+-            'context.identifier.value' => ['nullable', 'string'],
+-
+-            'categories' => ['required', 'array'],
+-            'categories.*.coding' => ['required', 'array'],
+-            'categories.*.coding.*.code' => ['required', 'string'],
+-            'categories.*.coding.*.system' => ['required', 'string'],
+-            'categories.*.text' => ['nullable', 'string'],
+-
+-            'code' => ['required', 'array'],
+-            'code.coding' => ['required', 'array'],
+-            'code.coding.*.code' => ['required', 'string'],
+-            'code.coding.*.system' => ['required', 'string'],
+-            'code.text' => ['nullable', 'string'],
+-
+-            'effective_date_time' => ['nullable', 'string'],
+-            'effective_period' => ['nullable', 'array'],
+-            'effective_period.start' => ['nullable', 'string'],
+-            'effective_period.end' => ['nullable', 'string'],
+-
+-            'issued' => ['required', 'date'],
+-            'ehealth_inserted_at' => ['required', 'date'],
+-            'ehealth_updated_at' => ['required', 'date'],
+-            'primary_source' => ['required', 'boolean'],
+-
+-            'performer' => ['nullable', 'array'],
+-            'performer.identifier' => ['nullable', 'array'],
+-            'performer.identifier.type' => ['nullable', 'array'],
+-            'performer.identifier.type.coding' => ['nullable', 'array'],
+-            'performer.identifier.type.coding.*.code' => ['nullable', 'string'],
+-            'performer.identifier.type.coding.*.system' => ['nullable', 'string'],
+-            'performer.identifier.value' => ['nullable', 'string'],
+-
+-            'report_origin' => ['nullable', 'array'],
+-            'report_origin.coding' => ['nullable', 'array'],
+-            'report_origin.coding.*.code' => ['nullable', 'string'],
+-            'report_origin.coding.*.system' => ['nullable', 'string'],
+-            'report_origin.text' => ['nullable', 'string'],
+-
+-            'interpretation' => ['nullable', 'array'],
+-            'interpretation.coding' => ['nullable', 'array'],
+-            'interpretation.coding.*.code' => ['nullable', 'string'],
+-            'interpretation.coding.*.system' => ['nullable', 'string'],
+-            'interpretation.text' => ['nullable', 'string'],
+-
+-            'comment' => ['nullable', 'string'],
+-
+-            'body_site' => ['nullable', 'array'],
+-            'body_site.coding' => ['nullable', 'array'],
+-            'body_site.coding.*.code' => ['nullable', 'string'],
+-            'body_site.coding.*.system' => ['nullable', 'string'],
+-            'body_site.text' => ['nullable', 'string'],
+-
+-            'method' => ['nullable', 'array'],
+-            'method.coding' => ['nullable', 'array'],
+-            'method.coding.*.code' => ['nullable', 'string'],
+-            'method.coding.*.system' => ['nullable', 'string'],
+-            'method.text' => ['nullable', 'string'],
+-
+-            'components' => ['nullable', 'array'],
+-            'components.*.code' => ['required', 'array'],
+-            'components.*.code.coding' => ['required', 'array'],
+-            'components.*.code.coding.*.code' => ['required', 'string'],
+-            'components.*.code.coding.*.system' => ['required', 'string'],
+-            'components.*.code.text' => ['nullable', 'string'],
+-
+-            'components.*.interpretation' => ['nullable', 'array'],
+-            'components.*.interpretation.coding' => ['nullable', 'array'],
+-            'components.*.interpretation.coding.*.code' => ['nullable', 'string'],
+-            'components.*.interpretation.coding.*.system' => ['nullable', 'string'],
+-            'components.*.interpretation.text' => ['nullable', 'string'],
+-
+-            'components.*.reference_ranges' => ['nullable', 'array'],
+-
+-            'components.*.value_codeable_concept' => ['nullable', 'array'],
+-            'components.*.value_codeable_concept.coding' => ['nullable', 'array'],
+-            'components.*.value_codeable_concept.coding.*.code' => ['nullable', 'string'],
+-            'components.*.value_codeable_concept.coding.*.system' => ['nullable', 'string'],
+-            'components.*.value_codeable_concept.coding.*.extension' => ['nullable', 'array'],
+-            'components.*.value_codeable_concept.text' => ['nullable', 'string'],
+-
+-            'components.*.value_quantity' => ['nullable', 'array'],
+-            'components.*.value_quantity.value' => ['nullable', 'numeric'],
+-            'components.*.value_quantity.comparator' => ['nullable', 'string'],
+-            'components.*.value_quantity.unit' => ['nullable', 'string'],
+-            'components.*.value_quantity.system' => ['nullable', 'string'],
+-            'components.*.value_quantity.code' => ['nullable', 'string'],
+-
+-            'components.*.value_string' => ['nullable', 'string'],
+-            'components.*.value_boolean' => ['nullable', 'boolean'],
+-            'components.*.value_date_time' => ['nullable', 'string'],
+-
+-            'specimen' => ['nullable', 'array'],
+-            'specimen.identifier' => ['nullable', 'array'],
+-            'specimen.identifier.type' => ['nullable', 'array'],
+-            'specimen.identifier.type.coding' => ['nullable', 'array'],
+-            'specimen.identifier.type.coding.*.code' => ['nullable', 'string'],
+-            'specimen.identifier.type.coding.*.system' => ['nullable', 'string'],
+-            'specimen.identifier.value' => ['nullable', 'string'],
+-
+-            'device' => ['nullable', 'array'],
+-            'device.identifier' => ['nullable', 'array'],
+-            'device.identifier.type' => ['nullable', 'array'],
+-            'device.identifier.type.coding' => ['nullable', 'array'],
+-            'device.identifier.type.coding.*.code' => ['nullable', 'string'],
+-            'device.identifier.type.coding.*.system' => ['nullable', 'string'],
+-            'device.identifier.value' => ['nullable', 'string'],
+-
+-            'based_on' => ['nullable', 'array'],
+-            'based_on.identifier' => ['nullable', 'array'],
+-            'based_on.identifier.type' => ['nullable', 'array'],
+-            'based_on.identifier.type.coding' => ['nullable', 'array'],
+-            'based_on.identifier.type.coding.*.code' => ['nullable', 'string'],
+-            'based_on.identifier.type.coding.*.system' => ['nullable', 'string'],
+-            'based_on.identifier.value' => ['nullable', 'string'],
+-
+-            'reference_ranges' => ['nullable', 'array'],
+-            'explanatory_letter' => ['nullable', 'string']
+-        ];
+-    }
+-
+-    /**
+-     * Replace eHealth property names with the ones used in the application.
+-     * E.g., id => uuid, inserted_at => ehealth_inserted_at.
+-     */
+-    protected static function replaceEHealthPropNames(array $properties): array
+-    {
+-        $replaced = [];
+-
+-        foreach ($properties as $name => $value) {
+-            $newName = match ($name) {
+-                'id' => 'uuid',
+-                'inserted_at' => 'ehealth_inserted_at',
+-                'updated_at' => 'ehealth_updated_at',
+-                default => $name
+-            };
+-
+-            $replaced[$newName] = $value;
+-        }
+-
+-        return $replaced;
+-    }
+-}
+diff --git a/app/Classes/eHealth/Api/Patient.php b/app/Classes/eHealth/Api/Patient.php
+index 622e677..e7b4a84 100644
+--- a/app/Classes/eHealth/Api/Patient.php
++++ b/app/Classes/eHealth/Api/Patient.php
+@@ -6,155 +6,15 @@
+ 
+ use App\Classes\eHealth\EHealthRequest as Request;
+ use App\Classes\eHealth\EHealthResponse;
+-use App\Enums\Person\ClinicalImpressionStatus;
+-use App\Enums\Person\EncounterStatus;
+-use App\Enums\Person\ImmunizationStatus;
+ use App\Exceptions\EHealth\EHealthResponseException;
+ use App\Exceptions\EHealth\EHealthValidationException;
+ use GuzzleHttp\Promise\PromiseInterface;
+ use Illuminate\Http\Client\ConnectionException;
+-use Illuminate\Support\Facades\Log;
+-use Illuminate\Support\Facades\Validator;
+-use Illuminate\Validation\Rule;
+ 
+ class Patient extends Request
+ {
+     protected const string URL = '/api/patients';
+ 
+-    /**
+-     * @param  string  $id  Person ID
+-     * @param  array  $data
+-     * @return PromiseInterface|EHealthResponse
+-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+-     *
+-     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/encounter-data-package/submit-encounter-package
+-     */
+-    public function submitEncounter(string $id, array $data): PromiseInterface|EHealthResponse
+-    {
+-        return $this->post(self::URL . "/$id/encounter_package", $data);
+-    }
+-
+-    /**
+-     * Get a list of short Encounter info filtered by search params.
+-     *
+-     * @param  string  $patientId
+-     * @param  array{
+-     *     period_start_from?: string,
+-     *     period_start_to?: string,
+-     *     period_end_from?: string,
+-     *     period_end_to?: string,
+-     *     episode_id?: string,
+-     *     status?: string,
+-     *     type?: string,
+-     *     class?: string,
+-     *     performer_speciality?: string,
+-     *     page?: int,
+-     *     page_size?: int
+-     *     }  $query
+-     * @return PromiseInterface|EHealthResponse
+-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+-     *
+-     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/patient-summary/get-short-encounters-by-search-params
+-     */
+-    public function getShortEncounters(string $patientId, array $query = []): PromiseInterface|EHealthResponse
+-    {
+-        $this->setValidator($this->validateEncounters(...));
+-        $this->setDefaultPageSize();
+-
+-        $mergedQuery = array_merge($this->options['query'], $query ?? []);
+-
+-        return $this->get(self::URL . "/$patientId/summary/encounters", $mergedQuery);
+-    }
+-
+-    /**
+-     * Get data about Encounter by ID.
+-     *
+-     * @param  string  $patientId
+-     * @param  string  $encounterId
+-     * @param  array  $query
+-     * @return PromiseInterface|EHealthResponse
+-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+-     *
+-     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/immunization/get-encounter-by-id
+-     */
+-    public function getEncounterById(
+-        string $patientId,
+-        string $encounterId,
+-        array $query = []
+-    ): PromiseInterface|EHealthResponse {
+-        return $this->get(self::URL . "/$patientId/encounters/$encounterId", $query);
+-    }
+-
+-    /**
+-     * Get a list of observations.
+-     *
+-     * @param  string  $patientId
+-     * @param  array{
+-     *     period_start_from?: string,
+-     *     period_start_to?: string,
+-     *     period_end_from?: string,
+-     *     period_end_to?: string,
+-     *     episode_id?: string,
+-     *     incoming_referral_id?: string,
+-     *     origin_episode_id?: string,
+-     *     managing_organization_id?: string,
+-     *     page?: int,
+-     *     page_size?: int
+-     * }  $query
+-     * @return PromiseInterface|EHealthResponse
+-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+-     *
+-     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/encounter/get-encounters-by-search-params
+-     */
+-    public function getEncounterBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
+-    {
+-        $this->setDefaultPageSize();
+-
+-        $mergedQuery = array_merge($this->options['query'], $query ?? []);
+-
+-        return $this->get(self::URL . "/$patientId/encounters", $mergedQuery);
+-    }
+-
+-    /**
+-     * Get a list of summary info about clinical impressions.
+-     *
+-     * @param  string  $patientId
+-     * @param  array{encounter_id?: string, episode_id?: string, code?: string, status?: string, page?: int, page_size?: int}  $query
+-     * @return PromiseInterface|EHealthResponse
+-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+-     *
+-     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/patient-summary/get-clinical-impressions
+-     */
+-    public function getClinicalImpressions(string $patientId, array $query = []): PromiseInterface|EHealthResponse
+-    {
+-        $this->setValidator($this->validateClinicalImpressions(...));
+-        $this->setDefaultPageSize();
+-
+-        $mergedQuery = array_merge($this->options['query'], $query ?? []);
+-
+-        return $this->get(self::URL . "/$patientId/summary/clinical_impressions", $mergedQuery);
+-    }
+-
+-    /**
+-     * Get a list of summary info about immunizations.
+-     *
+-     * @param  string  $patientId
+-     * @param  array{vaccine_code?: string, date_from?: string, date_to?: string, page?: int, page_size?: int}  $query
+-     * @return PromiseInterface|EHealthResponse
+-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+-     *
+-     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/patient-summary/get-immunizations
+-     */
+-    public function getImmunizations(string $patientId, array $query = []): PromiseInterface|EHealthResponse
+-    {
+-        $this->setValidator($this->validateImmunizations(...));
+-        $this->setDefaultPageSize();
+-
+-        $mergedQuery = array_merge($this->options['query'], $query ?? []);
+-
+-        return $this->get(self::URL . "/$patientId/summary/immunizations", $mergedQuery);
+-    }
+-
+     /**
+      * Get the current diagnoses related only to active episodes.
+      *
+@@ -194,26 +54,7 @@ public function getConditions(string $patientId, array $query = []): PromiseInte
+     }
+ 
+     /**
+-     * Get a list of summary info about diagnostic reports.
+-     *
+-     * @param  string  $patientId
+-     * @param  array{code?: string, issued_from?: string, issued_to?: string, page?: int, page_size?: int}  $query
+-     * @return PromiseInterface|EHealthResponse
+-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+-     *
+-     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/patient-summary/get-diagnostic-report-by-search-params
+-     */
+-    public function getDiagnosticReports(string $patientId, array $query = []): PromiseInterface|EHealthResponse
+-    {
+-        $this->setDefaultPageSize();
+-
+-        $mergedQuery = array_merge($this->options['query'], $query ?? []);
+-
+-        return $this->get(self::URL . "/$patientId/summary/diagnostic_reports", $mergedQuery);
+-    }
+-
+-    /**
+-     * Get a list of summary info about diagnostic reports.
++     * Get a list of summary info about allergy intolerances.
+      *
+      * @param  string  $patientId
+      * @param  array{code?: string, onset_date_time_from?: string, onset_date_time_to?: string, page?: int, page_size?: int}  $query
+@@ -288,327 +129,6 @@ public function getMedicationStatements(string $patientId, array $query = []): P
+         return $this->get(self::URL . "/$patientId/summary/medication_statements", $mergedQuery);
+     }
+ 
+-    /**
+-     * Validate encounters data from eHealth API.
+-     *
+-     * @param  EHealthResponse  $response
+-     * @return array
+-     */
+-    protected function validateEncounters(EHealthResponse $response): array
+-    {
+-        $replaced = [];
+-        foreach ($response->getData() as $data) {
+-            $replaced[] = self::replaceEHealthPropNames($data);
+-        }
+-
+-        $rules = collect($this->encounterValidationRules())
+-            ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
+-            ->toArray();
+-
+-        $validator = Validator::make($replaced, $rules);
+-
+-        if ($validator->fails()) {
+-            Log::channel('e_health_errors')->error(
+-                'Encounter validation failed: ' . implode(', ', $validator->errors()->all())
+-            );
+-        }
+-
+-        return $validator->validate();
+-    }
+-
+-    /**
+-     * Validate clinical impressions data from eHealth API.
+-     *
+-     * @param  EHealthResponse  $response
+-     * @return array
+-     */
+-    protected function validateClinicalImpressions(EHealthResponse $response): array
+-    {
+-        $replaced = [];
+-        foreach ($response->getData() as $data) {
+-            $replaced[] = self::replaceEHealthPropNames($data);
+-        }
+-
+-        $rules = collect($this->clinicalImpressionValidationRules())
+-            ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
+-            ->toArray();
+-
+-        $validator = Validator::make($replaced, $rules);
+-
+-        if ($validator->fails()) {
+-            Log::channel('e_health_errors')->error(
+-                'Clinical impression validation failed: ' . implode(', ', $validator->errors()->all())
+-            );
+-        }
+-
+-        return $validator->validate();
+-    }
+-
+-    /**
+-     * Validate immunizations data from eHealth API.
+-     *
+-     * @param  EHealthResponse  $response
+-     * @return array
+-     */
+-    protected function validateImmunizations(EHealthResponse $response): array
+-    {
+-        $replaced = [];
+-        foreach ($response->getData() as $data) {
+-            $replaced[] = self::replaceEHealthPropNames($data);
+-        }
+-
+-        $rules = collect($this->immunizationValidationRules())
+-            ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
+-            ->toArray();
+-
+-        $validator = Validator::make($replaced, $rules);
+-
+-        if ($validator->fails()) {
+-            Log::channel('e_health_errors')->error(
+-                'Immunization validation failed: ' . implode(', ', $validator->errors()->all())
+-            );
+-        }
+-
+-        return $validator->validate();
+-    }
+-
+-    /**
+-     * List of validation rules for encounters from eHealth.
+-     *
+-     * @return array
+-     */
+-    protected function encounterValidationRules(): array
+-    {
+-        return [
+-            'uuid' => ['required', 'uuid'],
+-            'status' => ['required', Rule::in(EncounterStatus::values())],
+-
+-            'class' => ['required', 'array'],
+-            'class.code' => ['required', 'string'],
+-            'class.system' => ['required', 'string'],
+-
+-            'type' => ['required', 'array'],
+-            'type.coding' => ['required', 'array'],
+-            'type.coding.*.code' => ['required', 'string'],
+-            'type.coding.*.system' => ['required', 'string'],
+-            'type.text' => ['nullable', 'string'],
+-
+-            'episode' => ['required', 'array'],
+-            'episode.identifier' => ['required', 'array'],
+-            'episode.identifier.type' => ['required', 'array'],
+-            'episode.identifier.type.coding' => ['required', 'array'],
+-            'episode.identifier.type.coding.*.code' => ['required', 'string'],
+-            'episode.identifier.type.coding.*.system' => ['required', 'string'],
+-            'episode.identifier.type.text' => ['nullable', 'string'],
+-            'episode.identifier.value' => ['required', 'uuid'],
+-
+-            'performer_speciality' => ['required', 'array'],
+-            'performer_speciality.coding' => ['required', 'array'],
+-            'performer_speciality.coding.*.code' => ['required', 'string'],
+-            'performer_speciality.coding.*.system' => ['required', 'string'],
+-            'performer_speciality.text' => ['nullable', 'string'],
+-
+-            'period' => ['required', 'array'],
+-            'period.start' => ['required', 'date'],
+-            'period.end' => ['required', 'date']
+-        ];
+-    }
+-
+-    /**
+-     * List of validation rules for clinical impressions from eHealth.
+-     *
+-     * @return array
+-     */
+-    protected function clinicalImpressionValidationRules(): array
+-    {
+-        return [
+-            'uuid' => ['required', 'uuid'],
+-            'status' => ['required', Rule::in(ClinicalImpressionStatus::values())],
+-            'description' => ['nullable', 'string'],
+-            'note' => ['nullable', 'string'],
+-            'summary' => ['nullable', 'string'],
+-            'explanatory_letter' => ['nullable', 'string'],
+-            'ehealth_inserted_at' => ['required', 'date'],
+-            'ehealth_updated_at' => ['required', 'date'],
+-
+-            'assessor' => ['required', 'array'],
+-            'assessor.identifier' => ['required', 'array'],
+-            'assessor.identifier.type' => ['required', 'array'],
+-            'assessor.identifier.type.coding' => ['required', 'array'],
+-            'assessor.identifier.type.coding.*.code' => ['required', 'string'],
+-            'assessor.identifier.type.coding.*.system' => ['required', 'string'],
+-            'assessor.identifier.type.text' => ['nullable', 'string'],
+-            'assessor.identifier.value' => ['required', 'uuid'],
+-
+-            'code' => ['required', 'array'],
+-            'code.coding' => ['required', 'array'],
+-            'code.coding.*.code' => ['required', 'string'],
+-            'code.coding.*.system' => ['required', 'string'],
+-            'code.text' => ['nullable', 'string'],
+-
+-            'effective_period' => ['nullable', 'array'],
+-            'effective_period.start' => ['nullable', 'date'],
+-            'effective_period.end' => ['nullable', 'date'],
+-            'effective_date_time' => ['nullable', 'date'],
+-
+-            'encounter' => ['required', 'array'],
+-            'encounter.identifier' => ['required', 'array'],
+-            'encounter.identifier.type' => ['required', 'array'],
+-            'encounter.identifier.type.coding' => ['required', 'array'],
+-            'encounter.identifier.type.coding.*.code' => ['required', 'string'],
+-            'encounter.identifier.type.coding.*.system' => ['required', 'string'],
+-            'encounter.identifier.type.text' => ['nullable', 'string'],
+-            'encounter.identifier.value' => ['required', 'uuid'],
+-
+-            'findings' => ['nullable', 'array'],
+-            'findings.*.basis' => ['nullable', 'string'],
+-            'findings.*.item_reference' => ['required', 'array'],
+-            'findings.*.item_reference.identifier' => ['required', 'array'],
+-            'findings.*.item_reference.identifier.type' => ['required', 'array'],
+-            'findings.*.item_reference.identifier.type.coding' => ['required', 'array'],
+-            'findings.*.item_reference.identifier.type.coding.*.code' => ['required', 'string'],
+-            'findings.*.item_reference.identifier.type.coding.*.system' => ['required', 'string'],
+-            'findings.*.item_reference.identifier.type.text' => ['nullable', 'string'],
+-            'findings.*.item_reference.identifier.value' => ['required', 'uuid'],
+-
+-            'previous' => ['nullable', 'array'],
+-            'previous.identifier' => ['nullable', 'array'],
+-            'previous.identifier.type' => ['nullable', 'array'],
+-            'previous.identifier.type.coding' => ['nullable', 'array'],
+-            'previous.identifier.type.coding.*.code' => ['nullable', 'string'],
+-            'previous.identifier.type.coding.*.system' => ['nullable', 'string'],
+-            'previous.identifier.type.text' => ['nullable', 'string'],
+-            'previous.identifier.value' => ['nullable', 'uuid'],
+-
+-            'problems' => ['nullable', 'array'],
+-            'problems.*.identifier' => ['required', 'array'],
+-            'problems.*.identifier.type' => ['required', 'array'],
+-            'problems.*.identifier.type.coding' => ['required', 'array'],
+-            'problems.*.identifier.type.coding.*.code' => ['required', 'string'],
+-            'problems.*.identifier.type.coding.*.system' => ['required', 'string'],
+-            'problems.*.identifier.type.text' => ['nullable', 'string'],
+-            'problems.*.identifier.value' => ['required', 'uuid'],
+-
+-            'supporting_info' => ['nullable', 'array'],
+-            'supporting_info.*.identifier' => ['required', 'array'],
+-            'supporting_info.*.identifier.type' => ['required', 'array'],
+-            'supporting_info.*.identifier.type.coding' => ['required', 'array'],
+-            'supporting_info.*.identifier.type.coding.*.code' => ['required', 'string'],
+-            'supporting_info.*.identifier.type.coding.*.system' => ['required', 'string'],
+-            'supporting_info.*.identifier.type.text' => ['nullable', 'string'],
+-            'supporting_info.*.identifier.value' => ['required', 'uuid'],
+-        ];
+-    }
+-
+-    /**
+-     * List of validation rules for immunizations from eHealth.
+-     *
+-     * @return array
+-     */
+-    protected function immunizationValidationRules(): array
+-    {
+-        return [
+-            'uuid' => ['required', 'uuid'],
+-            'status' => ['required', Rule::in(ImmunizationStatus::values())],
+-            'not_given' => ['required', 'boolean'],
+-            'primary_source' => ['required', 'boolean'],
+-            'date' => ['required', 'date'],
+-            'ehealth_inserted_at' => ['required', 'date'],
+-            'ehealth_updated_at' => ['required', 'date'],
+-            'manufacturer' => ['nullable', 'string'],
+-            'lot_number' => ['nullable', 'string'],
+-            'expiration_date' => ['nullable', 'date'],
+-            'explanatory_letter' => ['nullable', 'string'],
+-
+-            'vaccine_code' => ['required', 'array'],
+-            'vaccine_code.coding' => ['required', 'array'],
+-            'vaccine_code.coding.*.code' => ['required', 'string'],
+-            'vaccine_code.coding.*.system' => ['required', 'string'],
+-            'vaccine_code.text' => ['nullable', 'string'],
+-
+-            'context' => ['required', 'array'],
+-            'context.identifier' => ['required', 'array'],
+-            'context.identifier.type' => ['required', 'array'],
+-            'context.identifier.type.coding' => ['required', 'array'],
+-            'context.identifier.type.coding.*.code' => ['required', 'string'],
+-            'context.identifier.type.coding.*.system' => ['required', 'string'],
+-            'context.identifier.type.text' => ['nullable', 'string'],
+-            'context.identifier.value' => ['required', 'uuid'],
+-
+-            'performer' => ['nullable', 'array'],
+-            'performer.identifier' => ['nullable', 'array'],
+-            'performer.identifier.type' => ['nullable', 'array'],
+-            'performer.identifier.type.coding' => ['nullable', 'array'],
+-            'performer.identifier.type.coding.*.code' => ['nullable', 'string'],
+-            'performer.identifier.type.coding.*.system' => ['nullable', 'string'],
+-            'performer.identifier.type.text' => ['nullable', 'string'],
+-            'performer.identifier.value' => ['nullable', 'uuid'],
+-
+-            'report_origin' => ['nullable', 'array'],
+-            'report_origin.coding' => ['nullable', 'array'],
+-            'report_origin.coding.*.code' => ['nullable', 'string'],
+-            'report_origin.coding.*.system' => ['nullable', 'string'],
+-            'report_origin.text' => ['nullable', 'string'],
+-
+-            'site' => ['nullable', 'array'],
+-            'site.coding' => ['nullable', 'array'],
+-            'site.coding.*.code' => ['nullable', 'string'],
+-            'site.coding.*.system' => ['nullable', 'string'],
+-            'site.text' => ['nullable', 'string'],
+-
+-            'route' => ['nullable', 'array'],
+-            'route.coding' => ['nullable', 'array'],
+-            'route.coding.*.code' => ['nullable', 'string'],
+-            'route.coding.*.system' => ['nullable', 'string'],
+-            'route.text' => ['nullable', 'string'],
+-
+-            'dose_quantity' => ['nullable', 'array'],
+-            'dose_quantity.value' => ['nullable', 'numeric'],
+-            'dose_quantity.comparator' => ['nullable', 'string'],
+-            'dose_quantity.unit' => ['nullable', 'string'],
+-            'dose_quantity.system' => ['nullable', 'string'],
+-            'dose_quantity.code' => ['nullable', 'string'],
+-
+-            'explanation' => ['nullable', 'array'],
+-            'explanation.reasons' => ['nullable', 'array'],
+-            'explanation.reasons.*.coding' => ['nullable', 'array'],
+-            'explanation.reasons.*.coding.*.code' => ['nullable', 'string'],
+-            'explanation.reasons.*.coding.*.system' => ['nullable', 'string'],
+-            'explanation.reasons.*.text' => ['nullable', 'string'],
+-
+-            'explanation.reasons_not_given' => ['nullable', 'array'],
+-            'explanation.reasons_not_given.*.coding' => ['nullable', 'array'],
+-            'explanation.reasons_not_given.*.coding.*.code' => ['nullable', 'string'],
+-            'explanation.reasons_not_given.*.coding.*.system' => ['nullable', 'string'],
+-            'explanation.reasons_not_given.*.text' => ['nullable', 'string'],
+-
+-            'reactions' => ['nullable', 'array'],
+-            'reactions.*.detail' => ['required', 'array'],
+-            'reactions.*.detail.identifier' => ['required', 'array'],
+-            'reactions.*.detail.identifier.type' => ['required', 'array'],
+-            'reactions.*.detail.identifier.type.coding' => ['required', 'array'],
+-            'reactions.*.detail.identifier.type.coding.*.code' => ['required', 'string'],
+-            'reactions.*.detail.identifier.type.coding.*.system' => ['required', 'string'],
+-            'reactions.*.detail.identifier.value' => ['required', 'uuid'],
+-            'reactions.*.detail.display_value' => ['nullable', 'string'],
+-
+-            'vaccination_protocols' => ['nullable', 'array'],
+-            'vaccination_protocols.*.dose_sequence' => ['nullable', 'integer'],
+-            'vaccination_protocols.*.description' => ['nullable', 'string'],
+-            'vaccination_protocols.*.authority' => ['nullable', 'array'],
+-            'vaccination_protocols.*.authority.coding' => ['nullable', 'array'],
+-            'vaccination_protocols.*.authority.coding.*.code' => ['nullable', 'string'],
+-            'vaccination_protocols.*.authority.coding.*.system' => ['nullable', 'string'],
+-            'vaccination_protocols.*.series' => ['nullable', 'string'],
+-            'vaccination_protocols.*.series_doses' => ['nullable', 'integer'],
+-            'vaccination_protocols.*.target_diseases' => ['required', 'array'],
+-            'vaccination_protocols.*.target_diseases.*.coding' => ['nullable', 'array'],
+-            'vaccination_protocols.*.target_diseases.*.text' => ['nullable', 'string'],
+-            'vaccination_protocols.*.target_diseases.*.coding.*.code' => ['nullable', 'string'],
+-            'vaccination_protocols.*.target_diseases.*.coding.*.system' => ['nullable', 'string']
+-        ];
+-    }
+-
+     /**
+      * Replace eHealth property names with the ones used in the application.
+      * E.g., id => uuid, inserted_at => ehealth_inserted_at.
+diff --git a/app/Classes/eHealth/Api/Patient/ClinicalImpression.php b/app/Classes/eHealth/Api/Patient/ClinicalImpression.php
+new file mode 100644
+index 0000000..d4c7516
+--- /dev/null
++++ b/app/Classes/eHealth/Api/Patient/ClinicalImpression.php
+@@ -0,0 +1,135 @@
++<?php
++
++declare(strict_types=1);
++
++namespace App\Classes\eHealth\Api\Patient;
++
++use App\Classes\eHealth\EHealthResponse;
++use App\Classes\eHealth\ValidationRuleBuilder;
++use App\Enums\Person\ClinicalImpressionStatus;
++use App\Exceptions\EHealth\EHealthResponseException;
++use App\Exceptions\EHealth\EHealthValidationException;
++use GuzzleHttp\Promise\PromiseInterface;
++use Illuminate\Http\Client\ConnectionException;
++use Illuminate\Support\Facades\Log;
++use Illuminate\Support\Facades\Validator;
++use Illuminate\Validation\Rule;
++
++class ClinicalImpression extends PatientApiBase
++{
++    /**
++     * Get a list of summary info about clinical impressions.
++     *
++     * @param  string  $patientId
++     * @param  array{encounter_id?: string, episode_id?: string, code?: string, status?: string, page?: int, page_size?: int}  $query
++     * @return PromiseInterface|EHealthResponse
++     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
++     *
++     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/patient-summary/get-clinical-impressions
++     */
++    public function getSummary(string $patientId, array $query = []): PromiseInterface|EHealthResponse
++    {
++        $this->setValidator($this->validateClinicalImpressions(...));
++        $this->setDefaultPageSize();
++
++        $mergedQuery = array_merge($this->options['query'], $query ?? []);
++
++        return $this->get(self::URL . "/$patientId/summary/clinical_impressions", $mergedQuery);
++    }
++
++    /**
++     * Validate clinical impressions data from eHealth API.
++     *
++     * @param  EHealthResponse  $response
++     * @return array
++     */
++    protected function validateClinicalImpressions(EHealthResponse $response): array
++    {
++        $replaced = [];
++        foreach ($response->getData() as $data) {
++            $replaced[] = $this->replaceEHealthPropNames($data);
++        }
++
++        $rules = collect($this->clinicalImpressionValidationRules())
++            ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
++            ->toArray();
++
++        $validator = Validator::make($replaced, $rules);
++
++        if ($validator->fails()) {
++            Log::channel('e_health_errors')->error(
++                'Clinical impression validation failed: ' . implode(', ', $validator->errors()->all())
++            );
++        }
++
++        return $validator->validate();
++    }
++
++    /**
++     * List of validation rules for clinical impressions from eHealth.
++     *
++     * @return array
++     */
++    protected function clinicalImpressionValidationRules(): array
++    {
++        return ValidationRuleBuilder::merge(
++            // Basic fields
++            [
++                'uuid' => ['required', 'uuid'],
++                'status' => ['required', Rule::in(ClinicalImpressionStatus::values())],
++                'description' => ['nullable', 'string'],
++                'note' => ['nullable', 'string'],
++                'summary' => ['nullable', 'string'],
++                'explanatory_letter' => ['nullable', 'string', 'max:255'],
++                'ehealth_inserted_at' => ['required', 'date'],
++                'ehealth_updated_at' => ['required', 'date'],
++                'effective_date_time' => ['nullable', 'date'],
++            ],
++
++            // Identifier relationships
++            ValidationRuleBuilder::identifierRules('assessor', true),
++            ValidationRuleBuilder::identifierRules('encounter', true),
++            ValidationRuleBuilder::identifierRules('previous'),
++
++            // Codeable concept relationships
++            ValidationRuleBuilder::codeableConceptRules('code', true),
++
++            // Effective period
++            ValidationRuleBuilder::periodRules(),
++            [
++                'findings' => ['nullable', 'array'],
++                'findings.*.item_reference' => ['required_with:findings', 'array'],
++                'findings.*.item_reference.identifier' => ['required_with:findings.*.item_reference', 'array'],
++                'findings.*.item_reference.identifier.type' => [
++                    'required_with:findings.*.item_reference.identifier',
++                    'array'
++                ],
++                'findings.*.item_reference.identifier.type.coding' => [
++                    'required_with:findings.*.item_reference.identifier.type',
++                    'array'
++                ],
++                'findings.*.item_reference.identifier.type.coding.*.code' => [
++                    'required_with:findings.*.item_reference.identifier.type.coding',
++                    'string',
++                    'max:255'
++                ],
++                'findings.*.item_reference.identifier.type.coding.*.system' => [
++                    'required_with:findings.*.item_reference.identifier.type.coding',
++                    'string',
++                    'max:255'
++                ],
++                'findings.*.item_reference.identifier.type.text' => ['nullable', 'string', 'max:255'],
++                'findings.*.item_reference.identifier.value' => [
++                    'required_with:findings.*.item_reference.identifier',
++                    'uuid'
++                ],
++                'findings.*.basis' => ['nullable', 'string', 'max:255']
++            ],
++
++            // Collections of identifiers
++            ValidationRuleBuilder::identifierCollectionRules('problems'),
++            ValidationRuleBuilder::identifierCollectionRules('supporting_info')
++        );
++    }
++
++}
+diff --git a/app/Classes/eHealth/Api/Condition.php b/app/Classes/eHealth/Api/Patient/Condition.php
+similarity index 83%
+rename from app/Classes/eHealth/Api/Condition.php
+rename to app/Classes/eHealth/Api/Patient/Condition.php
+index 3fef2c8..bab482c 100644
+--- a/app/Classes/eHealth/Api/Condition.php
++++ b/app/Classes/eHealth/Api/Patient/Condition.php
+@@ -2,19 +2,16 @@
+ 
+ declare(strict_types=1);
+ 
+-namespace App\Classes\eHealth\Api;
++namespace App\Classes\eHealth\Api\Patient;
+ 
+-use App\Classes\eHealth\EHealthRequest as Request;
+ use App\Classes\eHealth\EHealthResponse;
+ use App\Exceptions\EHealth\EHealthResponseException;
+ use App\Exceptions\EHealth\EHealthValidationException;
+ use GuzzleHttp\Promise\PromiseInterface;
+ use Illuminate\Http\Client\ConnectionException;
+ 
+-class Condition extends Request
++class Condition extends PatientApiBase
+ {
+-    protected const string URL = '/api/patients';
+-
+     /**
+      * Return a condition context record by IDs.
+      *
+diff --git a/app/Classes/eHealth/Api/Patient/DiagnosticReport.php b/app/Classes/eHealth/Api/Patient/DiagnosticReport.php
+new file mode 100644
+index 0000000..5bb766b
+--- /dev/null
++++ b/app/Classes/eHealth/Api/Patient/DiagnosticReport.php
+@@ -0,0 +1,180 @@
++<?php
++
++declare(strict_types=1);
++
++namespace App\Classes\eHealth\Api\Patient;
++
++use App\Classes\eHealth\EHealthResponse;
++use App\Classes\eHealth\ValidationRuleBuilder;
++use App\Enums\Person\DiagnosticReportStatus;
++use App\Exceptions\EHealth\EHealthResponseException;
++use App\Exceptions\EHealth\EHealthValidationException;
++use GuzzleHttp\Promise\PromiseInterface;
++use Illuminate\Http\Client\ConnectionException;
++use Illuminate\Support\Facades\Log;
++use Illuminate\Support\Facades\Validator;
++use Illuminate\Validation\Rule;
++
++class DiagnosticReport extends PatientApiBase
++{
++    /**
++     * Create the diagnostic report for patient.
++     *
++     * @param  string  $uuid  Person UUID
++     * @param  array  $data
++     * @return EHealthResponse|PromiseInterface
++     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
++     *
++     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/diagnostic-report-data-package/submit-diagnostic-report-package
++     */
++    public function create(string $uuid, array $data = []): PromiseInterface|EHealthResponse
++    {
++        return $this->post(self::URL . "/$uuid/diagnostic_report_package", $data);
++    }
++
++    /**
++     * Get a diagnostic report by ID.
++     *
++     * @param  string  $patientId
++     * @param  string  $diagnosticReportId
++     * @return PromiseInterface|EHealthResponse
++     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
++     *
++     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/diagnostic-report/get-diagnostic-report-by-id
++     */
++    public function getById(string $patientId, string $diagnosticReportId): PromiseInterface|EHealthResponse
++    {
++        return $this->get(self::URL . "/$patientId/diagnostic_reports/$diagnosticReportId");
++    }
++
++    /**
++     * Get a list of info filtered by search params.
++     *
++     * @param  string  $patientId
++     * @param  array{
++     *     code?: string,
++     *     encounter_id?: string,
++     *     context_episode_id?: string,
++     *     origin_episode_id?: string,
++     *     issued_from?: string,
++     *     issued_to?: string,
++     *     based_on?: string,
++     *     managing_organization_id?: string,
++     *     specimen_id?: string,
++     *     page?: int,
++     *     page_size?: int
++     *     }  $query
++     * @return PromiseInterface|EHealthResponse
++     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
++     *
++     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/diagnostic-report/get-diagnostic-report-by-search-params
++     */
++    public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
++    {
++        $this->setValidator($this->validateDiagnosticReports(...));
++        $this->setDefaultPageSize();
++
++        $mergedQuery = array_merge($this->options['query'], $query ?? []);
++
++        return $this->get(self::URL . "/$patientId/diagnostic_reports", $mergedQuery);
++    }
++
++    /**
++     * Get a list of summary info about diagnostic reports.
++     *
++     * @param  string  $patientId
++     * @param  array{code?: string, issued_from?: string, issued_to?: string, page?: int, page_size?: int}  $query
++     * @return PromiseInterface|EHealthResponse
++     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
++     *
++     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/patient-summary/get-diagnostic-report-by-search-params
++     */
++    public function getSummary(string $patientId, array $query = []): PromiseInterface|EHealthResponse
++    {
++        $this->setDefaultPageSize();
++
++        $mergedQuery = array_merge($this->options['query'], $query ?? []);
++
++        return $this->get(self::URL . "/$patientId/summary/diagnostic_reports", $mergedQuery);
++    }
++
++    /**
++     * Validate diagnostic reports response from eHealth API.
++     *
++     * @param  EHealthResponse  $response
++     * @return array
++     */
++    protected function validateDiagnosticReports(EHealthResponse $response): array
++    {
++        $replaced = [];
++        foreach ($response->getData() as $data) {
++            $replaced[] = $this->replaceEHealthPropNames($data);
++        }
++
++        $rules = collect($this->diagnosticReportValidationRules())
++            ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
++            ->toArray();
++
++        $validator = Validator::make($replaced, $rules);
++
++        if ($validator->fails()) {
++            Log::channel('e_health_errors')->error(
++                'Diagnostic report validation failed: ' . implode(', ', $validator->errors()->all())
++            );
++        }
++
++        return $validator->validate();
++    }
++
++    /**
++     * Validation rules for diagnostic report data.
++     *
++     * @return array
++     */
++    protected function diagnosticReportValidationRules(): array
++    {
++        return ValidationRuleBuilder::merge(
++            // Basic fields
++            [
++                'uuid' => ['required', 'uuid'],
++                'status' => ['required', Rule::in(DiagnosticReportStatus::values())],
++                'effective_date_time' => ['nullable', 'date'],
++                'issued' => ['required', 'date'],
++                'primary_source' => ['required', 'boolean'],
++                'conclusion' => ['nullable', 'string'],
++                'explanatory_letter' => ['nullable', 'string', 'max:255'],
++                'ehealth_inserted_at' => ['required', 'date'],
++                'ehealth_updated_at' => ['required', 'date']
++            ],
++
++            // Identifier relationships
++            ValidationRuleBuilder::identifierRules('based_on'),
++            ValidationRuleBuilder::identifierRules('division'),
++            ValidationRuleBuilder::identifierRules('code', true),
++            ValidationRuleBuilder::identifierRules('encounter'),
++            ValidationRuleBuilder::identifierRules('origin_episode'),
++            ValidationRuleBuilder::identifierRules('recorded_by', true),
++            ValidationRuleBuilder::identifierRules('managing_organization'),
++
++            // Codeable concept relationships
++            ValidationRuleBuilder::codeableConceptRules('report_origin'),
++            ValidationRuleBuilder::codeableConceptRules('conclusion_code'),
++            ValidationRuleBuilder::codeableConceptRules('cancellation_reason'),
++
++            // Codeable concept collections
++            ValidationRuleBuilder::codeableConceptCollectionRules('category', true),
++
++            // Performer relationships
++            ValidationRuleBuilder::referenceRules('performer'),
++            ValidationRuleBuilder::referenceRules('results_interpreter'),
++
++            // Special relationships
++            ValidationRuleBuilder::paperReferralRules(),
++            ValidationRuleBuilder::periodRules(),
++
++            // Collections of identifiers
++            ValidationRuleBuilder::identifierCollectionRules('specimens'),
++            ValidationRuleBuilder::identifierCollectionRules('used_references')
++        );
++    }
++}
+diff --git a/app/Classes/eHealth/Api/Patient/Encounter.php b/app/Classes/eHealth/Api/Patient/Encounter.php
+new file mode 100644
+index 0000000..6243353
+--- /dev/null
++++ b/app/Classes/eHealth/Api/Patient/Encounter.php
+@@ -0,0 +1,166 @@
++<?php
++
++declare(strict_types=1);
++
++namespace App\Classes\eHealth\Api\Patient;
++
++use App\Classes\eHealth\EHealthResponse;
++use App\Classes\eHealth\ValidationRuleBuilder;
++use App\Enums\Person\EncounterStatus;
++use App\Exceptions\EHealth\EHealthResponseException;
++use App\Exceptions\EHealth\EHealthValidationException;
++use GuzzleHttp\Promise\PromiseInterface;
++use Illuminate\Http\Client\ConnectionException;
++use Illuminate\Support\Facades\Log;
++use Illuminate\Support\Facades\Validator;
++use Illuminate\Validation\Rule;
++
++class Encounter extends PatientApiBase
++{
++    /**
++     * @param  string  $id  Person ID
++     * @param  array  $data
++     * @return PromiseInterface|EHealthResponse
++     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
++     *
++     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/encounter-data-package/submit-encounter-package
++     */
++    public function submit(string $id, array $data): PromiseInterface|EHealthResponse
++    {
++        return $this->post(self::URL . "/$id/encounter_package", $data);
++    }
++
++    /**
++     * Get a list of short Encounter info filtered by search params.
++     *
++     * @param  string  $patientId
++     * @param  array{
++     *     period_start_from?: string,
++     *     period_start_to?: string,
++     *     period_end_from?: string,
++     *     period_end_to?: string,
++     *     episode_id?: string,
++     *     status?: string,
++     *     type?: string,
++     *     class?: string,
++     *     performer_speciality?: string,
++     *     page?: int,
++     *     page_size?: int
++     *     }  $query
++     * @return PromiseInterface|EHealthResponse
++     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
++     *
++     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/patient-summary/get-short-encounters-by-search-params
++     */
++    public function getShortBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
++    {
++        $this->setValidator($this->validateEncounters(...));
++        $this->setDefaultPageSize();
++
++        $mergedQuery = array_merge($this->options['query'], $query ?? []);
++
++        return $this->get(self::URL . "/$patientId/summary/encounters", $mergedQuery);
++    }
++
++    /**
++     * Get data about Encounter by ID.
++     *
++     * @param  string  $patientId
++     * @param  string  $encounterId
++     * @param  array  $query
++     * @return PromiseInterface|EHealthResponse
++     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
++     *
++     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/immunization/get-encounter-by-id
++     */
++    public function getById(string $patientId, string $encounterId, array $query = []): PromiseInterface|EHealthResponse
++    {
++        return $this->get(self::URL . "/$patientId/encounters/$encounterId", $query);
++    }
++
++    /**
++     * Get a list of encounters.
++     *
++     * @param  string  $patientId
++     * @param  array{
++     *     period_start_from?: string,
++     *     period_start_to?: string,
++     *     period_end_from?: string,
++     *     period_end_to?: string,
++     *     episode_id?: string,
++     *     incoming_referral_id?: string,
++     *     origin_episode_id?: string,
++     *     managing_organization_id?: string,
++     *     page?: int,
++     *     page_size?: int
++     * }  $query
++     * @return PromiseInterface|EHealthResponse
++     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
++     *
++     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/encounter/get-encounters-by-search-params
++     */
++    public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
++    {
++        $this->setDefaultPageSize();
++
++        $mergedQuery = array_merge($this->options['query'], $query ?? []);
++
++        return $this->get(self::URL . "/$patientId/encounters", $mergedQuery);
++    }
++
++    /**
++     * Validate encounters data from eHealth API.
++     *
++     * @param  EHealthResponse  $response
++     * @return array
++     */
++    protected function validateEncounters(EHealthResponse $response): array
++    {
++        $replaced = [];
++        foreach ($response->getData() as $data) {
++            $replaced[] = $this->replaceEHealthPropNames($data);
++        }
++
++        $rules = collect($this->encounterValidationRules())
++            ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
++            ->toArray();
++
++        $validator = Validator::make($replaced, $rules);
++
++        if ($validator->fails()) {
++            Log::channel('e_health_errors')->error(
++                'Encounter validation failed: ' . implode(', ', $validator->errors()->all())
++            );
++        }
++
++        return $validator->validate();
++    }
++
++    /**
++     * List of validation rules for encounters from eHealth.
++     *
++     * @return array
++     */
++    protected function encounterValidationRules(): array
++    {
++        return ValidationRuleBuilder::merge(
++            // Basic fields
++            [
++                'uuid' => ['required', 'uuid'],
++                'status' => ['required', Rule::in(EncounterStatus::values())],
++            ],
++
++            // Coding relationships
++            ValidationRuleBuilder::codingRules('class', true),
++            ValidationRuleBuilder::periodRules('period', true),
++
++            // Identifier relationships
++            ValidationRuleBuilder::identifierRules('episode', true),
++
++            // Codeable concept relationships
++            ValidationRuleBuilder::codeableConceptRules('type', true),
++            ValidationRuleBuilder::codeableConceptRules('performer_speciality', true)
++        );
++    }
++
++}
+diff --git a/app/Classes/eHealth/Api/Episode.php b/app/Classes/eHealth/Api/Patient/Episode.php
+similarity index 77%
+rename from app/Classes/eHealth/Api/Episode.php
+rename to app/Classes/eHealth/Api/Patient/Episode.php
+index 339974a..541784b 100644
+--- a/app/Classes/eHealth/Api/Episode.php
++++ b/app/Classes/eHealth/Api/Patient/Episode.php
+@@ -2,10 +2,10 @@
+ 
+ declare(strict_types=1);
+ 
+-namespace App\Classes\eHealth\Api;
++namespace App\Classes\eHealth\Api\Patient;
+ 
+-use App\Classes\eHealth\EHealthRequest as Request;
+ use App\Classes\eHealth\EHealthResponse;
++use App\Classes\eHealth\ValidationRuleBuilder;
+ use App\Enums\Person\EpisodeStatus;
+ use App\Exceptions\EHealth\EHealthResponseException;
+ use App\Exceptions\EHealth\EHealthValidationException;
+@@ -15,12 +15,10 @@
+ use Illuminate\Support\Facades\Validator;
+ use Illuminate\Validation\Rule;
+ 
+-class Episode extends Request
++class Episode extends PatientApiBase
+ {
+-    protected const string URL = '/api/patients';
+-
+     /**
+-     * Create episode
++     * Create episode.
+      *
+      * @param  string  $id
+      * @param  array  $data
+@@ -115,7 +113,7 @@ protected function validateEpisodes(EHealthResponse $response): array
+     {
+         $replaced = [];
+         foreach ($response->getData() as $data) {
+-            $replaced[] = self::replaceEHealthPropNames($data);
++            $replaced[] = $this->replaceEHealthPropNames($data);
+         }
+ 
+         $rules = collect($this->episodeValidationRules())
+@@ -140,37 +138,16 @@ protected function validateEpisodes(EHealthResponse $response): array
+      */
+     protected function episodeValidationRules(): array
+     {
+-        return [
+-            'uuid' => ['required', 'uuid'],
+-            'name' => ['required', 'string', 'max:255'],
+-            'status' => ['required', 'string', Rule::in(EpisodeStatus::values())],
+-            'ehealth_inserted_at' => ['required', 'date'],
+-            'ehealth_updated_at' => ['required', 'date'],
+-            'period' => ['required', 'array'],
+-            'period.start' => ['required', 'date'],
+-            'period.end' => ['nullable', 'date']
+-        ];
+-    }
+-
+-    /**
+-     * Replace eHealth property names with the ones used in the application.
+-     * E.g., id => uuid, inserted_at => ehealth_inserted_at.
+-     */
+-    protected static function replaceEHealthPropNames(array $properties): array
+-    {
+-        $replaced = [];
+-
+-        foreach ($properties as $name => $value) {
+-            $newName = match ($name) {
+-                'id' => 'uuid',
+-                'inserted_at' => 'ehealth_inserted_at',
+-                'updated_at' => 'ehealth_updated_at',
+-                default => $name
+-            };
+-
+-            $replaced[$newName] = $value;
+-        }
+-
+-        return $replaced;
++        return ValidationRuleBuilder::merge(
++            [
++                'uuid' => ['required', 'uuid'],
++                'name' => ['required', 'string', 'max:255'],
++                'status' => ['required', 'string', Rule::in(EpisodeStatus::values())],
++                'ehealth_inserted_at' => ['required', 'date'],
++                'ehealth_updated_at' => ['required', 'date']
++            ],
++
++            ValidationRuleBuilder::periodRules('period')
++        );
+     }
+ }
+diff --git a/app/Classes/eHealth/Api/Patient/Immunization.php b/app/Classes/eHealth/Api/Patient/Immunization.php
+new file mode 100644
+index 0000000..abb0cdf
+--- /dev/null
++++ b/app/Classes/eHealth/Api/Patient/Immunization.php
+@@ -0,0 +1,130 @@
++<?php
++
++declare(strict_types=1);
++
++namespace App\Classes\eHealth\Api\Patient;
++
++use App\Classes\eHealth\EHealthResponse;
++use App\Classes\eHealth\ValidationRuleBuilder;
++use App\Enums\Person\ImmunizationStatus;
++use App\Exceptions\EHealth\EHealthResponseException;
++use App\Exceptions\EHealth\EHealthValidationException;
++use GuzzleHttp\Promise\PromiseInterface;
++use Illuminate\Http\Client\ConnectionException;
++use Illuminate\Support\Facades\Log;
++use Illuminate\Support\Facades\Validator;
++use Illuminate\Validation\Rule;
++
++class Immunization extends PatientApiBase
++{
++    /**
++     * Get a list of summary info about immunizations.
++     *
++     * @param  string  $patientId
++     * @param  array{vaccine_code?: string, date_from?: string, date_to?: string, page?: int, page_size?: int}  $query
++     * @return PromiseInterface|EHealthResponse
++     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
++     *
++     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/patient-summary/get-immunizations
++     */
++    public function getSummary(string $patientId, array $query = []): PromiseInterface|EHealthResponse
++    {
++        $this->setValidator($this->validateImmunizations(...));
++        $this->setDefaultPageSize();
++
++        $mergedQuery = array_merge($this->options['query'], $query ?? []);
++
++        return $this->get(self::URL . "/$patientId/summary/immunizations", $mergedQuery);
++    }
++
++    /**
++     * Validate immunizations data from eHealth API.
++     *
++     * @param  EHealthResponse  $response
++     * @return array
++     */
++    protected function validateImmunizations(EHealthResponse $response): array
++    {
++        $replaced = [];
++        foreach ($response->getData() as $data) {
++            $replaced[] = $this->replaceEHealthPropNames($data);
++        }
++
++        $rules = collect($this->immunizationValidationRules())
++            ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
++            ->toArray();
++
++        $validator = Validator::make($replaced, $rules);
++
++        if ($validator->fails()) {
++            Log::channel('e_health_errors')->error(
++                'Immunization validation failed: ' . implode(', ', $validator->errors()->all())
++            );
++        }
++
++        return $validator->validate();
++    }
++
++    /**
++     * List of validation rules for immunizations from eHealth.
++     *
++     * @return array
++     */
++    protected function immunizationValidationRules(): array
++    {
++        return ValidationRuleBuilder::merge(
++            // Basic fields
++            [
++                'uuid' => ['required', 'uuid'],
++                'status' => ['required', Rule::in(ImmunizationStatus::values())],
++                'not_given' => ['required', 'boolean'],
++                'primary_source' => ['required', 'boolean'],
++                'date' => ['required', 'date'],
++                'ehealth_inserted_at' => ['required', 'date'],
++                'ehealth_updated_at' => ['required', 'date'],
++                'manufacturer' => ['nullable', 'string', 'max:255'],
++                'lot_number' => ['nullable', 'string', 'max:255'],
++                'expiration_date' => ['nullable', 'date'],
++                'explanatory_letter' => ['nullable', 'string', 'max:255'],
++            ],
++
++            // Identifier relationships
++            ValidationRuleBuilder::identifierRules('context', true),
++            ValidationRuleBuilder::identifierRules('performer'),
++
++            // Codeable concept relationships
++            ValidationRuleBuilder::codeableConceptRules('vaccine_code', true),
++            ValidationRuleBuilder::codeableConceptRules('report_origin'),
++            ValidationRuleBuilder::codeableConceptRules('site'),
++            ValidationRuleBuilder::codeableConceptRules('route'),
++
++            // Dose quantity
++            [
++                'dose_quantity' => ['nullable', 'array'],
++                'dose_quantity.value' => ['required_with:dose_quantity', 'numeric'],
++                'dose_quantity.comparator' => ['nullable', 'string', 'max:255'],
++                'dose_quantity.unit' => ['nullable', 'string', 'max:255'],
++                'dose_quantity.system' => ['required_with:dose_quantity', 'string', 'max:255'],
++                'dose_quantity.code' => ['required_with:dose_quantity', 'string', 'max:255'],
++            ],
++
++            // Explanation
++            ['explanation' => ['nullable', 'array']],
++            ValidationRuleBuilder::codeableConceptCollectionRules('explanation.reasons'),
++            ValidationRuleBuilder::codeableConceptCollectionRules('explanation.reasons_not_given'),
++            ['reactions' => ['nullable', 'array']],
++            ValidationRuleBuilder::identifierCollectionRules('reactions.*.detail'),
++
++            // Vaccination protocols
++            [
++                'vaccination_protocols' => ['nullable', 'array'],
++                'vaccination_protocols.*.dose_sequence' => ['nullable', 'integer'],
++                'vaccination_protocols.*.description' => ['nullable', 'string', 'max:255'],
++                'vaccination_protocols.*.series' => ['nullable', 'string', 'max:255'],
++                'vaccination_protocols.*.series_doses' => ['nullable', 'integer']
++            ],
++            ValidationRuleBuilder::codeableConceptRules('vaccination_protocols.*.authority'),
++            ValidationRuleBuilder::codeableConceptCollectionRules('vaccination_protocols.*.target_diseases', true)
++        );
++    }
++}
+diff --git a/app/Classes/eHealth/Api/Patient/Observation.php b/app/Classes/eHealth/Api/Patient/Observation.php
+new file mode 100644
+index 0000000..5c40d3d
+--- /dev/null
++++ b/app/Classes/eHealth/Api/Patient/Observation.php
+@@ -0,0 +1,202 @@
++<?php
++
++declare(strict_types=1);
++
++namespace App\Classes\eHealth\Api\Patient;
++
++use App\Classes\eHealth\EHealthResponse;
++use App\Classes\eHealth\ValidationRuleBuilder;
++use App\Enums\Person\ObservationStatus;
++use App\Exceptions\EHealth\EHealthResponseException;
++use App\Exceptions\EHealth\EHealthValidationException;
++use GuzzleHttp\Promise\PromiseInterface;
++use Illuminate\Http\Client\ConnectionException;
++use Illuminate\Support\Facades\Log;
++use Illuminate\Support\Facades\Validator;
++use Illuminate\Validation\Rule;
++
++class Observation extends PatientApiBase
++{
++    /**
++     * Return an observation context record by IDs.
++     *
++     * @param  string  $patientUuid
++     * @param  string  $episodeUuid
++     * @param  array  $data
++     * @return PromiseInterface|EHealthResponse
++     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
++     */
++    public function getInEpisodeContext(
++        string $patientUuid,
++        string $episodeUuid,
++        array $data = []
++    ): PromiseInterface|EHealthResponse {
++        return $this->get(self::URL . "/$patientUuid/episodes/$episodeUuid/observations", $data);
++    }
++
++    /**
++     * Get observation by ID.
++     *
++     * @param  string  $patientId
++     * @param  string  $observationId
++     * @return PromiseInterface|EHealthResponse
++     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
++     *
++     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/observation/get-observation-by-id
++     */
++    public function getById(string $patientId, string $observationId): PromiseInterface|EHealthResponse
++    {
++        return $this->get(self::URL . "/$patientId/episodes/$observationId");
++    }
++
++    /**
++     * Get a list of summary info about observations.
++     *
++     * @param  string  $patientId
++     * @param  array{code?: string, issued_from?: string, issued_to?: string, page?: int, page_size?: int}  $query
++     * @return PromiseInterface|EHealthResponse
++     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
++     *
++     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/patient-summary/get-observations
++     */
++    public function getSummary(string $patientId, array $query = []): PromiseInterface|EHealthResponse
++    {
++        $this->setDefaultPageSize();
++
++        $mergedQuery = array_merge($this->options['query'], $query ?? []);
++
++        return $this->get(self::URL . "/$patientId/summary/observations", $mergedQuery);
++    }
++
++    /**
++     * Get a list of observations.
++     *
++     * @param  string  $patientId
++     * @param  array{
++     *     code?: string,
++     *     encounter_id?: string,
++     *     diagnostic_report_id?: string,
++     *     episode_id?: string,
++     *     issued_from?: string,
++     *     issued_to?: string,
++     *     device_id?: string,
++     *     managing_organization_id?: string,
++     *     specimen_id?: string,
++     *     page?: int,
++     *     page_size?: int
++     * }  $query
++     * @return PromiseInterface|EHealthResponse
++     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
++     *
++     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/observation/get-observations-by-searh-params
++     */
++    public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
++    {
++        $this->setValidator($this->validateObservations(...));
++        $this->setDefaultPageSize();
++
++        $mergedQuery = array_merge($this->options['query'], $query ?? []);
++
++        return $this->get(self::URL . "/$patientId/observations", $mergedQuery);
++    }
++
++    /**
++     * Get a detail info about observation summary.
++     *
++     * @param  string  $patientId
++     * @param  string  $id  Observation ID
++     * @return PromiseInterface|EHealthResponse
++     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
++     *
++     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/patient-summary/get-observation-by-id
++     */
++    public function getSummaryById(string $patientId, string $id): PromiseInterface|EHealthResponse
++    {
++        return $this->get(self::URL . "/$patientId/summary/observations/$id");
++    }
++
++    /**
++     * Validate observations response from eHealth API.
++     *
++     * @param  EHealthResponse  $response
++     * @return array
++     */
++    protected function validateObservations(EHealthResponse $response): array
++    {
++        $replaced = [];
++        foreach ($response->getData() as $data) {
++            $replaced[] = $this->replaceEHealthPropNames($data);
++        }
++
++        $rules = collect($this->observationValidationRules())
++            ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
++            ->toArray();
++
++        $validator = Validator::make($replaced, $rules);
++
++        if ($validator->fails()) {
++            Log::channel('e_health_errors')->error(
++                'Observation validation failed: ' . implode(', ', $validator->errors()->all())
++            );
++        }
++
++        return $validator->validate();
++    }
++
++    /**
++     * Validation rules for observation data.
++     *
++     * @return array
++     */
++    protected function observationValidationRules(): array
++    {
++        return ValidationRuleBuilder::merge(
++            // Basic fields
++            [
++                'uuid' => ['required', 'string'],
++                'status' => ['required', Rule::in(ObservationStatus::values())],
++                'effective_date_time' => ['nullable', 'date'],
++                'issued' => ['required', 'date'],
++                'ehealth_inserted_at' => ['required', 'date'],
++                'ehealth_updated_at' => ['required', 'date'],
++                'primary_source' => ['required', 'boolean'],
++                'comment' => ['nullable', 'string'],
++                'reference_ranges' => ['nullable', 'array'], // TODO: add validation
++                'explanatory_letter' => ['nullable', 'string', 'max:255'],
++            ],
++
++            // Identifier relationships
++            ValidationRuleBuilder::identifierRules('diagnostic_report'),
++            ValidationRuleBuilder::identifierRules('context'),
++            ValidationRuleBuilder::identifierRules('performer'),
++            ValidationRuleBuilder::identifierRules('specimen'),
++            ValidationRuleBuilder::identifierRules('device'),
++            ValidationRuleBuilder::identifierRules('based_on'),
++
++            // Codeable concept relationships
++            ValidationRuleBuilder::codeableConceptRules('code', true),
++            ValidationRuleBuilder::codeableConceptRules('report_origin'),
++            ValidationRuleBuilder::codeableConceptRules('interpretation'),
++            ValidationRuleBuilder::codeableConceptRules('body_site'),
++            ValidationRuleBuilder::codeableConceptRules('method'),
++
++            // Codeable concept collections
++            ValidationRuleBuilder::codeableConceptCollectionRules('categories', true),
++
++            // Effective period
++            ValidationRuleBuilder::periodRules(),
++
++            // Components
++            [
++                'components' => ['nullable', 'array'],
++                'components.*.reference_ranges' => ['nullable', 'array'],
++
++                'components.*.value_codeable_concept.coding.*.extension' => ['nullable', 'array']
++            ],
++            ValidationRuleBuilder::codeableConceptRules('components.*.code'),
++            ValidationRuleBuilder::codeableConceptRules('components.*.interpretation'),
++            ValidationRuleBuilder::codeableConceptRules('components.*.value_codeable_concept')
++        );
++    }
++
++}
+diff --git a/app/Classes/eHealth/Api/Patient/PatientApiBase.php b/app/Classes/eHealth/Api/Patient/PatientApiBase.php
+new file mode 100644
+index 0000000..004134a
+--- /dev/null
++++ b/app/Classes/eHealth/Api/Patient/PatientApiBase.php
+@@ -0,0 +1,37 @@
++<?php
++
++declare(strict_types=1);
++
++namespace App\Classes\eHealth\Api\Patient;
++
++use App\Classes\eHealth\EHealthRequest as Request;
++
++class PatientApiBase extends Request
++{
++    protected const string URL = '/api/patients';
++
++    /**
++     * Replace eHealth property names with the ones used in the application.
++     * E.g., id => uuid, inserted_at => ehealth_inserted_at.
++     */
++    protected function replaceEHealthPropNames(array $properties): array
++    {
++        $mapping = $this->propertyMapping();
++        $replaced = [];
++
++        foreach ($properties as $name => $value) {
++            $replaced[$mapping[$name] ?? $name] = $value;
++        }
++
++        return $replaced;
++    }
++
++    protected function propertyMapping(): array
++    {
++        return [
++            'id' => 'uuid',
++            'inserted_at' => 'ehealth_inserted_at',
++            'updated_at' => 'ehealth_updated_at',
++        ];
++    }
++}
+diff --git a/app/Classes/eHealth/Api/Procedure.php b/app/Classes/eHealth/Api/Patient/Procedure.php
+similarity index 93%
+rename from app/Classes/eHealth/Api/Procedure.php
+rename to app/Classes/eHealth/Api/Patient/Procedure.php
+index 1560490..374ceaa 100644
+--- a/app/Classes/eHealth/Api/Procedure.php
++++ b/app/Classes/eHealth/Api/Patient/Procedure.php
+@@ -2,19 +2,16 @@
+ 
+ declare(strict_types=1);
+ 
+-namespace App\Classes\eHealth\Api;
++namespace App\Classes\eHealth\Api\Patient;
+ 
+-use App\Classes\eHealth\EHealthRequest as Request;
+ use App\Classes\eHealth\EHealthResponse;
+ use App\Exceptions\EHealth\EHealthResponseException;
+ use App\Exceptions\EHealth\EHealthValidationException;
+ use GuzzleHttp\Promise\PromiseInterface;
+ use Illuminate\Http\Client\ConnectionException;
+ 
+-class Procedure extends Request
++class Procedure extends PatientApiBase
+ {
+-    protected const string URL = '/api/patients';
+-
+     /**
+      * Create the procedure for patient.
+      *
+diff --git a/app/Classes/eHealth/EHealth.php b/app/Classes/eHealth/EHealth.php
+index 9d6ddc5..fb83acc 100644
+--- a/app/Classes/eHealth/EHealth.php
++++ b/app/Classes/eHealth/EHealth.php
+@@ -6,37 +6,40 @@
+ 
+ use App\Classes\eHealth\Api\Address;
+ use App\Classes\eHealth\Api\Auth;
+-use App\Classes\eHealth\Api\Condition;
++use App\Classes\eHealth\Api\Contract;
+ use App\Classes\eHealth\Api\ContractRequest;
+ use App\Classes\eHealth\Api\Declaration;
+ use App\Classes\eHealth\Api\DeclarationRequest;
+ use App\Classes\eHealth\Api\DeviceDefinition;
+ use App\Classes\eHealth\Api\DiagnoseGroup;
+-use App\Classes\eHealth\Api\DiagnosticReport;
+ use App\Classes\eHealth\Api\Dictionary;
++use App\Classes\eHealth\Api\Division;
+ use App\Classes\eHealth\Api\Drug;
+ use App\Classes\eHealth\Api\Employee;
+ use App\Classes\eHealth\Api\EmployeeRequest;
+ use App\Classes\eHealth\Api\EmployeeRole;
+-use App\Classes\eHealth\Api\Episode;
+ use App\Classes\eHealth\Api\Equipment;
+ use App\Classes\eHealth\Api\ForbiddenGroup;
+-use App\Classes\eHealth\Api\License;
+-use App\Classes\eHealth\Api\Job;
+-use App\Classes\eHealth\Api\Division;
+ use App\Classes\eHealth\Api\HealthcareService;
++use App\Classes\eHealth\Api\Job;
+ use App\Classes\eHealth\Api\LegalEntity;
++use App\Classes\eHealth\Api\License;
+ use App\Classes\eHealth\Api\MedicalProgram;
+-use App\Classes\eHealth\Api\Observation;
+ use App\Classes\eHealth\Api\Party;
+ use App\Classes\eHealth\Api\Patient;
++use App\Classes\eHealth\Api\Patient\ClinicalImpression;
++use App\Classes\eHealth\Api\Patient\Condition;
++use App\Classes\eHealth\Api\Patient\DiagnosticReport;
++use App\Classes\eHealth\Api\Patient\Encounter;
++use App\Classes\eHealth\Api\Patient\Episode;
++use App\Classes\eHealth\Api\Patient\Immunization;
++use App\Classes\eHealth\Api\Patient\Observation;
++use App\Classes\eHealth\Api\Patient\Procedure;
+ use App\Classes\eHealth\Api\Person;
+ use App\Classes\eHealth\Api\PersonRequest;
+-use App\Classes\eHealth\Api\Procedure;
+ use App\Classes\eHealth\Api\RuleEngineRules;
+ use App\Classes\eHealth\Api\Service;
+ use App\Classes\eHealth\Api\Verification;
+-use App\Classes\eHealth\Api\Contract;
+ 
+ final class EHealth
+ {
+@@ -70,11 +73,6 @@ public static function patient(): Patient
+         return app(Patient::class);
+     }
+ 
+-    public static function episode(): Episode
+-    {
+-        return app(Episode::class);
+-    }
+-
+     public static function declarationRequest(): DeclarationRequest
+     {
+         return app(DeclarationRequest::class);
+@@ -120,26 +118,6 @@ public static function equipment(): Equipment
+         return app(Equipment::class);
+     }
+ 
+-    public static function procedure(): Procedure
+-    {
+-        return app(Procedure::class);
+-    }
+-
+-    public static function condition(): Condition
+-    {
+-        return app(Condition::class);
+-    }
+-
+-    public static function observation(): Observation
+-    {
+-        return app(Observation::class);
+-    }
+-
+-    public static function diagnosticReport(): DiagnosticReport
+-    {
+-        return app(DiagnosticReport::class);
+-    }
+-
+     public static function party(): Party
+     {
+         return app(Party::class);
+@@ -204,4 +182,45 @@ public static function forbiddenGroup(): ForbiddenGroup
+     {
+         return app(ForbiddenGroup::class);
+     }
++
++    // Medical Events
++    public static function episode(): Episode
++    {
++        return app(Episode::class);
++    }
++
++    public static function encounter(): Encounter
++    {
++        return app(Encounter::class);
++    }
++
++    public static function clinicalImpression(): ClinicalImpression
++    {
++        return app(ClinicalImpression::class);
++    }
++
++    public static function immunization(): Immunization
++    {
++        return app(Immunization::class);
++    }
++
++    public static function procedure(): Procedure
++    {
++        return app(Procedure::class);
++    }
++
++    public static function condition(): Condition
++    {
++        return app(Condition::class);
++    }
++
++    public static function observation(): Observation
++    {
++        return app(Observation::class);
++    }
++
++    public static function diagnosticReport(): DiagnosticReport
++    {
++        return app(DiagnosticReport::class);
++    }
+ }
+diff --git a/app/Classes/eHealth/ValidationRuleBuilder.php b/app/Classes/eHealth/ValidationRuleBuilder.php
+new file mode 100644
+index 0000000..fb97861
+--- /dev/null
++++ b/app/Classes/eHealth/ValidationRuleBuilder.php
+@@ -0,0 +1,184 @@
++<?php
++
++declare(strict_types=1);
++
++namespace App\Classes\eHealth;
++
++class ValidationRuleBuilder
++{
++    /**
++     * Generate validation rules for identifier-type relationship.
++     * Pattern: field -> identifier -> type -> coding -> [code, system]
++     */
++    public static function identifierRules(string $field, bool $isRequired = false): array
++    {
++        $fieldRule = $isRequired ? 'required' : 'nullable';
++
++        return [
++            $field => [$fieldRule, 'array'],
++            "$field.display_value" => ['nullable', 'string', 'max:255'],
++            "$field.identifier" => ["required_with:$field", 'array'],
++            "$field.identifier.type" => ["required_with:$field.identifier", 'array'],
++            "$field.identifier.type.text" => ['nullable', 'string', 'max:255'],
++            "$field.identifier.type.coding" => ["required_with:$field.identifier.type", 'array'],
++            "$field.identifier.type.coding.*.code" => [
++                "required_with:$field.identifier.type.coding",
++                'string',
++                'max:255'
++            ],
++            "$field.identifier.type.coding.*.system" => [
++                "required_with:$field.identifier.type.coding",
++                'string',
++                'max:255'
++            ],
++            "$field.identifier.value" => ["required_with:$field.identifier", 'uuid']
++        ];
++    }
++
++    /**
++     * Generate validation rules for collections of identifier relationships.
++     * Pattern: field -> * -> identifier -> type -> coding -> [code, system]
++     */
++    public static function identifierCollectionRules(string $field, bool $isRequired = false): array
++    {
++        $fieldRule = $isRequired ? 'required' : 'nullable';
++
++        return [
++            $field => [$fieldRule, 'array'],
++            "$field.*.display_value" => ['nullable', 'string', 'max:255'],
++            "$field.*.identifier" => ["required_with:$field", 'array'],
++            "$field.*.identifier.type" => ["required_with:$field.*.identifier", 'array'],
++            "$field.*.identifier.type.text" => ['nullable', 'string', 'max:255'],
++            "$field.*.identifier.type.coding" => ["required_with:$field.*.identifier.type", 'array'],
++            "$field.*.identifier.type.coding.*.code" => [
++                "required_with:$field.*.identifier.type.coding",
++                'string',
++                'max:255'
++            ],
++            "$field.*.identifier.type.coding.*.system" => [
++                "required_with:$field.*.identifier.type.coding",
++                'string',
++                'max:255'
++            ],
++            "$field.*.identifier.value" => ["required_with:$field.*.identifier", 'uuid']
++        ];
++    }
++
++    /**
++     * Generate validation rules for codeable concept.
++     * Pattern: field -> coding -> [code, system]
++     */
++    public static function codeableConceptRules(string $field, bool $isRequired = false): array
++    {
++        $fieldRule = $isRequired ? 'required' : 'nullable';
++
++        return [
++            $field => [$fieldRule, 'array'],
++            "$field.coding" => ["required_with:$field", 'array'],
++            "$field.coding.*.code" => ["required_with:$field", 'string', 'max:255'],
++            "$field.coding.*.system" => ["required_with:$field", 'string', 'max:255'],
++            "$field.text" => ['nullable', 'string', 'max:255']
++        ];
++    }
++
++    /**
++     * Generate validation rules for collection of codeable concepts.
++     * Pattern: field -> * -> coding -> [code, system]
++     */
++    public static function codeableConceptCollectionRules(string $field, bool $isRequired = false): array
++    {
++        $fieldRule = $isRequired ? 'required' : 'nullable';
++
++        return [
++            $field => [$fieldRule, 'array'],
++            "$field.*.coding" => ["required_with:$field", 'array'],
++            "$field.*.coding.*.code" => ["required_with:$field", 'string', 'max:255'],
++            "$field.*.coding.*.system" => ["required_with:$field", 'string', 'max:255'],
++            "$field.*.text" => ['nullable', 'string', 'max:255']
++        ];
++    }
++
++    /**
++     * Generate validation rules for performer/interpreter-type relationship.
++     * Pattern: field -> reference -> identifier -> type -> coding
++     */
++    public static function referenceRules(string $field, bool $isRequired = false): array
++    {
++        $fieldRule = $isRequired ? 'required' : 'nullable';
++
++        return [
++            $field => [$fieldRule, 'array'],
++            "$field.reference" => ["required_with:$field", 'array'],
++            "$field.text" => ['nullable', 'string', 'max:255'],
++            "$field.reference.display_value" => ['nullable', 'string', 'max:255'],
++            "$field.reference.identifier" => ["required_with:$field.reference", 'array'],
++            "$field.reference.identifier.type" => ["required_with:$field.reference.identifier", 'array'],
++            "$field.reference.identifier.type.text" => ['nullable', 'string', 'max:255'],
++            "$field.reference.identifier.type.coding" => ["required_with:$field.reference.identifier.type", 'array'],
++            "$field.reference.identifier.type.coding.*.code" => [
++                "required_with:$field.reference.identifier.type.coding",
++                'string',
++                'max:255'
++            ],
++            "$field.reference.identifier.type.coding.*.system" => [
++                "required_with:$field.reference.identifier.type.coding",
++                'string',
++                'max:255'
++            ],
++            "$field.reference.identifier.value" => ["required_with:$field.reference.identifier", 'uuid']
++        ];
++    }
++
++    /**
++     * Generate validation rules for paper referral.
++     */
++    public static function paperReferralRules(string $field = 'paper_referral'): array
++    {
++        return [
++            $field => ['nullable', 'array'],
++            "$field.requisition" => ['nullable', 'string'],
++            "$field.requester_legal_entity_name" => ['nullable', 'string'],
++            "$field.requester_legal_entity_edrpou" => ["required_with:$field", 'string'],
++            "$field.requester_employee_name" => ["required_with:$field", 'string'],
++            "$field.service_request_date" => ["required_with:$field", 'date'],
++            "$field.note" => ['nullable', 'string'],
++        ];
++    }
++
++    /**
++     * Generate validation rules for simple coding structure.
++     * Pattern: field -> [code, system]
++     */
++    public static function codingRules(string $field, bool $isRequired = false): array
++    {
++        $fieldRule = $isRequired ? 'required' : 'nullable';
++
++        return [
++            $field => [$fieldRule, 'array'],
++            "$field.code" => ["required_with:$field", 'string', 'max:255'],
++            "$field.system" => ["required_with:$field", 'string', 'max:255']
++        ];
++    }
++
++    /**
++     * Generate validation rules for period fields.
++     */
++    public static function periodRules(string $field = 'effective_period', bool $isRequired = false): array
++    {
++        $fieldRule = $isRequired ? 'required' : 'nullable';
++
++        return [
++            $field => [$fieldRule, 'array'],
++            "$field.start" => ["required_with:$field", 'date'],
++            "$field.end" => ['nullable', 'date']
++        ];
++    }
++
++    /**
++     * Merge multiple rule sets together.
++     */
++    public static function merge(array ...$ruleSets): array
++    {
++        return array_merge(...$ruleSets);
++    }
++}
+diff --git a/app/Enums/Person/DiagnosticReportStatus.php b/app/Enums/Person/DiagnosticReportStatus.php
+new file mode 100644
+index 0000000..243fbd5
+--- /dev/null
++++ b/app/Enums/Person/DiagnosticReportStatus.php
+@@ -0,0 +1,26 @@
++<?php
++
++declare(strict_types=1);
++
++namespace App\Enums\Person;
++
++use App\Traits\EnumUtils;
++
++/**
++ * https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/18475090309/DRAFT+eHealth+diagnostic_report_statuses
++ */
++enum DiagnosticReportStatus: string
++{
++    use EnumUtils;
++
++    case ENTERED_IN_ERROR = 'entered_in_error';
++    case FINAL = 'final';
++
++    public function label(): string
++    {
++        return match ($this) {
++            self::ENTERED_IN_ERROR => __('patients.status.entered_in_error'),
++            self::FINAL => __('patients.status.final')
++        };
++    }
++}
+diff --git a/app/Livewire/Encounter/EncounterComponent.php b/app/Livewire/Encounter/EncounterComponent.php
+index ced909f..749eb9e 100644
+--- a/app/Livewire/Encounter/EncounterComponent.php
++++ b/app/Livewire/Encounter/EncounterComponent.php
+@@ -557,7 +557,7 @@ public function searchSupportingInfo(string $type, string $episodeId): void
+         try {
+             switch ($type) {
+                 case 'encounter':
+-                    $this->encounters = EHealth::patient()->getEncounterBySearchParams(
++                    $this->encounters = EHealth::encounter()->getBySearchParams(
+                         $this->patientUuid,
+                         ['episode_id' => $episodeId, 'managing_organization_id' => legalEntity()->uuid]
+                     )->getData();
+diff --git a/app/Livewire/Encounter/EncounterCreate.php b/app/Livewire/Encounter/EncounterCreate.php
+index 4eb021d..1fb0f6e 100644
+--- a/app/Livewire/Encounter/EncounterCreate.php
++++ b/app/Livewire/Encounter/EncounterCreate.php
+@@ -136,7 +136,7 @@ public function sign(): void
+         );
+ 
+         try {
+-            $resp = EHealth::patient()->submitEncounter($this->patientUuid, $signedSubmitEncounter);
++            $resp = EHealth::encounter()->submit($this->patientUuid, $signedSubmitEncounter);
+ 
+             dd($resp->getData());
+         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+diff --git a/app/Livewire/Person/Records/PatientSummary.php b/app/Livewire/Person/Records/PatientSummary.php
+index 8c1f1d4..f5915d2 100644
+--- a/app/Livewire/Person/Records/PatientSummary.php
++++ b/app/Livewire/Person/Records/PatientSummary.php
+@@ -84,7 +84,7 @@ public function getEpisodes(): void
+     public function syncEncounters(): void
+     {
+         try {
+-            $response = EHealth::patient()->getShortEncounters($this->uuid);
++            $response = EHealth::encounter()->getShortBySearchParams($this->uuid);
+             $validatedData = $response->validate();
+ 
+             try {
+@@ -117,7 +117,7 @@ public function getEncounters(): void
+     public function syncClinicalImpressions(): void
+     {
+         try {
+-            $response = EHealth::patient()->getClinicalImpressions($this->uuid);
++            $response = EHealth::clinicalImpression()->getSummary($this->uuid);
+             $validatedData = $response->validate();
+ 
+             try {
+@@ -150,7 +150,7 @@ public function getClinicalImpressions(): void
+     public function syncImmunizations(): void
+     {
+         try {
+-            $response = EHealth::patient()->getImmunizations($this->uuid);
++            $response = EHealth::immunization()->getSummary($this->uuid);
+             $validatedData = $response->validate();
+ 
+             try {
+@@ -180,7 +180,7 @@ public function getImmunizations(): void
+             ->toArray();
+     }
+ 
+-    public function getObservations(): void
++    public function syncObservations(): void
+     {
+         try {
+             $response = EHealth::observation()->getBySearchParams(
+@@ -208,7 +208,7 @@ public function getObservations(): void
+         }
+     }
+ 
+-    public function syncObservations(): void
++    public function getObservations(): void
+     {
+         $this->observations = Observation::wherePersonId($this->id)
+             ->withAllRelations()
+@@ -239,8 +239,19 @@ public function getConditions(): void
+     public function syncDiagnosticReports(): void
+     {
+         try {
+-            $response = EHealth::patient()->getDiagnosticReports($this->uuid);
++            $response = EHealth::diagnosticReport()->getBySearchParams(
++                $this->uuid,
++                ['managing_organization_id' => legalEntity()->uuid]
++            );
+             $validatedData = $response->validate();
++
++            try {
++                Repository::diagnosticReport()->sync($this->id, $validatedData);
++                Session::flash('success', __('patients.messages.diagnostic_reports_synced_successfully'));
++            } catch (Throwable $exception) {
++                $this->logDatabaseErrors($exception, 'Error while synchronizing diagnostic reports');
++                Session::flash('error', __('messages.database_error'));
++            }
+         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+             $this->handleEHealthExceptions($exception, 'Error when getting diagnostic reports');
+ 
+diff --git a/app/Models/MedicalEvents/Sql/DiagnosticReport.php b/app/Models/MedicalEvents/Sql/DiagnosticReport.php
+index fc6d33d..1a84523 100644
+--- a/app/Models/MedicalEvents/Sql/DiagnosticReport.php
++++ b/app/Models/MedicalEvents/Sql/DiagnosticReport.php
+@@ -4,8 +4,11 @@
+ 
+ namespace App\Models\MedicalEvents\Sql;
+ 
++use App\Enums\Person\DiagnosticReportStatus;
+ use Carbon\CarbonImmutable;
+ use Eloquence\Behaviours\HasCamelCasing;
++use Illuminate\Database\Eloquent\Attributes\Scope;
++use Illuminate\Database\Eloquent\Builder;
+ use Illuminate\Database\Eloquent\Casts\Attribute;
+ use Illuminate\Database\Eloquent\Model;
+ use Illuminate\Database\Eloquent\Relations\BelongsTo;
+@@ -17,10 +20,33 @@ class DiagnosticReport extends Model
+ {
+     use HasCamelCasing;
+ 
+-    protected $guarded = [];
++    protected $fillable = [
++        'uuid',
++        'person_id',
++        'encounter_internal_id',
++        'based_on_id',
++        'status',
++        'code_id',
++        'effective_date_time',
++        'issued',
++        'conclusion',
++        'conclusion_code_id',
++        'recorded_by_id',
++        'encounter_id',
++        'primary_source',
++        'division_id',
++        'managing_organization_id',
++        'report_origin_id',
++        'origin_episode_id',
++        'explanatory_letter',
++        'cancellation_reason_id',
++        'ehealth_inserted_at',
++        'ehealth_updated_at'
++    ];
+ 
+     protected $hidden = [
+         'id',
++        'person_id',
+         'encounter_internal_id',
+         'based_on_id',
+         'code_id',
+@@ -30,12 +56,16 @@ class DiagnosticReport extends Model
+         'division_id',
+         'managing_organization_id',
+         'encounter_id',
++        'report_origin_id',
++        'origin_episode_id',
++        'cancellation_reason_id',
+         'created_at',
+         'updated_at'
+     ];
+ 
+     protected $casts = [
+         'issued' => 'immutable_datetime',
++        'status' => DiagnosticReportStatus::class
+     ];
+ 
+     protected $appends = [
+@@ -137,6 +167,16 @@ public function encounter(): BelongsTo
+         return $this->belongsTo(Identifier::class, 'encounter_id');
+     }
+ 
++    public function originEpisode(): BelongsTo
++    {
++        return $this->belongsTo(Identifier::class, 'origin_episode_id');
++    }
++
++    public function cancellationReason(): BelongsTo
++    {
++        return $this->belongsTo(CodeableConcept::class, 'cancellation_reason_id');
++    }
++
+     public function performer(): HasOne
+     {
+         return $this->hasOne(DiagnosticReportPerformer::class);
+@@ -161,4 +201,41 @@ public function resultsInterpreter(): HasOne
+     {
+         return $this->hasOne(DiagnosticReportResultsInterpreter::class);
+     }
++
++    public function specimens(): BelongsToMany
++    {
++        return $this->belongsToMany(Identifier::class, 'diagnostic_report_specimens', 'diagnostic_report_id', 'identifier_id')->withTimestamps();
++    }
++
++    public function usedReferences(): BelongsToMany
++    {
++        return $this->belongsToMany(Identifier::class, 'diagnostic_report_used_references', 'diagnostic_report_id', 'identifier_id')->withTimestamps();
++    }
++
++    /**
++     * Scope to eager load all diagnostic report relationships.
++     */
++    #[Scope]
++    protected function withAllRelations(Builder $query): Builder
++    {
++        return $query->with([
++            'basedOn.type.coding',
++            'paperReferral',
++            'code.type.coding',
++            'category.coding',
++            'effectivePeriod',
++            'conclusionCode.coding',
++            'recordedBy.type.coding',
++            'encounter.type.coding',
++            'originEpisode.type.coding',
++            'cancellationReason.coding',
++            'performer.reference.type.coding',
++            'managingOrganization.type.coding',
++            'division.type.coding',
++            'reportOrigin.coding',
++            'resultsInterpreter.reference.type.coding',
++            'specimens.type.coding',
++            'usedReferences.type.coding'
++        ]);
++    }
+ }
+diff --git a/app/Models/MedicalEvents/Sql/DiagnosticReportPerformer.php b/app/Models/MedicalEvents/Sql/DiagnosticReportPerformer.php
+index e3155d4..00ee79b 100644
+--- a/app/Models/MedicalEvents/Sql/DiagnosticReportPerformer.php
++++ b/app/Models/MedicalEvents/Sql/DiagnosticReportPerformer.php
+@@ -11,7 +11,11 @@ class DiagnosticReportPerformer extends Model
+ {
+     protected $table = 'diagnostic_report_performer';
+ 
+-    protected $guarded = [];
++    protected $fillable = [
++        'diagnostic_report_id',
++        'reference_id',
++        'text'
++    ];
+ 
+     protected $hidden = [
+         'id',
+diff --git a/app/Models/MedicalEvents/Sql/DiagnosticReportResultsInterpreter.php b/app/Models/MedicalEvents/Sql/DiagnosticReportResultsInterpreter.php
+index f402dad..8553ccf 100644
+--- a/app/Models/MedicalEvents/Sql/DiagnosticReportResultsInterpreter.php
++++ b/app/Models/MedicalEvents/Sql/DiagnosticReportResultsInterpreter.php
+@@ -11,7 +11,11 @@ class DiagnosticReportResultsInterpreter extends Model
+ {
+     protected $table = 'diagnostic_report_results_interpreter';
+ 
+-    protected $guarded = [];
++    protected $fillable = [
++        'diagnostic_report_id',
++        'reference_id',
++        'text'
++    ];
+ 
+     protected $hidden = [
+         'id',
+diff --git a/app/Models/MedicalEvents/Sql/Observation.php b/app/Models/MedicalEvents/Sql/Observation.php
+index b0f57ba..d36c030 100644
+--- a/app/Models/MedicalEvents/Sql/Observation.php
++++ b/app/Models/MedicalEvents/Sql/Observation.php
+@@ -218,7 +218,9 @@ protected function withAllRelations(Builder $query): Builder
+         return $query->with([
+             'code.coding',
+             'categories.coding',
++            'diagnosticReport.type.coding',
+             'performer.type.coding',
++            'reportOrigin.coding',
+             'interpretation.coding',
+             'bodySite.coding',
+             'method.coding',
+diff --git a/app/Models/MedicalEvents/Sql/PaperReferral.php b/app/Models/MedicalEvents/Sql/PaperReferral.php
+index b49ebe1..0c25b58 100644
+--- a/app/Models/MedicalEvents/Sql/PaperReferral.php
++++ b/app/Models/MedicalEvents/Sql/PaperReferral.php
+@@ -11,7 +11,14 @@ class PaperReferral extends Model
+ {
+     use HasCamelCasing;
+ 
+-    protected $guarded = [];
++    protected $fillable = [
++        'requisition',
++        'requester_legal_entity_name',
++        'requester_legal_entity_edrpou',
++        'requester_employee_name',
++        'service_request_date',
++        'note'
++    ];
+ 
+     protected $hidden = [
+         'id',
+diff --git a/app/Repositories/MedicalEvents/ClinicalImpressionRepository.php b/app/Repositories/MedicalEvents/ClinicalImpressionRepository.php
+index 544e68b..3633981 100644
+--- a/app/Repositories/MedicalEvents/ClinicalImpressionRepository.php
++++ b/app/Repositories/MedicalEvents/ClinicalImpressionRepository.php
+@@ -9,7 +9,6 @@
+ use App\Models\MedicalEvents\Sql\ClinicalImpressionFinding;
+ use App\Models\MedicalEvents\Sql\ClinicalImpressionProblem;
+ use App\Models\MedicalEvents\Sql\ClinicalImpressionSupportingInfo;
+-use App\Models\MedicalEvents\Sql\CodeableConcept;
+ use Exception;
+ use Illuminate\Support\Facades\DB;
+ use Illuminate\Support\Facades\Log;
+@@ -414,47 +413,24 @@ public function sync(int $personId, array $validatedData): void
+      */
+     private function cleanupRelations(ClinicalImpression $existing): void
+     {
+-        if ($existing->code) {
+-            $existing->code->coding()->delete();
+-            $existing->code->delete();
+-        }
+-
+-        if ($existing->encounter) {
+-            $existing->encounter->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
+-            $existing->encounter->type()->delete();
+-            $existing->encounter->delete();
+-        }
+-
+-        if ($existing->assessor) {
+-            $existing->assessor->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
+-            $existing->assessor->type()->delete();
+-            $existing->assessor->delete();
+-        }
+-
+-        if ($existing->previous) {
+-            $existing->previous->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
+-            $existing->previous->type()->delete();
+-            $existing->previous->delete();
+-        }
+-
++        RelationshipCleaner::cleanRelations($existing, [
++            'encounter' => 'identifier',
++            'assessor' => 'identifier',
++            'previous' => 'identifier',
++            'code' => 'codeable_concept',
++        ]);
++
++        // Handle collections with special logic
+         foreach ($existing->problems as $problem) {
+-            $problem->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
+-            $problem->type()->delete();
+-            $problem->delete();
++            RelationshipCleaner::cleanIdentifierRelation($problem);
+         }
+ 
+         foreach ($existing->findings as $finding) {
+-            if ($finding->itemReference) {
+-                $finding->itemReference->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
+-                $finding->itemReference->type()->delete();
+-                $finding->itemReference->delete();
+-            }
++            RelationshipCleaner::cleanIdentifierRelation($finding->itemReference);
+         }
+ 
+         foreach ($existing->supportingInfo as $supportingInfo) {
+-            $supportingInfo->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
+-            $supportingInfo->type()->delete();
+-            $supportingInfo->delete();
++            RelationshipCleaner::cleanIdentifierRelation($supportingInfo);
+         }
+     }
+ }
+diff --git a/app/Repositories/MedicalEvents/DiagnosticReportRepository.php b/app/Repositories/MedicalEvents/DiagnosticReportRepository.php
+index dea5bfc..ec08929 100644
+--- a/app/Repositories/MedicalEvents/DiagnosticReportRepository.php
++++ b/app/Repositories/MedicalEvents/DiagnosticReportRepository.php
+@@ -5,12 +5,12 @@
+ namespace App\Repositories\MedicalEvents;
+ 
+ use App\Classes\eHealth\Api\PatientApi;
++use App\Core\Arr;
+ use App\Models\MedicalEvents\Sql\DiagnosticReport;
+ use App\Models\MedicalEvents\Sql\DiagnosticReportPerformer;
+ use App\Models\MedicalEvents\Sql\DiagnosticReportResultsInterpreter;
+ use Exception;
+ use Illuminate\Database\Eloquent\Model;
+-use Illuminate\Support\Arr;
+ use Illuminate\Support\Facades\Auth;
+ use Illuminate\Support\Facades\DB;
+ use Illuminate\Support\Facades\Log;
+@@ -314,4 +314,235 @@ public function formatForView(array $diagnosticReports): array
+             return $diagnosticReport;
+         }, $diagnosticReports);
+     }
++
++    /**
++     * Sync diagnostic report data and related data by deleting and creating.
++     *
++     * @param  int  $personId
++     * @param  array  $validatedData
++     * @return void
++     * @throws Throwable
++     */
++    public function sync(int $personId, array $validatedData): void
++    {
++        DB::transaction(function () use ($personId, $validatedData) {
++            // Load existing diagnostic reports with relations
++            $uuids = collect($validatedData)->pluck('uuid')->toArray();
++            $existingDiagnosticReports = $this->model::whereIn('uuid', $uuids)
++                ->withAllRelations()
++                ->get()
++                ->keyBy('uuid');
++
++            foreach ($validatedData as $data) {
++                $existing = $existingDiagnosticReports->get($data['uuid']);
++
++                // Store relationships
++                $basedOn = null;
++                if (isset($data['based_on'])) {
++                    $basedOn = Repository::identifier()->store($data['based_on']['identifier']['value']);
++                    Repository::codeableConcept()->attach($basedOn, $data['based_on']);
++                }
++
++                $code = Repository::identifier()->store($data['code']['identifier']['value']);
++                Repository::codeableConcept()->attach($code, $data['code']);
++
++                $encounter = null;
++                if (isset($data['encounter'])) {
++                    $encounter = Repository::identifier()->store($data['encounter']['identifier']['value']);
++                    Repository::codeableConcept()->attach($encounter, $data['encounter']);
++                }
++
++                $division = null;
++                if (isset($data['division'])) {
++                    $division = Repository::identifier()->store($data['division']['identifier']['value']);
++                    Repository::codeableConcept()->attach($division, $data['division']);
++                }
++
++                $conclusionCode = null;
++                if (isset($data['conclusion_code'])) {
++                    $conclusionCode = Repository::codeableConcept()->store($data['conclusion_code']);
++                }
++
++                $recordedBy = Repository::identifier()->store($data['recorded_by']['identifier']['value']);
++                Repository::codeableConcept()->attach($recordedBy, $data['recorded_by']);
++
++                $managingOrganization = null;
++                if (isset($data['managing_organization'])) {
++                    $managingOrganization = Repository::identifier()->store(
++                        $data['managing_organization']['identifier']['value']
++                    );
++                    Repository::codeableConcept()->attach($managingOrganization, $data['managing_organization']);
++                }
++
++                $reportOrigin = null;
++                if (isset($data['report_origin'])) {
++                    $reportOrigin = Repository::codeableConcept()->store($data['report_origin']);
++                }
++
++                $originEpisode = null;
++                if (isset($data['origin_episode'])) {
++                    $originEpisode = Repository::identifier()->store($data['origin_episode']['identifier']['value']);
++                    Repository::codeableConcept()->attach($originEpisode, $data['origin_episode']);
++                }
++
++                $cancellationReason = null;
++                if (isset($data['cancellation_reason'])) {
++                    $cancellationReason = Repository::codeableConcept()->store($data['cancellation_reason']);
++                }
++
++                // Create or update main diagnostic report
++                /** @var DiagnosticReport $diagnosticReport */
++                $diagnosticReport = $this->model::updateOrCreate(
++                    ['uuid' => $data['uuid']],
++                    array_merge(
++                        [
++                        'person_id' => $personId,
++                        'based_on_id' => $basedOn?->id,
++                        'code_id' => $code->id,
++                        'encounter_id' => $encounter?->id,
++                        'division_id' => $division?->id,
++                        'conclusion_code_id' => $conclusionCode?->id,
++                        'recorded_by_id' => $recordedBy->id,
++                        'managing_organization_id' => $managingOrganization?->id,
++                        'report_origin_id' => $reportOrigin?->id,
++                        'origin_episode_id' => $originEpisode?->id,
++                        'cancellation_reason_id' => $cancellationReason?->id
++                    ],
++                        Arr::except($data, [
++                            'based_on',
++                            'code',
++                            'encounter',
++                            'division',
++                            'conclusion_code',
++                            'recorded_by',
++                            'managing_organization',
++                            'report_origin',
++                            'origin_episode',
++                            'cancellation_reason',
++                            'paper_referral',
++                            'category',
++                            'effective_period',
++                            'performer',
++                            'results_interpreter',
++                            'specimens',
++                            'used_references'
++                        ])
++                    )
++                );
++
++                if (isset($data['paper_referral'])) {
++                    Repository::paperReferral()->sync($data['paper_referral'], $diagnosticReport);
++                }
++
++                $categoriesIds = [];
++                if (isset($data['category'])) {
++                    foreach ($data['category'] as $categoryData) {
++                        $category = Repository::codeableConcept()->store($categoryData);
++                        $categoriesIds[] = $category->id;
++                    }
++                }
++                $diagnosticReport->category()->sync($categoriesIds);
++
++                if (isset($data['effective_period'])) {
++                    $diagnosticReport->effectivePeriod()->delete();
++                    $diagnosticReport->effectivePeriod()->create([
++                        'start' => $data['effective_period']['start'],
++                        'end' => $data['effective_period']['end']
++                    ]);
++                }
++
++                $diagnosticReport->performer()->delete();
++                if (isset($data['performer'])) {
++                    $performerReference = null;
++                    if (isset($data['performer']['reference'])) {
++                        $performerReference = Repository::identifier()->store(
++                            $data['performer']['reference']['identifier']['value']
++                        );
++                        Repository::codeableConcept()->attach($performerReference, $data['performer']['reference']);
++                    }
++
++                    DiagnosticReportPerformer::create([
++                        'diagnostic_report_id' => $diagnosticReport->id,
++                        'reference_id' => $performerReference?->id,
++                        'text' => $data['performer']['text'] ?? null
++                    ]);
++                }
++
++                $diagnosticReport->resultsInterpreter()->delete();
++                if (isset($data['results_interpreter'])) {
++                    $interpreterReference = null;
++                    if (isset($data['results_interpreter']['reference'])) {
++                        $interpreterReference = Repository::identifier()->store(
++                            $data['results_interpreter']['reference']['identifier']['value']
++                        );
++                        Repository::codeableConcept()->attach(
++                            $interpreterReference,
++                            $data['results_interpreter']['reference']
++                        );
++                    }
++
++                    DiagnosticReportResultsInterpreter::create([
++                        'diagnostic_report_id' => $diagnosticReport->id,
++                        'reference_id' => $interpreterReference?->id,
++                        'text' => $data['results_interpreter']['text'] ?? null
++                    ]);
++                }
++
++                // Sync specimens
++                $specimenIds = [];
++                if (isset($data['specimens'])) {
++                    foreach ($data['specimens'] as $specimenData) {
++                        $specimen = Repository::identifier()->store($specimenData['identifier']['value']);
++                        Repository::codeableConcept()->attach($specimen, $specimenData);
++                        $specimenIds[] = $specimen->id;
++                    }
++                }
++                $diagnosticReport->specimens()->sync($specimenIds);
++
++                // Sync used references
++                $usedReferenceIds = [];
++                if (isset($data['used_references'])) {
++                    foreach ($data['used_references'] as $usedReferenceData) {
++                        $usedReference = Repository::identifier()->store($usedReferenceData['identifier']['value']);
++                        Repository::codeableConcept()->attach($usedReference, $usedReferenceData);
++                        $usedReferenceIds[] = $usedReference->id;
++                    }
++                }
++                $diagnosticReport->usedReferences()->sync($usedReferenceIds);
++
++                // Cleanup old relationships after all updates are done
++                if ($existing) {
++                    $this->cleanupRelations($existing);
++                }
++            }
++        });
++    }
++
++    /**
++     * Remove orphaned relations after diagnostic report FK update.
++     *
++     * @param  DiagnosticReport  $existing
++     * @return void
++     */
++    private function cleanupRelations(DiagnosticReport $existing): void
++    {
++        RelationshipCleaner::cleanRelations($existing, [
++            'basedOn' => 'identifier',
++            'code' => 'identifier',
++            'encounter' => 'identifier',
++            'division' => 'identifier',
++            'recordedBy' => 'identifier',
++            'managingOrganization' => 'identifier',
++            'originEpisode' => 'identifier',
++            'conclusionCode' => 'codeable_concept',
++            'reportOrigin' => 'codeable_concept',
++            'cancellationReason' => 'codeable_concept',
++            'category' => 'codeable_concept_collection',
++        ]);
++
++        RelationshipCleaner::cleanPerformerRelation($existing->performer);
++        RelationshipCleaner::cleanPerformerRelation($existing->resultsInterpreter);
++        RelationshipCleaner::cleanCodeableConceptCollection($existing->specimens);
++        RelationshipCleaner::cleanCodeableConceptCollection($existing->usedReferences);
++    }
+ }
+diff --git a/app/Repositories/MedicalEvents/EncounterRepository.php b/app/Repositories/MedicalEvents/EncounterRepository.php
+index 4557853..04ea5a0 100644
+--- a/app/Repositories/MedicalEvents/EncounterRepository.php
++++ b/app/Repositories/MedicalEvents/EncounterRepository.php
+@@ -7,7 +7,6 @@
+ use App\Classes\eHealth\Api\PatientApi;
+ use App\Core\Arr;
+ use App\Models\MedicalEvents\Mongo\Encounter as EncounterMongo;
+-use App\Models\MedicalEvents\Sql\CodeableConcept;
+ use App\Models\MedicalEvents\Sql\Condition;
+ use App\Models\MedicalEvents\Sql\Encounter as EncounterSql;
+ use App\Models\MedicalEvents\Sql\EncounterDiagnose;
+@@ -927,14 +926,8 @@ private function cleanupRelations(array $old): void
+     {
+         $old['class']->delete();
+ 
+-        $old['type']->coding()->delete();
+-        $old['type']->delete();
+-
+-        $old['performerSpeciality']->coding()->delete();
+-        $old['performerSpeciality']->delete();
+-
+-        $old['episode']->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
+-        $old['episode']->type()->delete();
+-        $old['episode']->delete();
++        RelationshipCleaner::cleanCodeableConceptRelation($old['type']);
++        RelationshipCleaner::cleanCodeableConceptRelation($old['performerSpeciality']);
++        RelationshipCleaner::cleanIdentifierRelation($old['episode']);
+     }
+ }
+diff --git a/app/Repositories/MedicalEvents/ImmunizationRepository.php b/app/Repositories/MedicalEvents/ImmunizationRepository.php
+index ef146dc..f462e6b 100644
+--- a/app/Repositories/MedicalEvents/ImmunizationRepository.php
++++ b/app/Repositories/MedicalEvents/ImmunizationRepository.php
+@@ -5,7 +5,6 @@
+ namespace App\Repositories\MedicalEvents;
+ 
+ use App\Core\Arr;
+-use App\Models\MedicalEvents\Sql\CodeableConcept;
+ use App\Models\MedicalEvents\Sql\Immunization;
+ use App\Models\MedicalEvents\Sql\ImmunizationDoseQuantity;
+ use App\Models\MedicalEvents\Sql\ImmunizationExplanation;
+@@ -257,9 +256,9 @@ public function sync(int $personId, array $validatedData): void
+                         'person_id' => $personId,
+                         'vaccine_code_id' => $vaccineCode->id,
+                         'context_id' => $context->id,
+-                        'performer_id' => $performer->id,
+-                        'report_origin_id' => $reportOrigin->id,
+-                        'site_id' => $site->id,
++                        'performer_id' => $performer?->id,
++                        'report_origin_id' => $reportOrigin?->id,
++                        'site_id' => $site?->id,
+                         'route_id' => $route?->id,
+                     ],
+                         Arr::except($data, [
+@@ -369,66 +368,28 @@ public function sync(int $personId, array $validatedData): void
+      */
+     private function cleanupRelations(Immunization $existing): void
+     {
+-        if ($existing->vaccineCode) {
+-            $existing->vaccineCode->coding()->delete();
+-            $existing->vaccineCode->delete();
+-        }
+-
+-        if ($existing->context) {
+-            $existing->context->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
+-            $existing->context->type()->delete();
+-            $existing->context->delete();
+-        }
+-
+-        if ($existing->performer) {
+-            $existing->performer->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
+-            $existing->performer->type()->delete();
+-            $existing->performer->delete();
+-        }
+-
+-        if ($existing->reportOrigin) {
+-            $existing->reportOrigin->coding()->delete();
+-            $existing->reportOrigin->delete();
+-        }
+-
+-        if ($existing->site) {
+-            $existing->site->coding()->delete();
+-            $existing->site->delete();
+-        }
+-
+-        if ($existing->route) {
+-            $existing->route->coding()->delete();
+-            $existing->route->delete();
+-        }
+-
++        RelationshipCleaner::cleanRelations($existing, [
++            'context' => 'identifier',
++            'performer' => 'identifier',
++            'vaccineCode' => 'codeable_concept',
++            'reportOrigin' => 'codeable_concept',
++            'site' => 'codeable_concept',
++            'route' => 'codeable_concept',
++        ]);
++
++        // Handle complex nested collections
+         foreach ($existing->explanations as $explanation) {
+-            if ($explanation->reasons) {
+-                $explanation->reasons->coding()->delete();
+-                $explanation->reasons->delete();
+-            }
+-            if ($explanation->reasonsNotGiven) {
+-                $explanation->reasonsNotGiven->coding()->delete();
+-                $explanation->reasonsNotGiven->delete();
+-            }
++            RelationshipCleaner::cleanCodeableConceptRelation($explanation->reasons);
++            RelationshipCleaner::cleanCodeableConceptRelation($explanation->reasonsNotGiven);
+         }
+ 
+         foreach ($existing->vaccinationProtocols as $protocol) {
+-            if ($protocol->authority) {
+-                $protocol->authority->coding()->delete();
+-                $protocol->authority->delete();
+-            }
+-            foreach ($protocol->targetDiseases as $targetDisease) {
+-                $targetDisease->coding()->delete();
+-                $targetDisease->delete();
+-            }
++            RelationshipCleaner::cleanCodeableConceptRelation($protocol->authority);
++            RelationshipCleaner::cleanCodeableConceptCollection($protocol->targetDiseases);
+         }
+ 
+         foreach ($existing->reactions as $reaction) {
+-            if ($reaction->detail) {
+-                $reaction->detail->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
+-                $reaction->detail->type()->delete();
+-                $reaction->detail->delete();
+-            }
++            RelationshipCleaner::cleanIdentifierRelation($reaction->detail);
+         }
+     }
+ }
+diff --git a/app/Repositories/MedicalEvents/ObservationRepository.php b/app/Repositories/MedicalEvents/ObservationRepository.php
+index 890a2ff..0d46249 100644
+--- a/app/Repositories/MedicalEvents/ObservationRepository.php
++++ b/app/Repositories/MedicalEvents/ObservationRepository.php
+@@ -6,7 +6,6 @@
+ 
+ use App\Classes\eHealth\Api\PatientApi;
+ use App\Core\Arr;
+-use App\Models\MedicalEvents\Sql\CodeableConcept;
+ use App\Models\MedicalEvents\Sql\Observation;
+ use App\Models\MedicalEvents\Sql\ObservationComponent;
+ use App\Models\MedicalEvents\Sql\Quantity;
+@@ -429,7 +428,10 @@ public function sync(int $personId, array $validatedData): void
+                             'device',
+                             'interpretation',
+                             'body_site',
+-                            'method'
++                            'method',
++                            'reference_ranges',
++                            'categories',
++                            'components'
+                         ])
+                     )
+                 );
+@@ -485,84 +487,26 @@ public function sync(int $personId, array $validatedData): void
+      */
+     private function cleanupRelations(Observation $existing): void
+     {
+-        if ($existing->code) {
+-            $existing->code->coding()->delete();
+-            $existing->code->delete();
+-        }
+-
+-        if ($existing->context) {
+-            $existing->context->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
+-            $existing->context->type()->delete();
+-            $existing->context->delete();
+-        }
+-
+-        if ($existing->performer) {
+-            $existing->performer->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
+-            $existing->performer->type()->delete();
+-            $existing->performer->delete();
+-        }
+-
+-        if ($existing->reportOrigin) {
+-            $existing->reportOrigin->coding()->delete();
+-            $existing->reportOrigin->delete();
+-        }
+-
+-        if ($existing->diagnosticReport) {
+-            $existing->diagnosticReport->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
+-            $existing->diagnosticReport->type()->delete();
+-            $existing->diagnosticReport->delete();
+-        }
+-
+-        if ($existing->specimen) {
+-            $existing->specimen->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
+-            $existing->specimen->type()->delete();
+-            $existing->specimen->delete();
+-        }
+-
+-        if ($existing->device) {
+-            $existing->device->type->each(fn (CodeableConcept $cc) => $cc->coding()->delete());
+-            $existing->device->type()->delete();
+-            $existing->device->delete();
+-        }
+-
+-        if ($existing->interpretation) {
+-            $existing->interpretation->coding()->delete();
+-            $existing->interpretation->delete();
+-        }
+-
+-        if ($existing->bodySite) {
+-            $existing->bodySite->coding()->delete();
+-            $existing->bodySite->delete();
+-        }
+-
+-        if ($existing->method) {
+-            $existing->method->coding()->delete();
+-            $existing->method->delete();
+-        }
+-
+-        if ($existing->valueCodeableConcept) {
+-            $existing->valueCodeableConcept->coding()->delete();
+-            $existing->valueCodeableConcept->delete();
+-        }
+-
+-        foreach ($existing->categories as $category) {
+-            $category->coding()->delete();
+-            $category->delete();
+-        }
+-
++        RelationshipCleaner::cleanRelations($existing, [
++            'context' => 'identifier',
++            'performer' => 'identifier',
++            'diagnosticReport' => 'identifier',
++            'specimen' => 'identifier',
++            'device' => 'identifier',
++            'code' => 'codeable_concept',
++            'reportOrigin' => 'codeable_concept',
++            'interpretation' => 'codeable_concept',
++            'bodySite' => 'codeable_concept',
++            'method' => 'codeable_concept',
++            'valueCodeableConcept' => 'codeable_concept',
++            'categories' => 'codeable_concept_collection',
++        ]);
++
++        // Handle components
+         foreach ($existing->components as $component) {
+-            if ($component->code) {
+-                $component->code->coding()->delete();
+-                $component->code->delete();
+-            }
+-            if ($component->interpretation) {
+-                $component->interpretation->coding()->delete();
+-                $component->interpretation->delete();
+-            }
+-            if ($component->valueCodeableConcept) {
+-                $component->valueCodeableConcept->coding()->delete();
+-                $component->valueCodeableConcept->delete();
+-            }
++            RelationshipCleaner::cleanCodeableConceptRelation($component->code);
++            RelationshipCleaner::cleanCodeableConceptRelation($component->interpretation);
++            RelationshipCleaner::cleanCodeableConceptRelation($component->valueCodeableConcept);
+         }
+     }
+ }
+diff --git a/app/Repositories/MedicalEvents/PaperReferralRepository.php b/app/Repositories/MedicalEvents/PaperReferralRepository.php
+index 8d63ede..2135418 100644
+--- a/app/Repositories/MedicalEvents/PaperReferralRepository.php
++++ b/app/Repositories/MedicalEvents/PaperReferralRepository.php
+@@ -12,6 +12,25 @@
+ 
+ class PaperReferralRepository extends BaseRepository
+ {
++    /**
++     * Sync paper referral data for provided model (delete existing and store new).
++     *
++     * @param  array  $data
++     * @param  Model  $parent
++     * @return mixed
++     * @throws Throwable
++     */
++    public function sync(array $data, Model $parent): mixed
++    {
++        return DB::transaction(static function () use ($data, $parent) {
++            // Delete existing paper referrals
++            $parent->paperReferral()->delete();
++
++            // Create new paper referral directly without field mapping
++            return $parent->paperReferral()->create($data);
++        });
++    }
++
+     /**
+      * Store paper referral data for provided model.
+      *
+diff --git a/app/Repositories/MedicalEvents/RelationshipCleaner.php b/app/Repositories/MedicalEvents/RelationshipCleaner.php
+new file mode 100644
+index 0000000..320f0c3
+--- /dev/null
++++ b/app/Repositories/MedicalEvents/RelationshipCleaner.php
+@@ -0,0 +1,85 @@
++<?php
++
++declare(strict_types=1);
++
++namespace App\Repositories\MedicalEvents;
++
++use App\Models\MedicalEvents\Sql\CodeableConcept;
++use Illuminate\Database\Eloquent\Collection;
++use Illuminate\Database\Eloquent\Model;
++
++class RelationshipCleaner
++{
++    /**
++     * Clean up identifier-based relationship (identifier -> type -> coding).
++     */
++    public static function cleanIdentifierRelation(?Model $relation): void
++    {
++        if (!$relation) {
++            return;
++        }
++
++        $relation->type->each(function (CodeableConcept $codeableConcept) {
++            $codeableConcept->coding()->delete();
++        });
++        $relation->type()->delete();
++        $relation->delete();
++    }
++
++    /**
++     * Clean up codeable concept relationship (coding directly attached).
++     */
++    public static function cleanCodeableConceptRelation(?Model $relation): void
++    {
++        if (!$relation) {
++            return;
++        }
++
++        $relation->coding()->delete();
++        $relation->delete();
++    }
++
++    /**
++     * Clean up collection of codeable concept relationships.
++     */
++    public static function cleanCodeableConceptCollection(Collection $collection): void
++    {
++        foreach ($collection as $item) {
++            self::cleanCodeableConceptRelation($item);
++        }
++    }
++
++    /**
++     * Clean up performer/interpreter type relationships (with reference).
++     */
++    public static function cleanPerformerRelation(?Model $relation): void
++    {
++        if (!$relation || !$relation->reference) {
++            return;
++        }
++
++        $relation->reference->type->each(function (CodeableConcept $codeableConcept) {
++            $codeableConcept->coding()->delete();
++        });
++        $relation->reference->type()->delete();
++        $relation->reference->delete();
++    }
++
++    /**
++     * Clean up multiple relationship types in batch.
++     */
++    public static function cleanRelations(Model $model, array $relationshipMap): void
++    {
++        foreach ($relationshipMap as $relationName => $type) {
++            $relation = $model->{$relationName};
++
++            match ($type) {
++                'identifier' => self::cleanIdentifierRelation($relation),
++                'codeable_concept' => self::cleanCodeableConceptRelation($relation),
++                'codeable_concept_collection' => self::cleanCodeableConceptCollection($relation),
++                'performer' => self::cleanPerformerRelation($relation),
++                default => null
++            };
++        }
++    }
++}
+diff --git a/database/migrations/install/2025_12_10_000076_create_diagnostic_reports_table.php b/database/migrations/install/2025_12_10_000076_create_diagnostic_reports_table.php
+index d344ff1..8288a33 100644
+--- a/database/migrations/install/2025_12_10_000076_create_diagnostic_reports_table.php
++++ b/database/migrations/install/2025_12_10_000076_create_diagnostic_reports_table.php
+@@ -2,6 +2,7 @@
+ 
+ declare(strict_types=1);
+ 
++use App\Enums\Person\DiagnosticReportStatus;
+ use Illuminate\Database\Migrations\Migration;
+ use Illuminate\Database\Schema\Blueprint;
+ use Illuminate\Support\Facades\Schema;
+@@ -16,9 +17,10 @@ public function up(): void
+         Schema::create('diagnostic_reports', static function (Blueprint $table) {
+             $table->id();
+             $table->uuid()->unique();
++            $table->foreignId('person_id')->constrained('persons');
+             $table->foreignId('encounter_internal_id')->nullable()->constrained('encounters');
+             $table->foreignId('based_on_id')->nullable()->constrained('identifiers');
+-            $table->enum('status', ['final', 'entered_in_error']);
++            $table->enum('status', DiagnosticReportStatus::values());
+             $table->foreignId('code_id')->constrained('identifiers');
+             $table->timestamp('effective_date_time')->nullable();
+             $table->timestamp('issued');
+diff --git a/database/migrations/update/0_1/2026_03_31_124801_update_diagnostic_reports_table.php b/database/migrations/update/0_1/2026_03_31_124801_update_diagnostic_reports_table.php
+new file mode 100644
+index 0000000..f0921e3
+--- /dev/null
++++ b/database/migrations/update/0_1/2026_03_31_124801_update_diagnostic_reports_table.php
+@@ -0,0 +1,67 @@
++<?php
++
++declare(strict_types=1);
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\Schema;
++
++return new class extends Migration
++{
++    /**
++     * Run the migrations.
++     */
++    public function up(): void
++    {
++        Schema::table('diagnostic_reports', function (Blueprint $table) {
++            if (!Schema::hasColumn('diagnostic_reports', 'person_id')) {
++                $table->foreignId('person_id')->after('uuid')->constrained('persons');
++            }
++            if (!Schema::hasColumn('diagnostic_reports', 'origin_episode_id')) {
++                $table->foreignId('origin_episode_id')->after('encounter_id')->nullable()->constrained('identifiers');
++            }
++            if (!Schema::hasColumn('diagnostic_reports', 'explanatory_letter')) {
++                $table->string('explanatory_letter')->after('report_origin_id')->nullable();
++            }
++            if (!Schema::hasColumn('diagnostic_reports', 'cancellation_reason_id')) {
++                $table->foreignId('cancellation_reason_id')->after('explanatory_letter')->nullable()->constrained('codeable_concepts');
++            }
++            if (!Schema::hasColumn('diagnostic_reports', 'ehealth_inserted_at')) {
++                $table->timestamp('ehealth_inserted_at')->nullable()->after('cancellation_reason_id');
++            }
++            if (!Schema::hasColumn('diagnostic_reports', 'ehealth_updated_at')) {
++                $table->timestamp('ehealth_updated_at')->nullable()->after('ehealth_inserted_at');
++            }
++        });
++    }
++
++    /**
++     * Reverse the migrations.
++     */
++    public function down(): void
++    {
++        Schema::table('diagnostic_reports', function (Blueprint $table) {
++            if (Schema::hasColumn('diagnostic_reports', 'person_id')) {
++                $table->dropForeign(['person_id']);
++                $table->dropColumn('person_id');
++            }
++            if (Schema::hasColumn('diagnostic_reports', 'origin_episode_id')) {
++                $table->dropForeign(['origin_episode_id']);
++                $table->dropColumn('origin_episode_id');
++            }
++            if (Schema::hasColumn('diagnostic_reports', 'explanatory_letter')) {
++                $table->dropColumn('explanatory_letter');
++            }
++            if (Schema::hasColumn('diagnostic_reports', 'cancellation_reason_id')) {
++                $table->dropForeign(['cancellation_reason_id']);
++                $table->dropColumn('cancellation_reason_id');
++            }
++            if (Schema::hasColumn('diagnostic_reports', 'ehealth_inserted_at')) {
++                $table->dropColumn('ehealth_inserted_at');
++            }
++            if (Schema::hasColumn('diagnostic_reports', 'ehealth_updated_at')) {
++                $table->dropColumn('ehealth_updated_at');
++            }
++        });
++    }
++};
+diff --git a/database/migrations/update/0_1/2026_03_31_181659_create_diagnostic_report_specimens_table.php b/database/migrations/update/0_1/2026_03_31_181659_create_diagnostic_report_specimens_table.php
+new file mode 100644
+index 0000000..0402f1f
+--- /dev/null
++++ b/database/migrations/update/0_1/2026_03_31_181659_create_diagnostic_report_specimens_table.php
+@@ -0,0 +1,31 @@
++<?php
++
++declare(strict_types=1);
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\Schema;
++
++return new class extends Migration
++{
++    /**
++     * Run the migrations.
++     */
++    public function up(): void
++    {
++        Schema::create('diagnostic_report_specimens', static function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('diagnostic_report_id')->constrained()->cascadeOnDelete();
++            $table->foreignId('identifier_id')->constrained('identifiers')->cascadeOnDelete();
++            $table->timestamps();
++        });
++    }
++
++    /**
++     * Reverse the migrations.
++     */
++    public function down(): void
++    {
++        Schema::dropIfExists('diagnostic_report_specimens');
++    }
++};
+diff --git a/database/migrations/update/0_1/2026_03_31_181734_create_diagnostic_report_used_references_table.php b/database/migrations/update/0_1/2026_03_31_181734_create_diagnostic_report_used_references_table.php
+new file mode 100644
+index 0000000..eb6e1a6
+--- /dev/null
++++ b/database/migrations/update/0_1/2026_03_31_181734_create_diagnostic_report_used_references_table.php
+@@ -0,0 +1,31 @@
++<?php
++
++declare(strict_types=1);
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\Schema;
++
++return new class extends Migration
++{
++    /**
++     * Run the migrations.
++     */
++    public function up(): void
++    {
++        Schema::create('diagnostic_report_used_references', static function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('diagnostic_report_id')->constrained()->cascadeOnDelete();
++            $table->foreignId('identifier_id')->constrained('identifiers')->cascadeOnDelete();
++            $table->timestamps();
++        });
++    }
++
++    /**
++     * Reverse the migrations.
++     */
++    public function down(): void
++    {
++        Schema::dropIfExists('diagnostic_report_used_references');
++    }
++};
+diff --git a/resources/lang/uk/patients.php b/resources/lang/uk/patients.php
+index 2aba561..8abf29b 100644
+--- a/resources/lang/uk/patients.php
++++ b/resources/lang/uk/patients.php
+@@ -199,7 +199,8 @@
+         'active' => 'Діючий',
+         'closed' => 'Завершений',
+         'entered_in_error' => 'Внесений помилково',
+-        'valid' => 'Дійсний'
++        'valid' => 'Дійсний',
++        'final' => 'Кінцева'
+     ],
+ 
+     'source' => [
+@@ -501,5 +502,6 @@
+         'clinical_impressions_synced_successfully' => 'Клінічні взаємодії успішно синхронізовані',
+         'immunizations_synced_successfully' => 'Вакцинації успішно синхронізовані',
+         'observations_synced_successfully' => 'Обстеження успішно синхронізовані',
++        'diagnostic_reports_synced_successfully' => 'Діагностичні звіти успішно синхронізовані',
+     ]
+ ];

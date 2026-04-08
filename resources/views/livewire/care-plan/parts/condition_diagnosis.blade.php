@@ -1,6 +1,6 @@
 <fieldset class="fieldset">
     <legend class="legend px-2 text-lg font-bold text-slate-900">
-        {{ __('treatment-plan.condition/diagnosis') }}
+        {{ __('care-plan.condition/diagnosis') }}
     </legend>
 
     <div class="mt-4">
@@ -8,26 +8,31 @@
             <thead>
             <tr class="bg-gray-50/50">
                 <th class="py-3 px-4 text-xs font-semibold uppercase tracking-wider text-gray-500 border-b border-gray-100">
-                    {{ __('treatment-plan.date') }}
+                    {{ __('care-plan.date') }}
                 </th>
                 <th class="py-3 px-4 text-xs font-semibold uppercase tracking-wider text-gray-500 border-b border-gray-100">
-                    {{ __('treatment-plan.name') }}
+                    {{ __('care-plan.name') }}
                 </th>
             </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
-            <tr>
-                <td class="py-4 px-4 text-sm text-gray-700">02.05.2025</td>
-                <td class="py-4 px-4 text-sm text-gray-900 font-medium">A10 Кровотеча / геморагія БДУ</td>
-            </tr>
 
-            <template x-for="(item, index) in items" :key="index">
+            @forelse($diagnoses as $item)
                 <tr>
-                    <td class="py-4 px-4 text-sm text-gray-700" x-text="item.date"></td>
-                    <td class="py-4 px-4 text-sm text-gray-900 font-medium" x-text="item.name"></td>
+                    <td class="py-4 px-4 text-sm text-gray-700">{{ $item['date'] }}</td>
+                    <td class="py-4 px-4 text-sm text-gray-900 font-medium">{{ $item['name'] }}</td>
                 </tr>
-            </template>
+            @empty
+                <tr>
+                    <td colspan="2" class="py-4 px-4 text-sm text-gray-400 text-center">
+                        {{ __('care-plan.no_diagnoses') }}
+                    </td>
+                </tr>
+            @endforelse
             </tbody>
         </table>
     </div>
+    @error('form.encounter')
+    <p class="text-error mt-2">{{ $message }}</p>
+    @enderror
 </fieldset>

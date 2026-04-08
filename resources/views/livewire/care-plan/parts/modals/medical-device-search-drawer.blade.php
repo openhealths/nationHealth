@@ -28,7 +28,7 @@
      x-data="{ showFilter: false }"
 >
     <h3 class="modal-header">
-        {{ __('treatment-plan.medical_device_search') }}
+        {{ __('care-plan.medical_device_search') }}
     </h3>
 
     {{-- Search Input --}}
@@ -39,7 +39,7 @@
             </div>
             <input type="text"
                    class="input peer ps-10 w-full"
-                   placeholder="{{ __('treatment-plan.test_strips') }}"
+                   placeholder="{{ __('care-plan.test_strips') }}"
             />
         </div>
     </div>
@@ -66,18 +66,18 @@
     <div x-show="showFilter" x-cloak x-transition class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div class="form-group group">
             <label class="label">
-                {{ __('treatment-plan.medical_device_type') }}
+                {{ __('care-plan.medical_device_type') }}
             </label>
             <select class="input-select peer w-full">
-                <option selected value="">{{ __('treatment-plan.glucose_test_reagent') }}</option>
+                <option selected value="">{{ __('care-plan.glucose_test_reagent') }}</option>
             </select>
         </div>
         <div class="form-group group">
             <label class="label">
-                {{ __('treatment-plan.medical_device_model_number') }}
+                {{ __('care-plan.medical_device_model_number') }}
             </label>
             <select class="input-select peer w-full">
-                <option selected value="">{{ __('treatment-plan.yes') }}</option>
+                <option selected value="">{{ __('care-plan.yes') }}</option>
             </select>
         </div>
     </div>
@@ -87,23 +87,23 @@
         <table class="w-full text-sm text-left">
             <thead class="thead-input">
                 <tr>
-                    <th scope="col" class="px-4 py-3 font-medium">{{ __('treatment-plan.name') }}</th>
-                    <th scope="col" class="px-4 py-3 font-medium">{{ __('treatment-plan.type') }}</th>
-                    <th scope="col" class="px-4 py-3 font-medium">{{ __('treatment-plan.packaging') }}</th>
-                    <th scope="col" class="px-4 py-3 font-medium">{{ __('treatment-plan.program_participants') }}</th>
-                    <th scope="col" class="px-4 py-3 font-medium">{{ __('treatment-plan.action') }}</th>
+                    <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.name') }}</th>
+                    <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.type') }}</th>
+                    <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.packaging') }}</th>
+                    <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.program_participants') }}</th>
+                    <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.action') }}</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
                     <td class="px-4 py-3">
-                        <span class="font-medium text-gray-900 dark:text-white">{{ __('treatment-plan.glucose_test_reagent') }}</span>
+                        <span class="font-medium text-gray-900 dark:text-white">{{ __('care-plan.glucose_test_reagent') }}</span>
                     </td>
                     <td class="px-4 py-3 text-gray-500">
-                        {{ __('treatment-plan.medical_device_for_glucose') }}
+                        {{ __('care-plan.medical_device_for_glucose') }}
                     </td>
                     <td class="px-4 py-3 text-gray-500">
-                        {{ __('treatment-plan.box_50_pieces') }}
+                        {{ __('care-plan.box_50_pieces') }}
                     </td>
                     <td class="px-4 py-3">
                         <div class="flex flex-col gap-1">

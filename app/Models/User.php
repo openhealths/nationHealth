@@ -128,6 +128,28 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->belongsTo(Party::class);
     }
 
+    /**
+     * Get the active employee for the user in the current legal entity.
+     *
+     * @return Employee|null
+     */
+    public function activeEmployee(): ?Employee
+    {
+        if (!config('permission.teams')) {
+            return $this->employees()->first();
+        }
+
+        $teamId = getPermissionsTeamId();
+
+        if (!$teamId) {
+            return null;
+        }
+
+        return $this->employees()
+            ->where('legal_entity_id', $teamId)
+            ->first();
+    }
+
     public function employeeRequests(): HasMany
     {
         return $this->hasMany(EmployeeRequest::class);
