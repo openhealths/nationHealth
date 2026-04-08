@@ -77,8 +77,8 @@
                     {{ __('patients.prescriptions') }}
                 </a>
 
-                <a href="javascript:void(0)"
-                   class="summary-tab summary-tab-inactive cursor-not-allowed opacity-60"
+                <a href="{{ route('persons.diagnostic-reports', [legalEntity(), 'id' => $id]) }}"
+                   class="summary-tab {{ request()->routeIs('persons.diagnostic-reports') ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                 >
                     {{ __('patients.diagnostic_reports') }}
                 </a>

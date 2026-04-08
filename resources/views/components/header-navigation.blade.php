@@ -55,7 +55,7 @@ if (empty($breadcrumbs)) {
             <div class="w-full flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div class="page-header-content min-w-0">
                     @if($title)
-                        <h1 class="page-title">{{ $title }}</h1>
+                        <h1 class="page-title !mb-0">{{ $title }}</h1>
                     @endif
                     @if($description)
                         <p class="page-description">{{ $description }}</p>

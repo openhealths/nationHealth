@@ -181,6 +181,7 @@ return [
         'new' => 'Новий',
         'approved' => 'Підтверджений',
         'signed' => 'Підписаний',
+        'signed_status' => 'Підписано',
         'cancelled' => 'Скасований',
         'completed' => 'Завершений',
         'expired' => 'Прострочений',
@@ -254,11 +255,15 @@ return [
 
     // Diagnoses record
     'diagnoses_search' => 'Пошук діагнозів',
+    'diagnostic_reports_search' => 'Пошук діагностичних звітів',
     'diagnoses' => 'Діагнози',
     // Observations record
     'observations' => 'Обстеження',
     'condition_search' => 'Пошук станів',
     'vaccination_search' => 'Пошук вакцинації',
+    'visual_studies' => 'Візуальні дослідження',
+    'doctor_conclusion' => 'Заключення лікаря',
+    'performed_status' => 'Виконано',
 
     // Encounter
     'encounters' => 'Взаємодії',
