@@ -27,6 +27,7 @@ return [
     'icpc-2_status_code' => 'Код стану за ICPC-2',
     'code_and_name' => 'Код та назва',
     'diagnoses' => 'Діагнози',
+    'encounter_search' => 'Пошук взаємодій',
     'observation' => 'Обстеження',
     'information_source' => 'Джерело інформації',
     'other_source' => 'Інше джерело',

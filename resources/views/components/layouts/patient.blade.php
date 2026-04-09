@@ -83,6 +83,12 @@
                     {{ __('patients.diagnostic_reports') }}
                 </a>
 
+                <a href="{{ route('persons.encounters', [legalEntity(), 'id' => $id]) }}"
+                   class="summary-tab {{ request()->routeIs('persons.encounters') ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                >
+                    {{ __('patients.encounters') }}
+                </a>
+
                 <button type="button"
                         class="inline-flex items-center px-2 py-1.5 text-gray-900 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors ml-1"
                 >
