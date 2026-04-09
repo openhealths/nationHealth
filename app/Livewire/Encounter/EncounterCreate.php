@@ -32,9 +32,9 @@ class EncounterCreate extends EncounterComponent
 {
     use HandlesReasonReferences;
 
-    public function mount(LegalEntity $legalEntity, int $id): void
+    public function mount(LegalEntity $legalEntity, int $patientId): void
     {
-        $this->initializeComponent($id);
+        $this->initializeComponent($patientId);
 
         $uuid = Auth::user()->party->employees()->whereStatus('APPROVED')->first()->uuid;
 
