@@ -36,7 +36,7 @@
             <li>
                 <a href="#immunizations-section" class="encounter-nav-item">
                     @icon('shield', 'w-6 h-6 dark:text-white')
-                    <p class="default-p">{{ __('patients.vaccinations') }}</p>
+                    <p class="default-p">{{ __('patients.immunizations') }}</p>
                 </a>
             </li>
             <li>

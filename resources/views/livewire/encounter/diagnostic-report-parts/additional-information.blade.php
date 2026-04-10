@@ -152,7 +152,7 @@
                        autocomplete="off"
                 >
                 <label for="issuedDate" class="wrapped-label">
-                    {{ __('patients.date_and_time_of_entry') }}
+                    {{ __('patients.date_time_entered') }}
                 </label>
 
                 @error('form.diagnosticReport.issuedDate')

@@ -424,10 +424,6 @@ class EncounterRepository extends BaseRepository
             $observation['id'] = Str::uuid()->toString();
             $observation['status'] = 'valid';
 
-            if (isset($observation['dictionaryName'])) {
-                unset($observation['dictionaryName']);
-            }
-
             $observation['effectiveDateTime'] = convertToEHealthISO8601($observation['effectiveDate'] . ' ' . $observation['effectiveTime']);
             unset($observation['effectiveDate'], $observation['effectiveTime']);
 
@@ -461,12 +457,16 @@ class EncounterRepository extends BaseRepository
                 $observation['valueCodeableConcept'] = [
                     'coding' => [
                         [
-                            'system' => 'eHealth/' . $observation['code']['coding'][0]['code'],
+                            'system' => $observation['dictionaryName'],
                             'code' => $observation['valueCodeableConcept'],
                         ]
                     ],
                     'text' => ''
                 ];
+            }
+
+            if (isset($observation['dictionaryName'])) {
+                unset($observation['dictionaryName']);
             }
 
             // combine date&time

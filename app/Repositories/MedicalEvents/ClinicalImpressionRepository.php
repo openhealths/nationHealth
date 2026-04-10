@@ -391,7 +391,14 @@ class ClinicalImpressionRepository extends BaseRepository
             $supportingInfoIds = $orphaned->flatMap->supportingInfo->pluck('id')->toArray();
             $findingsIds = $orphaned->flatMap->findings->pluck('item_reference_id')->toArray();
 
-            $identifierIds = array_merge($encounterIds, $assessorIds, $previousIds, $problemsIds, $supportingInfoIds, $findingsIds);
+            $identifierIds = array_merge(
+                $encounterIds,
+                $assessorIds,
+                $previousIds,
+                $problemsIds,
+                $supportingInfoIds,
+                $findingsIds
+            );
 
             $identifierCodeableConceptIds = CodeableConcept::whereCodeableConceptableType(Identifier::class)
                 ->whereIn('codeable_conceptable_id', $identifierIds)

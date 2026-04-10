@@ -55,7 +55,7 @@
 
     <div class="mt-12">
         <div class="flex gap-20 md:mb-5 mb-4">
-            <h2 class="default-p font-bold">{{ __('patients.has_it_been_done') }}</h2>
+            <h2 class="default-p font-bold">{{ __('patients.was_performed') }}</h2>
             <div class="flex items-center">
                 <input x-model="modalImmunization.notGiven"
                        @change="modalImmunization.notGiven = false"

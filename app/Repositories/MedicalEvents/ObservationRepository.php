@@ -6,6 +6,9 @@ namespace App\Repositories\MedicalEvents;
 
 use App\Classes\eHealth\Api\PatientApi;
 use App\Core\Arr;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
+use App\Models\MedicalEvents\Sql\Coding;
+use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\ObservationComponent;
 use App\Models\MedicalEvents\Sql\Quantity;
@@ -336,88 +339,57 @@ class ObservationRepository extends BaseRepository
     public function sync(int $personId, array $validatedData): void
     {
         DB::transaction(function () use ($personId, $validatedData) {
-            // Load existing observations with relations
-            $uuids = collect($validatedData)->pluck('uuid')->toArray();
-            $existingObservations = $this->model::whereIn('uuid', $uuids)
+            // Get UUIDs from API data
+            $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
+
+            $existingObservations = $this->model::whereIn('uuid', $apiUuids)
                 ->withAllRelations()
                 ->get()
                 ->keyBy('uuid');
 
+            // Delete observations and relationships that exist in DB but not in API response
+            $this->deleteOrphaned($personId, $apiUuids);
+
             foreach ($validatedData as $data) {
                 $existing = $existingObservations->get($data['uuid']);
 
-                // Store relationships
-                $code = Repository::codeableConcept()->store($data['code']);
-
-                $context = null;
-                if (isset($data['context'])) {
-                    $context = Repository::identifier()->store($data['context']['identifier']['value']);
-                    Repository::codeableConcept()->attach($context, $data['context']);
-                }
-
-                $performer = null;
-                if (isset($data['performer'])) {
-                    $performer = Repository::identifier()->store($data['performer']['identifier']['value']);
-                    Repository::codeableConcept()->attach($performer, $data['performer']);
-                }
-
-                $reportOrigin = null;
-                if (isset($data['report_origin'])) {
-                    $reportOrigin = Repository::codeableConcept()->store($data['report_origin']);
-                }
-
-                $diagnosticReport = null;
-                if (isset($data['diagnostic_report'])) {
-                    $diagnosticReport = Repository::identifier()->store(
-                        $data['diagnostic_report']['identifier']['value']
-                    );
-                    Repository::codeableConcept()->attach($diagnosticReport, $data['diagnostic_report']);
-                }
-
-                $specimen = null;
-                if (isset($data['specimen'])) {
-                    $specimen = Repository::identifier()->store($data['specimen']['identifier']['value']);
-                    Repository::codeableConcept()->attach($specimen, $data['specimen']);
-                }
-
-                $device = null;
-                if (isset($data['device'])) {
-                    $device = Repository::identifier()->store($data['device']['identifier']['value']);
-                    Repository::codeableConcept()->attach($device, $data['device']);
-                }
-
-                $interpretation = null;
-                if (isset($data['interpretation'])) {
-                    $interpretation = Repository::codeableConcept()->store($data['interpretation']);
-                }
-
-                $bodySite = null;
-                if (isset($data['body_site'])) {
-                    $bodySite = Repository::codeableConcept()->store($data['body_site']);
-                }
-
-                $method = null;
-                if (isset($data['method'])) {
-                    $method = Repository::codeableConcept()->store($data['method']);
-                }
+                // Sync relationships
+                $code = $this->syncCodeableConcept($existing, $data['code'], 'code');
+                $context = $this->syncIdentifier($existing, $data['context'] ?? null, 'context');
+                $performer = $this->syncIdentifier($existing, $data['performer'] ?? null, 'performer');
+                $reportOrigin = $this->syncCodeableConcept($existing, $data['report_origin'] ?? null, 'reportOrigin');
+                $diagnosticReport = $this->syncIdentifier(
+                    $existing,
+                    $data['diagnostic_report'] ?? null,
+                    'diagnosticReport'
+                );
+                $specimen = $this->syncIdentifier($existing, $data['specimen'] ?? null, 'specimen');
+                $device = $this->syncIdentifier($existing, $data['device'] ?? null, 'device');
+                $interpretation = $this->syncCodeableConcept(
+                    $existing,
+                    $data['interpretation'] ?? null,
+                    'interpretation'
+                );
+                $bodySite = $this->syncCodeableConcept($existing, $data['body_site'] ?? null, 'bodySite');
+                $method = $this->syncCodeableConcept($existing, $data['method'] ?? null, 'method');
 
                 // Create or update main observation
                 $observation = $this->model::updateOrCreate(
                     ['uuid' => $data['uuid']],
                     array_merge(
                         [
-                        'person_id' => $personId,
-                        'code_id' => $code->id,
-                        'context_id' => $context?->id,
-                        'performer_id' => $performer?->id,
-                        'report_origin_id' => $reportOrigin?->id,
-                        'diagnostic_report_id' => $diagnosticReport?->id,
-                        'specimen_id' => $specimen?->id,
-                        'device_id' => $device?->id,
-                        'interpretation_id' => $interpretation?->id,
-                        'body_site_id' => $bodySite?->id,
-                        'method_id' => $method?->id
-                    ],
+                            'person_id' => $personId,
+                            'code_id' => $code->id,
+                            'context_id' => $context?->id,
+                            'performer_id' => $performer?->id,
+                            'report_origin_id' => $reportOrigin?->id,
+                            'diagnostic_report_id' => $diagnosticReport?->id,
+                            'specimen_id' => $specimen?->id,
+                            'device_id' => $device?->id,
+                            'interpretation_id' => $interpretation?->id,
+                            'body_site_id' => $bodySite?->id,
+                            'method_id' => $method?->id
+                        ],
                         Arr::except($data, [
                             'code',
                             'context',
@@ -436,77 +408,165 @@ class ObservationRepository extends BaseRepository
                     )
                 );
 
-                // Sync categories (many-to-many relationship)
-                $categoriesIds = [];
-                if (isset($data['categories'])) {
-                    foreach ($data['categories'] as $categoryData) {
-                        $category = Repository::codeableConcept()->store($categoryData);
-                        $categoriesIds[] = $category->id;
-                    }
-                }
-                $observation->categories()->sync($categoriesIds);
+                // Sync categories
+                $categoryIds = $this->syncCodeableConcepts($existing, $data['categories'], 'categories');
+                $observation->categories()->sync($categoryIds);
 
                 // Sync components
-                $observation->components()->delete();
-                if (isset($data['components'])) {
-                    foreach ($data['components'] as $componentData) {
-                        $componentCode = Repository::codeableConcept()->store($componentData['code']);
-
-                        $componentInterpretation = null;
-                        if (isset($componentData['interpretation'])) {
-                            $componentInterpretation = Repository::codeableConcept()->store(
-                                $componentData['interpretation']
-                            );
-                        }
-
-                        $componentValueCodeableConcept = Repository::codeableConcept()
-                            ->store($componentData['value_codeable_concept']);
-
-                        ObservationComponent::create([
-                            'observation_id' => $observation->id,
-                            'code_id' => $componentCode->id,
-                            'interpretation_id' => $componentInterpretation?->id,
-                            'value_codeable_concept_id' => $componentValueCodeableConcept->id
-                        ]);
-                    }
-                }
-
-                // Cleanup old relationships after all updates are done
-                if ($existing) {
-                    $this->cleanupRelations($existing);
-                }
+                $this->syncComponents($observation, $existing, $data['components'] ?? []);
             }
         });
     }
 
     /**
-     * Remove orphaned relations after observation FK update.
+     * Cascade delete.
      *
-     * @param  Observation  $existing
+     * @param  int  $personId
+     * @param  array  $apiUuids
+     * @return void
+     * @throws Throwable
+     */
+    private function deleteOrphaned(int $personId, array $apiUuids): void
+    {
+        $orphaned = $this->model->where('person_id', $personId)
+            ->whereNotNull('uuid')
+            ->whereNotIn('uuid', $apiUuids)
+            ->withAllRelations()
+            ->get();
+
+        if ($orphaned->isEmpty()) {
+            return;
+        }
+
+        DB::transaction(static function () use ($orphaned) {
+            $diagnosticReportIds = $orphaned->pluck('diagnostic_report_id')->filter()->toArray();
+            $contextIds = $orphaned->pluck('context_id')->filter()->toArray();
+            $categoriesIds = $orphaned->flatMap->categories->pluck('id')->toArray();
+            $codeIds = $orphaned->pluck('code_id')->filter()->toArray();
+            $performerIds = $orphaned->pluck('performer_id')->filter()->toArray();
+            $reportOriginIds = $orphaned->pluck('report_origin_id')->filter()->toArray();
+            $interpretationIds = $orphaned->pluck('interpretation_id')->filter()->toArray();
+            $bodySiteIds = $orphaned->pluck('body_site_id')->filter()->toArray();
+            $methodIds = $orphaned->pluck('method_id')->filter()->toArray();
+            $specimeIds = $orphaned->pluck('specime_id')->filter()->toArray();
+            $deviceIds = $orphaned->pluck('device_id')->filter()->toArray();
+
+            // Components
+            $components = $orphaned->flatMap->components;
+            $componentIds = $components->pluck('id')->toArray();
+            $componentCodeIds = $components->pluck('code_id')->filter()->toArray();
+            $componentInterpretationIds = $components->pluck('interpretation_id')->filter()->toArray();
+            $componentValueCodeableConceptIds = $components->pluck('value_codeable_concept_id')->filter()->toArray();
+
+            $identifierIds = array_merge($diagnosticReportIds, $contextIds, $performerIds, $specimeIds, $deviceIds);
+            $codeableConceptIds = array_merge(
+                $categoriesIds,
+                $codeIds,
+                $reportOriginIds,
+                $interpretationIds,
+                $bodySiteIds,
+                $methodIds,
+                $componentCodeIds,
+                $componentInterpretationIds,
+                $componentValueCodeableConceptIds
+            );
+
+            $identifierCodeableConceptIds = CodeableConcept::whereCodeableConceptableType(Identifier::class)
+                ->whereIn('codeable_conceptable_id', $identifierIds)
+                ->pluck('id')
+                ->toArray();
+
+            $orphaned->each->delete();
+
+            // Codeable concept
+            Coding::whereCodeableType(CodeableConcept::class)
+                ->whereIn('codeable_id', array_merge($codeableConceptIds, $identifierCodeableConceptIds))
+                ->delete();
+            CodeableConcept::whereIn('id', array_merge($codeableConceptIds, $identifierCodeableConceptIds))->delete();
+
+            // Identifier
+            Identifier::whereIn('id', $identifierIds)->delete();
+
+            // Delete components
+            if (!empty($componentIds)) {
+                ObservationComponent::whereIn('id', $componentIds)->delete();
+            }
+        });
+    }
+
+    /**
+     * Sync observation components.
+     *
+     * @param  Observation  $observation
+     * @param  Observation|null  $existing
+     * @param  array  $componentsData
      * @return void
      */
-    private function cleanupRelations(Observation $existing): void
+    private function syncComponents(Observation $observation, ?Observation $existing, array $componentsData): void
     {
-        RelationshipCleaner::cleanRelations($existing, [
-            'context' => 'identifier',
-            'performer' => 'identifier',
-            'diagnosticReport' => 'identifier',
-            'specimen' => 'identifier',
-            'device' => 'identifier',
-            'code' => 'codeable_concept',
-            'reportOrigin' => 'codeable_concept',
-            'interpretation' => 'codeable_concept',
-            'bodySite' => 'codeable_concept',
-            'method' => 'codeable_concept',
-            'valueCodeableConcept' => 'codeable_concept',
-            'categories' => 'codeable_concept_collection',
-        ]);
+        $existingComponents = $existing?->components ?? collect();
 
-        // Handle components
-        foreach ($existing->components as $component) {
-            RelationshipCleaner::cleanCodeableConceptRelation($component->code);
-            RelationshipCleaner::cleanCodeableConceptRelation($component->interpretation);
-            RelationshipCleaner::cleanCodeableConceptRelation($component->valueCodeableConcept);
+        foreach ($componentsData as $index => $componentData) {
+            $existingComponent = $existingComponents[$index] ?? null;
+
+            // Sync component relationships
+            if ($existingComponent) {
+                // Update existing component's relationships
+                $code = $existingComponent->code;
+                if ($code) {
+                    $this->updateCodeableConcept($code, $componentData['code']);
+                } else {
+                    $code = Repository::codeableConcept()->store($componentData['code']);
+                }
+
+                $interpretation = null;
+                if (isset($componentData['interpretation'])) {
+                    if ($existingComponent->interpretation) {
+                        $this->updateCodeableConcept(
+                            $existingComponent->interpretation,
+                            $componentData['interpretation']
+                        );
+                        $interpretation = $existingComponent->interpretation;
+                    } else {
+                        $interpretation = Repository::codeableConcept()->store($componentData['interpretation']);
+                    }
+                }
+
+                $valueCodeableConcept = $existingComponent->valueCodeableConcept;
+                if ($valueCodeableConcept) {
+                    $this->updateCodeableConcept($valueCodeableConcept, $componentData['value_codeable_concept']);
+                } else {
+                    $valueCodeableConcept = Repository::codeableConcept()->store(
+                        $componentData['value_codeable_concept']
+                    );
+                }
+
+                // Update the component record
+                $existingComponent->update([
+                    'code_id' => $code->id,
+                    'interpretation_id' => $interpretation?->id,
+                    'value_codeable_concept_id' => $valueCodeableConcept->id
+                ]);
+            } else {
+                // Create new component
+                $componentCode = Repository::codeableConcept()->store($componentData['code']);
+
+                $componentInterpretation = null;
+                if (isset($componentData['interpretation'])) {
+                    $componentInterpretation = Repository::codeableConcept()->store($componentData['interpretation']);
+                }
+
+                $componentValueCodeableConcept = Repository::codeableConcept()->store(
+                    $componentData['value_codeable_concept']
+                );
+
+                ObservationComponent::create([
+                    'observation_id' => $observation->id,
+                    'code_id' => $componentCode->id,
+                    'interpretation_id' => $componentInterpretation?->id,
+                    'value_codeable_concept_id' => $componentValueCodeableConcept->id
+                ]);
+            }
         }
     }
 }

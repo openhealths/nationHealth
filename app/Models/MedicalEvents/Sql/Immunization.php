@@ -86,11 +86,11 @@ class Immunization extends Model
             'site.coding',
             'route.coding',
             'doseQuantity',
-            'explanations.reasons.coding',
-            'explanations.reasonsNotGiven.coding',
             'vaccinationProtocols.authority.coding',
             'vaccinationProtocols.targetDiseases.coding',
-            'reactions.detail.type.coding'
+            'reactions.detail.type.coding',
+            'explanations.reasons.coding',
+            'explanations.reasonsNotGiven.coding'
         ]);
     }
 

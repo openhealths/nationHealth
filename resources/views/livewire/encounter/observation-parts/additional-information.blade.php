@@ -99,7 +99,7 @@
 
         <div>
             <label for="issuedDate" class="label-modal">
-                {{ __('patients.date_and_time_of_entry') }}
+                {{ __('patients.date_time_entered') }}
             </label>
             <div class="relative flex items-center">
                 @icon('calendar-week', 'w-5 h-5 svg-input absolute left-2.5 pointer-events-none')

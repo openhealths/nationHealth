@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
+use App\Models\MedicalEvents\Sql\Identifier;
 use Illuminate\Database\Eloquent\Model;
 
 abstract class BaseRepository
@@ -54,39 +55,28 @@ abstract class BaseRepository
      */
     protected function syncCodeableConcept(?Model $existing, ?array $newData, string $relationshipName): ?Model
     {
-        // Check if API data is valid
         if (empty($newData)) {
             return $existing?->{$relationshipName};
         }
 
         if ($existing && $existing->{$relationshipName}) {
-            // Update existing codeable concept
             $codeableConcept = $existing->{$relationshipName};
-            $codeableConcept->update(['text' => $newData['text']]);
-
-            // Update the first coding
-            if ($codeableConcept->coding->isNotEmpty()) {
-                $codeableConcept->coding->first()->update([
-                    'code' => $newData['coding'][0]['code'],
-                    'system' => $newData['coding'][0]['system']
-                ]);
-            }
+            $this->updateCodeableConcept($codeableConcept, $newData);
 
             return $codeableConcept;
         }
 
-        // Create new codeable concept only if we have data
         return Repository::codeableConcept()->store($newData);
     }
 
     /**
      * Update an existing identifier with new data.
      *
-     * @param  Model  $identifier
+     * @param  Identifier  $identifier
      * @param  array  $newData
      * @return void
      */
-    protected function updateIdentifier(Model $identifier, array $newData): void
+    protected function updateIdentifier(Identifier $identifier, array $newData): void
     {
         $identifier->update([
             'value' => $newData['identifier']['value'],
@@ -94,15 +84,27 @@ abstract class BaseRepository
         ]);
 
         $typeData = $newData['identifier']['type'] ?? null;
-        if ($typeData && $identifier->type->isNotEmpty()) {
-            $codeableConcept = $identifier->type->first();
-            $codeableConcept->update(['text' => $typeData['text'] ?? null]);
+        if ($typeData) {
+            if ($identifier->type->isNotEmpty()) {
+                // Update existing codeableConcept
+                $codeableConcept = $identifier->type->first();
+                $codeableConcept->update(['text' => $typeData['text'] ?? null]);
 
-            if ($codeableConcept->coding->isNotEmpty()) {
-                $codeableConcept->coding->first()->update([
-                    'code' => $typeData['coding'][0]['code'],
-                    'system' => $typeData['coding'][0]['system']
-                ]);
+                if ($codeableConcept->coding->isNotEmpty()) {
+                    $codeableConcept->coding->first()->update([
+                        'code' => $typeData['coding'][0]['code'],
+                        'system' => $typeData['coding'][0]['system']
+                    ]);
+                } else {
+                    // Create missing coding
+                    $codeableConcept->coding()->create([
+                        'code' => $typeData['coding'][0]['code'],
+                        'system' => $typeData['coding'][0]['system']
+                    ]);
+                }
+            } else {
+                // Create missing codeableConcept with coding
+                Repository::codeableConcept()->attach($identifier, $newData);
             }
         }
     }
@@ -167,7 +169,9 @@ abstract class BaseRepository
                         $item['identifier']['value'],
                         $item['identifier']['display_value'] ?? null
                     );
-                    Repository::codeableConcept()->attach($identifier, $item);
+                    if (isset($item['identifier']['type'])) {
+                        Repository::codeableConcept()->attach($identifier, $item);
+                    }
                     $identifierIds[] = $identifier->id;
                 }
             }
@@ -177,11 +181,68 @@ abstract class BaseRepository
                     $item['identifier']['value'],
                     $item['identifier']['display_value'] ?? null
                 );
-                Repository::codeableConcept()->attach($identifier, $item);
+                if (isset($item['identifier']['type'])) {
+                    Repository::codeableConcept()->attach($identifier, $item);
+                }
                 $identifierIds[] = $identifier->id;
             }
         }
 
         return $identifierIds;
+    }
+
+    /**
+     * Update an existing codeable concept with new data.
+     */
+    protected function updateCodeableConcept(Model $codeableConcept, array $newData): void
+    {
+        $codeableConcept->update(['text' => $newData['text'] ?? null]);
+
+        if ($codeableConcept->coding->isNotEmpty()) {
+            $codeableConcept->coding->first()->update([
+                'code' => $newData['coding'][0]['code'],
+                'system' => $newData['coding'][0]['system']
+            ]);
+        }
+    }
+
+    /**
+     * Sync multiple codeable concepts for a BelongsToMany relationship.
+     *
+     * @param  Model|null  $existing
+     * @param  array|null  $items
+     * @param  string  $relationshipName
+     * @return array
+     */
+    protected function syncCodeableConcepts(?Model $existing, ?array $items, string $relationshipName): array
+    {
+        if (empty($items)) {
+            return [];
+        }
+
+        $ids = [];
+
+        if ($existing) {
+            $existingCollection = $existing->{$relationshipName};
+
+            foreach ($items as $index => $item) {
+                $existingConcept = $existingCollection[$index] ?? null;
+
+                if ($existingConcept) {
+                    $this->updateCodeableConcept($existingConcept, $item);
+                    $ids[] = $existingConcept->id;
+                } else {
+                    $concept = Repository::codeableConcept()->store($item);
+                    $ids[] = $concept->id;
+                }
+            }
+        } else {
+            foreach ($items as $item) {
+                $concept = Repository::codeableConcept()->store($item);
+                $ids[] = $concept->id;
+            }
+        }
+
+        return $ids;
     }
 }

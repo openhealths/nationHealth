@@ -27,10 +27,10 @@
         @php
             $navItems = [
                 ['id' => 'episodes', 'action' => 'getEpisodes', 'syncAction' => 'syncEpisodes', 'label' => __('patients.episodes'), 'icon' => 'book'],
-                ['id' => 'encounter', 'action' => 'getEncounters', 'syncAction' => 'syncEncounters', 'label' => __('patients.encounters'), 'icon' => 'users'],
+                ['id' => 'encounters', 'action' => 'getEncounters', 'syncAction' => 'syncEncounters', 'label' => __('patients.encounters'), 'icon' => 'users'],
                 ['id' => 'clinicalImpressions', 'action' => 'getClinicalImpressions', 'syncAction' => 'syncClinicalImpressions', 'label' => __('patients.clinical_impressions'), 'icon' => 'check'],
-                ['id' => 'vaccinations', 'action' => 'getImmunizations', 'syncAction' => 'syncImmunizations', 'label' => __('patients.vaccinations'), 'icon' => 'shield'],
-                ['id' => 'observation', 'action' => 'syncObservations', 'syncAction' => 'getObservations', 'label' => __('patients.observation'), 'icon' => 'heart'],
+                ['id' => 'immunizations', 'action' => 'getImmunizations', 'syncAction' => 'syncImmunizations', 'label' => __('patients.immunizations'), 'icon' => 'shield'],
+                ['id' => 'observations', 'action' => 'getObservations', 'syncAction' => 'syncObservations', 'label' => __('patients.observation'), 'icon' => 'heart'],
                 ['id' => 'diagnoses', 'action' => 'getConditions', 'syncAction' => 'syncConditions', 'label' => __('patients.diagnoses'), 'icon' => 'file'],
                 ['id' => 'condition', 'action' => 'getConditions', 'syncAction' => 'syncConditions', 'label' => __('patients.condition'), 'icon' => 'file-minus'],
                 ['id' => 'diagnostic_reports', 'action' => 'getDiagnosticReports', 'syncAction' => 'syncDiagnosticReports', 'label' => __('patients.diagnostic_reports'), 'icon' => 'activity'],
@@ -82,14 +82,14 @@
 
                             @if($item['id'] === 'episodes')
                                 @include('livewire.person.records.parts.episodes')
-                            @elseif($item['id'] === 'encounter')
+                            @elseif($item['id'] === 'encounters')
                                 @include('livewire.person.records.parts.encounters')
                             @elseif($item['id'] === 'clinicalImpressions')
                                 @include('livewire.person.records.parts.clinical-impressions')
-                            @elseif($item['id'] === 'vaccinations')
-                                @include('livewire.person.records.parts.vaccinations')
-                            @elseif($item['id'] === 'observation')
-                                @include('livewire.person.records.parts.observation')
+                            @elseif($item['id'] === 'immunizations')
+                                @include('livewire.person.records.parts.immunizations')
+                            @elseif($item['id'] === 'observations')
+                                @include('livewire.person.records.parts.observations')
                             @elseif($item['id'] === 'diagnoses')
                                 @include('livewire.person.records.parts.diagnoses')
                             @elseif($item['id'] === 'condition')
@@ -105,13 +105,17 @@
                             @elseif($item['id'] === 'medicines')
                                 @include('livewire.person.records.parts.medicines')
                             @else
-                                <div class="py-12 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-dashed border-gray-200 dark:border-gray-700 mt-2">
-                                    <div class="flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
-                                        <div class="w-8 h-8 mb-4 opacity-50 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full">
+                                <div
+                                    class="py-12 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-dashed border-gray-200 dark:border-gray-700 mt-2">
+                                    <div
+                                        class="flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
+                                        <div
+                                            class="w-8 h-8 mb-4 opacity-50 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full">
                                             @icon($item['icon'])
                                         </div>
                                         <p class="text-[15px] font-medium">Дані відсутні</p>
-                                        <p class="text-[13px] mt-1 text-gray-400">В цьому розділі поки немає інформації</p>
+                                        <p class="text-[13px] mt-1 text-gray-400">В цьому розділі поки немає
+                                            інформації</p>
                                     </div>
                                 </div>
                             @endif

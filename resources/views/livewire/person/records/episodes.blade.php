@@ -25,9 +25,6 @@
     </x-slot>
 
     <div class="breadcrumb-form p-4 shift-content">
-
-
-
         <div class="w-full mt-6" x-data="{ showAdditionalParams: $wire.entangle('showAdditionalParams') }">
             <div class="mb-4 flex items-center gap-1 font-semibold text-gray-900 dark:text-gray-100">
                 @icon('search-outline', 'w-4.5 h-4.5')
@@ -199,7 +196,7 @@
                             <option value="treatment">Лікування</option>
                         </select>
                         <label for="filterType" class="label">
-                            {{ __('patients.filter_type') }}
+                            {{ __('forms.type') }}
                         </label>
                     </div>
                 </div>
@@ -209,7 +206,6 @@
                 @include('livewire.person.records.parts.episodes')
             </div>
         </div>
-
     </div>
 
     <x-forms.loading />

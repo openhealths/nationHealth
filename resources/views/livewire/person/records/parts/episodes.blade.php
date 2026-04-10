@@ -9,15 +9,15 @@
 
             <div class="record-inner-column flex-1">
                 <div class="record-inner-label">{{ __('forms.name') }}</div>
-                <div class="record-inner-value text-[16px]">{{ $episode['name'] }}</div>
+                <div class="record-inner-value text-[16px]">{{ data_get($episode, 'name', '-') }}</div>
             </div>
 
             <div class="record-inner-column-bordered w-full md:w-36 shrink-0">
                 <div class="record-inner-label">{{ __('forms.status.label') }}</div>
                 <div>
-                <span class="record-inner-status-badge">
-                    {{ EpisodeStatus::from($episode['status'])->label() }}
-                </span>
+                    <span class="badge-green">
+                        {{ EpisodeStatus::from(data_get($episode, 'status'))->label() }}
+                    </span>
                 </div>
             </div>
 
@@ -99,15 +99,15 @@
                 <div class="flex items-start justify-between gap-2 xl:gap-4 overflow-hidden">
                     <div>
                         <div class="record-inner-label">{{ __('patients.date_opened') }}</div>
-                        <div class="record-inner-value">{{ $episode['period']['start'] }}</div>
+                        <div class="record-inner-value">{{ data_get($episode, 'period.start', '-') }}</div>
                     </div>
                     <div>
                         <div class="record-inner-label">{{ __('patients.date_closed') }}</div>
-                        <div class="record-inner-value">{{ $episode['period']['end'] }}</div>
+                        <div class="record-inner-value">{{ data_get($episode, 'period.end', '-') }}</div>
                     </div>
                     <div>
                         <div class="record-inner-label">{{ __('patients.date_updated') }}</div>
-                        <div class="record-inner-value">{{ $episode['ehealthUpdatedAt'] ?? '-' }}</div>
+                        <div class="record-inner-value">{{ data_get($episode, 'ehealthUpdatedAt', '-') }}</div>
                     </div>
                 </div>
             </div>
@@ -115,7 +115,7 @@
             <div class="record-inner-id-col">
                 <div class="min-w-0">
                     <div class="record-inner-label">{{ __('patients.filter_code') }}</div>
-                    <div class="record-inner-id-value">{{ $episode['uuid'] }}</div>
+                    <div class="record-inner-id-value">{{ data_get($episode, 'uuid', '-') }}</div>
                 </div>
             </div>
         </div>
