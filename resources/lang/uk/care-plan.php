@@ -186,4 +186,24 @@ return [
     'encounter' => 'Взаємодія (Encounter)',
     'conditions/diagnoses' => 'Стани/діагнози',
     'observations' => 'Спостереження',
+
+    // Access Management (Approvals)
+    'access_management' => 'Управління доступом (Approvals)',
+    'granted_to' => 'Кому надано доступ',
+    'grant_access' => 'Надати доступ',
+    'grant_access_btn' => 'Надати доступ',
+    'legal_entity_uuid' => 'UUID медичного закладу',
+    'approval_created' => 'Дозвіл на доступ успішно створено.',
+    'approval_create_error' => 'Помилка при створенні дозволу.',
+    'approval_cancelled' => 'Дозвіл на доступ скасовано.',
+    'approval_cancel_error' => 'Помилка при скасуванні дозволу.',
+    'approvals_fetch_error' => 'Помилка при отриманні списку дозволів.',
+    'no_approvals_found' => 'Дозволів на доступ не знайдено',
+    'confirm_cancel_approval' => 'Ви впевнені, що хочете скасувати цей дозвіл?',
+    'reason_placeholder' => 'Вкажіть причину надання доступу...',
+
+    // Outcomes
+    'outcome_dictionary' => 'Результат (довідник)',
+    'activity_outcomes' => 'Результати виконання',
+    'referral_outcome' => 'Пов\'язаний КД (Діагноз/Спостереження)',
 ];
