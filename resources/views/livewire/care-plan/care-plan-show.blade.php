@@ -27,8 +27,11 @@
             $status = is_array($carePlan->status) ? ($carePlan->status['coding'][0]['code'] ?? ($carePlan->status['text'] ?? '')) : $carePlan->status;
             $statusDisplay = is_array($carePlan->status) ? ($carePlan->status['text'] ?? ($carePlan->status['coding'][0]['display'] ?? $status)) : $status;
             
-            $categoryCode = is_array($carePlan->category) ? ($carePlan->category['coding'][0]['code'] ?? ($carePlan->category['text'] ?? '')) : $carePlan->category;
-            $categoryLabel = $dictionaries['care_plan_categories'][$categoryCode] ?? $categoryCode;
+            $categoryLabel = $carePlan->categoryConcept?->text ?? $carePlan->categoryConcept?->coding?->first()?->display;
+            if (!$categoryLabel) {
+                $categoryCode = is_array($carePlan->category) ? ($carePlan->category['coding'][0]['code'] ?? ($carePlan->category['text'] ?? '')) : $carePlan->category;
+                $categoryLabel = $dictionaries['care_plan_categories'][$categoryCode] ?? $categoryCode;
+            }
         @endphp
         <div class="flex items-center justify-between mb-6">
             <div class="flex items-center gap-3">
@@ -144,7 +147,9 @@
                         @forelse($carePlan->activities ?? [] as $activity)
                             <tr>
                                 <td class="td-input break-words whitespace-normal align-top">
-                                    @if(is_array($activity->kind))
+                                    @if($activity->kindConcept)
+                                        {{ $activity->kindConcept->text ?? $activity->kindConcept->coding->first()?->display ?? $activity->kindConcept->coding->first()?->code ?? '-' }}
+                                    @elseif(is_array($activity->kind))
                                         {{ $activity->kind['text'] ?? $activity->kind['coding'][0]['display'] ?? $activity->kind['coding'][0]['code'] ?? '-' }}
                                     @else
                                         {{ $activity->kind ?? '-' }}
@@ -217,13 +222,50 @@
                 </div>
             @elseif($carePlan->uuid && in_array(strtoupper($status), ['ACTIVE', 'NEW', 'active', 'new']))
                 {{-- Status Reason (shown above the modal trigger) --}}
-                <x-forms.textarea
-                    id="statusReason"
-                    name="statusReason"
-                    label="{{ __('care-plan.status_reason') }}"
-                    wire:model="statusReason"
-                    class="flex-1"
-                />
+                <div class="flex flex-col gap-4 flex-1">
+                    @if(in_array($actionType, ['complete_activity', 'cancel_activity']))
+                        @if($actionType === 'complete_activity')
+                            <x-forms.select
+                                id="outcomeCode"
+                                name="outcomeCode"
+                                label="{{ __('care-plan.outcome_dictionary') }}"
+                                wire:model="outcomeCode"
+                                :options="$dictionaries['care_plan_activity_outcomes'] ?? []"
+                            />
+
+                            @if(!empty($availableConditions))
+                                <div class="mt-2">
+                                    <label class="record-inner-label mb-2 block">{{ __('care-plan.referral_outcome') }}</label>
+                                    <div class="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto border border-gray-100 dark:border-gray-700 rounded p-2">
+                                        @foreach($availableConditions as $cond)
+                                            <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1 rounded">
+                                                <input type="checkbox" wire:model="outcomeReferences" value="{{ $cond['uuid'] }}" class="checkbox">
+                                                <div class="flex flex-col">
+                                                    <span class="text-sm">{{ $cond['name'] }}</span>
+                                                    <span class="text-xs text-gray-500">{{ $cond['date'] }}</span>
+                                                </div>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+                        @endif
+
+                        <x-forms.textarea
+                            id="activity_status_reason"
+                            name="statusReason"
+                            label="{{ __('care-plan.status_reason') }}"
+                            wire:model="statusReason"
+                        />
+                    @else
+                        <x-forms.textarea
+                            id="statusReason"
+                            name="statusReason"
+                            label="{{ __('care-plan.status_reason') }}"
+                            wire:model="statusReason"
+                        />
+                    @endif
+                </div>
 
                 <div class="flex items-center gap-3">
                     <button type="button"
@@ -240,6 +282,8 @@
                 </div>
             @endif
         </div>
+
+        @livewire('care-plan.care-plan-approvals', ['carePlan' => $carePlan])
 
         @include('components.signature-modal', ['method' => 'sign'])
 

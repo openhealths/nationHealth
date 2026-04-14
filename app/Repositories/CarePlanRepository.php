@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Classes\eHealth\EHealth;
 use App\Models\CarePlan;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class CarePlanRepository
 {
@@ -92,63 +97,79 @@ class CarePlanRepository
             return;
         }
 
-        $validator = \Illuminate\Support\Facades\Validator::make($data['data'], [
+        $validator = Validator::make($data['data'], [
             '*' => 'array',
             '*.id' => 'required|uuid',
             '*.status' => 'required|string',
             '*.title' => 'required|string',
-            '*.description' => 'nullable|string',
-            '*.note' => 'nullable|string',
-            '*.category' => 'nullable|array',
-            '*.category.coding' => 'nullable|array',
-            '*.period' => 'nullable|array',
-            '*.period.start' => 'nullable|date',
-            '*.period.end' => 'nullable|date',
         ]);
 
         if ($validator->fails()) {
-            throw new \Illuminate\Validation\ValidationException($validator);
+            throw new ValidationException($validator);
         }
-        $validData = $validator->validated();
 
         $activityRepo = app(CarePlanActivityRepository::class);
 
-        foreach ($validData as $index => $item) {
-            $rawFhir = $data['data'][$index];
-
+        foreach ($data['data'] as $rawFhir) {
             \App\Models\MedicalEvents\Mongo\CarePlan::updateOrCreate(
-                ['uuid' => $item['id']],
+                ['uuid' => $rawFhir['id']],
                 ['data' => $rawFhir]
             );
 
-            $periodStart = isset($item['period']['start']) ? \Carbon\Carbon::parse($item['period']['start']) : null;
-            $periodEnd = isset($item['period']['end']) ? \Carbon\Carbon::parse($item['period']['end']) : null;
+            DB::transaction(function () use ($person, $rawFhir, $activityRepo) {
+                $category = isset($rawFhir['category'])
+                    ? MedicalEventsRepository::codeableConcept()->store($rawFhir['category'])
+                    : null;
 
-            $category = null;
-            if (isset($item['category']['text'])) {
-                $category = $item['category']['text'];
-            } elseif (isset($item['category']['coding'][0]['display'])) {
-                $category = $item['category']['coding'][0]['display'];
-            } elseif (isset($item['category']['coding'][0]['code'])) {
-                $category = $item['category']['coding'][0]['code'];
-            }
+                $encounterIdentifier = isset($rawFhir['encounter'])
+                    ? MedicalEventsRepository::identifier()->store($rawFhir['encounter']['identifier']['value'])
+                    : null;
+                if ($encounterIdentifier && isset($rawFhir['encounter']['identifier']['type'])) {
+                    MedicalEventsRepository::codeableConcept()->attach($encounterIdentifier, $rawFhir['encounter']);
+                }
 
-            $carePlan = CarePlan::updateOrCreate(
-                ['uuid' => $item['id']],
-                [
-                    'person_id' => $person->id,
-                    'status' => $item['status'],
-                    'category' => $category,
-                    'title' => $item['title'],
-                    'description' => $item['description'] ?? null,
-                    'note' => $item['note'] ?? null,
-                    'period_start' => $periodStart,
-                    'period_end' => $periodEnd,
-                ]
-            );
+                $careManager = isset($rawFhir['careManager'])
+                    ? MedicalEventsRepository::identifier()->store($rawFhir['careManager']['identifier']['value'])
+                    : null;
+                if ($careManager && isset($rawFhir['careManager']['identifier']['type'])) {
+                    MedicalEventsRepository::codeableConcept()->attach($careManager, $rawFhir['careManager']);
+                }
 
-            // Trigger sync for activities directly for each plan found active or relevant
-            $activityRepo->syncActivities($person, $carePlan);
+                $carePlan = CarePlan::updateOrCreate(
+                    ['uuid' => $rawFhir['id']],
+                    [
+                        'person_id' => $person->id,
+                        'status' => $rawFhir['status'],
+                        'title' => $rawFhir['title'],
+                        'description' => $rawFhir['description'] ?? null,
+                        'note' => $rawFhir['note'] ?? null,
+                        'category_id' => $category?->id,
+                        'encounter_identifier_id' => $encounterIdentifier?->id,
+                        'care_manager_id' => $careManager?->id,
+                        'period_start' => isset($rawFhir['period']['start']) ? \Carbon\Carbon::parse($rawFhir['period']['start']) : null,
+                        'period_end' => isset($rawFhir['period']['end']) ? \Carbon\Carbon::parse($rawFhir['period']['end']) : null,
+                    ]
+                );
+
+                if (isset($rawFhir['period'])) {
+                    MedicalEventsRepository::period()->sync($carePlan, $rawFhir['period'], 'effectivePeriod');
+                }
+
+                if (isset($rawFhir['supportingInfo'])) {
+                    $supportingInfoIds = [];
+                    foreach ($rawFhir['supportingInfo'] as $info) {
+                        $identifier = MedicalEventsRepository::identifier()->store($info['identifier']['value']);
+                        if (isset($info['identifier']['type'])) {
+                            MedicalEventsRepository::codeableConcept()->attach($identifier, $info);
+                        }
+                        $supportingInfoIds[] = $identifier->id;
+                    }
+                    $carePlan->supportingInfoReferences()->sync($supportingInfoIds);
+                }
+
+                // Trigger sync for activities directly for each plan found active or relevant
+                $activityRepo->syncActivities($person, $carePlan);
+            });
         }
     }
 }

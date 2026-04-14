@@ -5,16 +5,22 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Models\Employee\Employee;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\MedicalEvents\Sql\Period;
 use App\Models\Person\Person;
+use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class CarePlan extends Model
 {
-    use HasFactory;
+    use HasFactory, HasCamelCasing;
 
     protected $fillable = [
         'uuid',
@@ -36,6 +42,9 @@ class CarePlan extends Model
         'note',
         'inform_with',
         'requisition',
+        'category_id',
+        'encounter_identifier_id',
+        'care_manager_id',
     ];
 
     protected $casts = [
@@ -68,5 +77,30 @@ class CarePlan extends Model
     public function activities(): HasMany
     {
         return $this->hasMany(CarePlanActivity::class);
+    }
+
+    public function categoryConcept(): BelongsTo
+    {
+        return $this->belongsTo(CodeableConcept::class, 'category_id');
+    }
+
+    public function encounterIdentifier(): BelongsTo
+    {
+        return $this->belongsTo(Identifier::class, 'encounter_identifier_id');
+    }
+
+    public function careManager(): BelongsTo
+    {
+        return $this->belongsTo(Identifier::class, 'care_manager_id');
+    }
+
+    public function supportingInfoReferences(): BelongsToMany
+    {
+        return $this->belongsToMany(Identifier::class, 'care_plan_supporting_info');
+    }
+
+    public function effectivePeriod(): MorphOne
+    {
+        return $this->morphOne(Period::class, 'periodable');
     }
 }

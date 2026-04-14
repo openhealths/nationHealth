@@ -56,13 +56,35 @@ class CarePlanShow extends Component
         'password' => '',
     ];
 
+    public string $outcomeCode = ''; // For outcomeCodeableConcept
+    public array $outcomeReferences = []; // For outcomeReference (IDs of identifiers)
+
+    public array $availableConditions = [];
+
     public function mount(CarePlan $carePlan): void
     {
         $this->carePlan = $carePlan;
+        
+        // Fetch patient conditions for outcomeReference selection
+        $this->availableConditions = \App\Models\MedicalEvents\Sql\Condition::whereHas('encounter', function ($query) {
+            $query->where('person_id', $this->carePlan->person_id);
+        })->with('code.coding')->get()->map(fn($c) => [
+            'uuid' => $c->uuid,
+            'name' => $c->code_display ?? $c->code ?? 'Unknown Condition',
+            'date' => $c->onset_date?->format('d.m.Y') ?? '-',
+        ])->toArray();
 
         try {
             $basics = app(\App\Services\Dictionary\DictionaryManager::class)->basics();
             $this->dictionaries['care_plan_categories'] = $basics->byName('eHealth/care_plan_categories')
+                ?->asCodeDescription()
+                ?->toArray() ?? [];
+            
+            $this->dictionaries['care_plan_activity_outcomes'] = $basics->byName('eHealth/care_plan_activity_outcomes')
+                ?->asCodeDescription()
+                ?->toArray() ?? [];
+
+            $this->dictionaries['care_plan_cancel_reasons'] = $basics->byName('eHealth/care_plan_cancel_reasons')
                 ?->asCodeDescription()
                 ?->toArray() ?? [];
         } catch (\Exception $exception) {
@@ -85,6 +107,8 @@ class CarePlanShow extends Component
         $this->actionType = $actionType;
         $this->activityToSign = $activityId;
         $this->statusReason = ''; // Reset reason
+        $this->outcomeCode = ''; // Reset outcome
+        $this->outcomeReferences = []; // Reset references
         $this->showSignatureModal = true;
     }
 
@@ -422,15 +446,31 @@ class CarePlanShow extends Component
         $activity = $activityRepository->findById($this->activityToSign);
         if (!$activity) return;
 
-        $statusMap = [
-            'cancel_activity' => 'entered_in_error', // or cancelled
-            'complete_activity' => 'completed',
-        ];
-
         $payload = [
             'status' => $statusMap[$this->actionType] ?? 'cancelled',
             'status_reason' => $this->statusReason,
         ];
+
+        if ($this->actionType === 'complete_activity') {
+            if ($this->outcomeCode) {
+                $payload['outcome_codeable_concept'] = [
+                    'coding' => [
+                        [
+                            'system' => 'eHealth/care_plan_activity_outcomes',
+                            'code' => $this->outcomeCode,
+                        ]
+                    ]
+                ];
+            }
+            
+            if (!empty($this->outcomeReferences)) {
+                $payload['outcome_reference'] = collect($this->outcomeReferences)->map(fn($id) => [
+                    'identifier' => [
+                        'value' => $id, // Assuming these are UUIDs of clinical documents
+                    ]
+                ])->toArray();
+            }
+        }
 
         try {
             $signedContent = signatureService()->signData(
@@ -473,9 +513,35 @@ class CarePlanShow extends Component
                 $activityStatus = $entity['status'] ?? $activityStatus;
             }
 
-            $activityRepository->updateById($activity->id, [
+            $updateData = [
                 'status' => $activityStatus,
-            ]);
+            ];
+
+            if ($this->actionType === 'complete_activity') {
+                if ($this->outcomeCode) {
+                    $code = \App\Repositories\MedicalEvents\Repository::codeableConcept()->store([
+                        'coding' => [
+                            [
+                                'system' => 'eHealth/care_plan_activity_outcomes',
+                                'code' => $this->outcomeCode,
+                                'display' => $this->dictionaries['care_plan_activity_outcomes'][$this->outcomeCode] ?? '',
+                            ]
+                        ]
+                    ]);
+                    $updateData['outcome_codeable_concept_id'] = $code->id;
+                }
+
+                if (!empty($this->outcomeReferences)) {
+                    $ids = [];
+                    foreach ($this->outcomeReferences as $uuid) {
+                        $identifier = \App\Repositories\MedicalEvents\Repository::identifier()->store($uuid);
+                        $ids[] = $identifier->id;
+                    }
+                    $activity->outcomeReferences()->sync($ids);
+                }
+            }
+
+            $activityRepository->updateById($activity->id, $updateData);
 
             $this->carePlan->refresh();
             Session::flash('success', __('care-plan.activity_updated'));
