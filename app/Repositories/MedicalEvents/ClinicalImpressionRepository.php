@@ -9,8 +9,6 @@ use App\Models\MedicalEvents\Sql\ClinicalImpression;
 use App\Models\MedicalEvents\Sql\ClinicalImpressionFinding;
 use App\Models\MedicalEvents\Sql\ClinicalImpressionProblem;
 use App\Models\MedicalEvents\Sql\ClinicalImpressionSupportingInfo;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
-use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Identifier;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -314,9 +312,6 @@ class ClinicalImpressionRepository extends BaseRepository
                 ->get()
                 ->keyBy('uuid');
 
-            // Delete clinical impressions and relationships that exist in DB but not in API response
-            $this->deleteOrphaned($personId, $apiUuids);
-
             foreach ($validatedData as $data) {
                 $existing = $existingClinicalImpressions->get($data['uuid']);
 
@@ -359,62 +354,6 @@ class ClinicalImpressionRepository extends BaseRepository
 
                 $this->syncFindings($existing, $data['findings'], $clinicalImpression);
             }
-        });
-    }
-
-    /**
-     * Remove orphaned relations after clinical impression FK update.
-     *
-     * @param  int  $personId
-     * @param  array  $apiUuids
-     * @return void
-     * @throws Throwable
-     */
-    private function deleteOrphaned(int $personId, array $apiUuids): void
-    {
-        $orphaned = $this->model->where('person_id', $personId)
-            ->whereNotNull('uuid')
-            ->whereNotIn('uuid', $apiUuids)
-            ->withAllRelations()
-            ->get();
-
-        if ($orphaned->isEmpty()) {
-            return;
-        }
-
-        DB::transaction(static function () use ($orphaned) {
-            $codeIds = $orphaned->pluck('code_id')->filter()->toArray();
-            $encounterIds = $orphaned->pluck('encounter_id')->filter()->toArray();
-            $assessorIds = $orphaned->pluck('assessor_id')->filter()->toArray();
-            $previousIds = $orphaned->pluck('previous_id')->filter()->toArray();
-            $problemsIds = $orphaned->flatMap->problems->pluck('id')->toArray();
-            $supportingInfoIds = $orphaned->flatMap->supportingInfo->pluck('id')->toArray();
-            $findingsIds = $orphaned->flatMap->findings->pluck('item_reference_id')->toArray();
-
-            $identifierIds = array_merge(
-                $encounterIds,
-                $assessorIds,
-                $previousIds,
-                $problemsIds,
-                $supportingInfoIds,
-                $findingsIds
-            );
-
-            $identifierCodeableConceptIds = CodeableConcept::whereCodeableConceptableType(Identifier::class)
-                ->whereIn('codeable_conceptable_id', $identifierIds)
-                ->pluck('id')
-                ->toArray();
-
-            $orphaned->each->delete();
-
-            // Codeable concept
-            Coding::whereCodeableType(CodeableConcept::class)
-                ->whereIn('codeable_id', array_merge($codeIds, $identifierCodeableConceptIds))
-                ->delete();
-            CodeableConcept::whereIn('id', array_merge($codeIds, $identifierCodeableConceptIds))->delete();
-
-            // Identifier
-            Identifier::whereIn('id', $identifierIds)->delete();
         });
     }
 

@@ -340,7 +340,7 @@
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-3">
                                 <div class="space-y-2.5 min-w-0">
                                     <div class="min-w-0">
-                                        <div class="record-inner-label text-[10px] uppercase">{{ __('patients.type') }}</div>
+                                        <div class="record-inner-label text-[10px] uppercase">{{ __('forms.type') }}</div>
                                         <div class="record-inner-value text-[14px] font-semibold">{{ __('patients.basic') }}</div>
                                     </div>
                                     <div class="min-w-0">
@@ -387,7 +387,7 @@
                                     <li class="flex items-start gap-1.5 text-[13px] leading-tight">
                                         <span class="w-1 h-1 rounded-full bg-gray-400 mt-1.5 shrink-0"></span>
                                         <div class="min-w-0">
-                                            <div class="text-gray-500 dark:text-gray-400 text-[10px] mb-0.5 uppercase">{{ __('patients.evidence_conditions') }}:</div>
+                                            <div class="text-gray-500 dark:text-gray-400 text-[10px] mb-0.5 uppercase">{{ __('patients.conditions') }}:</div>
                                             <div class="text-gray-800 dark:text-gray-200 font-semibold break-words whitespace-normal">- A01 - Кома</div>
                                         </div>
                                     </li>

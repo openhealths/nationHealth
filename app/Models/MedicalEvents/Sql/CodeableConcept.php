@@ -19,7 +19,7 @@ class CodeableConcept extends Model
         'codeable_conceptable_type',
         'codeable_conceptable_id',
         'created_at',
-        'updated_at',
+        'updated_at'
     ];
 
     public function codeableConceptable(): MorphTo

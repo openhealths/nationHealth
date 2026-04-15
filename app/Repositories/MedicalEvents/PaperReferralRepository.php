@@ -13,22 +13,25 @@ use Throwable;
 class PaperReferralRepository extends BaseRepository
 {
     /**
-     * Sync paper referral data for provided model (delete existing and store new).
+     * Sync paper referral data for provided model with comparison logic.
      *
      * @param  array  $data
      * @param  Model  $parent
+     * @param  Model|null  $existing
      * @return mixed
      * @throws Throwable
      */
-    public function sync(array $data, Model $parent): mixed
+    public function sync(array $data, Model $parent, ?Model $existing = null): mixed
     {
-        return DB::transaction(static function () use ($data, $parent) {
-            // Delete existing paper referrals
-            $parent->paperReferral()->delete();
+        $existingPaperReferral = $existing?->paperReferral;
 
-            // Create new paper referral directly without field mapping
-            return $parent->paperReferral()->create($data);
-        });
+        if ($existingPaperReferral) {
+            $existingPaperReferral->update($data);
+
+            return $existingPaperReferral;
+        }
+
+        return $parent->paperReferral()->create($data);
     }
 
     /**

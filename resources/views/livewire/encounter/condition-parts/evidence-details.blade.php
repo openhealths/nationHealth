@@ -173,7 +173,7 @@
                                             </option>
                                             @foreach($episodes as $key => $episode)
                                                 <option value="{{ $episode['id'] }}">
-                                                    {{ $episode['name'] }} ({{ __('patients.' . $episode['status']) }})
+                                                    {{ $episode['name'] }} ({{ __('patients.status.' . $episode['status']) }})
                                                     від {{ CarbonImmutable::parse($episode['inserted_at'])->format('d.m.Y') }}
                                                 </option>
                                             @endforeach

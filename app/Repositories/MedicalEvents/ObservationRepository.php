@@ -6,9 +6,6 @@ namespace App\Repositories\MedicalEvents;
 
 use App\Classes\eHealth\Api\PatientApi;
 use App\Core\Arr;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
-use App\Models\MedicalEvents\Sql\Coding;
-use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\ObservationComponent;
 use App\Models\MedicalEvents\Sql\Quantity;
@@ -347,9 +344,6 @@ class ObservationRepository extends BaseRepository
                 ->get()
                 ->keyBy('uuid');
 
-            // Delete observations and relationships that exist in DB but not in API response
-            $this->deleteOrphaned($personId, $apiUuids);
-
             foreach ($validatedData as $data) {
                 $existing = $existingObservations->get($data['uuid']);
 
@@ -414,82 +408,6 @@ class ObservationRepository extends BaseRepository
 
                 // Sync components
                 $this->syncComponents($observation, $existing, $data['components'] ?? []);
-            }
-        });
-    }
-
-    /**
-     * Cascade delete.
-     *
-     * @param  int  $personId
-     * @param  array  $apiUuids
-     * @return void
-     * @throws Throwable
-     */
-    private function deleteOrphaned(int $personId, array $apiUuids): void
-    {
-        $orphaned = $this->model->where('person_id', $personId)
-            ->whereNotNull('uuid')
-            ->whereNotIn('uuid', $apiUuids)
-            ->withAllRelations()
-            ->get();
-
-        if ($orphaned->isEmpty()) {
-            return;
-        }
-
-        DB::transaction(static function () use ($orphaned) {
-            $diagnosticReportIds = $orphaned->pluck('diagnostic_report_id')->filter()->toArray();
-            $contextIds = $orphaned->pluck('context_id')->filter()->toArray();
-            $categoriesIds = $orphaned->flatMap->categories->pluck('id')->toArray();
-            $codeIds = $orphaned->pluck('code_id')->filter()->toArray();
-            $performerIds = $orphaned->pluck('performer_id')->filter()->toArray();
-            $reportOriginIds = $orphaned->pluck('report_origin_id')->filter()->toArray();
-            $interpretationIds = $orphaned->pluck('interpretation_id')->filter()->toArray();
-            $bodySiteIds = $orphaned->pluck('body_site_id')->filter()->toArray();
-            $methodIds = $orphaned->pluck('method_id')->filter()->toArray();
-            $specimeIds = $orphaned->pluck('specime_id')->filter()->toArray();
-            $deviceIds = $orphaned->pluck('device_id')->filter()->toArray();
-
-            // Components
-            $components = $orphaned->flatMap->components;
-            $componentIds = $components->pluck('id')->toArray();
-            $componentCodeIds = $components->pluck('code_id')->filter()->toArray();
-            $componentInterpretationIds = $components->pluck('interpretation_id')->filter()->toArray();
-            $componentValueCodeableConceptIds = $components->pluck('value_codeable_concept_id')->filter()->toArray();
-
-            $identifierIds = array_merge($diagnosticReportIds, $contextIds, $performerIds, $specimeIds, $deviceIds);
-            $codeableConceptIds = array_merge(
-                $categoriesIds,
-                $codeIds,
-                $reportOriginIds,
-                $interpretationIds,
-                $bodySiteIds,
-                $methodIds,
-                $componentCodeIds,
-                $componentInterpretationIds,
-                $componentValueCodeableConceptIds
-            );
-
-            $identifierCodeableConceptIds = CodeableConcept::whereCodeableConceptableType(Identifier::class)
-                ->whereIn('codeable_conceptable_id', $identifierIds)
-                ->pluck('id')
-                ->toArray();
-
-            $orphaned->each->delete();
-
-            // Codeable concept
-            Coding::whereCodeableType(CodeableConcept::class)
-                ->whereIn('codeable_id', array_merge($codeableConceptIds, $identifierCodeableConceptIds))
-                ->delete();
-            CodeableConcept::whereIn('id', array_merge($codeableConceptIds, $identifierCodeableConceptIds))->delete();
-
-            // Identifier
-            Identifier::whereIn('id', $identifierIds)->delete();
-
-            // Delete components
-            if (!empty($componentIds)) {
-                ObservationComponent::whereIn('id', $componentIds)->delete();
             }
         });
     }

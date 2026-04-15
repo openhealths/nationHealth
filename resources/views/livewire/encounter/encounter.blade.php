@@ -1,7 +1,7 @@
-<x-layouts.patient :id="$patientId" :patientFullName="$patientFullName">
+<div>
     <div class="breadcrumb-form p-4 shift-content">
         <div x-data="{ activeSection: 'main-data' }" class="flex flex-col lg:flex-row gap-8 lg:gap-12">
-            
+
             <!-- Main Content -->
             <div class="flex-1 space-y-6">
                 <div id="main-data" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm scroll-mt-6">
@@ -89,4 +89,4 @@
     </div>
 
     <x-signature-modal method="sign" />
-</x-layouts.patient>
+</div>

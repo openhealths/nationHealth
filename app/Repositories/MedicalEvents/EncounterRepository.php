@@ -7,7 +7,6 @@ namespace App\Repositories\MedicalEvents;
 use App\Classes\eHealth\Api\PatientApi;
 use App\Core\Arr;
 use App\Models\MedicalEvents\Mongo\Encounter as EncounterMongo;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\Encounter;
@@ -878,9 +877,6 @@ class EncounterRepository extends BaseRepository
                 ->get()
                 ->keyBy('uuid');
 
-            // Delete encounters that exist in DB but not in API response
-            $this->deleteOrphaned($personId, $apiUuids);
-
             foreach ($validatedData as $data) {
                 $existing = $existingEncounters->get($data['uuid']);
 
@@ -905,53 +901,6 @@ class EncounterRepository extends BaseRepository
 
                 Repository::period()->sync($encounter, $data['period']);
             }
-        });
-    }
-
-    /**
-     * Delete encounters that exist in DB but not in API response.
-     *
-     * @param  int  $personId
-     * @param  array  $apiUuids
-     * @return void
-     * @throws Throwable
-     */
-    private function deleteOrphaned(int $personId, array $apiUuids): void
-    {
-        $orphanedEncounters = $this->model::orphanedForPerson($personId, $apiUuids)
-            ->withSyncRelationships()
-            ->get();
-
-        if ($orphanedEncounters->isEmpty()) {
-            return;
-        }
-
-        DB::transaction(static function () use ($orphanedEncounters) {
-            $classIds = $orphanedEncounters->pluck('class_id')->filter()->toArray();
-            $typeIds = $orphanedEncounters->pluck('type_id')->filter()->toArray();
-            $performerSpecialityIds = $orphanedEncounters->pluck('performer_speciality_id')->filter()->toArray();
-            $episodeIds = $orphanedEncounters->pluck('episode_id')->filter()->toArray();
-
-            $conceptIds = array_merge($typeIds, $performerSpecialityIds);
-
-            $episodeConceptIds = CodeableConcept::whereCodeableConceptableType(Identifier::class)
-                ->whereIn('codeable_conceptable_id', $episodeIds)
-                ->pluck('id')
-                ->toArray();
-
-            $orphanedEncounters->each->delete();
-
-            // Codeable concept
-            Coding::whereCodeableType(CodeableConcept::class)
-                ->whereIn('codeable_id', array_merge($conceptIds, $episodeConceptIds))
-                ->delete();
-            CodeableConcept::whereIn('id', array_merge($conceptIds, $episodeConceptIds))->delete();
-
-            // Identifier
-            Identifier::whereIn('id', $episodeIds)->delete();
-
-            // Coding
-            Coding::whereIn('id', $classIds)->delete();
         });
     }
 }

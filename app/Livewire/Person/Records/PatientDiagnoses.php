@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Person\Records;
 
-use App\Livewire\Person\Records\BasePatientComponent;
 use Livewire\Attributes\Url;
 
 class PatientDiagnoses extends BasePatientComponent
@@ -46,7 +45,7 @@ class PatientDiagnoses extends BasePatientComponent
 
     public function render()
     {
-        return view('livewire.person.records.diagnoses');
+        return view('livewire.person.records.diagnose');
     }
 
     public function search(): void

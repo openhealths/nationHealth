@@ -35,25 +35,6 @@ class Patient extends Request
     }
 
     /**
-     * Get a list of summary info about conditions.
-     *
-     * @param  string  $patientId
-     * @param  array{code?: string, onset_date_from?: string, onset_date_to?: string, page?: int, page_size?: int}  $query
-     * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
-     *
-     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/patient-summary/get-conditions
-     */
-    public function getConditions(string $patientId, array $query = []): PromiseInterface|EHealthResponse
-    {
-        $this->setDefaultPageSize();
-
-        $mergedQuery = array_merge($this->options['query'], $query ?? []);
-
-        return $this->get(self::URL . "/$patientId/summary/conditions", $mergedQuery);
-    }
-
-    /**
      * Get a list of summary info about allergy intolerances.
      *
      * @param  string  $patientId

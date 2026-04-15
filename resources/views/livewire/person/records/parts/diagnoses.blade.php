@@ -30,7 +30,7 @@
             <div
                 class="grid grid-cols-2 xl:grid-cols-4 gap-y-4 gap-x-4 w-full [&>div]:min-w-0 [&_.record-inner-subvalue]:break-words">
                 <div>
-                    <div class="record-inner-label">{{ __('patients.type') }}</div>
+                    <div class="record-inner-label">{{ __('forms.type') }}</div>
                     <div class="record-inner-subvalue">{{ __('patients.basic') }}</div>
                 </div>
                 <div>
@@ -51,7 +51,7 @@
                     <div class="record-inner-subvalue">Шевченко Т.Г.</div>
                 </div>
                 <div>
-                    <div class="record-inner-label">{{ __('patients.state') }}</div>
+                    <div class="record-inner-label">{{ __('patients.condition') }}</div>
                     <div class="record-inner-subvalue">{{ __('patients.moderate_severity') }}</div>
                 </div>
                 <div>

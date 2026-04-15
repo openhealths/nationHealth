@@ -31,9 +31,9 @@
                 ['id' => 'clinicalImpressions', 'action' => 'getClinicalImpressions', 'syncAction' => 'syncClinicalImpressions', 'label' => __('patients.clinical_impressions'), 'icon' => 'check'],
                 ['id' => 'immunizations', 'action' => 'getImmunizations', 'syncAction' => 'syncImmunizations', 'label' => __('patients.immunizations'), 'icon' => 'shield'],
                 ['id' => 'observations', 'action' => 'getObservations', 'syncAction' => 'syncObservations', 'label' => __('patients.observation'), 'icon' => 'heart'],
-                ['id' => 'diagnoses', 'action' => 'getConditions', 'syncAction' => 'syncConditions', 'label' => __('patients.diagnoses'), 'icon' => 'file'],
-                ['id' => 'condition', 'action' => 'getConditions', 'syncAction' => 'syncConditions', 'label' => __('patients.condition'), 'icon' => 'file-minus'],
-                ['id' => 'diagnostic_reports', 'action' => 'getDiagnosticReports', 'syncAction' => 'syncDiagnosticReports', 'label' => __('patients.diagnostic_reports'), 'icon' => 'activity'],
+                ['id' => 'diagnoses', 'action' => 'getDiagnoses', 'syncAction' => 'syncDiagnoses', 'label' => __('patients.diagnoses'), 'icon' => 'file'],
+                ['id' => 'conditions', 'action' => 'getConditions', 'syncAction' => 'syncConditions', 'label' => __('patients.conditions'), 'icon' => 'file-minus'],
+                ['id' => 'diagnosticReports', 'action' => 'getDiagnosticReports', 'syncAction' => 'syncDiagnosticReports', 'label' => __('patients.diagnostic_reports'), 'icon' => 'activity'],
                 ['id' => 'allergies', 'action' => 'syncAllergyIntolerances', 'syncAction' => 'syncAllergyIntolerances', 'label' => __('patients.allergies'), 'icon' => 'alert'],
                 ['id' => 'risk_assessments', 'action' => 'syncRiskAssessments', 'syncAction' => 'syncRiskAssessments', 'label' => __('patients.risk_assessments'), 'icon' => 'alert-octagon'],
                 ['id' => 'devices', 'action' => 'syncDevices', 'syncAction' => 'syncDevices', 'label' => __('patients.devices'), 'icon' => 'equipment'],
@@ -92,9 +92,9 @@
                                 @include('livewire.person.records.parts.observations')
                             @elseif($item['id'] === 'diagnoses')
                                 @include('livewire.person.records.parts.diagnoses')
-                            @elseif($item['id'] === 'condition')
-                                @include('livewire.person.records.parts.condition')
-                            @elseif($item['id'] === 'diagnostic_reports')
+                            @elseif($item['id'] === 'conditions')
+                                @include('livewire.person.records.parts.conditions')
+                            @elseif($item['id'] === 'diagnosticReports')
                                 @include('livewire.person.records.parts.diagnostic-reports')
                             @elseif($item['id'] === 'allergies')
                                 @include('livewire.person.records.parts.allergies')
@@ -128,7 +128,7 @@
             <div class="w-full lg:w-[320px] flex-shrink-0 space-y-1 mt-4 lg:mt-0 sticky top-6 self-start">
                 @foreach($navItems as $item)
                     <button @if($item['action']) wire:click.once="{{ $item['action'] }}" @endif
-                            @click="
+                    @click="
                                 activeSection = '{{ $item['id'] }}';
                                 setTimeout(() => { document.getElementById('block-{{ $item['id'] }}').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
                             "

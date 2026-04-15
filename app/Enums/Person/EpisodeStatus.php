@@ -21,7 +21,7 @@ enum EpisodeStatus: string
     {
         return match ($this) {
             self::ACTIVE => __('patients.status.active'),
-            self::CLOSED => __('patients.status.closed'),
+            self::CLOSED => __('patients.status.completed'),
             self::ENTERED_IN_ERROR => __('patients.status.entered_in_error')
         };
     }

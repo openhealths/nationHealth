@@ -80,7 +80,7 @@ abstract class BaseRepository
     {
         $identifier->update([
             'value' => $newData['identifier']['value'],
-            'display_value' => $newData['identifier']['display_value'] ?? null
+            'display_value' => $newData['display_value'] ?? null
         ]);
 
         $typeData = $newData['identifier']['type'] ?? null;
@@ -132,7 +132,7 @@ abstract class BaseRepository
 
         $identifier = Repository::identifier()->store(
             $newData['identifier']['value'],
-            $newData['identifier']['display_value'] ?? null
+            $newData['display_value'] ?? null
         );
         Repository::codeableConcept()->attach($identifier, $newData);
 
@@ -167,7 +167,7 @@ abstract class BaseRepository
                 } else {
                     $identifier = Repository::identifier()->store(
                         $item['identifier']['value'],
-                        $item['identifier']['display_value'] ?? null
+                        $item['display_value'] ?? null
                     );
                     if (isset($item['identifier']['type'])) {
                         Repository::codeableConcept()->attach($identifier, $item);
@@ -179,7 +179,7 @@ abstract class BaseRepository
             foreach ($items as $item) {
                 $identifier = Repository::identifier()->store(
                     $item['identifier']['value'],
-                    $item['identifier']['display_value'] ?? null
+                    $item['display_value'] ?? null
                 );
                 if (isset($item['identifier']['type'])) {
                     Repository::codeableConcept()->attach($identifier, $item);

@@ -34,7 +34,7 @@
                     <div class="record-inner-subvalue">1231FDSE</div>
                 </div>
                 <div>
-                    <div class="record-inner-label">{{ __('patients.type') }}</div>
+                    <div class="record-inner-label">{{ __('forms.type') }}</div>
                     <div class="record-inner-subvalue">Гістероскоп</div>
                 </div>
                 <div>

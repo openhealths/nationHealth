@@ -20,7 +20,7 @@ enum EncounterStatus: string
     {
         return match ($this) {
             self::ENTERED_IN_ERROR => __('patients.status.entered_in_error'),
-            self::FINISHED => __('patients.status.closed')
+            self::FINISHED => __('patients.status.completed')
         };
     }
 }

@@ -104,7 +104,7 @@
                     <div>
                         <div class="record-inner-label">{{ __('patients.doctor') }}</div>
                         <div class="record-inner-value">
-                            {{ data_get($clinicalImpression, 'assessor.display_value', '-') }}
+                            {{ data_get($clinicalImpression, 'assessor.displayValue', '-') }}
                         </div>
                     </div>
                     <div>

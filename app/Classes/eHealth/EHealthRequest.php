@@ -76,7 +76,7 @@ abstract class EHealthRequest extends PendingRequest
             return $response;
         }
 
-        if ($response->successful()) {
+        if ($response->successful() || $response->redirect()) {
             return $response;
         }
 

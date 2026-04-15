@@ -112,9 +112,6 @@ class EpisodeRepository extends BaseRepository
                 ->get()
                 ->keyBy('uuid');
 
-            // Delete episodes and relationships that exist in DB but not in API response
-            $this->deleteOrphaned($personId, $apiUuids);
-
             foreach ($validatedData as $data) {
                 $existing = $existingEpisodes->get($data['uuid']);
 
@@ -135,20 +132,5 @@ class EpisodeRepository extends BaseRepository
                 Repository::period()->sync($episode, $data['period']);
             }
         });
-    }
-
-    /**
-     * Remove episodes that are no longer in API response.
-     *
-     * @param  int  $personId
-     * @param  array  $apiUuids
-     * @return void
-     */
-    private function deleteOrphaned(int $personId, array $apiUuids): void
-    {
-        $this->model::where('person_id', $personId)
-            ->whereNotNull('uuid')
-            ->whereNotIn('uuid', $apiUuids)
-            ->delete();
     }
 }

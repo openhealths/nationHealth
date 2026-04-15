@@ -55,7 +55,6 @@ return [
     'view_details' => 'Переглянути деталі',
     'get_data_access' => 'Отримати доступ до даних',
     'class' => 'Клас',
-    'type' => 'Тип',
     'doctor_speciality' => 'Спеціалізація лікаря',
     'inpatient_care' => 'Стаціонарна медична допомога',
     'health_facility_interaction' => 'Взаємодія в закладі охорони здоров\'я',
@@ -74,8 +73,6 @@ return [
     'getting_indicators' => 'Отримання показників',
     'updated' => 'Оновлено',
     'medical_record_id' => 'ID Мед. Запису',
-    'state' => 'Стан',
-    'states' => 'Стани',
     'start_date' => 'Дата початку',
     'basic' => 'Основний',
     'final' => 'Заключний',
@@ -187,10 +184,16 @@ return [
         'expired' => 'Прострочений',
         'rejected' => 'Відхилений',
         'active' => 'Діючий',
-        'closed' => 'Завершений',
         'entered_in_error' => 'Внесений помилково',
         'valid' => 'Дійсний',
-        'final' => 'Кінцева'
+        'final' => 'Кінцева',
+        'recurrence' => 'рецидив',
+        'remission' => 'ремісія',
+        'resolved' => 'вилікуваний',
+        'confirmed' => 'заключний',
+        'differential' => 'диференціальний',
+        'provisional' => 'попередній',
+        'refuted' => 'спростований'
     ],
 
     'source' => [
@@ -273,7 +276,6 @@ return [
     'medical_reports' => 'Медичні висновки',
     'procedures' => 'Процедури',
     'care_plans' => 'Плани лікування',
-    'clinical_impressions' => 'Клінічні оцінки',
 
     // Main data
     'referral_available' => 'Є направлення',
@@ -300,11 +302,12 @@ return [
     'new_primary_diagnose' => "Ви вказали новий основний діагноз.<br> Підтвердження дії змінить основний діагноз епізоду медичної допомоги!",
     'duplicate_code_warning' => 'Такий код вже існує',
 
-    // Evidences
-    'evidence' => 'Докази',
-    'evidence_conditions' => 'Стани',
-    'evidence_observations' => 'Спостереження',
+    // Conditions
     'condition' => 'Стан',
+    'conditions' => 'Стани',
+    'evidence' => 'Докази',
+    'evidence_observations' => 'Спостереження',
+    'severity' => 'Ступінь тяжкості',
 
     // Additional data
     'additional_data' => 'Додаткові дані',
@@ -497,6 +500,7 @@ return [
         'clinical_impressions_synced_successfully' => 'Клінічні взаємодії успішно синхронізовані',
         'immunizations_synced_successfully' => 'Вакцинації успішно синхронізовані',
         'observations_synced_successfully' => 'Обстеження успішно синхронізовані',
+        'conditions_synced_successfully' => 'Стани успішно синхронізовані',
         'diagnostic_reports_synced_successfully' => 'Діагностичні звіти успішно синхронізовані',
     ]
 ];

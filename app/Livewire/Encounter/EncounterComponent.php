@@ -379,22 +379,14 @@ class EncounterComponent extends Component
         }
 
         try {
-            $params = EncounterRequestApi::buildGetObservationsInEpisodeContext(
+            $this->evidenceDetails = EHealth::condition()->getBySearchParams(
                 $this->patientUuid,
-                $episodeId
-            );
-            $this->evidenceDetails = PatientApi::getObservationsInEpisodeContext(
-                $this->patientUuid,
-                $episodeId,
-                $params
-            )['data'];
-        } catch (eHealthApiException $e) {
-            Log::channel('e_health_errors')->error('Error while getting evidence details', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ]);
-            session()?->flash('error', 'Виникла помилка. Зверніться до адміністратора.');
+                ['managing_organization_id' => legalEntity()->uuid]
+            )->getData();
+        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+            $this->handleEHealthExceptions($exception, 'Error while getting evidence details');
+
+            return;
         }
     }
 

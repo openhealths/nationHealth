@@ -33,11 +33,11 @@ class PatientSummary extends BasePatientComponent
 
     public array $observations = [];
 
-    public array $diagnoses;
+    public array $diagnoses = [];
 
-    public array $conditions;
+    public array $conditions = [];
 
-    public array $diagnosticReports;
+    public array $diagnosticReports = [];
 
     public array $allergyIntolerances;
 
@@ -63,6 +63,10 @@ class PatientSummary extends BasePatientComponent
         'eHealth/observation_methods',
         'eHealth/observation_interpretations',
         'eHealth/body_sites',
+        'eHealth/ICPC2/condition_codes',
+        'eHealth/ICD10/condition_codes',
+        'eHealth/condition_severities',
+        'eHealth/diagnostic_report_categories',
     ];
 
     protected function initializeComponent(): void
@@ -245,11 +249,46 @@ class PatientSummary extends BasePatientComponent
             ->toArray();
     }
 
+    public function syncDiagnoses(): void
+    {
+        try {
+            $response = EHealth::patient()->getActiveDiagnoses($this->uuid);
+
+            // Refresh data for display
+            $this->diagnoses = Arr::toCamelCase($this->formatDatesForDisplay($response->getData()));
+        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+            $this->handleEHealthExceptions($exception, 'Error when getting diagnoses');
+
+            return;
+        }
+    }
+
+    public function getDiagnoses(): void
+    {
+        //
+    }
+
     public function syncConditions(): void
     {
         try {
-            $response = EHealth::patient()->getConditions($this->uuid);
+            $response = EHealth::condition()->getBySearchParams(
+                $this->uuid,
+                ['managing_organization_id' => legalEntity()->uuid]
+            );
             $validatedData = $response->validate();
+
+            try {
+                Repository::condition()->sync($this->id, $validatedData);
+                Session::flash('success', __('patients.messages.conditions_synced_successfully'));
+            } catch (Throwable $exception) {
+                $this->logDatabaseErrors($exception, 'Error while synchronizing conditions');
+                Session::flash('error', __('messages.database_error'));
+
+                return;
+            }
+
+            // Refresh data for display
+            $this->conditions = Arr::toCamelCase($this->formatDatesForDisplay($validatedData));
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             $this->handleEHealthExceptions($exception, 'Error when getting conditions');
 

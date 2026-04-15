@@ -202,7 +202,7 @@
                             <option value="">{{ __('forms.select') }} ...</option>
                         </select>
                         <label for="filterType" class="label">
-                            {{ __('patients.type') }}
+                            {{ __('forms.type') }}
                         </label>
                     </div>
                 </div>
@@ -293,7 +293,7 @@
                                 <div class="record-inner-value text-[14px] font-semibold break-words leading-tight">{{ __('patients.inpatient_care') }}</div>
                             </div>
                             <div class="min-w-0">
-                                <div class="record-inner-label text-[10px] uppercase">{{ __('patients.type') }}</div>
+                                <div class="record-inner-label text-[10px] uppercase">{{ __('forms.type') }}</div>
                                 <div class="record-inner-value text-[14px] font-semibold break-words leading-tight">{{ __('patients.health_facility_interaction') }}</div>
                             </div>
                             <div class="min-w-0">

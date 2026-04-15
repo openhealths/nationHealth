@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Repositories\MedicalEvents;
 
 use App\Core\Arr;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
-use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\Immunization;
 use App\Models\MedicalEvents\Sql\ImmunizationDoseQuantity;
@@ -224,9 +222,6 @@ class ImmunizationRepository extends BaseRepository
                 ->get()
                 ->keyBy('uuid');
 
-            // Delete immunizations and relationships that exist in DB but not in API response
-            $this->deleteOrphaned($personId, $apiUuids);
-
             foreach ($validatedData as $data) {
                 $existing = $existingImmunizations->get($data['uuid']);
 
@@ -268,80 +263,6 @@ class ImmunizationRepository extends BaseRepository
                 $this->syncExplanations($immunization, $existing, $data['explanation'] ?? []);
                 $this->syncReactions($existing, $data['reactions'], $immunization);
                 $this->syncVaccinationProtocols($immunization, $existing, $data['vaccination_protocols'] ?? []);
-            }
-        });
-    }
-
-    /**
-     * Cascade delete.
-     *
-     * @param  int  $personId
-     * @param  array  $apiUuids
-     * @return void
-     * @throws Throwable
-     */
-    private function deleteOrphaned(int $personId, array $apiUuids): void
-    {
-        $orphaned = $this->model->where('person_id', $personId)
-            ->whereNotNull('uuid')
-            ->whereNotIn('uuid', $apiUuids)
-            ->withAllRelations()
-            ->get();
-
-        if ($orphaned->isEmpty()) {
-            return;
-        }
-
-        DB::transaction(static function () use ($orphaned) {
-            $vaccineCode = $orphaned->pluck('vaccine_code_id')->filter()->toArray();
-            $contextIds = $orphaned->pluck('context_id')->filter()->toArray();
-            $performerIds = $orphaned->pluck('performer_id')->filter()->toArray();
-            $reportOriginIds = $orphaned->pluck('report_origin_id')->filter()->toArray();
-            $siteIds = $orphaned->pluck('site_id')->filter()->toArray();
-            $routeIds = $orphaned->pluck('route_id')->filter()->toArray();
-            $doseQuantityIds = $orphaned->pluck('doseQuantity.id')->filter()->toArray();
-            $explanationIds = $orphaned->flatMap->explanations->pluck('id')->toArray();
-            $reactionIds = $orphaned->flatMap->reactions->pluck('id')->toArray();
-
-            $vaccinationProtocols = $orphaned->flatMap->vaccinationProtocols;
-            $vaccinationProtocolIds = $vaccinationProtocols->pluck('id')->toArray();
-            $authorityIds = $vaccinationProtocols->pluck('authority.id')->filter()->toArray();
-            $targetDiseaseIds = $vaccinationProtocols->flatMap->targetDiseases->pluck('id')->toArray();
-
-            $identifierIds = array_merge($contextIds, $performerIds, $reactionIds);
-            $codeableConceptIds = array_merge(
-                $vaccineCode,
-                $reportOriginIds,
-                $siteIds,
-                $routeIds,
-                $explanationIds,
-                $authorityIds,
-                $targetDiseaseIds
-            );
-
-            $identifierCodeableConceptIds = CodeableConcept::whereCodeableConceptableType(Identifier::class)
-                ->whereIn('codeable_conceptable_id', $identifierIds)
-                ->pluck('id')
-                ->toArray();
-
-            $orphaned->each->delete();
-
-            // Codeable concept
-            Coding::whereCodeableType(CodeableConcept::class)
-                ->whereIn('codeable_id', array_merge($codeableConceptIds, $identifierCodeableConceptIds))
-                ->delete();
-            CodeableConcept::whereIn('id', array_merge($codeableConceptIds, $identifierCodeableConceptIds))->delete();
-
-            // Identifier
-            Identifier::whereIn('id', $identifierIds)->delete();
-
-            if (!empty($doseQuantityIds)) {
-                ImmunizationDoseQuantity::whereIn('id', $doseQuantityIds)->delete();
-            }
-
-            // Delete vaccination protocols
-            if (!empty($vaccinationProtocolIds)) {
-                ImmunizationVaccinationProtocol::whereIn('id', $vaccinationProtocolIds)->delete();
             }
         });
     }
@@ -456,7 +377,7 @@ class ImmunizationRepository extends BaseRepository
                 // Create new reaction
                 $identifier = Repository::identifier()->store(
                     $item['detail']['identifier']['value'],
-                    $item['detail']['identifier']['display_value'] ?? null
+                    $item['detail']['display_value'] ?? null
                 );
                 Repository::codeableConcept()->attach($identifier, $item['detail']);
 

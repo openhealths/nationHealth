@@ -9,7 +9,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ConditionEvidence extends Model
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'condition_id',
+        'codes_id',
+        'details_id'
+    ];
 
     protected $table = 'condition_evidences';
 
@@ -30,5 +34,10 @@ class ConditionEvidence extends Model
     public function codes(): BelongsTo
     {
         return $this->belongsTo(CodeableConcept::class, 'codes_id');
+    }
+
+    public function details(): BelongsTo
+    {
+        return $this->belongsTo(Identifier::class, 'details_id');
     }
 }

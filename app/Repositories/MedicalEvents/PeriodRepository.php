@@ -27,15 +27,9 @@ class PeriodRepository extends BaseRepository
         $existing = $periodable->{$relation};
 
         if ($existing) {
-            $existing->update([
-                'start' => $periodData['start'],
-                'end' => $periodData['end'] ?? null
-            ]);
+            $existing->update($periodData);
         } else {
-            $periodable->{$relation}()->create([
-                'start' => $periodData['start'],
-                'end' => $periodData['end'] ?? null
-            ]);
+            $periodable->{$relation}()->create($periodData);
         }
     }
 }

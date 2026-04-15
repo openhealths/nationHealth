@@ -12,7 +12,7 @@
               }"
     >
         <legend class="legend">
-            <h2>{{ __('patients.evidence_conditions') }}</h2>
+            <h2>{{ __('patients.conditions') }}</h2>
         </legend>
 
         <table class="table-input w-inherit">
