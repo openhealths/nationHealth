@@ -12,8 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('care_plans', function (Blueprint $table) {
-            $table->string('clinical_protocol')->nullable()->after('category');
-            $table->string('context')->nullable()->after('clinical_protocol');
+            if (!Schema::hasColumn('care_plans', 'clinical_protocol')) {
+                $table->string('clinical_protocol')->nullable()->after('category');
+            }
+            if (!Schema::hasColumn('care_plans', 'context')) {
+                $table->string('context')->nullable()->after('clinical_protocol');
+            }
         });
     }
 
@@ -23,7 +27,12 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('care_plans', function (Blueprint $table) {
-            $table->dropColumn(['clinical_protocol', 'context']);
+            if (Schema::hasColumn('care_plans', 'clinical_protocol')) {
+                $table->dropColumn('clinical_protocol');
+            }
+            if (Schema::hasColumn('care_plans', 'context')) {
+                $table->dropColumn('context');
+            }
         });
     }
 };

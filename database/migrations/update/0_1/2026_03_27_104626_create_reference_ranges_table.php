@@ -13,18 +13,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('reference_ranges', function (Blueprint $table) {
-            $table->id();
-            $table->nullableMorphs('referenceable');
-            $table->foreignId('low_id')->nullable()->constrained('quantities');
-            $table->foreignId('high_id')->nullable()->constrained('quantities');
-            $table->foreignId('type_id')->nullable()->constrained('codeable_concepts');
-            $table->foreignId('applies_to_id')->nullable()->constrained('codeable_concepts');
-            $table->foreignId('age_low_id')->nullable()->constrained('quantities');
-            $table->foreignId('age_high_id')->nullable()->constrained('quantities');
-            $table->text('text')->nullable();
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('reference_ranges')) {
+            Schema::create('reference_ranges', function (Blueprint $table) {
+                $table->id();
+                $table->nullableMorphs('referenceable');
+                $table->foreignId('low_id')->nullable()->constrained('quantities');
+                $table->foreignId('high_id')->nullable()->constrained('quantities');
+                $table->foreignId('type_id')->nullable()->constrained('codeable_concepts');
+                $table->foreignId('applies_to_id')->nullable()->constrained('codeable_concepts');
+                $table->foreignId('age_low_id')->nullable()->constrained('quantities');
+                $table->foreignId('age_high_id')->nullable()->constrained('quantities');
+                $table->text('text')->nullable();
+                $table->timestamps();
+            });
+        }
     }
 
     /**

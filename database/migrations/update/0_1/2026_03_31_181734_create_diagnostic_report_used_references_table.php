@@ -13,12 +13,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('diagnostic_report_used_references', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('diagnostic_report_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('identifier_id')->constrained('identifiers')->cascadeOnDelete();
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('diagnostic_report_used_references')) {
+            Schema::create('diagnostic_report_used_references', static function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('diagnostic_report_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('identifier_id')->constrained('identifiers')->cascadeOnDelete();
+                $table->timestamps();
+            });
+        }
     }
 
     /**

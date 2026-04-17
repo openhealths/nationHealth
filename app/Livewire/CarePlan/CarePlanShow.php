@@ -34,6 +34,7 @@ class CarePlanShow extends Component
 
     // Activity Form state
     public array $activityForm = [
+        'id' => null,
         'kind' => 'service_request',
         'program' => '',
         'quantity' => '',
@@ -114,8 +115,57 @@ class CarePlanShow extends Component
 
     public function initActivityForm(string $kind): void
     {
-        $this->activityForm['kind'] = $kind;
-        $this->activityForm['scheduled_period_start'] = now()->format('d.m.Y');
+        $this->activityForm = [
+            'id' => null,
+            'kind' => $kind,
+            'program' => '',
+            'quantity' => '',
+            'quantity_system' => '',
+            'quantity_code' => '',
+            'daily_amount' => '',
+            'reason_code' => '',
+            'reason_reference' => '',
+            'goal' => '',
+            'description' => '',
+            'scheduled_period_start' => now()->format('d.m.Y'),
+            'scheduled_period_end' => '',
+            'product_reference' => '',
+            'product_codeable_concept' => '',
+        ];
+    }
+
+    public function editActivity(int $activityId, CarePlanActivityRepository $repository): void
+    {
+        $activity = $repository->findById($activityId);
+        if (!$activity) return;
+
+        $this->activityForm = [
+            'id' => $activity->id,
+            'kind' => is_array($activity->kind) ? ($activity->kind['coding'][0]['code'] ?? ($activity->kind['text'] ?? '')) : ($activity->kindConcept?->coding?->first()?->code ?? $activity->kind),
+            'program' => $activity->program ?? '',
+            'quantity' => is_array($activity->quantity) ? ($activity->quantity['value'] ?? '') : $activity->quantity,
+            'quantity_system' => is_array($activity->quantity) ? ($activity->quantity['unit'] ?? '') : $activity->quantity_system,
+            'quantity_code' => $activity->quantity_code ?? '',
+            'daily_amount' => $activity->daily_amount ?? '',
+            'reason_code' => $activity->reason_code ?? '',
+            'reason_reference' => $activity->reason_reference ?? '',
+            'goal' => $activity->goal ?? '',
+            'description' => $activity->description ?? '',
+            'scheduled_period_start' => $activity->scheduled_period_start?->format('d.m.Y') ?? '',
+            'scheduled_period_end' => $activity->scheduled_period_end?->format('d.m.Y') ?? '',
+            'product_reference' => $activity->product_reference ?? '',
+            'product_codeable_concept' => $activity->product_codeable_concept ?? '',
+        ];
+
+        if ($this->activityForm['kind'] === 'service_request' || $this->activityForm['kind'] === 'ServiceRequest') {
+            $this->showServiceDrawer = true;
+        } elseif ($this->activityForm['kind'] === 'medication_request' || $this->activityForm['kind'] === 'MedicationRequest') {
+            $this->showMedicationDrawer = true;
+        } elseif ($this->activityForm['kind'] === 'device_request' || $this->activityForm['kind'] === 'DeviceRequest') {
+            $this->showMedicalDeviceDrawer = true;
+        } else {
+            $this->showServiceDrawer = true;
+        }
     }
 
     public function saveActivity(CarePlanActivityRepository $repository): void
@@ -133,21 +183,34 @@ class CarePlanShow extends Component
             return;
         }
 
-        $repository->create([
-            'care_plan_id' => $this->carePlan->id,
-            'author_id' => Auth::user()?->activeEmployee()?->id,
-            'status' => 'NEW',
-            'kind' => $validated['activityForm']['kind'],
-            'quantity' => $validated['activityForm']['quantity'] ?? null,
-            'description' => $validated['activityForm']['description'] ?? null,
-            'product_reference' => $validated['activityForm']['product_reference'] ?? null,
-            'scheduled_period_start' => convertToYmd($validated['activityForm']['scheduled_period_start']),
-            'scheduled_period_end' => !empty($this->activityForm['scheduled_period_end'])
-                ? convertToYmd($this->activityForm['scheduled_period_end']) : null,
-        ]);
+        if (!empty($this->activityForm['id'])) {
+            $repository->updateById($this->activityForm['id'], [
+                'kind' => $validated['activityForm']['kind'],
+                'quantity' => $validated['activityForm']['quantity'] ?? null,
+                'description' => $validated['activityForm']['description'] ?? null,
+                'product_reference' => $validated['activityForm']['product_reference'] ?? null,
+                'scheduled_period_start' => convertToYmd($validated['activityForm']['scheduled_period_start']),
+                'scheduled_period_end' => !empty($this->activityForm['scheduled_period_end'])
+                    ? convertToYmd($this->activityForm['scheduled_period_end']) : null,
+            ]);
+            Session::flash('success', __('care-plan.activity_updated'));
+        } else {
+            $repository->create([
+                'care_plan_id' => $this->carePlan->id,
+                'author_id' => Auth::user()?->activeEmployee()?->id,
+                'status' => 'NEW',
+                'kind' => $validated['activityForm']['kind'],
+                'quantity' => $validated['activityForm']['quantity'] ?? null,
+                'description' => $validated['activityForm']['description'] ?? null,
+                'product_reference' => $validated['activityForm']['product_reference'] ?? null,
+                'scheduled_period_start' => convertToYmd($validated['activityForm']['scheduled_period_start']),
+                'scheduled_period_end' => !empty($this->activityForm['scheduled_period_end'])
+                    ? convertToYmd($this->activityForm['scheduled_period_end']) : null,
+            ]);
+            Session::flash('success', __('care-plan.activity_draft_saved'));
+        }
 
         $this->carePlan->refresh();
-        Session::flash('success', __('care-plan.activity_draft_saved'));
 
         // Close drawers
         $this->dispatch('close-drawers');
