@@ -8,6 +8,7 @@ use App\Classes\eHealth\EHealth;
 use App\Models\CarePlan;
 use App\Models\Person;
 use App\Traits\FormTrait;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Livewire\Component;
@@ -18,7 +19,7 @@ class CarePlanApprovals extends Component
 
     public CarePlan $carePlan;
     public Person $patient;
-    public array $approvals = [];
+    public Collection $approvals;
     public bool $isLoading = false;
 
     // For creating new approval
@@ -31,6 +32,7 @@ class CarePlanApprovals extends Component
     {
         $this->carePlan = $carePlan;
         $this->patient = $carePlan->person;
+        $this->approvals = new Collection();
         $this->fetchApprovals();
     }
 
@@ -38,11 +40,8 @@ class CarePlanApprovals extends Component
     {
         $this->isLoading = true;
         try {
-            $response = EHealth::approval()->getMany([
-                'granted_resource_type' => 'care_plan',
-                'granted_resource_id' => $this->carePlan->uuid,
-            ]);
-            $this->approvals = $response->getData();
+            app(\App\Repositories\ApprovalRepository::class)->syncApprovals($this->carePlan, 'care_plan');
+            $this->approvals = $this->carePlan->approvals()->with('grantedTo')->latest()->get();
         } catch (\Exception $e) {
             Log::error('CarePlanApprovals: failed to fetch: ' . $e->getMessage());
             Session::flash('error', __('care-plan.approvals_fetch_error'));
