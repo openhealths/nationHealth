@@ -4,17 +4,27 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use Exception;
+use App\Core\Arr;
 use App\Models\Role;
 use App\Models\Permission;
 use Illuminate\Support\Carbon;
 use App\Models\LegalEntityType;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\PermissionRegistrar;
 use Illuminate\Database\Migrations\Migrator;
+use Illuminate\Support\Facades\File;
 
 abstract class MigrationsCommand extends Command
 {
+    protected const string LE_TYPES_SCOPE_PATH = 'scopes/legal_entity_types.json';
+    protected const string LE_ROLES_SCOPE_PATH = 'scopes/roles.json';
+
+    protected const string CONFIG_TYPES_SCOPE_PATH = 'config/scopes/legal_entity_types.php';
+    protected const string CONFIG_ROLES_SCOPE_PATH = 'config/scopes/roles.php';
+
     protected const int CHUNK_SIZE = 1000;
 
     // Flag indicating whether the command is performing a rollback operation.
@@ -201,7 +211,14 @@ abstract class MigrationsCommand extends Command
      */
     protected function syncScopes(): void
     {
-        $this->warn("Updating scopes...\n");
+        $this->warn("\nUpdating scopes...\n");
+
+        //  See help about source file in PHPDocs for each functions below.
+        $this->updateLegalEntityTypeScopesConfig();
+        $this->updateRoleScopesConfig();
+
+        // Reread the config
+        config()->set('ehealth', require config_path('ehealth.php'));
 
         DB::transaction(function () {
             $this->syncLegalEntityTypes();
@@ -672,5 +689,176 @@ abstract class MigrationsCommand extends Command
 
         // Clear permission cache
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
+    /**
+     * Update the legal entity types scopes configuration from the source scopes file.
+        *
+        * Base source structure for scopes/legal_entity_types.json:
+        * {
+        *   "data": [
+        *     {
+        *       "name": "PRIMARY_CARE",
+        *       "scope": "employee:read employee:write",
+        *       "missed": "division:read",
+        *       "extra": "contract:read"
+        *     },
+        *     {
+        *       "name": "MSP",
+        *       "scope": "employee:read employee:write"
+        *     }
+        *        ...
+        *   ]
+        * }
+        *
+        * Note:
+        * - "scope" is the base list of scopes separated by spaces.
+        * - "missed" adds scopes that should be appended to the final set.
+        * - "extra" also adds scopes to the final set.
+        * - "missed" and "extra" are optional and may be ommitted.
+     *
+     * @return void
+     */
+    protected function updateLegalEntityTypeScopesConfig(): void
+    {
+        if (!Storage::exists(self::LE_TYPES_SCOPE_PATH)) {
+            $this->warn("\nNo source scopes file for legal entity types found. Skipping update config...\n");
+
+            return;
+        };
+
+        $config['OPEN'] = '<?php' . PHP_EOL . PHP_EOL. 'return [';
+
+        $data = Arr::get(Storage::json(self::LE_TYPES_SCOPE_PATH), 'data', []);
+
+        foreach ($data as $item) {
+            $typeName = Arr::get($item, 'name');
+
+            $scopes = explode(" ", Arr::get($item, 'scope', ""));
+            $missed = explode(" ", Arr::get($item, 'missed', ""));
+            $extra = explode(" ", Arr::get($item, 'extra', ""));
+
+            $scopes = collect([...$scopes, ...$missed, ...$extra])
+                ->filter(fn($scope) => !empty($scope))
+                ->map(fn($scope) => "'$scope'")
+                ->unique()
+                ->values()
+                ->toArray();
+
+            $config[$typeName] = $scopes;
+        }
+
+        $config['CLOSE'] ="];";
+
+        $this->saveScopesToFile(self::CONFIG_TYPES_SCOPE_PATH, $config);
+    }
+
+    /**
+     * Update the legal entity roles scopes configuration from the source scopes file.
+        *
+        * Base source structure for scopes/roles.json:
+        * {
+        *   "data": [
+        *     {
+        *       "name": "DOCTOR",
+        *       "scope": "encounter:read encounter:write"
+        *     },
+        *     {
+        *       "name": "ADMIN",
+        *       "scope": "employee:read employee:write"
+        *     }
+        *       ...
+        *   ]
+        * }
+        *
+        * Note:
+        * - "name" must match a role from ehealth.legal_entity_employee_types.
+        * - "scope" is a space-delimited list.
+     *
+     * @return void
+     */
+    protected function updateRoleScopesConfig(): void
+    {
+        if (!Storage::exists(self::LE_ROLES_SCOPE_PATH)) {
+            $this->warn("\nNo source scopes file for legal entity roles found. Skipping update config...\n");
+
+            return;
+        }
+
+        $roles = collect(array_values(config('ehealth.legal_entity_employee_types')))->flatten()->unique();
+
+        $config['OPEN'] = '<?php' . PHP_EOL . PHP_EOL. 'return [';
+
+        $data = Arr::get(Storage::json(self::LE_ROLES_SCOPE_PATH), 'data', []);
+
+        foreach ($data as $item) {
+            $roleName = Arr::get($item, 'name');
+
+            if (!$roles->contains($roleName)) {
+                continue;
+            }
+
+            $scopes = explode(" ", Arr::get($item, 'scope', ""));
+
+            $scopes = collect([...$scopes])
+                ->filter(fn($scope) => !empty($scope))
+                ->map(fn($scope) => "'$scope'")
+                ->unique()
+                ->values()
+                ->toArray();
+
+            $config[$roleName] = $scopes;
+        }
+
+        $config['CLOSE'] ="];";
+
+        $this->saveScopesToFile(self::CONFIG_ROLES_SCOPE_PATH, $config);
+    }
+
+    /**
+     * Persist generated scopes configuration to a PHP config file.
+     *
+     * @param string $path Target config file path.
+     * @param array<string, mixed> $config Prepared scopes configuration data.
+     *
+     * @return void
+     *
+     * @throws Exception
+     */
+    protected function saveScopesToFile(string $path, array $config = []): void
+    {
+        if (empty($config)) {
+            $this->warn("\nNo scopes received to save to file: {$path}\n");
+
+            return;
+        }
+
+        $tmpPath = $path . '.tmp';
+
+        try {
+            File::put($tmpPath, '');
+
+            foreach ($config as $typeName => $data) {
+                if ($typeName === 'OPEN' || $typeName === 'CLOSE') {
+                    File::append($tmpPath, $data . PHP_EOL);
+
+                    continue;
+                }
+
+                File::append($tmpPath, "\t'$typeName' => [". PHP_EOL ."\t\t");
+
+                foreach ($data as $scope) {
+                    File::append($tmpPath, "$scope, ");
+                }
+
+                File::append($tmpPath, PHP_EOL . "\t]," . PHP_EOL);
+            }
+
+            if (File::exists($tmpPath) && filesize($tmpPath) > 0) {
+                File::move($tmpPath, $path);
+            }
+        } catch (Exception $err) {
+            $this->error("Error writing to file: {$path}. Error: " . $err->getMessage());
+        }
     }
 }
