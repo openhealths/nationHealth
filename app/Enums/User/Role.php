@@ -12,6 +12,7 @@ enum Role: string
 
     case OWNER = 'OWNER';
     case PHARMACY_OWNER = 'PHARMACY_OWNER';
+    case REORGANIZATION_OWNER = 'REORGANIZATION_OWNER';
     case ADMIN = 'ADMIN';
     case DOCTOR = 'DOCTOR';
     case HR = 'HR';
@@ -28,6 +29,7 @@ enum Role: string
         return match ($this) {
             self::OWNER => __('users.role.OWNER'),
             self::PHARMACY_OWNER => __('users.role.PHARMACY_OWNER'),
+            self::REORGANIZATION_OWNER => __('users.role.REORGANIZATION_OWNER'),
             self::ADMIN => __('users.role.ADMIN'),
             self::DOCTOR => __('users.role.DOCTOR'),
             self::HR => __('users.role.HR'),

@@ -6,27 +6,27 @@ namespace App\Http\Controllers\Auth;
 
 use Closure;
 use Carbon\Carbon;
-use App\Auth\EHealth\Services\TokenStorage;
-use App\Classes\eHealth\Exceptions\ApiException;
-use App\Events\EHealthUserLogin;
-use App\Http\Controllers\Controller;
-use App\Mail\UserCredentialsMail;
 use App\Models\User;
 use App\Models\LegalEntity;
-use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use App\Events\EHealthUserLogin;
+use App\Mail\UserCredentialsMail;
+use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Session;
 use App\Classes\eHealth\Api\EmployeeApi;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Validator;
+use App\Auth\EHealth\Services\TokenStorage;
+use App\Classes\eHealth\Exceptions\ApiException;
 use App\Classes\eHealth\Request as EHealthRequest;
 use Illuminate\Contracts\Validation\Validator as ResponseValidator;
-use Illuminate\Validation\Rule;
 
 class EHealthLoginController extends Controller
 {
@@ -56,6 +56,8 @@ class EHealthLoginController extends Controller
         if (!$request->has('code')) {
             return Redirect::route('login');
         }
+
+        $loginedGuard = Session::get('logined_guard', 'web');
 
         $selectedLegalEntityUuidFromSession = Session::pull('selected_legal_entity_uuid_for_ehealth');
 
@@ -101,7 +103,7 @@ class EHealthLoginController extends Controller
 
         $legalEntity = LegalEntity::whereUuid($authLegalEntityUUID)->firstOrFail();
 
-        Auth::shouldUse('ehealth');
+        Auth::shouldUse($loginedGuard);
 
         $user = $this->findOrCreateUser($legalEntity, $authUserUUID);
 
@@ -117,7 +119,7 @@ class EHealthLoginController extends Controller
             return $this->breakAuth('auth.login.error.test_user_email');
         }
 
-        Auth::guard('ehealth')->login($user);
+        Auth::guard($loginedGuard)->login($user);
 
         $ehealthScopes = explode(
             ' ',
@@ -126,7 +128,7 @@ class EHealthLoginController extends Controller
 
         $user->syncPermissions($ehealthScopes);
 
-        EHealthUserLogin::dispatch($user, $legalEntity, $authUserUUID, $this->isFirstLogin);
+        EHealthUserLogin::dispatch($user, $legalEntity, $authUserUUID, $this->isFirstLogin, $loginedGuard);
 
         $user->refresh();
 
@@ -150,7 +152,7 @@ class EHealthLoginController extends Controller
             );
         }
 
-        Auth::guard('ehealth')->logout();
+        Auth::guard($loginedGuard)->logout();
 
         return Redirect::route('login')->with('error', __('auth.login.error.legal_entity.wrong_request'));
     }
@@ -278,6 +280,7 @@ class EHealthLoginController extends Controller
 
         // Forget session data
         Session::forget($authEhealth);
+        Session::forget('logined_guard');
 
         // Redirect to login page with error message
         $err = $err ?: 'auth.login.error.common';

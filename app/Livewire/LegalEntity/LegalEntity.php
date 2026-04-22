@@ -1025,13 +1025,13 @@ abstract class LegalEntity extends Component
 
         Auth::shouldUse('web');
 
-        // Assign the 'OWNER' role to the user authenticated via web guard
-        $owner->assignRole(Role::OWNER);
+        // Assign the OWNER's roles to the user authenticated via web guard
+        $owner->assignRole([Role::OWNER, Role::REORGANIZATION_OWNER]);
 
         Auth::shouldUse('ehealth');
 
-        // Assign the 'OWNER' role to the user authenticated via ehealth guard
-        $owner->assignRole(Role::OWNER);
+        // Assign the OWNER's roles to the user authenticated via ehealth guard
+        $owner->assignRole([Role::OWNER, Role::REORGANIZATION_OWNER]);
 
         // Send credentials and email verification link
         event(new LegalEntityCreate($authenticatedUser, $owner, $password));

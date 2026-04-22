@@ -15,10 +15,11 @@ use App\Jobs\LegalEntitySync;
 use App\Jobs\DeclarationsSync;
 use App\Jobs\EmployeeRoleSync;
 use App\Events\EHealthUserLogin;
-use App\Jobs\EmployeeRequestsSyncAll;
 use App\Jobs\PartyVerificationSync;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Auth;
+use App\Jobs\EmployeeRequestsSyncAll;
 use App\Notifications\SyncNotification;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -42,7 +43,9 @@ class FirstLoginOwnerSynchronization implements ShouldQueue
         // This need to be user with roles and permissions loaded
         setPermissionsTeamId($event->legalEntity->id);
 
-        $event->user->load('roles', 'permissions', 'party');
+        Auth::shouldUse($event->guard);
+
+        $user = $event->user->load('roles', 'permissions', 'party');
 
         // Check if it's the first login to the Legal Entity
         if ($event->legalEntity->syncStatus) {
@@ -62,7 +65,7 @@ class FirstLoginOwnerSynchronization implements ShouldQueue
             isFirstLogin: true
         );
 
-        if ($legalEntityType !== LegalEntity::TYPE_PHARMACY) {
+        if ($legalEntityType !== LegalEntity::TYPE_PHARMACY && !$event->user->hasAllowedRole(Role::REORGANIZATION_OWNER)) {
             $nextJob = new EquipmentSync(
                 legalEntity: $event->legalEntity,
                 nextEntity: $nextJob,
@@ -112,13 +115,13 @@ class FirstLoginOwnerSynchronization implements ShouldQueue
             ->name('FirstLoginSync')
             ->withOption('legal_entity_id', $event->legalEntity->id)
             ->withOption('token', $event->token) // Here token is encrypted
-            ->withOption('user', $event->user)
+            ->withOption('user', $user)
             ->onQueue('sync')
             ->dispatch();
 
         $event->legalEntity->setEntityStatus(JobStatus::PROCESSING);
 
-        $event->user->notify(new SyncNotification('legal_entity', 'started'));
+        $user->notify(new SyncNotification('legal_entity', 'started'));
     }
 
     /**

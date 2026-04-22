@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Models\User;
+use App\Enums\User\Role;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
 use App\Models\Employee\Employee;
@@ -15,6 +16,8 @@ class PartyRepository
 {
     public function syncUserEmployeesAndRoles(Party $party, LegalEntity $legalEntity): void
     {
+        $isLegalEntityCanBeReorganized = $legalEntity->type->name  === LegalEntity::TYPE_PRIMARY_CARE || $legalEntity->type->name === LegalEntity::TYPE_OUTPATIENT;
+
         $partyEmployees = Employee::getEmployeesForParty(legalEntityId: $legalEntity->id, partyId: $party->id)->get();
 
         // Get all employee-user relations from pivot table for the legal entity to compare with the new candidates we want to sync later
@@ -59,6 +62,10 @@ class PartyRepository
                 ->unique()
                 ->values()
                 ->all();
+
+            if (\in_array(Role::OWNER->value, $availRoles) && $isLegalEntityCanBeReorganized) {
+                $availRoles[] = Role::REORGANIZATION_OWNER->value;
+            }
 
             // Determine which roles are new and need to be assigned
             $newRoles = collect($availRoles)->diff($oldRoles)->values()->toArray();

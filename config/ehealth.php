@@ -56,10 +56,10 @@ return [
             'OWNER', 'HR', 'DOCTOR', 'ADMIN', 'RECEPTIONIST', 'LABORANT'
         ],
         'MSP_LIMITED' => [
-            'OWNER', 'ADMIN', 'DOCTOR'
+            'REORGANIZATION_OWNER', 'OWNER', 'ADMIN', 'DOCTOR'
         ],
         'PRIMARY_CARE' => [
-            'OWNER', 'HR', 'DOCTOR', 'ASSISTANT', 'ADMIN', 'RECEPTIONIST', 'MED_ADMIN', 'LABORANT'
+            'REORGANIZATION_OWNER', 'OWNER', 'HR', 'DOCTOR', 'ASSISTANT', 'ADMIN', 'RECEPTIONIST', 'MED_ADMIN', 'LABORANT'
         ],
         // 'MSP_PHARMACY' => [
         //     'OWNER', 'HR', 'DOCTOR', 'ADMIN', 'PHARMACIST', 'RECEPTIONIST'
@@ -68,10 +68,10 @@ return [
             'PHARMACY_OWNER', 'OWNER', 'PHARMACIST', 'HR'
         ],
         'OUTPATIENT' => [
-            'OWNER', 'HR', 'ASSISTANT', 'SPECIALIST', 'ADMIN', 'RECEPTIONIST', 'MED_ADMIN', 'LABORANT', 'MED_COORDINATOR'
+            'REORGANIZATION_OWNER', 'OWNER', 'HR', 'ASSISTANT', 'SPECIALIST', 'ADMIN', 'RECEPTIONIST', 'MED_ADMIN', 'LABORANT', 'MED_COORDINATOR'
         ],
         'EMERGENCY' => [
-            'OWNER', 'HR', 'SPECIALIST', 'ASSISTANT', 'ADMIN'
+            'REORGANIZATION_OWNER', 'OWNER', 'HR', 'SPECIALIST', 'ASSISTANT', 'ADMIN'
         ],
     ],
 

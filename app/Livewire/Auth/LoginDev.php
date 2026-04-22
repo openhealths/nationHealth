@@ -8,6 +8,7 @@ use Exception;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\LegalEntity;
+use App\Livewire\Auth\Login;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Layout;
 use App\Classes\eHealth\EHealth;
@@ -94,6 +95,7 @@ class LoginDev extends Login
 
         Session::put('selected_legal_entity_uuid_for_ehealth', $legalEntityUuid);
         Session::put('selected_email', $this->email);
+        Session::put('logined_guard', 'ehealth');
 
         return Redirect::route(
             'ehealth.oauth.callback',

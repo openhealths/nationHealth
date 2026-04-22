@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
-use App\Enums\User\Role;
 use App\Models\User;
+use App\Enums\Status;
+use App\Enums\User\Role;
 use App\Models\LegalEntity;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Support\Facades\Auth;
@@ -79,7 +80,7 @@ class LegalEntityPolicy
             return Response::denyWithStatus(404);
         }
 
-        if ($user->hasAllowedRole([Role::OWNER]) && Auth::guard('ehealth')->check()) {
+        if ($user->hasAllowedRole([Role::OWNER]) && Auth::guard('ehealth')->check() && $legalEntity->status !== Status::REORGANIZED->value) {
             return Response::allow();
         }
 
@@ -99,7 +100,7 @@ class LegalEntityPolicy
             return Response::denyWithStatus(404);
         }
 
-        if ($user->hasAllowedRole([Role::OWNER, Role::ADMIN, Role::HR]) && Auth::guard('ehealth')->check()) {
+        if ($user->hasAllowedRole([Role::REORGANIZATION_OWNER, Role::OWNER, Role::ADMIN, Role::HR]) && Auth::guard('ehealth')->check()) {
             return Response::allow();
         }
 

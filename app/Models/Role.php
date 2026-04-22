@@ -125,6 +125,8 @@ class Role extends SpatieRole
     {
         $permissions = collect($permissions);
 
-        $query->whereDoesntHave('permissions', fn (Builder $q) => $q->whereNotIn('name', $permissions));
+        $query
+            ->whereHas('permissions')
+            ->whereDoesntHave('permissions', fn (Builder $q) => $q->whereNotIn('name', $permissions));
     }
 }

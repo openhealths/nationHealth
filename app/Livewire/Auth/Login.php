@@ -110,6 +110,7 @@ class Login extends Component
             }
 
             Session::put('selected_legal_entity_uuid_for_ehealth', $this->legalEntityUUID);
+            Session::put('logined_guard', 'ehealth');
 
             return Redirect::to($this->buildFirstEHealthLoginUrl());
         }
@@ -127,14 +128,17 @@ class Login extends Component
         }
 
         if (!$this->isLocalAuth) {
-            if (!empty($this->legalEntityUUID)) {
-                // Temporary save the UUID of the selected Legal Entity
-                Session::put('selected_legal_entity_uuid_for_ehealth', $this->legalEntityUUID);
-            } else {
+            if (empty($this->legalEntityUUID)) {
                 Log::error("Legal entity hasn't been choose for email $user->email");
 
                 return back();
             }
+
+            // Temporary save the UUID of the selected Legal Entity
+            Session::put('selected_legal_entity_uuid_for_ehealth', $this->legalEntityUUID);
+
+            // Save the guard to understand that we need to use eHealth authorization flow
+            Session::put('logined_guard', 'ehealth');
 
             return Redirect::to($this->buildEHealthLoginUrl($user));
         }
@@ -304,6 +308,7 @@ class Login extends Component
         // Base URL and client ID
         $baseUrl = config('ehealth.api.auth_host');
         $redirectUri = config('ehealth.api.redirect_uri');
+        $loginedGuard = Session::get('logined_guard', 'web');
 
         $selectedLegalEntityClientId = $this->getLegalEntityClientIdFromUuid($this->legalEntityUUID);
 
@@ -311,7 +316,7 @@ class Login extends Component
         // Ensure Spatie team context is set so Role->permissions() is scoped by the selected Legal Entity type
         $selectedLegalEntityId = LegalEntity::whereUuid($this->legalEntityUUID)->value('id');
 
-        Auth::shouldUse('ehealth');
+        Auth::shouldUse($loginedGuard);
 
         if ($selectedLegalEntityId) {
             setPermissionsTeamId($selectedLegalEntityId);
