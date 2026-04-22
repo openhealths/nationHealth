@@ -79,12 +79,13 @@ class WorkingHoursRule implements ValidationRule
      */
     protected function checkEmptyShift(mixed $shift): bool
     {
-        if (empty($shift)) {
+        if (!is_array($shift) || !array_key_exists(0, $shift) || !array_key_exists(1, $shift)) {
             return true;
         }
 
         // If Start time = '00:00' and endTime = '00:00' it means that day is off
-        if ($shift[0] === $shift[1] && $shift[0] === '00:00') {
+        // Also treat identical empty strings or nulls as off
+        if ($shift[0] === $shift[1] && ($shift[0] === '00:00' || $shift[0] === '' || $shift[0] === null)) {
             return true;
         }
 
@@ -138,6 +139,12 @@ class WorkingHoursRule implements ValidationRule
      */
     protected function compareTime(string $day, array $shift): bool
     {
+        if (!$this->isValidTimeFormat($shift[0] ?? null) || !$this->isValidTimeFormat($shift[1] ?? null)) {
+            $this->setMessage(__('divisions.errors.workingHours.wrongFormat'));
+
+            return false;
+        }
+
         $startTime = Carbon::createFromFormat('H:i', $shift[0]);
         $endTime = Carbon::createFromFormat('H:i', $shift[1]);
 
@@ -160,6 +167,12 @@ class WorkingHoursRule implements ValidationRule
      */
     protected function isShiftIntersected(string $prevShiftEnd, string $currShiftStart): bool
     {
+        if (!$this->isValidTimeFormat($currShiftStart) || !$this->isValidTimeFormat($prevShiftEnd)) {
+            $this->setMessage(__('divisions.errors.workingHours.wrongFormat'));
+
+            return true;
+        }
+
         $startTime = Carbon::createFromFormat('H:i', $currShiftStart);
         $endTime = Carbon::createFromFormat('H:i', $prevShiftEnd);
 
@@ -170,5 +183,20 @@ class WorkingHoursRule implements ValidationRule
         }
 
         return false;
+    }
+
+    /**
+     * Check if the time string is in valid H:i format.
+     *
+     * @param string|null $time
+     * @return bool
+     */
+    protected function isValidTimeFormat(?string $time): bool
+    {
+        if (empty($time)) {
+            return false;
+        }
+
+        return (bool) preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $time);
     }
 }
