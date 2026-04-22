@@ -109,4 +109,56 @@ class CarePlan extends Model
     {
         return $this->morphMany(Approval::class, 'approvable');
     }
+
+    public function getStatusDisplayAttribute(): string
+    {
+        // Simple translation check, fallback to english or original
+        $statusStr = strtolower($this->status ?? 'new');
+        $translated = __('care-plan.status.' . $statusStr);
+        return $translated === 'care-plan.status.' . $statusStr ? ucfirst($statusStr) : $translated;
+    }
+
+    public function getEhealthIdAttribute(): ?string
+    {
+        return $this->uuid;
+    }
+
+    public function getEpisodeIdAttribute(): ?string
+    {
+        if (is_array($this->supporting_info) && isset($this->supporting_info['episodes']) && !empty($this->supporting_info['episodes'])) {
+            return $this->supporting_info['episodes'][0]['name'] ?? null;
+        }
+        return null;
+    }
+
+    public function getNotesAttribute(): ?string
+    {
+        return $this->note;
+    }
+
+    public function getExtendedDescriptionAttribute(): ?string
+    {
+        return $this->description;
+    }
+
+    public function getAdditionalInfoAttribute(): ?string
+    {
+        return $this->context;
+    }
+
+    public function getCareProvisionConditionsAttribute(): ?string
+    {
+        return collect(config('ehealth.dictionaries.care_provision_condition') ?? [])->get($this->terms_of_service, $this->terms_of_service);
+    }
+
+    public function getMedicalConditionAttribute(): ?string
+    {
+        if ($this->encounter && $this->encounter->diagnoses && $this->encounter->diagnoses->isNotEmpty()) {
+            $condition = $this->encounter->diagnoses->first()->condition;
+            if ($condition) {
+                return $condition->code . ' - ' . $condition->code_display;
+            }
+        }
+        return null;
+    }
 }

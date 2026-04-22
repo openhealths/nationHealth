@@ -70,8 +70,9 @@ abstract class EHealthRequest extends PendingRequest
      */
     public function send(string $method, string $url, array $options = []): EHealthResponse|Response
     {
+        \Illuminate\Support\Facades\Log::debug("eHealth Request: {$method} {$url}", ['options' => $options]);
         $response = parent::send($method, $url, $options);
-
+        
         if (!is_a($response, EHealthResponse::class)) {
             return $response;
         }

@@ -23,8 +23,7 @@ class CarePlanCreate extends BasePatientComponent
     use WithFileUploads;
 
     public bool $showSignatureModal = false;
-
-
+    public string $patientUuid = '';
 
     // Care Plan form data
     public array $form = [
@@ -318,7 +317,7 @@ class CarePlanCreate extends BasePatientComponent
 
         $encounterData = $this->resolveEncounterData();
 
-        $repository->create([
+        $carePlan = $repository->create([
             'person_id' => $this->resolvePersonId(),
             'author_id' => Auth::user()?->activeEmployee()?->id,
             'legal_entity_id' => $legalEntity?->id,
@@ -343,10 +342,10 @@ class CarePlanCreate extends BasePatientComponent
 
         $this->dispatch('flashMessage', [
             'type'    => 'success',
-            'message' => __('care-plan.draft_saved'),
+            'message' => __('care-plan.draft_saved') ?? 'План лікування успішно збережено',
             'errors'  => [],
         ]);
-        $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
+        $this->redirectRoute('care-plan.edit', [legalEntity(), $carePlan->id], navigate: true);
     }
 
     /**
