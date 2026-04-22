@@ -6,7 +6,7 @@ namespace App\Livewire\CarePlan;
 
 use App\Classes\eHealth\EHealth;
 use App\Models\CarePlan;
-use App\Models\Person;
+use App\Models\Person\Person;
 use App\Traits\FormTrait;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;

@@ -67,7 +67,7 @@ class CarePlanShow extends Component
         $this->carePlan = $carePlan;
         
         // Fetch patient conditions for outcomeReference selection
-        $this->availableConditions = \App\Models\MedicalEvents\Sql\Condition::whereHas('encounter', function ($query) {
+        $this->availableConditions = \App\Models\MedicalEvents\Sql\Condition::whereHas('context', function ($query) {
             $query->where('person_id', $this->carePlan->person_id);
         })->with('code.coding')->get()->map(fn($c) => [
             'uuid' => $c->uuid,
@@ -325,6 +325,9 @@ class CarePlanShow extends Component
             Session::flash('error', __('care-plan.connection_error'));
             $this->showSignatureModal = false;
         } catch (EHealthValidationException|EHealthResponseException $exception) {
+            if (method_exists($exception, 'report')) {
+                $exception->report();
+            }
             Log::error('CarePlanShow: eHealth error: ' . $exception->getMessage());
             $msg = $exception instanceof EHealthValidationException
                 ? $exception->getFormattedMessage()
@@ -343,7 +346,7 @@ class CarePlanShow extends Component
         $legalEntity = legalEntity();
 
         // Build eHealth payload from model
-        $carePlanPayload = removeEmptyKeys([
+        $carePlanPayload = \App\Core\Arr::removeEmptyKeys([
             'intent' => 'order',
             'status' => 'new',
             'category' => is_array($this->carePlan->category) ? ($this->carePlan->category['coding'][0]['code'] ?? null) : $this->carePlan->category,
@@ -399,6 +402,9 @@ class CarePlanShow extends Component
             Session::flash('error', __('care-plan.connection_error'));
             $this->showSignatureModal = false;
         } catch (EHealthValidationException|EHealthResponseException $exception) {
+            if (method_exists($exception, 'report')) {
+                $exception->report();
+            }
             Log::error('CarePlanShow: eHealth error: ' . $exception->getMessage());
             $msg = $exception instanceof EHealthValidationException
                 ? $exception->getFormattedMessage()
@@ -494,6 +500,9 @@ class CarePlanShow extends Component
             Session::flash('error', __('care-plan.connection_error'));
             $this->showSignatureModal = false;
         } catch (EHealthValidationException|EHealthResponseException $exception) {
+            if (method_exists($exception, 'report')) {
+                $exception->report();
+            }
             Log::error('CarePlanActivity: eHealth error: ' . $exception->getMessage());
             $msg = $exception instanceof EHealthValidationException
                 ? $exception->getFormattedMessage()

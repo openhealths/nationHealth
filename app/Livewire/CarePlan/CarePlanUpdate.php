@@ -32,7 +32,10 @@ class CarePlanUpdate extends CarePlanCreate
         }
 
         $this->carePlan = $carePlan;
+        $this->id = $carePlan->person_id;
         $this->patientUuid = $carePlan->person?->uuid ?? '';
+        
+        parent::mount($legalEntity, $this->id);
         
         // Hydrate form from model
         $this->form = [
@@ -149,11 +152,11 @@ class CarePlanUpdate extends CarePlanCreate
 
         $this->dispatch('flashMessage', [
             'type'    => 'success',
-            'message' => __('care-plan.draft_updated'),
+            'message' => __('care-plan.draft_updated') ?? 'План лікування успішно збережено',
             'errors'  => [],
         ]);
         
-        $this->redirectRoute('care-plan.show', [legalEntity(), $this->carePlan->id], navigate: true);
+        $this->redirectRoute('care-plan.edit', [legalEntity(), $this->carePlan->id], navigate: true);
     }
 
     /**
@@ -267,6 +270,9 @@ class CarePlanUpdate extends CarePlanCreate
             $this->dispatch('flashMessage', ['type' => 'error', 'message' => __('care-plan.connection_error'), 'errors' => []]);
             $this->showSignatureModal = false;
         } catch (EHealthValidationException|EHealthResponseException $exception) {
+            if (method_exists($exception, 'report')) {
+                $exception->report();
+            }
             Log::error('CarePlan: eHealth error: ' . $exception->getMessage());
             $msg = $exception instanceof EHealthValidationException
                 ? $exception->getFormattedMessage()
