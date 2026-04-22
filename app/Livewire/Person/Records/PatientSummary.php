@@ -10,7 +10,7 @@ use App\Enums\JobStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Jobs\EpisodeSync;
-use App\Jobs\EncounterSync;
+use App\Jobs\EncounterShortSync;
 use App\Jobs\ClinicalImpressionSync;
 use App\Jobs\ImmunizationSync;
 use App\Jobs\ObservationSync;
@@ -707,7 +707,7 @@ class PatientSummary extends BasePatientComponent
     {
         return match ($entityType) {
             self::ENTITY_TYPE_EPISODE => EpisodeSync::BATCH_NAME,
-            self::ENTITY_TYPE_ENCOUNTER => EncounterSync::BATCH_NAME,
+            self::ENTITY_TYPE_ENCOUNTER => EncounterShortSync::BATCH_NAME,
             self::ENTITY_TYPE_CLINICAL_IMPRESSION => ClinicalImpressionSync::BATCH_NAME,
             self::ENTITY_TYPE_IMMUNIZATION => ImmunizationSync::BATCH_NAME,
             self::ENTITY_TYPE_OBSERVATION => ObservationSync::BATCH_NAME,
@@ -727,7 +727,7 @@ class PatientSummary extends BasePatientComponent
     {
         return match ($entityType) {
             self::ENTITY_TYPE_EPISODE => EpisodeSync::class,
-            self::ENTITY_TYPE_ENCOUNTER => EncounterSync::class,
+            self::ENTITY_TYPE_ENCOUNTER => EncounterShortSync::class,
             self::ENTITY_TYPE_CLINICAL_IMPRESSION => ClinicalImpressionSync::class,
             self::ENTITY_TYPE_IMMUNIZATION => ImmunizationSync::class,
             self::ENTITY_TYPE_OBSERVATION => ObservationSync::class,

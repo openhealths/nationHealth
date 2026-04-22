@@ -50,7 +50,7 @@
                     <div class="min-w-0">
                         <div class="record-inner-label">{{ __('patients.doctor_speciality') }}</div>
                         <div class="record-inner-value truncate">
-                            {{ $this->dictionaries['SPECIALITY_TYPE'][data_get($encounter, 'performer_speciality.coding.0.code')] ?? '-' }}
+                            {{ $this->dictionaries['SPECIALITY_TYPE'][data_get($encounter, 'performerSpeciality.coding.0.code')] ?? '-' }}
                         </div>
                     </div>
                 </div>

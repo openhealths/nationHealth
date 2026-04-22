@@ -54,7 +54,7 @@ class Encounter extends PatientApiBase
      */
     public function getShortBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateEncounters(...));
+        $this->setValidator($this->validateShortEncounters(...));
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $query ?? []);
@@ -79,7 +79,7 @@ class Encounter extends PatientApiBase
     }
 
     /**
-     * Get a list of encounters.
+     * Get a list of encounters by search params.
      *
      * @param  string  $patientId
      * @param  array{
@@ -101,6 +101,7 @@ class Encounter extends PatientApiBase
      */
     public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator($this->validateEncounters(...));
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $query ?? []);
@@ -114,6 +115,28 @@ class Encounter extends PatientApiBase
      * @param  EHealthResponse  $response
      * @return array
      */
+    protected function validateShortEncounters(EHealthResponse $response): array
+    {
+        $replaced = [];
+        foreach ($response->getData() as $data) {
+            $replaced[] = $this->replaceEHealthPropNames($data);
+        }
+
+        $rules = collect($this->shortEncounterValidationRules())
+            ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
+            ->toArray();
+
+        $validator = Validator::make($replaced, $rules);
+
+        if ($validator->fails()) {
+            Log::channel('e_health_errors')->error(
+                'Encounter validation failed: ' . implode(', ', $validator->errors()->all())
+            );
+        }
+
+        return $validator->validate();
+    }
+
     protected function validateEncounters(EHealthResponse $response): array
     {
         $replaced = [];
@@ -141,7 +164,7 @@ class Encounter extends PatientApiBase
      *
      * @return array
      */
-    protected function encounterValidationRules(): array
+    protected function shortEncounterValidationRules(): array
     {
         return ValidationRuleBuilder::merge(
             // Basic fields
@@ -163,4 +186,70 @@ class Encounter extends PatientApiBase
         );
     }
 
+    /**
+     * List of validation rules for encounters from eHealth.
+     *
+     * @return array
+     */
+    protected function encounterValidationRules(): array
+    {
+        return ValidationRuleBuilder::merge(
+            // Basic fields
+            [
+                'cancellation_reason' => ['nullable', 'string', 'max:255'],
+                'explanatory_letter' => ['nullable', 'string', 'max:255'],
+                'uuid' => ['required', 'uuid'],
+                'ehealth_inserted_at' => ['required', 'date'],
+                'prescriptions' => ['nullable', 'string'],
+                'status' => ['required', Rule::in(EncounterStatus::values())],
+                'ehealth_updated_at' => ['required', 'date']
+            ],
+
+            // Collections of identifiers
+            ValidationRuleBuilder::identifierCollectionRules('action_references'),
+            ValidationRuleBuilder::identifierCollectionRules('participant'),
+            ValidationRuleBuilder::identifierCollectionRules('supporting_info'),
+
+            // Collections of сodeable concept
+            ValidationRuleBuilder::codeableConceptCollectionRules('actions', true),
+            ValidationRuleBuilder::codeableConceptCollectionRules('reasons', true),
+
+            // Coding relationships
+            ValidationRuleBuilder::codingRules('class', true),
+
+            // Diagnoses
+            [
+                'diagnoses' => ['nullable', 'array'],
+                'diagnoses.*.rank' => ['nullable', 'integer']
+            ],
+            ValidationRuleBuilder::codeableConceptRules('diagnoses.*.code'),
+            ValidationRuleBuilder::identifierRules('diagnoses.*.condition'),
+            ValidationRuleBuilder::codeableConceptRules('diagnoses.*.role'),
+
+            // Identifier relationships
+            ValidationRuleBuilder::identifierRules('division'),
+            ValidationRuleBuilder::identifierRules('episode', true),
+            ValidationRuleBuilder::identifierRules('incoming_referral'),
+            ValidationRuleBuilder::identifierRules('origin_episode'),
+            ValidationRuleBuilder::identifierRules('performer', true),
+            ValidationRuleBuilder::identifierRules('visit', true),
+
+            // Hospitalization
+            [
+                'hospitalization' => ['nullable', 'array'],
+                'hospitalization.pre_admission_identifier' => ['nullable', 'string', 'max:255'],
+            ],
+            ValidationRuleBuilder::codingCollectionRules('hospitalization.admit_source'),
+            ValidationRuleBuilder::codingCollectionRules('hospitalization.re_admission'),
+            ValidationRuleBuilder::identifierRules('hospitalization.destination'),
+            ValidationRuleBuilder::codingCollectionRules('hospitalization.discharge_disposition'),
+            ValidationRuleBuilder::codingCollectionRules('hospitalization.discharge_department'),
+            ValidationRuleBuilder::paperReferralRules(),
+            ValidationRuleBuilder::periodRules('period', true),
+
+            // Codeable concept relationships
+            ValidationRuleBuilder::codeableConceptRules('priority'),
+            ValidationRuleBuilder::codeableConceptRules('type', true)
+        );
+    }
 }

@@ -96,6 +96,8 @@ class ClinicalImpression extends PatientApiBase
 
             // Effective period
             ValidationRuleBuilder::periodRules(),
+
+            // Findings
             [
                 'findings' => ['nullable', 'array'],
                 'findings.*.item_reference' => ['required_with:findings', 'array'],

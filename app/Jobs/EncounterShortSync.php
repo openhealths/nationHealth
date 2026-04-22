@@ -13,7 +13,7 @@ use App\Classes\eHealth\EHealthResponse;
 use Illuminate\Queue\Middleware\RateLimited;
 use Throwable;
 
-class EncounterSync extends EHealthJob
+class EncounterShortSync extends EHealthJob
 {
     public const string BATCH_NAME = 'EncounterSync';
 

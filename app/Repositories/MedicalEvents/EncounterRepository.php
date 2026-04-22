@@ -6,13 +6,10 @@ namespace App\Repositories\MedicalEvents;
 
 use App\Classes\eHealth\Api\PatientApi;
 use App\Core\Arr;
-use App\Models\MedicalEvents\Mongo\Encounter as EncounterMongo;
-use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Encounter as EncounterSql;
 use App\Models\MedicalEvents\Sql\EncounterDiagnose;
-use App\Models\MedicalEvents\Sql\Identifier;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -21,6 +18,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
+/**
+ * @property Encounter $model
+ */
 class EncounterRepository extends BaseRepository
 {
     protected string $encounterUuid;
@@ -73,8 +73,7 @@ class EncounterRepository extends BaseRepository
                     Repository::codeableConcept()->attach($division, $encounterData['division']);
                 }
 
-                /** @var EncounterSql|EncounterMongo $encounter */
-                $encounter = $this->model::create([
+                $encounter = $this->model->create([
                     'person_id' => $personId,
                     'uuid' => $encounterData['uuid'] ?? $encounterData['id'],
                     'status' => $encounterData['status'],
@@ -254,7 +253,9 @@ class EncounterRepository extends BaseRepository
     {
         $episode['id'] = $this->episodeUuid;
         $episode['managingOrganization']['identifier']['value'] = legalEntity()->uuid;
-        $episode['period']['start'] = convertToEHealthISO8601($encounterPeriod['date'] . ' ' . $encounterPeriod['start']);
+        $episode['period']['start'] = convertToEHealthISO8601(
+            $encounterPeriod['date'] . ' ' . $encounterPeriod['start']
+        );
 
         return schemaService()
             ->setDataSchema($episode, app(PatientApi::class))
@@ -306,8 +307,12 @@ class EncounterRepository extends BaseRepository
 
                 // convert dates
                 if (isset($condition['onsetTime'])) {
-                    $condition['onsetDate'] = convertToEHealthISO8601($condition['onsetDate'] . ' ' . $condition['onsetTime']);
-                    $condition['assertedDate'] = convertToEHealthISO8601($condition['assertedDate'] . ' ' . $condition['assertedTime']);
+                    $condition['onsetDate'] = convertToEHealthISO8601(
+                        $condition['onsetDate'] . ' ' . $condition['onsetTime']
+                    );
+                    $condition['assertedDate'] = convertToEHealthISO8601(
+                        $condition['assertedDate'] . ' ' . $condition['assertedTime']
+                    );
                     unset($condition['onsetTime'], $condition['assertedTime'], $condition['diagnoses']);
                 }
 
@@ -395,7 +400,9 @@ class EncounterRepository extends BaseRepository
             unset($immunization['time']);
 
             if ($immunization['expirationDate']) {
-                $immunization['expirationDate'] = convertToEHealthISO8601($immunization['expirationDate'] . ' ' . now()->format('H:i'));
+                $immunization['expirationDate'] = convertToEHealthISO8601(
+                    $immunization['expirationDate'] . ' ' . now()->format('H:i')
+                );
             }
 
             return removeEmptyKeys($immunization);
@@ -423,14 +430,18 @@ class EncounterRepository extends BaseRepository
             $observation['id'] = Str::uuid()->toString();
             $observation['status'] = 'valid';
 
-            $observation['effectiveDateTime'] = convertToEHealthISO8601($observation['effectiveDate'] . ' ' . $observation['effectiveTime']);
+            $observation['effectiveDateTime'] = convertToEHealthISO8601(
+                $observation['effectiveDate'] . ' ' . $observation['effectiveTime']
+            );
             unset($observation['effectiveDate'], $observation['effectiveTime']);
 
             if (empty($observation['effectiveDateTime'])) {
                 unset($observation['effectiveDateTime']);
             }
 
-            $observation['issued'] = convertToEHealthISO8601($observation['issuedDate'] . ' ' . $observation['issuedTime']);
+            $observation['issued'] = convertToEHealthISO8601(
+                $observation['issuedDate'] . ' ' . $observation['issuedTime']
+            );
             unset($observation['issuedDate'], $observation['issuedTime']);
 
             $observation['context']['identifier']['type']['coding'][0] = [
@@ -470,7 +481,9 @@ class EncounterRepository extends BaseRepository
 
             // combine date&time
             if (isset($observation['valueDate'], $observation['valueTime'])) {
-                $observation['valueDateTime'] = convertToEHealthISO8601($observation['valueDate'] . ' ' . $observation['valueTime']);
+                $observation['valueDateTime'] = convertToEHealthISO8601(
+                    $observation['valueDate'] . ' ' . $observation['valueTime']
+                );
                 unset($observation['valueDate'], $observation['valueTime']);
             }
 
@@ -849,7 +862,9 @@ class EncounterRepository extends BaseRepository
     public function formatPeriod(array $encounterForm): array
     {
         $encounterForm['period'] = [
-            'start' => convertToEHealthISO8601($encounterForm['period']['date'] . ' ' . $encounterForm['period']['start']),
+            'start' => convertToEHealthISO8601(
+                $encounterForm['period']['date'] . ' ' . $encounterForm['period']['start']
+            ),
             'end' => convertToEHealthISO8601($encounterForm['period']['date'] . ' ' . $encounterForm['period']['end'])
         ];
         unset($encounterForm['period']['date']);
@@ -870,45 +885,142 @@ class EncounterRepository extends BaseRepository
         DB::transaction(function () use ($personId, $validatedData) {
             $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
 
-            // Load existing encounters with relations
-            $existingEncounters = $this->model::whereIn('uuid', $apiUuids)
-                ->withSyncRelationships()
+            $existingEncounters = $this->model->whereIn('uuid', $apiUuids)
+                ->withRelationships()
                 ->get()
                 ->keyBy('uuid');
 
             foreach ($validatedData as $data) {
                 $existing = $existingEncounters->get($data['uuid']);
 
-                // Sync relationships
-                $class = $this->syncCoding($existing, $data['class'], 'class');
-                $type = $this->syncCodeableConcept($existing, $data['type'], 'type');
+                $class = $this->syncCoding($existing, $data['class'] ?? null, 'class');
+                $type = $this->syncCodeableConcept($existing, $data['type'] ?? null, 'type');
+                $priority = $this->syncCodeableConcept($existing, $data['priority'] ?? null, 'priority');
                 $performerSpeciality = $this->syncCodeableConcept(
                     $existing,
-                    $data['performer_speciality'],
+                    $data['performer_speciality'] ?? null,
                     'performerSpeciality'
                 );
-                $episode = $this->syncIdentifier($existing, $data['episode'], 'episode');
+
+                $visit = $this->syncIdentifier($existing, $data['visit'] ?? null, 'visit');
+                $episode = $this->syncIdentifier($existing, $data['episode'] ?? null, 'episode');
+                $incomingReferral = $this->syncIdentifier(
+                    $existing,
+                    $data['incoming_referral'] ?? null,
+                    'incomingReferral'
+                );
+                $originEpisode = $this->syncIdentifier(
+                    $existing,
+                    $data['origin_episode'] ?? null,
+                    'originEpisode'
+                );
+                $performer = $this->syncIdentifier($existing, $data['performer'] ?? null, 'performer');
+                $division = $this->syncIdentifier($existing, $data['division'] ?? null, 'division');
 
                 $encounterData = [
                     'person_id' => $personId,
                     'status' => $data['status'],
-                    'class_id' => $class->id,
-                    'type_id' => $type->id,
-                    'performer_speciality_id' => $performerSpeciality->id,
-                    'episode_id' => $episode->id
+                    'cancellation_reason' => $data['cancellation_reason'] ?? null,
+                    'explanatory_letter' => $data['explanatory_letter'] ?? null,
+                    'prescriptions' => $data['prescriptions'] ?? null,
+                    'class_id' => $class?->id,
+                    'type_id' => $type?->id,
+                    'priority_id' => $priority?->id,
+                    'performer_speciality_id' => $performerSpeciality?->id,
+                    'visit_id' => $visit?->id,
+                    'episode_id' => $episode?->id,
+                    'incoming_referral_id' => $incomingReferral?->id,
+                    'origin_episode_id' => $originEpisode?->id,
+                    'performer_id' => $performer?->id,
+                    'division_id' => $division?->id,
+                    'ehealth_inserted_at' => $data['ehealth_inserted_at'] ?? null,
+                    'ehealth_updated_at' => $data['ehealth_updated_at'] ?? null
                 ];
 
                 if ($existing) {
                     $existing->update($encounterData);
                     $encounter = $existing;
                 } else {
-                    $encounter = $this->model::create(
+                    $encounter = $this->model->create(
                         array_merge(['uuid' => $data['uuid']], $encounterData)
                     );
                 }
 
                 Repository::period()->sync($encounter, $data['period']);
+
+                $encounter->reasons()->sync(
+                    $this->syncCodeableConcepts($existing, $data['reasons'] ?? null, 'reasons')
+                );
+                $encounter->actions()->sync(
+                    $this->syncCodeableConcepts($existing, $data['actions'] ?? null, 'actions')
+                );
+                $encounter->actionReferences()->sync(
+                    $this->syncIdentifiers($existing, $data['action_references'] ?? null, 'actionReferences')
+                );
+                $encounter->participants()->sync(
+                    $this->syncIdentifiers($existing, $data['participant'] ?? null, 'participants')
+                );
+                $encounter->supportingInfo()->sync(
+                    $this->syncIdentifiers($existing, $data['supporting_info'] ?? null, 'supportingInfo')
+                );
+
+                $this->syncHospitalization($encounter, $data['hospitalization'] ?? null);
             }
         });
+    }
+
+    /**
+     * Sync encounter hospitalization (HasOne) with nested codings and destination identifier.
+     *
+     * @param  Encounter  $encounter
+     * @param  array|null  $data
+     * @return void
+     */
+    protected function syncHospitalization(Encounter $encounter, ?array $data): void
+    {
+        if (empty($data)) {
+            $encounter->hospitalization?->delete();
+
+            return;
+        }
+
+        $existingHospitalization = $encounter->hospitalization;
+
+        $admitSource = $this->syncCoding(
+            $existingHospitalization,
+            $data['admit_source']['coding'][0] ?? null,
+            'admitSource'
+        );
+        $reAdmission = $this->syncCoding(
+            $existingHospitalization,
+            $data['re_admission']['coding'][0] ?? null,
+            'reAdmission'
+        );
+        $dischargeDisposition = $this->syncCoding(
+            $existingHospitalization,
+            $data['discharge_disposition']['coding'][0] ?? null,
+            'dischargeDisposition'
+        );
+        $dischargeDepartment = $this->syncCoding(
+            $existingHospitalization,
+            $data['discharge_department']['coding'][0] ?? null,
+            'dischargeDepartment'
+        );
+        $destination = $this->syncIdentifier($existingHospitalization, $data['destination'] ?? null, 'destination');
+
+        $hospitalizationData = [
+            'pre_admission_identifier' => $data['pre_admission_identifier'] ?? null,
+            'admit_source_id' => $admitSource?->id,
+            're_admission_id' => $reAdmission?->id,
+            'destination_id' => $destination?->id,
+            'discharge_disposition_id' => $dischargeDisposition?->id,
+            'discharge_department_id' => $dischargeDepartment?->id
+        ];
+
+        if ($existingHospitalization) {
+            $existingHospitalization->update($hospitalizationData);
+        } else {
+            $encounter->hospitalization()->create($hospitalizationData);
+        }
     }
 }

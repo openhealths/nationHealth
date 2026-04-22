@@ -161,6 +161,21 @@ class ValidationRuleBuilder
     }
 
     /**
+     * Generate validation rules for collection of coding.
+     * Pattern: field -> * -> [code, system]
+     */
+    public static function codingCollectionRules(string $field, bool $isRequired = false): array
+    {
+        $fieldRule = $isRequired ? 'required' : 'nullable';
+
+        return [
+            $field => [$fieldRule, 'array'],
+            "$field.*.code" => ["required_with:$field", 'string', 'max:255'],
+            "$field.*.system" => ["required_with:$field", 'string', 'max:255']
+        ];
+    }
+
+    /**
      * Generate validation rules for period fields.
      */
     public static function periodRules(string $field = 'effective_period', bool $isRequired = false): array

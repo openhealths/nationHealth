@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Jobs\ClinicalImpressionSync;
 use App\Jobs\ConditionSync;
 use App\Jobs\DiagnosticReportSync;
 use App\Jobs\EmployeeRoleSync;
-use App\Jobs\EncounterSync;
+use App\Jobs\EncounterFullSync;
+use App\Jobs\EncounterShortSync;
 use App\Jobs\EpisodeSync;
 use App\Jobs\EquipmentSync;
 use App\Jobs\HealthcareServiceSync;
+use App\Jobs\ImmunizationSync;
+use App\Jobs\ObservationSync;
 use App\Rules\TranslatedDateValidator;
 use Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider;
 use Fruitcake\LaravelDebugbar\ServiceProvider as DebugbarServiceProvider;
@@ -121,22 +125,22 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for(
             'ehealth-encounter-get',
-            static fn (EncounterSync $job) => Limit::perMinute(config('ehealth.rate_limit.encounter'))->by($job->user->id)
+            static fn (EncounterFullSync|EncounterShortSync $job) => Limit::perMinute(config('ehealth.rate_limit.encounter'))->by($job->user->id)
         );
 
         RateLimiter::for(
             'ehealth-clinical-impression-get',
-            static fn (EncounterSync $job) => Limit::perMinute(config('ehealth.rate_limit.clinical_impression'))->by($job->user->id)
+            static fn (ClinicalImpressionSync $job) => Limit::perMinute(config('ehealth.rate_limit.clinical_impression'))->by($job->user->id)
         );
 
         RateLimiter::for(
             'ehealth-immunization-get',
-            static fn (EncounterSync $job) => Limit::perMinute(config('ehealth.rate_limit.immunization'))->by($job->user->id)
+            static fn (ImmunizationSync $job) => Limit::perMinute(config('ehealth.rate_limit.immunization'))->by($job->user->id)
         );
 
         RateLimiter::for(
             'ehealth-observation-get',
-            static fn (EncounterSync $job) => Limit::perMinute(config('ehealth.rate_limit.observation'))->by($job->user->id)
+            static fn (ObservationSync $job) => Limit::perMinute(config('ehealth.rate_limit.observation'))->by($job->user->id)
         );
 
         RateLimiter::for(
