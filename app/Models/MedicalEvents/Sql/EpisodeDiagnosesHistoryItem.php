@@ -1,0 +1,52 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models\MedicalEvents\Sql;
+
+use Eloquence\Behaviours\HasCamelCasing;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class EpisodeDiagnosesHistoryItem extends Model
+{
+    use HasCamelCasing;
+
+    protected $fillable = [
+        'episode_diagnoses_history_id',
+        'condition_id',
+        'code_id',
+        'role_id',
+        'rank'
+    ];
+
+    protected $hidden = [
+        'id',
+        'episode_diagnoses_history_id',
+        'condition_id',
+        'code_id',
+        'role_id',
+        'created_at',
+        'updated_at'
+    ];
+
+    public function condition(): BelongsTo
+    {
+        return $this->belongsTo(Identifier::class, 'condition_id');
+    }
+
+    public function code(): BelongsTo
+    {
+        return $this->belongsTo(CodeableConcept::class, 'code_id');
+    }
+
+    public function role(): BelongsTo
+    {
+        return $this->belongsTo(CodeableConcept::class, 'role_id');
+    }
+
+    public function history(): BelongsTo
+    {
+        return $this->belongsTo(EpisodeDiagnosesHistory::class, 'episode_diagnoses_history_id');
+    }
+}

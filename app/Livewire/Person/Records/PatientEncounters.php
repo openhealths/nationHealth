@@ -13,15 +13,10 @@ use App\Jobs\EncounterFullSync;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
-use App\Notifications\SyncNotification;
 use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
-use Illuminate\Bus\Batch;
+use App\Traits\HandlesSyncBatch;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\View\View;
 use Throwable;
@@ -29,6 +24,7 @@ use Throwable;
 class PatientEncounters extends BasePatientComponent
 {
     use BatchLegalEntityQueries;
+    use HandlesSyncBatch;
 
     public array $encounters = [];
 
@@ -55,6 +51,31 @@ class PatientEncounters extends BasePatientComponent
         'eHealth/encounter_types',
         'SPECIALITY_TYPE'
     ];
+
+    protected function getSyncStatus(string $entityType): ?string
+    {
+        return $this->syncStatus ?: null;
+    }
+
+    protected function getBatchName(string $entityType): string
+    {
+        return EncounterFullSync::BATCH_NAME;
+    }
+
+    protected function getJobClass(string $entityType): string
+    {
+        return EncounterFullSync::class;
+    }
+
+    protected function getEntityConstant(string $entityType): string
+    {
+        return LegalEntity::ENTITY_ENCOUNTER;
+    }
+
+    protected function onSyncStatusChanged(string $entityType, JobStatus $status): void
+    {
+        $this->syncStatus = $status->value;
+    }
 
     protected function initializeComponent(): void
     {
@@ -94,16 +115,12 @@ class PatientEncounters extends BasePatientComponent
 
     public function sync(): void
     {
-        $batchName = EncounterFullSync::BATCH_NAME . '_' . $this->uuid;
-
-        if ($this->findRunningBatchesByLegalEntity(legalEntity()->id)->where('name', $batchName)->isNotEmpty()) {
-            Session::flash('error', __('patients.messages.encounter_sync_already_running'));
-
+        if ($this->cannotStartSync('encounter')) {
             return;
         }
 
-        if ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value) {
-            $this->resumeSync($batchName);
+        if ($this->shouldResumeSync('encounter')) {
+            $this->handleResumeLogic('encounter');
 
             return;
         }
@@ -130,7 +147,7 @@ class PatientEncounters extends BasePatientComponent
         }
 
         if ($response->isNotLast()) {
-            $this->dispatchRemainingPages($batchName);
+            $this->dispatchRemainingPages('encounter');
         } else {
             legalEntity()->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_ENCOUNTER);
             Session::flash('success', __('patients.messages.encounters_synced_successfully'));
@@ -166,60 +183,6 @@ class PatientEncounters extends BasePatientComponent
             'filterIncomingReferral',
             'filterOriginEpisode'
         ]);
-    }
-
-    private function resumeSync(string $batchName): void
-    {
-        $user = Auth::user();
-        $token = Session::get(config('ehealth.api.oauth.bearer_token'));
-
-        $failedBatch = $this->getFailedBatch($batchName);
-
-        if ($failedBatch) {
-            legalEntity()->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_ENCOUNTER);
-            $this->syncStatus = JobStatus::PROCESSING->value;
-            $this->restartBatch($failedBatch, $user, Crypt::encryptString($token), legalEntity());
-        }
-
-        Session::flash('success', __('patients.messages.encounter_sync_resume_started'));
-        $user->notify(new SyncNotification('encounter', 'resumed'));
-    }
-
-    private function dispatchRemainingPages(string $batchName): void
-    {
-        $user = Auth::user();
-        $token = Session::get(config('ehealth.api.oauth.bearer_token'));
-
-        try {
-            $user->notify(new SyncNotification('encounter', 'started'));
-
-            Bus::batch([new EncounterFullSync(legalEntity(), page: 2)])
-                ->withOption('legal_entity_id', legalEntity()->id)
-                ->withOption('token', Crypt::encryptString($token))
-                ->withOption('user', $user)
-                ->withOption('patient_uuid', $this->uuid)
-                ->withOption('person_id', $this->personId)
-                ->then(fn () => $user->notify(new SyncNotification('encounter', 'completed')))
-                ->catch(function (Batch $batch, Throwable $exception) use ($user) {
-                    Log::error('EncounterSync batch failed.', [
-                        'batch_id' => $batch->id,
-                        'patient_uuid' => $this->uuid,
-                        'exception' => $exception,
-                    ]);
-                    $user->notify(new SyncNotification('encounter', 'failed'));
-                })
-                ->onQueue('sync')
-                ->name($batchName)
-                ->dispatch();
-
-            legalEntity()->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_ENCOUNTER);
-            $this->syncStatus = JobStatus::PROCESSING->value;
-            Session::flash('success', __('patients.messages.encounters_first_page_synced_successfully'));
-        } catch (Throwable $exception) {
-            Log::error('Failed to dispatch EncounterSync batch', ['exception' => $exception]);
-            $user->notify(new SyncNotification('encounter', 'failed'));
-            Session::flash('error', __('patients.messages.encounter_sync_background_dispatch_error'));
-        }
     }
 
     public function render(): View

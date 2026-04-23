@@ -8,8 +8,11 @@ use App\Casts\EHealthTimestampCast;
 use App\Enums\Person\EpisodeStatus;
 use Eloquence\Behaviours\HasCamelCasing;
 use App\Models\Person\Person;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class Episode extends Model
@@ -25,6 +28,9 @@ class Episode extends Model
         'name',
         'managing_organization_id',
         'care_manager_id',
+        'status_reason_id',
+        'closing_summary',
+        'explanatory_letter',
         'ehealth_inserted_at',
         'ehealth_updated_at'
     ];
@@ -36,6 +42,7 @@ class Episode extends Model
         'episode_type_id',
         'managing_organization_id',
         'care_manager_id',
+        'status_reason_id',
         'created_at',
         'updated_at'
     ];
@@ -71,8 +78,48 @@ class Episode extends Model
         return $this->belongsTo(Identifier::class, 'care_manager_id');
     }
 
+    public function statusReason(): BelongsTo
+    {
+        return $this->belongsTo(CodeableConcept::class, 'status_reason_id');
+    }
+
     public function person(): BelongsTo
     {
         return $this->belongsTo(Person::class);
+    }
+
+    public function currentDiagnoses(): HasMany
+    {
+        return $this->hasMany(EpisodeCurrentDiagnosis::class);
+    }
+
+    public function diagnosesHistory(): HasMany
+    {
+        return $this->hasMany(EpisodeDiagnosesHistory::class);
+    }
+
+    public function statusHistory(): HasMany
+    {
+        return $this->hasMany(EpisodeStatusHistory::class);
+    }
+
+    #[Scope]
+    protected function withRelationships(Builder $query): Builder
+    {
+        return $query->with([
+            'type',
+            'managingOrganization.type.coding',
+            'careManager.type.coding',
+            'statusReason.coding',
+            'period',
+            'currentDiagnoses.code.coding',
+            'currentDiagnoses.condition.type.coding',
+            'currentDiagnoses.role.coding',
+            'diagnosesHistory.evidence.type.coding',
+            'diagnosesHistory.diagnoses.condition.type.coding',
+            'diagnosesHistory.diagnoses.code.coding',
+            'diagnosesHistory.diagnoses.role.coding',
+            'statusHistory.statusReason.coding',
+        ]);
     }
 }

@@ -1,6 +1,9 @@
+@use('App\Models\MedicalEvents\Sql\Encounter')
+@use('App\Enums\Person\EpisodeStatus')
+
 <x-layouts.patient :personId="$personId" :patientFullName="$patientFullName">
     <x-slot name="headerActions">
-        @can('create', \App\Models\MedicalEvents\Sql\Encounter::class)
+        @can('create', Encounter::class)
             <a href="{{ route('encounter.create', [legalEntity(), 'personId' => $personId]) }}"
                class="flex items-center gap-2 button-primary px-5 py-2 text-sm shadow-sm"
             >
@@ -15,7 +18,7 @@
             {{ __('patients.data_access') }}
         </button>
 
-        <button wire:click.prevent="syncEpisodes"
+        <button wire:click.prevent="sync"
                 type="button"
                 class="button-sync flex items-center gap-2 whitespace-nowrap px-5 py-2 text-sm shadow-sm"
         >
@@ -31,57 +34,58 @@
                 <p>{{ __('patients.search_episode') }}</p>
             </div>
 
-            <div class="form-row-3 mb-6">
-                <div class="form-group group">
-                    <input wire:model="filterName"
-                           type="text"
-                           name="filterName"
-                           id="filterName"
-                           class="input peer"
-                           placeholder=" "
-                           autocomplete="off"
-                    />
-                    <label for="filterName" class="label">
-                        {{ __('patients.filter_name') }}
-                    </label>
+            <div class="form-row-3 mb-6" x-data="{ dictionary: '', filterCode: $wire.entangle('filterCode') }">
+                <div class="form-group group" >
+                    <select x-model="dictionary" class="input-select peer w-full mb-1 text-sm">
+                        <option value="" selected>{{ __('forms.select') }}</option>
+                        <option value="icd10">ICD-10-AM</option>
+                        <option value="icpc2">ICPC-2</option>
+                    </select>
+                    <label class="label">{{ __('forms.type') }}</label>
+                </div>
+
+                <div class="form-group group" x-show="dictionary">
+                    <div x-show="dictionary === 'icd10'">
+                        <x-select2 modelPath="filterCode"
+                                   dictionaryName="eHealth/ICD10_AM/condition_codes"
+                                   id="filterCodeIcd10"
+                                   class="input-select peer w-full"
+                        />
+                    </div>
+                    <div x-show="dictionary === 'icpc2'">
+                        <x-select2 modelPath="filterCode"
+                                   dictionaryName="eHealth/ICPC2/condition_codes"
+                                   id="filterCodeIcpc2"
+                                   class="input-select peer w-full"
+                        />
+                    </div>
+                    <label class="label">{{ __('forms.code') }}</label>
                 </div>
 
                 <div class="form-group group">
-                    <input wire:model="filterCode"
-                           type="text"
-                           name="filterCode"
-                           id="filterCode"
-                           class="input peer"
-                           placeholder=" "
-                           autocomplete="off"
-                    />
-                    <label for="filterCode" class="label">
-                        {{ __('patients.filter_code') }}
-                    </label>
-                </div>
-
-                <div class="form-group group">
-                    <select wire:model="filterDoctor"
-                            name="filterDoctor"
-                            id="filterDoctor"
+                    <select wire:model="filterStatus"
+                            name="filterStatus"
+                            id="filterStatus"
                             class="input-select peer w-full"
                     >
-                        <option value="">{{ __('forms.select') }} ...</option>
-                        <option value="1">Шевченко Т.Г.</option>
+                        <option value="" selected>{{ __('forms.select') }}</option>
+                        @foreach(EpisodeStatus::options() as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
                     </select>
-                    <label for="filterDoctor" class="label">
-                        {{ __('patients.doctor') }}
+                    <label for="filterStatus" class="label">
+                        {{ __('forms.status.label') }}
                     </label>
                 </div>
             </div>
 
             <div class="mb-9 flex flex-wrap items-center justify-between gap-4">
                 <div class="flex flex-wrap gap-2">
-                    <button type="button" wire:click="searchEpisodes"
+                    <button type="button" wire:click="search"
                             class="flex items-center gap-2 button-primary px-5 py-2.5 text-sm shadow-sm"
                     >
                         @icon('search', 'w-4 h-4')
-                        <span>{{ __('patients.search_button') }}</span>
+                        <span>{{ __('patients.search') }}</span>
                     </button>
                     <button type="button" wire:click="resetFilters"
                             class="button-primary-outline-red px-5 py-2.5 text-sm"
@@ -129,75 +133,18 @@
                 <div class="form-row-3 mb-6">
                     <div class="form-group group">
                         <div class="datepicker-wrapper">
-                            <input wire:model="filterCreatedAtRange"
+                            <input wire:model="filterPeriodDateRange"
                                    type="text"
-                                   name="filterCreatedAtRange"
-                                   id="filterCreatedAtRange"
+                                   name="filterPeriodDateRange"
+                                   id="filterPeriodDateRange"
                                    class="datepicker-input with-leading-icon input peer"
                                    placeholder=" "
                                    autocomplete="off"
                             />
-                            <label for="filterCreatedAtRange" class="wrapped-label">
+                            <label for="filterPeriodDateRange" class="wrapped-label">
                                 {{ __('patients.filter_created_at_range') }}
                             </label>
                         </div>
-                    </div>
-
-                    <div class="form-group group">
-                        <select wire:model="filterStatus"
-                                name="filterStatus"
-                                id="filterStatus"
-                                class="input-select peer w-full"
-                        >
-                            <option value="">{{ __('forms.select') }} ...</option>
-                            <option value="active">Діючий</option>
-                            <option value="cancelled">Скасований</option>
-                        </select>
-                        <label for="filterStatus" class="label">
-                            {{ __('forms.status.label') }}
-                        </label>
-                    </div>
-                </div>
-
-                <div class="form-row-3 mb-9">
-                    <div class="form-group group">
-                        <select wire:model="filterIcdDiagnosis"
-                                name="filterIcdDiagnosis"
-                                id="filterIcdDiagnosis"
-                                class="input-select peer w-full"
-                        >
-                            <option value="">{{ __('forms.select') }} ...</option>
-                        </select>
-                        <label for="filterIcdDiagnosis" class="label">
-                            {{ __('patients.filter_icd_diagnosis') }}
-                        </label>
-                    </div>
-
-                    <div class="form-group group">
-                        <select wire:model="filterIcpcDiagnosis"
-                                name="filterIcpcDiagnosis"
-                                id="filterIcpcDiagnosis"
-                                class="input-select peer w-full"
-                        >
-                            <option value="">{{ __('forms.select') }} ...</option>
-                        </select>
-                        <label for="filterIcpcDiagnosis" class="label">
-                            {{ __('patients.filter_icpc_diagnosis') }}
-                        </label>
-                    </div>
-
-                    <div class="form-group group">
-                        <select wire:model="filterType"
-                                name="filterType"
-                                id="filterType"
-                                class="input-select peer w-full"
-                        >
-                            <option value="">{{ __('forms.select') }} ...</option>
-                            <option value="treatment">Лікування</option>
-                        </select>
-                        <label for="filterType" class="label">
-                            {{ __('forms.type') }}
-                        </label>
                     </div>
                 </div>
             </div>

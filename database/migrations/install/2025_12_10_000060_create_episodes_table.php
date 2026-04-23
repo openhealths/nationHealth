@@ -24,8 +24,52 @@ return new class extends Migration
             $table->string('name');
             $table->foreignId('managing_organization_id')->nullable()->constrained('identifiers');
             $table->foreignId('care_manager_id')->nullable()->constrained('identifiers');
+            $table->foreignId('status_reason_id')->nullable()->constrained('codeable_concepts');
+            $table->text('closing_summary')->nullable();
+            $table->string('explanatory_letter')->nullable();
             $table->timestamp('ehealth_inserted_at')->nullable();
             $table->timestamp('ehealth_updated_at')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('episode_current_diagnoses', static function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('episode_id')->constrained('episodes')->cascadeOnDelete();
+            $table->foreignId('code_id')->constrained('codeable_concepts');
+            $table->foreignId('condition_id')->constrained('identifiers');
+            $table->foreignId('role_id')->constrained('codeable_concepts');
+            $table->integer('rank')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('episode_diagnoses_history', static function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('episode_id')->constrained('episodes')->cascadeOnDelete();
+            $table->foreignId('evidence_id')->nullable()->constrained('identifiers');
+            $table->timestamp('date')->nullable();
+            $table->boolean('is_active')->default(false);
+            $table->timestamps();
+        });
+
+        Schema::create('episode_diagnoses_history_items', static function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('episode_diagnoses_history_id')->constrained(
+                'episode_diagnoses_history'
+            )->cascadeOnDelete();
+            $table->foreignId('condition_id')->constrained('identifiers');
+            $table->foreignId('code_id')->constrained('codeable_concepts');
+            $table->foreignId('role_id')->constrained('codeable_concepts');
+            $table->integer('rank')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('episode_status_history', static function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('episode_id')->constrained('episodes')->cascadeOnDelete();
+            $table->enum('status', EpisodeStatus::values());
+            $table->foreignId('status_reason_id')->nullable()->constrained('codeable_concepts');
+            $table->uuid('ehealth_inserted_by');
+            $table->timestamp('ehealth_inserted_at');
             $table->timestamps();
         });
     }
@@ -35,6 +79,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::dropIfExists('episode_status_history');
+        Schema::dropIfExists('episode_diagnoses_history_items');
+        Schema::dropIfExists('episode_diagnoses_history');
+        Schema::dropIfExists('episode_current_diagnoses');
         Schema::dropIfExists('episodes');
     }
 };

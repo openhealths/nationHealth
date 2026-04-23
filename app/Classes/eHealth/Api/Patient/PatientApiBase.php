@@ -11,7 +11,7 @@ class PatientApiBase extends Request
     protected const string URL = '/api/patients';
 
     /**
-     * Replace eHealth property names with the ones used in the application.
+     * Replace recursively eHealth property names with the ones used in the application.
      * E.g., id => uuid, inserted_at => ehealth_inserted_at.
      */
     protected function replaceEHealthPropNames(array $properties): array
@@ -20,7 +20,8 @@ class PatientApiBase extends Request
         $replaced = [];
 
         foreach ($properties as $name => $value) {
-            $replaced[$mapping[$name] ?? $name] = $value;
+            $newName = $mapping[$name] ?? $name;
+            $replaced[$newName] = is_array($value) ? $this->replaceEHealthPropNames($value) : $value;
         }
 
         return $replaced;
@@ -31,7 +32,8 @@ class PatientApiBase extends Request
         return [
             'id' => 'uuid',
             'inserted_at' => 'ehealth_inserted_at',
-            'updated_at' => 'ehealth_updated_at',
+            'inserted_by' => 'ehealth_inserted_by',
+            'updated_at' => 'ehealth_updated_at'
         ];
     }
 }

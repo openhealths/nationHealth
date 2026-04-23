@@ -244,7 +244,6 @@ return [
     'search_episode' => 'Пошук епізоду',
     'filter_name' => 'Назва',
     'filter_code' => 'ЕСОЗ ID',
-    'search_button' => 'Шукати',
     'reset_filters' => 'Скинути фільтри',
     'additional_params' => 'Додаткові параметри пошуку',
     'group_actions' => 'Групові дії',

@@ -24,17 +24,11 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Immunization;
 use App\Models\MedicalEvents\Sql\Observation;
-use App\Models\User;
-use App\Notifications\SyncNotification;
 use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
-use Illuminate\Bus\Batch;
+use App\Traits\HandlesSyncBatch;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use InvalidArgumentException;
 use Throwable;
@@ -42,6 +36,7 @@ use Throwable;
 class PatientSummary extends BasePatientComponent
 {
     use BatchLegalEntityQueries;
+    use HandlesSyncBatch;
 
     public const string ENTITY_TYPE_EPISODE = 'episode';
     public const string ENTITY_TYPE_ENCOUNTER = 'encounter';
@@ -104,6 +99,11 @@ class PatientSummary extends BasePatientComponent
         'eHealth/diagnostic_report_categories',
     ];
 
+    protected function getSyncStatus(string $entityType): ?string
+    {
+        return $this->syncStatuses[$entityType] ?? null;
+    }
+
     /**
      * Generic method to check if any entity is currently syncing.
      *
@@ -148,7 +148,7 @@ class PatientSummary extends BasePatientComponent
         }
 
         if ($this->shouldResumeSync(self::ENTITY_TYPE_EPISODE)) {
-            $this->handleResumeLogic(self::ENTITY_TYPE_EPISODE, LegalEntity::ENTITY_EPISODE);
+            $this->handleResumeLogic(self::ENTITY_TYPE_EPISODE);
 
             return;
         }
@@ -193,7 +193,7 @@ class PatientSummary extends BasePatientComponent
         }
 
         if ($this->shouldResumeSync(self::ENTITY_TYPE_ENCOUNTER)) {
-            $this->handleResumeLogic(self::ENTITY_TYPE_ENCOUNTER, LegalEntity::ENTITY_ENCOUNTER);
+            $this->handleResumeLogic(self::ENTITY_TYPE_ENCOUNTER);
 
             return;
         }
@@ -241,7 +241,7 @@ class PatientSummary extends BasePatientComponent
         }
 
         if ($this->shouldResumeSync(self::ENTITY_TYPE_CLINICAL_IMPRESSION)) {
-            $this->handleResumeLogic(self::ENTITY_TYPE_CLINICAL_IMPRESSION, LegalEntity::ENTITY_CLINICAL_IMPRESSION);
+            $this->handleResumeLogic(self::ENTITY_TYPE_CLINICAL_IMPRESSION);
 
             return;
         }
@@ -289,7 +289,7 @@ class PatientSummary extends BasePatientComponent
         }
 
         if ($this->shouldResumeSync(self::ENTITY_TYPE_IMMUNIZATION)) {
-            $this->handleResumeLogic(self::ENTITY_TYPE_IMMUNIZATION, LegalEntity::ENTITY_IMMUNIZATION);
+            $this->handleResumeLogic(self::ENTITY_TYPE_IMMUNIZATION);
 
             return;
         }
@@ -337,7 +337,7 @@ class PatientSummary extends BasePatientComponent
         }
 
         if ($this->shouldResumeSync(self::ENTITY_TYPE_OBSERVATION)) {
-            $this->handleResumeLogic(self::ENTITY_TYPE_OBSERVATION, LegalEntity::ENTITY_OBSERVATION);
+            $this->handleResumeLogic(self::ENTITY_TYPE_OBSERVATION);
 
             return;
         }
@@ -407,7 +407,7 @@ class PatientSummary extends BasePatientComponent
         }
 
         if ($this->shouldResumeSync(self::ENTITY_TYPE_CONDITION)) {
-            $this->handleResumeLogic(self::ENTITY_TYPE_CONDITION, LegalEntity::ENTITY_CONDITION);
+            $this->handleResumeLogic(self::ENTITY_TYPE_CONDITION);
 
             return;
         }
@@ -458,7 +458,7 @@ class PatientSummary extends BasePatientComponent
         }
 
         if ($this->shouldResumeSync(self::ENTITY_TYPE_DIAGNOSTIC_REPORT)) {
-            $this->handleResumeLogic(self::ENTITY_TYPE_DIAGNOSTIC_REPORT, LegalEntity::ENTITY_DIAGNOSTIC_REPORT);
+            $this->handleResumeLogic(self::ENTITY_TYPE_DIAGNOSTIC_REPORT);
 
             return;
         }
@@ -551,159 +551,12 @@ class PatientSummary extends BasePatientComponent
     }
 
     /**
-     * Generic method to check if any entity is currently syncing.
-     *
-     * @param  string  $entityType
-     * @return bool
-     */
-    protected function isSyncProcessing(string $entityType): bool
-    {
-        $batchName = $this->getBatchName($entityType);
-        $runningBatches = $this->findRunningBatchesByLegalEntity(legalEntity()->id);
-
-        return $runningBatches->where('name', $batchName . '_' . $this->uuid)->isNotEmpty();
-    }
-
-    /**
-     * Check if sync cannot be started (already running).
-     *
-     * @param  string  $entityType
-     * @return bool
-     */
-    private function cannotStartSync(string $entityType): bool
-    {
-        if ($this->isSyncProcessing($entityType)) {
-            Session::flash('error', __('patients.messages.' . $entityType . '_sync_already_running'));
-
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * Check if sync should be resumed.
-     *
-     * @param  string  $entityType
-     * @return bool
-     */
-    private function shouldResumeSync(string $entityType): bool
-    {
-        return $this->syncStatuses[$entityType] === JobStatus::PAUSED->value
-            || $this->syncStatuses[$entityType] === JobStatus::FAILED->value;
-    }
-
-    /**
-     * Handle resume logic for both episode and encounter syncs.
-     *
-     * @param  string  $entityType
-     * @param  string  $entityConstant
-     * @return void
-     */
-    private function handleResumeLogic(string $entityType, string $entityConstant): void
-    {
-        $user = Auth::user();
-        $token = Session::get(config('ehealth.api.oauth.bearer_token'));
-
-        $this->resumeSynchronization($entityType, $entityConstant, $user, $token);
-        Session::flash('success', __('patients.messages.' . $entityType . '_sync_resume_started'));
-        $user->notify(new SyncNotification($entityType, 'resumed'));
-    }
-
-    /**
-     * Dispatch background jobs for remaining pages.
-     *
-     * @param  string  $entityType
-     * @return void
-     */
-    private function dispatchRemainingPages(string $entityType): void
-    {
-        $user = Auth::user();
-        $token = Session::get(config('ehealth.api.oauth.bearer_token'));
-
-        try {
-            $user->notify(new SyncNotification($entityType, 'started'));
-            $this->dispatchNextJobs($entityType, $user, $token);
-            Session::flash('success', __('patients.messages.' . $entityType . 's_first_page_synced_successfully'));
-        } catch (Throwable $exception) {
-            Log::error('Failed to dispatch ' . ucfirst($entityType) . 'Sync batch', ['exception' => $exception]);
-            $user->notify(new SyncNotification($entityType, 'failed'));
-            Session::flash('error', __('patients.messages.' . $entityType . '_sync_background_dispatch_error'));
-        }
-    }
-
-    /**
-     * Generic method to resume synchronization.
-     *
-     * @param  string  $entityType
-     * @param  string  $entityConstant
-     * @param  User  $user
-     * @param  string  $token
-     * @return void
-     */
-    private function resumeSynchronization(string $entityType, string $entityConstant, User $user, string $token): void
-    {
-        $encryptedToken = Crypt::encryptString($token);
-        $batchName = $this->getBatchName($entityType);
-
-        $failedBatches = $this->findFailedBatchesByLegalEntity(legalEntity()->id, 'ASC');
-
-        foreach ($failedBatches as $batch) {
-            if ($batch->name === $batchName . '_' . $this->uuid) {
-                Log::info('Resuming ' . ucfirst($entityType) . ' sync batch: ' . $batch->name . ' id: ' . $batch->id);
-
-                legalEntity()->setEntityStatus(JobStatus::PROCESSING, $entityConstant);
-                $this->restartBatch($batch, $user, $encryptedToken, legalEntity());
-                break;
-            }
-        }
-    }
-
-    /**
-     * Dispatch next sync jobs for remaining pages.
-     *
-     * @param  string  $entityType
-     * @param  User  $user
-     * @param  string  $token
-     * @return void
-     * @throws Throwable
-     */
-    private function dispatchNextJobs(string $entityType, User $user, string $token): void
-    {
-        $batchName = $this->getBatchName($entityType);
-        $jobClass = $this->getJobClass($entityType);
-        $entityConstant = $this->getEntityConstant($entityType);
-
-        Bus::batch([new $jobClass(legalEntity(), page: 2)])
-            ->withOption('legal_entity_id', legalEntity()->id)
-            ->withOption('token', Crypt::encryptString($token))
-            ->withOption('user', $user)
-            ->withOption('patient_uuid', $this->uuid)
-            ->withOption('person_id', $this->personId)
-            ->then(fn () => $user->notify(new SyncNotification($entityType, 'completed')))
-            ->catch(function (Batch $batch, Throwable $exception) use ($user, $entityType) {
-                Log::error(ucfirst($entityType) . ' sync batch failed.', [
-                    'batch_id' => $batch->id,
-                    'patient_uuid' => $this->uuid,
-                    'exception' => $exception
-                ]);
-
-                $user->notify(new SyncNotification($entityType, 'failed'));
-            })
-            ->onQueue('sync')
-            ->name($batchName . '_' . $this->uuid)
-            ->dispatch();
-
-        legalEntity()->setEntityStatus(JobStatus::PROCESSING, $entityConstant);
-    }
-
-    /**
      * Get batch name for entity type.
      *
      * @param  string  $entityType
      * @return string
      */
-    private function getBatchName(string $entityType): string
+    protected function getBatchName(string $entityType): string
     {
         return match ($entityType) {
             self::ENTITY_TYPE_EPISODE => EpisodeSync::BATCH_NAME,
@@ -723,7 +576,7 @@ class PatientSummary extends BasePatientComponent
      * @param  string  $entityType
      * @return string
      */
-    private function getJobClass(string $entityType): string
+    protected function getJobClass(string $entityType): string
     {
         return match ($entityType) {
             self::ENTITY_TYPE_EPISODE => EpisodeSync::class,
@@ -743,7 +596,7 @@ class PatientSummary extends BasePatientComponent
      * @param  string  $entityType
      * @return string
      */
-    private function getEntityConstant(string $entityType): string
+    protected function getEntityConstant(string $entityType): string
     {
         return match ($entityType) {
             self::ENTITY_TYPE_EPISODE => LegalEntity::ENTITY_EPISODE,

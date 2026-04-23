@@ -25,7 +25,6 @@ return [
     'view' => 'Переглянути',
     'enter' => 'Вхід',
     'next' => 'Далі',
-    'previous' => 'Попередня',
     'open' => 'Відкрити',
     'save' => 'Зберегти',
     'saving' => 'Збереження...',
@@ -41,6 +40,7 @@ return [
     'information' => 'Інформація',
     'write_comment_here' => 'Напишіть коментар тут',
     'nothing_found' => 'Нічого не знайдено',
+    'type_to_search' => 'Введіть текст для пошуку',
     'changing_search_parameters' => 'Спробуйте змінити параметри пошуку.',
     'number' => 'Номер',
     'update_info' => 'Оновити інформацію',
@@ -376,12 +376,10 @@ return [
 
     // Declarations
     'declarations' => 'Декларації',
-
     'reason_code' => 'Причина / Код',
     'ehealth_comment_recommendation' => 'Коментар від ЕСОЗ / Рекомендації',
     'code' => 'Код',
     'verification_details_not_loaded' => 'Не вдалося завантажити деталі верифікації.',
-    'update_death_data' => 'Оновити дані про смерть',
     'edit_personal_data' => 'Редагувати персональні дані',
     'update_data' => 'Оновити дані в ЕСОЗ',
     'choose_reason' => 'Оберіть причину',
