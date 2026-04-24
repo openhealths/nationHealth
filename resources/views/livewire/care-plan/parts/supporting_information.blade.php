@@ -1,4 +1,4 @@
-<fieldset class="fieldset" x-data="{
+<div x-data="{
     localEpisodes: $wire.entangle('form.episodes'),
     localMedicalRecords: $wire.entangle('form.medical_records'),
 
@@ -59,10 +59,6 @@
         else this.localMedicalRecords.splice(index, 1);
     }
 }">
-    <legend class="legend">
-        {{ __('care-plan.supporting_information') }}
-    </legend>
-
     <div class="mt-4 space-y-10">
         <div class="overflow-x-auto">
             <template x-if="localEpisodes.length > 0">
@@ -187,10 +183,10 @@
 
                     <div class="p-6">
                         <form @submit.prevent="saveMedical()">
-                        <fieldset class="fieldset">
-                            <legend class="legend">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
                                 {{ __('care-plan.search_medical_records') ?? 'Пошук медичних записів' }}
-                            </legend>
+                            </label>
 
                             <div class="flex mt-2">
                                 <div class="flex items-center me-6">
@@ -209,11 +205,10 @@
                                     </label>
                                 </div>
                             </div>
-                        </fieldset>
+                        </div>
 
                         <div x-show="searchType === 'ehealth'">
-                            <fieldset class="fieldset">
-
+                            <div class="mt-6">
                                 <div class="mb-8 flex items-center gap-1 font-semibold text-gray-900 dark:text-white">
                                     @icon('search-outline', 'w-4.5 h-4.5')
                                     <p>{{ __('care-plan.search') }}</p>
@@ -283,7 +278,7 @@
                                         @enderror
                                     </div>
                                 </div>
-                            </fieldset>
+                            </div>
                         </div>
 
                         <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 p-6">
@@ -301,4 +296,4 @@
             </div>
         </div>
     </template>
-</fieldset>
+</div>

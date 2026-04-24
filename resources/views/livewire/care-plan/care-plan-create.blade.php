@@ -6,7 +6,7 @@
             <div class="flex-1 space-y-6 pb-24">
                 <div id="doctors" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm scroll-mt-6">
                     <div class="record-inner-header border-b border-gray-100 dark:border-gray-700 p-4">
-                        <h3 class="font-semibold text-gray-800 dark:text-gray-200">@icon('doctor', 'w-5 h-5 inline mr-2') {{ __('care-plan.doctors') ?? 'Лікарі' }}</h3>
+                        <h3 class="font-semibold text-gray-800 dark:text-gray-200">@icon('doctor', 'w-5 h-5 inline mr-2') {{ __('care-plan.doctors') }}</h3>
                     </div>
                     <div class="p-6">
                         @include('livewire.care-plan.parts.doctors')
@@ -15,7 +15,7 @@
 
                 <div id="patient_data" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm scroll-mt-6">
                     <div class="record-inner-header border-b border-gray-100 dark:border-gray-700 p-4">
-                        <h3 class="font-semibold text-gray-800 dark:text-gray-200">@icon('patients', 'w-5 h-5 inline mr-2') {{ __('patients.patient_data') }}</h3>
+                        <h3 class="font-semibold text-gray-800 dark:text-gray-200">@icon('patients', 'w-5 h-5 inline mr-2') {{ __('care-plan.patient_data') }}</h3>
                     </div>
                     <div class="p-6">
                         @include('livewire.care-plan.parts.patient_data')
@@ -24,7 +24,7 @@
 
                 <div id="care_plan_data" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm scroll-mt-6">
                     <div class="record-inner-header border-b border-gray-100 dark:border-gray-700 p-4">
-                        <h3 class="font-semibold text-gray-800 dark:text-gray-200">@icon('hugeicons-contracts', 'w-5 h-5 inline mr-2') {{ __('care-plan.care_plan_data') ?? 'Дані плану лікування' }}</h3>
+                        <h3 class="font-semibold text-gray-800 dark:text-gray-200">@icon('contracts', 'w-5 h-5 inline mr-2') {{ __('care-plan.care_plan_data') }}</h3>
                     </div>
                     <div class="p-6">
                         @include('livewire.care-plan.parts.care_plan_data')
@@ -33,7 +33,7 @@
 
                 <div id="condition_diagnosis" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm scroll-mt-6">
                     <div class="record-inner-header border-b border-gray-100 dark:border-gray-700 p-4">
-                        <h3 class="font-semibold text-gray-800 dark:text-gray-200">@icon('alert-circle', 'w-5 h-5 inline mr-2') {{ __('care-plan.condition_diagnosis') ?? 'Стан/Діагноз' }}</h3>
+                        <h3 class="font-semibold text-gray-800 dark:text-gray-200">@icon('alert-circle', 'w-5 h-5 inline mr-2') {{ __('care-plan.condition_diagnosis') }}</h3>
                     </div>
                     <div class="p-6">
                         @include('livewire.care-plan.parts.condition_diagnosis')
@@ -42,7 +42,7 @@
 
                 <div id="supporting_information" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm scroll-mt-6">
                     <div class="record-inner-header border-b border-gray-100 dark:border-gray-700 p-4">
-                        <h3 class="font-semibold text-gray-800 dark:text-gray-200">@icon('file-text', 'w-5 h-5 inline mr-2') {{ __('care-plan.supporting_information') ?? 'Допоміжна інформація' }}</h3>
+                        <h3 class="font-semibold text-gray-800 dark:text-gray-200">@icon('file-text', 'w-5 h-5 inline mr-2') {{ __('care-plan.supporting_information') }}</h3>
                     </div>
                     <div class="p-6">
                         @include('livewire.care-plan.parts.supporting_information')
@@ -51,7 +51,7 @@
 
                 <div id="additional_info" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm scroll-mt-6">
                     <div class="record-inner-header border-b border-gray-100 dark:border-gray-700 p-4">
-                        <h3 class="font-semibold text-gray-800 dark:text-gray-200">@icon('settings', 'w-5 h-5 inline mr-2') {{ __('care-plan.additional_info') ?? 'Додаткова інформація' }}</h3>
+                        <h3 class="font-semibold text-gray-800 dark:text-gray-200">@icon('settings', 'w-5 h-5 inline mr-2') {{ __('care-plan.additional_info') }}</h3>
                     </div>
                     <div class="p-6">
                         @include('livewire.care-plan.parts.additional_info', ['context' => 'create'])
@@ -77,12 +77,12 @@
             <div class="w-full lg:w-[280px] flex-shrink-0 space-y-1 mt-4 lg:mt-0 sticky top-6 self-start">
                 @php
                     $navItems = [
-                        ['id' => 'doctors', 'label' => __('care-plan.doctors') ?? 'Лікарі', 'icon' => 'doctor'],
-                        ['id' => 'patient_data', 'label' => __('patients.patient_data'), 'icon' => 'patients'],
-                        ['id' => 'care_plan_data', 'label' => __('care-plan.care_plan_data') ?? 'Дані плану лікування', 'icon' => 'hugeicons-contracts'],
-                        ['id' => 'condition_diagnosis', 'label' => __('care-plan.condition_diagnosis') ?? 'Стан/Діагноз', 'icon' => 'alert-circle'],
-                        ['id' => 'supporting_information', 'label' => __('care-plan.supporting_information') ?? 'Допоміжна інформація', 'icon' => 'file-text'],
-                        ['id' => 'additional_info', 'label' => __('care-plan.additional_info') ?? 'Додаткова інформація', 'icon' => 'settings'],
+                        ['id' => 'doctors', 'label' => __('care-plan.doctors'), 'icon' => 'doctor'],
+                        ['id' => 'patient_data', 'label' => __('care-plan.patient_data'), 'icon' => 'patients'],
+                        ['id' => 'care_plan_data', 'label' => __('care-plan.care_plan_data'), 'icon' => 'contracts'],
+                        ['id' => 'condition_diagnosis', 'label' => __('care-plan.condition_diagnosis'), 'icon' => 'alert-circle'],
+                        ['id' => 'supporting_information', 'label' => __('care-plan.supporting_information'), 'icon' => 'file-text'],
+                        ['id' => 'additional_info', 'label' => __('care-plan.additional_info'), 'icon' => 'settings'],
                     ];
                 @endphp
 

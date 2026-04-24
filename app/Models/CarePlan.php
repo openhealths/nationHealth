@@ -153,10 +153,13 @@ class CarePlan extends Model
 
     public function getMedicalConditionAttribute(): ?string
     {
-        if ($this->encounter && $this->encounter->diagnoses && $this->encounter->diagnoses->isNotEmpty()) {
-            $condition = $this->encounter->diagnoses->first()->condition;
-            if ($condition) {
-                return $condition->code . ' - ' . $condition->code_display;
+        if ($this->relationLoaded('encounter') && $this->encounter) {
+            if ($this->encounter->relationLoaded('diagnoses') && $this->encounter->diagnoses && $this->encounter->diagnoses->isNotEmpty()) {
+                $diagnosis = $this->encounter->diagnoses->first();
+                if ($diagnosis->relationLoaded('condition') && $diagnosis->condition) {
+                    $condition = $diagnosis->condition;
+                    return $condition->code . ' - ' . $condition->code_display;
+                }
             }
         }
         return null;

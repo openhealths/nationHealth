@@ -1,10 +1,5 @@
-<fieldset class="fieldset"
-          x-data="{ coAuthors: $wire.entangle('form.coAuthors') }"
-          x-init="if (!Array.isArray(coAuthors)) { coAuthors = [] }">
-    <legend class="legend">
-        <h2>{{ __('Лікарі') }}</h2>
-    </legend>
-
+<div x-data="{ coAuthors: $wire.entangle('form.coAuthors') }"
+     x-init="if (!Array.isArray(coAuthors)) { coAuthors = [] }">
     <div class="form">
         <div class="form-row-2">
             <div class="form-group">
@@ -57,4 +52,4 @@
             </button>
         </div>
     </div>
-</fieldset>
+</div>
