@@ -27,7 +27,11 @@
      tabindex="-1"
 >
     <h3 class="modal-header">
-        {{ __('care-plan.new_medication_prescription') }}
+        @if(isset($activityForm['id']) && $activityForm['id'])
+            {{ __('care-plan.edit_medication_prescription') }}
+        @else
+            {{ __('care-plan.new_medication_prescription') }}
+        @endif
     </h3>
 
     {{-- Content --}}
@@ -58,6 +62,7 @@
                     <select id="med_medication"
                             name="med_medication"
                             class="input-select peer"
+                            wire:model="activityForm.product_reference"
                     >
                         <option selected value="">{{ __('care-plan.example_medication_name') }}</option>
                     </select>
@@ -126,7 +131,7 @@
                                id="med_quantity_per_time"
                                name="med_quantity_per_time"
                                class="input peer w-full"
-                               value="1"
+                               wire:model="activityForm.daily_amount"
                         >
                         <select class="input-select peer w-20">
                             <option selected value="ml">{{ __('care-plan.ml') }}</option>

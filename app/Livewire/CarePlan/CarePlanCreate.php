@@ -23,8 +23,7 @@ class CarePlanCreate extends BasePatientComponent
     use WithFileUploads;
 
     public bool $showSignatureModal = false;
-
-
+    public string $patientUuid = '';
 
     // Care Plan form data
     public array $form = [
@@ -318,7 +317,7 @@ class CarePlanCreate extends BasePatientComponent
 
         $encounterData = $this->resolveEncounterData();
 
-        $repository->create([
+        $carePlan = $repository->create([
             'person_id' => $this->resolvePersonId(),
             'author_id' => Auth::user()?->activeEmployee()?->id,
             'legal_entity_id' => $legalEntity?->id,
@@ -343,10 +342,10 @@ class CarePlanCreate extends BasePatientComponent
 
         $this->dispatch('flashMessage', [
             'type'    => 'success',
-            'message' => __('care-plan.draft_saved'),
+            'message' => __('care-plan.draft_saved') ?? 'План лікування успішно збережено',
             'errors'  => [],
         ]);
-        $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
+        $this->redirectRoute('care-plan.edit', [legalEntity(), $carePlan->id], navigate: true);
     }
 
     /**
@@ -423,11 +422,13 @@ class CarePlanCreate extends BasePatientComponent
                 $carePlanRequisition = $entity['requisition'] ?? $carePlanRequisition;
             }
 
-            // Store to Mongo
-            try {
-                \App\Models\MedicalEvents\Mongo\CarePlan::create($finalResponse);
-            } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::warning('Failed to save CarePlan to Mongo: ' . $e->getMessage());
+            // Store to Mongo if configured
+            if (config('database.medical_events_db_driver') === 'mongo') {
+                try {
+                    \App\Models\MedicalEvents\Mongo\CarePlan::create($finalResponse);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed to save CarePlan to Mongo: ' . $e->getMessage());
+                }
             }
 
             // Store eHealth response locally
@@ -464,7 +465,11 @@ class CarePlanCreate extends BasePatientComponent
             $this->dispatch('flashMessage', ['type' => 'error', 'message' => $msg, 'errors' => []]);
             $this->showSignatureModal = false;
         } catch (\Throwable $exception) {
-            Log::error('CarePlan: unexpected error: ' . $exception->getMessage());
+            Log::error('CarePlan: unexpected error: ' . $exception->getMessage(), [
+                'file' => $exception->getFile(),
+                'line' => $exception->getLine(),
+                'trace' => $exception->getTraceAsString(),
+            ]);
             $this->dispatch('flashMessage', ['type' => 'error', 'message' => __('care-plan.unexpected_error'), 'errors' => []]);
             $this->showSignatureModal = false;
         }
@@ -503,16 +508,30 @@ class CarePlanCreate extends BasePatientComponent
         if ($encounter) {
             $data['id'] = $encounter->id;
             
-            // Extract the UUID of all conditions (addresses for the care plan)
-            $conditionUuids = $encounter->diagnoses
-                ->map(fn($d) => $d->condition?->value)
+            // Extract the Codeable Concepts of all conditions (addresses for the care plan)
+            $conditionData = $encounter->diagnoses
+                ->map(function ($d) {
+                    $coding = $d->condition?->code?->coding?->first();
+                    if ($coding) {
+                        return [
+                            'coding' => [
+                                [
+                                    'system' => $coding->system ?? 'eHealth/ICD10_AM/condition_codes',
+                                    'code' => $coding->code
+                                ]
+                            ]
+                        ];
+                    }
+                    return null;
+                })
                 ->filter()
-                ->unique()
-                ->values()
                 ->toArray();
                 
-            foreach ($conditionUuids as $uuid) {
-                $data['addresses'][] = ['identifier' => ['value' => $uuid]];
+            foreach ($conditionData as $address) {
+                // Ensure unique values if identical code is present twice
+                if (!in_array($address, $data['addresses'], true)) {
+                    $data['addresses'][] = $address;
+                }
             }
         }
 

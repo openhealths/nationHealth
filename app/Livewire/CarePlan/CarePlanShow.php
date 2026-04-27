@@ -34,6 +34,7 @@ class CarePlanShow extends Component
 
     // Activity Form state
     public array $activityForm = [
+        'id' => null,
         'kind' => 'service_request',
         'program' => '',
         'quantity' => '',
@@ -56,13 +57,35 @@ class CarePlanShow extends Component
         'password' => '',
     ];
 
+    public string $outcomeCode = ''; // For outcomeCodeableConcept
+    public array $outcomeReferences = []; // For outcomeReference (IDs of identifiers)
+
+    public array $availableConditions = [];
+
     public function mount(CarePlan $carePlan): void
     {
         $this->carePlan = $carePlan;
+        
+        // Fetch patient conditions for outcomeReference selection
+        $this->availableConditions = \App\Models\MedicalEvents\Sql\Condition::whereHas('context', function ($query) {
+            $query->where('person_id', $this->carePlan->person_id);
+        })->with('code.coding')->get()->map(fn($c) => [
+            'uuid' => $c->uuid,
+            'name' => $c->code_display ?? $c->code ?? 'Unknown Condition',
+            'date' => $c->onset_date?->format('d.m.Y') ?? '-',
+        ])->toArray();
 
         try {
             $basics = app(\App\Services\Dictionary\DictionaryManager::class)->basics();
             $this->dictionaries['care_plan_categories'] = $basics->byName('eHealth/care_plan_categories')
+                ?->asCodeDescription()
+                ?->toArray() ?? [];
+            
+            $this->dictionaries['care_plan_activity_outcomes'] = $basics->byName('eHealth/care_plan_activity_outcomes')
+                ?->asCodeDescription()
+                ?->toArray() ?? [];
+
+            $this->dictionaries['care_plan_cancel_reasons'] = $basics->byName('eHealth/care_plan_cancel_reasons')
                 ?->asCodeDescription()
                 ?->toArray() ?? [];
         } catch (\Exception $exception) {
@@ -85,13 +108,64 @@ class CarePlanShow extends Component
         $this->actionType = $actionType;
         $this->activityToSign = $activityId;
         $this->statusReason = ''; // Reset reason
+        $this->outcomeCode = ''; // Reset outcome
+        $this->outcomeReferences = []; // Reset references
         $this->showSignatureModal = true;
     }
 
     public function initActivityForm(string $kind): void
     {
-        $this->activityForm['kind'] = $kind;
-        $this->activityForm['scheduled_period_start'] = now()->format('d.m.Y');
+        $this->activityForm = [
+            'id' => null,
+            'kind' => $kind,
+            'program' => '',
+            'quantity' => '',
+            'quantity_system' => '',
+            'quantity_code' => '',
+            'daily_amount' => '',
+            'reason_code' => '',
+            'reason_reference' => '',
+            'goal' => '',
+            'description' => '',
+            'scheduled_period_start' => now()->format('d.m.Y'),
+            'scheduled_period_end' => '',
+            'product_reference' => '',
+            'product_codeable_concept' => '',
+        ];
+    }
+
+    public function editActivity(int $activityId, CarePlanActivityRepository $repository): void
+    {
+        $activity = $repository->findById($activityId);
+        if (!$activity) return;
+
+        $this->activityForm = [
+            'id' => $activity->id,
+            'kind' => is_array($activity->kind) ? ($activity->kind['coding'][0]['code'] ?? ($activity->kind['text'] ?? '')) : ($activity->kindConcept?->coding?->first()?->code ?? $activity->kind),
+            'program' => $activity->program ?? '',
+            'quantity' => is_array($activity->quantity) ? ($activity->quantity['value'] ?? '') : $activity->quantity,
+            'quantity_system' => is_array($activity->quantity) ? ($activity->quantity['unit'] ?? '') : $activity->quantity_system,
+            'quantity_code' => $activity->quantity_code ?? '',
+            'daily_amount' => $activity->daily_amount ?? '',
+            'reason_code' => $activity->reason_code ?? '',
+            'reason_reference' => $activity->reason_reference ?? '',
+            'goal' => $activity->goal ?? '',
+            'description' => $activity->description ?? '',
+            'scheduled_period_start' => $activity->scheduled_period_start?->format('d.m.Y') ?? '',
+            'scheduled_period_end' => $activity->scheduled_period_end?->format('d.m.Y') ?? '',
+            'product_reference' => $activity->product_reference ?? '',
+            'product_codeable_concept' => $activity->product_codeable_concept ?? '',
+        ];
+
+        if ($this->activityForm['kind'] === 'service_request' || $this->activityForm['kind'] === 'ServiceRequest') {
+            $this->showServiceDrawer = true;
+        } elseif ($this->activityForm['kind'] === 'medication_request' || $this->activityForm['kind'] === 'MedicationRequest') {
+            $this->showMedicationDrawer = true;
+        } elseif ($this->activityForm['kind'] === 'device_request' || $this->activityForm['kind'] === 'DeviceRequest') {
+            $this->showMedicalDeviceDrawer = true;
+        } else {
+            $this->showServiceDrawer = true;
+        }
     }
 
     public function saveActivity(CarePlanActivityRepository $repository): void
@@ -101,6 +175,9 @@ class CarePlanShow extends Component
                 'activityForm.kind' => 'required|string',
                 'activityForm.scheduled_period_start' => 'required|string',
                 'activityForm.quantity' => 'nullable|numeric',
+                'activityForm.quantity_system' => 'nullable|string',
+                'activityForm.quantity_code' => 'nullable|string',
+                'activityForm.daily_amount' => 'nullable|numeric',
                 'activityForm.description' => 'nullable|string',
                 'activityForm.product_reference' => 'nullable|string',
             ]);
@@ -109,21 +186,40 @@ class CarePlanShow extends Component
             return;
         }
 
-        $repository->create([
-            'care_plan_id' => $this->carePlan->id,
-            'author_id' => Auth::user()?->activeEmployee()?->id,
-            'status' => 'NEW',
-            'kind' => $validated['activityForm']['kind'],
-            'quantity' => $validated['activityForm']['quantity'] ?? null,
-            'description' => $validated['activityForm']['description'] ?? null,
-            'product_reference' => $validated['activityForm']['product_reference'] ?? null,
-            'scheduled_period_start' => convertToYmd($validated['activityForm']['scheduled_period_start']),
-            'scheduled_period_end' => !empty($this->activityForm['scheduled_period_end'])
-                ? convertToYmd($this->activityForm['scheduled_period_end']) : null,
-        ]);
+        if (!empty($this->activityForm['id'])) {
+            $repository->updateById($this->activityForm['id'], [
+                'kind' => $validated['activityForm']['kind'],
+                'quantity' => $validated['activityForm']['quantity'] ?? null,
+                'quantity_system' => $validated['activityForm']['quantity_system'] ?? null,
+                'quantity_code' => $validated['activityForm']['quantity_code'] ?? null,
+                'daily_amount' => $validated['activityForm']['daily_amount'] ?? null,
+                'description' => $validated['activityForm']['description'] ?? null,
+                'product_reference' => $validated['activityForm']['product_reference'] ?? null,
+                'scheduled_period_start' => convertToYmd($validated['activityForm']['scheduled_period_start']),
+                'scheduled_period_end' => !empty($this->activityForm['scheduled_period_end'])
+                    ? convertToYmd($this->activityForm['scheduled_period_end']) : null,
+            ]);
+            Session::flash('success', __('care-plan.activity_updated'));
+        } else {
+            $repository->create([
+                'care_plan_id' => $this->carePlan->id,
+                'author_id' => Auth::user()?->activeEmployee()?->id,
+                'status' => 'NEW',
+                'kind' => $validated['activityForm']['kind'],
+                'quantity' => $validated['activityForm']['quantity'] ?? null,
+                'quantity_system' => $validated['activityForm']['quantity_system'] ?? null,
+                'quantity_code' => $validated['activityForm']['quantity_code'] ?? null,
+                'daily_amount' => $validated['activityForm']['daily_amount'] ?? null,
+                'description' => $validated['activityForm']['description'] ?? null,
+                'product_reference' => $validated['activityForm']['product_reference'] ?? null,
+                'scheduled_period_start' => convertToYmd($validated['activityForm']['scheduled_period_start']),
+                'scheduled_period_end' => !empty($this->activityForm['scheduled_period_end'])
+                    ? convertToYmd($this->activityForm['scheduled_period_end']) : null,
+            ]);
+            Session::flash('success', __('care-plan.activity_draft_saved'));
+        }
 
         $this->carePlan->refresh();
-        Session::flash('success', __('care-plan.activity_draft_saved'));
 
         // Close drawers
         $this->dispatch('close-drawers');
@@ -229,6 +325,9 @@ class CarePlanShow extends Component
             Session::flash('error', __('care-plan.connection_error'));
             $this->showSignatureModal = false;
         } catch (EHealthValidationException|EHealthResponseException $exception) {
+            if (method_exists($exception, 'report')) {
+                $exception->report();
+            }
             Log::error('CarePlanShow: eHealth error: ' . $exception->getMessage());
             $msg = $exception instanceof EHealthValidationException
                 ? $exception->getFormattedMessage()
@@ -247,7 +346,7 @@ class CarePlanShow extends Component
         $legalEntity = legalEntity();
 
         // Build eHealth payload from model
-        $carePlanPayload = removeEmptyKeys([
+        $carePlanPayload = \App\Core\Arr::removeEmptyKeys([
             'intent' => 'order',
             'status' => 'new',
             'category' => is_array($this->carePlan->category) ? ($this->carePlan->category['coding'][0]['code'] ?? null) : $this->carePlan->category,
@@ -303,6 +402,9 @@ class CarePlanShow extends Component
             Session::flash('error', __('care-plan.connection_error'));
             $this->showSignatureModal = false;
         } catch (EHealthValidationException|EHealthResponseException $exception) {
+            if (method_exists($exception, 'report')) {
+                $exception->report();
+            }
             Log::error('CarePlanShow: eHealth error: ' . $exception->getMessage());
             $msg = $exception instanceof EHealthValidationException
                 ? $exception->getFormattedMessage()
@@ -398,6 +500,9 @@ class CarePlanShow extends Component
             Session::flash('error', __('care-plan.connection_error'));
             $this->showSignatureModal = false;
         } catch (EHealthValidationException|EHealthResponseException $exception) {
+            if (method_exists($exception, 'report')) {
+                $exception->report();
+            }
             Log::error('CarePlanActivity: eHealth error: ' . $exception->getMessage());
             $msg = $exception instanceof EHealthValidationException
                 ? $exception->getFormattedMessage()
@@ -422,15 +527,31 @@ class CarePlanShow extends Component
         $activity = $activityRepository->findById($this->activityToSign);
         if (!$activity) return;
 
-        $statusMap = [
-            'cancel_activity' => 'entered_in_error', // or cancelled
-            'complete_activity' => 'completed',
-        ];
-
         $payload = [
             'status' => $statusMap[$this->actionType] ?? 'cancelled',
             'status_reason' => $this->statusReason,
         ];
+
+        if ($this->actionType === 'complete_activity') {
+            if ($this->outcomeCode) {
+                $payload['outcome_codeable_concept'] = [
+                    'coding' => [
+                        [
+                            'system' => 'eHealth/care_plan_activity_outcomes',
+                            'code' => $this->outcomeCode,
+                        ]
+                    ]
+                ];
+            }
+            
+            if (!empty($this->outcomeReferences)) {
+                $payload['outcome_reference'] = collect($this->outcomeReferences)->map(fn($id) => [
+                    'identifier' => [
+                        'value' => $id, // Assuming these are UUIDs of clinical documents
+                    ]
+                ])->toArray();
+            }
+        }
 
         try {
             $signedContent = signatureService()->signData(
@@ -473,9 +594,35 @@ class CarePlanShow extends Component
                 $activityStatus = $entity['status'] ?? $activityStatus;
             }
 
-            $activityRepository->updateById($activity->id, [
+            $updateData = [
                 'status' => $activityStatus,
-            ]);
+            ];
+
+            if ($this->actionType === 'complete_activity') {
+                if ($this->outcomeCode) {
+                    $code = \App\Repositories\MedicalEvents\Repository::codeableConcept()->store([
+                        'coding' => [
+                            [
+                                'system' => 'eHealth/care_plan_activity_outcomes',
+                                'code' => $this->outcomeCode,
+                                'display' => $this->dictionaries['care_plan_activity_outcomes'][$this->outcomeCode] ?? '',
+                            ]
+                        ]
+                    ]);
+                    $updateData['outcome_codeable_concept_id'] = $code->id;
+                }
+
+                if (!empty($this->outcomeReferences)) {
+                    $ids = [];
+                    foreach ($this->outcomeReferences as $uuid) {
+                        $identifier = \App\Repositories\MedicalEvents\Repository::identifier()->store($uuid);
+                        $ids[] = $identifier->id;
+                    }
+                    $activity->outcomeReferences()->sync($ids);
+                }
+            }
+
+            $activityRepository->updateById($activity->id, $updateData);
 
             $this->carePlan->refresh();
             Session::flash('success', __('care-plan.activity_updated'));

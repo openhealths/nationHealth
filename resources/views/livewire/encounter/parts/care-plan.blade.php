@@ -8,7 +8,7 @@
             <p class="text-sm text-gray-500 dark:text-gray-400">
                 {{ __('care-plan.care_plans_description_in_encounter') ?? 'Плани лікування, пов’язані з цією взаємодією.' }}
             </p>
-            <a href="{{ route('carePlan.create', [legalEntity(), 'patientUuid' => $patientUuid, 'encounterUuid' => $form->encounter['uuid'] ?? '']) }}" 
+            <a href="{{ route('care-plan.create', [legalEntity(), 'patientUuid' => $patientUuid, 'encounterUuid' => $form->encounter['uuid'] ?? '']) }}" 
                target="_blank"
                class="button-primary-outline flex items-center gap-2">
                 @icon('plus', 'w-4 h-4')
@@ -46,7 +46,7 @@
                                 </span>
                             </td>
                             <td class="td-input text-right">
-                                <a href="{{ route('carePlan.show', [legalEntity(), $plan->id]) }}" 
+                                <a href="{{ route('care-plan.show', [legalEntity(), $plan->id]) }}" 
                                    target="_blank"
                                    class="text-blue-500 hover:underline text-sm">
                                     {{ __('forms.show') }}
