@@ -1,18 +1,16 @@
-<div class="overflow-x-auto relative" id="clinical-impressions-section">
-    <fieldset class="fieldset"
-              {{-- Binding ClinicalImpression to Alpine, it will be re-used in the modal.
-                Note that it's necessary for modal to work properly --}}
-              x-data="{
-                  clinicalImpressions: $wire.entangle('form.clinicalImpressions'),
-                  modalClinicalImpression: new ClinicalImpression(),
-                  newClinicalImpression: false,
-                  item: 0,
-                  dictionary: $wire.dictionaries['eHealth/clinical_impression_patient_categories']
-              }"
-    >
-        <legend class="legend">
-            <h2>{{ __('patients.clinical_impressions') }}</h2>
-        </legend>
+<div class="p-4 sm:p-8"
+     id="clinical-impressions-section"
+     x-data="{
+         clinicalImpressions: $wire.entangle('form.clinicalImpressions'),
+         modalClinicalImpression: new ClinicalImpression(),
+         newClinicalImpression: false,
+         item: 0,
+         dictionary: $wire.dictionaries['eHealth/clinical_impression_patient_categories']
+     }"
+>
+    <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
+        {{ __('patients.clinical_impressions') }}
+    </h2>
 
         <table class="table-input w-inherit">
             <thead class="thead-input">
@@ -184,7 +182,6 @@
                 </div>
             </template>
         </div>
-    </fieldset>
 </div>
 
 <script>

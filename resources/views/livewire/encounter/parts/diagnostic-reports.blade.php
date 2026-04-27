@@ -1,17 +1,17 @@
-<div class="relative" id="diagnostic-reports-section">
-    <fieldset class="fieldset"
-              x-data="{
-                  diagnosticReports: $wire.entangle('form.diagnosticReports'),
-                  modalDiagnosticReport: new DiagnosticReport(),
-                  newDiagnosticReport: false,
-                  item: 0,
-                  diagnosticReportCategoriesDictionary: $wire.dictionaries['eHealth/diagnostic_report_categories'],
-                  servicesDictionary: $wire.dictionaries['custom/services']
-              }"
-    >
-        <legend class="legend">
-            <h2>{{ __('patients.diagnostic_reports') }}</h2>
-        </legend>
+<div class="p-4 sm:p-8"
+     id="diagnostic-reports-section"
+     x-data="{
+         diagnosticReports: $wire.entangle('form.diagnosticReports'),
+         modalDiagnosticReport: new DiagnosticReport(),
+         newDiagnosticReport: false,
+         item: 0,
+         diagnosticReportCategoriesDictionary: $wire.dictionaries['eHealth/diagnostic_report_categories'],
+         servicesDictionary: $wire.dictionaries['custom/services']
+     }"
+>
+    <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
+        {{ __('patients.diagnostic_reports') }}
+    </h2>
 
         {{-- Show saved data in table --}}
         <table class="table-input w-inherit">
@@ -187,7 +187,6 @@
                 </form>
             </div>
         </template>
-    </fieldset>
 </div>
 
 <script>

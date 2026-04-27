@@ -1,8 +1,7 @@
-<div class="overflow-x-auto relative" id="care-plan-section">
-    <fieldset class="fieldset">
-        <legend class="legend">
-            <h2>{{ __('patients.care_plans') }}</h2>
-        </legend>
+<div class="p-4 sm:p-8" id="care-plan-section">
+    <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
+        {{ __('patients.care_plans') }}
+    </h2>
 
         <div class="flex items-center justify-between mb-4">
             <p class="text-sm text-gray-500 dark:text-gray-400">
@@ -61,5 +60,4 @@
                 {{ __('care-plan.no_care_plans') }}
             </div>
         @endif
-    </fieldset>
 </div>

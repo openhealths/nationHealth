@@ -1,21 +1,18 @@
-{{-- Component to input values to the table through the Modal, built with Alpine --}}
-<div class="relative" id="reasons-section"> {{-- This required for table overflow scrolling --}}
-    <fieldset class="fieldset"
-              {{-- Binding Reason to Alpine, it will be re-used in the modal.
-                Note that it's necessary for modal to work properly --}}
-              x-data="{
-                  reasons: $wire.entangle('form.encounter.reasons'),
-                  openModal: false,
-                  showDuplicateCodeWarning: false,
-                  modalReason: new Reason(),
-                  newReason: false,
-                  item: 0,
-                  dictionary: $wire.dictionaries['eHealth/ICPC2/reasons']
-              }"
-    >
-        <legend class="legend">
-            <h2>{{ __('patients.reasons_for_visit') }}</h2>
-        </legend>
+<div class="p-4 sm:p-8"
+     id="reasons-section"
+     x-data="{
+         reasons: $wire.entangle('form.encounter.reasons'),
+         openModal: false,
+         showDuplicateCodeWarning: false,
+         modalReason: new Reason(),
+         newReason: false,
+         item: 0,
+         dictionary: $wire.dictionaries['eHealth/ICPC2/reasons']
+     }"
+>
+    <div class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
+        {{ __('patients.reasons_for_visit') }}
+    </div>
 
         <table class="table-input w-inherit">
             <thead class="thead-input">
@@ -230,7 +227,6 @@
                 </div>
             </template>
         </div>
-    </fieldset>
 </div>
 
 <script>

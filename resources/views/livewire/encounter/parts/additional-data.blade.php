@@ -1,7 +1,7 @@
-<fieldset class="fieldset" id="additional-data-section">
-    <legend class="legend">
+<div class="p-4 sm:p-8" id="additional-data-section">
+    <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
         {{ __('patients.additional_data') }}
-    </legend>
+    </h2>
 
     <div class="form-row-3">
         <div class="form-group group">
@@ -118,4 +118,4 @@
             @enderror
         </div>
     </div>
-</fieldset>
+</div>

@@ -1,7 +1,4 @@
-<fieldset class="fieldset" id="patient-data-section">
-    <legend class="legend">
-        {{ __('patients.main_data') }}
-    </legend>
+<div class="p-4 sm:p-8" id="patient-data-section">
 
     <div x-data="{ isReferralAvailable: false }">
         <div class="form-row-3">
@@ -57,7 +54,7 @@
                     class="input-select peer @error('form.encounter.class.code') input-error @enderror"
                     required
             >
-                <option selected>{{ __('forms.select') }} {{ mb_strtolower(__('patients.interaction_class')) }}*
+                <option selected>{{ __('forms.select') }} {{ mb_strtolower(__('patients.interaction_class')) }}
                 </option>
                 @foreach($this->dictionaries['eHealth/encounter_classes'] as $key => $encounterClass)
                     <option value="{{ $key }}">{{ $encounterClass }}</option>
@@ -77,7 +74,7 @@
                     class="input-select peer @error('form.encounter.type.coding.code') input-error @enderror"
                     required
             >
-                <option selected>{{ __('forms.select') }} {{ mb_strtolower(__('patients.interaction_type')) }}*
+                <option selected>{{ __('forms.select') }} {{ mb_strtolower(__('patients.interaction_type')) }}
                 </option>
                 @foreach($this->dictionaries['eHealth/encounter_types'] as $key => $encounterType)
                     <option value="{{ $key }}">{{ $encounterType }}</option>
@@ -152,7 +149,7 @@
                             class="input-select peer @error('form.episode.type.code') input-error @enderror"
                             required
                     >
-                        <option selected>{{ __('forms.select') }} {{ mb_strtolower(__('patients.episode_type')) }}*
+                        <option selected>{{ __('forms.select') }} {{ mb_strtolower(__('patients.episode_type')) }}
                         </option>
                         @foreach($this->dictionaries['eHealth/episode_types'] as $key => $episodeType)
                             <option value="{{ $key }}">{{ $episodeType }}</option>
@@ -191,4 +188,4 @@
             </div>
         </template>
     </div>
-</fieldset>
+</div>

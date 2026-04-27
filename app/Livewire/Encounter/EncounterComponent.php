@@ -355,11 +355,11 @@ class EncounterComponent extends Component
         })->toArray();
 
         $this->patientId = $patientId;
-        $this->legalEntityType = legalEntity()->type->name;
-        $this->role = $authUser->roles->first()->name;
+        $this->legalEntityType = legalEntity()->type->name ?? '';
+        $this->role = $authUser->roles->first()?->name ?? '';
         $this->divisions = legalEntity()->divisions->toArray();
 
-        $this->employeeFullName = $authUser->getEncounterWriterEmployee()->fullName;
+        $this->employeeFullName = $authUser->getEncounterWriterEmployee()?->fullName ?? '';
 
         $this->adjustEpisodeTypes();
         $this->adjustEncounterClasses();

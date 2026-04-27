@@ -1,25 +1,23 @@
-{{-- Component to input values to the table through the Modal, built with Alpine --}}
-<fieldset class="fieldset"
-          {{-- Binding conditions to Alpine, it will be re-used in the modal.
-            Note that it's necessary for modal to work properly --}}
-          x-data="{
-                  conditions: $wire.entangle('form.conditions'),
-                  diagnoses: $wire.entangle('form.encounter.diagnoses'),
-                  openModal: false,
-                  showPrimaryWarning: false,
-                  showDuplicateCodeWarning: false,
-                  modalCondition: new Condition(),
-                  newCondition: false,
-                  item: 0,
-                  conditionCodesDictionary: $wire.dictionaries['eHealth/ICPC2/condition_codes'],
-                  diagnosisRolesDictionary: $wire.dictionaries['eHealth/diagnosis_roles'],
-                  conditionClinicalStatusesRolesDictionary: $wire.dictionaries['eHealth/condition_clinical_statuses'],
-                  conditionVerificationStatusesDictionary: $wire.dictionaries['eHealth/condition_verification_statuses']
-              }"
+<div class="p-4 sm:p-8"
+     id="conditions-section"
+     x-data="{
+             conditions: $wire.entangle('form.conditions'),
+             diagnoses: $wire.entangle('form.encounter.diagnoses'),
+             openModal: false,
+             showPrimaryWarning: false,
+             showDuplicateCodeWarning: false,
+             modalCondition: new Condition(),
+             newCondition: false,
+             item: 0,
+             conditionCodesDictionary: $wire.dictionaries['eHealth/ICPC2/condition_codes'],
+             diagnosisRolesDictionary: $wire.dictionaries['eHealth/diagnosis_roles'],
+             conditionClinicalStatusesRolesDictionary: $wire.dictionaries['eHealth/condition_clinical_statuses'],
+             conditionVerificationStatusesDictionary: $wire.dictionaries['eHealth/condition_verification_statuses']
+         }"
 >
-    <legend class="legend">
-        <h2>{{ __('patients.diagnoses') }}</h2>
-    </legend>
+    <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
+        {{ __('patients.diagnoses') }}
+    </h2>
 
     <table class="table-input w-inherit">
         <thead class="thead-input">
@@ -618,7 +616,7 @@
             </div>
         </template>
     </div>
-</fieldset>
+</div>
 
 <script>
     /**

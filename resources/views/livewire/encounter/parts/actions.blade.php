@@ -1,21 +1,18 @@
-{{-- Component to input values to the table through the Modal, built with Alpine --}}
-<div class="overflow-x-auto relative" id="actions-section"> {{-- This required for table overflow scrolling --}}
-    <fieldset class="fieldset"
-              {{-- Binding Action to Alpine, it will be re-used in the modal.
-                Note that it's necessary for modal to work properly --}}
-              x-data="{
-                  actions: $wire.entangle('form.encounter.actions'),
-                  openModal: false,
-                  showDuplicateCodeWarning: false,
-                  modalAction: new Action(),
-                  newAction: false,
-                  item: 0,
-                  dictionary: $wire.dictionaries['eHealth/ICPC2/actions']
-              }"
-    >
-        <legend class="legend">
-            <h2>{{ __('forms.actions') }}</h2>
-        </legend>
+<div class="p-4 sm:p-8"
+     id="actions-section"
+     x-data="{
+         actions: $wire.entangle('form.encounter.actions'),
+         openModal: false,
+         showDuplicateCodeWarning: false,
+         modalAction: new Action(),
+         newAction: false,
+         item: 0,
+         dictionary: $wire.dictionaries['eHealth/ICPC2/actions']
+     }"
+>
+    <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
+        {{ __('forms.actions') }}
+    </h2>
 
         <table class="table-input w-inherit">
             <thead class="thead-input">
@@ -232,7 +229,6 @@
                 </div>
             </template>
         </div>
-    </fieldset>
 </div>
 
 <script>
