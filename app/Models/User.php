@@ -237,19 +237,21 @@ class User extends Authenticatable implements MustVerifyEmail
             ->where('party_id', $partyId)
             ->where(function (Builder $q) use ($partyId, $legalEntityId) {
                 $employeeBase = Employee::getEmployeesForParty(legalEntityId: $legalEntityId, partyId: $partyId);
+                $employeeBaseReorganized = Employee::getEmployeesForParty(legalEntityId: $legalEntityId, partyId: $partyId, status: Status::REORGANIZED);
 
                 // Users linked via direct employee.user_id column
                 $q->whereIn('id', $employeeBase->whereNotNull('user_id')->select('user_id'))
-                // Users linked via employee_users pivot
-                // NOTE: about reuse of $employeeBase. At the first glance it can be done with mergeConstraintsFrom(),
-                // but trying to reuse the base query directly with methods like mergeConstraintsFrom()
-                // won't work cleanly since that's not a standard Laravel approach.
-                // The simplest solution is to just duplicate the conditions in the orWhereHas callback
-                // rather than trying to extract them into a reusable query builder instance.
+                    ->orWhereIn('id', $employeeBaseReorganized->whereNotNull('user_id')->select('user_id'))
+                    // Users linked via employee_users pivot
+                    // NOTE: about reuse of $employeeBase. At the first glance it can be done with mergeConstraintsFrom(),
+                    // but trying to reuse the base query directly with methods like mergeConstraintsFrom()
+                    // won't work cleanly since that's not a standard Laravel approach.
+                    // The simplest solution is to just duplicate the conditions in the orWhereHas callback
+                    // rather than trying to extract them into a reusable query builder instance.
                     ->orWhereHas('employees', fn (Builder $q1) => $q1
                         ->where('party_id', $partyId)
                         ->where('legal_entity_id', $legalEntityId)
-                        ->where('status', Status::APPROVED)
+                        ->whereIn('status', [Status::APPROVED, Status::REORGANIZED])
                     );
             })
             ->distinct();

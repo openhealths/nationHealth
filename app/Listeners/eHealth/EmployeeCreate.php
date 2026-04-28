@@ -82,10 +82,15 @@ class EmployeeCreate
             [
                 'legal_entity_id' => $event->legalEntity->uuid,
                 'tax_id' => $taxId,
-                'status' => Status::APPROVED->value,
                 'page_size' => config('ehealth.api.page_size_max') // Get maximum records at one time allowed by EHealth's API (if page_size in .env will set to smaller value, some of employee may be missed)
             ]
         )->validate();
+
+        // Pass only employees with APPROVED or REORGANIZED status
+        $employees = array_filter(
+            $employees,
+            fn(array $employee) => in_array($employee['status'], [Status::APPROVED->value, Status::REORGANIZED->value])
+        );
 
         if (empty($employees)) {
             return;
@@ -93,7 +98,7 @@ class EmployeeCreate
 
         // This filters out only uuids associated with the current user
         $existingUuids = Employee::whereIn('uuid', array_column($employees, 'uuid'))
-            ->where('status', Status::APPROVED)
+            ->whereIn('status', [Status::APPROVED, Status::REORGANIZED])
             ->where('legal_entity_id', $event->legalEntity->id)
             ->whereNotIn('id', $employeeRequests->pluck('employee_id')->filter()->all())
             ->whereHas('users', fn(EloquentBuilder $query) => $query->where('id', $user->id))
@@ -115,7 +120,7 @@ class EmployeeCreate
                     continue;
                 }
 
-                // If emloyee has already an associated user, skip attaching because it means it's already created by the stored user (user_id)
+                // If employee has already an associated user, skip attaching because it means it's already created by the stored user (user_id)
                 $eHealthEmployee['user_id'] ??= $user->id;
 
                 $dataFromRevision = EHealth::employeeRequest()->mapCreate($employeeRequest->revision->data);
@@ -174,7 +179,7 @@ class EmployeeCreate
             }
         });
 
-        // This means (if NULL) that procceded the first OWNER's login, so we can skip role sync
+        // This means (if NULL) that proceeded the first OWNER's login, so we can skip role sync
         // because roles are assigned based on employee types and employee types are assigned based on employee records that are just created,
         // so if it's first login and OWNER, it means that there is no employee record with employee type OWNER before,
         // so roles will be assigned correctly through EmployeeDetailsUpsert job.

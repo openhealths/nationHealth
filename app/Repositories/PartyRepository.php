@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Models\User;
+use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
@@ -19,6 +20,12 @@ class PartyRepository
         $isLegalEntityCanBeReorganized = $legalEntity->type->name  === LegalEntity::TYPE_PRIMARY_CARE || $legalEntity->type->name === LegalEntity::TYPE_OUTPATIENT;
 
         $partyEmployees = Employee::getEmployeesForParty(legalEntityId: $legalEntity->id, partyId: $party->id)->get();
+
+        if ($legalEntity->status === Status::REORGANIZED->value) {
+            $reorganizedEmployees = Employee::getEmployeesForParty(legalEntityId: $legalEntity->id, partyId: $party->id, status: Status::REORGANIZED)->get();
+
+            $partyEmployees = $partyEmployees->merge($reorganizedEmployees)->unique('id')->values();
+        }
 
         // Get all employee-user relations from pivot table for the legal entity to compare with the new candidates we want to sync later
         $pivotEmployeeUsers = $this->getPivotEmployeeUsers($legalEntity->id);
