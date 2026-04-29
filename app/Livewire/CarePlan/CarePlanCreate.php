@@ -60,17 +60,17 @@ class CarePlanCreate extends BasePatientComponent
 
     public function mount(LegalEntity $legalEntity, ?int $id = null): void
     {
-        $this->id = $id ?? (int) \App\Models\Person\Person::where('uuid', request()->query('patientUuid'))->value('id') ??
+        $this->personId = $id ?? (int) \App\Models\Person\Person::where('uuid', request()->query('patientUuid'))->value('id') ??
                     (int) request()->query('id', 0);
 
-        if ($this->id) {
-            parent::mount($legalEntity, $this->id);
+        if ($this->personId) {
+            parent::mount($legalEntity, $this->personId);
         } else {
             $this->patientFullName = '';
             $this->uuid = '';
         }
 
-        $person = $this->id ? \App\Models\Person\Person::find($this->id) : null;
+        $person = $this->personId ? \App\Models\Person\Person::find($this->personId) : null;
         if ($person) {
             $this->form['patient'] = trim($person->last_name . ' ' . $person->first_name . ' ' . ($person->second_name ?? ''));
             
@@ -88,7 +88,7 @@ class CarePlanCreate extends BasePatientComponent
             $this->form['encounter'] = $encounterUuid;
         } else {
             // If no encounter provided, try to find the latest one for this patient
-            $latestEncounter = \App\Models\MedicalEvents\Sql\Encounter::where('person_id', $this->id)
+            $latestEncounter = \App\Models\MedicalEvents\Sql\Encounter::where('person_id', $this->personId)
                 ->latest()
                 ->first();
             if ($latestEncounter) {
@@ -437,7 +437,7 @@ class CarePlanCreate extends BasePatientComponent
             // Store eHealth response locally
             $repository->create([
                 'uuid' => $carePlanUuid,
-                'person_id' => $this->id,
+                'person_id' => $this->personId,
                 'author_id' => Auth::user()?->activeEmployee()?->id,
                 'legal_entity_id' => $legalEntity?->id,
                 'status' => $carePlanStatus,
@@ -454,7 +454,7 @@ class CarePlanCreate extends BasePatientComponent
                 'message' => __('care-plan.signed_and_sent'),
                 'errors'  => [],
             ]);
-            $this->redirectRoute('persons.care-plans', [legalEntity(), 'id' => $this->id], navigate: true);
+            $this->redirectRoute('persons.care-plans', [legalEntity(), 'id' => $this->personId], navigate: true);
 
         } catch (ConnectionException $exception) {
             Log::error('CarePlan: connection error: ' . $exception->getMessage());
@@ -491,7 +491,7 @@ class CarePlanCreate extends BasePatientComponent
      */
     protected function resolvePersonId(): ?int
     {
-        return $this->id;
+        return $this->personId;
     }
 
     /**
