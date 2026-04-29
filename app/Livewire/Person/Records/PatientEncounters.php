@@ -84,13 +84,16 @@ class PatientEncounters extends BasePatientComponent
         $status = legalEntity()->getEntityStatus(LegalEntity::ENTITY_ENCOUNTER);
         $this->syncStatus = $status instanceof JobStatus ? $status->value : ($status ?? '');
 
-        $person = Person::whereId($this->personId)
-            ->with(['episodes', 'encounters', 'encounters.incomingReferral', 'encounters.originEpisode'])
-            ->first();
+        $this->episodes = \App\Models\MedicalEvents\Sql\Episode::where('person_id', $this->personId)
+            ->select(['id', 'person_id', 'uuid', 'name'])
+            ->get()
+            ->toArray();
 
-        $this->episodes = $person->episodes->toArray();
+        $encounters = \App\Models\MedicalEvents\Sql\Encounter::where('person_id', $this->personId)
+            ->with(['incomingReferral', 'originEpisode'])
+            ->get();
 
-        $this->incomingReferrals = $person->encounters
+        $this->incomingReferrals = $encounters
             ->pluck('incomingReferral')
             ->filter()
             ->map(fn (Identifier $referral) => [
@@ -101,7 +104,7 @@ class PatientEncounters extends BasePatientComponent
             ->values()
             ->toArray();
 
-        $this->originEpisodes = $person->encounters
+        $this->originEpisodes = $encounters
             ->pluck('originEpisode')
             ->filter()
             ->map(fn (Identifier $referral) => [
