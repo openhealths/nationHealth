@@ -32,45 +32,33 @@ class EncounterMapper
             'visit' => FhirResource::make()->coding('eHealth/resources', 'visit')->toIdentifier($uuids['visit']),
             'episode' => FhirResource::make()->coding('eHealth/resources', 'episode')->toIdentifier($uuids['episode']),
             'class' => FhirResource::make()->coding('eHealth/encounter_classes', $encounter['classCode'])->toCoding(),
-            'type' => FhirResource::make()->coding(
-                'eHealth/encounter_types',
-                $encounter['typeCode']
-            )->toCodeableConcept(),
-            'performer' => FhirResource::make()->coding('eHealth/resources', 'employee')->toIdentifier(
-                $uuids['employee']
-            )
+            'type' => FhirResource::make()->coding('eHealth/encounter_types', $encounter['typeCode'])
+                ->toCodeableConcept(),
+            'performer' => FhirResource::make()->coding('eHealth/resources', 'employee')
+                ->toIdentifier($uuids['employee'])
         ];
 
         // todo: add incoming_referral and paper_referral
 
         if (!empty($encounter['priorityCode'])) {
-            $data['priority'] = FhirResource::make()->coding(
-                'eHealth/encounter_priority',
-                $encounter['priorityCode']
-            )->toCodeableConcept();
+            $data['priority'] = FhirResource::make()->coding('eHealth/encounter_priority', $encounter['priorityCode'])
+                ->toCodeableConcept();
         }
 
         if (!empty($encounter['reasons'])) {
             $data['reasons'] = collect($encounter['reasons'])
-                ->map(
-                    fn (array $cc) => FhirResource::make()->coding(
-                        'eHealth/ICPC2/reasons',
-                        $cc['code']
-                    )->toCodeableConcept()
-                )
+                ->map(fn (array $cc) => FhirResource::make()->coding('eHealth/ICPC2/reasons', $cc['code'])
+                    ->toCodeableConcept())
                 ->toArray();
         }
 
         $data['diagnoses'] = array_map(
             static function (array $fhir, array $diagnosis) {
                 $item = [
-                    'condition' => FhirResource::make()->coding('eHealth/resources', 'condition')->toIdentifier(
-                        $fhir['id']
-                    ),
-                    'role' => FhirResource::make()->coding(
-                        'eHealth/diagnosis_roles',
-                        $diagnosis['roleCode']
-                    )->toCodeableConcept(),
+                    'condition' => FhirResource::make()->coding('eHealth/resources', 'condition')
+                        ->toIdentifier($fhir['id']),
+                    'role' => FhirResource::make()->coding('eHealth/diagnosis_roles', $diagnosis['roleCode'])
+                        ->toCodeableConcept(),
                 ];
 
                 if (!empty($diagnosis['rank'])) {
@@ -85,21 +73,16 @@ class EncounterMapper
 
         if (!empty($encounter['actions'])) {
             $data['actions'] = collect($encounter['actions'])
-                ->map(
-                    fn (array $cc) => FhirResource::make()->coding(
-                        'eHealth/ICPC2/actions',
-                        $cc['code']
-                    )->toCodeableConcept()
-                )
+                ->map(fn (array $cc) => FhirResource::make()->coding('eHealth/ICPC2/actions', $cc['code'])
+                    ->toCodeableConcept())
                 ->toArray();
         }
 
         // todo: action_references
 
         if (!empty($encounter['divisionId'])) {
-            $data['division'] = FhirResource::make()->coding('eHealth/resources', 'division')->toIdentifier(
-                $encounter['divisionId']
-            );
+            $data['division'] = FhirResource::make()->coding('eHealth/resources', 'division')
+                ->toIdentifier($encounter['divisionId']);
         }
 
         // todo: prescriptions

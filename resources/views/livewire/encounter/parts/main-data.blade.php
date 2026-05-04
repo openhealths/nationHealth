@@ -93,10 +93,17 @@
     </div>
 
     {{-- Select episode type --}}
-    <div x-data="{ episodeType: $wire.entangle('episodeType'), episodeId: $wire.entangle('form.episode.id') }" class="mt-8">
+    <div x-data="{
+            episodeType: $wire.entangle('episodeType'),
+            episodeId: $wire.entangle('form.episode.id'),
+            episodeTypeCode: $wire.entangle('form.episode.typeCode'),
+            episodeName: $wire.entangle('form.episode.name')
+         }"
+         class="mt-8"
+    >
         <div class="form-row-3">
             <div class="flex items-center">
-                <input @change="episodeType = 'existing'"
+                <input @change="episodeType = 'existing'; episodeTypeCode = ''; episodeName = ''"
                        id="existingEpisode"
                        type="radio"
                        value="existing"
@@ -109,7 +116,7 @@
                 </label>
             </div>
             <div class="flex items-center">
-                <input @change="episodeType = 'new'; episodeId = ''"
+                <input @change="episodeType = 'new'; episodeId = ''; episodeTypeCode = ''; episodeName = ''"
                        id="newEpisode"
                        type="radio"
                        value="new"
@@ -178,7 +185,7 @@
                     >
                         <option value="" selected>{{ __('forms.select') }}</option>
                         @foreach($episodes as $key => $episode)
-                            <option value="{{ $episode['id'] }}">{{ $episode['name'] }}</option>
+                            <option value="{{ $episode['uuid'] }}">{{ $episode['name'] }}</option>
                         @endforeach
                     </select>
 

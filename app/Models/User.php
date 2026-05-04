@@ -100,9 +100,14 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     protected $with = ['person'];
 
-    // If User is able to consume multiple roles or permissions from different guards
-    // this method helps make sure that User class's operate within all allowed guards defined in config/auth.php
-    public function guardName() {
+    /**
+     * If User is able to consume multiple roles or permissions from different guards
+     * this method helps make sure that User class's operate within all allowed guards defined in config/auth.php
+     *
+     * @return Collection
+     */
+    public function guardName(): Collection
+    {
         return collect(array_keys((array) config('auth.guards')))->values();
     }
 
@@ -191,25 +196,26 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * Find a user by their eHealth UUID who has at least one employee in the given Legal Entity.
      *
-     * @param  string  $userUuid        The user's eHealth UUID (from access token)
-     * @param  string  $legalEntityUuid The Legal Entity UUID to check access against
+     * @param  string  $userUuid  The user's eHealth UUID (from access token)
+     * @param  string  $legalEntityUuid  The Legal Entity UUID to check access against
      */
     public function scopeWithLegalEntityAccess(Builder $query, string $userUuid, string $legalEntityUuid): Builder
     {
         return $query
             ->where('uuid', $userUuid)
-            ->whereExists(fn (QueryBuilder $q) => $q
-                ->from('employee_users')
-                ->join('employees', 'employees.id', '=', 'employee_users.employee_id')
-                ->whereColumn('employee_users.user_id', 'users.id')
-                ->where('employees.legal_entity_uuid', $legalEntityUuid)
+            ->whereExists(
+                fn (QueryBuilder $q) => $q
+                    ->from('employee_users')
+                    ->join('employees', 'employees.id', '=', 'employee_users.employee_id')
+                    ->whereColumn('employee_users.user_id', 'users.id')
+                    ->where('employees.legal_entity_uuid', $legalEntityUuid)
             );
     }
 
     /**
      * Get ALL Legal Entities IDs available for this user
      *
-     * @return Collection<int|string, mixed>|null
+     * @return Collection
      */
     public function accessibleLegalEntities(): Collection
     {
@@ -223,9 +229,8 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * Scope a query to users related to a given party (direct or via employee_users pivot).
      *
-     * @param Builder $query
-     * @param int $partyId
-     *
+     * @param  Builder  $query
+     * @param  int  $partyId
      * @return Builder
      */
     public function scopeAllRelated(Builder $query, ?int $partyId = null, ?int $legalEntityId = null): Builder
@@ -248,10 +253,12 @@ class User extends Authenticatable implements MustVerifyEmail
                     // won't work cleanly since that's not a standard Laravel approach.
                     // The simplest solution is to just duplicate the conditions in the orWhereHas callback
                     // rather than trying to extract them into a reusable query builder instance.
-                    ->orWhereHas('employees', fn (Builder $q1) => $q1
-                        ->where('party_id', $partyId)
-                        ->where('legal_entity_id', $legalEntityId)
-                        ->whereIn('status', [Status::APPROVED, Status::REORGANIZED])
+                    ->orWhereHas(
+                        'employees',
+                        fn (Builder $q1) => $q1
+                            ->where('party_id', $partyId)
+                            ->where('legal_entity_id', $legalEntityId)
+                            ->whereIn('status', [Status::APPROVED, Status::REORGANIZED])
                     );
             })
             ->distinct();
@@ -311,12 +318,28 @@ class User extends Authenticatable implements MustVerifyEmail
 
     /**
      * Get employee by priority with encounter:write permission.
+     * When $encounterClass is provided, only roles allowed for that class are considered.
      *
+     * @param  string|null  $encounterClass
      * @return Employee|null
      */
-    public function getEncounterWriterEmployee(): ?Employee
+    public function getEncounterWriterEmployee(?string $encounterClass = null): ?Employee
     {
-        return $this->getWriterEmployeeByRolePriority(Role::DOCTOR, Role::SPECIALIST, Role::ASSISTANT, Role::MED_COORDINATOR);
+        $roles = [Role::DOCTOR, Role::SPECIALIST, Role::ASSISTANT, Role::MED_COORDINATOR];
+
+        if ($encounterClass !== null) {
+            $allowedTypes = collect(config('ehealth.performer_employee_encounter_classes'))
+                ->filter(fn (array $classes) => in_array($encounterClass, $classes, true))
+                ->keys()
+                ->all();
+
+            $roles = array_values(array_filter(
+                $roles,
+                static fn (Role $role) => in_array($role->value, $allowedTypes, true)
+            ));
+        }
+
+        return $this->getWriterEmployeeByRolePriority(...$roles);
     }
 
     /**
@@ -449,6 +472,8 @@ class User extends Authenticatable implements MustVerifyEmail
         $roleValues = array_map(static fn (Role $role) => $role->value, $priorityRoles);
 
         $employees = $this->party?->employees()
+            ->whereLegalEntityId(legalEntity()->id)
+            ->whereStatus(Status::APPROVED)
             ->with('party:id,first_name,last_name,second_name')
             ->whereIn('employee_type', $roleValues)
             ->get(['id', 'uuid', 'party_id', 'employee_type']);

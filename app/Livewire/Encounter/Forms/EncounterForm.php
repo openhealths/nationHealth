@@ -10,6 +10,7 @@ use App\Rules\InDictionary;
 use App\Rules\OnlyOnePrimaryDiagnosis;
 use App\Rules\PastDateTime;
 use Carbon\Carbon;
+use Closure;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\RequiredIf;
@@ -18,7 +19,7 @@ class EncounterForm extends BaseForm
 {
     public array $encounter = ['diagnoses' => [], 'reasons' => [], 'actions' => []];
 
-    public array $episode = ['id' => ''];
+    public array $episode = ['id' => '', 'typeCode' => '', 'name' => ''];
 
     public array $conditions;
 
@@ -36,7 +37,7 @@ class EncounterForm extends BaseForm
     {
         $rules = [
             'encounter.periodDate' => ['required', 'date', 'before_or_equal:today'],
-            'encounter.periodStart' => ['required', 'date_format:H:i'],
+            'encounter.periodStart' => ['required', 'date_format:H:i', new PastDateTime($this->encounter['periodDate'])],
             'encounter.periodEnd' => [
                 'required',
                 'date_format:H:i',
@@ -55,15 +56,15 @@ class EncounterForm extends BaseForm
             'encounter.reasons.*.text' => ['nullable', 'string', new Cyrillic()],
             'encounter.diagnoses' => [
                 'required_unless:encounter.typeCode,intervention',
-                Rule::when($this->encounter['typeCode'] !== 'intervention', new OnlyOnePrimaryDiagnosis()),
+                Rule::when(($this->encounter['typeCode'] ?? '') !== 'intervention', new OnlyOnePrimaryDiagnosis($this->encounter['classCode'] ?? null, $this->conditions ?? [])),
                 'array'
             ],
-            'encounter.*.diagnoses.*.roleCode' => [
+            'encounter.diagnoses.*.roleCode' => [
                 'required_with:conditions',
                 'string',
                 new InDictionary('eHealth/diagnosis_roles')
             ],
-            'encounter.*.diagnoses.*.diagnosisRank' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'encounter.diagnoses.*.rank' => ['nullable', 'integer', 'min:1', 'max:10'],
             'encounter.actions' => [
                 'required_if:encounter.classCode,PHC',
                 'prohibited_unless:encounter.classCode,PHC',
@@ -72,9 +73,10 @@ class EncounterForm extends BaseForm
             'encounter.actions.*.code' => ['required', 'string', new InDictionary('eHealth/ICPC2/actions')],
             'encounter.actions.*.text' => ['nullable', 'string', new Cyrillic()],
             'encounter.divisionId' => [
+                'required_if:encounter.classCode,INPATIENT',
                 'nullable',
                 'uuid',
-                Rule::prohibitedIf(in_array($this->encounter['typeCode'], ['field', 'home']))
+                Rule::prohibitedIf(in_array($this->encounter['typeCode'] ?? '', ['field', 'home']))
             ],
 
             'episode.id' => ['nullable', 'uuid'],
@@ -288,7 +290,7 @@ class EncounterForm extends BaseForm
                 return [
                     'required_with:diagnosticReports',
                     'date_format:H:i',
-                    function (string $attribute, mixed $value, \Closure $fail) use ($report) {
+                    function (string $attribute, mixed $value, Closure $fail) use ($report) {
                         $start = Carbon::createFromFormat('Y-m-d H:i', $report['effectivePeriodStartDate'] . ' ' . $report['effectivePeriodStartTime']);
                         $end = Carbon::createFromFormat('Y-m-d H:i', $report['effectivePeriodEndDate'] . ' ' . $value);
                         $issued = Carbon::createFromFormat('Y-m-d H:i', $report['issuedDate'] . ' ' . $report['issuedTime']);
@@ -386,7 +388,11 @@ class EncounterForm extends BaseForm
     protected function messages(): array
     {
         return [
-            'encounter.divisionId.prohibited' => __('validation.custom.encounter.divisionId.prohibited')
+            'encounter.divisionId.prohibited' => __('validation.custom.encounter.divisionId.prohibited'),
+            'encounter.actions.required_if' => 'Дії є обов\'язковими для класу взаємодії PHC',
+            'encounter.actions.prohibited_unless' => 'Дії заборонені для вашого класу взаємодії',
+            'encounter.diagnoses.*.rank.min' => 'expected the value to be >= 1',
+            'encounter.diagnoses.*.rank.max' => 'expected the value to be <= 10',
         ];
     }
 
@@ -402,7 +408,7 @@ class EncounterForm extends BaseForm
             'ehealth.legal_entity_episode_types',
             'ehealth.employee_episode_types'
         );
-        $this->addAllowedRule($rules, 'episode.typeCode', $allowedValues);
+        $rules['episode.typeCode'][] = 'in:' . implode(',', $allowedValues);
     }
 
     /**
@@ -413,11 +419,31 @@ class EncounterForm extends BaseForm
      */
     private function addAllowedEncounterClasses(array &$rules): void
     {
-        $allowedValues = $this->getAllowedValues(
-            'ehealth.legal_entity_encounter_classes',
-            'ehealth.employee_encounter_classes'
-        );
-        $this->addAllowedRule($rules, 'encounter.classCode', $allowedValues);
+        $rules['encounter.classCode'][] = function (string $attribute, mixed $value, Closure $fail): void {
+            $episodeTypeCode = $this->episode['typeCode'] ?? null;
+
+            if (empty($episodeTypeCode) && !empty($this->episode['id'])) {
+                $episode = collect($this->component->episodes)
+                    ->firstWhere('uuid', $this->episode['id']);
+                $episodeTypeCode = data_get($episode, 'type.code');
+            }
+
+            if (empty($episodeTypeCode)) {
+                return;
+            }
+
+            $allowed = config("ehealth.episode_type_encounter_classes.$episodeTypeCode", []);
+            if (!in_array($value, $allowed, true)) {
+                $fail("Клас взаємодії $value заборонений для типу вашого епізоду");
+            }
+        };
+
+        $rules['encounter.classCode'][] = static function (string $attribute, mixed $value, Closure $fail): void {
+            $allowed = config('ehealth.legal_entity_encounter_classes.' . legalEntity()->type->name, []);
+            if (!in_array($value, $allowed, true)) {
+                $fail("Клас взаємодії $value заборонений для типу вашого медичного закладу");
+            }
+        };
     }
 
     /**
@@ -428,10 +454,16 @@ class EncounterForm extends BaseForm
      */
     private function addAllowedEncounterTypes(array &$rules): void
     {
-        $allowedValues = config('ehealth.encounter_class_encounter_types')[key(
-            $this->component->dictionaries['eHealth/encounter_classes']
-        )];
-        $this->addAllowedRule($rules, 'encounter.typeCode', $allowedValues);
+        $rules['encounter.typeCode'][] = function (string $attribute, mixed $value, Closure $fail): void {
+            $classCode = $this->encounter['classCode'] ?? null;
+            if (empty($classCode)) {
+                return;
+            }
+            $allowed = config("ehealth.encounter_class_encounter_types.$classCode", []);
+            if (!in_array($value, $allowed, true)) {
+                $fail("Тип взаємодії $value заборонений для вашого класу взаємодії");
+            }
+        };
     }
 
     /**
@@ -454,19 +486,6 @@ class EncounterForm extends BaseForm
         }
 
         return $allowedValues;
-    }
-
-    /**
-     * Add 'in' rule by key and with allowed values.
-     *
-     * @param  array  $rules
-     * @param  string  $ruleKey
-     * @param  array  $allowedValues
-     * @return void
-     */
-    private function addAllowedRule(array &$rules, string $ruleKey, array $allowedValues): void
-    {
-        $rules[$ruleKey][] = 'in:' . implode(',', $allowedValues);
     }
 
     /**

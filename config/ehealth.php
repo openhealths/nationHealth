@@ -366,17 +366,24 @@ return [
         'MSP' => ['PHC'],
         'OUTPATIENT' => ['AMB', 'INPATIENT']
     ],
-    // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583402009/Medical+Events+Dictionaries+and+configurations#employee_encounter_classes
-    'employee_encounter_classes' => [
+    // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583402009/Medical+Events+Dictionaries+and+configurations#performer_employee_encounter_classes
+    'performer_employee_encounter_classes' => [
         'DOCTOR' => ['PHC'],
         'SPECIALIST' => ['AMB', 'INPATIENT'],
         'ASSISTANT' => ['PHC', 'AMB', 'INPATIENT'],
         'MED_COORDINATOR' => ['AMB']
     ],
+    // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583402009/Medical+Events+Dictionaries+and+configurations#performer_employee_encounter_types
+    'performer_employee_encounter_types' => [
+        'SPECIALIST' => ['service_delivery_location', 'virtual', 'patient_identity', 'discharge', 'field', 'home', 'covid', 'intervention', 'concilium'],
+        'DOCTOR' => ['service_delivery_location', 'virtual', 'home', 'field', 'intervention'],
+        'ASSISTANT' => ['intervention'],
+        'MED_COORDINATOR' => ['service_delivery_location', 'virtual']
+    ],
     // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583402009/Medical+Events+Dictionaries+and+configurations#encounter_class_encounter_types
     'encounter_class_encounter_types' => [
-        'AMB' => ['service_delivery_location', 'virtual', 'patient_identity', 'field', 'home', 'intervention'],
-        'INPATIENT' => ['patient_identity', 'discharge', 'service_delivery_location', 'intervention'],
+        'AMB' => ['service_delivery_location', 'virtual', 'patient_identity', 'field', 'home', 'intervention', 'concilium'],
+        'INPATIENT' => ['patient_identity', 'discharge', 'service_delivery_location', 'intervention', 'concilium'],
         'PHC' => ['service_delivery_location', 'virtual', 'home', 'field', 'intervention']
     ],
     // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583402009/Medical+Events+Dictionaries+and+configurations#legal_entity_%3CLEGAL_ENTITY_TYPE%3E_episode_types
@@ -385,6 +392,16 @@ return [
         'PRIMARY_CARE' => ['TREATMENT', 'PREVENTION', 'PALLIATIVE_CARE', 'PHC'],
         'MSP' => ['TREATMENT', 'PHC', 'PREVENTION', 'PALLIATIVE_CARE'],
         'MSP_PHARMACY' => ['TREATMENT', 'PREVENTION', 'PALLIATIVE_CARE']
+    ],
+    // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583402009/Medical+Events+Dictionaries+and+configurations#episode_type_%3CeHealth%2Fepisode_types%3E_encounter_classes--dynamic-configuration-for-episode-types
+    'episode_type_encounter_classes' => [
+        'TREATMENT' => ['AMD', 'PHC', 'INPATIENT'],
+        'PREVENTION' => ['PHC', 'INPATIENT', 'AMB'],
+        'DG' => ['AMB', 'INPATIENT'],
+        'REHAB' => ['AMB', 'INPATIENT'],
+        'PALLIATIVE_CARE' => ['INPATIENT', 'PHC', 'AMB'],
+        'PHC' => ['PHC'],
+        'CONDITIONING' => ['INPATIENT']
     ],
     // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583402009/Medical+Events+Dictionaries+and+configurations#employee_%3CEMPLOYEE_TYPE%3E_episode_types
     'employee_episode_types' => [

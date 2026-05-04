@@ -28,7 +28,7 @@ readonly class EncounterPackageBuilder
         $uuids = [
             'encounter' => Str::uuid()->toString(),
             'visit' => Str::uuid()->toString(),
-            'employee' => Auth::user()->getEncounterWriterEmployee()->uuid,
+            'employee' => Auth::user()->getEncounterWriterEmployee($data['encounter']['classCode'])->uuid,
             'episode' => $data['episode']['id'] ?: Str::uuid()->toString()
         ];
 

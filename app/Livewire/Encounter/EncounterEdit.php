@@ -104,7 +104,7 @@ class EncounterEdit extends EncounterComponent
         $uuids = [
             'encounter' => $encounter->uuid,
             'visit' => data_get($encounter->toArray(), 'visit.identifier.value'),
-            'employee' => Auth::user()->getEncounterWriterEmployee()->uuid,
+            'employee' => Auth::user()->getEncounterWriterEmployee($validated['encounter']['classCode'])->uuid,
             'episode' => $validated['episode']['id']
         ];
         $fhirConditions = collect($validated['conditions'] ?? [])

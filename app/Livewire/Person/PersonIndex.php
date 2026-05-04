@@ -186,19 +186,8 @@ class PersonIndex extends Component
             try {
                 $validatedEhealth = EHealth::person()->searchForPersonByParams($buildSearchRequest)->validate();
                 $validatedEhealth = $this->setPersonSource($validatedEhealth, 'ehealth');
-            } catch (ConnectionException $exception) {
-                $this->logConnectionError($exception, 'Error when searching for person');
-                Session::flash('error', "Виникла помилка. Відсутній зв'язок із ЕСОЗ");
-
-                return;
-            } catch (EHealthValidationException|EHealthResponseException $exception) {
-                $this->logEHealthException($exception, 'Error when searching for person');
-
-                if ($exception instanceof EHealthValidationException) {
-                    Session::flash('error', $exception->getFormattedMessage());
-                } else {
-                    Session::flash('error', 'Помилка від ЕСОЗ: ' . $exception->getMessage());
-                }
+            } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+                $this->handleEHealthExceptions($exception, 'Error while submitting encounter');
 
                 return;
             }
