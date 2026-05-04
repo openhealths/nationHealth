@@ -296,7 +296,7 @@ Route::middleware(['auth:web,ehealth', 'verified'])->group(function () {
                         Route::get('/{personId}/episodes', PatientEpisodes::class)->name('episodes');
                         Route::get('/{personId}/care-plans', \App\Livewire\Person\Records\PersonCarePlans::class)->name('care-plans');
                         Route::get('/{personId}/observations', PatientObservation::class)->name('observations');
-                        Route::get('/{personId}/vaccination', PatientVaccination::class)->name('vaccination');
+                        Route::get('/{personId}/immunization', PatientVaccination::class)->name('vaccination');
                         Route::get('/{personId}/condition', PatientCondition::class)->name('condition');
                         Route::get('/{personId}/diagnoses', PatientDiagnoses::class)->name('diagnoses');
                         Route::get('/{personId}/diagnostic-reports', PatientDiagnosticReports::class)->name('diagnostic-reports');
