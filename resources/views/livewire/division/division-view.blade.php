@@ -24,7 +24,7 @@
     <div wire:key="division-actions-{{ $divisionForm->division['id'] }}-{{ $statusStr ?? 'unknown' }}" class="flex items-center gap-2">
 
         @can('update', $division)
-            <a role="button" class="default-button cursor-pointer inline-flex items-center leading-none !mb-0" href="{{ route('division.edit', [legalEntity(), $divisionForm->division['id']]) }}">
+            <a role="button" class="default-button cursor-pointer inline-flex items-center leading-none" href="{{ route('division.edit', [legalEntity(), $divisionForm->division['id']]) }}">
                 {{ __('forms.edit') }}
             </a>
         @endcan
@@ -39,7 +39,7 @@
                     actionTitle=@js(__('divisions.modals.activate.title'));
                     actionButtonText=@js(__('forms.activate'));
                 "
-                class="alternative-button cursor-pointer inline-flex items-center leading-none !mb-0"
+                class="alternative-button cursor-pointer inline-flex items-center leading-none"
             >
                 {{ __('forms.activate') }}
             </button>
@@ -54,7 +54,7 @@
                     actionTitle=@js(__('divisions.modals.deactivate.title'));
                     actionButtonText=@js(__('forms.deactivate'));
                 "
-                class="alternative-button cursor-pointer inline-flex items-center leading-none !mb-0"
+                class="alternative-button cursor-pointer inline-flex items-center leading-none"
             >
                 {{ __('forms.deactivate') }}
             </button>
@@ -69,7 +69,7 @@
                     actionTitle=@js(__('divisions.modals.delete.title'));
                     actionButtonText=@js(__('forms.delete'));
                 "
-                class="alternative-button cursor-pointer inline-flex items-center leading-none !mb-0"
+                class="alternative-button cursor-pointer inline-flex items-center leading-none"
             >
                 {{ __('forms.delete') }}
             </button>

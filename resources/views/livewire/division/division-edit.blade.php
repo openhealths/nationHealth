@@ -27,7 +27,7 @@
                     actionTitle=@js(__('divisions.modals.delete.title'));
                     actionButtonText=@js(__('forms.delete'));
                 "
-                class="button-primary-outline-red cursor-pointer inline-flex items-center leading-none !mb-0 !me-0"
+                class="button-primary-outline-red cursor-pointer inline-flex items-center leading-none"
             >
                 {{ __('forms.delete') }}
             </button>
@@ -36,7 +36,7 @@
         <button
             type="button"
             id="save_button"
-            class="button-outline-primary cursor-pointer inline-flex items-center gap-2 leading-none !mb-0 !me-0"
+            class="button-outline-primary cursor-pointer inline-flex items-center gap-2 leading-none"
             wire:click="store"
         >
             @icon('archive', 'w-4 h-4')
@@ -46,7 +46,7 @@
         <button
             type="button"
             id="save_and_send_button"
-            class="button-primary cursor-pointer inline-flex items-center leading-none !mb-0 !me-0"
+            class="button-primary cursor-pointer inline-flex items-center leading-none"
             wire:click="update"
         >
             {{ __('forms.create') }}

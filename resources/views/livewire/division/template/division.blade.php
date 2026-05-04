@@ -412,7 +412,7 @@
                                     isStoreMode: {{ $action === 'store' ? 'true' : 'false' }},
                                     init() {
                                         this.working = Object.values(this.workingHours).some(day => 
-                                            day.some(shift => (shift[0] && shift[0] !== '') || (shift[1] && shift[1] !== ''))
+                                            day.some(shift => (shift[0] && shift[0] !== '' && shift[0] !== '00:00') || (shift[1] && shift[1] !== '' && shift[1] !== '00:00'))
                                         );
                                     }
                                 }"
@@ -462,19 +462,19 @@
                                                     :key="'{{ $key }}'"
                                                     x-data="{
                                                     shift: workingHours['{{ $key }}'].length > 1,
-                                                    show_work: workingHours['{{ $key }}'][0][0] !== '' && workingHours['{{ $key }}'][0][0] !== null ||
-                                                    workingHours['{{ $key }}'][0][1] !== '' && workingHours['{{ $key }}'][0][1] !== null ||
+                                                    show_work: (workingHours['{{ $key }}'][0][0] !== '' && workingHours['{{ $key }}'][0][0] !== null && workingHours['{{ $key }}'][0][0] !== '00:00') ||
+                                                    (workingHours['{{ $key }}'][0][1] !== '' && workingHours['{{ $key }}'][0][1] !== null && workingHours['{{ $key }}'][0][1] !== '00:00') ||
                                                     '{{ $action }}' === 'store',
                                                     switchWorking(day) {
                                                     this.show_work = !this.show_work;
-                                                    this.workingHours[day] = [['', '']];
+                                                    this.workingHours[day] = [['00:00', '00:00']];
                                                     if (! this.show_work) {
                                                     this.shift = false;
                                                     }
                                                     },
                                                     addAvailableShift(day) {
                                                     if (this.workingHours[day].length < 4) {
-                                                    this.workingHours[day].push(['', '']);
+                                                    this.workingHours[day].push(['00:00', '00:00']);
                                                     }
                                                     },
                                                     deleteShift(day, index) {
@@ -671,7 +671,7 @@
 
                         <div class="flex gap-2 items-center additional-actions">
                             <a role="button"
-                            class="button-minor cursor-pointer !mb-0 inline-flex items-center leading-none"
+                            class="button-minor cursor-pointer inline-flex items-center leading-none"
                             href="javascript:history.back()">
                                 {{ __('forms.cancel') }}
                             </a>
