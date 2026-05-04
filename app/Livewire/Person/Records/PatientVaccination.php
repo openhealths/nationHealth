@@ -18,19 +18,19 @@ class PatientVaccination extends BasePatientComponent
 {
     public array $immunizations = [];
 
-public string $filterVaccine = '';
+    public string $filterVaccine = '';
 
-public string $filterEcozId = '';
+    public string $filterEcozId = '';
 
-public string $filterMedicalRecordId = '';
+    public string $filterMedicalRecordId = '';
 
-public string $filterEpisodeId = '';
+    public string $filterEpisodeId = '';
 
-public string $filterDateFrom = '';
+    public string $filterDateFrom = '';
 
-public string $filterDateTo = '';
+    public string $filterDateTo = '';
 
-public bool $showAdditionalParams = false;
+    public bool $showAdditionalParams = false;
 
     protected function initializeComponent(): void
     {
