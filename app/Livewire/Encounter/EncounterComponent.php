@@ -11,6 +11,7 @@ use App\Classes\eHealth\Api\PatientApi;
 use App\Classes\eHealth\Api\ServiceRequestApi;
 use App\Core\Arr;
 use App\Enums\Person\EpisodeStatus;
+use App\Enums\Person\ObservationStatus;
 use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Exceptions\EHealth\EHealthResponseException;
@@ -151,6 +152,14 @@ class EncounterComponent extends Component
      * @var array
      */
     public array $observationValueMap;
+
+    /**
+     * Allowed condition codes per code system for the current user, based on employee type and speciality.
+     * Key absent = no restriction; key present with empty array = system forbidden; key present with codes = allowed codes.
+     *
+     * @var array
+     */
+    public array $allowedConditionCodesBySystem = [];
 
     /**
      * List of values for codeable concept.
@@ -310,13 +319,20 @@ class EncounterComponent extends Component
      */
     public function searchICD10(string $value): void
     {
-        $this->results = DB::table('icd_10')
+        $query = DB::table('icd_10')
             ->select(['code', 'description'])
-            ->where('code', 'ILIKE', "%$value%")
-            ->orWhere('description', 'ILIKE', "%$value%")
-            ->limit(50)
-            ->get()
-            ->toArray();
+            ->where(function ($q) use ($value) {
+                $q->where('code', 'ILIKE', "%$value%")
+                    ->orWhere('description', 'ILIKE', "%$value%");
+            })
+            ->limit(50);
+
+        $allowedCodes = $this->allowedConditionCodesBySystem['eHealth/ICD10_AM/condition_codes'] ?? null;
+        if ($allowedCodes !== null) {
+            $query->whereIn('code', $allowedCodes);
+        }
+
+        $this->results = $query->get()->toArray();
     }
 
     /**
@@ -349,6 +365,7 @@ class EncounterComponent extends Component
         $this->divisions = legalEntity()->divisions()->whereStatus(Status::ACTIVE)->get()->toArray();
 
         $this->employeeFullName = $authUser->getEncounterWriterEmployee()->fullName;
+        $this->allowedConditionCodesBySystem = $this->computeAllowedConditionCodesBySystem();
 
         $this->setPatientData();
 
@@ -361,34 +378,31 @@ class EncounterComponent extends Component
     }
 
     /**
-     * Search for evidence detail by episode id.
+     * Search for evidence details based on selected type.
      *
-     * @param  string  $episodeId
+     * @param  string  $type
      * @return void
      */
-    public function searchEvidenceDetails(string $episodeId): void
+    public function searchEvidenceDetails(string $type): void
     {
-        // Validate that an episode ID is provided
-        if (empty($episodeId)) {
-            $this->addError('episode', 'Будь ласка, оберіть епізод для пошуку.');
-
-            return;
-        }
-
         try {
-            $response = EHealth::condition()->getBySearchParams(
+            $api = $type === 'observation' ? EHealth::observation() : EHealth::condition();
+
+            $response = $api->getBySearchParams(
                 $this->patientUuid,
                 ['managing_organization_id' => legalEntity()->uuid]
             );
 
-            // map for align with frontend flat structure
-            $this->evidenceDetails = collect($response->validate())->map(static fn (array $item) => [
-                'id' => data_get($item, 'id'),
-                'insertedAt' => data_get($item, 'inserted_at'),
-                'codeCode' => data_get($item, 'code.coding.0.code'),
-                'type' => 'condition'
-            ])
-                ->values()->all();
+            $this->evidenceDetails = collect($response->validate())
+                ->when($type === 'observation', fn ($collection) => $collection->filter(
+                    static fn (array $item) => data_get($item, 'status') !== ObservationStatus::ENTERED_IN_ERROR->value
+                ))
+                ->map(static fn (array $item) => [
+                    'id' => data_get($item, 'uuid'),
+                    'insertedAt' => data_get($item, 'ehealth_inserted_at'),
+                    'codeCode' => data_get($item, 'code.coding.0.code'),
+                    'type' => $type
+                ])->values()->all();
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             $this->handleEHealthExceptions($exception, 'Error while getting evidence details');
 
@@ -694,11 +708,50 @@ class EncounterComponent extends Component
     }
 
     /**
-     * Adjust dictionaries by provided key and values.
+     * Compute allowed condition codes per code system for the current user.
+     * Key absent means no restriction; empty array means the system is forbidden; non-empty array lists the allowed codes.
+     * Combines employee-type restrictions with officio-speciality restrictions, intersecting ICD-10 AM when both apply.
      *
-     * @param  string  $dictionaryKey
-     * @param  array  $allowedValues
-     * @return void
+     * @return array
+     */
+    private function computeAllowedConditionCodesBySystem(): array
+    {
+        $employee = Auth::user()->getEncounterWriterEmployee();
+        $employeeTypeRestrictions = config("ehealth.employee_type_conditions_allowed.$employee->employeeType");
+
+        $speciality = $employee->loadMissing('specialities')
+            ->specialities
+            ->firstWhere('speciality_officio', true)
+            ?->speciality;
+        $specialityIcd10Codes = $speciality
+            ? config("ehealth.icd10am_speciality_conditions_allowed.$speciality")
+            : null;
+
+        $result = [];
+        $icd10Key = 'eHealth/ICD10_AM/condition_codes';
+        $icpc2Key = 'eHealth/ICPC2/condition_codes';
+
+        $employeeIcd10Codes = $employeeTypeRestrictions !== null
+            ? ($employeeTypeRestrictions[$icd10Key] ?? [])
+            : null;
+
+        if ($employeeIcd10Codes !== null && $specialityIcd10Codes !== null) {
+            $result[$icd10Key] = array_values(array_intersect($employeeIcd10Codes, $specialityIcd10Codes));
+        } elseif ($employeeIcd10Codes !== null) {
+            $result[$icd10Key] = $employeeIcd10Codes;
+        } elseif ($specialityIcd10Codes !== null) {
+            $result[$icd10Key] = $specialityIcd10Codes;
+        }
+
+        if ($employeeTypeRestrictions !== null) {
+            $result[$icpc2Key] = $employeeTypeRestrictions[$icpc2Key] ?? [];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Adjust dictionaries by provided key and values.
      */
     private function adjustDictionary(string $dictionaryKey, array $allowedValues): void
     {
