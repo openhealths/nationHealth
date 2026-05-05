@@ -6,6 +6,13 @@
             {{ __('care-plan.care_plan') }}
         </x-slot>
         <x-slot name="actions">
+            <button wire:click.prevent="sync"
+                    class="button-primary-outline flex items-center gap-2 whitespace-nowrap px-5 py-2 text-sm shadow-sm"
+                    wire:loading.attr="disabled">
+                <span wire:loading.remove wire:target="sync">🔄</span>
+                <span wire:loading wire:target="sync" class="animate-spin">⏳</span>
+                {{ __('patients.sync_ehealth_data') ?? 'Синхронізувати' }}
+            </button>
             <a href="{{ route('care-plan.create', legalEntity()) }}" class="button-primary">
                 + {{ __('care-plan.new_care_plan') }}
             </a>

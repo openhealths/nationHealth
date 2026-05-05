@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Classes\eHealth;
 
 use App\Classes\eHealth\Api\Address;
+use App\Classes\eHealth\Api\Approval;
 use App\Classes\eHealth\Api\Auth;
 use App\Classes\eHealth\Api\Contract;
 use App\Classes\eHealth\Api\CarePlan;
+use App\Classes\eHealth\Api\CarePlanActivity;
 use App\Classes\eHealth\Api\ContractRequest;
 use App\Classes\eHealth\Api\Declaration;
 use App\Classes\eHealth\Api\DeclarationRequest;
@@ -44,6 +46,11 @@ use App\Classes\eHealth\Api\Verification;
 
 final class EHealth
 {
+    public static function approval(): Approval
+    {
+        return app(Approval::class);
+    }
+
     public static function license(): License
     {
         return app(License::class);
@@ -167,6 +174,11 @@ final class EHealth
     public static function carePlan(): CarePlan
     {
         return app(CarePlan::class);
+    }
+
+    public static function carePlanActivity(): CarePlanActivity
+    {
+        return app(CarePlanActivity::class);
     }
 
     public static function verification(): Verification

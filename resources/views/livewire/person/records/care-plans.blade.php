@@ -15,7 +15,7 @@
             {{ __('patients.data_access') }}
         </button>
 
-        <button wire:click.prevent=""
+        <button wire:click.prevent="sync"
                 type="button"
                 class="button-sync flex items-center gap-2 whitespace-nowrap px-5 py-2 text-sm shadow-sm"
         >
@@ -282,19 +282,17 @@
                                          :id="$id('dropdown-button')"
                                          class="absolute right-0 mt-2 w-56 rounded-md bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-lg z-50 py-1"
                                     >
-                                        <button @click="close($refs.button)"
-                                                class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-                                        >
-                                            @icon('eye', 'w-5 h-5 text-gray-500')
-                                            {{ __('patients.view_details') }}
-                                        </button>
+                                        @if($plan->status === 'new')
+                                            <a href="{{ route('care-plan.edit', [legalEntity(), $plan->id]) }}" class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                                                @icon('edit', 'w-5 h-5 text-gray-500')
+                                                {{ __('forms.edit') ?? 'Редагувати' }}
+                                            </a>
+                                        @endif
 
-                                        <button @click="close($refs.button)"
-                                                class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-                                        >
-                                            @icon('alert-circle', 'w-5 h-5 text-gray-500')
-                                            {{ __('patients.status.entered_in_error') }}
-                                        </button>
+                                        <a href="{{ route('care-plan.show', [legalEntity(), $plan->id]) }}" class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                                            @icon('eye', 'w-5 h-5 text-gray-500')
+                                            {{ __('patients.view_details') ?? 'Переглянути' }}
+                                        </a>
                                     </div>
                                 </div>
                             </div>
@@ -310,17 +308,17 @@
                                     <div class="min-w-0">
                                         <div class="record-inner-label text-[10px] uppercase">Створено</div>
                                         <div
-                                            class="record-inner-value text-[14px] font-semibold break-words">{{ $plan->created_at->format('d.m.Y') }}</div>
+                                            class="record-inner-value text-[14px] font-semibold break-words">{{ $plan->created_at?->format('d.m.Y') ?? '-' }}</div>
                                     </div>
                                     <div class="min-w-0">
                                         <div class="record-inner-label text-[10px] uppercase">Початок</div>
                                         <div
-                                            class="record-inner-value text-[14px] font-semibold break-words">{{ $plan->period_start->format('d.m.Y') }}</div>
+                                            class="record-inner-value text-[14px] font-semibold break-words">{{ $plan->period_start?->format('d.m.Y') ?? '-' }}</div>
                                     </div>
                                     <div class="min-w-0">
                                         <div class="record-inner-label text-[10px] uppercase">Кінець</div>
                                         <div
-                                            class="record-inner-value text-[14px] font-semibold break-words">{{ $plan->period_end->format('d.m.Y') }}</div>
+                                            class="record-inner-value text-[14px] font-semibold break-words">{{ $plan->period_end?->format('d.m.Y') ?? '-' }}</div>
                                     </div>
                                     <div class="min-w-0">
                                         <div class="record-inner-label text-[10px] uppercase">Лікар</div>

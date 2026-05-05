@@ -10,6 +10,9 @@ use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
+use App\Core\Arr;
 
 class CarePlan extends Request
 {
@@ -37,6 +40,7 @@ class CarePlan extends Request
      */
     public function getMany(array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator($this->validateMany(...));
         return $this->get(self::URL, $query);
     }
 
@@ -50,6 +54,7 @@ class CarePlan extends Request
      */
     public function getDetails(string $id, array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator($this->validateDetails(...));
         return $this->get(self::URL . "/$id", $query);
     }
 
@@ -80,14 +85,75 @@ class CarePlan extends Request
     }
 
     /**
-     * Fetch a summary of Care Plans for a specific patient.
+     * Get Care Plans by search parameters.
      *
-     * @param string $personId
+     * @param string $patientId
      * @param array $query
      * @return PromiseInterface|EHealthResponse
      */
-    public function getSummary(string $personId, array $query = []): PromiseInterface|EHealthResponse
+    public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
-        return $this->get("/api/patients/$personId/care_plans", $query);
+        $this->setValidator($this->validateMany(...));
+        return $this->get("/api/patients/$patientId/care_plans", $query);
+    }
+
+    protected function validateDetails(EHealthResponse $response): array
+    {
+        $data = $this->replaceEHealthPropNames($response->getData());
+        
+        $validator = Validator::make($data, [
+            'uuid' => 'required|uuid',
+            'status' => 'required|string',
+            'title' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            Log::channel('e_health_errors')->error(
+                'CarePlan details validation failed: ' . implode(', ', $validator->errors()->all())
+            );
+        }
+
+        return $validator->validate();
+    }
+
+    protected function validateMany(EHealthResponse $response): array
+    {
+        $transformedData = [];
+        foreach ($response->getData() as $item) {
+            $transformedData[] = $this->replaceEHealthPropNames($item);
+        }
+
+        $validator = Validator::make($transformedData, [
+            '*' => 'array',
+            '*.uuid' => 'required|uuid',
+            '*.status' => 'required|string',
+            '*.title' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            Log::channel('e_health_errors')->error(
+                'CarePlan validation failed: ' . implode(', ', $validator->errors()->all())
+            );
+        }
+
+        return $validator->validate();
+    }
+
+    protected function replaceEHealthPropNames(array $properties): array
+    {
+        $mapping = [
+            'id' => 'uuid',
+            'inserted_at' => 'ehealth_inserted_at',
+            'inserted_by' => 'ehealth_inserted_by',
+            'updated_at' => 'ehealth_updated_at'
+        ];
+        
+        $replaced = [];
+        foreach ($properties as $name => $value) {
+            $newName = $mapping[$name] ?? $name;
+            $replaced[$newName] = is_array($value) ? $this->replaceEHealthPropNames($value) : $value;
+        }
+
+        return $replaced;
     }
 }
