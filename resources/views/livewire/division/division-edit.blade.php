@@ -49,7 +49,7 @@
             class="button-primary cursor-pointer inline-flex items-center leading-none"
             wire:click="update"
         >
-            {{ __('forms.create') }}
+            {{ __('forms.save_and_send') }}
         </button>
     </div>
 @endsection
