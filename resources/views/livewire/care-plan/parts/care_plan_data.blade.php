@@ -98,6 +98,27 @@
         <p class="text-error">{{ $message }}</p>
         @enderror
     </div>
+
+    <div class="form-group group">
+        <label for="terms_of_service" class="label">
+            {{ __('care-plan.terms_of_service') ?? 'Умови надання послуг' }}
+        </label>
+        <select id="terms_of_service"
+                name="terms_of_service"
+                class="input-select peer"
+                wire:model="form.terms_of_service"
+        >
+            <option value="">{{ __('forms.select') }}</option>
+            @isset($dictionaries['care_provision_conditions'])
+                @foreach($dictionaries['care_provision_conditions'] as $code => $description)
+                    <option value="{{ $code }}">{{ $description }}</option>
+                @endforeach
+            @endisset
+        </select>
+        @error('form.terms_of_service')
+        <p class="text-error">{{ $message }}</p>
+        @enderror
+    </div>
 </div>
 
 <div class="form-row-2 mt-5">

@@ -64,27 +64,81 @@ class CarePlanRepository
      */
     public function formatCarePlanRequest(array $form, ?string $encounterUuid, array $encounterData, ?string $employeeUuid): array
     {
+        $id = \Illuminate\Support\Str::uuid()->toString();
+
+        $addresses = [];
+        if (!empty($encounterData['diagnoses'][0]['condition']['identifier']['value'])) {
+            $addresses[] = [
+                'identifier' => [
+                    'type' => [
+                        'coding' => [['system' => 'eHealth/resources', 'code' => 'condition']]
+                    ],
+                    'value' => $encounterData['diagnoses'][0]['condition']['identifier']['value']
+                ]
+            ];
+        }
+
+        $employeeRef = [
+            'identifier' => [
+                'type' => [
+                    'coding' => [['system' => 'eHealth/resources', 'code' => 'employee']]
+                ],
+                'value' => $employeeUuid
+            ]
+        ];
+
         return \App\Core\Arr::removeEmptyKeys([
-            'intent' => 'order',
+            'id' => $id,
+            'intent' => $form['intent'] ?? 'order',
             'status' => 'new',
-            'category' => $form['category'],
+            'category' => [
+                'coding' => [
+                    ['system' => 'eHealth/care_plan_categories', 'code' => $form['category']]
+                ]
+            ],
             'instantiates_protocol' => !empty($form['clinical_protocol']) ? [['display' => $form['clinical_protocol']]] : null,
-            'context' => !empty($form['context']) ? ['identifier' => ['type_code' => $form['context']]] : null,
             'title' => $form['title'],
             'period' => array_filter([
-                'start' => convertToYmd($form['period_start']),
-                'end' => !empty($form['period_end']) ? convertToYmd($form['period_end']) : null,
+                'start' => convertToEHealthISO8601($form['period_start'] . ' 00:00:00'),
+                'end' => !empty($form['period_end']) ? convertToEHealthISO8601($form['period_end'] . ' 23:59:59') : null,
             ]),
-            'addresses' => $encounterData['addresses'] ?? null,
+            'addresses' => !empty($addresses) ? $addresses : null,
             'supporting_info' => array_merge(
-                array_map(fn($e) => ['display' => $e['name']], $form['episodes'] ?? []),
-                array_map(fn($m) => ['display' => $m['name']], $form['medical_records'] ?? [])
+                array_map(fn($e) => [
+                    'identifier' => [
+                        'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'episode_of_care']]],
+                        'value' => $e['uuid'] ?? $e['id'] ?? null
+                    ]
+                ], $form['episodes'] ?? []),
+                array_map(fn($m) => [
+                    'identifier' => [
+                        'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'observation']]],
+                        'value' => $m['uuid'] ?? $m['id'] ?? null
+                    ]
+                ], $form['medical_records'] ?? [])
             ),
-            'encounter' => !empty($form['encounter']) ? ['identifier' => ['value' => $form['encounter']]] : null,
-            'care_manager' => ['identifier' => ['value' => $employeeUuid]],
+            'encounter' => !empty($form['encounter']) ? [
+                'identifier' => [
+                    'type' => [
+                        'coding' => [['system' => 'eHealth/resources', 'code' => 'encounter']]
+                    ],
+                    'value' => $form['encounter']
+                ]
+            ] : null,
+            'author' => $employeeRef,
+            'care_manager' => $employeeRef,
             'description' => $form['description'] ?: null,
             'note' => $form['note'] ?: null,
-            'inform_with' => $form['inform_with'] ?: null,
+            'inform_with' => !empty($form['inform_with']) ? [
+                'coding' => [
+                    ['system' => 'eHealth/inform_with', 'code' => $form['inform_with']]
+                ]
+            ] : null,
+            'terms_of_service' => [
+                'coding' => [
+                    ['system' => 'eHealth/care_provision_conditions', 'code' => $form['terms_of_service']]
+                ]
+            ]
         ]);
     }
 

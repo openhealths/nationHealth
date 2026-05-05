@@ -186,10 +186,9 @@ class EncounterEdit extends EncounterComponent
         }
 
         $formattedData = $this->save();
-        if (is_null($formattedData)) {
+        if ($formattedData === null) {
             return;
         }
-
         $formattedData = Arr::toSnakeCase($formattedData);
 
         try {

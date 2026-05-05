@@ -150,6 +150,9 @@ class CarePlanCreate extends BasePatientComponent
             $this->dictionaries['encounter_classes'] = $basics->byName('eHealth/encounter_classes')
                 ?->asCodeDescription()
                 ?->toArray() ?? [];
+            $this->dictionaries['care_provision_conditions'] = $basics->byName('eHealth/care_provision_conditions')
+                ?->asCodeDescription()
+                ?->toArray() ?? [];
             $this->categories = $this->dictionaries['care_plan_categories'];
         } catch (\Exception $exception) {
             report($exception);
@@ -216,6 +219,7 @@ class CarePlanCreate extends BasePatientComponent
             'form.description'      => 'nullable|string',
             'form.note'             => 'nullable|string',
             'form.inform_with'      => 'nullable|string',
+            'form.terms_of_service' => 'required|string',
             'form.episodes'         => 'nullable|array',
             'form.medical_records'  => 'nullable|array',
         ];
@@ -237,6 +241,7 @@ class CarePlanCreate extends BasePatientComponent
             'form.description'       => __('care-plan.extended_description'),
             'form.note'              => __('care-plan.notes'),
             'form.inform_with'       => __('care-plan.inform_with'),
+            'form.terms_of_service'  => __('care-plan.terms_of_service') ?? 'Умови надання послуг',
             'form.knedp'                  => __('forms.knedp') ?? 'КНЕДП',
             'form.keyContainerUpload'     => __('forms.key_container') ?? 'Ключ-контейнер',
             'form.password'               => __('forms.password'),
@@ -411,6 +416,10 @@ class CarePlanCreate extends BasePatientComponent
                     $finalResponse = $jobApi->getDetails($jobId)->getData();
                     $attempts++;
                 } while ($finalResponse['status'] === 'pending' && $attempts < 15);
+
+                if ($finalResponse['status'] === 'failed') {
+                    Log::error('CarePlan creation job failed', $finalResponse);
+                }
             }
 
             // Extract the actual CarePlan data
