@@ -119,7 +119,8 @@ class ConditionRepository extends BaseRepository
             'reportOrigin.coding',
             'context.type.coding',
             'code.coding',
-            'severity.coding'
+            'severity.coding',
+            'stageSummary'
         ])
             ->whereIn('uuid', $uuids)
             ->get()

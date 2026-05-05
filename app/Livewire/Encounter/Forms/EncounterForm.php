@@ -11,6 +11,7 @@ use App\Rules\OnlyOnePrimaryDiagnosis;
 use App\Rules\PastDateTime;
 use Carbon\Carbon;
 use Closure;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\RequiredIf;
@@ -37,7 +38,11 @@ class EncounterForm extends BaseForm
     {
         $rules = [
             'encounter.periodDate' => ['required', 'date', 'before_or_equal:today'],
-            'encounter.periodStart' => ['required', 'date_format:H:i', new PastDateTime($this->encounter['periodDate'])],
+            'encounter.periodStart' => [
+                'required',
+                'date_format:H:i',
+                new PastDateTime($this->encounter['periodDate'])
+            ],
             'encounter.periodEnd' => [
                 'required',
                 'date_format:H:i',
@@ -56,7 +61,10 @@ class EncounterForm extends BaseForm
             'encounter.reasons.*.text' => ['nullable', 'string', new Cyrillic()],
             'encounter.diagnoses' => [
                 'required_unless:encounter.typeCode,intervention',
-                Rule::when(($this->encounter['typeCode'] ?? '') !== 'intervention', new OnlyOnePrimaryDiagnosis($this->encounter['classCode'] ?? null, $this->conditions ?? [])),
+                Rule::when(
+                    ($this->encounter['typeCode'] ?? '') !== 'intervention',
+                    new OnlyOnePrimaryDiagnosis($this->encounter['classCode'] ?? null, $this->conditions ?? [])
+                ),
                 'array'
             ],
             'encounter.diagnoses.*.roleCode' => [
@@ -116,7 +124,11 @@ class EncounterForm extends BaseForm
             // absent on frontend
             'conditions.*.bodySites.*.code' => ['nullable', 'string', new InDictionary('eHealth/body_sites')],
             'conditions.*.onsetDate' => ['required_with:conditions', 'before:tomorrow', 'date'],
-            'conditions.*.onsetTime' => ['required_with:conditions', 'date_format:H:i'],
+            'conditions.*.onsetTime' => Rule::forEach(fn ($value, $attribute) => [
+                'required_with:conditions',
+                'date_format:H:i',
+                new PastDateTime($this->conditions[explode('.', $attribute)[1]]['onsetDate'] ?? '')
+            ]),
             'conditions.*.assertedDate' => ['nullable', 'before:tomorrow', 'date'],
             'conditions.*.assertedTime' => ['nullable', 'date_format:H:i'],
             'conditions.*.asserterText' => ['nullable', 'string'],
@@ -256,10 +268,12 @@ class EncounterForm extends BaseForm
                 new InDictionary('eHealth/ICD10_AM/condition_codes')
             ],
             'diagnosticReports.*.conclusion' => Rule::forEach(fn ($value, $attribute) => [
-                Rule::requiredIf(in_array(
-                    $this->diagnosticReports[explode('.', $attribute)[1]]['categoryCode'],
-                    ['diagnostic_procedure', 'imaging']
-                )),
+                Rule::requiredIf(
+                    in_array(
+                        $this->diagnosticReports[explode('.', $attribute)[1]]['categoryCode'],
+                        ['diagnostic_procedure', 'imaging']
+                    )
+                ),
                 'nullable',
                 'string',
                 'max:1000'
@@ -284,19 +298,27 @@ class EncounterForm extends BaseForm
             ]),
             'diagnosticReports.*.effectivePeriodEndDate' => ['required_with:diagnosticReports', 'date'],
             'diagnosticReports.*.effectivePeriodEndTime' => Rule::forEach(function ($value, $attribute) {
-                $index = (int) explode('.', $attribute)[1];
+                $index = (int)explode('.', $attribute)[1];
                 $report = $this->diagnosticReports[$index];
 
                 return [
                     'required_with:diagnosticReports',
                     'date_format:H:i',
                     function (string $attribute, mixed $value, Closure $fail) use ($report) {
-                        $start = Carbon::createFromFormat('Y-m-d H:i', $report['effectivePeriodStartDate'] . ' ' . $report['effectivePeriodStartTime']);
+                        $start = Carbon::createFromFormat(
+                            'Y-m-d H:i',
+                            $report['effectivePeriodStartDate'] . ' ' . $report['effectivePeriodStartTime']
+                        );
                         $end = Carbon::createFromFormat('Y-m-d H:i', $report['effectivePeriodEndDate'] . ' ' . $value);
-                        $issued = Carbon::createFromFormat('Y-m-d H:i', $report['issuedDate'] . ' ' . $report['issuedTime']);
+                        $issued = Carbon::createFromFormat(
+                            'Y-m-d H:i',
+                            $report['issuedDate'] . ' ' . $report['issuedTime']
+                        );
 
                         if (!$end->isAfter($start)) {
-                            $fail(__('validation.after', ['date' => __('validation.attributes.effective_period_start')]));
+                            $fail(
+                                __('validation.after', ['date' => __('validation.attributes.effective_period_start')])
+                            );
                         }
 
                         if ($end->isAfter($issued)) {
@@ -378,6 +400,10 @@ class EncounterForm extends BaseForm
         $this->addAllowedEncounterClasses($rules);
         $this->addAllowedEncounterTypes($rules);
         $this->addAllowedEpisodeCareManagerEmployeeTypes($rules);
+        $this->addAllowedConditionCodes($rules);
+        $this->addPsychiatryEvidenceValidation($rules);
+        $this->addEmployeeTypeConditionsValidation($rules);
+        $this->addSpecialityConditionsValidation($rules);
 
         return $rules;
     }
@@ -406,9 +432,9 @@ class EncounterForm extends BaseForm
      */
     private function addAllowedEpisodeCareManagerEmployeeTypes(array &$rules): void
     {
-        $allowedValues = $this->getAllowedValues(
-            'ehealth.legal_entity_episode_types',
-            'ehealth.employee_episode_types'
+        $allowedValues = array_intersect(
+            config('ehealth.legal_entity_episode_types')[legalEntity()->type->name],
+            config('ehealth.employee_episode_types')[Auth::user()->getEncounterWriterEmployee()->employeeType]
         );
         $rules['episode.typeCode'][] = 'in:' . implode(',', $allowedValues);
     }
@@ -469,25 +495,137 @@ class EncounterForm extends BaseForm
     }
 
     /**
-     * Get allowed values by config keys.
+     * Add condition code system validation based on encounter class.
      *
-     * @param  string  $configKey
-     * @param  string|null  $additionalConfigKey
-     * @return array
+     * @param  array  $rules
+     * @return void
      */
-    private function getAllowedValues(string $configKey, ?string $additionalConfigKey = null): array
+    private function addAllowedConditionCodes(array &$rules): void
     {
-        $allowedValues = config($configKey);
+        $rules['conditions.*.codeSystem'][] = function (string $attribute, mixed $value, Closure $fail): void {
+            $classCode = $this->encounter['classCode'] ?? null;
+            if (empty($classCode) || $classCode === 'PHC') {
+                return;
+            }
 
-        if ($additionalConfigKey) {
-            $additionalValues = config($additionalConfigKey);
-            $allowedValues = array_intersect(
-                $allowedValues[legalEntity()->type->name],
-                $additionalValues[Auth::user()?->getEncounterWriterEmployee()->employeeType]
-            );
-        }
+            if ($value !== 'eHealth/ICD10_AM/condition_codes') {
+                $fail(__('validation.custom.conditions.codeSystem.class_forbidden'));
+            }
+        };
 
-        return $allowedValues;
+        $rules['conditions'][] = static function (string $attribute, mixed $value, Closure $fail): void {
+            if (empty($value)) {
+                return;
+            }
+
+            $hasDuplicate = collect($value)->groupBy('codeSystem')
+                ->contains(fn (Collection $group) => $group->count() > 1);
+
+            if ($hasDuplicate) {
+                $fail(__('validation.custom.conditions.max_one_per_dictionary'));
+            }
+        };
+    }
+
+    /**
+     * Validate that conditions requiring a psychiatry evidence reference have a valid condition evidence attached.
+     *
+     * @param  array  $rules
+     * @return void
+     */
+    private function addPsychiatryEvidenceValidation(array &$rules): void
+    {
+        $rules['conditions.*'][] = static function (string $attribute, mixed $value, Closure $fail): void {
+            $codeCode = data_get($value, 'codeCode');
+            $psychiatryCodes = config('ehealth.psychiatry_icpc2_diagnoses_evidence_check', []);
+
+            if (!in_array($codeCode, $psychiatryCodes, true)) {
+                return;
+            }
+
+            $evidenceDetails = collect(data_get($value, 'evidenceDetails', []));
+            $conditionEvidence = $evidenceDetails->firstWhere('type', '=', 'condition');
+
+            if (!$conditionEvidence) {
+                $fail(__('validation.custom.conditions.psychiatry_evidence_required', ['code' => $codeCode]));
+
+                return;
+            }
+
+            $allowedCodes = config('ehealth.icd10am_speciality_conditions_allowed.PSYCHIATRY', []);
+
+            if (!in_array(data_get($conditionEvidence, 'codeCode'), $allowedCodes, true)) {
+                $fail(__('validation.custom.conditions.psychiatry_evidence_code_forbidden', ['code' => $codeCode]));
+            }
+        };
+    }
+
+    /**
+     * Validate that ASSISTANT and MED_COORDINATOR employees only use their allowed condition codes.
+     *
+     * @param  array  $rules
+     * @return void
+     */
+    private function addEmployeeTypeConditionsValidation(array &$rules): void
+    {
+        $employeeType = Auth::user()->getEncounterWriterEmployee()->employeeType;
+
+        $rules['conditions.*'][] = static function (string $attribute, mixed $value, Closure $fail) use (
+            $employeeType
+        ): void {
+            $allowedByCodeSystem = config("ehealth.employee_type_conditions_allowed.$employeeType");
+
+            if ($allowedByCodeSystem === null) {
+                return;
+            }
+
+            $codeSystem = data_get($value, 'codeSystem');
+            $allowedCodes = $allowedByCodeSystem[$codeSystem] ?? [];
+            $codeCode = data_get($value, 'codeCode');
+
+            if (!in_array($codeCode, $allowedCodes, true)) {
+                $fail(__("validation.custom.conditions.employee_type_code_forbidden"));
+            }
+        };
+    }
+
+    /**
+     * Validate that the asserter's officio speciality is allowed to set the given ICD10_AM condition code.
+     * Only applies when primarySource is true and codeSystem is eHealth/ICD10_AM/condition_codes.
+     *
+     * @param  array  $rules
+     * @return void
+     */
+    private function addSpecialityConditionsValidation(array &$rules): void
+    {
+        $speciality = Auth::user()
+            ->getEncounterWriterEmployee()
+            ->loadMissing('specialities')
+            ->specialities
+            ->firstWhere('speciality_officio', true)
+            ->speciality;
+
+        $rules['conditions.*'][] = static function (string $attribute, mixed $value, Closure $fail) use (
+            $speciality
+        ): void {
+            if (data_get($value, 'codeSystem') !== 'eHealth/ICD10_AM/condition_codes') {
+                return;
+            }
+
+            if (!$speciality) {
+                return;
+            }
+
+            $allowedCodes = config("ehealth.icd10am_speciality_conditions_allowed.$speciality");
+            if ($allowedCodes === null) {
+                return;
+            }
+
+            $codeCode = data_get($value, 'codeCode');
+            if (!in_array($codeCode, $allowedCodes, true)) {
+                $fail(__('validation.custom.conditions.speciality_condition_code_forbidden', ['code' => $codeCode]));
+            }
+        };
     }
 
     /**

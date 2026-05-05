@@ -1,4 +1,3 @@
-@use('Carbon\CarbonImmutable')
 
 <div class="relative"> {{-- This required for table overflow scrolling --}}
     <fieldset class="fieldset"
@@ -14,7 +13,7 @@
               }"
     >
         <legend class="legend">
-            <h2>{{ __('patients.evidence_observations') }}</h2>
+            <h2>{{ __('patients.evidence') }}</h2>
         </legend>
 
         <table class="table-input w-inherit">
@@ -166,28 +165,24 @@
                                 {{-- Episode info in which the search happens --}}
                                 <div class="form-row-modal">
                                     <div class="form-group group">
-                                        <select id="episodeId" class="input-modal peer" x-model="modalEvidenceDetail.selectedEpisodeId">
+                                        <select id="evidenceType" class="input-modal peer" x-model="modalEvidenceDetail.type">
                                             <option value="" selected>
-                                                {{ __('forms.select') }} {{ mb_strtolower(__('patients.episode')) }}
+                                                {{ __('forms.select') }} {{ mb_strtolower(__('forms.type')) }}
                                             </option>
-                                            @foreach($episodes as $key => $episode)
-                                                <option value="{{ $episode['uuid'] }}">
-                                                    {{ $episode['name'] }} ({{ __('patients.status.' . $episode['status']) }})
-                                                    від {{ CarbonImmutable::parse($episode['ehealth_inserted_at'])->format('d.m.Y') }}
-                                                </option>
-                                            @endforeach
+                                            <option value="condition">{{ __('patients.condition') }}</option>
+                                            <option value="observation">{{ __('patients.observation') }}</option>
                                         </select>
                                     </div>
 
                                     {{-- Search button --}}
                                     <div>
                                         <button @click.prevent="
-                                                $wire.searchEvidenceDetails(modalEvidenceDetail.selectedEpisodeId).then(() => {
+                                                $wire.searchEvidenceDetails(modalEvidenceDetail.type).then(() => {
                                                     searchResults = JSON.parse(JSON.stringify($wire.evidenceDetails));
                                                     selectedEvidenceDetailIds = [];
                                                 })"
                                                 class="flex items-center gap-2 button-primary"
-                                                :disabled="!modalEvidenceDetail.selectedEpisodeId"
+                                                :disabled="!modalEvidenceDetail.type"
                                         >
                                             @icon('search', 'w-4 h-4')
                                             <span>{{ __('patients.search') }}</span>
@@ -271,8 +266,7 @@
                                                 const existingIds = modalCondition.evidenceDetails.map(detail => detail.id);
 
                                                 const newDetails = searchResults
-                                                    .filter(detail => selectedEvidenceDetailIds.includes(detail.id) && !existingIds.includes(detail.id))
-                                                    .map(detail => ({ ...detail, selectedEpisodeId: modalEvidenceDetail.selectedEpisodeId }));
+                                                    .filter(detail => selectedEvidenceDetailIds.includes(detail.id) && !existingIds.includes(detail.id));
 
                                                 modalCondition.evidenceDetails = modalCondition.evidenceDetails.concat(newDetails);
 
@@ -299,7 +293,7 @@
      */
     class EvidenceDetail {
         constructor(obj = null) {
-            this.selectedEpisodeId = '';
+            this.type = '';
 
             if (obj) {
                 Object.assign(this, JSON.parse(JSON.stringify(obj)));
