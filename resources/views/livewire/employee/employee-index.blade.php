@@ -249,19 +249,19 @@
                     @php
                         // Filter requests: exclude those that are already APPROVED and have an applied_at date.
                         // We use strict filtering on the collection to avoid showing historical processed requests.
-                        $drafts = $party->employeeRequests->reject(function ($request) {
+                        $drafts = $party->employeeRequests->where('legal_entity_id', $currentLegalEntityId)->reject(function ($request) {
                             $status = $request->status instanceof \UnitEnum ? $request->status->value : $request->status;
                             return $status === Status::APPROVED->value;
                         });
 
-                        $employees = $party->employees;
+                        $employees = $party->employees->where('legal_entity_id', $currentLegalEntityId);
 
                         $positions = $drafts->merge($employees)->sortByDesc('updated_at');
 
                         // Check permissions for actions.
                         // We iterate through the filtered list of positions.
                         $hasAnyActionInTable = $positions->contains(function ($pos) use ($permissions) {
-                            $isEmp = $pos instanceof \App\Models\Employee\Employee;
+                            $isEmp = $pos instanceof Employee;
                             // Safe access to status value handling both Enum objects and strings
                             $status = $pos->status instanceof \UnitEnum ? $pos->status->value : $pos->status;
 
@@ -304,10 +304,8 @@
 
                                 {{-- Email --}}
                                 @php
-
-                                    $emailsCollection = $party->loadMissing('users')->employees
-                                        ->where('legal_entity_id', $currentLegalEntityId)
-                                        ->map(fn($emp) => $emp->loadMissing('party.users')->party->users?->map(fn($user) => $user->email))
+                                    $emailsCollection = $employees
+                                        ->map(fn($emp) => $emp->loadMissing('users')->users?->map(fn($user) => $user->email))
                                         ->flatten()
                                         ->filter()
                                         ->unique();
@@ -356,22 +354,22 @@
                             </div>
 
                             <div class="flex items-center gap-4">
-                                @if($party->employees->isNotEmpty())
+                                @if($employees->isNotEmpty())
                                     @php
                                         // Find the last active employee of this person to check the rights
-                                        $latestEmployee = $party->employees->first(); // or through the method by which you get a topical position
+                                        $latestEmployee = $employees->first(); // or through the method by which you get a topical position
 
                                         // Check if ANY of the employee positions for this party is an OWNER
-                                        $isOwner = $party->employees->contains(fn($emp) => $emp->employeeType === Role::OWNER->value);
+                                        $isOwner = $employees->contains(fn($emp) => $emp->employeeType === Role::OWNER->value);
                                         $hasUserLinked = $latestEmployee && !empty($latestEmployee->userId);
 
                                         // We check the possibility of editing personal data according to your rules:
                                         // 1. Not the owner 3. Not exempt
                                         $canEditParty = $latestEmployee
                                             && !$isOwner
-                                            && $latestEmployee->status !== \App\Enums\Status::DISMISSED;
+                                            && $latestEmployee->status !== Status::DISMISSED;
                                     @endphp
-                                    @can('create', \App\Models\Employee\EmployeeRequest::class)
+                                    @can('create', EmployeeRequest::class)
                                         {{-- Edit personal data button --}}
                                         @if($canEditParty)
                                             <a href="{{ route('party.edit', ['legalEntity' => $currentLegalEntityId, 'party' => $party->id]) }}"
@@ -414,9 +412,9 @@
                                     @foreach($positions as $position)
                                         @php
                                             $positionEmail = null;
-                                            if ($position instanceof \App\Models\Employee\Employee) {
-                                                $positionEmail = $position->loadMissing('party.users')->party->users()->first()?->email ?? null;
-                                            } else if ($position instanceof \App\Models\Employee\EmployeeRequest) {
+                                            if ($position instanceof Employee) {
+                                                $positionEmail = $party->loadMissing('users')->users->where(fn($user) => $user->id === $position->user_id)->first()?->email ?? null;
+                                            } else if ($position instanceof EmployeeRequest) {
                                                 $positionEmail = $position->revision->data['party']['email'] ?? null;
                                             }
                                         @endphp
@@ -428,7 +426,7 @@
                                                 {{ $dictionaries['EMPLOYEE_TYPE'][$position->employee_type] ?? $position->employee_type }}
                                             </td>
                                             <td class="td-input break-words whitespace-normal align-top">
-                                                {{ $position->division->name ?? 'N/A' }}
+                                                {{ $position->division->name ?? __('forms.undefined') }}
                                             </td>
 
                                             <td class="td-input break-words whitespace-normal align-top">
@@ -436,24 +434,28 @@
                                                     <a href="mailto:{{ $positionEmail }}" class="hover:underline"
                                                        title="{{ $positionEmail }}">{{ $positionEmail }}</a>
                                                 @else
-                                                    N/A
+                                                    {{ __('forms.undefined') }}
                                                 @endif
                                             </td>
 
                                             <td class="td-input break-words whitespace-nowrap align-middle">
-                                                @php $isEmployee = $position instanceof \App\Models\Employee\Employee; @endphp
+                                                @php
+                                                    $isEmployee = $position instanceof Employee;
+                                                    $employeeStatus = $isEmployee ? $position->status?->value : '';
+                                                @endphp
+
                                                 @if($isEmployee)
-                                                    @if($position->status?->value === Status::APPROVED->value)
+                                                    @if($employeeStatus === Status::APPROVED->value)
                                                         <span class="badge-green">{{__('forms.status.active')}}</span>
-                                                    @elseif($position->status?->value === Status::DISMISSED->value)
+                                                    @elseif($employeeStatus === Status::DISMISSED->value || $employeeStatus === Status::STOPPED->value)
                                                         <span class="badge-red">{{__('forms.status.dismissed')}}</span>
-                                                    @elseif($position->status?->value === Status::REORGANIZED->value)
+                                                    @elseif($employeeStatus === Status::REORGANIZED->value)
                                                         <span class="badge-yellow">{{__('forms.status.reorganized')}}</span>
                                                     @endif
                                                 @else
-                                                    @if($position->status?->value === Status::NEW->value)
+                                                    @if($employeeStatus === Status::NEW->value)
                                                         <span class="badge-red">{{__('forms.status.draft')}}</span>
-                                                    @elseif($position->status?->value === Status::SIGNED->value)
+                                                    @elseif($employeeStatus === Status::SIGNED->value)
                                                         <span class="badge-yellow">{{__('forms.status.sent')}}</span>
                                                     @endif
                                                 @endif
