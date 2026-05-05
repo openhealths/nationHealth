@@ -6,7 +6,6 @@ namespace App\Models;
 
 use App\Enums\User\Role;
 use App\Enums\JobStatus;
-use App\Models\Contracts\ContractRequest;
 use App\Models\Relations\Phone;
 use App\Models\Relations\Address;
 use App\Models\Employee\Employee;
@@ -14,6 +13,7 @@ use App\Casts\LegalEntityArchiveCast;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Employee\EmployeeRequest;
 use Eloquence\Behaviours\HasCamelCasing;
+use App\Models\Contracts\ContractRequest;
 use Illuminate\Database\Eloquent\Builder;
 use App\Casts\LegalEntityAccreditationCast;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -149,6 +149,11 @@ class LegalEntity extends Model
     public function equipments(): HasMany
     {
         return $this->hasMany(Equipment::class);
+    }
+
+    public function legators(): HasMany
+    {
+        return $this->hasMany(Legator::class);
     }
 
     /**

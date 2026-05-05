@@ -56,4 +56,53 @@ class LegalEntityRepository
 
         return $result;
     }
+
+    /**
+     * Save legators for the given legal entity.
+     *
+     * Deletes existing legators and inserts the new ones derived from the provided data.
+     *
+     * @param LegalEntity $legalEntity The legal entity to associate legators with.
+     * @param array $data Array of legator data from the eHealth API response.
+     *                    Each entry is expected to contain:
+     *                    - merged_from_legal_entity (array): { uuid, name, edrpou }
+     *                    - is_active (bool)
+     *                    - reason (string)
+     *                    - reason_date (string|null)
+     *                    - type (string)
+     *                    - ehealth_inserted_at (string)
+     *                    - inserted_by (string)
+     * @return void
+     */
+    public function saveLegators(LegalEntity $legalEntity, array $data): void
+    {
+        $legalEntityId = $legalEntity->id;
+
+        $legatorsData= [];
+
+        foreach ($data as $legator) {
+            $legatorsData[] = [
+                'legal_entity_id' => $legalEntityId,
+                'uuid' => $legator['merged_from_legal_entity']['uuid'],
+                'name' => $legator['merged_from_legal_entity']['name'],
+                'is_active' => $legator['is_active'],
+                'reason' => $legator['reason'],
+                'reason_date' => $legator['reason_date'] ?? null,
+                'edrpou' => $legator['merged_from_legal_entity']['edrpou'],
+                "type" => $legator['type'],
+                "ehealth_inserted_at" => $legator['ehealth_inserted_at'],
+                "inserted_by" => $legator['inserted_by'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        if (!empty($legatorsData)) {
+            $legalEntity->legators()->upsert(
+                $legatorsData,
+                ['uuid', 'legal_entity_id'], // unique keys
+                ['edrpou', 'name', 'is_active', 'type', 'reason', 'reason_date', 'ehealth_inserted_at', 'inserted_by', 'updated_at'] // fields to update if record exists
+            );
+        }
+    }
 }

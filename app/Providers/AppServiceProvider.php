@@ -14,6 +14,7 @@ use App\Jobs\EpisodeSync;
 use App\Jobs\EquipmentSync;
 use App\Jobs\HealthcareServiceSync;
 use App\Jobs\ImmunizationSync;
+use App\Jobs\LegalEntitySync;
 use App\Jobs\ObservationSync;
 use App\Rules\TranslatedDateValidator;
 use Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider;
@@ -151,6 +152,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for(
             'ehealth-diagnostic-report-get',
             static fn (DiagnosticReportSync $job) => Limit::perMinute(config('ehealth.rate_limit.diagnostic_report'))->by($job->user->id)
+        );
+
+        RateLimiter::for(
+            'legal-entity-legators-get',
+            static fn (LegalEntitySync $job) => Limit::perMinute(config('ehealth.rate_limit.legal_entity_legators'))->by($job->user->id)
         );
     }
 }

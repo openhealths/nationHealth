@@ -92,7 +92,8 @@ return [
         'employee_role' => 50,
         'party_request' => 30,
         'declaration' => 10,
-        'declaration_request' => 20
+        'declaration_request' => 20,
+        'legal_entity_legators'=> 2
     ],
     'employee_type' => [
         'OWNER' => [

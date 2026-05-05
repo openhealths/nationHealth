@@ -70,6 +70,7 @@ return [
     'sync_successfull' => 'Дані синхронізовано успішно',
     'warn_reorganized' => 'Увага! Статус закладу змінився на "Реорганізовано"',
     "access_read_only" => 'Рівень доступу змінюється на "Тільки перегляд"',
+    'legators_sync' => 'Дані залежних закладів - синхронізуються',
     'patient_has_no_auth_methods' => 'У пацієнта відсутні методи автентифікації',
     'new_auth_method' => 'Новий метод автентифікації',
     'send_files' => 'Відправити файли',
@@ -377,6 +378,15 @@ return [
         'unknown' => 'Невідомо',
         'stopped' => 'Зупинений',
         'entered_in_error' => 'Внесено помилково'
+    ],
+
+    // Reorganization types
+    'reorganization' => [
+        'accession' => 'Приєднання',
+        'merging' => 'Злиття',
+        'dividing' => 'Виділ',
+        'separating' => 'Поділ',
+        'transformation' => 'Перетворення',
     ],
 
     // Declarations
