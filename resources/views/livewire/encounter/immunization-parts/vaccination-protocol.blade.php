@@ -116,6 +116,19 @@
             </tbody>
         </table>
 
+        <p class="text-error text-xs mt-1"
+           x-show="modalImmunization.vaccinationProtocols.length === 0"
+        >
+            {{ __('patients.vaccination_protocol_required') }}
+        </p>
+
+        <p class="text-error text-xs mt-1"
+           x-show="modalImmunization.primarySource &&
+                    modalImmunization.vaccinationProtocols.some(protocol => !protocol.doseSequence || !protocol.series || !protocol.seriesDoses)"
+        >
+            {{ __('patients.vaccination_protocol_required_fields') }}
+        </p>
+
         <div>
             {{-- Button to trigger the modal --}}
             <button @click.prevent="
@@ -249,7 +262,7 @@
                                         >
 
                                         <p class="text-error text-xs"
-                                           x-show="modalVaccinationProtocol.authorityCode === 'MoH' && !modalVaccinationProtocol.doseSequence"
+                                           x-show="(modalVaccinationProtocol.authorityCode === 'MoH' || modalImmunization.primarySource) && !modalVaccinationProtocol.doseSequence"
                                         >
                                             {{ __('forms.field_empty') }}
                                         </p>
@@ -271,7 +284,7 @@
                                         >
 
                                         <p class="text-error text-xs"
-                                           x-show="modalVaccinationProtocol.authorityCode === 'MoH' && !modalVaccinationProtocol.series"
+                                           x-show="(modalVaccinationProtocol.authorityCode === 'MoH' || modalImmunization.primarySource) && !modalVaccinationProtocol.series"
                                         >
                                             {{ __('forms.field_empty') }}
                                         </p>
@@ -293,7 +306,7 @@
                                         >
 
                                         <p class="text-error text-xs"
-                                           x-show="modalVaccinationProtocol.authorityCode === 'MoH' && !modalVaccinationProtocol.seriesDoses"
+                                           x-show="(modalVaccinationProtocol.authorityCode === 'MoH' || modalImmunization.primarySource) && !modalVaccinationProtocol.seriesDoses"
                                         >
                                             {{ __('forms.field_empty') }}
                                         </p>
@@ -333,7 +346,9 @@
                                                 openModal = false;
                                             "
                                             class="button-primary"
-                                            :disabled="!modalVaccinationProtocol.authorityCode.trim()"
+                                            :disabled="!modalVaccinationProtocol.authorityCode.trim() ||
+                                                       ((modalVaccinationProtocol.authorityCode === 'MoH' || modalImmunization.primarySource) &&
+                                                        (!modalVaccinationProtocol.doseSequence || !modalVaccinationProtocol.series || !modalVaccinationProtocol.seriesDoses))"
                                     >
                                         {{ __('forms.save') }}
                                     </button>

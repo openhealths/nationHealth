@@ -79,10 +79,10 @@ class ImmunizationMapper
 
         if (!$immunization['notGiven']) {
             $data['explanation']['reasons'] = collect($immunization['reasons'] ?? [])
-                ->filter()
+                ->filter(fn (array $reason) => !empty($reason['code']))
                 ->map(
-                    fn (string $code) => FhirResource::make()
-                        ->coding('eHealth/reason_explanations', $code)
+                    fn (array $reason) => FhirResource::make()
+                        ->coding('eHealth/reason_explanations', $reason['code'])
                         ->toCodeableConcept()
                 )
                 ->values()
@@ -118,13 +118,13 @@ class ImmunizationMapper
         $time = $rawTime ? CarbonImmutable::parse($rawTime) : $date;
         $notGiven = data_get($immunization, 'notGiven', false);
         $reasons = $notGiven ? [] : collect(data_get($immunization, 'explanation.reasons', []))
-            ->map(fn (array $reason) => data_get($reason, 'coding.0.code', ''))
-            ->filter()
+            ->map(fn (array $reason) => ['code' => data_get($reason, 'coding.0.code', '')])
+            ->filter(fn (array $reason) => !empty($reason['code']))
             ->values()
             ->toArray();
 
         if (!$notGiven && empty($reasons)) {
-            $reasons = [''];
+            $reasons = [['code' => '']];
         }
 
         return [

@@ -58,7 +58,7 @@
             <h2 class="default-p font-bold">{{ __('patients.was_performed') }}</h2>
             <div class="flex items-center">
                 <input x-model="modalImmunization.notGiven"
-                       @change="modalImmunization.notGiven = false"
+                       @change="modalImmunization.notGiven = false; if (modalImmunization.reasons.length === 0) modalImmunization.reasons = [{code: ''}]"
                        id="yes"
                        type="radio"
                        value="false"
@@ -73,7 +73,7 @@
 
             <div class="flex items-center">
                 <input x-model="modalImmunization.notGiven"
-                       @change="modalImmunization.notGiven = true"
+                       @change="modalImmunization.notGiven = true; modalImmunization.primarySource = true"
                        id="no"
                        type="radio"
                        value="true"
@@ -95,19 +95,19 @@
                             <label :for="'reasonExplanation-' + index" class="label-modal">
                                 {{ __('patients.reasons') }}
                             </label>
-                            <select x-model="modalImmunization.reasons[index]"
+                            <select x-model="modalImmunization.reasons[index].code"
                                     :id="'reasonExplanation-' + index"
                                     class="input-modal"
                                     required
                             >
-                                <option selected>{{ __('forms.select') }}</option>
+                                <option value="" selected>{{ __('forms.select') }}</option>
                                 @foreach($this->dictionaries['eHealth/reason_explanations'] as $key => $reasonExplanation)
                                     <option value="{{ $key }}">{{ $reasonExplanation }}</option>
                                 @endforeach
                             </select>
 
                             <p class="text-error text-xs"
-                               x-show="!Object.keys(reasonExplanationsDictionary).includes(modalImmunization.reasons[index])"
+                               x-show="!Object.keys(reasonExplanationsDictionary).includes(modalImmunization.reasons[index]?.code)"
                             >
                                 {{ __('forms.field_empty') }}
                             </p>
@@ -125,7 +125,7 @@
                         <!-- Add Button -->
                         <template x-if="index === modalImmunization.reasons.length - 1">
                             <button type="button"
-                                    @click="modalImmunization.reasons.push('')"
+                                    @click="modalImmunization.reasons.push({code: ''})"
                                     class="item-add lg:justify-self-start"
                                     :class="{ 'lg:justify-self-start': index > 0 }"
                             >
@@ -161,7 +161,7 @@
         </div>
     </div>
 
-    <div class="mt-12">
+    <div class="mt-12" x-show="modalImmunization.notGiven === false">
         <div class="flex gap-20 md:mb-5 mb-4">
             <h2 class="default-p font-bold">{{ __('patients.information_source') }}</h2>
             <div class="flex items-center">
