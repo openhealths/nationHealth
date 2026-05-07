@@ -18,7 +18,21 @@ use Illuminate\Validation\Rules\RequiredIf;
 
 class EncounterForm extends BaseForm
 {
-    public array $encounter = ['diagnoses' => [], 'reasons' => [], 'actions' => []];
+    public array $encounter = [
+        'diagnoses' => [],
+        'reasons' => [],
+        'actions' => [],
+        'referralType' => '',
+        'referralNumber' => '',
+        'paperReferral' => [
+            'requisition' => '',
+            'requesterEmployeeName' => '',
+            'requesterLegalEntityEdrpou' => '',
+            'requesterLegalEntityName' => '',
+            'serviceRequestDate' => '',
+            'note' => '',
+        ]
+    ];
 
     public array $episode = ['id' => '', 'typeCode' => '', 'name' => ''];
 
