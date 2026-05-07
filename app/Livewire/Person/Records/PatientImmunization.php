@@ -14,12 +14,10 @@ use App\Models\LegalEntity;
 use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
-use App\Livewire\Person\Records\PatientImmunization; //
 use Illuminate\View\View;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Pagination\Paginator;
 use Livewire\WithPagination;
 use Throwable;
 
@@ -171,7 +169,6 @@ class PatientImmunization extends BasePatientComponent
             $this->pageSize = $paging['page_size'] ?? 10;
 
             $this->immunizations = Arr::toCamelCase($validatedData);
-            //dd($this->immunizations);
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             $this->immunizations = [];
 
