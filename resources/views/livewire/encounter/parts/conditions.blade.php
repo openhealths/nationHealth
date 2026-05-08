@@ -295,7 +295,7 @@
                                             type="text"
                                             required
                                     >
-                                        <option selected>{{ __('forms.select') }}</option>
+                                        <option value="" selected>{{ __('forms.select') }}</option>
                                         @foreach($this->dictionaries['eHealth/diagnosis_roles'] as $key => $diagnosisRole)
                                             <option value="{{ $key }}">{{ $diagnosisRole }}</option>
                                         @endforeach

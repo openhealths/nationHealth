@@ -68,7 +68,7 @@
                         type="text"
                         required
                 >
-                    <option selected>{{ __('forms.select') }} {{ mb_strtolower(__('patients.source_link')) }} *</option>
+                    <option value="" selected>{{ __('forms.select') }} {{ mb_strtolower(__('patients.source_link')) }} *</option>
                     @foreach($this->dictionaries['eHealth/report_origins'] as $key => $reportOrigin)
                         <option value="{{ $key }}">{{ $reportOrigin }}</option>
                     @endforeach

@@ -15,7 +15,6 @@ return new class extends Migration
     {
         Schema::create('quantities', static function (Blueprint $table) {
             $table->id();
-            $table->nullableMorphs('quantifiable');
             $table->decimal('value')->comment('Numerical value (with implicit precision)');
             $table->enum('comparator', ['<', '<=', '>=', '>', '='])->nullable()->comment('ad - how to understand the value');
             $table->string('unit')->nullable()->comment('Unit from eHealth/ucum/units');

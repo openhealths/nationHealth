@@ -213,10 +213,10 @@ class DiagnosticReportComponent extends Component
             ->flattenedChildValues()
             ->toArray();
 
-        $this->observationCodeMap = config('ehealth.observation_category_codes');
-        $this->observationValueMap = config('ehealth.observation_code_values');
+        $this->observationCodeMap = config('observation.category_codes');
+        $this->observationValueMap = config('observation.code_values');
 
-        $this->codeableConceptValues = collect(config('ehealth.observation_code_values'))
+        $this->codeableConceptValues = collect(config('observation.code_values'))
             ->filter(static fn (array $value) => $value[1] === 'valueCodeableConcept')
             ->mapWithKeys(fn (array $value) => [
                 $value[0] => $this->dictionaries[$value[0]] ?? []

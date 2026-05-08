@@ -243,6 +243,7 @@ class EncounterComponent extends Component
         'eHealth/observation_categories',
         'eHealth/ICF/observation_categories',
         'eHealth/LOINC/observation_codes',
+        'eHealth/custom/observation_codes',
         'eHealth/stature',
         'eHealth/eye_colour',
         'eHealth/hair_color',
@@ -255,6 +256,9 @@ class EncounterComponent extends Component
         'eHealth/vaccination_covid_groups',
         'eHealth/LOINC/LL2451-4',
         'eHealth/LOINC/LL360-9',
+        'eHealth/LOINC/LL3841-5',
+        'eHealth/LOINC/LL4129-4',
+        'eHealth/LOINC/LL3250-9',
         'eHealth/ICF/qualifiers',
         'eHealth/ICF/qualifiers/extent_or_magnitude_of_impairment',
         'eHealth/ICF/qualifiers/nature_of_change_in_body_structure',
@@ -277,8 +281,8 @@ class EncounterComponent extends Component
     {
         $this->getDictionary();
 
-        $this->observationCodeMap = config('ehealth.observation_category_codes');
-        $this->observationValueMap = config('ehealth.observation_code_values');
+        $this->observationCodeMap = config('observation.category_codes');
+        $this->observationValueMap = config('observation.code_values');
 
         $this->dictionaries['eHealth/ICF/classifiers'] = dictionary()->basics()
             ->byName('eHealth/ICF/classifiers')
@@ -292,7 +296,7 @@ class EncounterComponent extends Component
         $this->dictionaries['custom/services'] = dictionary()->services()->flattened()->toArray();
         $this->loadRuleEngineRules();
 
-        $this->codeableConceptValues = collect(config('ehealth.observation_code_values'))
+        $this->codeableConceptValues = collect(config('observation.code_values'))
             ->filter(static fn (array $value) => $value[1] === 'valueCodeableConcept')
             ->mapWithKeys(fn (array $value) => [
                 $value[0] => $this->dictionaries[$value[0]] ?? [],

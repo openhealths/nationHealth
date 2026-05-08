@@ -4,16 +4,21 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
+use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Model;
 
-class Quantity extends Model
+class SampledData extends Model
 {
+    use HasCamelCasing;
+
     protected $fillable = [
-        'value',
-        'comparator',
-        'unit',
-        'system',
-        'code'
+        'origin',
+        'period',
+        'factor',
+        'lower_limit',
+        'upper_limit',
+        'dimensions',
+        'data'
     ];
 
     protected $hidden = [

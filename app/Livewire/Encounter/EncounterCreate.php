@@ -132,6 +132,7 @@ class EncounterCreate extends EncounterComponent
 
         if ($this->episodeType === 'new') {
             $this->createEpisode($formattedData['episode']);
+            unset($formattedData['episode']);
         }
 
         try {
@@ -193,10 +194,6 @@ class EncounterCreate extends EncounterComponent
 
         $encounterRepository = Repository::encounter();
 
-        if (!empty($this->form->observations)) {
-            $package['observations'] = $encounterRepository->formatObservationsRequest($this->form->observations);
-        }
-
         if (!empty($this->form->procedures)) {
             $package['procedures'] = $encounterRepository->formatProceduresRequest($this->form->procedures);
         }
@@ -239,11 +236,7 @@ class EncounterCreate extends EncounterComponent
             }
 
             if (isset($formattedData['observations'])) {
-                Repository::observation()->store(
-                    $formattedData['observations'],
-                    $this->personId,
-                    $createdEncounterId
-                );
+                Repository::observation()->store($formattedData['observations'], $this->personId);
             }
 
             if (isset($formattedData['procedures'])) {

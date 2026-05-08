@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class Observation extends Model
@@ -24,7 +24,6 @@ class Observation extends Model
     protected $fillable = [
         'uuid',
         'person_id',
-        'encounter_id',
         'based_on_id',
         'status',
         'diagnostic_report_id',
@@ -38,10 +37,6 @@ class Observation extends Model
         'comment',
         'body_site_id',
         'method_id',
-        'value_codeable_concept_id',
-        'value_string',
-        'value_boolean',
-        'value_date_time',
         'reaction_on_id',
         'context_id',
         'specimen_id',
@@ -52,17 +47,23 @@ class Observation extends Model
     ];
 
     protected $casts = [
-        'issued' => 'immutable_datetime',
-        'effective_date_time' => 'immutable_datetime',
+        'issued' => EHealthTimestampCast::class,
+        'effective_date_time' => EHealthTimestampCast::class,
         'status' => ObservationStatus::class,
         'ehealth_inserted_at' => EHealthTimestampCast::class,
         'ehealth_updated_at' => EHealthTimestampCast::class
     ];
 
+    protected $appends = [
+        'issued_date',
+        'issued_time',
+        'effective_date',
+        'effective_time'
+    ];
+
     protected $hidden = [
         'id',
         'person_id',
-        'encounter_id',
         'diagnostic_report_id',
         'code_id',
         'effective_date_time',
@@ -70,7 +71,6 @@ class Observation extends Model
         'performer_id',
         'report_origin_id',
         'interpretation_id',
-        'value_codeable_concept_id',
         'body_site_id',
         'method_id',
         'reaction_on_id',
@@ -82,44 +82,32 @@ class Observation extends Model
         'updated_at'
     ];
 
-    protected $appends = [
-        'issued_date',
-        'issued_time',
-        'effective_date',
-        'effective_time'
-    ];
-
     protected function issuedDate(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->issued->toDateString()
+            get: fn () => $this->issued ? substr($this->issued, 0, 10) : ''
         );
     }
 
     protected function issuedTime(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->issued->toTimeString()
+            get: fn () => $this->issued ? substr($this->issued, 11, 5) : ''
         );
     }
 
     protected function effectiveDate(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->effective_date_time->toDateString()
+            get: fn () => $this->effectiveDateTime ? substr($this->effectiveDateTime, 0, 10) : ''
         );
     }
 
     protected function effectiveTime(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->effective_date_time->toTimeString()
+            get: fn () => $this->effectiveDateTime ? substr($this->effectiveDateTime, 11, 5) : ''
         );
-    }
-
-    public function encounter(): BelongsTo
-    {
-        return $this->belongsTo(Encounter::class);
     }
 
     public function diagnosticReport(): BelongsTo
@@ -167,14 +155,9 @@ class Observation extends Model
         return $this->belongsTo(CodeableConcept::class, 'method_id');
     }
 
-    public function valueQuantity(): MorphOne
+    public function value(): HasOne
     {
-        return $this->morphOne(Quantity::class, 'quantifiable');
-    }
-
-    public function valueCodeableConcept(): BelongsTo
-    {
-        return $this->belongsTo(CodeableConcept::class, 'value_codeable_concept_id');
+        return $this->hasOne(Value::class);
     }
 
     public function reactionOn(): BelongsTo
@@ -202,9 +185,9 @@ class Observation extends Model
         return $this->belongsTo(Identifier::class, 'based_on_id');
     }
 
-    public function referenceRanges(): MorphMany
+    public function referenceRanges(): HasMany
     {
-        return $this->morphMany(ReferenceRange::class, 'referenceable');
+        return $this->hasMany(ReferenceRange::class);
     }
 
     public function components(): HasMany
@@ -227,7 +210,14 @@ class Observation extends Model
             'interpretation.coding',
             'bodySite.coding',
             'method.coding',
-            'valueCodeableConcept.coding',
+            'value.valueQuantity',
+            'value.valueCodeableConcept.coding',
+            'value.valueRange.low',
+            'value.valueRange.high',
+            'value.valueRatio.numerator',
+            'value.valueRatio.denominator',
+            'value.valueSampledData',
+            'effectivePeriod',
             'context.type.coding',
             'specimen.type.coding',
             'device.type.coding',
@@ -235,7 +225,7 @@ class Observation extends Model
             'referenceRanges',
             'components.code.coding',
             'components.interpretation.coding',
-            'components.valueCodeableConcept.coding',
+            'components.value.valueCodeableConcept.coding',
             'components.referenceRanges'
         ]);
     }

@@ -17,6 +17,7 @@ use App\Services\MedicalEvents\Mappers\ConditionMapper;
 use App\Services\MedicalEvents\Mappers\DiagnosticReportMapper;
 use App\Services\MedicalEvents\Mappers\EncounterMapper;
 use App\Services\MedicalEvents\Mappers\ImmunizationMapper;
+use App\Services\MedicalEvents\Mappers\ObservationMapper;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
@@ -74,9 +75,13 @@ class EncounterEdit extends EncounterComponent
                 ->toArray();
         }
 
-        //        $this->form->observations = Repository::observation()->get($this->encounterId);
-        //        $this->form->observations = Repository::observation()->formatForView($this->form->observations);
-        //
+        $observations = Repository::observation()->get($encounter['uuid']);
+        if ($observations) {
+            $this->form->observations = collect($observations)
+                ->map(fn (array $observation) => app(ObservationMapper::class)->fromFhir($observation))
+                ->toArray();
+        }
+
         //        $this->form->procedures = Repository::procedure()->get($this->encounterId);
         //        $this->form->procedures = Repository::procedure()->formatForView($this->form->procedures);
         //
@@ -119,6 +124,10 @@ class EncounterEdit extends EncounterComponent
             ->map(fn (array $diagnosticReport) => app(DiagnosticReportMapper::class)->toFhir($diagnosticReport, $uuids))
             ->values()
             ->toArray();
+        $fhirObservations = collect($validated['observations'] ?? [])
+            ->map(fn (array $observation) => app(ObservationMapper::class)->toFhir($observation, $uuids))
+            ->values()
+            ->toArray();
         $fhirEncounter = app(EncounterMapper::class)->toFhir(
             $validated['encounter'],
             $fhirConditions,
@@ -133,6 +142,7 @@ class EncounterEdit extends EncounterComponent
                 $this->personId,
                 array_map($this->fhirToSync(...), $fhirDiagnosticReports)
             );
+            Repository::observation()->sync($this->personId, array_map($this->fhirToSync(...), $fhirObservations), $uuids['encounter']);
         } catch (Throwable $exception) {
             $this->logDatabaseErrors($exception, 'Failed to sync encounter package data');
             Session::flash('error', __('messages.database_error'));
@@ -147,6 +157,7 @@ class EncounterEdit extends EncounterComponent
             'conditions' => $fhirConditions,
             'immunizations' => $fhirImmunizations,
             'diagnostic_reports' => $fhirDiagnosticReports,
+            'observations' => $fhirObservations
         ];
     }
 

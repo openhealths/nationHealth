@@ -116,7 +116,7 @@ trait HandlesReasonReferences
 
         try {
             $observationData = EHealth::observation()->getById($this->patientUuid, $uuid)->getData();
-            $encounterId = $this->ensureEncounterExist($observationData['context']['identifier']['value']);
+            $this->ensureEncounterExist($observationData['context']['identifier']['value']);
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             $this->handleEHealthExceptions($exception, 'Failed while ensuring encounter existence');
 
@@ -124,7 +124,7 @@ trait HandlesReasonReferences
         }
 
         try {
-            Repository::observation()->store([Arr::toCamelCase($observationData)], $this->personId, $encounterId);
+            Repository::observation()->store([Arr::toCamelCase($observationData)], $this->personId);
         } catch (Throwable $exception) {
             $this->logDatabaseErrors($exception, 'Error while storing observation');
             Session::flash('error', __('messages.database_error'));

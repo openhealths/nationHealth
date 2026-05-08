@@ -8,14 +8,15 @@ use App\Classes\eHealth\Api\PatientApi;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\ObservationComponent;
 use App\Models\MedicalEvents\Sql\Quantity;
-use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
+/**
+ * @property Observation $model
+ */
 class ObservationRepository extends BaseRepository
 {
     protected ?string $employeeUuid;
@@ -133,128 +134,144 @@ class ObservationRepository extends BaseRepository
      *
      * @param  array  $data
      * @param  int  $personId
-     * @param  int|null  $encounterId
      * @param  int|null  $diagnosticReportId
      * @return void
      * @throws Throwable
      */
-    public function store(array $data, int $personId, ?int $encounterId = null, ?int $diagnosticReportId = null): void
+    public function store(array $data, int $personId, ?int $diagnosticReportId = null): void
     {
-        DB::transaction(function () use ($data, $personId, $encounterId, $diagnosticReportId) {
-            try {
-                foreach ($data as $datum) {
-                    if ($diagnosticReportId) {
-                        $diagnosticReport = Repository::identifier()
-                            ->store($datum['diagnosticReport']['identifier']['value']);
-                        Repository::codeableConcept()->attach($diagnosticReport, $datum['diagnosticReport']);
-                    }
-
-                    $code = Repository::codeableConcept()->store($datum['code']);
-
-                    if (isset($datum['performer'])) {
-                        $performer = Repository::identifier()->store($datum['performer']['identifier']['value']);
-                        Repository::codeableConcept()->attach($performer, $datum['performer']);
-                    }
-
-                    if (isset($datum['reportOrigin'])) {
-                        $reportOrigin = Repository::codeableConcept()->store($datum['reportOrigin']);
-                    }
-
-                    if (isset($datum['interpretation'])) {
-                        $interpretation = Repository::codeableConcept()->store($datum['interpretation']);
-                    }
-
-                    if (isset($datum['bodySite'])) {
-                        $bodySite = Repository::codeableConcept()->store($datum['bodySite']);
-                    }
-
-                    if (isset($datum['method'])) {
-                        $method = Repository::codeableConcept()->store($datum['method']);
-                    }
-
-                    $valueQuantity = null;
-                    if (isset($datum['valueQuantity'])) {
-                        $valueQuantity = [
-                            'value' => $datum['valueQuantity']['value'],
-                            'comparator' => $datum['valueQuantity']['comparator'] ?? null,
-                            'unit' => $datum['valueQuantity']['unit'] ?? null,
-                            'system' => $datum['valueQuantity']['system'] ?? null,
-                            'code' => $datum['valueQuantity']['code'] ?? null
-                        ];
-                    }
-
-                    if (isset($datum['valueCodeableConcept'])) {
-                        $valueCodeableConcept = Repository::codeableConcept()->store($datum['valueCodeableConcept']);
-                    }
-
-                    if (isset($datum['context'])) {
-                        $context = Repository::identifier()->store($datum['context']['identifier']['value']);
-                        Repository::codeableConcept()->attach($context, $datum['context']);
-                    }
-
-                    /** @var Observation $observation */
-                    $observation = $this->model::create([
-                        'uuid' => $datum['uuid'] ?? $datum['id'],
-                        'person_id' => $personId,
-                        'encounter_id' => $encounterId,
-                        'status' => $datum['status'],
-                        'diagnostic_report_id' => $diagnosticReport->id ?? null,
-                        'code_id' => $code->id,
-                        'effective_date_time' => $datum['effectiveDateTime'] ?? null,
-                        'issued' => $datum['issued'],
-                        'primary_source' => $datum['primarySource'],
-                        'performer_id' => $performer->id ?? null,
-                        'report_origin_id' => $reportOrigin->id ?? null,
-                        'interpretation_id' => $interpretation->id ?? null,
-                        'comment' => $datum['comment'] ?? null,
-                        'body_site_id' => $bodySite->id ?? null,
-                        'method_id' => $method->id ?? null,
-                        'value_codeable_concept_id' => $valueCodeableConcept->id ?? null,
-                        'value_string' => $datum['valueString'] ?? null,
-                        'value_boolean' => $datum['valueBoolean'] ?? null,
-                        'value_date_time' => $datum['valueDateTime'] ?? null,
-                        'context_id' => $context->id ?? null
-                    ]);
-
-                    // Create polymorphic quantity relationship if needed
-                    if ($valueQuantity) {
-                        $observation->valueQuantity()->create($valueQuantity);
-                    }
-
-                    $categoriesIds = [];
-
-                    foreach ($datum['categories'] as $categoryData) {
-                        $category = Repository::codeableConcept()->store($categoryData);
-
-                        $categoriesIds[] = $category->id;
-                    }
-
-                    $observation->categories()->attach($categoriesIds);
-
-                    if (isset($datum['components'])) {
-                        foreach ($datum['components'] as $componentData) {
-                            $valueCodeableConcept = Repository::codeableConcept()
-                                ->store($componentData['valueCodeableConcept']);
-                            $interpretation = Repository::codeableConcept()->store($componentData['interpretation']);
-
-                            ObservationComponent::create([
-                                'observation_id' => $observation->id,
-                                'codeable_concept_id' => $valueCodeableConcept->id,
-                                'interpretation_id' => $interpretation->id
-                            ]);
-                        }
-                    }
+        DB::transaction(function () use ($data, $personId, $diagnosticReportId) {
+            foreach ($data as $datum) {
+                if ($diagnosticReportId) {
+                    $diagnosticReport = Repository::identifier()
+                        ->store($datum['diagnosticReport']['identifier']['value']);
+                    Repository::codeableConcept()->attach($diagnosticReport, $datum['diagnosticReport']);
                 }
-            } catch (Exception $e) {
-                Log::channel('db_errors')->error('Error saving observation', [
-                    'error' => $e->getMessage(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine()
+
+                $code = Repository::codeableConcept()->store($datum['code']);
+
+                if (isset($datum['performer'])) {
+                    $performer = Repository::identifier()->store($datum['performer']['identifier']['value']);
+                    Repository::codeableConcept()->attach($performer, $datum['performer']);
+                }
+
+                if (isset($datum['reportOrigin'])) {
+                    $reportOrigin = Repository::codeableConcept()->store($datum['reportOrigin']);
+                }
+
+                if (isset($datum['interpretation'])) {
+                    $interpretation = Repository::codeableConcept()->store($datum['interpretation']);
+                }
+
+                if (isset($datum['bodySite'])) {
+                    $bodySite = Repository::codeableConcept()->store($datum['bodySite']);
+                }
+
+                if (isset($datum['method'])) {
+                    $method = Repository::codeableConcept()->store($datum['method']);
+                }
+
+                if (isset($datum['context'])) {
+                    $context = Repository::identifier()->store($datum['context']['identifier']['value']);
+                    Repository::codeableConcept()->attach($context, $datum['context']);
+                }
+
+                $observation = $this->model->create([
+                    'uuid' => $datum['uuid'] ?? $datum['id'],
+                    'person_id' => $personId,
+                    'status' => $datum['status'],
+                    'diagnostic_report_id' => $diagnosticReport->id ?? null,
+                    'code_id' => $code->id,
+                    'effective_date_time' => $datum['effectiveDateTime'] ?? null,
+                    'issued' => $datum['issued'],
+                    'primary_source' => $datum['primarySource'],
+                    'performer_id' => $performer->id ?? null,
+                    'report_origin_id' => $reportOrigin->id ?? null,
+                    'interpretation_id' => $interpretation->id ?? null,
+                    'comment' => $datum['comment'] ?? null,
+                    'body_site_id' => $bodySite->id ?? null,
+                    'method_id' => $method->id ?? null,
+                    'context_id' => $context->id ?? null
                 ]);
 
-                throw $e;
+                $this->storeValue($datum, $observation);
+
+                $categoriesIds = [];
+
+                foreach ($datum['categories'] as $categoryData) {
+                    $category = Repository::codeableConcept()->store($categoryData);
+
+                    $categoriesIds[] = $category->id;
+                }
+
+                $observation->categories()->attach($categoriesIds);
+
+                if (isset($datum['components'])) {
+                    foreach ($datum['components'] as $componentData) {
+                        $componentCode = Repository::codeableConcept()->store($componentData['code']);
+                        $componentInterpretation = Repository::codeableConcept()->store(
+                            $componentData['interpretation']
+                        );
+
+                        $component = ObservationComponent::create([
+                            'observation_id' => $observation->id,
+                            'code_id' => $componentCode->id,
+                            'interpretation_id' => $componentInterpretation->id
+                        ]);
+
+                        $this->storeValue($componentData, $component);
+                    }
+                }
             }
         });
+    }
+
+    /**
+     * Store all value fields for an observation or component into the values table.
+     *
+     * @param  array  $datum
+     * @param  Observation|ObservationComponent  $owner
+     * @return void
+     */
+    private function storeValue(array $datum, Observation|ObservationComponent $owner): void
+    {
+        $valueData = [];
+
+        if (isset($datum['valueQuantity'])) {
+            $quantity = Quantity::create([
+                'value' => $datum['valueQuantity']['value'],
+                'comparator' => $datum['valueQuantity']['comparator'] ?? null,
+                'unit' => $datum['valueQuantity']['unit'] ?? null,
+                'system' => $datum['valueQuantity']['system'] ?? null,
+                'code' => $datum['valueQuantity']['code'] ?? null
+            ]);
+            $valueData['value_quantity_id'] = $quantity->id;
+        }
+
+        if (isset($datum['valueCodeableConcept'])) {
+            $valueCodeableConcept = Repository::codeableConcept()->store($datum['valueCodeableConcept']);
+            $valueData['value_codeable_concept_id'] = $valueCodeableConcept->id;
+        }
+
+        if (isset($datum['valueString'])) {
+            $valueData['value_string'] = $datum['valueString'];
+        }
+
+        if (isset($datum['valueBoolean'])) {
+            $valueData['value_boolean'] = $datum['valueBoolean'];
+        }
+
+        if (isset($datum['valueDateTime'])) {
+            $valueData['value_date_time'] = $datum['valueDateTime'];
+        }
+
+        if (isset($datum['valueTime'])) {
+            $valueData['value_time'] = $datum['valueTime'];
+        }
+
+        if (!empty($valueData)) {
+            $owner->value()->create($valueData);
+        }
     }
 
     /**
@@ -265,10 +282,12 @@ class ObservationRepository extends BaseRepository
      */
     public function getDetailsMapByUuids(array $uuids): array
     {
-        return collect($this->model::whereIn('uuid', $uuids)
-            ->with('code.coding')
-            ->get()
-            ->toArray())
+        return collect(
+            $this->model->whereIn('uuid', $uuids)
+                ->with('code.coding')
+                ->get()
+                ->toArray()
+        )
             ->mapWithKeys(fn (array $observation) => [
                 $observation['uuid'] => [
                     'insertedAt' => $observation['ehealthInsertedAt'] ?? null,
@@ -282,10 +301,10 @@ class ObservationRepository extends BaseRepository
     /**
      * Get observation data that is related to the encounter.
      *
-     * @param  int  $encounterId
+     * @param  string  $encounterUuid
      * @return array|null
      */
-    public function get(int $encounterId): ?array
+    public function get(string $encounterUuid): ?array
     {
         return $this->model::with([
             'categories.coding',
@@ -295,13 +314,14 @@ class ObservationRepository extends BaseRepository
             'interpretation.coding',
             'bodySite.coding',
             'method.coding',
-            'valueQuantity',
-            'valueCodeableConcept.coding',
+            'value.valueQuantity',
+            'value.valueCodeableConcept.coding',
             'reactionOn.type.coding',
-            'components.valueCodeableConcept.coding',
+            'components.code.coding',
+            'components.value.valueCodeableConcept.coding',
             'components.interpretation.coding'
         ])
-            ->where('encounter_id', $encounterId)
+            ->whereHas('context', fn ($query) => $query->where('value', $encounterUuid))
             ->get()
             ?->toArray();
     }
@@ -353,15 +373,33 @@ class ObservationRepository extends BaseRepository
      *
      * @param  int  $personId
      * @param  array  $validatedData
+     * @param  string|null  $encounterUuid
      * @return void
      * @throws Throwable
      */
-    public function sync(int $personId, array $validatedData): void
+    public function sync(int $personId, array $validatedData, ?string $encounterUuid = null): void
     {
-        DB::transaction(function () use ($personId, $validatedData) {
+        DB::transaction(function () use ($personId, $validatedData, $encounterUuid) {
             $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
 
-            $existingObservations = $this->model::whereIn('uuid', $apiUuids)
+            if ($encounterUuid !== null) {
+                $this->model
+                    ->whereHas('context', fn ($q) => $q->where('value', $encounterUuid))
+                    ->whereNotIn('uuid', $apiUuids)
+                    ->with(['components.value', 'value'])
+                    ->get()
+                    ->each(function (Observation $observation): void {
+                        $observation->categories()->detach();
+                        $observation->components->each(function (ObservationComponent $component): void {
+                            $component->value()->delete();
+                            $component->delete();
+                        });
+                        $observation->value()->delete();
+                        $observation->delete();
+                    });
+            }
+
+            $existingObservations = $this->model->whereIn('uuid', $apiUuids)
                 ->withAllRelations()
                 ->get()
                 ->keyBy('uuid');
@@ -405,21 +443,19 @@ class ObservationRepository extends BaseRepository
                     'effective_date_time' => $data['effective_date_time'] ?? null,
                     'issued' => $data['issued'] ?? null,
                     'primary_source' => $data['primary_source'] ?? null,
-                    'comment' => $data['comment'] ?? null,
-                    'value_string' => $data['value_string'] ?? null,
-                    'value_boolean' => $data['value_boolean'] ?? null,
-                    'value_date_time' => $data['value_date_time'] ?? null,
-                    'value_codeable_concept_id' => $data['value_codeable_concept_id'] ?? null
+                    'comment' => $data['comment'] ?? null
                 ];
 
                 if ($existing) {
                     $existing->update($observationData);
                     $observation = $existing;
                 } else {
-                    $observation = $this->model::create(
+                    $observation = $this->model->create(
                         array_merge(['uuid' => $data['uuid']], $observationData)
                     );
                 }
+
+                $this->syncValue($data, $observation);
 
                 // Sync categories
                 $categoryIds = $this->syncCodeableConcepts($existing, $data['categories'], 'categories');
@@ -446,9 +482,7 @@ class ObservationRepository extends BaseRepository
         foreach ($componentsData as $index => $componentData) {
             $existingComponent = $existingComponents[$index] ?? null;
 
-            // Sync component relationships
             if ($existingComponent) {
-                // Update existing component's relationships or create missing ones
                 if ($existingComponent->code) {
                     $this->updateCodeableConcept($existingComponent->code, $componentData['code']);
                     $code = $existingComponent->code;
@@ -469,26 +503,13 @@ class ObservationRepository extends BaseRepository
                     }
                 }
 
-                if ($existingComponent->valueCodeableConcept) {
-                    $this->updateCodeableConcept(
-                        $existingComponent->valueCodeableConcept,
-                        $componentData['value_codeable_concept']
-                    );
-                    $valueCodeableConcept = $existingComponent->valueCodeableConcept;
-                } else {
-                    $valueCodeableConcept = Repository::codeableConcept()->store(
-                        $componentData['value_codeable_concept']
-                    );
-                }
-
-                // Update the component record
                 $existingComponent->update([
                     'code_id' => $code->id,
-                    'interpretation_id' => $interpretation?->id,
-                    'value_codeable_concept_id' => $valueCodeableConcept->id
+                    'interpretation_id' => $interpretation?->id
                 ]);
+
+                $this->syncValue($componentData, $existingComponent);
             } else {
-                // Create new component
                 $componentCode = Repository::codeableConcept()->store($componentData['code']);
 
                 $componentInterpretation = null;
@@ -496,17 +517,80 @@ class ObservationRepository extends BaseRepository
                     $componentInterpretation = Repository::codeableConcept()->store($componentData['interpretation']);
                 }
 
-                $componentValueCodeableConcept = Repository::codeableConcept()->store(
-                    $componentData['value_codeable_concept']
-                );
-
-                ObservationComponent::create([
+                $component = ObservationComponent::create([
                     'observation_id' => $observation->id,
                     'code_id' => $componentCode->id,
-                    'interpretation_id' => $componentInterpretation?->id,
-                    'value_codeable_concept_id' => $componentValueCodeableConcept->id
+                    'interpretation_id' => $componentInterpretation?->id
                 ]);
+
+                $this->syncValue($componentData, $component);
             }
+        }
+    }
+
+    /**
+     * Sync all value fields for an observation or component into the values table.
+     *
+     * @param  array  $data
+     * @param  Observation|ObservationComponent  $owner
+     * @return void
+     */
+    private function syncValue(array $data, Observation|ObservationComponent $owner): void
+    {
+        $existingValue = $owner->value;
+        $valueData = [];
+
+        if (isset($data['value_quantity'])) {
+            $quantityData = [
+                'value' => $data['value_quantity']['value'],
+                'comparator' => $data['value_quantity']['comparator'] ?? null,
+                'unit' => $data['value_quantity']['unit'] ?? null,
+                'system' => $data['value_quantity']['system'] ?? null,
+                'code' => $data['value_quantity']['code'] ?? null
+            ];
+
+            if ($existingValue?->valueQuantity) {
+                $existingValue->valueQuantity->update($quantityData);
+                $valueData['value_quantity_id'] = $existingValue->valueQuantity->id;
+            } else {
+                $valueData['value_quantity_id'] = Quantity::create($quantityData)->id;
+            }
+        }
+
+        if (isset($data['value_codeable_concept'])) {
+            if ($existingValue?->valueCodeableConcept) {
+                $this->updateCodeableConcept($existingValue->valueCodeableConcept, $data['value_codeable_concept']);
+                $valueData['value_codeable_concept_id'] = $existingValue->valueCodeableConcept->id;
+            } else {
+                $valueData['value_codeable_concept_id'] = Repository::codeableConcept()
+                    ->store($data['value_codeable_concept'])->id;
+            }
+        }
+
+        if (isset($data['value_string'])) {
+            $valueData['value_string'] = $data['value_string'];
+        }
+
+        if (isset($data['value_boolean'])) {
+            $valueData['value_boolean'] = $data['value_boolean'];
+        }
+
+        if (isset($data['value_date_time'])) {
+            $valueData['value_date_time'] = $data['value_date_time'];
+        }
+
+        if (isset($data['value_time'])) {
+            $valueData['value_time'] = $data['value_time'];
+        }
+
+        if (empty($valueData)) {
+            return;
+        }
+
+        if ($existingValue) {
+            $existingValue->update($valueData);
+        } else {
+            $owner->value()->create($valueData);
         }
     }
 }

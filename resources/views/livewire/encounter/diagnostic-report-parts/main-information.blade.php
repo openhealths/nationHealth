@@ -13,7 +13,7 @@
                         type="text"
                         required
                 >
-                    <option selected value="">
+                    <option value="" selected>
                         {{ __('forms.select') }} {{ mb_strtolower(__('forms.category')) }} *
                     </option>
                     @foreach($this->dictionaries['eHealth/diagnostic_report_categories'] as $key => $category)
@@ -74,7 +74,7 @@
                                     x-model="modalDiagnosticReport.referralType"
                                     required
                             >
-                                <option selected value="">
+                                <option value="" selected>
                                     {{ __('forms.select') }} {{ mb_strtolower(__('patients.requisition_type')) }}
                                 </option>
                                 <option value="electronic">{{ __('patients.electronic') }}</option>

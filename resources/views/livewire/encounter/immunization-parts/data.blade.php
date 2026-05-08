@@ -100,7 +100,7 @@
                                     class="input-modal"
                                     required
                             >
-                                <option selected>{{ __('forms.select') }}</option>
+                                <option value="" selected>{{ __('forms.select') }}</option>
                                 @foreach($this->dictionaries['eHealth/reason_explanations'] as $key => $reasonExplanation)
                                     <option value="{{ $key }}">{{ $reasonExplanation }}</option>
                                 @endforeach
@@ -205,7 +205,7 @@
                             type="text"
                             required
                     >
-                        <option selected>{{ __('forms.select') }}</option>
+                        <option value="" selected>{{ __('forms.select') }}</option>
                         @foreach($this->dictionaries['eHealth/immunization_report_origins'] as $key => $reportOrigin)
                             <option value="{{ $key }}">{{ $reportOrigin }}</option>
                         @endforeach
