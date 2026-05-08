@@ -5,7 +5,7 @@
                class="flex items-center gap-2 button-primary px-5 py-2 text-sm shadow-sm"
             >
                 @icon('plus', 'w-4 h-4')
-                {{ __('patients.starts_interacting') }}
+                {{ __('care-plan.new_care_plan') ?? 'Створити план лікування' }}
             </a>
         @endcan
 
@@ -15,7 +15,7 @@
             {{ __('patients.data_access') }}
         </button>
 
-        <button wire:click.prevent=""
+        <button wire:click.prevent="$refresh"
                 type="button"
                 class="button-sync flex items-center gap-2 whitespace-nowrap px-5 py-2 text-sm shadow-sm"
         >
@@ -82,6 +82,8 @@
                     >
                         <option value="">{{ __('forms.select') }} ...</option>
                         <option value="active">Активний</option>
+                        <option value="completed">Завершений</option>
+                        <option value="cancelled">Скасований</option>
                     </select>
                     <label for="filterStatus" class="label">
                         Статус
@@ -384,5 +386,5 @@
         </div>
     </div>
 
-    <x-forms.loading/>
+    <x-forms.loading />
 </x-layouts.patient>
