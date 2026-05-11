@@ -16,7 +16,7 @@
             {{ __('patients.data_access') }}
         </button>
 
-        <button wire:click.prevent=""
+        <button wire:click.prevent="sync"
                 type="button"
                 class="button-sync flex items-center gap-2 whitespace-nowrap px-5 py-2 text-sm shadow-sm"
         >
@@ -676,7 +676,7 @@
             </div>
 
             <div class="space-y-4">
-                @forelse($diagnosticReports as $diagnosticReport)
+                @forelse($paginatedDiagnosticReports as $diagnosticReport)
                     <div class="record-inner-card">
                         <div class="record-inner-header">
                             <div class="record-inner-checkbox-col">
@@ -837,6 +837,9 @@
                         {{ __('diagnosticReport.diagnostic_report_not_found') }}
                     </div>
                 @endforelse
+            </div>
+            <div class="mt-8">
+                {{ $paginatedDiagnosticReports->links() }}
             </div>
         </div>
     </div>
