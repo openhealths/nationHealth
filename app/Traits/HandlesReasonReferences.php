@@ -59,7 +59,7 @@ trait HandlesReasonReferences
             $encounterId = $this->ensureEncounterExist($conditionData['context']['identifier']['value']);
 
             if ($encounterId) {
-                Repository::condition()->store([Arr::toCamelCase($conditionData)], $encounterId);
+                Repository::condition()->store([Arr::toCamelCase($conditionData)], $encounterId); // todo: personID!
             }
         } catch (ApiException|Throwable $e) {
             Session::flash('error', __('messages.database_error'));

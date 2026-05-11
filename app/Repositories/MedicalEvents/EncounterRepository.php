@@ -10,11 +10,9 @@ use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Encounter as EncounterSql;
 use App\Models\MedicalEvents\Sql\EncounterDiagnose;
-use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -53,91 +51,81 @@ class EncounterRepository extends BaseRepository
     public function store(array $encounterData, int $personId): false|int
     {
         return DB::transaction(function () use ($encounterData, $personId) {
-            try {
-                $visit = Repository::identifier()->store($encounterData['visit']['identifier']['value']);
-                Repository::codeableConcept()->attach($visit, $encounterData['visit']);
+            $visit = Repository::identifier()->store($encounterData['visit']['identifier']['value']);
+            Repository::codeableConcept()->attach($visit, $encounterData['visit']);
 
-                $episode = Repository::identifier()->store($encounterData['episode']['identifier']['value']);
-                Repository::codeableConcept()->attach($episode, $encounterData['episode']);
+            $episode = Repository::identifier()->store($encounterData['episode']['identifier']['value']);
+            Repository::codeableConcept()->attach($episode, $encounterData['episode']);
 
-                $class = Repository::coding()->store($encounterData['class']);
+            $class = Repository::coding()->store($encounterData['class']);
 
-                $type = Repository::codeableConcept()->store($encounterData['type']);
+            $type = Repository::codeableConcept()->store($encounterData['type']);
 
-                if (isset($encounterData['priority']['coding'][0]['code'])) {
-                    $priority = Repository::codeableConcept()->store($encounterData['priority']);
-                }
-
-                $performer = Repository::identifier()->store($encounterData['performer']['identifier']['value']);
-                Repository::codeableConcept()->attach($performer, $encounterData['performer']);
-
-                if (isset($encounterData['division'])) {
-                    $division = Repository::identifier()->store($encounterData['division']['identifier']['value']);
-                    Repository::codeableConcept()->attach($division, $encounterData['division']);
-                }
-
-                $encounter = $this->model->create([
-                    'person_id' => $personId,
-                    'uuid' => $encounterData['uuid'] ?? $encounterData['id'],
-                    'status' => $encounterData['status'],
-                    'visit_id' => $visit->id,
-                    'episode_id' => $episode->id,
-                    'class_id' => $class->id,
-                    'type_id' => $type->id,
-                    'priority_id' => $priority->id ?? null,
-                    'performer_id' => $performer->id,
-                    'division_id' => $division->id ?? null
-                ]);
-
-                $encounter->period()->create([
-                    'start' => $encounterData['period']['start'],
-                    'end' => $encounterData['period']['end']
-                ]);
-
-                $reasonIds = [];
-
-                foreach ($encounterData['reasons'] as $reasonData) {
-                    $reason = Repository::codeableConcept()->store($reasonData);
-
-                    $reasonIds[] = $reason->id;
-                }
-
-                $encounter->reasons()->attach($reasonIds);
-
-                foreach ($encounterData['diagnoses'] as $diagnoseData) {
-                    $condition = Repository::identifier()->store($diagnoseData['condition']['identifier']['value']);
-                    Repository::codeableConcept()->attach($condition, $diagnoseData['condition']);
-
-                    $role = Repository::codeableConcept()->store($diagnoseData['role']);
-
-                    EncounterDiagnose::create([
-                        'encounter_id' => $encounter->id,
-                        'condition_id' => $condition->id,
-                        'role_id' => $role->id,
-                        'rank' => $diagnoseData['rank'] ?? null
-                    ]);
-                }
-
-                $actionIds = [];
-
-                foreach ($encounterData['actions'] as $actionData) {
-                    $action = Repository::codeableConcept()->store($actionData);
-
-                    $actionIds[] = $action->id;
-                }
-
-                $encounter->actions()->attach($actionIds);
-
-                return $encounter->id;
-            } catch (Exception $e) {
-                Log::channel('db_errors')->error('Error saving encounter', [
-                    'error' => $e->getMessage(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine()
-                ]);
-
-                throw $e;
+            if (isset($encounterData['priority']['coding'][0]['code'])) {
+                $priority = Repository::codeableConcept()->store($encounterData['priority']);
             }
+
+            $performer = Repository::identifier()->store($encounterData['performer']['identifier']['value']);
+            Repository::codeableConcept()->attach($performer, $encounterData['performer']);
+
+            if (isset($encounterData['division'])) {
+                $division = Repository::identifier()->store($encounterData['division']['identifier']['value']);
+                Repository::codeableConcept()->attach($division, $encounterData['division']);
+            }
+
+            $encounter = $this->model->create([
+                'person_id' => $personId,
+                'uuid' => $encounterData['uuid'] ?? $encounterData['id'],
+                'status' => $encounterData['status'],
+                'visit_id' => $visit->id,
+                'episode_id' => $episode->id,
+                'class_id' => $class->id,
+                'type_id' => $type->id,
+                'priority_id' => $priority->id ?? null,
+                'performer_id' => $performer->id,
+                'division_id' => $division->id ?? null
+            ]);
+
+            $encounter->period()->create([
+                'start' => $encounterData['period']['start'],
+                'end' => $encounterData['period']['end']
+            ]);
+
+            $reasonIds = [];
+
+            foreach ($encounterData['reasons'] as $reasonData) {
+                $reason = Repository::codeableConcept()->store($reasonData);
+
+                $reasonIds[] = $reason->id;
+            }
+
+            $encounter->reasons()->attach($reasonIds);
+
+            foreach ($encounterData['diagnoses'] as $diagnoseData) {
+                $condition = Repository::identifier()->store($diagnoseData['condition']['identifier']['value']);
+                Repository::codeableConcept()->attach($condition, $diagnoseData['condition']);
+
+                $role = Repository::codeableConcept()->store($diagnoseData['role']);
+
+                EncounterDiagnose::create([
+                    'encounter_id' => $encounter->id,
+                    'condition_id' => $condition->id,
+                    'role_id' => $role->id,
+                    'rank' => $diagnoseData['rank'] ?? null
+                ]);
+            }
+
+            $actionIds = [];
+
+            foreach ($encounterData['actions'] as $actionData) {
+                $action = Repository::codeableConcept()->store($actionData);
+
+                $actionIds[] = $action->id;
+            }
+
+            $encounter->actions()->attach($actionIds);
+
+            return $encounter->id;
         });
     }
 

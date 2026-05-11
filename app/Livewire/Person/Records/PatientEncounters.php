@@ -12,6 +12,7 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Jobs\EncounterFullSync;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
 use App\Repositories\MedicalEvents\Repository;
@@ -85,11 +86,10 @@ class PatientEncounters extends BasePatientComponent
         $status = legalEntity()->getEntityStatus(LegalEntity::ENTITY_ENCOUNTER);
         $this->syncStatus = $status instanceof JobStatus ? $status->value : ($status ?? '');
 
-        $person = Person::whereId($this->personId)
-            ->with(['episodes:person_id,uuid,name'])
-            ->first();
-
-        $this->episodes = $person->episodes->toArray();
+        $this->episodes = Episode::where('person_id', $this->personId)
+            ->select(['id', 'person_id', 'uuid', 'name'])
+            ->get()
+            ->toArray();
 
         $encountersModel = Encounter::where('person_id', $this->personId)
             ->withRelationships()

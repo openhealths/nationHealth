@@ -224,4 +224,27 @@ class EncounterEdit extends EncounterComponent
 
         $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
     }
+    /**
+     * Get the primary condition UUID from the encounter diagnoses.
+     *
+     * @return string|null
+     */
+    public function getPrimaryConditionUuid(): ?string
+    {
+        $diagnoses = $this->form->encounter['diagnoses'] ?? [];
+        $index = collect($diagnoses)->search(fn ($diagnose) => ($diagnose['roleCode'] ?? '') === 'primary');
+
+        if ($index !== false) {
+            return $this->form->conditions[$index]['uuid'] ?? null;
+        }
+
+        return null;
+    }
+
+    public function render()
+    {
+        return view('livewire.encounter.encounter', [
+            'primaryConditionUuid' => $this->getPrimaryConditionUuid(),
+        ]);
+    }
 }

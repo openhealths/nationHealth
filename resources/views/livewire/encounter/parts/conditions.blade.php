@@ -191,8 +191,16 @@
                                             required
                                     >
                                         <option value="">{{ __('forms.select') }} {{ __('patients.coding_system') }}*</option>
-                                        <option value="eHealth/ICPC2/condition_codes">ICPC-2</option>
-                                        <option value="eHealth/ICD10_AM/condition_codes">ICD-10 AM</option>
+                                        <option value="eHealth/ICPC2/condition_codes"
+                                                x-show="($wire.allowedConditionCodesBySystem['eHealth/ICPC2/condition_codes']?.length ?? 1) > 0"
+                                        >
+                                            ICPC-2
+                                        </option>
+                                        <option value="eHealth/ICD10_AM/condition_codes"
+                                                x-show="($wire.allowedConditionCodesBySystem['eHealth/ICD10_AM/condition_codes']?.length ?? 1) > 0"
+                                        >
+                                            ICD-10 AM
+                                        </option>
                                     </select>
                                     <p class="text-error text-xs"
                                        x-show="!modalCondition.codeSystem"

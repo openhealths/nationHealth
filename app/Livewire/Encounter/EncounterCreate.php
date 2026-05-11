@@ -354,7 +354,7 @@ class EncounterCreate extends EncounterComponent
             $episodeData = EHealth::episode()->getById($this->patientUuid, $uuid)->getData();
 
             try {
-                Repository::episode()->store(Arr::toCamelCase($episodeData), $this->personId);
+                Repository::episode()->store([Arr::toCamelCase($episodeData)], $this->personId);
             } catch (Throwable $exception) {
                 $this->logDatabaseErrors($exception, 'Failed to store episode');
                 Session::flash('error', __('messages.database_error'));
@@ -362,7 +362,7 @@ class EncounterCreate extends EncounterComponent
                 return;
             }
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Failed while ensuring diagnostic report existence');
+            $this->handleEHealthExceptions($exception, 'Failed while ensuring episode existence');
 
             return;
         }

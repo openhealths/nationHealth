@@ -391,7 +391,7 @@ class ProcedureRepository extends BaseRepository
         if (!$condition) {
             try {
                 $conditionData = PatientApi::getConditionById($patientUuid, $value);
-                Repository::condition()->store([CoreArr::toCamelCase($conditionData)], $encounterId);
+                Repository::condition()->store([CoreArr::toCamelCase($conditionData)], $encounterId); // todo: personID!
             } catch (ApiException|Throwable $e) {
                 Log::channel('e_health_errors')->error('Failed to fetch or store condition', [
                     'message' => $e->getMessage(),
