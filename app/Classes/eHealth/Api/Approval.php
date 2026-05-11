@@ -28,8 +28,22 @@ class Approval extends Request
     }
 
     /**
+     * Create a new Approval request for a patient entity.
+     *
+     * @param string $patientId
+     * @param array $payload
+     * @return PromiseInterface|EHealthResponse
+     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     */
+    public function createApproval(string $patientId, array $payload): PromiseInterface|EHealthResponse
+    {
+        return $this->post("/api/patients/{$patientId}/approvals", $payload);
+    }
+
+    /**
      * Create a new Approval request for a Care Plan.
      *
+     * @deprecated Use createApproval instead.
      * @param array $payload
      * @return PromiseInterface|EHealthResponse
      * @throws ConnectionException|EHealthValidationException|EHealthResponseException
@@ -37,6 +51,33 @@ class Approval extends Request
     public function create(array $payload): PromiseInterface|EHealthResponse
     {
         return $this->post(self::URL, $payload);
+    }
+
+    /**
+     * Verify Approval via OTP.
+     *
+     * @param string $patientId
+     * @param string $approvalId
+     * @param array $payload
+     * @return PromiseInterface|EHealthResponse
+     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     */
+    public function verify(string $patientId, string $approvalId, array $payload): PromiseInterface|EHealthResponse
+    {
+        return $this->patch("/api/patients/{$patientId}/approvals/{$approvalId}", $payload);
+    }
+
+    /**
+     * Resend SMS code for Approval.
+     *
+     * @param string $patientId
+     * @param string $approvalId
+     * @return PromiseInterface|EHealthResponse
+     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     */
+    public function resendSms(string $patientId, string $approvalId): PromiseInterface|EHealthResponse
+    {
+        return $this->post("/api/patients/{$patientId}/approvals/{$approvalId}/actions/resend", []);
     }
 
     /**
