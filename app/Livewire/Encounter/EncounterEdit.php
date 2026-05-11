@@ -142,7 +142,11 @@ class EncounterEdit extends EncounterComponent
                 $this->personId,
                 array_map($this->fhirToSync(...), $fhirDiagnosticReports)
             );
-            Repository::observation()->sync($this->personId, array_map($this->fhirToSync(...), $fhirObservations), $uuids['encounter']);
+            Repository::observation()->sync(
+                $this->personId,
+                array_map($this->fhirToSync(...), $fhirObservations),
+                $uuids['encounter']
+            );
         } catch (Throwable $exception) {
             $this->logDatabaseErrors($exception, 'Failed to sync encounter package data');
             Session::flash('error', __('messages.database_error'));

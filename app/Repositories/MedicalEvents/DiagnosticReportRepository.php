@@ -241,9 +241,9 @@ class DiagnosticReportRepository extends BaseRepository
             'encounter.type.coding',
             'managingOrganization.type.coding',
             'division.type.coding',
-            'performer.reference',
+            'performer.reference.type.coding',
             'reportOrigin.coding',
-            'resultsInterpreter.reference'
+            'resultsInterpreter.reference.type.coding'
         ])
             ->whereHas('encounter', fn ($query) => $query->where('value', $encounterUuid))
             ->get()

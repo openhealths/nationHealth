@@ -101,9 +101,26 @@ class EncounterForm extends BaseForm
                 Rule::prohibitedIf(in_array($this->encounter['typeCode'] ?? '', ['field', 'home']))
             ],
 
-            'episode.id' => ['nullable', 'uuid'],
-            'episode.typeCode' => ['nullable', 'string', new InDictionary('eHealth/episode_types')],
-            'episode.name' => ['nullable', 'string', new Cyrillic()],
+            'episode.id' => [
+                'nullable',
+                'uuid',
+                'required_without_all:episode.typeCode,episode.name',
+                Rule::prohibitedIf(!empty($this->episode['typeCode']) || !empty($this->episode['name']))
+            ],
+            'episode.typeCode' => [
+                'nullable',
+                'string',
+                new InDictionary('eHealth/episode_types'),
+                'required_without:episode.id',
+                Rule::prohibitedIf(!empty($this->episode['id']))
+            ],
+            'episode.name' => [
+                'nullable',
+                'string',
+                new Cyrillic(),
+                'required_without:episode.id',
+                Rule::prohibitedIf(!empty($this->episode['id']))
+            ],
 
             'conditions' => ['nullable', 'array'],
             // for edit page
@@ -296,7 +313,7 @@ class EncounterForm extends BaseForm
                 ),
                 'nullable',
                 'string',
-                'max:1000'
+                'max:3000'
             ]),
             'diagnosticReports.*.divisionId' => ['nullable', 'uuid'],
             'diagnosticReports.*.resultsInterpreterEmployeeId' => ['nullable', 'uuid'],

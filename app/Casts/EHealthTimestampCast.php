@@ -19,7 +19,7 @@ class EHealthTimestampCast implements CastsAttributes
             return null;
         }
 
-        return Carbon::parse($value)->format('Y-m-d H:i');
+        return Carbon::parse($value, 'UTC')->setTimezone(config('app.timezone'))->format('Y-m-d H:i');
     }
 
     /**

@@ -25,7 +25,6 @@ class DiagnosticReportMapper
             'code' => FhirResource::make()
                 ->coding('eHealth/resources', 'service')
                 ->toIdentifier($diagnosticReport['codeValue']),
-            // todo: must be array of cc
             'category' => [
                 FhirResource::make()
                     ->coding('eHealth/diagnostic_report_categories', $diagnosticReport['categoryCode'])
@@ -54,8 +53,6 @@ class DiagnosticReportMapper
                 ->toIdentifier(legalEntity()->uuid)
         ];
 
-        // todo: based_on
-
         if (!empty($diagnosticReport['paperReferralRequesterLegalEntityEdrpou'])) {
             $data['paperReferral'] = [
                 'requisition' => $diagnosticReport['paperReferralRequisition'] ?? '',
@@ -80,8 +77,6 @@ class DiagnosticReportMapper
         // todo: specimens
 
         // todo: used_references (array of equipment)
-
-        // todo: managing_organization
 
         if (!empty($diagnosticReport['divisionId'])) {
             $data['division'] = FhirResource::make()

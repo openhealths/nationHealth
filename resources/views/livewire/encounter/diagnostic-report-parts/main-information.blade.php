@@ -241,6 +241,8 @@
                 <input type="text"
                        @input.debounce.300ms="
                            let value = $event.target.value;
+                           modalDiagnosticReport.conclusionCode = value;
+                           selected = null;
                            let isEnglish = /^[a-zA-Z]+$/.test(value);
 
                            if ((isEnglish && value.length >= 1) || (!isEnglish && value.length >= 3)) {
@@ -250,7 +252,7 @@
                        "
                        @focus="if ((modalDiagnosticReport.conclusionCode?.length ?? 0) >= 1) showResults = true"
                        @click.away="showResults = false"
-                       x-model="modalDiagnosticReport.conclusionCode"
+                       :value="selected ? selected.code + ' - ' + selected.description : modalDiagnosticReport.conclusionCode"
                        id="conclusionCode"
                        name="conclusionCode"
                        class="input-select peer"

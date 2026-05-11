@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
+use App\Casts\EHealthTimestampCast;
 use App\Enums\Person\DiagnosticReportStatus;
 use Carbon\CarbonImmutable;
 use Eloquence\Behaviours\HasCamelCasing;
@@ -23,7 +24,6 @@ class DiagnosticReport extends Model
     protected $fillable = [
         'uuid',
         'person_id',
-        'encounter_internal_id',
         'based_on_id',
         'status',
         'code_id',
@@ -47,7 +47,6 @@ class DiagnosticReport extends Model
     protected $hidden = [
         'id',
         'person_id',
-        'encounter_internal_id',
         'based_on_id',
         'code_id',
         'issued',
@@ -64,7 +63,8 @@ class DiagnosticReport extends Model
     ];
 
     protected $casts = [
-        'issued' => 'immutable_datetime',
+        'issued' => EHealthTimestampCast::class,
+        'effective_date_time' => EHealthTimestampCast::class,
         'status' => DiagnosticReportStatus::class
     ];
 
@@ -80,14 +80,14 @@ class DiagnosticReport extends Model
     protected function issuedDate(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->issued->toDateString()
+            get: fn () => CarbonImmutable::parse($this->issued)->toDateString()
         );
     }
 
     protected function issuedTime(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->issued->toTimeString()
+            get: fn () => CarbonImmutable::parse($this->issued)->toTimeString()
         );
     }
 

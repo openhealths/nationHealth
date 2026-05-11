@@ -190,7 +190,7 @@
     class DiagnosticReport {
         constructor(obj = null) {
             const now = new Date();
-            const endTime = new Date(now.getTime() + 15 * 60 * 1000);
+            const startTime = new Date(now.getTime() - 15 * 60 * 1000);
 
             this.categoryCode = '';
             this.codeValue = '';
@@ -212,10 +212,10 @@
             this.resultsInterpreterEmployeeId = '';
             this.issuedDate = now.toISOString().split('T')[0];
             this.issuedTime = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
-            this.effectivePeriodStartDate = now.toISOString().split('T')[0];
-            this.effectivePeriodStartTime = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
-            this.effectivePeriodEndDate = endTime.toISOString().split('T')[0];
-            this.effectivePeriodEndTime = endTime.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
+            this.effectivePeriodStartDate = startTime.toISOString().split('T')[0];
+            this.effectivePeriodStartTime = startTime.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
+            this.effectivePeriodEndDate = now.toISOString().split('T')[0];
+            this.effectivePeriodEndTime = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
 
             if (obj) {
                 Object.assign(this, JSON.parse(JSON.stringify(obj)));
