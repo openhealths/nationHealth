@@ -5,6 +5,8 @@
     $le = $this->legalEntity;
     $isEdit = $isDetails = true;
 
+    $parentLegalEntity = legalEntity()->parentLegalEntity()->first();
+
     $leStatusMap = [
         'ACTIVE' => [__('forms.status.active'), 'status-alert-green'],
         'SUSPENDED' => [__('forms.status.suspended'), 'status-alert-red'],
@@ -240,6 +242,7 @@
             <legend class="legend">{{ __('forms.participation_reorganization') }}</legend>
 
             @if ($le->status !== 'REORGANIZED')
+                @if ($this->relatedLegalEntities->isEmpty())
                 <div class="status-alert-green status-alert-full mb-6">
                     <span class="flex-shrink-0">
                         @icon('check-circle', 'w-5 h-5 text-green-700 mr-3')
@@ -247,6 +250,15 @@
 
                     <span class="ms-1">{{__('forms.not_process_of_reorganization')}}</span>
                 </div>
+                @else
+                <div class="status-alert-cyan status-alert-full mb-6">
+                    <span class="flex-shrink-0">
+                        @icon('check-circle', 'w-5 h-5 text-green-700 mr-3')
+                    </span>
+
+                    <span class="ms-1">{{__('forms.le_accessor')}}</span>
+                </div>
+                @endif
             @else
                 <div class="status-alert-red status-alert-full mb-6">
                     <span class="flex-shrink-0">
@@ -257,9 +269,21 @@
                 </div>
             @endif
 
+            @if($this->relatedLegalEntities->isNotEmpty() || $parentLegalEntity)
             <div class=" lg:mt-0 lg:min-w-[280px] lg:-ml-1 space-y-4">
-                <p class="text-base font-semibold text-gray-900 dark:text-gray-200 mb-4">{{__('Заклади, повʼязані з процесом реорганізації:')}}</p>
+                <p class="text-base font-semibold text-gray-900 dark:text-gray-200 mb-4">{{__('forms.reorg_related_legal_entities')}}:</p>
+
+                <ul class="list-disc list-inside">
+                    @if($parentLegalEntity)
+                        <li class="ms-4">{{ $parentLegalEntity->edr['name'] ?? __('forms.name_not_defined') }}</li>
+                    @endif
+
+                    @foreach ($this->relatedLegalEntities as $relatedLegalEntity)
+                        <li class="ms-4">{{ $relatedLegalEntity->name }}</li>
+                    @endforeach
+                </ul>
             </div>
+            @endif
 
             <div class="flex items-center gap-4 mt-6">
                 <a href=" "

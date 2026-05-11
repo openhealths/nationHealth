@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class LegalEntity extends Model
 {
@@ -154,6 +155,24 @@ class LegalEntity extends Model
     public function legators(): HasMany
     {
         return $this->hasMany(Legator::class);
+    }
+
+    /**
+     * Get the parent (successor) legal entity this entity was reorganized into.
+     * Traverses legators.uuid → legators.legal_entity_id → legal_entities.id.
+     *
+     * @return HasOneThrough<LegalEntity, Legator>
+     */
+    public function parentLegalEntity(): HasOneThrough
+    {
+        return $this->hasOneThrough(
+            LegalEntity::class, // final model
+            Legator::class,     // intermediate model
+            'uuid',             // legators.uuid = this.uuid
+            'id',               // legal_entities.id = legators.legal_entity_id
+            'uuid',             // local key on this model
+            'legal_entity_id',  // key on legators pointing to parent legal entity
+        );
     }
 
     /**
