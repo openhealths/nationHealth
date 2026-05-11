@@ -122,24 +122,24 @@ class PatientDiagnosticReports extends BasePatientComponent
             $validatedData = $response->validate();
 
             $this->filterEpisodeOptions = collect($validatedData)
-                                            ->map(function (array $episode) {
-                                                $episodeId = data_get($episode, 'uuid');
+                ->map(function (array $episode) {
+                    $episodeId = data_get($episode, 'uuid');
 
-                                                if (!$episodeId) {
-                                                    return null;
-                                                }
+                    if (!$episodeId) {
+                        return null;
+                    }
 
-                                                return [
-                                                    'value' => $episodeId,
-                                                    'label' => data_get($episode, 'name') ?: $episodeId,
-                                                    'description' => $episodeId,
-                                                ];
-                                            })
-                                            ->filter()
-                                            ->unique('value')
-                                            ->sortBy('label')
-                                            ->values()
-                                            ->toArray();
+                    return [
+                        'value' => $episodeId,
+                        'label' => data_get($episode, 'name') ?: $episodeId,
+                        'description' => $episodeId,
+                    ];
+                })
+                ->filter()
+                ->unique('value')
+                ->sortBy('label')
+                ->values()
+                ->toArray();
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             $this->filterEpisodeOptions = [];
 

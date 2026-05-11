@@ -255,8 +255,7 @@ return [
     // Diagnoses record
     'diagnoses_search' => 'Пошук діагнозів',
     'diagnostic_reports_search' => 'Пошук діагностичних звітів',
-    'category' => 'Категорія',
-    'status_label' => 'Статус',
+    'diagnostic_report_not_found' => 'Діагностичних звітів не знайдено',
 
     // Observations record
     'observations' => 'Обстеження',
