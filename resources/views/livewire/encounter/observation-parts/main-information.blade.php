@@ -49,19 +49,19 @@
                         {{ __('patients.source_link') }}
                     </label>
                     <select class="input-modal"
-                            x-model="modalObservation.reportOrigin.coding[0].code"
+                            x-model="modalObservation.reportOriginCode"
                             id="reportOrigin"
                             type="text"
                             required
                     >
-                        <option selected>{{ __('forms.select') }}</option>
+                        <option value="" selected>{{ __('forms.select') }}</option>
                         @foreach($this->dictionaries['eHealth/report_origins'] as $key => $reportOrigin)
                             <option value="{{ $key }}">{{ $reportOrigin }}</option>
                         @endforeach
                     </select>
 
                     <p class="text-error text-xs"
-                       x-show="!Object.keys($wire.dictionaries['eHealth/report_origins']).includes(modalObservation.reportOrigin.coding[0].code)"
+                       x-show="!Object.keys($wire.dictionaries['eHealth/report_origins']).includes(modalObservation.reportOriginCode)"
                     >
                         {{ __('forms.field_empty') }}
                     </p>
@@ -75,16 +75,16 @@
                     {{ __('forms.category') }}
                 </label>
                 <select class="input-modal"
-                        x-model="modalObservation.categories[0].coding[0].code"
+                        x-model="modalObservation.categoryCode"
                         id="performerCategories"
                         type="text"
                         required
                 >
                     <option selected>{{ __('forms.select') }}</option>
                     <template x-for="
-                                  (label, key) in modalObservation.codingSystem === 'loinc'
-                                      ? $wire.dictionaries['eHealth/observation_categories']
-                                      : $wire.dictionaries['eHealth/ICF/observation_categories']
+                                  (label, key) in modalObservation.codingSystem === 'icf'
+                                      ? $wire.dictionaries['eHealth/ICF/observation_categories']
+                                      : $wire.dictionaries['eHealth/observation_categories']
                               "
                               :key="key"
                     >
@@ -94,8 +94,8 @@
 
                 <p class="text-error text-xs"
                    x-show="!(
-                       Object.keys(observationCategoriesDictionary).includes(modalObservation.categories[0].coding[0].code)
-                       || Object.keys(icfObservationCategoriesDictionary).includes(modalObservation.categories[0].coding[0].code)
+                       Object.keys(observationCategoriesDictionary).includes(modalObservation.categoryCode)
+                       || Object.keys(icfObservationCategoriesDictionary).includes(modalObservation.categoryCode)
                    )"
                 >
                     {{ __('forms.field_empty') }}
@@ -107,9 +107,9 @@
                     {{ __('forms.code') }}
                 </label>
 
-                {{-- Show select2 when code is laboratory --}}
-                <template x-if="modalObservation.categories[0].coding[0].code === 'laboratory'">
-                    <x-select2 modelPath="modalObservation.code.coding[0].code"
+                {{-- Show select2 when code is laboratory (loinc) --}}
+                <template x-if="modalObservation.categoryCode === 'laboratory' && modalObservation.codingSystem === 'loinc'">
+                    <x-select2 modelPath="modalObservation.codeCode"
                                dictionaryName="eHealth/LOINC/observation_codes"
                                id="performerCode"
                     />
@@ -118,41 +118,58 @@
                 {{-- Show select2 for ICF --}}
                 <template x-if="
                               modalObservation.codingSystem === 'icf' &&
-                              ['functions', 'structures', 'activities', 'environmental'].includes(modalObservation.categories[0].coding[0].code)
+                              ['functions', 'structures', 'activities', 'environmental'].includes(modalObservation.categoryCode)
                           "
                 >
-                    <x-select2 modelPath="modalObservation.code.coding[0].code"
+                    <x-select2 modelPath="modalObservation.codeCode"
                                dictionaryName="eHealth/ICF/classifiers"
                                id="performerCode"
                     />
                 </template>
 
-                <template x-if="
-                              modalObservation.categories[0].coding[0].code !== 'laboratory' &&
-                              modalObservation.codingSystem === 'loinc'
-                          "
-                >
+                {{-- Show filtered select for custom dictionary --}}
+                <template x-if="modalObservation.codingSystem === 'custom'">
                     <select class="input-modal"
-                            x-model="modalObservation.code.coding[0].code"
+                            x-model="modalObservation.codeCode"
                             id="performerCode"
                             type="text"
                             required
                     >
-                        <option selected value="">{{ __('forms.select') }}</option>
-                        <div x-show="modalObservation.codingSystem === 'loinc'">
-                            @foreach($this->dictionaries['eHealth/LOINC/observation_codes'] as $key => $code)
-                                <template x-if="codeMap[modalObservation.categories[0].coding[0].code]?.includes('{{ $key }}')">
-                                    <option value="{{ $key }}">{{ $code }}</option>
-                                </template>
-                            @endforeach
-                        </div>
+                        <option value="" selected>{{ __('forms.select') }}</option>
+                        @foreach($this->dictionaries['eHealth/custom/observation_codes'] as $key => $code)
+                            <template x-if="codeMap[modalObservation.categoryCode]?.includes('{{ $key }}')">
+                                <option value="{{ $key }}">{{ $code }}</option>
+                            </template>
+                        @endforeach
+                    </select>
+                </template>
+
+                <template x-if="
+                              modalObservation.categoryCode !== 'laboratory' &&
+                              modalObservation.codingSystem === 'loinc'
+                          "
+                >
+                    <select class="input-modal"
+                            x-model="modalObservation.codeCode"
+                            x-effect="$nextTick(() => $el.value = modalObservation.codeCode)"
+                            id="performerCode"
+                            type="text"
+                            required
+                    >
+                        <option value="" selected>{{ __('forms.select') }}</option>
+                        <template x-for="key in (codeMap[modalObservation.categoryCode] ?? [])" :key="key">
+                            <option :value="key"
+                                    x-text="$wire.dictionaries['eHealth/LOINC/observation_codes'][key] ?? key"
+                            ></option>
+                        </template>
                     </select>
                 </template>
 
                 <p class="text-error text-xs"
                    x-show="!(
-                       Object.keys(observationCodesDictionary).includes(modalObservation.code.coding[0].code) ||
-                       Object.keys(icfObservationCodesDictionary).includes(modalObservation.code.coding[0].code)
+                       Object.keys(observationCodesDictionary).includes(modalObservation.codeCode) ||
+                       Object.keys(icfObservationCodesDictionary).includes(modalObservation.codeCode) ||
+                       Object.keys(customObservationCodesDictionary).includes(modalObservation.codeCode)
                    )"
                 >
                     {{ __('forms.field_empty') }}
@@ -162,8 +179,8 @@
 
         {{-- value codeable concept --}}
         <template x-if="
-                      valueMap[modalObservation.code.coding[0].code] &&
-                      valueMap[modalObservation.code.coding[0].code][1] === 'valueCodeableConcept'
+                      valueMap[modalObservation.codeCode] &&
+                      valueMap[modalObservation.codeCode][1] === 'valueCodeableConcept'
                   "
         >
             <div class="form-row-modal">
@@ -174,13 +191,14 @@
 
                     <select class="input-modal"
                             x-model="modalObservation.valueCodeableConcept"
+                            x-init="$nextTick(() => { if (modalObservation.valueCodeableConcept) $el.value = modalObservation.valueCodeableConcept })"
                             id="valueCodeableConcept"
                             type="text"
                             required
                     >
                         <option selected>{{ __('forms.select') }}</option>
                         <template :key="key"
-                                  x-for="(label, key) in codeableConceptValues[valueMap[modalObservation.code.coding[0].code]?.[0]]"
+                                  x-for="(label, key) in codeableConceptValues[valueMap[modalObservation.codeCode]?.[0]]"
                         >
                             <option :value="key" x-text="label"></option>
                         </template>
@@ -191,8 +209,8 @@
 
         {{-- value boolean --}}
         <template x-if="
-                      valueMap[modalObservation.code.coding[0].code] &&
-                      valueMap[modalObservation.code.coding[0].code][1] === 'valueBoolean'
+                      valueMap[modalObservation.codeCode] &&
+                      valueMap[modalObservation.codeCode][1] === 'valueBoolean'
                   "
         >
             <div class="flex gap-20">
@@ -234,8 +252,8 @@
 
         {{-- value string --}}
         <template x-if="
-                      valueMap[modalObservation.code.coding[0].code] &&
-                      valueMap[modalObservation.code.coding[0].code][1] === 'valueString'
+                      valueMap[modalObservation.codeCode] &&
+                      valueMap[modalObservation.codeCode][1] === 'valueString'
                   "
         >
             <div class="form-row-modal">
@@ -260,8 +278,8 @@
 
         {{-- value quantity --}}
         <template x-if="
-                 valueMap[modalObservation.code.coding[0].code] &&
-                 valueMap[modalObservation.code.coding[0].code][1] === 'valueQuantity'
+                 valueMap[modalObservation.codeCode] &&
+                 valueMap[modalObservation.codeCode][1] === 'valueQuantity'
              "
         >
             <div class="form-row-modal">
@@ -269,8 +287,8 @@
                     <label for="valueQuantity" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                         {{ __('patients.value') }}
                         <span x-text="
-                                  valueMap[modalObservation.code.coding[0].code][2] !== '' && modalObservation.code.coding[0].code !== 'Обрати' && valueMap[modalObservation.code.coding[0].code]?.[2] ?
-                                  `(одиниця виміру &quot;${$wire.dictionaries['eHealth/ucum/units'][valueMap[modalObservation.code.coding[0].code][2]]}&quot;)` :
+                                  valueMap[modalObservation.codeCode][2] !== '' && modalObservation.codeCode !== 'Обрати' && valueMap[modalObservation.codeCode]?.[2] ?
+                                  `(одиниця виміру &quot;${$wire.dictionaries['eHealth/ucum/units'][valueMap[modalObservation.codeCode][2]]}&quot;)` :
                                   ''
                               "
                         ></span>
@@ -278,32 +296,31 @@
                     <div class="relative flex items-center max-w-[8rem]"
                          x-data="{
                              get min() {
-                                 const range = this.valueMap[this.modalObservation.code.coding[0].code]?.[0]?.split('-');
+                                 const range = this.valueMap[this.modalObservation.codeCode]?.[0]?.split('-');
                                  return parseInt(range?.[0] || 0);
                              },
 
                              get max() {
-                                 const range = this.valueMap[this.modalObservation.code.coding[0].code]?.[0]?.split('-');
+                                 const range = this.valueMap[this.modalObservation.codeCode]?.[0]?.split('-');
                                  return parseInt(range?.[1] || 10000);
                              },
 
                              updateValueQuantity() {
-                                 const code = this.modalObservation.code.coding[0].code;
-                                 const unit = this.valueMap[code][2];
+                                 const unit = this.valueMap[this.modalObservation.codeCode][2];
 
-                                 this.modalObservation.valueQuantity.comparator = '=';
-                                 this.modalObservation.valueQuantity.unit = unit;
-                                 this.modalObservation.valueQuantity.system = 'eHealth/ucum/units';
-                                 this.modalObservation.valueQuantity.code = unit;
+                                 this.modalObservation.valueQuantityComparator = '=';
+                                 this.modalObservation.valueQuantityUnit = unit;
+                                 this.modalObservation.valueQuantitySystem = 'eHealth/ucum/units';
+                                 this.modalObservation.valueQuantityCode = unit;
                              }
                          }"
                     >
                         <button type="button"
                                 id="decrement-button"
                                 @click="
-                                    modalObservation.valueQuantity.value = Math.max(min, (modalObservation.valueQuantity.value || 0) - 1);
+                                    modalObservation.valueQuantityValue = Math.max(min, (modalObservation.valueQuantityValue || 0) - 1);
 
-                                    if (!modalObservation.valueQuantity.unit) {
+                                    if (!modalObservation.valueQuantityUnit) {
                                         updateValueQuantity();
                                     }
                                 "
@@ -324,13 +341,13 @@
                                class="bg-gray-50 border-x-0 border-gray-300 h-11 text-center text-gray-900 text-sm focus:ring-blue-500 focus:border-blue-500 block w-full py-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
                                placeholder="1"
                                required
-                               x-model.number="modalObservation.valueQuantity.value"
+                               x-model.number="modalObservation.valueQuantityValue"
                                autocomplete="off"
                                :min="min"
                                :max="max"
                                @input="
-                                   if (modalObservation.valueQuantity.value < min) modalObservation.valueQuantity.value = min;
-                                   if (modalObservation.valueQuantity.value > max) modalObservation.valueQuantity.value = max;
+                                   if (modalObservation.valueQuantityValue < min) modalObservation.valueQuantityValue = min;
+                                   if (modalObservation.valueQuantityValue > max) modalObservation.valueQuantityValue = max;
 
                                    updateValueQuantity();
                                "
@@ -339,9 +356,9 @@
                         <button type="button"
                                 id="increment-button"
                                 @click="
-                                    modalObservation.valueQuantity.value = Math.min(max, (modalObservation.valueQuantity.value || 0) + 1);
+                                    modalObservation.valueQuantityValue = Math.min(max, (modalObservation.valueQuantityValue || 0) + 1);
 
-                                    if (!modalObservation.valueQuantity.unit) {
+                                    if (!modalObservation.valueQuantityUnit) {
                                         updateValueQuantity();
                                     }
                                 "
@@ -359,8 +376,8 @@
 
                     <p id="quantity" class="mt-2 text-sm text-gray-500 dark:text-gray-400">
                         <span x-text="
-                            modalObservation?.code?.coding?.[0]?.code && valueMap[modalObservation.code.coding[0].code]?.[0] ?
-                            'від ' + valueMap[modalObservation.code.coding[0].code][0].split('-')[0] + ' до ' + valueMap[modalObservation.code.coding[0].code][0].split('-')[1] :
+                            modalObservation?.codeCode && valueMap[modalObservation.codeCode]?.[0] ?
+                            'від ' + valueMap[modalObservation.codeCode][0].split('-')[0] + ' до ' + valueMap[modalObservation.codeCode][0].split('-')[1] :
                             ''
                         "
                         ></span>
@@ -371,8 +388,8 @@
 
         {{-- value date time --}}
         <template x-if="
-                      valueMap[modalObservation.code.coding[0].code] &&
-                      valueMap[modalObservation.code.coding[0].code][1] === 'valueDateTime'
+                      valueMap[modalObservation.codeCode] &&
+                      valueMap[modalObservation.codeCode][1] === 'valueDateTime'
                   "
         >
             <div class="form-row-3">
@@ -426,7 +443,7 @@
 
         {{-- Функції організму (b) --}}
         <template
-            x-if="modalObservation.code.coding[0].code.startsWith('b') && modalObservation.codingSystem === 'icf' && modalObservation.codingSystem === 'icf'"
+            x-if="modalObservation.codeCode.startsWith('b') && modalObservation.codingSystem === 'icf'"
         >
             <div>
                 <h3 class="default-p font-bold my-10">{{ __('patients.components') }}</h3>
@@ -439,19 +456,18 @@
 
                         <select class="input-modal"
                                 x-init="
-                                    modalObservation.components[0].code.coding[0].system = 'eHealth/ICF/qualifiers';
-                                    modalObservation.components[0].code.coding[0].code = 'extent_or_magnitude_of_impairment';
-                                    modalObservation.components[0].code.text = '';
+                                    modalObservation.components[0].codeCode = 'extent_or_magnitude_of_impairment';
+                                    modalObservation.components[0].codeSystem = 'eHealth/ICF/qualifiers';
 
-                                    if (!modalObservation.components[0].valueCodeableConcept.coding[0].system) {
-                                        modalObservation.components[0].valueCodeableConcept.coding[0].system = 'eHealth/ICF/qualifiers/extent_or_magnitude_of_impairment';
+                                    if (!modalObservation.components[0].valueSystem) {
+                                        modalObservation.components[0].valueSystem = 'eHealth/ICF/qualifiers/extent_or_magnitude_of_impairment';
                                     }
 
-                                    if (!modalObservation.components[0].valueCodeableConcept.coding[0].code) {
-                                        modalObservation.components[0].valueCodeableConcept.coding[0].code = '';
+                                    if (!modalObservation.components[0].valueCode) {
+                                        modalObservation.components[0].valueCode = '';
                                     }
                                 "
-                                x-model="modalObservation.components[0].valueCodeableConcept.coding[0].code"
+                                x-model="modalObservation.components[0].valueCode"
                                 id="extentCode"
                                 type="text"
                                 required
@@ -463,7 +479,7 @@
                         </select>
 
                         <p class="text-error text-xs"
-                           x-show="!Object.keys($wire.dictionaries['eHealth/ICF/qualifiers/extent_or_magnitude_of_impairment']).includes(modalObservation.components[0].valueCodeableConcept.coding[0].code)"
+                           x-show="!Object.keys($wire.dictionaries['eHealth/ICF/qualifiers/extent_or_magnitude_of_impairment']).includes(modalObservation.components[0].valueCode)"
                         >
                             {{ __('forms.field_empty') }}
                         </p>
@@ -475,8 +491,7 @@
                         </label>
 
                         <select class="input-modal"
-                                @change="modalObservation.components[0].interpretation.coding[0].system = 'eHealth/observation_interpretations'"
-                                x-model="modalObservation.components[0].interpretation.coding[0].code"
+                                x-model="modalObservation.components[0].interpretationCode"
                                 id="extentInterpretationCode"
                                 type="text"
                                 required
@@ -488,7 +503,7 @@
                         </select>
 
                         <p class="text-error text-xs"
-                           x-show="!Object.keys(observationInterpretationsDictionary).includes(modalObservation.components[0].interpretation.coding[0].code)"
+                           x-show="!Object.keys(observationInterpretationsDictionary).includes(modalObservation.components[0].interpretationCode)"
                         >
                             {{ __('forms.field_empty') }}
                         </p>
@@ -499,7 +514,7 @@
 
         {{-- Структури організму (s) --}}
         <template
-            x-if="modalObservation.code.coding[0].code.startsWith('s') && modalObservation.codingSystem === 'icf' && modalObservation.codingSystem === 'icf'"
+            x-if="modalObservation.codeCode.startsWith('s') && modalObservation.codingSystem === 'icf'"
         >
             <div>
                 <h3 class="default-p font-bold my-10">{{ __('patients.components') }}</h3>
@@ -512,19 +527,18 @@
 
                         <select class="input-modal"
                                 x-init="
-                                    modalObservation.components[0].code.coding[0].system = 'eHealth/ICF/qualifiers';
-                                    modalObservation.components[0].code.coding[0].code = 'extent_or_magnitude_of_impairment';
-                                    modalObservation.components[0].code.text = '';
+                                    modalObservation.components[0].codeCode = 'extent_or_magnitude_of_impairment';
+                                    modalObservation.components[0].codeSystem = 'eHealth/ICF/qualifiers';
 
-                                    if (!modalObservation.components[0].valueCodeableConcept.coding[0].system) {
-                                        modalObservation.components[0].valueCodeableConcept.coding[0].system = 'eHealth/ICF/qualifiers/extent_or_magnitude_of_impairment';
+                                    if (!modalObservation.components[0].valueSystem) {
+                                        modalObservation.components[0].valueSystem = 'eHealth/ICF/qualifiers/extent_or_magnitude_of_impairment';
                                     }
 
-                                    if (!modalObservation.components[0].valueCodeableConcept.coding[0].code) {
-                                        modalObservation.components[0].valueCodeableConcept.coding[0].code = '';
+                                    if (!modalObservation.components[0].valueCode) {
+                                        modalObservation.components[0].valueCode = '';
                                     }
                                 "
-                                x-model="modalObservation.components[0].valueCodeableConcept.coding[0].code"
+                                x-model="modalObservation.components[0].valueCode"
                                 id="extentCode"
                                 type="text"
                                 required
@@ -536,7 +550,7 @@
                         </select>
 
                         <p class="text-error text-xs"
-                           x-show="!Object.keys($wire.dictionaries['eHealth/ICF/qualifiers/extent_or_magnitude_of_impairment']).includes(modalObservation.components[0].valueCodeableConcept.coding[0].code)"
+                           x-show="!Object.keys($wire.dictionaries['eHealth/ICF/qualifiers/extent_or_magnitude_of_impairment']).includes(modalObservation.components[0].valueCode)"
                         >
                             {{ __('forms.field_empty') }}
                         </p>
@@ -548,8 +562,7 @@
                         </label>
 
                         <select class="input-modal"
-                                @change="modalObservation.components[0].interpretation.coding[0].system = 'eHealth/observation_interpretations'"
-                                x-model="modalObservation.components[0].interpretation.coding[0].code"
+                                x-model="modalObservation.components[0].interpretationCode"
                                 id="extentInterpretationCode"
                                 type="text"
                                 required
@@ -561,7 +574,7 @@
                         </select>
 
                         <p class="text-error text-xs"
-                           x-show="!Object.keys(observationInterpretationsDictionary).includes(modalObservation.components[0].interpretation.coding[0].code)"
+                           x-show="!Object.keys(observationInterpretationsDictionary).includes(modalObservation.components[0].interpretationCode)"
                         >
                             {{ __('forms.field_empty') }}
                         </p>
@@ -572,24 +585,11 @@
                     <div x-init="
                         if (!modalObservation.components[1]) {
                             modalObservation.components[1] = {
-                                code: {
-                                    coding: [{ system: 'eHealth/ICF/qualifiers', code: 'nature_of_change_in_body_structure' }],
-                                    text: ''
-                                },
-                                valueCodeableConcept: {
-                                    coding: [{
-                                        system: 'eHealth/ICF/qualifiers/nature_of_change_in_body_structure',
-                                        code: ''
-                                    }],
-                                    text: ''
-                                },
-                                interpretation: {
-                                    coding: [{
-                                        system: 'eHealth/observation_interpretations',
-                                        code: ''
-                                    }],
-                                    text: ''
-                                }
+                                codeCode: 'nature_of_change_in_body_structure',
+                                codeSystem: 'eHealth/ICF/qualifiers',
+                                valueCode: '',
+                                valueSystem: 'eHealth/ICF/qualifiers/nature_of_change_in_body_structure',
+                                interpretationCode: ''
                             };
                         }
                     ">
@@ -598,7 +598,7 @@
                         </label>
 
                         <select class="input-modal"
-                                x-model="modalObservation.components[1].valueCodeableConcept.coding[0].code"
+                                x-model="modalObservation.components[1].valueCode"
                                 id="natureCode"
                                 type="text"
                                 required
@@ -610,7 +610,7 @@
                         </select>
 
                         <p class="text-error text-xs"
-                           x-show="!Object.keys($wire.dictionaries['eHealth/ICF/qualifiers/nature_of_change_in_body_structure']).includes(modalObservation.components[1].valueCodeableConcept.coding[0].code)"
+                           x-show="!Object.keys($wire.dictionaries['eHealth/ICF/qualifiers/nature_of_change_in_body_structure']).includes(modalObservation.components[1].valueCode)"
                         >
                             {{ __('forms.field_empty') }}
                         </p>
@@ -622,7 +622,7 @@
                         </label>
 
                         <select class="input-modal"
-                                x-model="modalObservation.components[1].interpretation.coding[0].code"
+                                x-model="modalObservation.components[1].interpretationCode"
                                 id="natureInterpretationCode"
                                 type="text"
                                 required
@@ -634,7 +634,7 @@
                         </select>
 
                         <p class="text-error text-xs"
-                           x-show="!Object.keys(observationInterpretationsDictionary).includes(modalObservation.components[1].interpretation.coding[0].code)"
+                           x-show="!Object.keys(observationInterpretationsDictionary).includes(modalObservation.components[1].interpretationCode)"
                         >
                             {{ __('forms.field_empty') }}
                         </p>
@@ -645,24 +645,11 @@
                     <div x-init="
                         if (!modalObservation.components[2]) {
                             modalObservation.components[2] = {
-                                code: {
-                                    coding: [{ system: 'eHealth/ICF/qualifiers', code: 'anatomical_localization' }],
-                                    text: ''
-                                },
-                                valueCodeableConcept: {
-                                    coding: [{
-                                        system: 'eHealth/ICF/qualifiers/anatomical_localization',
-                                        code: ''
-                                    }],
-                                    text: ''
-                                },
-                                interpretation: {
-                                    coding: [{
-                                        system: 'eHealth/observation_interpretations',
-                                        code: ''
-                                    }],
-                                    text: ''
-                                }
+                                codeCode: 'anatomical_localization',
+                                codeSystem: 'eHealth/ICF/qualifiers',
+                                valueCode: '',
+                                valueSystem: 'eHealth/ICF/qualifiers/anatomical_localization',
+                                interpretationCode: ''
                             };
                         }
                     ">
@@ -671,7 +658,7 @@
                         </label>
 
                         <select class="input-modal"
-                                x-model="modalObservation.components[2].valueCodeableConcept.coding[0].code"
+                                x-model="modalObservation.components[2].valueCode"
                                 id="anatomicalCode"
                                 type="text"
                                 required
@@ -683,7 +670,7 @@
                         </select>
 
                         <p class="text-error text-xs"
-                           x-show="!Object.keys($wire.dictionaries['eHealth/ICF/qualifiers/anatomical_localization']).includes(modalObservation.components[2].valueCodeableConcept.coding[0].code)"
+                           x-show="!Object.keys($wire.dictionaries['eHealth/ICF/qualifiers/anatomical_localization']).includes(modalObservation.components[2].valueCode)"
                         >
                             {{ __('forms.field_empty') }}
                         </p>
@@ -695,7 +682,7 @@
                         </label>
 
                         <select class="input-modal"
-                                x-model="modalObservation.components[2].interpretation.coding[0].code"
+                                x-model="modalObservation.components[2].interpretationCode"
                                 id="anatomicalInterpretationCode"
                                 type="text"
                                 required
@@ -707,7 +694,7 @@
                         </select>
 
                         <p class="text-error text-xs"
-                           x-show="!Object.keys(observationInterpretationsDictionary).includes(modalObservation.components[2].interpretation.coding[0].code)"
+                           x-show="!Object.keys(observationInterpretationsDictionary).includes(modalObservation.components[2].interpretationCode)"
                         >
                             {{ __('forms.field_empty') }}
                         </p>
@@ -718,7 +705,7 @@
 
         {{-- Активність та Участь (d) --}}
         <template
-            x-if="modalObservation.code.coding[0].code.startsWith('d') && modalObservation.codingSystem === 'icf' && modalObservation.codingSystem === 'icf'"
+            x-if="modalObservation.codeCode.startsWith('d') && modalObservation.codingSystem === 'icf'"
         >
             <div>
                 <h3 class="default-p font-bold my-10">{{ __('patients.components') }}</h3>
@@ -731,19 +718,18 @@
 
                         <select class="input-modal"
                                 x-init="
-                                    modalObservation.components[0].code.coding[0].system = 'eHealth/ICF/qualifiers';
-                                    modalObservation.components[0].code.coding[0].code = 'performance';
-                                    modalObservation.components[0].code.text = '';
+                                    modalObservation.components[0].codeCode = 'performance';
+                                    modalObservation.components[0].codeSystem = 'eHealth/ICF/qualifiers';
 
-                                    if (!modalObservation.components[0].valueCodeableConcept.coding[0].system) {
-                                        modalObservation.components[0].valueCodeableConcept.coding[0].system = 'eHealth/ICF/qualifiers/performance';
+                                    if (!modalObservation.components[0].valueSystem) {
+                                        modalObservation.components[0].valueSystem = 'eHealth/ICF/qualifiers/performance';
                                     }
 
-                                    if (!modalObservation.components[0].valueCodeableConcept.coding[0].code) {
-                                        modalObservation.components[0].valueCodeableConcept.coding[0].code = '';
+                                    if (!modalObservation.components[0].valueCode) {
+                                        modalObservation.components[0].valueCode = '';
                                     }
                                 "
-                                x-model="modalObservation.components[0].valueCodeableConcept.coding[0].code"
+                                x-model="modalObservation.components[0].valueCode"
                                 id="performanceCode"
                                 type="text"
                                 required
@@ -755,7 +741,7 @@
                         </select>
 
                         <p class="text-error text-xs"
-                           x-show="!Object.keys($wire.dictionaries['eHealth/ICF/qualifiers/performance']).includes(modalObservation.components[0].valueCodeableConcept.coding[0].code)"
+                           x-show="!Object.keys($wire.dictionaries['eHealth/ICF/qualifiers/performance']).includes(modalObservation.components[0].valueCode)"
                         >
                             {{ __('forms.field_empty') }}
                         </p>
@@ -767,8 +753,7 @@
                         </label>
 
                         <select class="input-modal"
-                                @change="modalObservation.components[0].interpretation.coding[0].system = 'eHealth/observation_interpretations'"
-                                x-model="modalObservation.components[0].interpretation.coding[0].code"
+                                x-model="modalObservation.components[0].interpretationCode"
                                 id="performanceInterpretationCode"
                                 type="text"
                                 required
@@ -780,7 +765,7 @@
                         </select>
 
                         <p class="text-error text-xs"
-                           x-show="!Object.keys(observationInterpretationsDictionary).includes(modalObservation.components[0].interpretation.coding[0].code)"
+                           x-show="!Object.keys(observationInterpretationsDictionary).includes(modalObservation.components[0].interpretationCode)"
                         >
                             {{ __('forms.field_empty') }}
                         </p>
@@ -791,24 +776,11 @@
                     <div x-init="
                         if (!modalObservation.components[1]) {
                             modalObservation.components[1] = {
-                                code: {
-                                    coding: [{ system: 'eHealth/ICF/qualifiers', code: 'capacity' }],
-                                    text: ''
-                                },
-                                valueCodeableConcept: {
-                                    coding: [{
-                                        system: 'eHealth/ICF/qualifiers/capacity',
-                                        code: ''
-                                    }],
-                                    text: ''
-                                },
-                                interpretation: {
-                                    coding: [{
-                                        system: 'eHealth/observation_interpretations',
-                                        code: ''
-                                    }],
-                                    text: ''
-                                }
+                                codeCode: 'capacity',
+                                codeSystem: 'eHealth/ICF/qualifiers',
+                                valueCode: '',
+                                valueSystem: 'eHealth/ICF/qualifiers/capacity',
+                                interpretationCode: ''
                             };
                         }
                     ">
@@ -817,7 +789,7 @@
                         </label>
 
                         <select class="input-modal"
-                                x-model="modalObservation.components[1].valueCodeableConcept.coding[0].code"
+                                x-model="modalObservation.components[1].valueCode"
                                 id="capacityCode"
                                 type="text"
                                 required
@@ -829,7 +801,7 @@
                         </select>
 
                         <p class="text-error text-xs"
-                           x-show="!Object.keys($wire.dictionaries['eHealth/ICF/qualifiers/capacity']).includes(modalObservation.components[1].valueCodeableConcept.coding[0].code)"
+                           x-show="!Object.keys($wire.dictionaries['eHealth/ICF/qualifiers/capacity']).includes(modalObservation.components[1].valueCode)"
                         >
                             {{ __('forms.field_empty') }}
                         </p>
@@ -841,7 +813,7 @@
                         </label>
 
                         <select class="input-modal"
-                                x-model="modalObservation.components[1].interpretation.coding[0].code"
+                                x-model="modalObservation.components[1].interpretationCode"
                                 id="capacityInterpretationCode"
                                 type="text"
                                 required
@@ -853,7 +825,7 @@
                         </select>
 
                         <p class="text-error text-xs"
-                           x-show="!Object.keys(observationInterpretationsDictionary).includes(modalObservation.components[1].interpretation.coding[0].code)"
+                           x-show="!Object.keys(observationInterpretationsDictionary).includes(modalObservation.components[1].interpretationCode)"
                         >
                             {{ __('forms.field_empty') }}
                         </p>
@@ -864,7 +836,7 @@
 
         {{-- Фактори середовища (e) --}}
         <template
-            x-if="modalObservation.code.coding[0].code.startsWith('e') && modalObservation.codingSystem === 'icf'"
+            x-if="modalObservation.codeCode.startsWith('e') && modalObservation.codingSystem === 'icf'"
         >
             <div>
                 <h3 class="default-p font-bold my-10">{{ __('patients.components') }}</h3>
@@ -877,19 +849,18 @@
 
                         <select class="input-modal"
                                 x-init="
-                                    modalObservation.components[0].code.coding[0].system = 'eHealth/ICF/qualifiers';
-                                    modalObservation.components[0].code.coding[0].code = 'barrier_or_facilitator';
-                                    modalObservation.components[0].code.text = '';
+                                    modalObservation.components[0].codeCode = 'barrier_or_facilitator';
+                                    modalObservation.components[0].codeSystem = 'eHealth/ICF/qualifiers';
 
-                                    if (!modalObservation.components[0].valueCodeableConcept.coding[0].system) {
-                                        modalObservation.components[0].valueCodeableConcept.coding[0].system = 'eHealth/ICF/qualifiers/barrier_or_facilitator';
+                                    if (!modalObservation.components[0].valueSystem) {
+                                        modalObservation.components[0].valueSystem = 'eHealth/ICF/qualifiers/barrier_or_facilitator';
                                     }
 
-                                    if (!modalObservation.components[0].valueCodeableConcept.coding[0].code) {
-                                        modalObservation.components[0].valueCodeableConcept.coding[0].code = '';
+                                    if (!modalObservation.components[0].valueCode) {
+                                        modalObservation.components[0].valueCode = '';
                                     }
                                 "
-                                x-model="modalObservation.components[0].valueCodeableConcept.coding[0].code"
+                                x-model="modalObservation.components[0].valueCode"
                                 id="barrierCode"
                                 type="text"
                                 required
@@ -901,7 +872,7 @@
                         </select>
 
                         <p class="text-error text-xs"
-                           x-show="!Object.keys($wire.dictionaries['eHealth/ICF/qualifiers/barrier_or_facilitator']).includes(modalObservation.components[0].valueCodeableConcept.coding[0].code)"
+                           x-show="!Object.keys($wire.dictionaries['eHealth/ICF/qualifiers/barrier_or_facilitator']).includes(modalObservation.components[0].valueCode)"
                         >
                             {{ __('forms.field_empty') }}
                         </p>
@@ -913,8 +884,7 @@
                         </label>
 
                         <select class="input-modal"
-                                @change="modalObservation.components[0].interpretation.coding[0].system = 'eHealth/observation_interpretations'"
-                                x-model="modalObservation.components[0].interpretation.coding[0].code"
+                                x-model="modalObservation.components[0].interpretationCode"
                                 id="barrierInterpretationCode"
                                 type="text"
                                 required
@@ -926,7 +896,7 @@
                         </select>
 
                         <p class="text-error text-xs"
-                           x-show="!Object.keys(observationInterpretationsDictionary).includes(modalObservation.components[0].interpretation.coding[0].code)"
+                           x-show="!Object.keys(observationInterpretationsDictionary).includes(modalObservation.components[0].interpretationCode)"
                         >
                             {{ __('forms.field_empty') }}
                         </p>

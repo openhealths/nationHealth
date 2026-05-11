@@ -6,9 +6,6 @@ namespace App\Classes\eHealth\Api;
 
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
-use App\Models\LegalEntity as LegalEntityModel;
-use App\Models\Division as DivisionModel;
-use App\Rules\InDictionary;
 use Illuminate\Support\Facades\Log;
 use App\Classes\eHealth\EHealthResponse;
 use GuzzleHttp\Promise\PromiseInterface;
@@ -19,6 +16,7 @@ use App\Classes\eHealth\EHealthRequest as Request;
 class LegalEntity extends Request
 {
     protected const string URL = '/api/v2/legal_entities';
+    protected const string LEGATORS_URL = '/api/legal_entities';
 
     /**
      * Get full details data of a current legal entity
@@ -36,6 +34,65 @@ class LegalEntity extends Request
         return $this->get($url . '/' . legalEntity()->uuid);
     }
 
+    /**
+     * Get legators (related legal entities) of a legal entity.
+     *
+     * @see https://ehealthmisapi1.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/legal-entities/get-legators-legal-entities
+     *
+     * @param  string  $uuid     UUID of the legal entity to fetch legators for.
+     * @param  int     $page     Page number for paginated results.
+     *
+     * @return PromiseInterface|EHealthResponse
+     *
+     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     */
+    public function getLegators(string $uuid, int $page = 1): PromiseInterface|EHealthResponse
+    {
+        $this->setValidator($this->validateLegatorsResponse(...));
+        $this->setDefaultPageSize();
+
+        $mergedQuery = \array_merge(
+            $this->options['query'] ?? [],
+            ['page' => $page]
+        );
+
+        return $this->get(self::LEGATORS_URL . '/' . $uuid . '/related', $mergedQuery);
+    }
+
+    protected function validateLegatorsResponse(EHealthResponse $response): array
+    {
+        $transformedData = [];
+
+        foreach ($response->getData() as $item) {
+            $transformedData[] = self::replaceEHealthPropNames($item);
+        }
+
+        $validator = Validator::make($transformedData, [
+            '*' => 'required|array',
+
+            '*.merged_from_legal_entity' => 'required|array',
+            '*.merged_from_legal_entity.name' => 'required|string',
+            '*.merged_from_legal_entity.uuid' => 'required|uuid',
+            '*.merged_from_legal_entity.edrpou' => 'required|string',
+
+            '*.is_active'=> 'required|boolean',
+
+            "*.reason" => 'nullable|string',
+            "*.reason_date" => 'required|date',
+            '*.type' => 'required|string',
+
+            '*.ehealth_inserted_at' => 'required|date',
+            '*.inserted_by' => 'required|uuid',
+        ]);
+
+        if ($validator->fails()) {
+            Log::channel('e_health_errors')->error(
+                'EHealth Employee validation failed: ' . implode(', ', $validator->errors()->all())
+            );
+        }
+
+        return $validator->validated();
+    }
 
     /**
      * Validate healthcare service response (create, activate, deactivate),

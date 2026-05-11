@@ -12,6 +12,7 @@
                   icfObservationCategoriesDictionary: $wire.dictionaries['eHealth/ICF/observation_categories'],
                   observationCodesDictionary: $wire.dictionaries['eHealth/LOINC/observation_codes'],
                   icfObservationCodesDictionary: $wire.dictionaries['eHealth/ICF/classifiers'],
+                  customObservationCodesDictionary: $wire.dictionaries['eHealth/custom/observation_codes'],
                   observationInterpretationsDictionary: $wire.dictionaries['eHealth/observation_interpretations']
               }"
     >
@@ -34,14 +35,15 @@
                 <tr>
                     <td class="td-input"
                         x-text="
-                            observationCategoriesDictionary[observation.categories[0].coding[0]['code']] ||
-                            icfObservationCategoriesDictionary[observation.categories[0].coding[0]['code']]
+                            observationCategoriesDictionary[observation.categoryCode] ||
+                            icfObservationCategoriesDictionary[observation.categoryCode]
                         "
                     ></td>
                     <td class="td-input"
                         x-text="
-                            observationCodesDictionary[observation.code.coding[0]['code']] ||
-                            icfObservationCodesDictionary[observation.code.coding[0]['code']]
+                            observationCodesDictionary[observation.codeCode] ||
+                            icfObservationCodesDictionary[observation.codeCode] ||
+                            customObservationCodesDictionary[observation.codeCode]
                         "
                     ></td>
                     <td class="td-input"
@@ -52,8 +54,8 @@
                                 ? observation.valueString
                             : (observation.valueDate !== undefined && observation.valueTime !== undefined)
                                 ? observation.valueDate + ' ' + observation.valueTime
-                            : observation.valueQuantity.value !== ''
-                                ? observation.valueQuantity.value
+                            : observation.valueQuantityValue !== ''
+                                ? observation.valueQuantityValue
                             : observation.dictionaryName !== ''
                                 ? $wire.dictionaries[observation.dictionaryName]?.[observation.valueCodeableConcept]
                             : '-'
@@ -198,9 +200,8 @@
                                     </button>
 
                                     <button @click.prevent="
-                                                const selectedValueType = valueMap[modalObservation.code.coding[0].code]?.[1];
+                                                const selectedValueType = valueMap[modalObservation.codeCode]?.[1];
 
-                                                // Delete all types of filed except the last selected
                                                 const fieldsToDelete = [
                                                     'valueQuantity',
                                                     'valueCodeableConcept',
@@ -211,12 +212,13 @@
 
                                                 fieldsToDelete.forEach(field => {
                                                     if (field !== selectedValueType) {
-                                                        // set empty value as default for valueQuantity
                                                         if (field === 'valueQuantity') {
-                                                            if (modalObservation.valueQuantity) {
-                                                                modalObservation.valueQuantity.value = '';
-                                                            }
-                                                        } else if(field === 'valueDateTime') {
+                                                            modalObservation.valueQuantityValue = '';
+                                                            modalObservation.valueQuantityComparator = '';
+                                                            modalObservation.valueQuantityUnit = '';
+                                                            modalObservation.valueQuantitySystem = '';
+                                                            modalObservation.valueQuantityCode = '';
+                                                        } else if (field === 'valueDateTime') {
                                                             delete modalObservation.valueDate;
                                                             delete modalObservation.valueTime;
                                                         } else {
@@ -225,15 +227,7 @@
                                                     }
                                                 });
 
-                                                if (modalObservation.codingSystem === 'loinc') {
-                                                    modalObservation.categories[0].coding[0].system = 'eHealth/observation_categories';
-                                                    modalObservation.code.coding[0].system = 'eHealth/LOINC/observation_codes';
-                                                } else {
-                                                    modalObservation.categories[0].coding[0].system = 'eHealth/ICF/observation_categories';
-                                                    modalObservation.code.coding[0].system = 'eHealth/ICF/classifiers';
-                                                }
-
-                                                modalObservation.dictionaryName = $wire.observationValueMap[modalObservation.code.coding[0].code]?.[0];
+                                                modalObservation.dictionaryName = $wire.observationValueMap[modalObservation.codeCode]?.[0];
 
                                                 newObservation !== false
                                                     ? observations.push(modalObservation)
@@ -246,8 +240,8 @@
                                             :disabled="!(
                                                 modalObservation.issuedDate.trim() &&
                                                 modalObservation.issuedTime.trim() &&
-                                                modalObservation.categories[0].coding[0].code.trim() &&
-                                                modalObservation.code.coding[0].code.trim()
+                                                modalObservation.categoryCode.trim() &&
+                                                modalObservation.codeCode.trim()
                                             )"
                                     >
                                         {{ __('forms.save') }}
@@ -273,69 +267,39 @@
      */
     class Observation {
         codingSystem = 'loinc';
+        categorySystem = 'eHealth/observation_categories';
+        codeSystem = 'eHealth/LOINC/observation_codes';
         dictionaryName = '';
         primarySource = true;
-        performer = {
-            identifier: {
-                type: {
-                    coding: [{ system: 'eHealth/resources', code: 'employee' }],
-                    text: ''
-                }
-            }
-        };
-        reportOrigin = {
-            coding: [{ system: 'eHealth/report_origins', code: '' }],
-            text: ''
-        };
-        categories = [
-            {
-                coding: [{ system: '', code: '' }],
-                text: ''
-            }
-        ];
-        code = {
-            coding: [{ system: '', code: '' }],
-            text: ''
-        };
-        components = [
-            {
-                code: {
-                    coding: [{ system: '', code: '' }],
-                    text: ''
-                },
-                valueCodeableConcept: {
-                    coding: [{ system: '', code: '' }],
-                    text: ''
-                },
-                interpretation: {
-                    coding: [{ system: '', code: '' }],
-                    text: ''
-                }
-            }
-        ];
-        valueQuantity = {
-            value: ''
-        };
-        method = {
-            coding: [{ system: 'eHealth/observation_methods', code: '' }],
-            text: ''
-        };
-        interpretation = {
-            coding: [{ system: 'eHealth/observation_interpretations', code: '' }],
-            text: ''
-        };
-        bodySite = {
-            coding: [{ system: 'eHealth/body_sites', code: '' }],
-            text: ''
-        };
+        reportOriginCode = '';
+        categoryCode = '';
+        codeCode = '';
+        methodCode = '';
+        interpretationCode = '';
+        bodySiteCode = '';
+        valueQuantityValue = '';
+        valueQuantityComparator = '';
+        valueQuantityUnit = '';
+        valueQuantitySystem = '';
+        valueQuantityCode = '';
+        comment = '';
         issuedDate = new Date().toISOString().split('T')[0];
         issuedTime = new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
         effectiveDate = new Date().toISOString().split('T')[0];
         effectiveTime = new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
+        components = [
+            {
+                codeCode: '',
+                codeSystem: 'eHealth/ICF/qualifiers',
+                valueCode: '',
+                valueSystem: '',
+                interpretationCode: ''
+            }
+        ];
 
         constructor(obj = null) {
             if (obj) {
-                this.observations = JSON.parse(JSON.stringify(obj.observations || obj));
+                Object.assign(this, JSON.parse(JSON.stringify(obj)));
             }
         }
     }

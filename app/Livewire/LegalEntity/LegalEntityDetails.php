@@ -10,10 +10,14 @@ use App\Models\User;
 use App\Enums\Status;
 use App\Enums\JobStatus;
 use App\Traits\FormTrait;
+use Illuminate\Bus\Batch;
 use App\Models\LegalEntity;
+use App\Jobs\LegalEntitySync;
+use App\Repositories\Repository;
 use App\Classes\eHealth\EHealth;
 use Livewire\Attributes\Computed;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use App\Repositories\PhoneRepository;
@@ -21,9 +25,9 @@ use App\Notifications\SyncNotification;
 use Illuminate\Support\Facades\Session;
 use App\Repositories\AddressRepository;
 use App\Traits\BatchLegalEntityQueries;
-use App\Livewire\Employee\EmployeeIndex;
 use Spatie\Permission\PermissionRegistrar;
 use App\Enums\License\Type as LicenseType;
+use Illuminate\Http\Client\ConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\LegalEntity\LegalEntity as LegalEntityComponent;
@@ -337,7 +341,9 @@ class LegalEntityDetails extends LegalEntityComponent
             return;
         }
 
-        legalEntity()?->setEntityStatus(JobStatus::PROCESSING);
+        $legalEntity = legalEntity();
+
+        $legalEntity?->setEntityStatus(JobStatus::PROCESSING);
 
         $oldStatus = $this->legalEntity->status;
 
@@ -355,7 +361,7 @@ class LegalEntityDetails extends LegalEntityComponent
 
             session()->flash('error', __('errors.ehealth.messages.server_error'));
 
-            legalEntity()?->setEntityStatus(JobStatus::FAILED);
+            $legalEntity?->setEntityStatus(JobStatus::FAILED);
 
             return;
         } catch (EHealthValidationException $err) {
@@ -363,7 +369,7 @@ class LegalEntityDetails extends LegalEntityComponent
 
             session()->flash('error', __('errors.ehealth.messages.server_error'));
 
-            legalEntity()?->setEntityStatus(JobStatus::FAILED);
+            $legalEntity?->setEntityStatus(JobStatus::FAILED);
 
             return;
         } catch (Throwable $err) {
@@ -371,12 +377,12 @@ class LegalEntityDetails extends LegalEntityComponent
 
             session()->flash('error', __('legal-entity.request.sync.errors.fail'));
 
-            legalEntity()?->setEntityStatus(JobStatus::FAILED);
+            $legalEntity?->setEntityStatus(JobStatus::FAILED);
 
             return;
         }
 
-        $infomsg = __('forms.sync_successfull');
+        $messages = [__('forms.sync_successfull')];
 
         if ($legalEntityData['data']['status'] !== $oldStatus) {
             Log::channel('e_health_warnings')->warning(
@@ -395,17 +401,49 @@ class LegalEntityDetails extends LegalEntityComponent
             Auth::user()->syncPermissions(Auth::user()->getAllPermissions()->pluck('name')->toArray());
 
             if ($legalEntityData['data']['status'] === Status::REORGANIZED->value) {
-                $infomsg .= PHP_EOL . __('forms.warn_reorganized') . PHP_EOL . __('forms.access_read_only');
-
-                // app(EmployeeIndex::class)->sync();
+                $messages[] = __('forms.warn_reorganized');
+                $messages[] = __('forms.access_read_only');
             }
         }
 
+        // Check if the legal entity has legators and if it does - synchronize them as well
+        try {
+            $response = EHealth::legalEntity()->getLegators($legalEntity->uuid);
+
+            $validated = $response->validate();
+
+            Repository::legalEntity()->saveLegators($legalEntity, $validated);
+        } catch (ConnectionException $exception) {
+            $this->logConnectionError($exception, 'Error connecting when getting a legators list');
+
+            Session::flash('error', __('errors.ehealth.messages.server_error'));
+
+            $legalEntity?->setEntityStatus(JobStatus::FAILED);
+
+            return;
+        } catch (EHealthValidationException|EHealthResponseException $exception) {
+            $this->logEHealthException($exception, 'Error connecting when getting a legators list');
+
+            Session::flash('error', __('errors.ehealth.messages.server_error'));
+
+            $legalEntity?->setEntityStatus(JobStatus::FAILED);
+
+            return;
+        } catch (Throwable $err) {
+            Log::channel('db_errors')->error(static::class . ': [syncLegalEntity]: ', ['error' => $err->getMessage()]);
+
+            session()->flash('error', __('legal-entity.request.sync.errors.fail'));
+
+            $legalEntity?->setEntityStatus(JobStatus::FAILED);
+
+            return;
+        }
+
+        $legalEntity?->setEntityStatus(JobStatus::COMPLETED);
+
         $this->redirect(route('legal-entity.details', [legalEntity()]), navigate: true);
 
-        session()->flash('success', $infomsg);
-
-        legalEntity()?->setEntityStatus(JobStatus::COMPLETED);
+        session()->flash('success', implode(PHP_EOL, $messages));
 
         return;
     }

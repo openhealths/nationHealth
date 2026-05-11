@@ -13,6 +13,7 @@ class SyncNotification extends Notification
 
     /** @var array Entity types mapping for sync operations with Ukrainian descriptions */
     protected const array SYNC_ENTITIES = [
+        'legators' => 'Синхронізація залежних закладів',
         'legal_entity' => 'Синхронізація даних медичного закладу',
         'employee' => 'Синхронізація співробітників',
         'employee_request' => 'Синхронізація заявок',

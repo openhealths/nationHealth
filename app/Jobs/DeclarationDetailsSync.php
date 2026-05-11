@@ -144,11 +144,9 @@ class DeclarationDetailsSync extends EHealthJob
     // Get next entity job if needed
     protected function getNextEntityJob(): ?EHealthJob
     {
-        $nextEntity = $this->nextEntity ?? $this->getConfidantPersonStartJob($this->legalEntity, null);
-
-        return $this->standalone || !$nextEntity
+        return $this->standalone || !$this->nextEntity
             ? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin)
-            : $nextEntity;
+            : $this->getConfidantPersonStartJob($this->legalEntity, $this->nextEntity);
     }
 
     /**

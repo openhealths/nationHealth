@@ -7,9 +7,7 @@ namespace App\Repositories\MedicalEvents;
 use App\Core\Arr;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\EpisodeDiagnosesHistory;
-use Exception;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -29,39 +27,29 @@ class EpisodeRepository extends BaseRepository
     public function store(array $data, int $personId, ?int $encounterId = null): void
     {
         DB::transaction(function () use ($data, $personId, $encounterId) {
-            try {
-                $type = Repository::coding()->store($data['type']);
+            $type = Repository::coding()->store($data['type']);
 
-                $managingOrganization = Repository::identifier()
-                    ->store($data['managingOrganization']['identifier']['value']);
-                Repository::codeableConcept()->attach($managingOrganization, $data['managingOrganization']);
+            $managingOrganization = Repository::identifier()
+                ->store($data['managingOrganization']['identifier']['value']);
+            Repository::codeableConcept()->attach($managingOrganization, $data['managingOrganization']);
 
-                $careManager = Repository::identifier()->store($data['careManager']['identifier']['value']);
-                Repository::codeableConcept()->attach($careManager, $data['careManager']);
+            $careManager = Repository::identifier()->store($data['careManager']['identifier']['value']);
+            Repository::codeableConcept()->attach($careManager, $data['careManager']);
 
-                $episode = $this->model->create([
-                    'uuid' => $data['id'],
-                    'person_id' => $personId,
-                    'encounter_id' => $encounterId,
-                    'episode_type_id' => $type->id,
-                    'status' => $data['status'],
-                    'name' => $data['name'],
-                    'managing_organization_id' => $managingOrganization->id,
-                    'care_manager_id' => $careManager->id
-                ]);
+            $episode = $this->model->create([
+                'uuid' => $data['id'],
+                'person_id' => $personId,
+                'encounter_id' => $encounterId,
+                'episode_type_id' => $type->id,
+                'status' => $data['status'],
+                'name' => $data['name'],
+                'managing_organization_id' => $managingOrganization->id,
+                'care_manager_id' => $careManager->id
+            ]);
 
-                $episode->period()->create([
-                    'start' => $data['period']['start']
-                ]);
-            } catch (Exception $e) {
-                Log::channel('db_errors')->error('Error saving episode', [
-                    'error' => $e->getMessage(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine()
-                ]);
-
-                throw $e;
-            }
+            $episode->period()->create([
+                'start' => $data['period']['start']
+            ]);
         });
     }
 
@@ -172,7 +160,11 @@ class EpisodeRepository extends BaseRepository
                 $existing = $existingEpisodes->get($data['uuid']);
 
                 $type = $this->syncCoding($existing, $data['type'] ?? null, 'type');
-                $managingOrganization = $this->syncIdentifier($existing, $data['managing_organization'] ?? null, 'managingOrganization');
+                $managingOrganization = $this->syncIdentifier(
+                    $existing,
+                    $data['managing_organization'] ?? null,
+                    'managingOrganization'
+                );
                 $careManager = $this->syncIdentifier($existing, $data['care_manager'] ?? null, 'careManager');
                 $statusReason = $this->syncCodeableConcept($existing, $data['status_reason'] ?? null, 'statusReason');
 

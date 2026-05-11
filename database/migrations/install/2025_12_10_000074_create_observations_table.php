@@ -18,7 +18,6 @@ return new class extends Migration
             $table->id();
             $table->uuid()->unique();
             $table->foreignId('person_id')->constrained('persons');
-            $table->foreignId('encounter_id')->nullable()->constrained('encounters');
             $table->enum('status', ObservationStatus::values());
             $table->foreignId('diagnostic_report_id')->nullable()->constrained('identifiers');
             $table->foreignId('code_id')->constrained('codeable_concepts');
@@ -31,10 +30,6 @@ return new class extends Migration
             $table->text('comment')->nullable();
             $table->foreignId('body_site_id')->nullable()->constrained('codeable_concepts');
             $table->foreignId('method_id')->nullable()->constrained('codeable_concepts');
-            $table->foreignId('value_codeable_concept_id')->nullable()->constrained('codeable_concepts');
-            $table->string('value_string')->nullable();
-            $table->boolean('value_boolean')->nullable();
-            $table->timestamp('value_date_time')->nullable();
             $table->foreignId('reaction_on_id')->nullable()->constrained('identifiers');
             $table->foreignId('context_id')->nullable()->constrained('identifiers');
             $table->foreignId('specimen_id')->nullable()->constrained('identifiers');
@@ -57,9 +52,49 @@ return new class extends Migration
             $table->id();
             $table->foreignId('observation_id')->constrained('observations')->cascadeOnDelete();
             $table->foreignId('code_id')->constrained('codeable_concepts');
-            $table->foreignId('codeable_concept_id')->nullable()->constrained('codeable_concepts')->cascadeOnDelete();
             $table->foreignId('interpretation_id')->nullable()->constrained('codeable_concepts')->cascadeOnDelete();
+            $table->timestamps();
+        });
+
+        Schema::create('sampled_data', static function (Blueprint $table) {
+            $table->id();
+            $table->integer('origin')->nullable();
+            $table->integer('period')->nullable();
+            $table->integer('factor')->nullable();
+            $table->integer('lower_limit')->nullable();
+            $table->integer('upper_limit')->nullable();
+            $table->integer('dimensions')->nullable();
+            $table->string('data');
+            $table->timestamps();
+        });
+
+        Schema::create('ratios', static function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('numerator_id')->nullable()->constrained('quantities');
+            $table->foreignId('denominator_id')->nullable()->constrained('quantities');
+            $table->timestamps();
+        });
+
+        Schema::create('ranges', static function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('low_id')->nullable()->constrained('quantities');
+            $table->foreignId('high_id')->nullable()->constrained('quantities');
+            $table->timestamps();
+        });
+
+        Schema::create('values', static function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('observation_id')->nullable()->constrained('observations')->cascadeOnDelete();
+            $table->foreignId('observation_component_id')->nullable()->constrained('observation_components')->cascadeOnDelete();
             $table->foreignId('value_codeable_concept_id')->nullable()->constrained('codeable_concepts');
+            $table->foreignId('value_quantity_id')->nullable()->constrained('quantities');
+            $table->foreignId('value_ratio_id')->nullable()->constrained('ratios');
+            $table->foreignId('value_range_id')->nullable()->constrained('ranges');
+            $table->foreignId('value_sampled_data_id')->nullable()->constrained('sampled_data')->cascadeOnDelete();
+            $table->string('value_string')->nullable();
+            $table->boolean('value_boolean')->nullable();
+            $table->timestamp('value_date_time')->nullable();
+            $table->time('value_time')->nullable();
             $table->timestamps();
         });
     }
@@ -69,10 +104,12 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::dropIfExists('values');
+        Schema::dropIfExists('ranges');
+        Schema::dropIfExists('ratios');
+        Schema::dropIfExists('sampled_data');
         Schema::dropIfExists('observation_components');
-
         Schema::dropIfExists('observation_categories');
-
         Schema::dropIfExists('observations');
     }
 };

@@ -21,7 +21,13 @@ class Immunization extends PatientApiBase
      * Get a list of summary info about immunizations.
      *
      * @param  string  $patientId
-     * @param  array{vaccine_code?: string, date_from?: string, date_to?: string, page?: int, page_size?: int}  $query
+     * @param array{
+     *     vaccine_code?: string,
+     *     date_from?: string,
+     *     date_to?: string,
+     *     page?: int,
+     *     page_size?: int
+     * } $query
      * @return PromiseInterface|EHealthResponse
      * @throws ConnectionException|EHealthValidationException|EHealthResponseException
      *
@@ -32,22 +38,66 @@ class Immunization extends PatientApiBase
         $this->setValidator($this->validateImmunizations(...));
         $this->setDefaultPageSize();
 
-        $mergedQuery = array_merge($this->options['query'], $query ?? []);
+        $mergedQuery = array_merge($this->options['query'], $query);
 
         return $this->get(self::URL . "/$patientId/summary/immunizations", $mergedQuery);
     }
 
     /**
-     * Validate immunizations data from eHealth API.
+     * Get immunizations by search params.
+     *
+     * @param  string  $patientId
+     * @param array{
+     *     vaccine_code?: string,
+     *     encounter_id?: string,
+     *     episode_id: string,
+     *     date_from?: string,
+     *     date_to?: string,
+     *     page?: int,
+     *     page_size?: int
+     * } $query
+     * @return PromiseInterface|EHealthResponse
+     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     *
+     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/immunization/get-immunizations-by-search-params
+     */
+    public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
+    {
+        $this->setValidator($this->validateImmunizations(...));
+        $this->setDefaultPageSize();
+
+        $mergedQuery = array_merge(
+            $this->options['query'],
+            $this->format($query, ['date_from', 'date_to'])
+        );
+
+        return $this->get(self::URL . "/$patientId/immunizations", $mergedQuery);
+    }
+
+    /**
+     * Validate immunizations collection from eHealth API.
      *
      * @param  EHealthResponse  $response
      * @return array
      */
     protected function validateImmunizations(EHealthResponse $response): array
     {
+        $data = $response->getData();
+
+        if (empty($data)) {
+            return [];
+        }
+
+        $items = array_is_list($data) ? $data : [$data];
+
         $replaced = [];
-        foreach ($response->getData() as $data) {
-            $replaced[] = $this->replaceEHealthPropNames($data);
+
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $replaced[] = $this->replaceEHealthPropNames($item);
         }
 
         $rules = collect($this->immunizationValidationRules())

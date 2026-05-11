@@ -13,15 +13,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('reference_ranges', function (Blueprint $table) {
+        Schema::create('reference_ranges', static function (Blueprint $table) {
             $table->id();
-            $table->nullableMorphs('referenceable');
+            $table->foreignId('observation_id')->nullable()->constrained('observations')->cascadeOnDelete();
+            $table->foreignId('observation_component_id')->nullable()->constrained('observation_components')->cascadeOnDelete();
             $table->foreignId('low_id')->nullable()->constrained('quantities');
             $table->foreignId('high_id')->nullable()->constrained('quantities');
             $table->foreignId('type_id')->nullable()->constrained('codeable_concepts');
             $table->foreignId('applies_to_id')->nullable()->constrained('codeable_concepts');
-            $table->foreignId('age_low_id')->nullable()->constrained('quantities');
-            $table->foreignId('age_high_id')->nullable()->constrained('quantities');
+            $table->foreignId('age_id')->nullable()->constrained('ranges');
             $table->text('text')->nullable();
             $table->timestamps();
         });

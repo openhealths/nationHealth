@@ -10,11 +10,9 @@ use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Encounter as EncounterSql;
 use App\Models\MedicalEvents\Sql\EncounterDiagnose;
-use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -53,91 +51,81 @@ class EncounterRepository extends BaseRepository
     public function store(array $encounterData, int $personId): false|int
     {
         return DB::transaction(function () use ($encounterData, $personId) {
-            try {
-                $visit = Repository::identifier()->store($encounterData['visit']['identifier']['value']);
-                Repository::codeableConcept()->attach($visit, $encounterData['visit']);
+            $visit = Repository::identifier()->store($encounterData['visit']['identifier']['value']);
+            Repository::codeableConcept()->attach($visit, $encounterData['visit']);
 
-                $episode = Repository::identifier()->store($encounterData['episode']['identifier']['value']);
-                Repository::codeableConcept()->attach($episode, $encounterData['episode']);
+            $episode = Repository::identifier()->store($encounterData['episode']['identifier']['value']);
+            Repository::codeableConcept()->attach($episode, $encounterData['episode']);
 
-                $class = Repository::coding()->store($encounterData['class']);
+            $class = Repository::coding()->store($encounterData['class']);
 
-                $type = Repository::codeableConcept()->store($encounterData['type']);
+            $type = Repository::codeableConcept()->store($encounterData['type']);
 
-                if (isset($encounterData['priority']['coding'][0]['code'])) {
-                    $priority = Repository::codeableConcept()->store($encounterData['priority']);
-                }
-
-                $performer = Repository::identifier()->store($encounterData['performer']['identifier']['value']);
-                Repository::codeableConcept()->attach($performer, $encounterData['performer']);
-
-                if (isset($encounterData['division'])) {
-                    $division = Repository::identifier()->store($encounterData['division']['identifier']['value']);
-                    Repository::codeableConcept()->attach($division, $encounterData['division']);
-                }
-
-                $encounter = $this->model->create([
-                    'person_id' => $personId,
-                    'uuid' => $encounterData['uuid'] ?? $encounterData['id'],
-                    'status' => $encounterData['status'],
-                    'visit_id' => $visit->id,
-                    'episode_id' => $episode->id,
-                    'class_id' => $class->id,
-                    'type_id' => $type->id,
-                    'priority_id' => $priority->id ?? null,
-                    'performer_id' => $performer->id,
-                    'division_id' => $division->id ?? null
-                ]);
-
-                $encounter->period()->create([
-                    'start' => $encounterData['period']['start'],
-                    'end' => $encounterData['period']['end']
-                ]);
-
-                $reasonIds = [];
-
-                foreach ($encounterData['reasons'] as $reasonData) {
-                    $reason = Repository::codeableConcept()->store($reasonData);
-
-                    $reasonIds[] = $reason->id;
-                }
-
-                $encounter->reasons()->attach($reasonIds);
-
-                foreach ($encounterData['diagnoses'] as $diagnoseData) {
-                    $condition = Repository::identifier()->store($diagnoseData['condition']['identifier']['value']);
-                    Repository::codeableConcept()->attach($condition, $diagnoseData['condition']);
-
-                    $role = Repository::codeableConcept()->store($diagnoseData['role']);
-
-                    EncounterDiagnose::create([
-                        'encounter_id' => $encounter->id,
-                        'condition_id' => $condition->id,
-                        'role_id' => $role->id,
-                        'rank' => $diagnoseData['rank'] ?? null
-                    ]);
-                }
-
-                $actionIds = [];
-
-                foreach ($encounterData['actions'] as $actionData) {
-                    $action = Repository::codeableConcept()->store($actionData);
-
-                    $actionIds[] = $action->id;
-                }
-
-                $encounter->actions()->attach($actionIds);
-
-                return $encounter->id;
-            } catch (Exception $e) {
-                Log::channel('db_errors')->error('Error saving encounter', [
-                    'error' => $e->getMessage(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine()
-                ]);
-
-                throw $e;
+            if (isset($encounterData['priority']['coding'][0]['code'])) {
+                $priority = Repository::codeableConcept()->store($encounterData['priority']);
             }
+
+            $performer = Repository::identifier()->store($encounterData['performer']['identifier']['value']);
+            Repository::codeableConcept()->attach($performer, $encounterData['performer']);
+
+            if (isset($encounterData['division'])) {
+                $division = Repository::identifier()->store($encounterData['division']['identifier']['value']);
+                Repository::codeableConcept()->attach($division, $encounterData['division']);
+            }
+
+            $encounter = $this->model->create([
+                'person_id' => $personId,
+                'uuid' => $encounterData['uuid'] ?? $encounterData['id'],
+                'status' => $encounterData['status'],
+                'visit_id' => $visit->id,
+                'episode_id' => $episode->id,
+                'class_id' => $class->id,
+                'type_id' => $type->id,
+                'priority_id' => $priority->id ?? null,
+                'performer_id' => $performer->id,
+                'division_id' => $division->id ?? null
+            ]);
+
+            $encounter->period()->create([
+                'start' => $encounterData['period']['start'],
+                'end' => $encounterData['period']['end']
+            ]);
+
+            $reasonIds = [];
+
+            foreach ($encounterData['reasons'] as $reasonData) {
+                $reason = Repository::codeableConcept()->store($reasonData);
+
+                $reasonIds[] = $reason->id;
+            }
+
+            $encounter->reasons()->attach($reasonIds);
+
+            foreach ($encounterData['diagnoses'] as $diagnoseData) {
+                $condition = Repository::identifier()->store($diagnoseData['condition']['identifier']['value']);
+                Repository::codeableConcept()->attach($condition, $diagnoseData['condition']);
+
+                $role = Repository::codeableConcept()->store($diagnoseData['role']);
+
+                EncounterDiagnose::create([
+                    'encounter_id' => $encounter->id,
+                    'condition_id' => $condition->id,
+                    'role_id' => $role->id,
+                    'rank' => $diagnoseData['rank'] ?? null
+                ]);
+            }
+
+            $actionIds = [];
+
+            foreach ($encounterData['actions'] as $actionData) {
+                $action = Repository::codeableConcept()->store($actionData);
+
+                $actionIds[] = $action->id;
+            }
+
+            $encounter->actions()->attach($actionIds);
+
+            return $encounter->id;
         });
     }
 
@@ -165,259 +153,6 @@ class EncounterRepository extends BaseRepository
             'periodStart' => $encounter->period->start,
             'code' => $condition?->code
         ];
-    }
-
-    /**
-     * Format immunizations data before request.
-     *
-     * @param  array  $immunizations
-     * @return array
-     */
-    public function formatImmunizationsRequest(array $immunizations): array
-    {
-        $immunizationForm = array_map(function (array $immunization) {
-            $immunization['id'] = Str::uuid()->toString();
-
-            $immunization['status'] = 'completed';
-
-            $immunization['context']['identifier']['type']['coding'][0] = [
-                'system' => 'eHealth/resources',
-                'code' => 'encounter'
-            ];
-            $immunization['context']['identifier']['value'] = $this->encounterUuid;
-
-            if ($immunization['primarySource']) {
-                unset($immunization['reportOrigin']);
-
-                $immunization['performer']['identifier']['value'] = $this->employeeUuid;
-            } else {
-                unset($immunization['performer']);
-            }
-
-            if ($immunization['notGiven']) {
-                unset($immunization['explanation']['reasons']);
-            } else {
-                unset($immunization['explanation']['reasonsNotGiven']);
-            }
-
-            if ($immunization['route']['coding'][0]['code'] === '') {
-                unset($immunization['route']);
-            }
-
-            if ($immunization['site']['coding'][0]['code'] === '') {
-                unset($immunization['site']);
-            }
-
-            if (is_null($immunization['doseQuantity']['value'])) {
-                unset($immunization['doseQuantity']);
-            }
-
-            $immunization['date'] = convertToEHealthISO8601($immunization['date'] . ' ' . $immunization['time']);
-            unset($immunization['time']);
-
-            if ($immunization['expirationDate']) {
-                $immunization['expirationDate'] = convertToEHealthISO8601(
-                    $immunization['expirationDate'] . ' ' . now()->format('H:i')
-                );
-            }
-
-            return removeEmptyKeys($immunization);
-        }, $immunizations);
-
-        return schemaService()
-            ->setDataSchema(['immunizations' => $immunizationForm], app(PatientApi::class))
-            ->requestSchemaNormalize()
-            ->camelCaseKeys()
-            ->extractFirst()
-            ->getNormalizedData();
-    }
-
-    /**
-     * Format observations data before request.
-     *
-     * @param  array  $observations
-     * @return array
-     */
-    public function formatObservationsRequest(array $observations): array
-    {
-        $observationForm = array_map(function (array $observation) {
-            unset($observation['codingSystem']);
-
-            $observation['id'] = Str::uuid()->toString();
-            $observation['status'] = 'valid';
-
-            $observation['effectiveDateTime'] = convertToEHealthISO8601(
-                $observation['effectiveDate'] . ' ' . $observation['effectiveTime']
-            );
-            unset($observation['effectiveDate'], $observation['effectiveTime']);
-
-            if (empty($observation['effectiveDateTime'])) {
-                unset($observation['effectiveDateTime']);
-            }
-
-            $observation['issued'] = convertToEHealthISO8601(
-                $observation['issuedDate'] . ' ' . $observation['issuedTime']
-            );
-            unset($observation['issuedDate'], $observation['issuedTime']);
-
-            $observation['context']['identifier']['type']['coding'][0] = [
-                'system' => 'eHealth/resources',
-                'code' => 'encounter'
-            ];
-            $observation['context']['identifier']['value'] = $this->encounterUuid;
-
-            if ($observation['primarySource']) {
-                unset($observation['reportOrigin']);
-
-                $observation['performer']['identifier']['value'] = $this->employeeUuid;
-            } else {
-                unset($observation['performer']);
-            }
-
-            if ($observation['valueQuantity']['value'] === '') {
-                unset($observation['valueQuantity']);
-            }
-
-            // format to codeable concept type
-            if (isset($observation['valueCodeableConcept'])) {
-                $observation['valueCodeableConcept'] = [
-                    'coding' => [
-                        [
-                            'system' => $observation['dictionaryName'],
-                            'code' => $observation['valueCodeableConcept'],
-                        ]
-                    ],
-                    'text' => ''
-                ];
-            }
-
-            if (isset($observation['dictionaryName'])) {
-                unset($observation['dictionaryName']);
-            }
-
-            // combine date&time
-            if (isset($observation['valueDate'], $observation['valueTime'])) {
-                $observation['valueDateTime'] = convertToEHealthISO8601(
-                    $observation['valueDate'] . ' ' . $observation['valueTime']
-                );
-                unset($observation['valueDate'], $observation['valueTime']);
-            }
-
-            if (empty($observation['bodySite']['coding'][0]['code'])) {
-                unset($observation['bodySite']);
-            }
-
-            if (empty($observation['interpretation']['coding'][0]['code'])) {
-                unset($observation['interpretation']);
-            }
-
-            if (empty($observation['method']['coding'][0]['code'])) {
-                unset($observation['method']);
-            }
-
-            if ($observation['components'][0]['valueCodeableConcept']['coding'][0]['code'] === '') {
-                unset($observation['components']);
-            }
-
-            if (isset($observation['components'][0]['interpretation']['coding'][0]['code']) && $observation['components'][0]['interpretation']['coding'][0]['code'] === '') {
-                unset($observation['components']);
-            }
-
-            return $observation;
-        }, $observations);
-
-        return schemaService()
-            ->setDataSchema(['observations' => $observationForm], app(PatientApi::class))
-            ->requestSchemaNormalize()
-            ->camelCaseKeys()
-            ->extractFirst()
-            ->getNormalizedData();
-    }
-
-    /**
-     * Format diagnostic reports data before request.
-     *
-     * @param  array  $diagnosticReports
-     * @param  string|null  $divisionUuid
-     * @return array
-     */
-    public function formatDiagnosticReportsRequest(array $diagnosticReports, ?string $divisionUuid = null): array
-    {
-        $diagnosticReportForm = array_map(function (array $diagnosticReport) use ($divisionUuid) {
-            // delete frontend properties
-            unset($diagnosticReport['isReferralAvailable'], $diagnosticReport['referralType'], $diagnosticReport['query']);
-
-            $diagnosticReport['id'] = Str::uuid()->toString();
-            $diagnosticReport['status'] = 'final';
-
-            if ($diagnosticReport['primarySource']) {
-                unset($diagnosticReport['reportOrigin']);
-
-                $diagnosticReport['performer']['reference']['identifier']['value'] = $this->employeeUuid;
-            } else {
-                unset($diagnosticReport['performer']);
-            }
-
-            if (empty($diagnosticReport['conclusionCode']['coding'][0]['code'])) {
-                unset($diagnosticReport['conclusionCode']);
-            }
-
-            $diagnosticReport['recordedBy']['identifier']['value'] = $this->employeeUuid;
-
-            $diagnosticReport['issued'] = convertToEHealthISO8601(
-                $diagnosticReport['issuedDate'] . $diagnosticReport['issuedTime']
-            );
-            unset($diagnosticReport['issuedDate'], $diagnosticReport['issuedTime']);
-
-            $diagnosticReport['effectivePeriod']['start'] = convertToEHealthISO8601(
-                $diagnosticReport['effectivePeriodStartDate'] . $diagnosticReport['effectivePeriodStartTime']
-            );
-            unset($diagnosticReport['effectivePeriodStartDate'], $diagnosticReport['effectivePeriodStartTime']);
-
-            $diagnosticReport['effectivePeriod']['end'] = convertToEHealthISO8601(
-                $diagnosticReport['effectivePeriodEndDate'] . $diagnosticReport['effectivePeriodEndTime']
-            );
-            unset($diagnosticReport['effectivePeriodEndDate'], $diagnosticReport['effectivePeriodEndTime']);
-
-            $diagnosticReport['encounter'] = [
-                'identifier' => [
-                    'type' => [
-                        'coding' => [['system' => 'eHealth/resources', 'code' => 'encounter']],
-                        'text' => ''
-                    ],
-                    'value' => $this->encounterUuid
-                ]
-            ];
-
-            $diagnosticReport['managingOrganization'] = [
-                'identifier' => [
-                    'type' => [
-                        'coding' => [['system' => 'eHealth/resources', 'code' => 'legal_entity']],
-                        'text' => ''
-                    ],
-                    'value' => legalEntity()->uuid
-                ],
-            ];
-
-            if (is_null($divisionUuid)) {
-                unset($diagnosticReport['division']);
-            } else {
-                $diagnosticReport['division']['identifier']['value'] = $divisionUuid;
-            }
-
-            if (empty($diagnosticReport['resultsInterpreter']['reference']['identifier']['value'])) {
-                unset($diagnosticReport['resultsInterpreter']);
-            }
-
-            return $diagnosticReport;
-        }, $diagnosticReports);
-
-        return schemaService()
-            ->setDataSchema(['diagnostic_reports' => $diagnosticReportForm], app(PatientApi::class))
-            ->requestSchemaNormalize()
-            ->camelCaseKeys()
-            ->extractFirst()
-            ->getNormalizedData();
     }
 
     /**

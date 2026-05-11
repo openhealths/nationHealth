@@ -96,9 +96,19 @@
                         this.options = Object.entries(rawData)
                             .filter(([value]) => allowedCodes.has(value))
                             .map(([value, label]) => this.makeOption(value, label));
+                    } else if (dictionaryKey === 'eHealth/ICPC2/condition_codes') {
+                        const allowedCodes = this.$wire.allowedConditionCodesBySystem?.['eHealth/ICPC2/condition_codes'];
+                        if (allowedCodes !== undefined) {
+                            const allowedSet = new Set(allowedCodes);
+                            this.options = Object.entries(rawData)
+                                .filter(([value]) => allowedSet.has(value))
+                                .map(([value, label]) => this.makeOption(value, label));
+                        } else {
+                            this.options = Object.entries(rawData).map(([value, label]) => this.makeOption(value, label));
+                        }
                     } else if (dictionaryKey === 'eHealth/ICF/classifiers') {
                         this.updateIcfOptions(rawData);
-                        this.$watch('modalObservation.categories[0].coding[0].code', () => {
+                        this.$watch('modalObservation.categoryCode', () => {
                             this.updateIcfOptions(rawData);
                         });
                     } else if (dictionaryKey === 'custom/services') {
@@ -128,6 +138,15 @@
                     }
 
                     this.buildOptionsMap();
+
+                    // Restore display text if selected was set before optionsMap was built
+                    if (this.selected && !this.search) {
+                        const opt = this.optionsMap.get(this.selected);
+                        if (opt) {
+                            this.search = `[${opt.code ?? opt.value}] – ${opt.label}`;
+                        }
+                    }
+
                     this.initialized = true;
 
                     // Restore display if search was set before init completed
@@ -152,7 +171,7 @@
             },
 
             updateIcfOptions(rawData) {
-                const categoryCode = this.modalObservation?.categories[0].coding[0]?.code;
+                const categoryCode = this.modalObservation?.categoryCode;
                 const prefixMap = {
                     functions: 'b',
                     structures: 's',

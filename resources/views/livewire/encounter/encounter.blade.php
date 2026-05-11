@@ -4,6 +4,10 @@
 
             <!-- Main Content -->
             <div class="flex-1 space-y-6">
+                <div id="referral" class="scroll-mt-6">
+                    @include('livewire.encounter.parts.referral')
+                </div>
+
                 <div id="main-data" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm scroll-mt-6">
                     @include('livewire.encounter.parts.main-data')
                 </div>
@@ -24,9 +28,9 @@
                     @include('livewire.encounter.parts.diagnostic-reports')
                 </div>
 
-{{--                <div id="observations" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm scroll-mt-6">--}}
-{{--                    @include('livewire.encounter.parts.observations')--}}
-{{--                </div>--}}
+                <div id="observations" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm scroll-mt-6">
+                    @include('livewire.encounter.parts.observations')
+                </div>
 
 {{--                <div id="procedures" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm scroll-mt-6">--}}
 {{--                    @include('livewire.encounter.parts.procedures')--}}
@@ -58,6 +62,7 @@
             <div class="w-full lg:w-[280px] flex-shrink-0 space-y-1 mt-4 lg:mt-0 sticky top-6 self-start">
                 @php
                     $navItems = [
+                        ['id' => 'referral', 'label' => __('patients.referrals'), 'icon' => 'arrow-right'],
                         ['id' => 'main-data', 'label' => __('patients.main_data'), 'icon' => 'pie-chart'],
                         ['id' => 'reasons', 'label' => __('patients.reasons_for_visit'), 'icon' => 'person'],
                         ['id' => 'conditions', 'label' => __('patients.diagnoses'), 'icon' => 'file'],

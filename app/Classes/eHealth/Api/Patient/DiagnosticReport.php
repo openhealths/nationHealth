@@ -74,7 +74,7 @@ class DiagnosticReport extends PatientApiBase
         $this->setValidator($this->validateDiagnosticReports(...));
         $this->setDefaultPageSize();
 
-        $mergedQuery = array_merge($this->options['query'], $query ?? []);
+        $mergedQuery = array_merge($this->options['query'], $this->format($query, ['issued_from', 'issued_to']));
 
         return $this->get(self::URL . "/$patientId/diagnostic_reports", $mergedQuery);
     }

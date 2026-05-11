@@ -356,21 +356,21 @@ trait BatchLegalEntityQueries
      *
      * @param  LegalEntity  $legalEntity
      * @param  EHealthJob|null  $nextEntity  The job to be executed after the chain completes (or null)
-     * @return EHealthJob|null The first job in the EmployeeDetailsUpsert chain, or null if there are no employees
+     * @return EHealthJob|null The first job in the DeclarationRequestsDetailsSync chain, or null if there are no declarationRequests
      */
     protected function getDeclarationRequestsStartJob(LegalEntity $legalEntity, ?EHealthJob $nextEntity): ?EHealthJob
     {
         $job = null;
 
         // The incoming $nextEntity will be executed after the whole chain
-        $previousJob = $nextEntity ?? $this->getDeclarationDataStartJob($legalEntity, $nextEntity);
+        $previousJob = $this->getDeclarationDataStartJob($legalEntity, $nextEntity);
 
         $models = DeclarationRequest::with(['employee', 'division', 'person'])
             ->filterByLegalEntityId(legalEntityId: $legalEntity->id)
             ->filterBySyncStatus(status: JobStatus::PARTIAL)
             ->get();
 
-        foreach ($models->reverse() as $index => $model) {
+        foreach ($models->reverse() as $model) {
             $job = new DeclarationRequestDetailsSync(
                 declarationRequest: $model,
                 legalEntity: $legalEntity,
@@ -402,7 +402,8 @@ trait BatchLegalEntityQueries
         // The incoming $nextEntity will be executed after the whole chain
         $previousJob = $nextEntity;
 
-        $models = ConfidantPerson::with(['person', 'subjectPerson'])->filterByLegalEntityId(legalEntityId: $legalEntity->id)
+        $models = ConfidantPerson::with(['person', 'subjectPerson'])
+            ->filterByLegalEntityId(legalEntityId: $legalEntity->id)
             ->filterBySyncStatus(status: JobStatus::PARTIAL)
             ->get();
 

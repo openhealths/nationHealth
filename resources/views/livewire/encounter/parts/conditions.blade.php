@@ -191,8 +191,16 @@
                                             required
                                     >
                                         <option value="">{{ __('forms.select') }} {{ __('patients.coding_system') }}*</option>
-                                        <option value="eHealth/ICPC2/condition_codes">ICPC-2</option>
-                                        <option value="eHealth/ICD10_AM/condition_codes">ICD-10 AM</option>
+                                        <option value="eHealth/ICPC2/condition_codes"
+                                                x-show="($wire.allowedConditionCodesBySystem['eHealth/ICPC2/condition_codes']?.length ?? 1) > 0"
+                                        >
+                                            ICPC-2
+                                        </option>
+                                        <option value="eHealth/ICD10_AM/condition_codes"
+                                                x-show="($wire.allowedConditionCodesBySystem['eHealth/ICD10_AM/condition_codes']?.length ?? 1) > 0"
+                                        >
+                                            ICD-10 AM
+                                        </option>
                                     </select>
                                     <p class="text-error text-xs"
                                        x-show="!modalCondition.codeSystem"
@@ -289,7 +297,7 @@
                                             type="text"
                                             required
                                     >
-                                        <option selected>{{ __('forms.select') }}</option>
+                                        <option value="" selected>{{ __('forms.select') }}</option>
                                         @foreach($this->dictionaries['eHealth/diagnosis_roles'] as $key => $diagnosisRole)
                                             <option value="{{ $key }}">{{ $diagnosisRole }}</option>
                                         @endforeach

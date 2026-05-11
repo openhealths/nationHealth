@@ -70,7 +70,7 @@ use App\Livewire\Person\PersonIndex;
 use App\Livewire\Person\Records\PatientData;
 use App\Livewire\Person\Records\PatientEpisodes;
 use App\Livewire\Person\Records\PatientSummary;
-use App\Livewire\Person\Records\PatientVaccination;
+use App\Livewire\Person\Records\PatientImmunization;
 use App\Livewire\Person\Records\PatientDiagnoses;
 use App\Livewire\Person\Records\PatientCondition;
 use App\Livewire\Person\Records\PatientDiagnosticReports;
@@ -296,7 +296,7 @@ Route::middleware(['auth:web,ehealth', 'verified'])->group(function () {
                         Route::get('/{personId}/episodes', PatientEpisodes::class)->name('episodes');
                         Route::get('/{personId}/care-plans', \App\Livewire\Person\Records\PersonCarePlans::class)->name('care-plans');
                         Route::get('/{personId}/observations', PatientObservation::class)->name('observations');
-                        Route::get('/{personId}/vaccination', PatientVaccination::class)->name('vaccination');
+                        Route::get('/{personId}/immunization', PatientImmunization::class)->name('immunization');
                         Route::get('/{personId}/condition', PatientCondition::class)->name('condition');
                         Route::get('/{personId}/diagnoses', PatientDiagnoses::class)->name('diagnoses');
                         Route::get('/{personId}/diagnostic-reports', PatientDiagnosticReports::class)->name('diagnostic-reports');

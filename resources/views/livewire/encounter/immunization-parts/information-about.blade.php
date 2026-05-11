@@ -14,7 +14,7 @@
                     class="input-modal"
                     required
             >
-                <option selected>{{ __('forms.select') }}</option>
+                <option value="" selected>{{ __('forms.select') }}</option>
                 @foreach($this->dictionaries['eHealth/vaccine_codes'] as $key => $vaccineCode)
                     <option value="{{ $key }}">{{ $key }} - {{ $vaccineCode }}</option>
                 @endforeach
@@ -141,7 +141,7 @@
                         autocomplete="off"
                         required
                 >
-                    <option selected value="">{{ __('forms.select') }}</option>
+                    <option value="" selected>{{ __('forms.select') }}</option>
                     @foreach($this->dictionaries['eHealth/immunization_dosage_units'] as $key => $immunizationDosageUnit)
                         <option value="{{ $key }}">{{ $immunizationDosageUnit }}</option>
                     @endforeach
@@ -173,7 +173,7 @@
                     autocomplete="off"
                     required
             >
-                <option selected>{{ __('forms.select') }}</option>
+                <option value="" selected>{{ __('forms.select') }}</option>
                 @foreach($this->dictionaries['eHealth/vaccination_routes'] as $key => $vaccinationRoute)
                     <option value="{{ $key }}">{{ $vaccinationRoute }}</option>
                 @endforeach
@@ -203,7 +203,7 @@
                     autocomplete="off"
                     required
             >
-                <option selected>{{ __('forms.select') }}</option>
+                <option value="" selected>{{ __('forms.select') }}</option>
                 @foreach($this->dictionaries['eHealth/immunization_body_sites'] as $key => $immunizationBodySite)
                     <option value="{{ $key }}">{{ $immunizationBodySite }}</option>
                 @endforeach

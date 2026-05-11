@@ -255,6 +255,7 @@ return [
     // Diagnoses record
     'diagnoses_search' => 'Пошук діагнозів',
     'diagnostic_reports_search' => 'Пошук діагностичних звітів',
+    'diagnostic_report_not_found' => 'Діагностичних звітів не знайдено',
 
     // Observations record
     'observations' => 'Обстеження',
@@ -278,6 +279,16 @@ return [
     // Main data
     'referral_available' => 'Є направлення',
     'referral_number' => 'Номер направлення',
+    'referral_type' => 'Тип направлення',
+    'electronic_referral' => 'Електронне направлення',
+    'paper_referral' => 'Паперове направлення',
+    'paper_referral_author' => 'Автор направлення',
+    'paper_referral_edrpou' => 'ЄДРПОУ закладу, що виписав паперове направлення',
+    'paper_referral_edrpou_short' => 'ЄДРПОУ закладу',
+    'paper_referral_institution' => 'Найменування закладу, що виписав паперове направлення',
+    'paper_referral_institution_short' => 'Найменування закладу',
+    'paper_referral_date' => 'Дата направлення',
+    'paper_referral_notes' => 'Нотатки',
     'search_for_referral' => 'Шукати направлення',
     'interaction_class' => 'Клас взаємодії',
     'interaction_type' => 'Тип взаємодії',
@@ -335,6 +346,13 @@ return [
     'protocol_author' => 'Автор протоколу',
     'series_of_doses_by_protocol' => 'Кількість доз по протоколу',
     'protocol_description' => 'Опис протоколу',
+    'vaccination_protocol_required' => 'Необхідно додати принаймні один протокол вакцинації.',
+    'vaccination_protocol_required_fields' => 'Для цієї вакцинації необхідно заповнити порядковий номер дози, етап імунізації та кількість доз по протоколу.',
+    'episode_id' => 'ID епізоду',
+    'date_from' => 'Дата проведення від',
+    'date_to' => 'Дата проведення до',
+    'episodes_not_found' => 'Епізоди не знайдено',
+    'immunizations_not_found' => 'Вакцинації не знайдено',
 
     // Diagnostic reports
     'diagnostic_report' => 'Діагностичний звіт',

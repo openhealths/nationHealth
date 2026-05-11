@@ -8,13 +8,13 @@
             <label for="observationMethod" class="label-modal">
                 {{ __('patients.observation_method') }}
             </label>
-            <select x-model="modalObservation.method.coding[0].code"
+            <select x-model="modalObservation.methodCode"
                     id="observationMethod"
                     class="input-modal"
                     type="text"
                     required
             >
-                <option selected>{{ __('forms.select') }}</option>
+                <option value="" selected>{{ __('forms.select') }}</option>
                 @foreach($this->dictionaries['eHealth/observation_methods'] as $key => $observationMethod)
                     <option value="{{ $key }}">{{ $observationMethod }}</option>
                 @endforeach
@@ -25,13 +25,13 @@
             <label for="observationInterpretation" class="label-modal">
                 {{ __('patients.interpretation_of_observation') }}
             </label>
-            <select x-model="modalObservation.interpretation.coding[0].code"
+            <select x-model="modalObservation.interpretationCode"
                     id="observationInterpretation"
                     class="input-modal"
                     type="text"
                     required
             >
-                <option selected>{{ __('forms.select') }}</option>
+                <option value="" selected>{{ __('forms.select') }}</option>
                 @foreach($this->dictionaries['eHealth/observation_interpretations'] as $key => $observationInterpretation)
                     <option value="{{ $key }}">{{ $observationInterpretation }}</option>
                 @endforeach
@@ -44,13 +44,13 @@
             <label for="bodySite" class="label-modal">
                 {{ __('patients.body_part') }}
             </label>
-            <select x-model="modalObservation.bodySite.coding[0].code"
+            <select x-model="modalObservation.bodySiteCode"
                     id="bodySite"
                     class="input-modal"
                     type="text"
                     required
             >
-                <option selected>{{ __('forms.select') }}</option>
+                <option value="" selected>{{ __('forms.select') }}</option>
                 @foreach($this->dictionaries['eHealth/body_sites'] as $key => $bodySite)
                     <option value="{{ $key }}">{{ $bodySite }}</option>
                 @endforeach

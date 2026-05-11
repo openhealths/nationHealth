@@ -8,7 +8,6 @@ use Exception;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\LegalEntity;
-use App\Livewire\Auth\Login;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Layout;
 use App\Classes\eHealth\EHealth;

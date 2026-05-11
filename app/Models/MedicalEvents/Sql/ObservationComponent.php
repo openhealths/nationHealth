@@ -7,21 +7,24 @@ namespace App\Models\MedicalEvents\Sql;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ObservationComponent extends Model
 {
     use HasCamelCasing;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'observation_id',
+        'code_id',
+        'interpretation_id'
+    ];
 
     protected $hidden = [
         'id',
         'observation_id',
         'authority_id',
         'code_id',
-        'codeable_concept_id',
-        'value_codeable_concept_id',
         'interpretation_id',
         'created_at',
         'updated_at'
@@ -37,9 +40,9 @@ class ObservationComponent extends Model
         return $this->belongsTo(CodeableConcept::class, 'code_id');
     }
 
-    public function valueCodeableConcept(): BelongsTo
+    public function value(): HasOne
     {
-        return $this->belongsTo(CodeableConcept::class, 'value_codeable_concept_id');
+        return $this->hasOne(Value::class);
     }
 
     public function interpretation(): BelongsTo
@@ -47,8 +50,8 @@ class ObservationComponent extends Model
         return $this->belongsTo(CodeableConcept::class, 'interpretation_id');
     }
 
-    public function referenceRanges(): MorphMany
+    public function referenceRanges(): HasMany
     {
-        return $this->morphMany(ReferenceRange::class, 'referenceable');
+        return $this->hasMany(ReferenceRange::class);
     }
 }

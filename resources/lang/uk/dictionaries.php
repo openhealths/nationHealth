@@ -90,6 +90,7 @@ return [
 
     'loinc_observation_dictionary' => 'Довідник спостережень LOINC',
     'icf_dictionary_condition_patient' => 'Довідник станів пацієнта МКФ',
+    'custom_observation_dictionary' => 'Довідник додаткових показників Спостережень поза класифікацією LOINC',
 
     'condition_diagnose' => [
         'title' => 'Каталог груп станів/діагнозів',

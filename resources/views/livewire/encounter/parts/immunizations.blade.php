@@ -45,8 +45,8 @@
                     ></td>
                     <td class="td-input"
                         x-text="
-                            immunization.reasons?.[0]
-                                ? reasonExplanationsDictionary[immunization.reasons[0]]
+                            immunization.reasons?.[0]?.code
+                                ? reasonExplanationsDictionary[immunization.reasons[0].code]
                                 : reasonNotGivenExplanationsDictionary[immunization.reasonNotGivenCode]
                         "
                     ></td>
@@ -228,8 +228,11 @@
                                             :disabled="!(
                                                 modalImmunization.date.trim() &&
                                                 modalImmunization.time.trim() &&
-                                                (modalImmunization.reasons?.[0]?.trim?.() || modalImmunization.reasonNotGivenCode?.trim?.()))
-                                            "
+                                                (modalImmunization.reasons?.[0]?.code?.trim?.() || modalImmunization.reasonNotGivenCode?.trim?.()) &&
+                                                (modalImmunization.vaccinationProtocols.length > 0 &&
+                                                 (!modalImmunization.primarySource ||
+                                                  modalImmunization.vaccinationProtocols.every(protocol => protocol.doseSequence && protocol.series && protocol.seriesDoses)))
+                                            )"
                                     >
                                         {{ __('forms.save') }}
                                     </button>
@@ -261,7 +264,7 @@
             this.notGiven = false;
             this.vaccineCode = '';
             this.primarySource = true;
-            this.reasons = [''];
+            this.reasons = [{code: ''}];
             this.reasonNotGivenCode = '';
             this.reportOriginCode = '';
             this.reportOriginText = '';
