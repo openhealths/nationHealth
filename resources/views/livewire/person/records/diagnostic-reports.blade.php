@@ -639,7 +639,7 @@
                         </div>
                     </div>
                     <div class="form-group group">
-                        <select wire:model.defer="filterEncounterId"
+                        <select wire:model="filterEncounterId"
                                 name="filterEncounterId"
                                 id="filterEncounterId"
                                 class="input-select peer w-full"
@@ -693,7 +693,7 @@
                             </div>
 
                             <div class="record-inner-column-bordered w-full md:w-[180px] shrink-0">
-                                <div class="record-inner-label">{{ __('patients.status_label') }}</div>
+                                <div class="record-inner-label">{{ __('forms.status.label') }}</div>
                                 <div>
                                     <span class="badge-green">
                                         {{ DiagnosticReportStatus::tryFrom(data_get($diagnosticReport, 'status'))?->label() ?? '-' }}
@@ -761,7 +761,7 @@
                                 <div class="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
                                     <div class="space-y-2.5 min-w-0">
                                         <div class="min-w-0">
-                                            <div class="record-inner-label text-[10px] uppercase">{{ __('patients.category') }}</div>
+                                            <div class="record-inner-label text-[10px] uppercase">{{ __('forms.category') }}</div>
                                             <div class="record-inner-value text-[14px] font-semibold break-words">
                                                 {{ data_get(
                                                     $this->dictionaries,
