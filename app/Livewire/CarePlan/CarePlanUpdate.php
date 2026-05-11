@@ -32,7 +32,10 @@ class CarePlanUpdate extends CarePlanCreate
         }
 
         $this->carePlan = $carePlan;
+        $this->id = $carePlan->person_id;
         $this->patientUuid = $carePlan->person?->uuid ?? '';
+        
+        parent::mount($legalEntity, $this->id);
         
         // Hydrate form from model
         $this->form = [
@@ -149,11 +152,11 @@ class CarePlanUpdate extends CarePlanCreate
 
         $this->dispatch('flashMessage', [
             'type'    => 'success',
-            'message' => __('care-plan.draft_updated'),
+            'message' => __('care-plan.draft_updated') ?? 'План лікування успішно збережено',
             'errors'  => [],
         ]);
         
-        $this->redirectRoute('care-plan.show', [legalEntity(), $this->carePlan->id], navigate: true);
+        $this->redirectRoute('care-plan.edit', [legalEntity(), $this->carePlan->id], navigate: true);
     }
 
     /**
@@ -228,12 +231,24 @@ class CarePlanUpdate extends CarePlanCreate
                 $carePlanRequisition = $entity['requisition'] ?? $carePlanRequisition;
             }
 
-            // Store to Mongo
-            try {
-                \App\Models\MedicalEvents\Mongo\CarePlan::create($finalResponse);
-            } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::warning('Failed to save CarePlan to Mongo: ' . $e->getMessage());
+            // Store to Mongo if configured
+            if (config('database.medical_events_db_driver') === 'mongo') {
+                try {
+                    \App\Models\MedicalEvents\Mongo\CarePlan::create($finalResponse);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed to save CarePlan to Mongo: ' . $e->getMessage());
+                }
             }
+
+            Log::debug('CarePlanUpdate: updating local model with data:', [
+                'id' => $this->carePlan->id,
+                'uuid' => $carePlanUuid,
+                'status' => $carePlanStatus,
+                'requisition' => $carePlanRequisition,
+                'category' => $this->form['category'],
+                'encounter_id' => $encounterData['id'],
+                'addresses' => $encounterData['addresses'],
+            ]);
 
             // Update local model with eHealth response
             $repository->updateById($this->carePlan->id, [
@@ -267,6 +282,9 @@ class CarePlanUpdate extends CarePlanCreate
             $this->dispatch('flashMessage', ['type' => 'error', 'message' => __('care-plan.connection_error'), 'errors' => []]);
             $this->showSignatureModal = false;
         } catch (EHealthValidationException|EHealthResponseException $exception) {
+            if (method_exists($exception, 'report')) {
+                $exception->report();
+            }
             Log::error('CarePlan: eHealth error: ' . $exception->getMessage());
             $msg = $exception instanceof EHealthValidationException
                 ? $exception->getFormattedMessage()
@@ -274,7 +292,11 @@ class CarePlanUpdate extends CarePlanCreate
             $this->dispatch('flashMessage', ['type' => 'error', 'message' => $msg, 'errors' => []]);
             $this->showSignatureModal = false;
         } catch (\Throwable $exception) {
-            Log::error('CarePlan: unexpected error: ' . $exception->getMessage());
+            Log::error('CarePlan: unexpected error: ' . $exception->getMessage(), [
+                'file' => $exception->getFile(),
+                'line' => $exception->getLine(),
+                'trace' => $exception->getTraceAsString(),
+            ]);
             $this->dispatch('flashMessage', ['type' => 'error', 'message' => __('care-plan.unexpected_error'), 'errors' => []]);
             $this->showSignatureModal = false;
         }

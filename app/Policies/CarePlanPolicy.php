@@ -51,8 +51,10 @@ class CarePlanPolicy
             return Response::denyWithStatus(404);
         }
 
-        // Only author can edit if it's still NEW? Or check status?
-        // For now, follow the general pattern.
+        if ($carePlan->status !== 'new') {
+            return Response::denyWithStatus(404);
+        }
+
         return Response::allow();
     }
 }

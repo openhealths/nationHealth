@@ -4,8 +4,15 @@ declare(strict_types=1);
 
 namespace App\Livewire\Person\Records;
 
+use App\Classes\eHealth\EHealth;
+use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\EHealth\EHealthValidationException;
+use App\Models\LegalEntity;
 use App\Repositories\CarePlanRepository;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Session;
+use Throwable;
 
 class PersonCarePlans extends BasePatientComponent
 {
@@ -25,28 +32,7 @@ class PersonCarePlans extends BasePatientComponent
      */
     protected function initializeComponent(): void
     {
-        // Mock data
-        $this->carePlans = collect([
-            (object)[
-                'id' => 1,
-                'title' => 'План лікування носової кровотечі',
-                'status' => 'active',
-                'status_display' => 'Активний',
-                'created_at' => \Carbon\Carbon::parse('2025-04-02'),
-                'period_start' => \Carbon\Carbon::parse('2025-04-02'),
-                'period_end' => \Carbon\Carbon::parse('2025-04-02'),
-                'author' => (object)['party' => (object)['full_name' => 'Петров І.І.']],
-                'intent' => 'plan',
-                'category' => '123',
-                'care_provision_conditions' => 'Амбулаторні умови',
-                'medical_condition' => 'R04.0 - Носова кровотеча',
-                'extended_description' => 'Розширений опис',
-                'additional_info' => 'Допоміжна інформація',
-                'notes' => 'Нотатки',
-                'ehealth_id' => '1231-adsadas-aqeqe-casdda',
-                'episode_id' => '1231-adsadas-aqeqe-casdda',
-            ]
-        ]);
+        $this->loadCarePlans();
 
         try {
             $basics = app(\App\Services\Dictionary\DictionaryManager::class)->basics();
@@ -58,9 +44,42 @@ class PersonCarePlans extends BasePatientComponent
         }
     }
 
+    /**
+     * Load care plans from the database.
+     */
+    public function loadCarePlans(): void
+    {
+        $this->carePlans = app(CarePlanRepository::class)->getByPersonId($this->personId);
+    }
+
+    public function sync(): void
+    {
+        try {
+            $response = EHealth::carePlan()->getBySearchParams(
+                $this->uuid,
+                ['managing_organization_id' => legalEntity()->uuid]
+            );
+        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+            $this->handleEHealthExceptions($exception, 'Error while synchronizing care plans');
+            return;
+        }
+
+        try {
+            $validatedData = $response->validate();
+            app(CarePlanRepository::class)->syncCarePlans($validatedData, $this->personId);
+        } catch (Throwable $exception) {
+            $this->logDatabaseErrors($exception, 'Error while synchronizing care plans');
+            Session::flash('error', __('patients.messages.care_plan_sync_database_error') ?? 'Помилка збереження планів лікування');
+            return;
+        }
+
+        Session::flash('success', __('patients.sync_success') ?? 'Синхронізація успішна');
+        $this->loadCarePlans();
+    }
+
     public function search(): void
     {
-        // Mock search logic
+        $this->loadCarePlans();
     }
 
     public function resetFilters(): void
