@@ -15,8 +15,6 @@ class PatientDiagnosticReports extends BasePatientComponent
 {
     public array $diagnosticReports = [];
 
-    public array $episodes = [];
-
     public array $filterCodeOptions = [];
 
     public array $filterEncounterOptions = [];
@@ -123,7 +121,6 @@ class PatientDiagnosticReports extends BasePatientComponent
 
             $validatedData = $response->validate();
 
-            $this->episodes = Arr::toCamelCase($validatedData);
             $this->filterEpisodeOptions = collect($validatedData)
                                             ->map(function (array $episode) {
                                                 $episodeId = data_get($episode, 'uuid');
@@ -144,7 +141,6 @@ class PatientDiagnosticReports extends BasePatientComponent
                                             ->values()
                                             ->toArray();
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->episodes = [];
             $this->filterEpisodeOptions = [];
 
             $this->handleEHealthExceptions($exception, 'Error while loading episodes');

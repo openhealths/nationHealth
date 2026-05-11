@@ -30,8 +30,7 @@
             x-data="{ 
                 showAdditionalParams: $wire.entangle('showAdditionalParams'),
                 modalDiagnosticReport: {
-                    categoryCode: '',
-                    codeValue: @entangle('filterCode').defer,
+                    categoryCode: $wire.entangle('filterCategory'),
                 },
             }"
         >
@@ -43,7 +42,6 @@
             <div class="form-row-3 mb-6">
                 <div class="form-group group">
                     <select x-model="modalDiagnosticReport.categoryCode"
-                            @change="modalDiagnosticReport.codeValue = ''"
                             id="filterCategory"
                             name="filterCategory"
                             class="input-select peer w-full"
@@ -62,21 +60,154 @@
                     </label>
                 </div>
 
-                <div class="form-group group relative"
-                    :class="{ 'opacity-60': !modalDiagnosticReport.categoryCode }"
-                >
-                    <div :class="{ 'pointer-events-none': !modalDiagnosticReport.categoryCode }">
-                        <x-select2 modelPath="modalDiagnosticReport.codeValue"
-                                dictionaryName="custom/services"
-                                id="filterCode"
-                                name="filterCode"
-                                class="input peer w-full"
-                        />
-                    </div>
+               @php
+                    $servicesForSearch = collect($this->dictionaries['custom/services'] ?? [])
+                        ->map(fn ($service) => [
+                            'id' => data_get($service, 'id'),
+                            'code' => data_get($service, 'code'),
+                            'name' => data_get($service, 'name'),
+                            'category' => data_get($service, 'category'),
+                            'categoryCode' => data_get($service, 'categoryCode'),
+                            'category_code' => data_get($service, 'category_code'),
+                        ])
+                        ->values();
+                @endphp
 
-                    <label for="filterCode" class="label pointer-events-none">
-                        {{ __('forms.select') }} {{ mb_strtolower(__('forms.services')) }}
-                    </label>
+                <div class="form-group group relative"
+                    x-data="{
+                        open: false,
+                        search: '',
+                        selected: $wire.entangle('filterCode'),
+                        services: @js($servicesForSearch),
+
+                        get filteredServices() {
+                            const selectedCategory = String(modalDiagnosticReport.categoryCode ?? '');
+                            const needle = this.search.trim().toLowerCase();
+
+                            return this.services
+                                .filter((service) => {
+                                    const serviceCategory = String(service.category ?? '');
+                                    const serviceCategoryCode = String(service.categoryCode ?? '');
+                                    const serviceCategorySnake = String(service.category_code ?? '');
+
+                                    const matchesCategory = !selectedCategory
+                                        || serviceCategory === selectedCategory
+                                        || serviceCategoryCode === selectedCategory
+                                        || serviceCategorySnake === selectedCategory;
+
+                                    const name = String(service.name ?? '').toLowerCase();
+                                    const code = String(service.code ?? '').toLowerCase();
+                                    const id = String(service.id ?? '').toLowerCase();
+
+                                    const matchesSearch = !needle
+                                        || name.includes(needle)
+                                        || code.includes(needle)
+                                        || id.includes(needle);
+
+                                    return matchesCategory && matchesSearch;
+                                })
+                                .slice(0, 100);
+                        },
+
+                        get selectedService() {
+                            return this.services.find((service) => String(service.id) === String(this.selected));
+                        },
+
+                        makeServiceLabel(service) {
+                            return [
+                                service.code,
+                                service.name,
+                            ].filter(Boolean).join(' — ') || service.id;
+                        },
+
+                        selectService(service) {
+                            this.selected = service.id;
+                            this.search = this.makeServiceLabel(service);
+                            this.open = false;
+                        },
+
+                        clearService() {
+                            this.selected = '';
+                            this.search = '';
+                            this.open = false;
+                        },
+
+                        init() {
+                            this.search = this.selectedService ? this.makeServiceLabel(this.selectedService) : '';
+
+                            this.$watch('selected', () => {
+                                this.search = this.selectedService ? this.makeServiceLabel(this.selectedService) : '';
+                            });
+
+                            this.$watch('modalDiagnosticReport.categoryCode', () => {
+                                this.clearService();
+                            });
+                        }
+                    }"
+                    @click.outside="open = false"
+                >
+                    <div class="relative">
+                        <input type="text"
+                            name="filterCodeSearch"
+                            id="filterCodeSearch"
+                            class="input peer w-full pr-10"
+                            placeholder=" "
+                            autocomplete="off"
+                            x-model="search"
+                            @focus="open = true"
+                            @input="
+                                open = true;
+
+                                if (selected) {
+                                    selected = '';
+                                }
+                            "
+                        />
+
+                        <label for="filterCodeSearch" class="label">
+                            {{ __('forms.select') }} {{ mb_strtolower(__('forms.services')) }}
+                        </label>
+
+                        <button type="button"
+                                x-show="selected || search"
+                                x-cloak
+                                @click="clearService()"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                            @icon('close', 'w-4 h-4')
+                        </button>
+
+                        <div x-show="open"
+                            x-transition
+                            x-cloak
+                            class="absolute left-0 right-0 top-full mt-1 z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                        >
+                            <template x-if="filteredServices.length > 0">
+                                <div>
+                                    <template x-for="service in filteredServices" :key="service.id">
+                                        <button type="button"
+                                                class="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                @click="selectService(service)"
+                                        >
+                                            <div class="font-medium text-gray-900 dark:text-gray-100"
+                                                x-text="makeServiceLabel(service)"
+                                            ></div>
+
+                                            <div class="text-xs text-gray-500 break-all"
+                                                x-text="service.id"
+                                            ></div>
+                                        </button>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <template x-if="filteredServices.length === 0">
+                                <div class="px-3 py-2 text-sm text-gray-500">
+                                    {{ __('patients.nothing_found') }}
+                                </div>
+                            </template>
+                        </div>
+                    </div>
                 </div>
             </div>
 
