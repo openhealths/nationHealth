@@ -133,4 +133,4 @@
 
     {{ $slot }}
     <livewire:components.x-message :key="time()" />
-</x-layouts.patient>
+</section>
