@@ -364,7 +364,7 @@
                             />
 
                             <label for="filterSpecimenId" class="label">
-                                ID зразка
+                                {{ __('patients.specimen_id') }}
                             </label>
 
                             <button type="button"
@@ -482,7 +482,7 @@
                             />
 
                             <label for="episodesId" class="label">
-                                ID контекстного епізоду
+                                {{ __('patients.context_episode_id') }}
                             </label>
 
                             <button type="button"
@@ -594,7 +594,7 @@
                             />
 
                             <label for="originEpisodesId" class="label">
-                                ID первинного епізоду
+                                {{ __('patients.origin_episode_id') }}
                             </label>
 
                             <button type="button"
@@ -669,7 +669,7 @@
                         </select>
 
                         <label for="filterEncounterId" class="label">
-                            ID взаємодії
+                            {{ __('patients.encounter_id') }}
                         </label>
                     </div>
                 </div>
@@ -814,7 +814,7 @@
                                 <div class="space-y-4">
                                     <div class="min-w-0">
                                         <div class="record-inner-label text-[10px] uppercase">
-                                            ID ECO3
+                                            {{ __('patients.ehealth_id') }}
                                         </div>
                                         <div class="record-inner-id-value text-[13px] break-all whitespace-normal leading-normal">
                                             {{ data_get($diagnosticReport, 'uuid') ?? '-'}}

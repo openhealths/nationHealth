@@ -63,7 +63,7 @@ class PatientDiagnosticReports extends BasePatientComponent
 
     public string $syncStatus = '';
 
-    public int $pageSize = 2;
+    public int $pageSize = 10;
 
     protected array $dictionaryNames = [
         'eHealth/diagnostic_report_categories',

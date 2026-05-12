@@ -365,6 +365,12 @@ return [
     'doctor_submitting_a_report_to_the_system' => 'Лікар, що передає в систему звіт',
     'reception_start_date_and_time' => 'Дата та час початку прийому',
     'reception_end_date_and_time' => 'Дата та час завершення прийому',
+    'specimen_id' => 'ID зразка',
+    'unnamed' => 'Без назви',
+    'context_episode_id' => 'ID контекстного епізоду',
+    'origin_episode_id' => 'ID первинного епізоду',
+    'encounter_id' => 'ID взаємодії',
+    'ehealth_id' => 'ID ЕСОЗ',
 
     // Observations
     'code' => 'Код',
