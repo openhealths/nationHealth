@@ -16,7 +16,7 @@
             {{ __('patients.data_access') }}
         </button>
 
-        <button wire:click.prevent=""
+        <button wire:click.prevent="sync"
                 type="button"
                 class="button-sync flex items-center gap-2 whitespace-nowrap px-5 py-2 text-sm shadow-sm"
         >
@@ -364,7 +364,7 @@
                             />
 
                             <label for="filterSpecimenId" class="label">
-                                ID зразка
+                                {{ __('patients.specimen_id') }}
                             </label>
 
                             <button type="button"
@@ -482,7 +482,7 @@
                             />
 
                             <label for="episodesId" class="label">
-                                ID контекстного епізоду
+                                {{ __('patients.context_episode_id') }}
                             </label>
 
                             <button type="button"
@@ -594,7 +594,7 @@
                             />
 
                             <label for="originEpisodesId" class="label">
-                                ID первинного епізоду
+                                {{ __('patients.origin_episode_id') }}
                             </label>
 
                             <button type="button"
@@ -669,14 +669,14 @@
                         </select>
 
                         <label for="filterEncounterId" class="label">
-                            ID взаємодії
+                            {{ __('patients.encounter_id') }}
                         </label>
                     </div>
                 </div>
             </div>
 
             <div class="space-y-4">
-                @forelse($diagnosticReports as $diagnosticReport)
+                @forelse($paginatedDiagnosticReports as $diagnosticReport)
                     <div class="record-inner-card">
                         <div class="record-inner-header">
                             <div class="record-inner-checkbox-col">
@@ -814,7 +814,7 @@
                                 <div class="space-y-4">
                                     <div class="min-w-0">
                                         <div class="record-inner-label text-[10px] uppercase">
-                                            ID ECO3
+                                            {{ __('patients.ehealth_id') }}
                                         </div>
                                         <div class="record-inner-id-value text-[13px] break-all whitespace-normal leading-normal">
                                             {{ data_get($diagnosticReport, 'uuid') ?? '-'}}
@@ -837,6 +837,9 @@
                         {{ __('diagnosticReport.diagnostic_report_not_found') }}
                     </div>
                 @endforelse
+            </div>
+            <div class="mt-8">
+                {{ $paginatedDiagnosticReports->links() }}
             </div>
         </div>
     </div>
