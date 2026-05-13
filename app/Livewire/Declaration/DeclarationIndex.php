@@ -23,11 +23,13 @@ use App\Classes\eHealth\EHealth;
 use App\Enums\Declaration\Status;
 use App\Models\Employee\Employee;
 use Livewire\Attributes\Computed;
+use Illuminate\Support\Facades\DB;
 use App\Models\DeclarationRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use App\Enums\Status as EntityStatus;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Session;
 use App\Notifications\SyncNotification;
@@ -329,12 +331,18 @@ class DeclarationIndex extends Component
         }
 
         if ($this->isSyncProcessing()) {
-            Session::flash('error', 'Синхронізація вже запущена. Будь ласка, зачекайте її завершення.');
+            Session::flash('error', __('forms.errors.sync_already_running'));
 
             return;
         }
 
         $legalEntity = legalEntity();
+
+        if (!Employee::where('legal_entity_uuid', $legalEntity->uuid)->where('status', EntityStatus::REORGANIZED->value)->exists()) {
+            Session::flash('error', __('forms.errors.sync_reorg_declarations_cannot_start'));
+
+            return;
+        }
 
         $user = Auth::user();
         $token = Session::get(config('ehealth.api.oauth.bearer_token'));
@@ -345,7 +353,7 @@ class DeclarationIndex extends Component
 
             $this->resumeSynchronization($user, $token);
 
-            Session::flash('success', __('Відновлення попередньої синхронізації розпочато'));
+            Session::flash('success', __('forms.success.sync_resumed'));
 
             $user->notify(new SyncNotification('declaration', 'resumed'));
 
@@ -372,7 +380,7 @@ class DeclarationIndex extends Component
             Repository::declaration()->storeMany($declarations);
         } catch (ConnectionException $exception) {
             $this->logConnectionError($exception, 'Error while syncing declaration requests');
-            Session::flash('error', "Виникла помилка. Відсутній зв'язок із ЕСОЗ");
+            Session::flash('error', __('forms.errors.esoz_error'));
 
             return;
         } catch (EHealthValidationException|EHealthResponseException $exception) {

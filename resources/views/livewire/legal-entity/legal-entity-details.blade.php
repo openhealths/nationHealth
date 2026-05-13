@@ -285,6 +285,8 @@
             </div>
             @endif
 
+            <!-- TODO: restore this functionality later -->
+            @if(false)
             <div class="flex items-center gap-4 mt-6">
                 <a href=" "
                 class="cursor-pointer text-blue-600 hover:text-blue-800 flex items-center gap-1">
@@ -298,6 +300,7 @@
                     <span class="text-sm">{{ __('forms.upload_employee_list') }}</span>
                 </a>
             </div>
+            @endif
         </fieldset>
 
         {{-- STEPS --}}

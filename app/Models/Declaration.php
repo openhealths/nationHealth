@@ -10,9 +10,10 @@ use App\Models\Employee\Employee;
 use App\Models\Person\Person;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Declaration extends Model
 {
@@ -85,5 +86,27 @@ class Declaration extends Model
     public function person(): BelongsTo
     {
         return $this->belongsTo(Person::class);
+    }
+
+    /**
+     * Get the employees associated with this declaration through the reorganization process.
+     *
+     * @return BelongsToMany<Employee, ReorganizationEmployeeDeclaration>
+     */
+    public function reorganizedEmployees(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Employee::class,
+            'reorganization_employee_declarations'
+        )
+        ->using(ReorganizationEmployeeDeclaration::class)
+        ->withPivot([
+            'legal_entity_uuid',
+            'employee_uuid',
+            'declaration_uuid',
+            'person_uuid',
+            'declaration_number',
+            'authorize_with'
+        ]);
     }
 }

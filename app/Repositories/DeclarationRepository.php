@@ -6,15 +6,18 @@ namespace App\Repositories;
 
 use Exception;
 use Carbon\Carbon;
+use App\Enums\Status;
 use App\Models\Division;
 use App\Enums\JobStatus;
 use App\Models\Declaration;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
+use App\Models\Relations\Party;
 use App\Models\Employee\Employee;
 use App\Models\DeclarationRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Models\ReorganizationEmployeeDeclaration;
 
 class DeclarationRepository
 {
@@ -183,5 +186,55 @@ class DeclarationRepository
         }
 
         return $declarationsData;
+    }
+
+    /**
+     * Stores declaration data for a reorganized legal entity.
+     *
+     * Only processes records where the declarations has status 'active'.
+     *
+     * @param  array  $data  The payload containing 'employee' and 'party' sub-arrays with UUID and status fields.
+     * @param  LegalEntity  $legalEntity
+     *
+     * @return void
+     */
+    public function storeDataForReorganizedLegalEntity(array $data, LegalEntity $legalEntity): void
+    {
+        if ($data['status'] !== strtolower(Status::ACTIVE->value)) {
+            return;
+        }
+
+        $employee = Employee::where('uuid', $data['employee']['uuid'])->first();
+
+        if ($employee->status !== Status::REORGANIZED || $employee->employee_type !== 'DOCTOR') {
+            return;
+        }
+
+        $party = Party::where('id', $employee->party_id)->first();
+
+        $declarationData = [
+            'legal_entity_id' => $legalEntity->id,
+            'legal_entity_uuid' => $data['legal_entity']['uuid'],
+            'employee_id' => $employee?->id,
+            'employee_uuid' => $employee?->uuid,
+            'party_id' => $party?->id,
+            'party_uuid' => $party?->uuid,
+            'person_id' => Person::where('uuid', $data['person']['uuid'])->value('id') ?? null,
+            'person_uuid' => $data['person']['uuid'],
+            'declaration_id' => Declaration::where('uuid', $data['uuid'])->value('id') ?? null,
+            'declaration_uuid' => $data['uuid'],
+            'declaration_number' => $data['declaration_number'],
+            'authorize_with' => DeclarationRequest::where('uuid', $data['declaration_request_uuid'])->value('authorize_with') ?? null,
+            'updated_at'=> now(),
+        ];
+
+        ReorganizationEmployeeDeclaration::updateOrCreate(
+            [
+                'legal_entity_uuid' => $data['legal_entity']['uuid'],
+                'employee_uuid' => $data['employee']['uuid'],
+                'declaration_uuid' => $data['uuid'],
+            ],
+            $declarationData
+        );
     }
 }

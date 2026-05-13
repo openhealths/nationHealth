@@ -6,6 +6,8 @@ namespace App\Jobs;
 
 use Throwable;
 use App\Core\Arr;
+use Carbon\Carbon;
+use App\Enums\Status;
 use App\Core\EHealthJob;
 use App\Enums\JobStatus;
 use App\Models\LegalEntity;
@@ -19,7 +21,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Queue\SerializesModels;
 use App\Classes\eHealth\EHealthResponse;
 use App\Traits\BatchLegalEntityQueries;
-use Carbon\Carbon;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Middleware\RateLimited;
@@ -126,6 +127,10 @@ class DeclarationDetailsSync extends EHealthJob
 
         if (!empty($validatedData)) {
             $this->declaration->update($validatedData);
+        }
+
+        if ($this->legalEntity->status === Status::REORGANIZED->value) {
+            Repository::declaration()->storeDataForReorganizedLegalEntity($response->validate(), $this->legalEntity);
         }
     }
 

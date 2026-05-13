@@ -16,6 +16,7 @@ use App\Models\Relations\Qualification;
 use App\Models\Relations\ScienceDegree;
 use App\Enums\Party\VerificationStatus;
 use Illuminate\Database\Eloquent\Builder;
+use App\Models\ReorganizationEmployeeDeclaration;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
@@ -68,6 +69,28 @@ class Employee extends BaseEmployee
     public function specialities(): MorphMany
     {
         return $this->morphMany(Speciality::class, 'specialityable');
+    }
+
+    /**
+     * Get the declarations associated with this employee through the reorganization process.
+     *
+     * @return BelongsToMany<Declaration, ReorganizationEmployeeDeclaration>
+     */
+    public function reorganizedDeclarations(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Declaration::class,
+            'reorganization_employee_declarations'
+        )
+        ->using(ReorganizationEmployeeDeclaration::class)
+        ->withPivot([
+            'legal_entity_uuid',
+            'employee_uuid',
+            'declaration_uuid',
+            'person_uuid',
+            'declaration_number',
+            'authorize_with'
+        ]);
     }
 
     #[Scope]

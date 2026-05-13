@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use Log;
+use Throwable;
 use App\Core\Arr;
 use App\Enums\Status;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
 use App\Models\Employee\Employee;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use App\Enums\Employee\RequestStatus;
 use App\Models\Employee\EmployeeRequest;
-use Log;
-use Throwable;
+use Illuminate\Database\Eloquent\Builder;
 
 readonly class EmployeeRepository
 {

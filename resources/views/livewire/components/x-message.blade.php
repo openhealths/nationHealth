@@ -8,7 +8,7 @@
                 <div role="alert"
                     class="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50 dark:bg-gray-800 dark:text-red-400"
                 >
-                    <span class="font-medium">{{ session('error') }}</span>
+                    <span class="font-medium whitespace-pre-line">{{ session('error') }}</span>
                 </div>
             @endsession
 
