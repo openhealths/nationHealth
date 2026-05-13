@@ -1,4 +1,3 @@
-@use('Carbon\CarbonImmutable')
 
 <div class="relative"> {{-- This required for table overflow scrolling --}}
     <fieldset class="fieldset"
@@ -8,7 +7,9 @@
                   openModal: false,
                   modalComplicationDetail: new ComplicationDetail(),
                   newComplicationDetail: false,
-                  item: 0
+                  item: 0,
+                  searchResults: [],
+                  selectedComplicationDetailIds: []
               }"
     >
         <legend class="legend">
@@ -27,13 +28,14 @@
             <template x-for="(complicationDetail, index) in modalProcedure.complicationDetails">
                 <tr>
                     <td class="td-input"
-                        x-text="new Date(complicationDetail.inserted_at).toLocaleDateString('uk-UA')"
+                        x-text="complicationDetail.insertedAt ? new Date(complicationDetail.insertedAt).toLocaleDateString('uk-UA') : ''"
                     ></td>
                     <td class="td-input"
-                        x-text="`${ complicationDetail.code.coding[0].code } - ${
-                            $wire.dictionaries['eHealth/LOINC/observation_codes'][complicationDetail.code.coding[0].code] ||
-                            $wire.dictionaries['eHealth/ICF/classifiers'][complicationDetail.code.coding[0].code] ||
-                            $wire.dictionaries['eHealth/ICPC2/condition_codes'][complicationDetail.code.coding[0].code]
+                        x-text="`${ complicationDetail.codeCode } - ${
+                            $wire.dictionaries['eHealth/LOINC/observation_codes']?.[complicationDetail.codeCode] ||
+                            $wire.dictionaries['eHealth/ICF/classifiers']?.[complicationDetail.codeCode] ||
+                            $wire.dictionaries['eHealth/ICPC2/condition_codes']?.[complicationDetail.codeCode] ||
+                            $wire.dictionaries['eHealth/ICD10_AM/condition_codes']?.[complicationDetail.codeCode]
                         }`"
                     ></td>
                     <td class="td-input">
@@ -89,20 +91,6 @@
                                      class="dropdown-panel relative"
                                      style="left: -50%" {{-- Center a dropdown panel --}}
                                 >
-
-                                    <button @click="
-                                                openModal = true; {{-- Open the modal --}}
-                                                item = index; {{-- Identify the item we are corrently editing --}}
-                                                {{-- Replace the previous complicationDetail with the current, don't assign object directly (modalComplicationDetail = complicationDetail) to avoid reactiveness --}}
-                                                modalComplicationDetail = new ComplicationDetail(complicationDetail);
-                                                newComplicationDetail = false; {{-- This complicationDetail is already created --}}
-                                            "
-                                            @click.prevent
-                                            class="dropdown-button"
-                                    >
-                                        {{ __('forms.edit') }}
-                                    </button>
-
                                     <button @click.prevent="modalProcedure.complicationDetails.splice(index, 1); close($refs.button);"
                                             class="dropdown-button dropdown-delete"
                                     >
@@ -120,12 +108,12 @@
         <div>
             {{-- Button to trigger the modal --}}
             <button @click.prevent="
-                        openModal = true; {{-- Open the Modal --}}
-                        newComplicationDetail = true; {{-- We are adding a new complicationDetail --}}
-                        modalComplicationDetail = new ComplicationDetail(); {{-- Replace the data of the previous complicationDetail with a new one--}}
-
-                        $nextTick(() => {
-                            $wire.searchComplicationDetails();
+                        openModal = true;
+                        newComplicationDetail = true;
+                        modalComplicationDetail = new ComplicationDetail();
+                        selectedComplicationDetailIds = [];
+                        $wire.searchConditionsOrObservations('condition').then(() => {
+                            searchResults = JSON.parse(JSON.stringify($wire.evidenceDetails));
                         });
                     "
                     class="item-add my-5"
@@ -162,52 +150,50 @@
                             <h3 class="modal-header" :id="$id('modal-title')">{{ __('forms.add') }}</h3>
 
                             {{-- Content --}}
-                            <form x-data="{ selectedComplicationDetailIds: [] }">
+                            <form>
                                 <x-forms.loading/>
 
                                 {{-- A table that shows the results of the found data --}}
-                                <template x-if="$wire.complicationDetails.length > 0">
+                                <template x-if="searchResults.length > 0">
                                     <div class="table-container">
                                         <div class="overflow-visible">
                                             <table class="table-base">
                                                 <thead class="table-header">
                                                 <tr>
                                                     <th scope="col" class="th-input">{{ __('forms.date') }}</th>
-                                                    <th scope="col"
-                                                        class="th-input">{{ __('patients.code_and_name') }}</th>
+                                                    <th scope="col" class="th-input">{{ __('patients.code_and_name') }}</th>
                                                     <th scope="col" class="th-input">{{ __('forms.action') }}</th>
                                                 </tr>
                                                 </thead>
                                                 <tbody>
-                                                <template x-for="complicationDetail in $wire.complicationDetails"
-                                                          :key="complicationDetail.id"
-                                                >
+                                                <template x-for="result in searchResults" :key="result.id">
                                                     <tr class="border-b dark:border-gray-700">
                                                         <th scope="row" class="table-cell-primary">
                                                             <div class="text-base"
-                                                                 x-text="new Date(complicationDetail.inserted_at).toLocaleDateString('uk-UA')"
+                                                                 x-text="result.insertedAt ? new Date(result.insertedAt).toLocaleDateString('uk-UA') : ''"
                                                             ></div>
                                                         </th>
                                                         <td class="td-input"
-                                                            x-text="`${ complicationDetail.code.coding[0].code } - ${
-                                                                $wire.dictionaries['eHealth/LOINC/observation_codes'][complicationDetail.code.coding[0].code] ||
-                                                                $wire.dictionaries['eHealth/ICF/classifiers'][complicationDetail.code.coding[0].code] ||
-                                                                $wire.dictionaries['eHealth/ICPC2/condition_codes'][complicationDetail.code.coding[0].code]
+                                                            x-text="`${ result.codeCode } - ${
+                                                                $wire.dictionaries['eHealth/LOINC/observation_codes']?.[result.codeCode] ||
+                                                                $wire.dictionaries['eHealth/ICF/classifiers']?.[result.codeCode] ||
+                                                                $wire.dictionaries['eHealth/ICPC2/condition_codes']?.[result.codeCode] ||
+                                                                $wire.dictionaries['eHealth/ICD10_AM/condition_codes']?.[result.codeCode]
                                                             }`"
                                                         ></td>
                                                         <td class="td-input">
                                                             <button @click.prevent="
-                                                                        const id = complicationDetail.id;
+                                                                        const id = result.id;
                                                                         const index = selectedComplicationDetailIds.indexOf(id);
 
                                                                         if (index === -1) {
                                                                             selectedComplicationDetailIds.push(id);
                                                                         } else {
-                                                                            selectedComplicationDetailIds.splice(index, 1); // toggle off
+                                                                            selectedComplicationDetailIds.splice(index, 1);
                                                                         }
                                                                     "
                                                                     class="button-primary w-28"
-                                                                    x-text="selectedComplicationDetailIds.includes(complicationDetail.id)
+                                                                    x-text="selectedComplicationDetailIds.includes(result.id)
                                                                         ? '{{ __('patients.added') }}'
                                                                         : '{{ __('forms.add') }}'"
                                                             >
@@ -221,7 +207,7 @@
                                     </div>
                                 </template>
 
-                                <template x-if="$wire.complicationDetails.length <= 0">
+                                <template x-if="searchResults.length <= 0">
                                     <p class="default-p">{{ __('forms.nothing_found') }}</p>
                                 </template>
 
@@ -237,16 +223,15 @@
 
                                     <button @click.prevent
                                             @click="
-                                                {{-- Return only the needed data --}}
-                                                modalProcedure.complicationDetails = $wire.complicationDetails
-                                                    .filter(reason => selectedComplicationDetailIds.includes(reason.id))
-                                                    .map(reason => ({
-                                                        id: reason.id,
-                                                        inserted_at: reason.inserted_at,
-                                                        code: reason.code
-                                                    }));
+                                                const existingIds = modalProcedure.complicationDetails.map(cd => cd.id);
+
+                                                const newDetails = searchResults
+                                                    .filter(r => selectedComplicationDetailIds.includes(r.id) && !existingIds.includes(r.id));
+
+                                                modalProcedure.complicationDetails = modalProcedure.complicationDetails.concat(newDetails);
 
                                                 openModal = false;
+                                                searchResults = [];
                                             "
                                             class="button-primary"
                                     >

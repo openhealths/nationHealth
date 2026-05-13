@@ -352,6 +352,10 @@ input:-webkit-autofill ~ .label {
 }
 
 
+.status-alert-cyan {
+    @apply bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300 p-4 rounded-lg flex items-center gap-2 text-sm font-medium;
+}
+
 .status-alert-red {
     @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 p-4 rounded-lg flex items-center gap-2 text-sm font-medium;
 }
@@ -453,7 +457,7 @@ input:-webkit-autofill ~ .label {
 
 /* Modals */
 .modal {
-    @apply fixed inset-0 z-10 overflow-y-auto
+    @apply fixed inset-0 z-50 overflow-y-auto
 }
 
 .modal-wrapper {

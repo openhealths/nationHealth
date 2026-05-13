@@ -20,7 +20,6 @@ use App\Models\LegalEntity;
 use App\Rules\DocumentNumber;
 use App\Rules\PhoneDuplicates;
 use Illuminate\Support\Facades\Log;
-use App\Enums\License\Type as LicenseType;
 use App\Exceptions\CustomValidationException;
 use Illuminate\Validation\ValidationException;
 

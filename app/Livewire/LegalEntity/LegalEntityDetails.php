@@ -10,14 +10,12 @@ use App\Models\User;
 use App\Enums\Status;
 use App\Enums\JobStatus;
 use App\Traits\FormTrait;
-use Illuminate\Bus\Batch;
 use App\Models\LegalEntity;
-use App\Jobs\LegalEntitySync;
 use App\Repositories\Repository;
 use App\Classes\eHealth\EHealth;
 use Livewire\Attributes\Computed;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use App\Repositories\PhoneRepository;
@@ -132,6 +130,17 @@ class LegalEntityDetails extends LegalEntityComponent
         }
 
         return $isNotNew;
+    }
+
+    /**
+     * Get the legal entities related to the current legal entity through the reorganization process.
+     *
+     * @return Collection<int, LegalEntity>
+     */
+    #[Computed]
+    public function relatedLegalEntities(): Collection
+    {
+        return $this->legalEntity->legators;
     }
 
     /**

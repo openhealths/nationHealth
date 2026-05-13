@@ -57,6 +57,12 @@ class InDictionary implements ValidationRule
                         ->select(['code'])
                         ->pluck('code')
                         ->toArray();
+                } elseif ($name === 'eHealth/assistive_products') {
+                    self::$dictionaryCache[$name] = dictionary()->basics()
+                        ->byName('eHealth/assistive_products')
+                        ->flattenedChildValues()
+                        ->keys()
+                        ->toArray();
                 } elseif ($name === 'device_definition_classification_type') {
                     // Convert all keys to string
                     self::$dictionaryCache[$name] = dictionary()->basics()

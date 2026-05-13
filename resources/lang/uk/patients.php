@@ -60,7 +60,6 @@ return [
     'created' => 'Створено',
     'clinical_impression_conclusion' => 'Заключення по оцінці',
     'conducted' => 'Проведена',
-    'status_done' => 'Виконана',
     'route' => 'Шлях',
     'reactions' => 'Реакції',
     'manufacturer_and_lot_number' => 'Виробник та партія',
@@ -191,7 +190,8 @@ return [
         'confirmed' => 'заключний',
         'differential' => 'диференціальний',
         'provisional' => 'попередній',
-        'refuted' => 'спростований'
+        'refuted' => 'спростований',
+        'not_done' => 'Не виконана'
     ],
 
     'source' => [
@@ -255,6 +255,7 @@ return [
     // Diagnoses record
     'diagnoses_search' => 'Пошук діагнозів',
     'diagnostic_reports_search' => 'Пошук діагностичних звітів',
+    'diagnostic_report_not_found' => 'Діагностичних звітів не знайдено',
 
     // Observations record
     'observations' => 'Обстеження',
@@ -366,6 +367,12 @@ return [
     'doctor_submitting_a_report_to_the_system' => 'Лікар, що передає в систему звіт',
     'reception_start_date_and_time' => 'Дата та час початку прийому',
     'reception_end_date_and_time' => 'Дата та час завершення прийому',
+    'specimen_id' => 'ID зразка',
+    'unnamed' => 'Без назви',
+    'context_episode_id' => 'ID контекстного епізоду',
+    'origin_episode_id' => 'ID первинного епізоду',
+    'encounter_id' => 'ID взаємодії',
+    'ehealth_id' => 'ID ЕСОЗ',
 
     // Observations
     'code' => 'Код',

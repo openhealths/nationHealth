@@ -251,6 +251,7 @@ return [
         'phone' => 'телефон',
         'issued' => 'час внесення',
         'effective_period_start' => 'час початку прийому',
+        'performed_period_start' => 'час початку процедури',
         'password' => 'пароль',
         'keyContainerUpload' => 'контейнер ключа',
         'knedp' => 'КНЕДП',
@@ -714,22 +715,26 @@ return [
             'effectivePeriodEndTime' => 'час завершення прийому діагностичного звіту'
         ],
 
-        'procedures' => [
-            'referralType' => 'тип направлення',
-            'category.coding.*.code' => 'категорія',
-            'code.identifier.value' => 'послуги',
-            'paperReferral.requisition' => 'номер',
-            'paperReferral.requesterEmployeeName' => 'автор',
-            'paperReferral.requesterLegalEntityEdrpou' => 'ЄДРПОУ закладу, що виписав',
-            'paperReferral.requesterLegalEntityName' => 'Найменування закладу, що виписав',
-            'paperReferral.serviceRequestDate' => 'дата',
-            'division.identifier.value' => 'місце надання послуг',
-            'outcome.coding.*.code' => 'результат проведення',
-            'performedPeriodStartTime' => 'дата початку процедури',
-            'performedPeriodStartDate' => 'час початку процедури',
+        'procedures.*' => [
+            'categoryCode' => 'категорія',
+            'codeValue' => 'послуги',
+            'primarySource' => 'джерело інформації',
+            'reportOriginCode' => 'джерело',
+            'reportOriginText' => 'текст джерела',
+            'divisionId' => 'місце надання послуг',
+            'outcomeCode' => 'результат проведення',
+            'performedPeriodStartDate' => 'дата початку процедури',
+            'performedPeriodStartTime' => 'час початку процедури',
             'performedPeriodEndDate' => 'дата завершення процедури',
             'performedPeriodEndTime' => 'час завершення процедури',
-            'note' => 'комент'
+            'note' => 'коментар',
+            'paperReferralRequisition' => 'номер',
+            'paperReferralRequesterEmployeeName' => 'автор',
+            'paperReferralRequesterLegalEntityEdrpou' => 'ЄДРПОУ закладу, що виписав',
+            'paperReferralRequesterLegalEntityName' => 'найменування закладу, що виписав',
+            'paperReferralServiceRequestDate' => 'дата',
+            'paperReferralNote' => 'нотатки',
+            'usedCodes.*.code' => 'допоміжні засоби реабілітації'
         ],
 
         // Declaration

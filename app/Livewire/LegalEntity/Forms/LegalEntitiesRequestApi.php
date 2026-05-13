@@ -3,12 +3,9 @@
 namespace App\Livewire\LegalEntity\Forms;
 
 use App\Classes\eHealth\Api\LegalEntitiesApi;
-use Livewire\Component;
 
 class LegalEntitiesRequestApi extends LegalEntitiesApi
 {
-
-
     public static function getLegalEntitie($edrpou): array
     {
 

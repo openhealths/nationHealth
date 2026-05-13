@@ -10,6 +10,7 @@ use App\Services\MedicalEvents\Mappers\EncounterMapper;
 use App\Services\MedicalEvents\Mappers\EpisodeMapper;
 use App\Services\MedicalEvents\Mappers\ImmunizationMapper;
 use App\Services\MedicalEvents\Mappers\ObservationMapper;
+use App\Services\MedicalEvents\Mappers\ProcedureMapper;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
@@ -21,7 +22,8 @@ readonly class EncounterPackageBuilder
         private ConditionMapper $conditionMapper,
         private ImmunizationMapper $immunizationMapper,
         private DiagnosticReportMapper $diagnosticReportMapper,
-        private ObservationMapper $observationMapper
+        private ObservationMapper $observationMapper,
+        private ProcedureMapper $procedureMapper
     ) {
     }
 
@@ -53,6 +55,11 @@ readonly class EncounterPackageBuilder
             ->values()
             ->toArray();
 
+        $fhirProcedures = collect($data['procedures'] ?? [])
+            ->map(fn (array $procedure) => $this->procedureMapper->toFhir($procedure, $uuids))
+            ->values()
+            ->toArray();
+
         $fhirEncounter = $this->encounterMapper->toFhir($data['encounter'], $fhirConditions, $uuids);
 
         $fhirEpisode = [];
@@ -72,6 +79,7 @@ readonly class EncounterPackageBuilder
             'immunizations' => $fhirImmunizations,
             'diagnosticReports' => $fhirDiagnosticReports,
             'observations' => $fhirObservations,
+            'procedures' => $fhirProcedures,
         ]);
     }
 }

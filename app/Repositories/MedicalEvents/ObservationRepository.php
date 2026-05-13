@@ -342,33 +342,6 @@ class ObservationRepository extends BaseRepository
     }
 
     /**
-     * Formatting to show on the frontend.
-     *
-     * @param  array  $observations
-     * @return array
-     */
-    public function formatForView(array $observations): array
-    {
-        return array_map(static function (array $observation) {
-            if (empty($observation['reportOrigin'])) {
-                $observation['reportOrigin'] = [
-                    'coding' => [
-                        ['code' => '']
-                    ]
-                ];
-            }
-
-            if ($observation['categories'][0]['coding'][0]['system'] === 'eHealth/observation_categories') {
-                $observation['codingSystem'] = 'loinc';
-            } else {
-                $observation['codingSystem'] = 'icf';
-            }
-
-            return $observation;
-        }, $observations);
-    }
-
-    /**
      * Sync observation data and related data by deleting and creating.
      *
      * @param  int  $personId

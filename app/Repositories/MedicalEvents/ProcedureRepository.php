@@ -5,21 +5,19 @@ declare(strict_types=1);
 namespace App\Repositories\MedicalEvents;
 
 use App\Classes\eHealth\Api\PatientApi;
-use App\Classes\eHealth\Exceptions\ApiException;
-use App\Models\MedicalEvents\Sql\Condition;
-use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\MedicalEvents\Sql\ProcedureComplicationDetail;
 use App\Models\MedicalEvents\Sql\ProcedureReasonReference;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
-use App\Core\Arr as CoreArr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
+/**
+ * @property Procedure $model
+ */
 class ProcedureRepository extends BaseRepository
 {
     protected string $employeeUuid;
@@ -89,6 +87,15 @@ class ProcedureRepository extends BaseRepository
             unset($procedure['outcome']);
         }
 
+        if (!empty($procedure['usedCodes'])) {
+            $procedure['usedCodes'] = collect($procedure['usedCodes'])
+                ->map(fn (array $uc) => [
+                    'coding' => [['system' => 'eHealth/assistive_products', 'code' => $uc['code']]]
+                ])
+                ->values()
+                ->toArray();
+        }
+
         $normalizedData = schemaService()
             ->setDataSchema($procedure, app(PatientApi::class))
             ->requestSchemaNormalize('schemaProcedurePackageRequest')
@@ -119,15 +126,13 @@ class ProcedureRepository extends BaseRepository
      * Store procedure in DB.
      *
      * @param  array  $data
-     * @param  int|null  $createdEncounterId
-     * @return int|null
+     * @param  int  $personId
+     * @return void
      * @throws Throwable
      */
-    public function store(array $data, ?int $createdEncounterId = null): ?int
+    public function store(array $data, int $personId): void
     {
-        return DB::transaction(function () use ($data, $createdEncounterId) {
-            $procedureId = null;
-
+        DB::transaction(function () use ($data, $personId) {
             foreach ($data as $datum) {
                 if (isset($datum['basedOn'])) {
                     $basedOn = Repository::identifier()->store($datum['basedOn']['identifier']['value']);
@@ -137,7 +142,7 @@ class ProcedureRepository extends BaseRepository
                 $code = Repository::identifier()->store($datum['code']['identifier']['value']);
                 Repository::codeableConcept()->attach($code, $datum['code']);
 
-                if ($createdEncounterId) {
+                if (isset($datum['encounter'])) {
                     $encounter = Repository::identifier()->store($datum['encounter']['identifier']['value']);
                     Repository::codeableConcept()->attach($encounter, $datum['encounter']);
                 }
@@ -169,10 +174,9 @@ class ProcedureRepository extends BaseRepository
 
                 $category = Repository::codeableConcept()->store($datum['category']);
 
-                /** @var Procedure $procedure */
-                $procedure = $this->model::create([
+                $procedure = $this->model->create([
                     'uuid' => $datum['uuid'] ?? $datum['id'],
-                    'encounter_internal_id' => $createdEncounterId,
+                    'person_id' => $personId,
                     'status' => $datum['status'],
                     'based_on_id' => $basedOn->id ?? null,
                     'code_id' => $code->id,
@@ -233,95 +237,38 @@ class ProcedureRepository extends BaseRepository
 
                     $procedure->usedCodes()->attach($usedCodeIds);
                 }
-
-                $procedureId = $procedure->id;
             }
-
-            // Return the ID when creating separately
-            return $createdEncounterId === null ? $procedureId : null;
         });
-    }
-
-    /**
-     * Store reason references.
-     *
-     * @param  string  $patientUuid
-     * @param  array  $reasonReference
-     * @param  int  $encounterId
-     * @return void
-     */
-    public function storeReasonReferences(string $patientUuid, array $reasonReference, int $encounterId): void
-    {
-        if ($reasonReference['identifier']['type']['coding'][0]['code'] === 'condition') {
-            $this->storeCondition($reasonReference['identifier']['value'], $patientUuid, $encounterId);
-        } else {
-            $observation = Observation::whereUuid($reasonReference['identifier']['value'])->first();
-
-            // Get from API and save in the DB.
-            if (!$observation) {
-                try {
-                    $observationData = PatientApi::getObservationById(
-                        $patientUuid,
-                        $reasonReference['identifier']['value']
-                    );
-                    Repository::observation()->store([CoreArr::toCamelCase($observationData)], $encounterId);
-                } catch (ApiException|Throwable $e) {
-                    Log::channel('e_health_errors')->error('Failed to fetch or store observation', [
-                        'message' => $e->getMessage(),
-                        'file' => $e->getFile(),
-                        'line' => $e->getLine()
-                    ]);
-                }
-            }
-        }
-    }
-
-    /**
-     * Store complication details.
-     *
-     * @param  string  $patientUuid
-     * @param  array  $procedure
-     * @param  int  $encounterId
-     * @return void
-     */
-    public function storeComplicationDetails(string $patientUuid, array $procedure, int $encounterId): void
-    {
-        foreach ($procedure['complicationDetails'] as $complicationDetail) {
-            $this->storeCondition($complicationDetail['identifier']['value'], $patientUuid, $encounterId);
-        }
     }
 
     /**
      * Get data that is related to the encounter.
      *
-     * @param  int  $encounterId
+     * @param  string  $encounterUuid
      * @return array|null
      */
-    public function get(int $encounterId): ?array
+    public function get(string $encounterUuid): ?array
     {
         $results = $this->model::with([
             'basedOn.type.coding',
             'code.type.coding',
             'encounter.type.coding',
             'recordedBy.type.coding',
-            'performer',
+            'performer.type.coding',
             'reportOrigin.coding',
             'division.type.coding',
             'managingOrganization.type.coding',
-            'reasonReferences',
+            'reasonReferences.type.coding',
             'outcome.coding',
-            'complicationDetails',
+            'complicationDetails.type.coding',
             'category.coding',
             'paperReferral',
             'usedCodes.coding',
             'performedPeriod'
         ])
-            ->where('encounter_internal_id', $encounterId)
+            ->whereHas('encounter', fn ($query) => $query->where('value', $encounterUuid))
             ->get()
             ->toArray();
-
-        $results = $this->resolveReasonReferences($results);
-        $results = $this->resolveComplicationDetails($results);
 
         // Hide array of relationship data, accessories are used
         return array_map(static fn (array $item) => Arr::except($item, ['performedPeriod']), $results);
@@ -340,135 +287,5 @@ class ProcedureRepository extends BaseRepository
             ->with('code.coding')
             ->first()
             ?->toArray();
-    }
-
-    /**
-     * Formatting to show on the frontend.
-     *
-     * @param  array  $procedures
-     * @return array
-     */
-    public function formatForView(array $procedures): array
-    {
-        return array_map(static function (array $procedure) {
-            // Set value to checkbox isReferralAvailable
-            if (empty($procedure['basedOn']) && empty($procedure['paperReferral'])) {
-                $procedure['isReferralAvailable'] = false;
-            } else {
-                $procedure['isReferralAvailable'] = true;
-            }
-
-            // Set referral type if referral is available
-            if ($procedure['isReferralAvailable']) {
-                $procedure['referralType'] = !empty($procedure['basedOn']) ? 'electronic' : 'paper';
-            }
-
-            // Set default value to avoid error
-            if (empty($procedure['reportOrigin'])) {
-                $procedure['reportOrigin'] = [
-                    'coding' => [
-                        ['code' => '']
-                    ]
-                ];
-            }
-
-            return $procedure;
-        }, $procedures);
-    }
-
-    /**
-     * Store condition if it doesn't exist by data from the API.
-     *
-     * @param  string  $value
-     * @param  string  $patientUuid
-     * @param  int  $encounterId
-     * @return void
-     */
-    protected function storeCondition(string $value, string $patientUuid, int $encounterId): void
-    {
-        $condition = Condition::whereUuid($value)->first();
-
-        if (!$condition) {
-            try {
-                $conditionData = PatientApi::getConditionById($patientUuid, $value);
-                Repository::condition()->store([CoreArr::toCamelCase($conditionData)], $encounterId); // todo: personID!
-            } catch (ApiException|Throwable $e) {
-                Log::channel('e_health_errors')->error('Failed to fetch or store condition', [
-                    'message' => $e->getMessage(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine()
-                ]);
-            }
-        }
-    }
-
-    /**
-     * Get related condition and observation from the DB.
-     *
-     * @param  array  $results
-     * @return array
-     */
-    protected function resolveReasonReferences(array $results): array
-    {
-        return collect($results)->map(function ($result) {
-            if (!empty($result['reasonReferences'])) {
-                $result['reasonReferences'] = collect($result['reasonReferences'])
-                    ->map(function ($reasonReference) {
-                        if ($reasonReference['identifier']['type'][0]['coding'][0]['code'] === 'condition') {
-                            $reasonReference = $this->getCondition($reasonReference);
-                        } else {
-                            $observation = Repository::observation()
-                                ->getForProcedure($reasonReference['identifier']['value']);
-
-                            if ($observation) {
-                                $reasonReference['inserted_at'] = $observation['issued'];
-                                $reasonReference['code']['coding'][0]['code'] = $observation['code']['coding'][0]['code'];
-                            }
-                        }
-
-                        return $reasonReference;
-                    })->toArray();
-            }
-
-            return $result;
-        })->toArray();
-    }
-
-    /**
-     * Get related condition and observation from the DB.
-     *
-     * @param  array  $results
-     * @return array
-     */
-    protected function resolveComplicationDetails(array $results): array
-    {
-        return collect($results)->map(function ($result) {
-            if (!empty($result['complicationDetails'])) {
-                $result['complicationDetails'] = collect($result['complicationDetails'])
-                    ->map(function ($complicationDetail) {
-                        return $this->getCondition($complicationDetail);
-                    })->toArray();
-            }
-
-            return $result;
-        })->toArray();
-    }
-
-    /**
-     * Get condition from DB and set inserted_at and code to response.
-     *
-     * @param  array  $data
-     * @return array
-     */
-    protected function getCondition(array $data): array
-    {
-        $condition = Repository::condition()->getForProcedure($data['identifier']['value']);
-
-        if ($condition) {
-            $data['inserted_at'] = $condition['onsetDate'];
-            $data['code']['coding'][0]['code'] = $condition['code']['coding'][0]['code'];
-        }
-
-        return $data;
     }
 }

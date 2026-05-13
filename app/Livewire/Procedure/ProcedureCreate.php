@@ -140,7 +140,7 @@ class ProcedureCreate extends ProcedureComponent
     protected function storeValidatedData(array $formattedData): void
     {
         DB::transaction(function () use ($formattedData) {
-            Repository::procedure()->store([$formattedData]);
+            Repository::procedure()->store([$formattedData], $this->personId);
 
             // Save the selected condition and observation locally if they don't exist in our database.
             $this->processReasonReferences($formattedData);

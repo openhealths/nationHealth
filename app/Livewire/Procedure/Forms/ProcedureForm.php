@@ -96,8 +96,7 @@ class ProcedureForm extends Form
             ],
             'procedures.reasonReferences.*.code.coding.*.system' => ['required', 'string'],
             'procedures.usedCodes' => ['nullable', 'array'],
-            'procedures.usedCodes.coding.*.system' => ['required', 'string', 'max:255'],
-            'procedures.usedCodes.coding.*.code' => [
+            'procedures.usedCodes.*.code' => [
                 'required',
                 'string',
                 new InDictionary('eHealth/assistive_products')

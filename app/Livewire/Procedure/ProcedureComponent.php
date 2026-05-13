@@ -8,6 +8,7 @@ use App\Classes\Cipher\Traits\Cipher;
 use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\Exceptions\ApiException as eHealthApiException;
 use App\Core\Arr;
+use App\Enums\Person\ObservationStatus;
 use App\Enums\Status;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -22,7 +23,6 @@ use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
-use RuntimeException;
 
 class ProcedureComponent extends Component
 {
@@ -76,11 +76,11 @@ class ProcedureComponent extends Component
     public string $employeeFullName;
 
     /**
-     * List of founded procedure reasons.
+     * Search results for reason references (conditions or observations).
      *
      * @var array
      */
-    public array $procedureReasons = [];
+    public array $reasonReferenceResults = [];
 
     protected array $dictionaryNames = [
         'eHealth/procedure_categories',
@@ -89,6 +89,7 @@ class ProcedureComponent extends Component
         'eHealth/LOINC/observation_codes',
         'eHealth/ICF/classifiers',
         'eHealth/ICPC2/condition_codes',
+        'eHealth/ICD10_AM/condition_codes',
         'eHealth/assistive_products'
     ];
 
@@ -110,67 +111,49 @@ class ProcedureComponent extends Component
 
     public function mount(LegalEntity $legalEntity, int $personId): void
     {
-        $authUser = Auth::user();
-
-        if (!$authUser) {
-            throw new RuntimeException('Authenticated user not found');
-        }
-
         $this->personId = $personId;
-        $this->employeeFullName = $authUser->getProcedureWriterEmployee()->fullName;
+        $this->employeeFullName = Auth::user()->getProcedureWriterEmployee()->fullName;
 
         $this->setPatientData();
 
         // Get all active divisions of current legal entity
         $this->divisions = $legalEntity->divisions()
-            ->where('status', Status::ACTIVE->name)
-            ->where('is_active', '=', true)
+            ->whereStatus(Status::ACTIVE)
+            ->whereIsActive(true)
             ->select(['uuid', 'name'])
             ->get()
             ->toArray();
     }
 
     /**
-     * Search for procedure reasons in conditions and observations.
+     * Search for conditions or observations by type.
+     * Used for: reason references (procedure modal).
      *
-     * @param  string  $episodeId
+     * @param  string  $type  'condition' or 'observation'
      * @return void
      */
-    public function searchReasons(string $episodeId): void
+    public function searchConditionsOrObservations(string $type): void
     {
-        // Validate that an episode ID is provided
-        if (empty($episodeId)) {
-            $this->addError('episode', 'Please select an episode first.');
-
-            return;
-        }
-
         try {
-            $conditions = EHealth::condition()->getInEpisodeContext(
+            $api = $type === 'observation' ? EHealth::observation() : EHealth::condition();
+
+            $response = $api->getBySearchParams(
                 $this->patientUuid,
-                $episodeId,
-                ['patient_id' => $this->patientUuid, 'episode_id' => $episodeId]
-            );
-            $observations = EHealth::observation()->getInEpisodeContext(
-                $this->patientUuid,
-                $episodeId,
-                ['patient_id' => $this->patientUuid, 'episode_id' => $episodeId]
+                ['managing_organization_id' => legalEntity()->uuid]
             );
 
-            $this->procedureReasons = array_merge($conditions->getData(), $observations->getData());
-        } catch (ConnectionException $exception) {
-            $this->logConnectionError($exception, 'Error connecting when getting a reasons');
-            Session::flash('error', "Виникла помилка. Відсутній зв'язок із ЕСОЗ.");
-
-            return;
-        } catch (EHealthValidationException|EHealthResponseException $exception) {
-            $this->logEHealthException($exception, 'Error when getting a reasons');
-
-            if ($exception instanceof EHealthValidationException) {
-                Session::flash('error', $exception->getFormattedMessage());
-            } else {
-                Session::flash('error', 'Помилка від ЕСОЗ: ' . $exception->getMessage());
-            }
+            $this->reasonReferenceResults = collect($response->validate())
+                ->when($type === 'observation', fn ($collection) => $collection->filter(
+                    static fn (array $item) => data_get($item, 'status') !== ObservationStatus::ENTERED_IN_ERROR->value
+                ))
+                ->map(static fn (array $item) => [
+                    'id' => data_get($item, 'uuid'),
+                    'insertedAt' => data_get($item, 'ehealth_inserted_at'),
+                    'codeCode' => data_get($item, 'code.coding.0.code'),
+                    'type' => $type
+                ])->values()->all();
+        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+            $this->handleEHealthExceptions($exception, 'Error while searching conditions or observations');
 
             return;
         }

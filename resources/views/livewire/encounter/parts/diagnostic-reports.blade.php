@@ -53,7 +53,7 @@
                                  }
                              }"
                              @keydown.escape.prevent.stop="close($refs.button)"
-                             @focusin.window="! $refs.panel.contains($event.target) && close()"
+                             @focusin.window="!$refs.panel.contains($event.target) && close()"
                              x-id="['dropdown-button']"
                              class="relative"
                         >

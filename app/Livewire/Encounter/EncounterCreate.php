@@ -192,14 +192,8 @@ class EncounterCreate extends EncounterComponent
     {
         $package = $this->packageBuilder->build($validated, $this->episodeType);
 
-        $encounterRepository = Repository::encounter();
-
-        if (!empty($this->form->procedures)) {
-            $package['procedures'] = $encounterRepository->formatProceduresRequest($this->form->procedures);
-        }
-
         if (!empty($this->form->clinicalImpressions)) {
-            $package['clinicalImpressions'] = $encounterRepository->formatClinicalImpressionsRequest(
+            $package['clinicalImpressions'] = Repository::encounter()->formatClinicalImpressionsRequest(
                 $this->form->clinicalImpressions
             );
         }
@@ -240,7 +234,7 @@ class EncounterCreate extends EncounterComponent
             }
 
             if (isset($formattedData['procedures'])) {
-                Repository::procedure()->store($formattedData['procedures'], $createdEncounterId);
+                Repository::procedure()->store($formattedData['procedures'], $this->personId);
 
                 // Save the selected condition and observation locally if they don't exist in our database.
                 foreach ($formattedData['procedures'] as $procedure) {
@@ -277,7 +271,7 @@ class EncounterCreate extends EncounterComponent
         try {
             EHealth::episode()->create($this->patientUuid, Arr::toSnakeCase($formattedEpisode));
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when sign person request');
+            $this->handleEHealthExceptions($exception, 'Error when create episode');
 
             return;
         }
@@ -377,7 +371,7 @@ class EncounterCreate extends EncounterComponent
             $procedureData = EHealth::procedure()->getById($this->patientUuid, $uuid)->getData();
 
             try {
-                Repository::procedure()->store([Arr::toCamelCase($procedureData)]);
+                Repository::procedure()->store([Arr::toCamelCase($procedureData)], $this->personId);
             } catch (Throwable $exception) {
                 $this->logDatabaseErrors($exception, 'Failed to store procedure');
                 Session::flash('error', __('messages.database_error'));

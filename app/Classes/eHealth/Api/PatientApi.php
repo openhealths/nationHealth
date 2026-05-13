@@ -13,23 +13,6 @@ class PatientApi
     protected const string ENDPOINT_PATIENT = '/api/patients';
 
     /**
-     * Get patient episode by relevant IDs.
-     *
-     * @param  string  $patientId
-     * @param  string  $episodeId
-     * @return array
-     * @throws ApiException
-     */
-    public static function getEpisodeById(string $patientId, string $episodeId): array
-    {
-        return new Request(
-            HttpRequest::METHOD_GET,
-            self::ENDPOINT_PATIENT . "/$patientId/episodes/$episodeId",
-            []
-        )->sendRequest();
-    }
-
-    /**
      * Get condition data by ID.
      *
      * @param  string  $patientId
@@ -78,27 +61,6 @@ class PatientApi
             HttpRequest::METHOD_GET,
             self::ENDPOINT_PATIENT . "/$patientId/observations/$observationId",
             []
-        )->sendRequest();
-    }
-
-    /**
-     * Get observations in episode context.
-     *
-     * @param  string  $patientUuid
-     * @param  string  $episodeUuid
-     * @param  array  $params
-     * @return array
-     * @throws ApiException
-     */
-    public static function getObservationsInEpisodeContext(
-        string $patientUuid,
-        string $episodeUuid,
-        array $params
-    ): array {
-        return new Request(
-            HttpRequest::METHOD_GET,
-            self::ENDPOINT_PATIENT . "/$patientUuid/episodes/$episodeUuid/observations",
-            $params
         )->sendRequest();
     }
 

@@ -55,7 +55,7 @@
 
                                      focusAfter &amp;&amp; focusAfter.focus()
                                  }
-                             }" @keydown.escape.prevent.stop="close($refs.button)" @focusin.window="! $refs.panel.contains($event.target) &amp;&amp; close()" x-id="['dropdown-button']" class="relative" bis_skin_checked="1">
+                             }" @keydown.escape.prevent.stop="close($refs.button)" @focusin.window="!$refs.panel.contains($event.target) &amp;&amp; close()" x-id="['dropdown-button']" class="relative" bis_skin_checked="1">
 
                             <button x-ref="button" @click="toggle()" :aria-expanded="openDropdown" :aria-controls="$id('dropdown-button')" type="button" class="cursor-pointer" aria-expanded="false" aria-controls="dropdown-button-1">
                                 <svg class="w-6 h-6 text-gray-800 dark:text-gray-200 svg-hover-action" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">

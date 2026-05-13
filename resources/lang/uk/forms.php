@@ -143,8 +143,12 @@ return [
     'address_registration_NMP' => 'Адреса реєстрації НМП',
     'process_of_reorganization' => 'В стані реорганізації',
     'not_process_of_reorganization' => 'Не перебуває в стані реорганізації',
+    'le_accessor' => 'Заклад є закладом-правонаступником',
+    'legal_entity_accessor' => 'Заклад-правонаступник',
+    'reorg_related_legal_entities' => 'Заклади, повʼязані з процесом реорганізації',
     'download_list_employees' => 'Завантажити список співробітників',
     'upload_employee_list' => 'Вивантажити список співробітників',
+    'name_not_defined' => 'Назва не визначена',
 
     // Division
     'divisions' => 'Місця надання послуг',
