@@ -15,7 +15,7 @@
 
         @include('livewire.encounter.procedure-parts.main-information', ['context' => 'procedure'])
         @include('livewire.encounter.procedure-parts.additional-information', ['context' => 'procedure'])
-        @include('livewire.encounter.procedure-parts.reason-references')
+        @include('livewire.encounter.procedure-parts.reason-references', ['wireProp' => 'reasonReferenceResults'])
         @include('livewire.encounter.procedure-parts.used-codes')
 
         <div class="flex gap-8">
@@ -51,83 +51,36 @@
      * Representation of the user's personal procedure
      */
     class Procedure {
-        isReferralAvailable = true;
-        referralType = '';
-        paperReferral = {
-            requesterLegalEntityEdrpou: '',
-            requesterLegalEntityName: '',
-            serviceRequestDate: ''
-        };
-        category = {
-            coding: [{ system: 'eHealth/procedure_categories', code: '' }],
-            text: ''
-        };
-        code = {
-            identifier: {
-                type: {
-                    coding: [{ system: 'eHealth/resources', code: 'service' }],
-                    text: ''
-                },
-                value: ''
-            }
-        };
-        recordedBy = {
-            identifier: {
-                type: {
-                    coding: [{ system: 'eHealth/resources', code: 'employee' }],
-                    text: ''
-                }
-            }
-        };
-        division = {
-            identifier: {
-                type: {
-                    coding: [{ system: 'eHealth/resources', code: 'division' }],
-                    text: ''
-                },
-                value: ''
-            }
-        };
-        outcome = {
-            coding: [{ system: 'eHealth/procedure_outcomes', code: '' }],
-            text: ''
-        };
-        primarySource = true;
-        performer = {
-            identifier: {
-                type: {
-                    coding: [{ system: 'eHealth/resources', code: 'employee' }],
-                    text: ''
-                }
-            }
-        };
-        reportOrigin = {
-            coding: [{ system: 'eHealth/report_origins', code: '' }],
-            text: ''
-        };
-        reasonReferences = [];
-        usedCodes = [];
-
-        // Create date
-        #now = new Date();
-        #endTime = new Date(this.#now.getTime() + 15 * 60 * 1000); // add 15 minutes
-
-        performedPeriodStartDate = this.#now.toISOString().split('T')[0];
-        performedPeriodStartTime = this.#now.toLocaleTimeString('uk-UA', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
-        });
-        performedPeriodEndDate = this.#endTime.toISOString().split('T')[0];
-        performedPeriodEndTime = this.#endTime.toLocaleTimeString('uk-UA', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
-        });
-
         constructor(obj = null) {
+            const now = new Date();
+            const startTime = new Date(now.getTime() - 15 * 60 * 1000);
+
+            this.categoryCode = '';
+            this.codeValue = '';
+            this.divisionId = '';
+            this.outcomeCode = '';
+            this.primarySource = true;
+            this.reportOriginCode = '';
+            this.reportOriginText = '';
+            this.isReferralAvailable = true;
+            this.referralType = '';
+            this.paperReferralRequisition = '';
+            this.paperReferralRequesterEmployeeName = '';
+            this.paperReferralRequesterLegalEntityEdrpou = '';
+            this.paperReferralRequesterLegalEntityName = '';
+            this.paperReferralServiceRequestDate = '';
+            this.paperReferralNote = '';
+            this.note = '';
+            this.reasonReferences = [];
+            this.usedCodes = [];
+            this.complicationDetails = [];
+            this.performedPeriodStartDate = startTime.toISOString().split('T')[0];
+            this.performedPeriodStartTime = startTime.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
+            this.performedPeriodEndDate = now.toISOString().split('T')[0];
+            this.performedPeriodEndTime = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
+
             if (obj) {
-                this.procedures = JSON.parse(JSON.stringify(obj.procedures || obj));
+                Object.assign(this, JSON.parse(JSON.stringify(obj)));
             }
         }
     }

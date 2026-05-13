@@ -60,7 +60,6 @@ return [
     'created' => 'Створено',
     'clinical_impression_conclusion' => 'Заключення по оцінці',
     'conducted' => 'Проведена',
-    'status_done' => 'Виконана',
     'route' => 'Шлях',
     'reactions' => 'Реакції',
     'manufacturer_and_lot_number' => 'Виробник та партія',
@@ -191,7 +190,8 @@ return [
         'confirmed' => 'заключний',
         'differential' => 'диференціальний',
         'provisional' => 'попередній',
-        'refuted' => 'спростований'
+        'refuted' => 'спростований',
+        'not_done' => 'Не виконана'
     ],
 
     'source' => [

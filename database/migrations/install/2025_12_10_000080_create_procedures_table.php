@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Person\ProcedureStatus;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -16,8 +17,8 @@ return new class extends Migration
         Schema::create('procedures', static function (Blueprint $table) {
             $table->id();
             $table->uuid()->unique();
-            $table->foreignId('encounter_internal_id')->nullable()->constrained('encounters');
-            $table->enum('status', ['completed', 'entered_in_error']);
+            $table->foreignId('person_id')->constrained('persons');
+            $table->enum('status', ProcedureStatus::values());
             $table->foreignId('based_on_id')->nullable()->constrained('identifiers');
             $table->foreignId('code_id')->constrained('identifiers');
             $table->foreignId('encounter_id')->nullable()->constrained('identifiers');

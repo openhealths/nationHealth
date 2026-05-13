@@ -457,7 +457,7 @@ input:-webkit-autofill ~ .label {
 
 /* Modals */
 .modal {
-    @apply fixed inset-0 z-10 overflow-y-auto
+    @apply fixed inset-0 z-50 overflow-y-auto
 }
 
 .modal-wrapper {

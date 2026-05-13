@@ -433,21 +433,93 @@ class EncounterForm extends BaseForm
             'observations.*.valueRatio.numerator' => ['nullable', 'array'],
             'observations.*.valueRatio.denominator' => ['nullable', 'array'],
 
-            //            'procedures' => ['nullable', 'array'],
-            //            'procedures.*.code.identifier.value' => ['required_with:procedures', 'uuid', 'max:255'],
-            //            'procedures.*.category.coding.*.code' => [
-            //                'required_with:procedures',
-            //                'string',
-            //                new InDictionary('eHealth/procedure_categories')
-            //            ],
-            //            'procedures.*.performedPeriod.start' => ['required_with:procedures', 'date', 'before_or_equal:now'],
-            //            'procedures.*.performedPeriod.end' => [
-            //                'required_with:procedures',
-            //                'date',
-            //                'before_or_equal:now',
-            //                'after:procedures.*.performedPeriod.start'
-            //            ],
-            //
+            'procedures' => ['nullable', 'array'],
+            'procedures.*.codeValue' => ['required_with:procedures', 'uuid', 'max:255'],
+            'procedures.*.categoryCode' => [
+                'required_with:procedures',
+                'string',
+                new InDictionary('eHealth/procedure_categories')
+            ],
+            'procedures.*.primarySource' => ['required_with:procedures', 'boolean'],
+            'procedures.*.reportOriginCode' => Rule::forEach(function (mixed $value, string $attribute) {
+                $index = (int)explode('.', $attribute)[1];
+                $primarySource = $this->procedures[$index]['primarySource'] ?? null;
+
+                return [
+                    Rule::requiredIf($primarySource === false),
+                    $primarySource === true ? 'prohibited' : 'nullable',
+                    'string',
+                    new InDictionary('eHealth/report_origins')
+                ];
+            }),
+            'procedures.*.reportOriginText' => ['nullable', 'string'],
+            'procedures.*.divisionId' => ['nullable', 'uuid'],
+            'procedures.*.outcomeCode' => ['nullable', 'string', new InDictionary('eHealth/procedure_outcomes')],
+            'procedures.*.performedPeriodStartDate' => ['required_with:procedures', 'date', 'before_or_equal:now'],
+            'procedures.*.performedPeriodStartTime' => Rule::forEach(fn (mixed $value, string $attribute) => [
+                'required_with:procedures',
+                'date_format:H:i',
+                new PastDateTime($this->procedures[(int)explode('.', $attribute)[1]]['performedPeriodStartDate'] ?? '')
+            ]),
+            'procedures.*.performedPeriodEndDate' => [
+                'required_with:procedures',
+                'date',
+                'before_or_equal:now',
+                'after_or_equal:procedures.*.performedPeriodStartDate'
+            ],
+            'procedures.*.performedPeriodEndTime' => Rule::forEach(function (mixed $value, string $attribute) {
+                $index = (int)explode('.', $attribute)[1];
+                $procedure = $this->procedures[$index];
+
+                return [
+                    'required_with:procedures',
+                    'date_format:H:i',
+                    function (string $attribute, mixed $value, Closure $fail) use ($procedure) {
+                        $start = Carbon::createFromFormat(
+                            'Y-m-d H:i',
+                            $procedure['performedPeriodStartDate'] . ' ' . $procedure['performedPeriodStartTime']
+                        );
+                        $end = Carbon::createFromFormat(
+                            'Y-m-d H:i',
+                            $procedure['performedPeriodEndDate'] . ' ' . $value
+                        );
+
+                        if ($end->lessThan($start)) {
+                            $fail(
+                                __('validation.after', ['date' => __('validation.attributes.performed_period_start')])
+                            );
+                        }
+                    }
+                ];
+            }),
+            'procedures.*.note' => ['nullable', 'string'],
+            'procedures.*.paperReferralRequisition' => ['nullable', 'string', 'max:255'],
+            'procedures.*.paperReferralRequesterEmployeeName' => ['nullable', 'string', 'max:255'],
+            'procedures.*.paperReferralRequesterLegalEntityEdrpou' => ['nullable', 'digits_between:8,10'],
+            'procedures.*.paperReferralRequesterLegalEntityName' => ['nullable', 'string', 'max:255'],
+            'procedures.*.paperReferralServiceRequestDate' => ['nullable', 'date'],
+            'procedures.*.paperReferralNote' => ['nullable', 'string'],
+            'procedures.*.usedCodes' => ['nullable', 'array'],
+            'procedures.*.usedCodes.*.code' => [
+                'required',
+                'string',
+                new InDictionary('eHealth/assistive_products')
+            ],
+            'procedures.*.reasonReferences' => ['nullable', 'array'],
+            'procedures.*.reasonReferences.*.id' => ['nullable', 'uuid'],
+            'procedures.*.reasonReferences.*.type' => ['nullable', 'string', 'in:observation,condition'],
+            'procedures.*.reasonReferences.*.codeCode' => Rule::forEach(
+                fn (mixed $value, string $attribute) => $this->reasonReferenceCodeRule($attribute)
+            ),
+            'procedures.*.complicationDetails' => ['nullable', 'array'],
+            'procedures.*.complicationDetails.*.id' => ['nullable', 'uuid'],
+            'procedures.*.complicationDetails.*.type' => ['nullable', 'string', 'in:condition'],
+            'procedures.*.complicationDetails.*.codeCode' => [
+                'nullable',
+                'string',
+                new InDictionary(['eHealth/ICPC2/condition_codes', 'eHealth/ICD10_AM/condition_codes'])
+            ],
+
             //            'clinicalImpressions' => ['nullable', 'array'],
             //            'clinicalImpressions.*.code.coding.*.code' => [
             //                'required_with:clinicalImpressions',
@@ -698,6 +770,29 @@ class EncounterForm extends BaseForm
                 $fail(__('validation.custom.conditions.speciality_condition_code_forbidden', ['code' => $codeCode]));
             }
         };
+    }
+
+    /**
+     * @param  string  $attribute  e.g. procedures.0.reasonReferences.1.codeCode
+     * @return array
+     */
+    private function reasonReferenceCodeRule(string $attribute): array
+    {
+        $parts = explode('.', $attribute);
+        $type = $this->procedures[(int)$parts[1]]['reasonReferences'][(int)$parts[3]]['type'] ?? null;
+
+        $dictionaries = match ($type) {
+            'observation' => ['eHealth/LOINC/observation_codes', 'eHealth/ICF/classifiers'],
+            'condition' => ['eHealth/ICPC2/condition_codes', 'eHealth/ICD10_AM/condition_codes'],
+            default => [
+                'eHealth/LOINC/observation_codes',
+                'eHealth/ICF/classifiers',
+                'eHealth/ICPC2/condition_codes',
+                'eHealth/ICD10_AM/condition_codes',
+            ],
+        };
+
+        return ['nullable', 'string', new InDictionary($dictionaries)];
     }
 
     /**

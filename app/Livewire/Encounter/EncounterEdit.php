@@ -18,6 +18,7 @@ use App\Services\MedicalEvents\Mappers\DiagnosticReportMapper;
 use App\Services\MedicalEvents\Mappers\EncounterMapper;
 use App\Services\MedicalEvents\Mappers\ImmunizationMapper;
 use App\Services\MedicalEvents\Mappers\ObservationMapper;
+use App\Services\MedicalEvents\Mappers\ProcedureMapper;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
@@ -82,10 +83,44 @@ class EncounterEdit extends EncounterComponent
                 ->toArray();
         }
 
-        //        $this->form->procedures = Repository::procedure()->get($this->encounterId);
-        //        $this->form->procedures = Repository::procedure()->formatForView($this->form->procedures);
-        //
-        //        $this->form->clinicalImpressions = Repository::clinicalImpression()->get($this->encounterId);
+        $procedures = Repository::procedure()->get($encounter['uuid']);
+        if ($procedures) {
+            $conditionUuids = collect($procedures)
+                ->flatMap(fn (array $procedure) => array_merge(
+                    collect(data_get($procedure, 'reasonReferences', []))
+                        ->filter(fn ($reasonReference) => data_get($reasonReference, 'identifier.type.coding.0.code') === 'condition')
+                        ->pluck('identifier.value')
+                        ->toArray(),
+                    collect(data_get($procedure, 'complicationDetails', []))
+                        ->pluck('identifier.value')
+                        ->toArray()
+                ))
+                ->filter()
+                ->unique()
+                ->values()
+                ->toArray();
+
+            $observationUuids = collect($procedures)
+                ->flatMap(
+                    fn (array $procedure) => collect(data_get($procedure, 'reasonReferences', []))
+                        ->filter(fn ($reasonReference) => data_get($reasonReference, 'identifier.type.coding.0.code') === 'observation')
+                        ->pluck('identifier.value')
+                        ->toArray()
+                )
+                ->filter()
+                ->unique()
+                ->values()
+                ->toArray();
+
+            $procedureDetailsMap = array_merge(
+                Repository::condition()->getDetailsMapByUuids($conditionUuids),
+                Repository::observation()->getDetailsMapByUuids($observationUuids)
+            );
+
+            $this->form->procedures = collect($procedures)
+                ->map(fn (array $procedure) => app(ProcedureMapper::class)->fromFhir($procedure, $procedureDetailsMap))
+                ->toArray();
+        }
     }
 
     /**
@@ -128,6 +163,10 @@ class EncounterEdit extends EncounterComponent
             ->map(fn (array $observation) => app(ObservationMapper::class)->toFhir($observation, $uuids))
             ->values()
             ->toArray();
+        $fhirProcedures = collect($validated['procedures'] ?? [])
+            ->map(fn (array $procedure) => app(ProcedureMapper::class)->toFhir($procedure, $uuids))
+            ->values()
+            ->toArray();
         $fhirEncounter = app(EncounterMapper::class)->toFhir(
             $validated['encounter'],
             $fhirConditions,
@@ -157,7 +196,8 @@ class EncounterEdit extends EncounterComponent
             'conditions' => $fhirConditions,
             'immunizations' => $fhirImmunizations,
             'diagnostic_reports' => $fhirDiagnosticReports,
-            'observations' => $fhirObservations
+            'observations' => $fhirObservations,
+            'procedures' => $fhirProcedures
         ];
     }
 

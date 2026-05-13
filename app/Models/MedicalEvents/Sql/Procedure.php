@@ -20,7 +20,6 @@ class Procedure extends Model
 
     protected $hidden = [
         'id',
-        'encounter_internal_id',
         'based_on_id',
         'code_id',
         'recorded_by_id',

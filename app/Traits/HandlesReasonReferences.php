@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Traits;
 
-use App\Classes\eHealth\Api\PatientApi;
 use App\Classes\eHealth\EHealth;
-use App\Classes\eHealth\Exceptions\ApiException;
 use App\Core\Arr;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -15,7 +13,6 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Throwable;
 
@@ -55,20 +52,20 @@ trait HandlesReasonReferences
         }
 
         try {
-            $conditionData = PatientApi::getConditionById($this->patientUuid, $uuid);
-            $encounterId = $this->ensureEncounterExist($conditionData['context']['identifier']['value']);
+            $conditionData = EHealth::condition()->getById($this->patientUuid, $uuid)->getData();
 
-            if ($encounterId) {
-                Repository::condition()->store([Arr::toCamelCase($conditionData)], $encounterId); // todo: personID!
+            try {
+                Repository::condition()->store([Arr::toCamelCase($conditionData)], $this->personId);
+            } catch (Throwable $exception) {
+                $this->logDatabaseErrors($exception, 'Error while creating condition');
+                Session::flash('error', __('messages.database_error'));
+
+                return;
             }
-        } catch (ApiException|Throwable $e) {
-            Session::flash('error', __('messages.database_error'));
+        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+            $this->handleEHealthExceptions($exception, 'Error while getting condition by ID');
 
-            Log::error('Failed while ensuring condition existence', [
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ]);
+            return;
         }
     }
 
@@ -116,9 +113,8 @@ trait HandlesReasonReferences
 
         try {
             $observationData = EHealth::observation()->getById($this->patientUuid, $uuid)->getData();
-            $this->ensureEncounterExist($observationData['context']['identifier']['value']);
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Failed while ensuring encounter existence');
+            $this->handleEHealthExceptions($exception, 'Failed while getting observation by ID');
 
             return;
         }

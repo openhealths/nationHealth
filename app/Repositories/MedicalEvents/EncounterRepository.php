@@ -164,11 +164,89 @@ class EncounterRepository extends BaseRepository
     public function formatProceduresRequest(array $procedures): array
     {
         $procedureForm = array_map(function (array $procedure) {
-            if ($procedure['referralType'] === 'electronic' || $procedure['referralType'] === '') {
-                unset($procedure['paperReferral']);
-            }
+            // Reconstruct nested FHIR structures from flat form properties
+            $procedure['category'] = [
+                'coding' => [['system' => 'eHealth/procedure_categories', 'code' => $procedure['categoryCode']]],
+            ];
+            unset($procedure['categoryCode']);
 
-            // Delete frontend properties
+            $procedure['code'] = [
+                'identifier' => [
+                    'type' => [
+                        'coding' => [['system' => 'eHealth/resources', 'code' => 'service']],
+                        'text' => ''
+                    ],
+                    'value' => $procedure['codeValue']
+                ]
+            ];
+            unset($procedure['codeValue']);
+
+            if (!empty($procedure['divisionId'])) {
+                $procedure['division'] = [
+                    'identifier' => [
+                        'type' => [
+                            'coding' => [['system' => 'eHealth/resources', 'code' => 'division']],
+                            'text' => ''
+                        ],
+                        'value' => $procedure['divisionId']
+                    ]
+                ];
+            }
+            unset($procedure['divisionId']);
+
+            if (!empty($procedure['outcomeCode'])) {
+                $procedure['outcome'] = [
+                    'coding' => [['system' => 'eHealth/procedure_outcomes', 'code' => $procedure['outcomeCode']]]
+                ];
+            }
+            unset($procedure['outcomeCode']);
+
+            $procedure['recordedBy'] = [
+                'identifier' => [
+                    'type' => [
+                        'coding' => [['system' => 'eHealth/resources', 'code' => 'employee']],
+                        'text' => ''
+                    ],
+                    'value' => $this->employeeUuid
+                ]
+            ];
+
+            $procedure['performer'] = [
+                'identifier' => [
+                    'type' => [
+                        'coding' => [['system' => 'eHealth/resources', 'code' => 'employee']],
+                        'text' => ''
+                    ],
+                    'value' => $this->employeeUuid
+                ]
+            ];
+
+            $procedure['reportOrigin'] = [
+                'coding' => [['system' => 'eHealth/report_origins', 'code' => $procedure['reportOriginCode']]],
+                'text' => $procedure['reportOriginText'] ?? ''
+            ];
+            unset($procedure['reportOriginCode'], $procedure['reportOriginText']);
+
+            if ($procedure['referralType'] === 'paper') {
+                $procedure['paperReferral'] = [
+                    'requisition' => $procedure['paperReferralRequisition'],
+                    'requesterEmployeeName' => $procedure['paperReferralRequesterEmployeeName'],
+                    'requesterLegalEntityEdrpou' => $procedure['paperReferralRequesterLegalEntityEdrpou'],
+                    'requesterLegalEntityName' => $procedure['paperReferralRequesterLegalEntityName'],
+                    'serviceRequestDate' => $procedure['paperReferralServiceRequestDate'],
+                    'note' => $procedure['paperReferralNote'],
+                ];
+            }
+            unset(
+                $procedure['paperReferralRequisition'],
+                $procedure['paperReferralRequesterEmployeeName'],
+                $procedure['paperReferralRequesterLegalEntityEdrpou'],
+                $procedure['paperReferralRequesterLegalEntityName'],
+                $procedure['paperReferralServiceRequestDate'],
+                $procedure['paperReferralNote']
+            );
+
+            // Delete frontend-only properties
             unset($procedure['isReferralAvailable'], $procedure['referralType']);
 
             $procedure['id'] = Str::uuid()->toString();
@@ -184,16 +262,8 @@ class EncounterRepository extends BaseRepository
                 ]
             ];
 
-            $procedure['recordedBy']['identifier']['value'] = $this->employeeUuid;
-
-            if (empty($procedure['division']['identifier']['value'])) {
-                unset($procedure['division']);
-            }
-
             if ($procedure['primarySource']) {
                 unset($procedure['reportOrigin']);
-
-                $procedure['performer']['identifier']['value'] = $this->employeeUuid;
             } else {
                 unset($procedure['performer']);
             }

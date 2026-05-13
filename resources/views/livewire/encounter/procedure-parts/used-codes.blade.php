@@ -25,8 +25,8 @@
             <tbody>
             <template x-for="(usedCode, index) in modalProcedure.usedCodes">
                 <tr>
-                    <td class="td-input" x-text="usedCode.coding[0].code"></td>
-                    <td class="td-input" x-text="dictionary[usedCode.coding[0].code]"
+                    <td class="td-input" x-text="usedCode.code"></td>
+                    <td class="td-input" x-text="dictionary[usedCode.code]"
                     ></td>
                     <td class="td-input">
                         {{-- That all that is needed for the dropdown --}}
@@ -52,7 +52,7 @@
                                  }
                              }"
                              @keydown.escape.prevent.stop="close($refs.button)"
-                             @focusin.window="! $refs.panel.contains($event.target) && close()"
+                             @focusin.window="!$refs.panel.contains($event.target) && close()"
                              x-id="['dropdown-button']"
                              class="relative"
                         >
@@ -158,14 +158,14 @@
                                         <label for="usedCode" class="label-modal">
                                             {{ __('patients.code_and_name') }}
                                         </label>
-                                        <x-select2 modelPath="modalUsedCode.coding[0].code"
+                                        <x-select2 modelPath="modalUsedCode.code"
                                                    dictionaryName="eHealth/assistive_products"
                                                    id="usedCode"
                                                    class="input-modal"
                                         />
 
                                         <p class="text-error text-xs"
-                                           x-show="!Object.keys(dictionary).includes(modalUsedCode.coding[0].code)"
+                                           x-show="!Object.keys(dictionary).includes(modalUsedCode.code)"
                                         >
                                             {{ __('forms.field_empty') }}
                                         </p>
@@ -191,7 +191,7 @@
                                                 openModal = false;
                                             "
                                             class="button-primary"
-                                            :disabled="!modalUsedCode.coding[0].code.trim()"
+                                            :disabled="!modalUsedCode.code.trim()"
                                     >
                                         {{ __('forms.save') }}
                                     </button>
@@ -210,9 +210,9 @@
      * Representation of the user's personal UsedCode
      */
     class UsedCode {
-        coding = [{ system: 'eHealth/assistive_products', code: '' }];
-
         constructor(obj = null) {
+            this.code = '';
+
             if (obj) {
                 Object.assign(this, JSON.parse(JSON.stringify(obj)));
             }
