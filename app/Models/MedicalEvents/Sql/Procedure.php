@@ -6,6 +6,8 @@ namespace App\Models\MedicalEvents\Sql;
 
 use Carbon\CarbonImmutable;
 use Eloquence\Behaviours\HasCamelCasing;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,12 +18,34 @@ class Procedure extends Model
 {
     use HasCamelCasing;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'uuid',
+        'person_id',
+        'status',
+        'status_reason_id',
+        'based_on_id',
+        'code_id',
+        'encounter_id',
+        'origin_episode_id',
+        'recorded_by_id',
+        'primary_source',
+        'performer_id',
+        'report_origin_id',
+        'division_id',
+        'managing_organization_id',
+        'outcome_id',
+        'note',
+        'explanatory_letter',
+        'category_id'
+    ];
 
     protected $hidden = [
         'id',
+        'status_reason_id',
         'based_on_id',
         'code_id',
+        'encounter_id',
+        'origin_episode_id',
         'recorded_by_id',
         'performer_id',
         'report_origin_id',
@@ -29,7 +53,6 @@ class Procedure extends Model
         'managing_organization_id',
         'outcome_id',
         'category_id',
-        'encounter_id',
         'created_at',
         'updated_at'
     ];
@@ -82,6 +105,11 @@ class Procedure extends Model
         return $this->belongsTo(Identifier::class, 'based_on_id');
     }
 
+    public function statusReason(): BelongsTo
+    {
+        return $this->belongsTo(CodeableConcept::class, 'status_reason_id');
+    }
+
     public function code(): BelongsTo
     {
         return $this->belongsTo(Identifier::class, 'code_id');
@@ -90,6 +118,11 @@ class Procedure extends Model
     public function encounter(): BelongsTo
     {
         return $this->belongsTo(Identifier::class, 'encounter_id');
+    }
+
+    public function originEpisode(): BelongsTo
+    {
+        return $this->belongsTo(Identifier::class, 'origin_episode_id');
     }
 
     public function performedPeriod(): MorphOne
@@ -137,6 +170,11 @@ class Procedure extends Model
         return $this->belongsToMany(Identifier::class, 'procedure_complication_details');
     }
 
+    public function usedReferences(): BelongsToMany
+    {
+        return $this->belongsToMany(Identifier::class, 'procedure_used_references');
+    }
+
     public function category(): BelongsTo
     {
         return $this->belongsTo(CodeableConcept::class, 'category_id');
@@ -150,5 +188,30 @@ class Procedure extends Model
     public function usedCodes(): BelongsToMany
     {
         return $this->belongsToMany(CodeableConcept::class, 'procedure_used_codes')->withTimestamps();
+    }
+
+    #[Scope]
+    protected function withAllRelations(Builder $query): Builder
+    {
+        return $query->with([
+            'basedOn.type.coding',
+            'statusReason.coding',
+            'code.type.coding',
+            'encounter.type.coding',
+            'originEpisode.type.coding',
+            'recordedBy.type.coding',
+            'performer.type.coding',
+            'reportOrigin.coding',
+            'division.type.coding',
+            'managingOrganization.type.coding',
+            'outcome.coding',
+            'category.coding',
+            'performedPeriod',
+            'reasonReferences.type.coding',
+            'complicationDetails.type.coding',
+            'usedReferences.type.coding',
+            'paperReferral',
+            'usedCodes.coding'
+        ]);
     }
 }

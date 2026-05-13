@@ -9,7 +9,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EncounterDiagnose extends Model
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'encounter_id',
+        'condition_id',
+        'role_id',
+        'rank'
+    ];
 
     protected $hidden = [
         'id',
@@ -17,7 +22,7 @@ class EncounterDiagnose extends Model
         'condition_id',
         'role_id',
         'created_at',
-        'updated_at',
+        'updated_at'
     ];
 
     public function condition(): BelongsTo

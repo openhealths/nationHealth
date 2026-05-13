@@ -29,7 +29,7 @@
             <template x-for="(reason, index) in reasons" :key="index">
                 <tr>
                     <td class="td-input" x-text="`${ reason.code } - ${ dictionary[reason.code] }`"></td>
-                    <td class="td-input" x-text="reason.text"></td>
+                    <td class="td-input" x-text="reason.text ?? '-'"></td>
                     <td class="td-input">
                         {{-- That all that is needed for the dropdown --}}
                         <div x-data="{

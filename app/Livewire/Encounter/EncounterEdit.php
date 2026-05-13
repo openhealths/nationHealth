@@ -12,6 +12,7 @@ use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Procedure;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Mappers\ConditionMapper;
 use App\Services\MedicalEvents\Mappers\DiagnosticReportMapper;
@@ -185,6 +186,10 @@ class EncounterEdit extends EncounterComponent
                 $this->personId,
                 array_map($this->fhirToSync(...), $fhirObservations),
                 $uuids['encounter']
+            );
+            Repository::procedure()->sync(
+                $this->personId,
+                array_map($this->fhirToSync(...), $fhirProcedures)
             );
         } catch (Throwable $exception) {
             $this->logDatabaseErrors($exception, 'Failed to sync encounter package data');

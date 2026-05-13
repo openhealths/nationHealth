@@ -242,6 +242,90 @@ class ProcedureRepository extends BaseRepository
     }
 
     /**
+     * Sync procedure data and related data by updating or creating.
+     *
+     * @param  int  $personId
+     * @param  array  $validatedData
+     * @return void
+     * @throws Throwable
+     */
+    public function sync(int $personId, array $validatedData): void
+    {
+        DB::transaction(function () use ($personId, $validatedData) {
+            $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
+
+            $existingProcedures = $this->model->whereIn('uuid', $apiUuids)
+                ->withAllRelations()
+                ->get()
+                ->keyBy('uuid');
+
+            foreach ($validatedData as $data) {
+                $existing = $existingProcedures->get($data['uuid']);
+
+                $basedOn = $this->syncIdentifier($existing, $data['based_on'] ?? null, 'basedOn');
+                $statusReason = $this->syncCodeableConcept($existing, $data['status_reason'] ?? null, 'statusReason');
+                $code = $this->syncIdentifier($existing, $data['code'], 'code');
+                $encounter = $this->syncIdentifier($existing, $data['encounter'] ?? null, 'encounter');
+                $originEpisode = $this->syncIdentifier($existing, $data['origin_episode'] ?? null, 'originEpisode');
+                $recordedBy = $this->syncIdentifier($existing, $data['recorded_by'], 'recordedBy');
+                $performer = $this->syncIdentifier($existing, $data['performer'] ?? null, 'performer');
+                $reportOrigin = $this->syncCodeableConcept($existing, $data['report_origin'] ?? null, 'reportOrigin');
+                $division = $this->syncIdentifier($existing, $data['division'] ?? null, 'division');
+                $managingOrganization = $this->syncIdentifier($existing, $data['managing_organization'], 'managingOrganization');
+                $outcome = $this->syncCodeableConcept($existing, $data['outcome'] ?? null, 'outcome');
+                $category = $this->syncCodeableConcept($existing, $data['category'], 'category');
+
+                $procedureData = [
+                    'person_id' => $personId,
+                    'status' => $data['status'],
+                    'status_reason_id' => $statusReason?->id,
+                    'primary_source' => $data['primary_source'],
+                    'note' => $data['note'] ?? null,
+                    'explanatory_letter' => $data['explanatory_letter'] ?? null,
+                    'based_on_id' => $basedOn?->id,
+                    'code_id' => $code->id,
+                    'encounter_id' => $encounter?->id,
+                    'origin_episode_id' => $originEpisode?->id,
+                    'recorded_by_id' => $recordedBy->id,
+                    'performer_id' => $performer?->id,
+                    'report_origin_id' => $reportOrigin?->id,
+                    'division_id' => $division?->id,
+                    'managing_organization_id' => $managingOrganization?->id,
+                    'outcome_id' => $outcome?->id,
+                    'category_id' => $category->id
+                ];
+
+                if ($existing) {
+                    $existing->update($procedureData);
+                    $procedure = $existing;
+                } else {
+                    $procedure = $this->model->create(
+                        array_merge(['uuid' => $data['uuid']], $procedureData)
+                    );
+                }
+
+                if (isset($data['paper_referral'])) {
+                    Repository::paperReferral()->sync($data['paper_referral'], $procedure, $existing);
+                }
+
+                Repository::period()->sync($procedure, $data['performed_period'] ?? [], 'performedPeriod');
+
+                $reasonReferenceIds = $this->syncIdentifiers($existing, $data['reason_references'] ?? [], 'reasonReferences');
+                $procedure->reasonReferences()->sync($reasonReferenceIds);
+
+                $complicationDetailIds = $this->syncIdentifiers($existing, $data['complication_details'] ?? [], 'complicationDetails');
+                $procedure->complicationDetails()->sync($complicationDetailIds);
+
+                $usedReferenceIds = $this->syncIdentifiers($existing, $data['used_references'] ?? [], 'usedReferences');
+                $procedure->usedReferences()->sync($usedReferenceIds);
+
+                $usedCodeIds = $this->syncCodeableConcepts($existing, $data['used_codes'] ?? [], 'usedCodes');
+                $procedure->usedCodes()->sync($usedCodeIds);
+            }
+        });
+    }
+
+    /**
      * Get data that is related to the encounter.
      *
      * @param  string  $encounterUuid

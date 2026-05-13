@@ -8,5 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class ProcedureComplicationDetail extends Model
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'procedure_id',
+        'identifier_id',
+    ];
 }

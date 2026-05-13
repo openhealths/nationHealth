@@ -366,6 +366,8 @@ class EncounterForm extends BaseForm
             }),
 
             'observations' => ['nullable', 'array'],
+            // for edit page
+            'observations.*.uuid' => ['nullable', 'uuid'],
             'observations.*.categorySystem' => ['required_with:observations', 'string'],
             'observations.*.categoryCode' => [
                 'required_with:observations',
@@ -451,6 +453,8 @@ class EncounterForm extends BaseForm
             'observations.*.valueRatio.denominator' => ['nullable', 'array'],
 
             'procedures' => ['nullable', 'array'],
+            // for edit page
+            'procedures.*.uuid' => ['nullable', 'uuid'],
             'procedures.*.codeValue' => ['required_with:procedures', 'uuid', 'max:255'],
             'procedures.*.categoryCode' => [
                 'required_with:procedures',
@@ -538,6 +542,8 @@ class EncounterForm extends BaseForm
             ],
 
             //            'clinicalImpressions' => ['nullable', 'array'],
+                            // for edit page
+            //            'clinicalImpressions.*.uuid' => ['nullable', 'uuid'],
             //            'clinicalImpressions.*.code.coding.*.code' => [
             //                'required_with:clinicalImpressions',
             //                'string',
