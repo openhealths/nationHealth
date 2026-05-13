@@ -102,11 +102,11 @@
         class="py-2 text-sm text-gray-700 dark:text-gray-400 absolute z-17 mt-1 w-full bg-white border border-gray-400 rounded shadow max-h-60 overflow-auto"
     >
         <template x-if="filtered.length > 0">
-            <template x-for="(option, index) in filtered" :key="index">
-                <li @mousedown.prevent="select(option)"
-                    x-text="option"
+            <template x-for="option in filtered" :key="option.index">
+                <li @mousedown.prevent="select(option.label, option.index)"
+                    x-text="option.label"
                     tabindex=0
-                    :id="`option-${index}`"
+                    :id="`option-${option.index}`"
                     class="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-blue-800"
                 ></li>
             </template>
@@ -143,10 +143,12 @@
 
                 get filtered() {
                     if (!this.search) {
-                        return this.options.map((value) => value[this.param]);
+                        return this.options.map((opt, idx) => ({ label: opt[this.param], index: idx }));
                     }
 
-                    arr = this.options.filter(opt => opt.name.toLowerCase().includes(this.search.toLowerCase())).map((value) => value[this.param]);
+                    arr = this.options
+                        .map((opt, idx) => ({ label: opt[this.param], index: idx }))
+                        .filter(item => this.options[item.index].name.toLowerCase().includes(this.search.toLowerCase()));
 
                     if (arr.length === 0) {
                         this.value = '';
@@ -155,9 +157,9 @@
                     return arr;
                 },
 
-                select(value) {
+                select(value, index) {
                     this.search = value;
-                    this.value = this.options.find((option) => option[this.param] === value)[this.valueName];
+                    this.value = this.options.find((option, idx) => idx === index && option[this.param] === value)[this.valueName];
                     this.open = false;
                 }
             }
