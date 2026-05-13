@@ -351,13 +351,12 @@ input:-webkit-autofill ~ .label {
     @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300 p-4 rounded-lg flex items-center gap-2 text-sm font-medium;
 }
 
-
-.status-alert-cyan {
-    @apply bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300 p-4 rounded-lg flex items-center gap-2 text-sm font-medium;
-}
-
 .status-alert-red {
     @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 p-4 rounded-lg flex items-center gap-2 text-sm font-medium;
+}
+
+.status-info-cyan {
+    @apply bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300 p-4 rounded-lg flex items-center gap-2 text-sm font-medium;
 }
 
 .encounter-nav-item {

@@ -35,6 +35,7 @@ use Illuminate\Support\Facades\Session;
 use App\Notifications\SyncNotification;
 use App\Traits\BatchLegalEntityQueries;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Client\ConnectionException;
 use App\Notifications\DeclarationSyncCompleted;
@@ -85,6 +86,8 @@ class DeclarationIndex extends Component
      * @var array|string[]
      */
     public array $statusFilter = ['active', 'CANCELLED'];
+
+    public array $reorganizationFilter = ['to_be_resigned'];
 
     /**
      * Filter for multiselect doctors
@@ -187,12 +190,24 @@ class DeclarationIndex extends Component
     {
         $user = Auth::user();
 
-        $this->employeeIds = $user->party->employees()->filterByLegalEntityId($legalEntity->id)->pluck('id')->all();
+        $this->employeeIds = $user->party->employees()->where('legal_entity_id', $legalEntity->id)->pluck('id')->all();
+
+        $reorganizedEmployeeIds = $user->party->reorganizedEmployees()
+            // Select employee_ids from reorganization_employee_declarations where legal_entity_uuid is in legators of current legal entity
+            ->whereIn('reorganization_employee_declarations.legal_entity_uuid', fn(QueryBuilder $q) => $q
+                ->select('uuid')
+                ->from('legators')
+                ->where('legal_entity_id', $legalEntity->id)
+            )
+            ->pluck('employee_id')
+            ->all();
+
+        $this->employeeIds = array_values(array_unique(array_merge($this->employeeIds, $reorganizedEmployeeIds)));
 
         if ($user->hasAllowedRole(Role::OWNER)) {
             $this->doctors = $this->getDoctors();
         } else {
-            $this->countActive = Declaration::query()->forEmployees($this->employeeIds)->count();
+            $this->countActive = Declaration::query()->forEmployees($this->employeeIds)->where('status', Status::ACTIVE)->count();
         }
 
         $this->syncStatus = $this->getSyncStatus();
@@ -210,6 +225,7 @@ class DeclarationIndex extends Component
         $this->searchByNumber = '';
         $this->typeFilter = ['request', 'declaration'];
         $this->statusFilter = ['active', 'CANCELLED'];
+        $this->reorganizationFilter = ['to_be_resigned', 'resigned'];
         $this->doctorFilter = [];
 
         $this->resetPage();
@@ -233,7 +249,8 @@ class DeclarationIndex extends Component
                     !$user->hasAllowedRole(Role::OWNER),
                     fn (Builder $query) => $query->forEmployees($this->employeeIds)
                 )
-                ->filterByLegalEntityId(legalEntity()->id)
+                // ->filterByLegalEntityId(legalEntity()->id)
+                ->filterWithReorganizedLegalEntity(legalEntity())
                 ->get(['id', 'person_id', 'employee_id', 'legal_entity_id', 'declaration_number', 'status'])
                 ->each->setAttribute('type', 'declaration');
         }
@@ -268,6 +285,22 @@ class DeclarationIndex extends Component
                     if ($item instanceof Declaration) {
                         return in_array($item->status->value, $this->statusFilter, true);
                     }
+
+                    return true;
+                });
+            }
+
+            // Filter by reorganization type
+            if (!empty($this->reorganizationFilter)) {
+                $allItems = $allItems->filter(function (DeclarationRequest|Declaration $item) {
+                    if ($item instanceof Declaration) {
+                        return in_array($item->reorganization_type->value, $this->reorganizationFilter, true);
+                    }
+
+                    if ($item instanceof DeclarationRequest) {
+                        return in_array($item->reorganization_type->value, $this->reorganizationFilter, true);
+                    }
+
 
                     return true;
                 });

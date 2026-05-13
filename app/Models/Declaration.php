@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Enums\Declaration\Status;
 use App\Enums\JobStatus;
-use App\Models\Employee\Employee;
 use App\Models\Person\Person;
-use Eloquence\Behaviours\HasCamelCasing;
+use App\Models\Employee\Employee;
+use App\Enums\Declaration\Status;
 use Illuminate\Database\Eloquent\Model;
+use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -64,6 +64,26 @@ class Declaration extends Model
     }
 
     #[Scope]
+    protected function filterWithReorganizedLegalEntity(Builder $query, LegalEntity $legalEntity): Builder
+    {
+        if ($legalEntity->legators->isEmpty()) {
+            return $query;
+        }
+
+        $legatorEntityIds = LegalEntity::whereIn(
+            'uuid',
+            $legalEntity->legators->pluck('uuid')
+        )->select('id');
+
+        return $query->orWhere(function (Builder $q) use ($legatorEntityIds, $legalEntity) {
+            $q->whereIn('legal_entity_id', $legatorEntityIds)
+              ->whereHas('reorganizedDeclarations', function (Builder $r) use ($legalEntity) {
+                  $r->where('reorganization_employee_declarations.legal_entity_uuid', $legalEntity->uuid);
+              });
+        });
+    }
+
+    #[Scope]
     protected function forEmployees(Builder $query, array $employeeIds): Builder
     {
         return $query->whereIn('employee_id', $employeeIds);
@@ -99,7 +119,7 @@ class Declaration extends Model
      *
      * @return BelongsToMany<Employee, ReorganizationEmployeeDeclaration>
      */
-    public function reorganizedEmployees(): BelongsToMany
+    public function reorganizedDeclarations(): BelongsToMany
     {
         return $this->belongsToMany(
             Employee::class,
