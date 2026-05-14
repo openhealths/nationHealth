@@ -117,7 +117,6 @@ class EncounterForm extends BaseForm
             'episode.name' => [
                 'nullable',
                 'string',
-                new Cyrillic(),
                 'required_without:episode.id',
                 Rule::prohibitedIf(!empty($this->episode['id']))
             ],
