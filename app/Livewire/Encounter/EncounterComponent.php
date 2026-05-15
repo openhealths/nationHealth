@@ -191,22 +191,11 @@ class EncounterComponent extends Component
     public array $conditionsAndObservations = [];
 
     /**
-     * List of founded complication details for current episode.
-     *
-     * @var array
-     */
-    public array $complicationDetails;
-
-    /**
      * List of founded problems for current episode.
      *
      * @var array
      */
     public array $problems;
-
-    public string $eHealthRegistrationStatus;
-
-    public string $eHealthReferralStatus;
 
     /**
      * List of dictionary names.
@@ -219,8 +208,8 @@ class EncounterComponent extends Component
         'eHealth/encounter_types',
         'eHealth/encounter_priority',
         'eHealth/episode_types',
-        'eHealth/ICD10_AM/condition_codes',
         'eHealth/ICPC2/condition_codes',
+        'eHealth/ICD10_AM/condition_codes',
         'eHealth/ICPC2/reasons',
         'eHealth/ICPC2/actions',
         'eHealth/diagnosis_roles',
@@ -317,7 +306,7 @@ class EncounterComponent extends Component
      */
     public function searchForReferralNumber(): void
     {
-        $buildSearchRequest = EncounterRequestApi::buildGetServiceRequestList($this->form->encounter['referralNumber'] ?? '');
+        $buildSearchRequest = EncounterRequestApi::buildGetServiceRequestList($this->form->referralNumber);
         ServiceRequestApi::searchForServiceRequestsByParams($buildSearchRequest);
     }
 
@@ -389,12 +378,13 @@ class EncounterComponent extends Component
     }
 
     /**
-     * Search for evidence details based on selected type.
+     * Search for conditions or observations by type.
+     * Used for: evidence details (condition modal), reason references (procedure modal).
      *
-     * @param  string  $type
+     * @param  string  $type  'condition' or 'observation'
      * @return void
      */
-    public function searchEvidenceDetails(string $type): void
+    public function searchConditionsOrObservations(string $type): void
     {
         try {
             $api = $type === 'observation' ? EHealth::observation() : EHealth::condition();
@@ -422,17 +412,6 @@ class EncounterComponent extends Component
     }
 
     /**
-     * Search for procedure reasons in conditions and observations.
-     *
-     * @param  string  $episodeId
-     * @return void
-     */
-    public function searchConditionsAndObservations(string $episodeId): void
-    {
-        $this->conditionsAndObservations = [];
-    }
-
-    /**
      * Search for clinical impressions in episodes.
      *
      * @param  string  $episodeId
@@ -440,6 +419,7 @@ class EncounterComponent extends Component
      */
     public function searchClinicalImpressions(string $episodeId): void
     {
+        // Validate that an episode ID is provided
         if (empty($episodeId)) {
             $this->addError('episode', 'Please select an episode first.');
 
@@ -466,21 +446,12 @@ class EncounterComponent extends Component
     /**
      * Search for complication details in conditions for selected episode.
      *
-     * @return void
-     */
-    public function searchComplicationDetails(): void
-    {
-        $this->complicationDetails = [];
-    }
-
-    /**
-     * Search for complication details in conditions for selected episode.
-     *
      * @param  string  $episodeId
      * @return void
      */
     public function searchProblems(string $episodeId): void
     {
+        // If the episode is not selected, don't perform a search.
         if (!isset($episodeId)) {
             return;
         }
@@ -510,6 +481,7 @@ class EncounterComponent extends Component
      */
     public function searchSupportingInfo(string $type, string $episodeId): void
     {
+        // If the episode is not selected, don't perform a search.
         if (!isset($episodeId)) {
             return;
         }

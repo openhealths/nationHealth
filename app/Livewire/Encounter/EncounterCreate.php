@@ -22,7 +22,6 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use JsonException;
@@ -350,7 +349,7 @@ class EncounterCreate extends EncounterComponent
                 return;
             }
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Failed while ensuring episode existence');
+            $this->handleEHealthExceptions($exception, 'Failed while ensuring diagnostic report existence');
 
             return;
         }
@@ -402,7 +401,7 @@ class EncounterCreate extends EncounterComponent
             $diagnosticReportData = EHealth::diagnosticReport()->getById($this->patientUuid, $uuid)->getData();
 
             try {
-                Repository::diagnosticReport()->store([Arr::toCamelCase($diagnosticReportData)], $this->personId);
+                Repository::diagnosticReport()->store([Arr::toCamelCase($diagnosticReportData)]);
             } catch (Throwable $exception) {
                 $this->logDatabaseErrors($exception, 'Failed to store diagnostic report');
                 Session::flash('error', __('messages.database_error'));
@@ -414,13 +413,5 @@ class EncounterCreate extends EncounterComponent
 
             return;
         }
-    }
-
-    private function logDatabaseErrors(Throwable $exception, string $message): void
-    {
-        Log::channel('database_errors')->error($message, [
-            'exception' => $exception->getMessage(),
-            'trace' => $exception->getTraceAsString()
-        ]);
     }
 }
