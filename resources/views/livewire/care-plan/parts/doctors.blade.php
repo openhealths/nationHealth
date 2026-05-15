@@ -1,5 +1,10 @@
-<div x-data="{ coAuthors: $wire.entangle('form.coAuthors') }"
-     x-init="if (!Array.isArray(coAuthors)) { coAuthors = [] }">
+<fieldset class="fieldset bg-white dark:bg-gray-800 !rounded-xl !shadow-none !border-gray-100 dark:!border-gray-700 !max-w-full !p-6 !mb-6"
+          x-data="{ coAuthors: $wire.entangle('form.coAuthors') }"
+          x-init="if (!Array.isArray(coAuthors)) { coAuthors = [] }">
+    <legend class="legend">
+        {{ __('care-plan.doctors') ?? 'Лікарі' }}
+    </legend>
+
     <div class="form">
         <div class="form-row-2">
             <div class="form-group">
@@ -11,7 +16,7 @@
                        placeholder=" "
                        required>
                 <label for="author" class="label">
-                    {{ __('care-plan.author') }}
+                    {{ __('care-plan.author') ?? 'Автор' }}
                 </label>
                 @error('form.author') <p class="text-error">{{ $message }}</p> @enderror
             </div>
@@ -52,4 +57,4 @@
             </button>
         </div>
     </div>
-</div>
+</fieldset>
