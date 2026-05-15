@@ -268,6 +268,7 @@ return [
 
     // Encounter
     'encounters' => 'Взаємодії',
+    'encounter' => 'Взаємодія',
     'main_data' => 'Основні дані',
     'reasons_for_visit' => 'Причини звернення',
     'prescriptions' => 'Рецепти',
@@ -279,12 +280,11 @@ return [
 
     // Main data
     'referral_available' => 'Є направлення',
-    'referral_number' => 'Номер направлення',
     'referral_type' => 'Тип направлення',
     'electronic_referral' => 'Електронне направлення',
     'paper_referral' => 'Паперове направлення',
+    'referral_number' => 'Номер направлення',
     'paper_referral_author' => 'Автор направлення',
-    'paper_referral_edrpou' => 'ЄДРПОУ закладу, що виписав паперове направлення',
     'paper_referral_edrpou_short' => 'ЄДРПОУ закладу',
     'paper_referral_institution_short' => 'Найменування закладу',
     'paper_referral_date' => 'Дата направлення',
@@ -320,6 +320,7 @@ return [
 
     // Additional data
     'additional_data' => 'Додаткові дані',
+    'assignments' => 'Призначення',
     'period_start' => 'Час початку',
     'period_end' => 'Час закінчення',
 
@@ -358,8 +359,8 @@ return [
     'diagnostic_report' => 'Діагностичний звіт',
     'conclusion_code' => 'Код заключення(за МКХ-10АМ)',
     'requisition_type' => 'Тип направлення',
-    'electronic' => 'Електронне',
-    'paper' => 'Паперове',
+    'electronic' => 'Електронне направлення',
+    'paper' => 'Паперове направлення',
     'edrpou_of_the_issuing_institution' => 'ЄДРПОУ закладу, що виписав',
     'name_of_the_institution_that_issued_it' => 'Найменування закладу, що виписав',
     'the_doctor_who_interpreted_the_results' => 'Лікар, що інтерпретував результати',

@@ -34,11 +34,7 @@
              tabindex="-1"
         >
         <h3 class="modal-header" id="services-drawer-label">
-            @if(isset($activityForm['id']) && $activityForm['id'])
-                {{ __('care-plan.edit_service_prescription') }}
-            @else
-                {{ __('care-plan.new_service_prescription') }}
-            @endif
+            {{ __('care-plan.new_service_prescription') }}
         </h3>
 
         {{-- Content --}}

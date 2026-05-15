@@ -63,7 +63,7 @@
         <div class="form-row-modal">
             <div>
                 <select class="input-select peer"
-                        x-model="modalProcedure.reportOriginCode"
+                        x-model="modalProcedure.reportOrigin.coding[0].code"
                         id="reportOrigin"
                         type="text"
                         required

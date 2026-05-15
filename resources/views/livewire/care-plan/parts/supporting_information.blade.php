@@ -1,6 +1,6 @@
-<div x-data="{
+<fieldset class="fieldset bg-white dark:bg-gray-800 !rounded-xl !shadow-none !border-gray-100 dark:!border-gray-700 !max-w-full !p-6 !mb-6" x-data="{
     localEpisodes: $wire.entangle('form.episodes'),
-    localMedicalRecords: $wire.entangle('form.medicalRecords'),
+    localMedicalRecords: $wire.entangle('form.medical_records'),
 
     openModal: false,
     openMedicalModal: false,
@@ -59,63 +59,71 @@
         else this.localMedicalRecords.splice(index, 1);
     }
 }">
+    <legend class="legend">
+        {{ __('care-plan.supporting_information') }}
+    </legend>
+
     <div class="mt-4 space-y-10">
-        <div class="overflow-x-auto">
+        <div class="space-y-4">
             <template x-if="localEpisodes.length > 0">
-                <table class="w-full mb-4 text-left border-collapse">
-                    <thead>
-                    <tr class="text-xs uppercase text-gray-400 border-b border-gray-100">
-                        <th class="py-3 px-2 font-medium w-32">{{ __('care-plan.date') }}</th>
-                        <th class="py-3 px-2 font-medium">{{ __('care-plan.name_episode') }}</th>
-                        <th class="py-3 px-2 font-medium w-24 text-right">{{ __('forms.action') }}</th>
-                    </tr>
-                    </thead>
-                    <tbody class="text-sm">
-                    <template x-for="(item, index) in localEpisodes" :key="'ep-'+index">
-                        <tr class="group hover:bg-gray-50 transition-colors cursor-pointer" @click="initEdit('episode', index)">
-                            <td class="py-4 px-2 text-gray-600" x-text="item.date"></td>
-                            <td class="py-4 px-2 text-gray-800" x-text="item.name"></td>
-                            <td class="py-4 px-2 text-right">
-                                <button type="button" @click.stop="removeEntry('episode', index)" class="svg-hover-action">
-                                    @icon('delete', 'w-5 h-5 text-red-600')
-                                </button>
-                            </td>
+                <div class="overflow-x-auto index-table-wrapper">
+                    <table class="index-table">
+                        <thead class="index-table-thead">
+                        <tr>
+                            <th class="index-table-th w-32">{{ __('care-plan.date') }}</th>
+                            <th class="index-table-th">{{ __('care-plan.name_episode') }}</th>
+                            <th class="index-table-th w-24 text-right">{{ __('forms.action') }}</th>
                         </tr>
-                    </template>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                        <template x-for="(item, index) in localEpisodes" :key="'ep-'+index">
+                            <tr class="index-table-tr group cursor-pointer" @click="initEdit('episode', index)">
+                                <td class="index-table-td" x-text="item.date"></td>
+                                <td class="index-table-td-primary" x-text="item.name"></td>
+                                <td class="index-table-td text-right">
+                                    <button type="button" @click.stop="removeEntry('episode', index)" class="svg-hover-action">
+                                        @icon('delete', 'w-5 h-5 text-red-600')
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                        </tbody>
+                    </table>
+                </div>
             </template>
-            <button type="button" @click="initAdd('episode')" class="item-add flex items-center">
+            <button type="button" @click="initAdd('episode')" class="item-add flex items-center ml-1">
                 {{ __('care-plan.add_episode') }}
             </button>
         </div>
 
-        <div class="overflow-x-auto">
+        <div class="space-y-4">
             <template x-if="localMedicalRecords.length > 0">
-                <table class="w-full mb-4 text-left border-collapse">
-                    <thead>
-                    <tr class="text-xs uppercase text-gray-400 border-b border-gray-100">
-                        <th class="py-3 px-2 font-medium w-32">{{ __('care-plan.date') }}</th>
-                        <th class="py-3 px-2 font-medium">{{ __('care-plan.medical_record') }}</th>
-                        <th class="py-3 px-2 font-medium w-24 text-right">{{ __('forms.action') }}</th>
-                    </tr>
-                    </thead>
-                    <tbody class="text-sm">
-                    <template x-for="(item, index) in localMedicalRecords" :key="'mr-'+index">
-                        <tr class="group hover:bg-gray-50 transition-colors cursor-pointer" @click="initEdit('medical', index)">
-                            <td class="py-4 px-2 text-gray-600" x-text="item.date"></td>
-                            <td class="py-4 px-2 text-gray-800" x-text="item.name"></td>
-                            <td class="py-4 px-2 text-right">
-                                <button type="button" @click.stop="removeEntry('medical', index)" class="svg-hover-action">
-                                    @icon('delete', 'w-5 h-5 text-red-600')
-                                </button>
-                            </td>
+                <div class="overflow-x-auto index-table-wrapper">
+                    <table class="index-table">
+                        <thead class="index-table-thead">
+                        <tr>
+                            <th class="index-table-th w-32">{{ __('care-plan.date') }}</th>
+                            <th class="index-table-th">{{ __('care-plan.medical_record') }}</th>
+                            <th class="index-table-th w-24 text-right">{{ __('forms.action') }}</th>
                         </tr>
-                    </template>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                        <template x-for="(item, index) in localMedicalRecords" :key="'mr-'+index">
+                            <tr class="index-table-tr group cursor-pointer" @click="initEdit('medical', index)">
+                                <td class="index-table-td" x-text="item.date"></td>
+                                <td class="index-table-td-primary" x-text="item.name"></td>
+                                <td class="index-table-td text-right">
+                                    <button type="button" @click.stop="removeEntry('medical', index)" class="svg-hover-action">
+                                        @icon('delete', 'w-5 h-5 text-red-600')
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                        </tbody>
+                    </table>
+                </div>
             </template>
-            <button type="button" @click="openMedicalModal = true" class="item-add flex items-center">
+            <button type="button" @click="openMedicalModal = true" class="item-add flex items-center ml-1">
                 {{ __('care-plan.add_medical_record') }}
             </button>
         </div>
@@ -183,10 +191,10 @@
 
                     <div class="p-6">
                         <form @submit.prevent="saveMedical()">
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <fieldset class="fieldset">
+                            <legend class="legend">
                                 {{ __('care-plan.search_medical_records') ?? 'Пошук медичних записів' }}
-                            </label>
+                            </legend>
 
                             <div class="flex mt-2">
                                 <div class="flex items-center me-6">
@@ -205,10 +213,11 @@
                                     </label>
                                 </div>
                             </div>
-                        </div>
+                        </fieldset>
 
                         <div x-show="searchType === 'ehealth'">
-                            <div class="mt-6">
+                            <fieldset class="fieldset">
+
                                 <div class="mb-8 flex items-center gap-1 font-semibold text-gray-900 dark:text-white">
                                     @icon('search-outline', 'w-4.5 h-4.5')
                                     <p>{{ __('care-plan.search') }}</p>
@@ -216,7 +225,7 @@
 
                                 <div class="form-row-2" x-data="{
                                    open: false,
-                                   selectedType: $wire.entangle('medicalRecordType'),
+                                   selectedType: $wire.entangle('medical_record_type'),
                                    types: {
                                    'CONDITION': 'Стани/діагнози',
                                    'OBSERVATION': 'Спостереження'
@@ -278,7 +287,7 @@
                                         @enderror
                                     </div>
                                 </div>
-                            </div>
+                            </fieldset>
                         </div>
 
                         <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 p-6">
@@ -296,4 +305,4 @@
             </div>
         </div>
     </template>
-</div>
+</fieldset>
