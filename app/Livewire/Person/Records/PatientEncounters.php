@@ -87,7 +87,12 @@ class PatientEncounters extends BasePatientComponent
         $this->syncStatus = $status instanceof JobStatus ? $status->value : ($status ?? '');
 
         $person = Person::whereId($this->personId)
-            ->with(['episodes:person_id,uuid,name'])
+            ->with([
+                'episodes:person_id,uuid,name', 
+                'encounters.incomingReferral', 
+                'encounters.paperReferral',
+                'encounters.originEpisode'
+            ])
             ->first();
 
         $this->episodes = $person->episodes->toArray();

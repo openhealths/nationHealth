@@ -170,6 +170,7 @@ class Encounter extends Model
             'visit.type.coding',
             'episode.type.coding',
             'incomingReferral.type.coding',
+            'paperReferral',
             'originEpisode.type.coding',
             'performer.type.coding',
             'division.type.coding',

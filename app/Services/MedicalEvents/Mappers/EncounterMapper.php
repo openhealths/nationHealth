@@ -38,7 +38,18 @@ class EncounterMapper implements FhirMapperContract
                 ->toIdentifier($uuids['employee'])
         ];
 
-        // todo: add incoming_referral and paper_referral
+        if ($data['referralType'] === 'electronic') {
+            $result['incomingReferral'] = FhirResource::make()
+                ->coding('eHealth/resources', 'service_request')
+                ->toIdentifier($data['referralNumber']);
+        }
+
+        if ($data['referralType'] === 'paper') {
+            $result['paperReferral'] = $data['paperReferral'];
+            $result['paperReferral']['serviceRequestDate'] = convertToEHealthISO8601(
+                $data['paperReferral']['serviceRequestDate']
+            );
+        }
 
         if (!empty($data['priorityCode'])) {
             $result['priority'] = FhirResource::make()->coding('eHealth/encounter_priority', $data['priorityCode'])
@@ -100,6 +111,7 @@ class EncounterMapper implements FhirMapperContract
      * Populate flat form keys from a nested FHIR encounter. Used when loading an existing encounter for editing.
      *
      * @param  array  $data  FHIR encounter data
+     * @param  mixed  ...$context
      * @return array
      */
     public function fromFhir(array $data, mixed ...$context): array
@@ -129,7 +141,17 @@ class EncounterMapper implements FhirMapperContract
                     'roleCode' => data_get($diagnosis, 'role.coding.0.code', ''),
                     'rank' => data_get($diagnosis, 'rank', '')
                 ])
-                ->toArray()
+                ->toArray(),
+            'referralType' => match (true) {
+                !empty(data_get($data, 'incoming_referral')) => 'electronic',
+                !empty(data_get($data, 'paper_referral')) => 'paper',
+                default => ''
+            },
+            'referralNumber' => data_get($data, 'incoming_referral.identifier.value', ''),
+            'paperReferral' => [
+                ...data_get($data, 'paper_referral', []),
+                'serviceRequestDate' => convertToAppDateFormat(data_get($data, 'paper_referral.serviceRequestDate'))
+            ]
         ];
     }
 }

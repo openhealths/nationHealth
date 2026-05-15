@@ -73,6 +73,13 @@ class EncounterRepository extends BaseRepository
                 Repository::codeableConcept()->attach($division, $encounterData['division']);
             }
 
+            if (isset($encounterData['incomingReferral'])) {
+                $incomingReferral = Repository::identifier()->store(
+                    $encounterData['incomingReferral']['identifier']['value']
+                );
+                Repository::codeableConcept()->attach($incomingReferral, $encounterData['incomingReferral']);
+            }
+
             $encounter = $this->model->create([
                 'person_id' => $personId,
                 'uuid' => $encounterData['uuid'] ?? $encounterData['id'],
@@ -83,13 +90,18 @@ class EncounterRepository extends BaseRepository
                 'type_id' => $type->id,
                 'priority_id' => $priority->id ?? null,
                 'performer_id' => $performer->id,
-                'division_id' => $division->id ?? null
+                'division_id' => $division->id ?? null,
+                'incoming_referral_id' => $incomingReferral->id ?? null
             ]);
 
             $encounter->period()->create([
                 'start' => $encounterData['period']['start'],
                 'end' => $encounterData['period']['end']
             ]);
+
+            if (!empty($encounterData['paperReferral'])) {
+                Repository::paperReferral()->store($encounterData['paperReferral'], $encounter);
+            }
 
             $reasonIds = [];
 
@@ -379,6 +391,12 @@ class EncounterRepository extends BaseRepository
 
                 $this->syncDiagnoses($encounter, $data['diagnoses'] ?? [], $existing);
                 $this->syncHospitalization($encounter, $data['hospitalization'] ?? null);
+
+                if (!empty($data['paper_referral'])) {
+                    Repository::paperReferral()->sync($data['paper_referral'], $encounter, $existing);
+                } else {
+                    $encounter->paperReferral?->delete();
+                }
             }
         });
     }

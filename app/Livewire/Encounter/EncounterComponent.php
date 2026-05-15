@@ -120,13 +120,6 @@ class EncounterComponent extends Component
     public string $patientUuid;
 
     /**
-     * Patient declaration number.
-     *
-     * @var string|null
-     */
-    public ?string $declarationNumber = null;
-
-    /**
      * Legal entity type of auth user.
      *
      * @var string
@@ -525,14 +518,12 @@ class EncounterComponent extends Component
 
     protected function setPatientData(): void
     {
-        $patient = Person::select(['id', 'uuid', 'first_name', 'last_name', 'second_name'])
-            ->with(['declarations' => fn ($query) => $query->latest()->take(1)])
-            ->where('id', $this->personId)
+        $patient = Person::select(['uuid', 'first_name', 'last_name', 'second_name'])
+            ->whereId($this->personId)
             ->firstOrFail();
 
         $this->patientUuid = $patient->uuid;
         $this->patientFullName = $patient->fullName;
-        $this->declarationNumber = $patient->declarations->first()?->declarationNumber ?? null;
     }
 
     /**

@@ -22,16 +22,7 @@ class EncounterForm extends BaseForm
         'diagnoses' => [],
         'reasons' => [],
         'actions' => [],
-        'referralType' => '',
-        'referralNumber' => '',
-        'paperReferral' => [
-            'requisition' => '',
-            'requesterEmployeeName' => '',
-            'requesterLegalEntityEdrpou' => '',
-            'requesterLegalEntityName' => '',
-            'serviceRequestDate' => '',
-            'note' => '',
-        ]
+        'referralType' => ''
     ];
 
     public array $episode = ['id' => '', 'typeCode' => '', 'name' => ''];
@@ -101,6 +92,38 @@ class EncounterForm extends BaseForm
                 Rule::prohibitedIf(in_array($this->encounter['typeCode'] ?? '', ['field', 'home']))
             ],
 
+            'encounter.referralType' => ['nullable', 'string', Rule::in(['', 'electronic','paper'])],
+            'encounter.referralNumber' => [
+                Rule::requiredIf(($this->encounter['referralType'] ?? '') === 'electronic'),
+                'nullable',
+                'uuid'
+            ],
+            'encounter.paperReferral' => [
+                Rule::requiredIf(($this->encounter['referralType'] ?? '') === 'paper'),
+                'nullable',
+                'array'
+            ],
+            'encounter.paperReferral.requisition' => ['nullable', 'string', 'max:255'],
+            'encounter.paperReferral.requesterLegalEntityName' => ['nullable', 'string', 'max:255'],
+            'encounter.paperReferral.requesterLegalEntityEdrpou' => [
+                Rule::requiredIf(($this->encounter['referralType'] ?? '') === 'paper'),
+                'nullable',
+                'string',
+                'max:255'
+            ],
+            'encounter.paperReferral.requesterEmployeeName' => [
+                Rule::requiredIf(($this->encounter['referralType'] ?? '') === 'paper'),
+                'nullable',
+                'string',
+                'max:255'
+            ],
+            'encounter.paperReferral.serviceRequestDate' => [
+                Rule::requiredIf(($this->encounter['referralType'] ?? '') === 'paper'),
+                'nullable',
+                'date'
+            ],
+            'encounter.paperReferral.note' => ['nullable', 'string', 'max:1000'],
+
             'episode.id' => [
                 'nullable',
                 'uuid',
@@ -152,6 +175,7 @@ class EncounterForm extends BaseForm
                 'string',
                 new InDictionary('eHealth/condition_severities')
             ],
+            'conditions.*.bodySites.*.code' => ['nullable', 'string', new InDictionary('eHealth/body_sites')],
             'conditions.*.onsetDate' => ['required_with:conditions', 'before:tomorrow', 'date'],
             'conditions.*.onsetTime' => Rule::forEach(fn (mixed $value, string $attribute) => [
                 'required_with:conditions',
