@@ -1,5 +1,6 @@
 @use('App\Livewire\CarePlan\CarePlanShow')
 @use('App\Enums\CarePlanStatus')
+@use('App\Enums\Status')
 
 <section class="section-form">
     <x-header-navigation class="breadcrumb-form">
@@ -51,7 +52,7 @@
                 </button>
             </nav>
 
-            @if($carePlan->status === CarePlanStatus::ACTIVE->value || strtolower($status) === CarePlanStatus::ACTIVE->value)
+            @if(in_array(strtolower($status), [CarePlanStatus::ACTIVE->value, CarePlanStatus::DRAFT->value, 'new', 'pending']))
             <div class="relative pb-2 pr-2">
                 <button type="button" 
                         @click="openDropdown = !openDropdown" 
@@ -120,7 +121,7 @@
                     <div class="record-inner-column">
                         <div class="record-inner-label">{{ __('care-plan.ehealth_status') }}</div>
                         <div class="record-inner-value">
-                            <span class="badge {{ strtoupper($status) === Status::ACTIVE->value ? 'badge-success' : 'badge-secondary' }}">
+                            <span class="badge {{ strtoupper($status) === 'ACTIVE' ? 'badge-green' : 'badge-dark' }}">
                                 {{ $statusDisplay }}
                             </span>
                         </div>
@@ -319,7 +320,7 @@
                                             $activityStatus = is_array($activity->status) ? ($activity->status['coding'][0]['code'] ?? ($activity->status['text'] ?? '')) : $activity->status;
                                             $activityStatusDisplay = is_array($activity->status) ? ($activity->status['text'] ?? ($activity->status['coding'][0]['display'] ?? $activityStatus)) : $activityStatus;
                                         @endphp
-                                        <span class="badge {{ in_array(strtoupper($activityStatus), ['NEW', 'DRAFT']) ? 'badge-warning' : 'badge-success' }}">
+                                        <span class="badge {{ in_array(strtoupper($activityStatus), ['NEW', 'DRAFT']) ? 'badge-yellow' : 'badge-green' }}">
                                             {{ $activityStatusDisplay }}
                                         </span>
                                     </td>

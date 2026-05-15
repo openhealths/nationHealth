@@ -96,8 +96,12 @@ class CarePlanShow extends Component
 
     protected function rulesForSigning(): array
     {
+        $statusReasonRule = in_array($this->actionType, ['sign_activity', 'sign_plan']) 
+            ? 'nullable|string' 
+            : 'required|string';
+
         return [
-            'statusReason' => 'required|string',
+            'statusReason' => $statusReasonRule,
             'form.knedp' => 'required|string',
             'form.keyContainerUpload' => 'required|file|max:1024',
             'form.password' => 'required|string',
@@ -190,12 +194,12 @@ class CarePlanShow extends Component
         if (!empty($this->activityForm['id'])) {
             $repository->updateById($this->activityForm['id'], [
                 'kind' => $validated['activityForm']['kind'],
-                'quantity' => $validated['activityForm']['quantity'] ?? null,
-                'quantity_system' => $validated['activityForm']['quantity_system'] ?? null,
-                'quantity_code' => $validated['activityForm']['quantity_code'] ?? null,
-                'daily_amount' => $validated['activityForm']['daily_amount'] ?? null,
-                'description' => $validated['activityForm']['description'] ?? null,
-                'product_reference' => $validated['activityForm']['product_reference'] ?? null,
+                'quantity' => !empty($validated['activityForm']['quantity']) ? $validated['activityForm']['quantity'] : null,
+                'quantity_system' => !empty($validated['activityForm']['quantity_system']) ? $validated['activityForm']['quantity_system'] : null,
+                'quantity_code' => !empty($validated['activityForm']['quantity_code']) ? $validated['activityForm']['quantity_code'] : null,
+                'daily_amount' => !empty($validated['activityForm']['daily_amount']) ? $validated['activityForm']['daily_amount'] : null,
+                'description' => !empty($validated['activityForm']['description']) ? $validated['activityForm']['description'] : null,
+                'product_reference' => !empty($validated['activityForm']['product_reference']) ? $validated['activityForm']['product_reference'] : null,
                 'scheduled_period_start' => convertToYmd($validated['activityForm']['scheduled_period_start']),
                 'scheduled_period_end' => !empty($this->activityForm['scheduled_period_end'])
                     ? convertToYmd($this->activityForm['scheduled_period_end']) : null,
@@ -207,12 +211,12 @@ class CarePlanShow extends Component
                 'author_id' => Auth::user()?->activeEmployee()?->id,
                 'status' => CarePlanStatus::DRAFT->value,
                 'kind' => $validated['activityForm']['kind'],
-                'quantity' => $validated['activityForm']['quantity'] ?? null,
-                'quantity_system' => $validated['activityForm']['quantity_system'] ?? null,
-                'quantity_code' => $validated['activityForm']['quantity_code'] ?? null,
-                'daily_amount' => $validated['activityForm']['daily_amount'] ?? null,
-                'description' => $validated['activityForm']['description'] ?? null,
-                'product_reference' => $validated['activityForm']['product_reference'] ?? null,
+                'quantity' => !empty($validated['activityForm']['quantity']) ? $validated['activityForm']['quantity'] : null,
+                'quantity_system' => !empty($validated['activityForm']['quantity_system']) ? $validated['activityForm']['quantity_system'] : null,
+                'quantity_code' => !empty($validated['activityForm']['quantity_code']) ? $validated['activityForm']['quantity_code'] : null,
+                'daily_amount' => !empty($validated['activityForm']['daily_amount']) ? $validated['activityForm']['daily_amount'] : null,
+                'description' => !empty($validated['activityForm']['description']) ? $validated['activityForm']['description'] : null,
+                'product_reference' => !empty($validated['activityForm']['product_reference']) ? $validated['activityForm']['product_reference'] : null,
                 'scheduled_period_start' => convertToYmd($validated['activityForm']['scheduled_period_start']),
                 'scheduled_period_end' => !empty($this->activityForm['scheduled_period_end'])
                     ? convertToYmd($this->activityForm['scheduled_period_end']) : null,
@@ -238,7 +242,7 @@ class CarePlanShow extends Component
         }
 
         if ($this->actionType === 'sign_activity') {
-            $this->signActivity($activityRepository);
+            $this->signActivity($repository, $activityRepository);
             return;
         }
 
@@ -419,7 +423,7 @@ class CarePlanShow extends Component
         }
     }
 
-    private function signActivity(CarePlanActivityRepository $activityRepository): void
+    private function signActivity(CarePlanRepository $repository, CarePlanActivityRepository $activityRepository): void
     {
         if (!$this->activityToSign) {
             Session::flash('error', __('care-plan.no_activity_selected'));
@@ -481,16 +485,26 @@ class CarePlanShow extends Component
             }
 
             // Store to Mongo
+            /* 
             try {
                 \App\Models\MedicalEvents\Mongo\CarePlanActivity::create($finalResponse);
             } catch (\Exception $e) {
                 Log::warning('Failed to save CarePlanActivity to Mongo: ' . $e->getMessage());
             }
+            */
 
             $activityRepository->updateById($activity->id, [
                 'status' => $activityStatus,
                 'uuid' => $activityUuid,
             ]);
+
+            // Sync parent Care Plan to catch status transition (e.g., Draft -> Active) triggered by activity creation
+            try {
+                $planResponse = EHealth::carePlan()->getBySearchParams($this->carePlan->person->uuid, ['id' => $this->carePlan->uuid]);
+                $repository->syncCarePlans($planResponse->getData(), $this->carePlan->person_id);
+            } catch (\Exception $e) {
+                Log::warning('CarePlanShow: failed to sync plan status after activity: ' . $e->getMessage());
+            }
 
             $this->carePlan->refresh();
             Session::flash('success', __('care-plan.activity_signed'));

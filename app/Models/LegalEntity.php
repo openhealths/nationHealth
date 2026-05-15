@@ -81,7 +81,8 @@ class LegalEntity extends Model
         'ehealth_inserted_at',
         'ehealth_inserted_by',
         'ehealth_updated_at',
-        'ehealth_updated_by'
+        'ehealth_updated_by',
+        'legal_entity_type_id',
     ];
 
     protected $casts = [

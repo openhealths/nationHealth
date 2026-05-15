@@ -123,39 +123,49 @@
 
 <div class="form-row-2 mt-5">
     <div class="form-group group">
-        <input type="text"
-               name="period_start"
-               id="period_start"
-               class="peer input pl-10 appearance-none datepicker-input dark:text-white"
-               placeholder=" "
-               required
-               datepicker-autohide
-               datepicker-format="{{ frontendDateFormat() }}"
-               datepicker-button="false"
-               wire:model.lazy="form.periodStart"
-        />
-        <label for="period_start" class="wrapped-label">
-            {{ __('care-plan.date_and_time_start') }}
-        </label>
+        <div class="relative">
+            <input type="text"
+                   name="period_start"
+                   id="period_start"
+                   class="peer input pl-10 appearance-none datepicker-input dark:text-white"
+                   placeholder=" "
+                   required
+                   datepicker-autohide
+                   datepicker-format="{{ frontendDateFormat() }}"
+                   datepicker-button="false"
+                   wire:model.lazy="form.periodStart"
+            />
+            <label for="period_start" class="label">
+                {{ __('care-plan.date_and_time_start') }}
+            </label>
+            <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
+                @icon('calendar', 'w-4 h-4 text-gray-400')
+            </div>
+        </div>
         @error('form.periodStart')
         <p class="text-error">{{ $message }}</p>
         @enderror
     </div>
 
     <div class="form-group group">
-        <input type="text"
-               name="period_end"
-               id="period_end"
-               class="peer input pl-10 appearance-none datepicker-input dark:text-white"
-               placeholder=" "
-               datepicker-autohide
-               datepicker-format="{{ frontendDateFormat() }}"
-               datepicker-button="false"
-               wire:model.lazy="form.periodEnd"
-        />
-        <label for="period_end" class="wrapped-label">
-            {{ __('care-plan.date_and_time_end') }}
-        </label>
+        <div class="relative">
+            <input type="text"
+                   name="period_end"
+                   id="period_end"
+                   class="peer input pl-10 appearance-none datepicker-input dark:text-white"
+                   placeholder=" "
+                   datepicker-autohide
+                   datepicker-format="{{ frontendDateFormat() }}"
+                   datepicker-button="false"
+                   wire:model.lazy="form.periodEnd"
+            />
+            <label for="period_end" class="label">
+                {{ __('care-plan.date_and_time_end') }}
+            </label>
+            <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
+                @icon('calendar', 'w-4 h-4 text-gray-400')
+            </div>
+        </div>
         @error('form.periodEnd')
         <p class="text-error">{{ $message }}</p>
         @enderror

@@ -13,6 +13,11 @@ use Illuminate\Validation\ValidationException;
 
 class CarePlanActivityRepository
 {
+    public function findById(int $id): ?CarePlanActivity
+    {
+        return CarePlanActivity::find($id);
+    }
+
     public function getByCarePlanId(int $carePlanId)
     {
         return CarePlanActivity::where('care_plan_id', $carePlanId)->get();
@@ -40,14 +45,16 @@ class CarePlanActivityRepository
         return removeEmptyKeys([
             'detail' => removeEmptyKeys([
                 'kind' => $activity->kind,
+                'status' => 'scheduled',
+                'intent' => 'order',
                 'description' => $activity->description ?: null,
                 'product_reference' => $activity->product_reference ? ['identifier' => ['value' => $activity->product_reference]] : null,
                 'scheduled_period' => array_filter([
                     'start' => $activity->scheduled_period_start ? convertToYmd($activity->scheduled_period_start->format('d.m.Y')) : null,
                     'end' => $activity->scheduled_period_end ? convertToYmd($activity->scheduled_period_end->format('d.m.Y')) : null,
                 ]),
-                'quantity' => $activity->quantity ? ['value' => $activity->quantity, 'system' => $activity->quantity_system ?? null, 'code' => $activity->quantity_code ?? null] : null,
-                'daily_amount' => $activity->daily_amount ? ['value' => $activity->daily_amount, 'system' => $activity->daily_amount_system ?? null, 'code' => $activity->daily_amount_code ?? null] : null,
+                'quantity' => $activity->quantity ? ['value' => (float)$activity->quantity, 'system' => $activity->quantity_system ?? null, 'code' => $activity->quantity_code ?? null] : null,
+                'daily_amount' => $activity->daily_amount ? ['value' => (float)$activity->daily_amount, 'system' => $activity->daily_amount_system ?? null, 'code' => $activity->daily_amount_code ?? null] : null,
                 'reason_code' => $activity->reason_code ? [['coding' => [['code' => $activity->reason_code]]]] : null,
                 'reason_reference' => !empty($activity->reason_reference) ? array_map(fn($r) => ['identifier' => ['value' => $r]], $activity->reason_reference) : null,
                 'goal' => !empty($activity->goal) ? array_map(fn($g) => ['identifier' => ['value' => $g]], $activity->goal) : null,
@@ -76,10 +83,12 @@ class CarePlanActivityRepository
         }
 
         foreach ($data['data'] as $rawFhir) {
+            /*
             \App\Models\MedicalEvents\Mongo\CarePlanActivity::updateOrCreate(
                 ['uuid' => $rawFhir['id']],
                 ['data' => $rawFhir]
             );
+            */
 
             DB::transaction(function () use ($carePlan, $rawFhir) {
                 $detail = $rawFhir['detail'] ?? [];

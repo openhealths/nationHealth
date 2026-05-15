@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use App\Livewire\Person\Records\BasePatientComponent;
+use App\Traits\InteractsWithApprovals;
 use App\Models\Person\Person;
 use App\Models\LegalEntity;
 use Livewire\WithFileUploads;
@@ -23,11 +24,13 @@ use Livewire\WithFileUploads;
 class CarePlanCreate extends BasePatientComponent
 {
     use WithFileUploads;
+    use InteractsWithApprovals;
 
     public bool $showSignatureModal = false;
     public string $patientUuid = '';
     public string $conditionUuid = '';
     public string $medicalRecordType = 'CONDITION';
+    public ?string $carePlanUuid = null;
 
     // Care Plan form data
     public array $form = [
@@ -85,11 +88,19 @@ class CarePlanCreate extends BasePatientComponent
         if ($person) {
             $this->form['patient'] = trim($person->last_name . ' ' . $person->first_name . ' ' . ($person->second_name ?? ''));
 
-            // Load abstract authentication methods for "inform_with" dropdown
-            $this->authMethods = collect(\App\Enums\Person\AuthenticationMethod::cases())->map(fn($m) => [
-                'value' => $m->value,
-                'label' => $m->label(),
-            ])->toArray();
+            // Load actual authentication methods from eHealth
+            try {
+                $this->authMethods = EHealth::person()->getAuthMethods($this->uuid)->getData();
+            } catch (\Exception $e) {
+                Log::warning('CarePlanCreate: failed to load auth methods: ' . $e->getMessage());
+                // Fallback to static cases if eHealth fails
+                $this->authMethods = collect(\App\Enums\Person\AuthenticationMethod::cases())->map(fn($m) => [
+                    'id' => (string) \Illuminate\Support\Str::uuid(),
+                    'uuid' => (string) \Illuminate\Support\Str::uuid(),
+                    'type' => $m->value,
+                    'label' => $m->label(),
+                ])->toArray();
+            }
         }
 
         // Load only encounters that have been confirmed by eHealth (have ehealth_inserted_at)
@@ -152,7 +163,7 @@ class CarePlanCreate extends BasePatientComponent
                 })->toArray();
             }
         }
-        $this->form['period_start'] = now()->format('d.m.Y');
+        $this->form['periodStart'] = now()->format('d.m.Y');
 
         // Pre-fill author from current employee
         $employee = Auth::user()?->getCarePlanWriterEmployee();
@@ -226,10 +237,16 @@ class CarePlanCreate extends BasePatientComponent
 
         $person = \App\Models\Person\Person::where('uuid', $uuid)->first();
         if ($person) {
-            $this->authMethods = collect(\App\Enums\Person\AuthenticationMethod::cases())->map(fn($m) => [
-                'value' => $m->value,
-                'label' => $m->label(),
-            ])->toArray();
+            try {
+                $this->authMethods = EHealth::person()->getAuthMethods($uuid)->getData();
+            } catch (\Exception $e) {
+                $this->authMethods = collect(\App\Enums\Person\AuthenticationMethod::cases())->map(fn($m) => [
+                    'id' => (string) \Illuminate\Support\Str::uuid(),
+                    'uuid' => (string) \Illuminate\Support\Str::uuid(),
+                    'type' => $m->value,
+                    'label' => $m->label(),
+                ])->toArray();
+            }
         }
     }
 
@@ -240,18 +257,18 @@ class CarePlanCreate extends BasePatientComponent
     {
         return [
             'form.category'         => 'required|string',
-            'form.clinical_protocol' => 'nullable|string',
+            'form.clinicalProtocol' => 'nullable|string',
             'form.context'          => 'nullable|string',
             'form.title'            => 'required|string',
-            'form.period_start'     => 'required|string',
-            'form.period_end'       => 'nullable|string',
+            'form.periodStart'      => 'required|string',
+            'form.periodEnd'        => 'nullable|string',
             'form.encounter'        => 'nullable|string',
             'form.description'      => 'nullable|string',
             'form.note'             => 'nullable|string',
-            'form.inform_with'      => 'nullable|string',
-            'form.terms_of_service' => 'required|string',
+            'form.informWith'       => 'nullable|string',
+            'form.termsOfService'   => 'required|string',
             'form.episodes'         => 'nullable|array',
-            'form.medical_records'  => 'nullable|array',
+            'form.medicalRecords'   => 'nullable|array',
         ];
     }
 
@@ -262,16 +279,16 @@ class CarePlanCreate extends BasePatientComponent
     {
         return [
             'form.category'          => __('care-plan.category'),
-            'form.clinical_protocol' => __('care-plan.clinical_protocol'),
+            'form.clinicalProtocol'  => __('care-plan.clinical_protocol'),
             'form.context'           => __('care-plan.context'),
             'form.title'             => __('care-plan.name_care_plan'),
-            'form.period_start'      => __('care-plan.date_and_time_start'),
-            'form.period_end'        => __('care-plan.date_and_time_end'),
+            'form.periodStart'       => __('care-plan.date_and_time_start'),
+            'form.periodEnd'         => __('care-plan.date_and_time_end'),
             'form.encounter'         => __('care-plan.encounter'),
             'form.description'       => __('care-plan.extended_description'),
             'form.note'              => __('care-plan.notes'),
-            'form.inform_with'       => __('care-plan.inform_with'),
-            'form.terms_of_service'  => __('care-plan.terms_of_service') ?? 'Умови надання послуг',
+            'form.informWith'        => __('care-plan.inform_with'),
+            'form.termsOfService'    => __('care-plan.terms_of_service') ?? 'Умови надання послуг',
             'form.knedp'                  => __('forms.knedp') ?? 'КНЕДП',
             'form.keyContainerUpload'     => __('forms.key_container') ?? 'Ключ-контейнер',
             'form.password'               => __('forms.password'),
@@ -321,7 +338,7 @@ class CarePlanCreate extends BasePatientComponent
      */
     public function updatedFormPeriodEnd(): void
     {
-        if (!empty($this->form['period_end'])) {
+        if (!empty($this->form['periodEnd'])) {
             $this->dispatch('flashMessage', [
                 'type'    => 'error',
                 'message' => __('care-plan.period_end_warning'),
@@ -361,21 +378,21 @@ class CarePlanCreate extends BasePatientComponent
             'legal_entity_id' => $legalEntity?->id,
             'status' => 'NEW',
             'category' => $validated['form']['category'],
-            'clinical_protocol' => $validated['form']['clinical_protocol'] ?? null,
+            'clinical_protocol' => $validated['form']['clinicalProtocol'] ?? null,
             'context' => $validated['form']['context'] ?? null,
             'title' => $validated['form']['title'],
-            'period_start' => convertToYmd($validated['form']['period_start']),
-            'period_end' => !empty($validated['form']['period_end'])
-                ? convertToYmd($validated['form']['period_end']) : null,
+            'period_start' => convertToYmd($validated['form']['periodStart']),
+            'period_end' => !empty($validated['form']['periodEnd'])
+                ? convertToYmd($validated['form']['periodEnd']) : null,
             'encounter_id' => $encounterData['id'],
             'addresses' => $encounterData['addresses'],
             'supporting_info' => [
                 'episodes' => $validated['form']['episodes'],
-                'medical_records' => $validated['form']['medical_records'],
+                'medical_records' => $validated['form']['medicalRecords'],
             ],
             'description' => $validated['form']['description'] ?? null,
             'note' => $validated['form']['note'] ?? null,
-            'inform_with' => $validated['form']['inform_with'] ?? null,
+            'inform_with' => $validated['form']['informWith'] ?? null,
         ]);
 
         $this->dispatch('flashMessage', [
@@ -397,6 +414,116 @@ class CarePlanCreate extends BasePatientComponent
         }
     }
 
+    public bool $showMethodSelectionModal = false;
+
+    /**
+     * Start the signing process by opening the method selection modal.
+     */
+    public function startSigningProcess(): void
+    {
+        try {
+            $this->validate($this->rules());
+        } catch (ValidationException $exception) {
+            $this->handleValidationFailed($exception);
+            return;
+        }
+
+        $this->showMethodSelectionModal = true;
+    }
+
+    /**
+     * Handle the selection of an authentication method.
+     */
+    public function selectAuthMethod(string $methodUuid): void
+    {
+        $this->form['informWith'] = $methodUuid;
+        $this->showMethodSelectionModal = false;
+
+        $authMethod = collect($this->authMethods)->first(fn($m) => ($m['id'] ?? $m['uuid'] ?? null) === $methodUuid);
+        $authType = $authMethod['type'] ?? null;
+
+        if ($authType === \App\Enums\Person\AuthenticationMethod::OTP->value) {
+            $this->createApproval();
+        } else {
+            $this->showSignatureModal = true;
+        }
+    }
+
+    /**
+     * Create an approval request for the Care Plan.
+     */
+    protected function createApproval(): void
+    {
+        try {
+            if (empty($this->carePlanUuid)) {
+                $this->carePlanUuid = \Illuminate\Support\Str::uuid()->toString();
+            }
+
+            $payload = [
+                'granted_resource_id' => $this->carePlanUuid,
+                'granted_resource_type' => 'care_plan',
+                'granted_to_id' => legalEntity()->uuid,
+                'granted_to_type' => 'legal_entity',
+                'authorize_with' => $this->form['informWith'] ?: null,
+            ];
+
+            $response = EHealth::approval()->createApproval($this->uuid, $payload);
+            $responseData = $response->getData();
+
+            if ($response->getStatusCode() === 201 || $response->getStatusCode() === 200) {
+                $this->approvalId = $responseData['id'];
+                $this->openAuthModal();
+            }
+        } catch (\Exception $e) {
+            Log::error('CarePlanCreate: failed to create approval: ' . $e->getMessage());
+            $this->dispatch('flashMessage', [
+                'type' => 'error', 
+                'message' => 'Не вдалося надіслати SMS підтвердження: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Verify the SMS code.
+     */
+    public function verify(): void
+    {
+        $this->validate($this->approvalVerificationRules());
+
+        try {
+            $response = EHealth::approval()->verify($this->uuid, $this->approvalId, [
+                'code' => (int) $this->verificationCode,
+            ]);
+
+            if ($response->getStatusCode() === 200) {
+                $this->closeAuthModal();
+                $this->showSignatureModal = true;
+            }
+        } catch (\Exception $e) {
+            Log::error('CarePlanCreate: failed to verify approval: ' . $e->getMessage());
+            $this->addError('verificationCode', 'Невірний код підтвердження або помилка сервісу');
+        }
+    }
+
+    /**
+     * Resend the SMS code.
+     */
+    public function resendSms(): void
+    {
+        if ($this->smsResent) {
+            return;
+        }
+
+        try {
+            EHealth::approval()->resendSms($this->uuid, $this->approvalId);
+            $this->smsResent = true;
+            $this->dispatch('flashMessage', ['type' => 'success', 'message' => 'SMS надіслано повторно']);
+        } catch (\Exception $e) {
+            Log::error('CarePlanCreate: failed to resend SMS: ' . $e->getMessage());
+            $this->dispatch('flashMessage', ['type' => 'error', 'message' => 'Помилка при повторному надсиланні SMS']);
+        }
+    }
+
     /**
      * Sign with KEP and send to eHealth.
      */
@@ -412,7 +539,8 @@ class CarePlanCreate extends BasePatientComponent
                 $this->form, 
                 $this->form['encounter'] ?? null, 
                 $encounterData, 
-                Auth::user()?->getCarePlanWriterEmployee()?->uuid
+                Auth::user()?->getCarePlanWriterEmployee()?->uuid,
+                $this->carePlanUuid ?: null
             );
 
             $signedContent = signatureService()->signData(
@@ -467,8 +595,8 @@ class CarePlanCreate extends BasePatientComponent
                 'status' => $carePlanStatus,
                 'category' => $this->form['category'],
                 'title' => $this->form['title'],
-                'period_start' => convertToYmd($this->form['period_start']),
-                'period_end' => !empty($this->form['period_end']) ? convertToYmd($this->form['period_end']) : null,
+                'period_start' => convertToYmd($this->form['periodStart']),
+                'period_end' => !empty($this->form['periodEnd']) ? convertToYmd($this->form['periodEnd']) : null,
                 'encounter_id' => $encounterData['id'] ?? null,
             ]);
 

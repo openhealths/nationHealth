@@ -37,8 +37,13 @@
                 wire:model="form.informWith"
         >
             <option value="">{{ __('forms.select') }}</option>
-            @foreach($authMethods as $method)
-                <option value="{{ $method['value'] }}">{{ $method['label'] }}</option>
+            @foreach($authMethods as $authMethod)
+                <option value="{{ $authMethod['id'] }}">
+                    {{ \App\Enums\Person\AuthenticationMethod::tryFrom($authMethod['type'])->label() }}
+                    @if(!empty($authMethod['phone_number']))
+                        ({{ $authMethod['phone_number'] }})
+                    @endif
+                </option>
             @endforeach
         </select>
         @error('form.informWith')
