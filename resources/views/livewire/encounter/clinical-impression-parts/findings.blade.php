@@ -174,7 +174,7 @@
                                             @foreach($episodes as $key => $episode)
                                                 <option value="{{ $episode['uuid'] }}">
                                                     {{ $episode['name'] }} ({{ __('patients.' . $episode['status']) }})
-                                                    від {{ CarbonImmutable::parse($episode['insertedAt'])->format('d.m.Y') }}
+                                                    від {{ CarbonImmutable::parse($episode['insertedAt'] ?? $episode['ehealth_inserted_at'] ?? now())->format('d.m.Y') }}
                                                 </option>
                                             @endforeach
                                         </select>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 16 16"
+     fill="none"
+     aria-hidden="true">
+    <path d="M7.667 10.333L10.333 7.667m0 0L7.667 5m2.666 2.667H5m9.333 0c0 3.682-2.985 6.666-6.666 6.666-3.682 0-6.667-2.984-6.667-6.666 0-3.682 2.985-6.667 6.667-6.667 3.681 0 6.666 2.985 6.666 6.667z"
+          stroke="currentColor"
+          stroke-width="1.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+</svg>
