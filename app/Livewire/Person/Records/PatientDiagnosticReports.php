@@ -102,7 +102,7 @@ class PatientDiagnosticReports extends BasePatientComponent
 
         $this->loadFilters();
 
-        $this->loadDiagnosticReports($this->buildSearchParams());
+        $this->loadDiagnosticReportsFromDb();
     }
 
     public function search(): void
@@ -171,6 +171,9 @@ class PatientDiagnosticReports extends BasePatientComponent
         }
 
         $this->diagnosticReports = Arr::toCamelCase($this->formatDatesForDisplay($validatedData));
+
+        $this->loadEpisodes();
+        $this->loadEncounters();
     }
 
     public function updatedPage(): void
@@ -182,9 +185,9 @@ class PatientDiagnosticReports extends BasePatientComponent
     {
         $this->loadServices();
 
-        $this->loadEpisodes();
+        $this->loadEpisodesFromDb();
 
-        $this->loadEncounters();
+        $this->loadEncountersFromDb();
     }
 
     private function loadDiagnosticReports(array $params = []): void
@@ -207,6 +210,17 @@ class PatientDiagnosticReports extends BasePatientComponent
 
             $this->handleEHealthExceptions($exception, 'Error while loading diagnostic reports');
         }
+    }
+
+    private function loadDiagnosticReportsFromDb(): void
+    {
+        $diagnosticReports = Repository::diagnosticReport()->getByPersonId($this->personId);
+
+        $this->totalEntries = count($diagnosticReports);
+
+        $this->diagnosticReports = Arr::toCamelCase(
+            $this->formatDatesForDisplay($diagnosticReports)
+        );
     }
 
     private function loadEpisodes(): void
@@ -245,6 +259,32 @@ class PatientDiagnosticReports extends BasePatientComponent
         }
     }
 
+    private function loadEpisodesFromDb(): void 
+    {
+        $filterEpisodeOptions = Repository::episode()->getByPersonId($this->personId);
+
+        $this->totalEntries = count($filterEpisodeOptions);
+
+        $this->filterEpisodeOptions = collect($filterEpisodeOptions)
+                ->map(function (array $episode) {
+                    $episodeId = data_get($episode, 'uuid');
+
+                    if (!$episodeId) {
+                        return null;
+                    }
+
+                    return [
+                        'value' => $episodeId,
+                        'label' => data_get($episode, 'name') ?: $episodeId,
+                        'description' => $episodeId,
+                    ];
+                })
+                ->filter()
+                ->unique('value')
+                ->values()
+                ->toArray();
+    }
+
     private function loadEncounters(): void
     {
         try {
@@ -264,6 +304,15 @@ class PatientDiagnosticReports extends BasePatientComponent
 
             $this->handleEHealthExceptions($exception, 'Error while loading encounters');
         }
+    }
+
+    private function loadEncountersFromDb(): void
+    {
+        $this->filterEncounterOptions = Arr::toCamelCase(
+            $this->formatDatesForDisplay(
+                Repository::encounter()->getByPersonId($this->personId)
+            )
+        );
     }
 
     private function loadServices(): void

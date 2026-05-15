@@ -254,6 +254,21 @@ class DiagnosticReportRepository extends BaseRepository
     }
 
     /**
+     * Get diagnostic reports data that is related to the person.
+     *
+     * @param  string  $personId
+     * @return array|null
+     */
+    public function getByPersonId(int $personId): array
+    {
+        return $this->model
+            ->withAllRelations()
+            ->where('person_id', $personId)
+            ->get()
+            ->toArray();
+    }
+
+    /**
      * Get the diagnostic report for the clinical impression based on the provided UUID to display the selected supporting info.
      *
      * @param  string  $uuid

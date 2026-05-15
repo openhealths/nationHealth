@@ -157,6 +157,21 @@ class ImmunizationRepository extends BaseRepository
     }
 
     /**
+     * Get immunization data that is related to the person.
+     *
+     * @param  string  $personId
+     * @return array|null
+     */
+    public function getByPersonId(int $personId): array
+    {
+        return $this->model
+            ->withAllRelations()
+            ->where('person_id', $personId)
+            ->get()
+            ->toArray();
+    }
+
+    /**
      * Formatting immunizations to show on the frontend.
      *
      * @param  array  $immunizations

@@ -90,8 +90,7 @@ class EncounterRepository extends BaseRepository
                 'type_id' => $type->id,
                 'priority_id' => $priority->id ?? null,
                 'performer_id' => $performer->id,
-                'division_id' => $division->id ?? null,
-                'incoming_referral_id' => $incomingReferral->id ?? null
+                'division_id' => $division->id ?? null
             ]);
 
             $encounter->period()->create([
@@ -295,6 +294,21 @@ class EncounterRepository extends BaseRepository
             ->camelCaseKeys()
             ->extractFirst()
             ->getNormalizedData();
+    }
+
+    /**
+     * Get encounter data that is related to the person.
+     *
+     * @param  string  $personId
+     * @return array|null
+     */
+    public function getByPersonId(int $personId): array
+    {
+        return $this->model
+            ->withRelationships()
+            ->where('person_id', $personId)
+            ->get()
+            ->toArray();
     }
 
     /**

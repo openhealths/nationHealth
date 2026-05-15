@@ -29,7 +29,34 @@ class PatientImmunization extends BasePatientComponent
 
     protected function initializeComponent(): void
     {
-        $this->loadEpisodes();
+        $this->getDictionary();
+        $this->loadEpisodesFromDb();
+        $this->loadImmunizaionsFromDb();
+    }
+
+    protected function getSyncStatus(string $entityType): ?string
+    {
+        return $this->syncStatus ?: null;
+    }
+
+    protected function getBatchName(string $entityType): string
+    {
+        return ImmunizationSync::BATCH_NAME;
+    }
+
+    protected function getJobClass(string $entityType): string 
+    {
+        return ImmunizationSync::class;
+    }
+
+    protected function getEntityConstant(string $entityType): string 
+    {
+        return LegalEntity::ENTITY_IMMUNIZATION;
+    }
+
+    protected function onSyncStatusChanged(string $entityType, JobStatus $status): void 
+    {
+        $this->syncStatus = $status->value;
     }
 
     public function search(): void
@@ -41,6 +68,47 @@ class PatientImmunization extends BasePatientComponent
 
     public function sync(): void
     {
+        if ($this->cannotStartSync('immunization')) {
+            return;
+        }
+
+        if ($this->shouldResumeSync('immunization')) {
+            $this->handleResumeLogic('immunization');
+
+            return;
+        }
+
+        try {
+            $response = EHealth::immunization()->getBySearchParams(
+                $this->uuid,
+                $this->buildSearchParams(),
+            );
+        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+            $this->handleEHealthExceptions($exception, 'Error while synchronizing immunizations');
+
+            return;
+        }
+
+        try {
+            $validatedData = $response->validate();
+            Repository::immunization()->sync($this->personId, $validatedData);
+        } catch (Throwable $exception) {
+            $this->logDatabaseErrors($exception, 'Error while synchronizing immunizations');
+            Session::flash('error', __('patients.messages.immunization_sync_database_error'));
+
+            return;
+        }
+
+        if ($response->isNotLast()) {
+            $this->dispatchRemainingPages('immunization');
+        } else {
+            legalEntity()->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_IMMUNIZATION);
+            Session::flash('success', __('patients.messages.immunization_synced_successfully'));
+        }
+
+        $this->immunizations = Arr::toCamelCase($this->formatDatesForDisplay($validatedData));
+
+        $this->loadEpisodes();
     }
 
     public function resetFilters(): void
@@ -54,6 +122,33 @@ class PatientImmunization extends BasePatientComponent
 
         $this->loadImmunizations();
     }
+
+    public function updatedPage(): void
+    {
+        $this->loadImmunizations($this->buildSearchParams());
+    }
+
+    private function loadImmunizaionsFromDb(): void
+    {
+        $immunizations = Repository::immunization()->getByPersonId($this->personId);
+
+        $this->totalEntries = count($immunizations);
+
+        $this->immunizations = Arr::toCamelCase(
+            $this->formatDatesForDisplay($immunizations)
+        );
+    }
+
+    private function loadEpisodesFromDb(): void 
+    {
+        $episodes = Repository::episode()->getByPersonId($this->personId);
+
+        $this->totalEntries = count($episodes);
+
+        $this->episodes = Arr::toCamelCase(
+            $this->formatDatesForDisplay($episodes)
+        );
+    }   
 
     private function loadImmunizations(array $params = []): void
     {
