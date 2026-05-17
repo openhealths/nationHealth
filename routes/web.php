@@ -321,6 +321,8 @@ Route::middleware(['auth:web,ehealth', 'verified'])->group(function () {
                 Route::middleware('can:create,' . Encounter::class)->name('encounter.')->group(function () {
                     Route::get('/{personId}/encounter/create', EncounterCreate::class)->name('create');
                     Route::get('/{personId}/encounter/{encounterId}', EncounterEdit::class)->name('edit');
+                    Route::get('/{personId}/encounter/{encounterId}/show', \App\Livewire\Encounter\EncounterShow::class)
+                        ->name('show');
                 });
 
                 Route::get('/{personId}/care-plan/create', \App\Livewire\CarePlan\CarePlanCreate::class)

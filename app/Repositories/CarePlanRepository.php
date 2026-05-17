@@ -111,7 +111,7 @@ class CarePlanRepository
         $payload = removeEmptyKeys([
             'id' => $id,
             'intent' => 'order',
-            'status' => CarePlanStatus::DRAFT->value,
+            'status' => 'new',
             'category' => [
                 'coding' => [
                     ['system' => 'eHealth/care_plan_categories', 'code' => $form['category']]

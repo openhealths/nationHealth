@@ -7,7 +7,6 @@
                name="clinical_protocol"
                id="clinical_protocol"
                class="input peer"
-               placeholder="R53.0"
                wire:model="form.clinicalProtocol"
         >
         @error('form.clinicalProtocol')
@@ -25,8 +24,8 @@
                 wire:model="form.context"
         >
             <option value="">{{ __('forms.select') }}</option>
-            @isset($dictionaries['encounter_classes'])
-                @foreach($dictionaries['encounter_classes'] as $code => $description)
+            @isset($dictionaries['eHealth/encounter_classes'])
+                @foreach($dictionaries['eHealth/encounter_classes'] as $code => $description)
                     <option value="{{ $code }}">{{ $description }}</option>
                 @endforeach
             @endisset
@@ -109,8 +108,8 @@
                 wire:model="form.termsOfService"
         >
             <option value="">{{ __('forms.select') }}</option>
-            @isset($dictionaries['care_provision_conditions'])
-                @foreach($dictionaries['care_provision_conditions'] as $code => $description)
+            @isset($dictionaries['PROVIDING_CONDITION'])
+                @foreach($dictionaries['PROVIDING_CONDITION'] as $code => $description)
                     <option value="{{ $code }}">{{ $description }}</option>
                 @endforeach
             @endisset

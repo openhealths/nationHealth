@@ -73,10 +73,36 @@ class CarePlanApprovals extends Component
             $carePlan = CarePlan::findOrFail($this->carePlanId);
 
             $payload = [
-                'granted_resource_id' => $carePlan->uuid,
-                'granted_resource_type' => 'care_plan',
-                'granted_to_id' => $this->newApproval['granted_to_legal_entity_id'],
-                'granted_to_type' => 'legal_entity',
+                'resources' => [
+                    [
+                        'identifier' => [
+                            'type' => [
+                                'coding' => [
+                                    [
+                                        'system' => 'eHealth/resources',
+                                        'code' => 'care_plan',
+                                    ]
+                                ]
+                            ],
+                            'value' => $carePlan->uuid,
+                        ]
+                    ]
+                ],
+                'granted_to' => [
+                    'identifier' => [
+                        'type' => [
+                            'coding' => [
+                                [
+                                    'system' => 'eHealth/resources',
+                                    'code' => 'employee',
+                                ]
+                            ]
+                        ],
+                        // Using current employee who is creating the approval
+                        'value' => \Illuminate\Support\Facades\Auth::user()?->getCarePlanWriterEmployee()?->uuid,
+                    ]
+                ],
+                'access_level' => 'write',
             ];
 
             $response = EHealth::approval()->createApproval($this->patientUuid, $payload);

@@ -1,4 +1,4 @@
-@props(['personId', 'patientFullName'])
+@props(['personId', 'patientFullName', 'declarationNumber' => null])
 
 @php
     use App\Models\DeclarationRequest;
@@ -24,10 +24,10 @@
         @endif
 
         <x-slot name="description">
-            @if($this->declarationNumber)
+            @if($declarationNumber)
                 <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm font-semibold rounded-lg mt-1 border border-gray-100 dark:border-gray-700">
-                    @icon('file-text', 'w-4 h-4 text-gray-400')
-                    Декларація №{{ $this->declarationNumber }}
+                    {{-- @icon('file-text', 'w-4 h-4 text-gray-400') --}}
+                    Декларація №{{ $declarationNumber }}
                 </div>
             @endif
         </x-slot>

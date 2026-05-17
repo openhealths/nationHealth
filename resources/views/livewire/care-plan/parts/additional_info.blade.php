@@ -26,28 +26,3 @@
     </div>
 </div>
 
-<div class="form-row-2">
-    <div class="form-group group">
-        <label for="inform_with" class="label">
-            {{ __('care-plan.inform_with') }}
-        </label>
-        <select id="inform_with"
-                name="inform_with"
-                class="input-select peer"
-                wire:model="form.informWith"
-        >
-            <option value="">{{ __('forms.select') }}</option>
-            @foreach($authMethods as $authMethod)
-                <option value="{{ $authMethod['id'] }}">
-                    {{ \App\Enums\Person\AuthenticationMethod::tryFrom($authMethod['type'])->label() }}
-                    @if(!empty($authMethod['phone_number']))
-                        ({{ $authMethod['phone_number'] }})
-                    @endif
-                </option>
-            @endforeach
-        </select>
-        @error('form.informWith')
-        <p class="text-error">{{ $message }}</p>
-        @enderror
-    </div>
-</div>

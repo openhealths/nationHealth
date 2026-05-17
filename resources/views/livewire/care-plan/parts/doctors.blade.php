@@ -11,7 +11,7 @@
                    readonly
                    required>
             <label for="author" class="label">
-                {{ __('care-plan.author') }}
+                {{ __('care-plan.author') === 'care-plan.author' ? 'Автор' : __('care-plan.author') }}
             </label>
             @error('form.author') <p class="text-error">{{ $message }}</p> @enderror
         </div>
