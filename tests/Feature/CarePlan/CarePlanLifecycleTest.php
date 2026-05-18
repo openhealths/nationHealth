@@ -317,4 +317,127 @@ class CarePlanLifecycleTest extends TestCase
             'status' => 'active',
         ]);
     }
+
+    public function test_create_service_activity_with_linked_grounds(): void
+    {
+        $this->actingAs($this->user);
+        
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'title' => 'Service Plan',
+            'status' => 'draft',
+        ]);
+
+        $condition = \App\Models\MedicalEvents\Sql\Condition::first();
+
+        // Bind mock APIs to satisfy dependencies
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
+
+        $activityCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $activityCreateResponse->shouldReceive('getData')->andReturn(['id' => (string) Str::uuid(), 'status' => 'scheduled']);
+        $activityCreateResponse->shouldReceive('getStatusCode')->andReturn(201);
+        $mockActivityApi->shouldReceive('create')->andReturn($activityCreateResponse);
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->call('initActivityForm', 'service_request')
+            ->set('selectedProduct', ['code' => 'A01001', 'name' => 'General medical consultation'])
+            ->set('activityForm.product_reference', 'A01001')
+            ->call('addLinkedGround', 'Condition', $condition->uuid)
+            ->assertSet('linkedGrounds.0.uuid', $condition->uuid)
+            ->set('activityForm.quantity', 2)
+            ->call('saveActivity')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('care_plan_activities', [
+            'care_plan_id' => $carePlan->id,
+            'product_reference' => 'A01001',
+            'quantity' => 2,
+        ]);
+    }
+
+    public function test_create_medication_activity_with_program_and_linked_grounds(): void
+    {
+        $this->actingAs($this->user);
+        
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'title' => 'Medication Plan',
+            'status' => 'draft',
+        ]);
+
+        $condition = \App\Models\MedicalEvents\Sql\Condition::first();
+
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
+
+        $activityCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $activityCreateResponse->shouldReceive('getData')->andReturn(['id' => (string) Str::uuid(), 'status' => 'scheduled']);
+        $activityCreateResponse->shouldReceive('getStatusCode')->andReturn(201);
+        $mockActivityApi->shouldReceive('create')->andReturn($activityCreateResponse);
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->call('initActivityForm', 'medication_request')
+            ->set('selectedProgram', 'program-id')
+            ->set('selectedProduct', ['code' => 'INN-123', 'name' => 'Aspirin'])
+            ->set('activityForm.product_reference', 'INN-123')
+            ->call('addLinkedGround', 'Condition', $condition->uuid)
+            ->set('activityForm.quantity', 30)
+            ->set('activityForm.daily_amount', 1.5)
+            ->call('saveActivity')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('care_plan_activities', [
+            'care_plan_id' => $carePlan->id,
+            'product_reference' => 'INN-123',
+            'program' => 'program-id',
+            'quantity' => 30,
+        ]);
+    }
+
+    public function test_create_device_activity_with_positive_quantity_validation(): void
+    {
+        $this->actingAs($this->user);
+        
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'title' => 'Device Plan',
+            'status' => 'draft',
+        ]);
+
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
+
+        $activityCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $activityCreateResponse->shouldReceive('getData')->andReturn(['id' => (string) Str::uuid(), 'status' => 'scheduled']);
+        $activityCreateResponse->shouldReceive('getStatusCode')->andReturn(201);
+        $mockActivityApi->shouldReceive('create')->andReturn($activityCreateResponse);
+
+        // Validation error for negative or zero quantity
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->call('initActivityForm', 'device_request')
+            ->set('selectedProduct', ['code' => 'DEV-456', 'name' => 'Test strips'])
+            ->set('activityForm.product_reference', 'DEV-456')
+            ->set('activityForm.quantity', -5)
+            ->call('saveActivity')
+            ->assertHasErrors(['activityForm.quantity']);
+
+        // Success when positive integer
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->call('initActivityForm', 'device_request')
+            ->set('selectedProduct', ['code' => 'DEV-456', 'name' => 'Test strips'])
+            ->set('activityForm.product_reference', 'DEV-456')
+            ->set('activityForm.quantity', 10)
+            ->call('saveActivity')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('care_plan_activities', [
+            'care_plan_id' => $carePlan->id,
+            'product_reference' => 'DEV-456',
+            'quantity' => 10,
+        ]);
+    }
 }
