@@ -13,7 +13,7 @@
          role="dialog"
          aria-modal="true"
          aria-labelledby="medications-drawer-label"
-    >
+     >
         <div class="absolute inset-0 bg-gray-900/50"
              aria-hidden="true"
              @click="showMedicationDrawer = false"
@@ -49,8 +49,12 @@
                         <select id="medication_program"
                                 name="medication_program"
                                 class="input-select peer"
+                                wire:model="selectedProgram"
                         >
-                            <option selected value="">{{ __('care-plan.prescription_medication') }}</option>
+                            <option value="">{{ __('care-plan.prescription_medication') }}</option>
+                            @foreach(($dictionaries['medical_programs'] ?? []) as $id => $name)
+                                <option value="{{ $id }}">{{ $name }}</option>
+                            @endforeach
                         </select>
                     </div>
                 </div>
@@ -68,7 +72,7 @@
                 <button type="button"
                         class="button-primary"
                         aria-controls="medication-search-drawer-right"
-                        @click="showMedicationSearchDrawer = true"
+                        @click="showMedicationDrawer = false; showMedicationSearchDrawer = true"
                 >
                     {{ __('forms.continue') }}
                 </button>

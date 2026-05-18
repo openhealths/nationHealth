@@ -57,11 +57,11 @@
                         </label>
                         <div class="relative">
                             <button type="button"
-                                    class="input-select peer pr-12 w-full text-left text-gray-500"
+                                    class="input-select peer pr-12 w-full text-left {{ !empty($selectedProduct) ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-500' }}"
                                     aria-controls="service-search-drawer-right"
                                     @click="showServiceSearchDrawer = true"
                             >
-                                {{ __('care-plan.select_service') }}
+                                {{ !empty($selectedProduct) ? (($selectedProduct['code'] ?? '') . ' - ' . ($selectedProduct['name'] ?? '')) : __('care-plan.select_service') }}
                             </button>
                             <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                                 <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -225,15 +225,46 @@
             </fieldset>
 
             {{-- Grounds for Prescription Section --}}
-            <fieldset class="fieldset">
+            <fieldset class="fieldset" x-data="{ selectedGround: '' }">
                 <legend class="legend">
                     {{ __('care-plan.grounds_for_prescription') }}
                 </legend>
 
-                <div class="form-row-3">
-                    <select class="input-select peer w-full">
-                        <option selected value="">{{ __('care-plan.select_icd10_code') }}</option>
-                    </select>
+                <div class="flex gap-4 items-end mb-6">
+                    <div class="flex-1">
+                        <label class="label">Оберіть клінічний запис пацієнта</label>
+                        <select x-model="selectedGround" class="input-select peer w-full">
+                            <option value="">-- Оберіть запис --</option>
+                            @if(!empty($availableConditions))
+                                <optgroup label="Діагнози (Стани)">
+                                    @foreach($availableConditions as $cond)
+                                        <option value="Condition|{{ $cond['uuid'] }}">{{ $cond['name'] }} (від {{ $cond['date'] }})</option>
+                                    @endforeach
+                                </optgroup>
+                            @endif
+                            @if(!empty($availableReports))
+                                <optgroup label="Діагностичні звіти">
+                                    @foreach($availableReports as $report)
+                                        <option value="DiagnosticReport|{{ $report['uuid'] }}">{{ $report['name'] }} (від {{ $report['date'] }})</option>
+                                    @endforeach
+                                </optgroup>
+                            @endif
+                            @if(!empty($availableObservations))
+                                <optgroup label="Спостереження">
+                                    @foreach($availableObservations as $obs)
+                                        <option value="Observation|{{ $obs['uuid'] }}">{{ $obs['name'] }} (від {{ $obs['date'] }})</option>
+                                    @endforeach
+                                </optgroup>
+                            @endif
+                        </select>
+                    </div>
+                    <button type="button" @click="if(selectedGround) { 
+                        let parts = selectedGround.split('|');
+                        $wire.addLinkedGround(parts[0], parts[1]);
+                        selectedGround = '';
+                    }" class="button-primary whitespace-nowrap">
+                        Додати обґрунтування
+                    </button>
                 </div>
 
                 <div class="mb-4">
@@ -250,28 +281,35 @@
                                     <th scope="col" class="px-4 py-3 font-medium text-right">{{ __('care-plan.action') }}</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
-                                    <td class="px-4 py-3 text-gray-900 dark:text-white whitespace-nowrap">
-                                        02.05.2025
-                                    </td>
-                                    <td class="px-4 py-3 text-gray-900 dark:text-white">
-                                        Діагностичний звіт A35002 Загальний аналіз сечі (лабораторна діагностика), Лейкоцити 10,0
-                                    </td>
-                                    <td class="px-4 py-3 text-right">
-                                        <button type="button" class="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-500">
-                                            @icon('delete', 'w-5 h-5')
-                                        </button>
-                                    </td>
-                                </tr>
+                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                @forelse($linkedGrounds as $ground)
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                        <td class="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                            {{ $ground['date'] }}
+                                        </td>
+                                        <td class="px-4 py-3 text-gray-900 dark:text-white">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 mr-2">
+                                                {{ $ground['type'] === 'Condition' ? 'Діагноз' : ($ground['type'] === 'DiagnosticReport' ? 'Діагн. звіт' : 'Спостереження') }}
+                                            </span>
+                                            {{ $ground['name'] }}
+                                        </td>
+                                        <td class="px-4 py-3 text-right">
+                                            <button type="button" wire:click="removeLinkedGround('{{ $ground['uuid'] }}')" class="text-red-500 hover:text-red-700 transition-colors">
+                                                @icon('delete', 'w-5 h-5')
+                                            </button>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="3" class="px-4 py-8 text-center text-gray-400 italic">
+                                            Немає доданих обґрунтувань
+                                        </td>
+                                    </tr>
+                                @endforelse
                             </tbody>
                         </table>
                     </div>
                 </div>
-
-                <button type="button" class="item-add">
-                    {{ __('care-plan.add_medical_record') }}
-                </button>
             </fieldset>
 
             {{-- Additional Information Section --}}

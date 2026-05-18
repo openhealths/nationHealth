@@ -18,14 +18,14 @@
     <div x-data="{ 
         activeTab: 'info',
         openDropdown: false,
-        showServiceDrawer: false,
-        showServiceSearchDrawer: false,
-        showMedicationDrawer: false,
-        showMedicationSearchDrawer: false,
-        showMedicationFormDrawer: false,
-        showMedicalDeviceDrawer: false,
-        showMedicalDeviceSearchDrawer: false,
-        showMedicalDeviceFormDrawer: false
+        showServiceDrawer: @entangle('showServiceDrawer'),
+        showServiceSearchDrawer: @entangle('showServiceSearchDrawer'),
+        showMedicationDrawer: @entangle('showMedicationDrawer'),
+        showMedicationSearchDrawer: @entangle('showMedicationSearchDrawer'),
+        showMedicationFormDrawer: @entangle('showMedicationFormDrawer'),
+        showMedicalDeviceDrawer: @entangle('showMedicalDeviceDrawer'),
+        showMedicalDeviceSearchDrawer: @entangle('showMedicalDeviceSearchDrawer'),
+        showMedicalDeviceFormDrawer: @entangle('showMedicalDeviceFormDrawer')
     }" 
     @close-drawers.window="showServiceDrawer = false; showServiceSearchDrawer = false; showMedicationDrawer = false; showMedicationSearchDrawer = false; showMedicationFormDrawer = false; showMedicalDeviceDrawer = false; showMedicalDeviceSearchDrawer = false; showMedicalDeviceFormDrawer = false;"
     class="form shift-content" wire:key="care-plan-show-container">

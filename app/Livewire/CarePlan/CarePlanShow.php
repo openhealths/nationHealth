@@ -38,6 +38,28 @@ class CarePlanShow extends Component
     public bool $showMethodSelectionModal = false;
     public ?string $carePlanUuid = null;
 
+    // Drawer visibility controls (entangled with Alpine)
+    public bool $showServiceDrawer = false;
+    public bool $showServiceSearchDrawer = false;
+    public bool $showMedicationDrawer = false;
+    public bool $showMedicationSearchDrawer = false;
+    public bool $showMedicationFormDrawer = false;
+    public bool $showMedicalDeviceDrawer = false;
+    public bool $showMedicalDeviceSearchDrawer = false;
+    public bool $showMedicalDeviceFormDrawer = false;
+
+    // Search and selection parameters
+    public string $searchQuery = '';
+    public array $searchResults = [];
+    public int $searchPage = 1;
+    public ?array $selectedProduct = null;
+    public string $selectedProgram = '';
+
+    // Linked justification references (grounds)
+    public array $linkedGrounds = [];
+    public array $availableReports = [];
+    public array $availableObservations = [];
+
     // Activity Form state
     public array $activityForm = [
         'id' => null,
@@ -81,6 +103,22 @@ class CarePlanShow extends Component
             'date' => $c->onset_date ? \Carbon\Carbon::parse($c->onset_date)->format('d.m.Y') : '-',
         ])->toArray();
 
+        // Fetch patient diagnostic reports for justifications (grounds)
+        $this->availableReports = \App\Models\MedicalEvents\Sql\DiagnosticReport::where('person_id', $this->carePlan->person_id)
+            ->get()->map(fn($dr) => [
+                'uuid' => $dr->uuid,
+                'name' => $dr->code?->text ?: 'Diagnostic Report',
+                'date' => $dr->issued ? \Carbon\Carbon::parse($dr->issued)->format('d.m.Y') : '-',
+            ])->toArray();
+
+        // Fetch patient observations for justifications (grounds)
+        $this->availableObservations = \App\Models\MedicalEvents\Sql\Observation::where('person_id', $this->carePlan->person_id)
+            ->get()->map(fn($obs) => [
+                'uuid' => $obs->uuid,
+                'name' => $obs->code?->text ?: 'Observation',
+                'date' => $obs->issued ? \Carbon\Carbon::parse($obs->issued)->format('d.m.Y') : '-',
+            ])->toArray();
+
         try {
             $basics = app(\App\Services\Dictionary\DictionaryManager::class)->basics();
             $this->dictionaries['care_plan_categories'] = $basics->byName('eHealth/care_plan_categories')
@@ -94,6 +132,12 @@ class CarePlanShow extends Component
             $this->dictionaries['care_plan_cancel_reasons'] = $basics->byName('eHealth/care_plan_cancel_reasons')
                 ?->asCodeDescription()
                 ?->toArray() ?? [];
+
+            // Load medical programs
+            $this->dictionaries['medical_programs'] = app(\App\Services\Dictionary\DictionaryManager::class)
+                ->medicalPrograms()
+                ->pluck('name', 'id')
+                ->toArray() ?? [];
         } catch (\Exception $exception) {
             Log::warning('CarePlanShow: failed to load dictionaries: ' . $exception->getMessage());
         }
@@ -170,12 +214,64 @@ class CarePlanShow extends Component
             'product_codeable_concept' => $activity->product_codeable_concept ?? '',
         ];
 
-        if ($this->activityForm['kind'] === 'service_request' || $this->activityForm['kind'] === 'ServiceRequest') {
+        // Load pre-selected product info
+        $this->selectedProduct = null;
+        if (!empty($activity->product_reference)) {
+            try {
+                $kindLower = strtolower($this->activityForm['kind']);
+                if (str_contains($kindLower, 'service')) {
+                    $response = EHealth::service()->getMany(['code' => $activity->product_reference]);
+                    $data = $response->getData();
+                    if (!empty($data['data'])) {
+                        $this->selectedProduct = $data['data'][0];
+                    }
+                } elseif (str_contains($kindLower, 'medication')) {
+                    $response = EHealth::drug()->getMany(['innm_id' => $activity->product_reference]);
+                    $data = $response->getData();
+                    if (!empty($data['data'])) {
+                        $this->selectedProduct = $data['data'][0];
+                    }
+                } elseif (str_contains($kindLower, 'device')) {
+                    $response = EHealth::deviceDefinition()->getMany(['classification_type_code' => $activity->product_reference]);
+                    $data = $response->getData();
+                    if (!empty($data['data'])) {
+                        $this->selectedProduct = $data['data'][0];
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('CarePlanShow: failed to preload product reference: ' . $e->getMessage());
+            }
+        }
+
+        // Initialize linked justification grounds
+        $this->linkedGrounds = [];
+        if (!empty($activity->reason_reference)) {
+            foreach ($activity->reason_reference as $ref) {
+                $parts = explode('/', $ref);
+                if (count($parts) === 2) {
+                    $this->addLinkedGround($parts[0], $parts[1]);
+                } else {
+                    $uuid = $ref;
+                    if (collect($this->availableConditions)->contains('uuid', $uuid)) {
+                        $this->addLinkedGround('Condition', $uuid);
+                    } elseif (collect($this->availableReports)->contains('uuid', $uuid)) {
+                        $this->addLinkedGround('DiagnosticReport', $uuid);
+                    } elseif (collect($this->availableObservations)->contains('uuid', $uuid)) {
+                        $this->addLinkedGround('Observation', $uuid);
+                    } else {
+                        $this->addLinkedGround('Condition', $uuid);
+                    }
+                }
+            }
+        }
+
+        $kindLower = strtolower($this->activityForm['kind']);
+        if (str_contains($kindLower, 'service')) {
             $this->showServiceDrawer = true;
-        } elseif ($this->activityForm['kind'] === 'medication_request' || $this->activityForm['kind'] === 'MedicationRequest') {
-            $this->showMedicationDrawer = true;
-        } elseif ($this->activityForm['kind'] === 'device_request' || $this->activityForm['kind'] === 'DeviceRequest') {
-            $this->showMedicalDeviceDrawer = true;
+        } elseif (str_contains($kindLower, 'medication')) {
+            $this->showMedicationFormDrawer = true;
+        } elseif (str_contains($kindLower, 'device')) {
+            $this->showMedicalDeviceFormDrawer = true;
         } else {
             $this->showServiceDrawer = true;
         }
@@ -183,52 +279,60 @@ class CarePlanShow extends Component
 
     public function saveActivity(CarePlanActivityRepository $repository): void
     {
+        $rules = [
+            'activityForm.kind' => 'required|string',
+            'activityForm.scheduled_period_start' => 'required|string',
+            'activityForm.quantity' => 'nullable|numeric',
+            'activityForm.quantity_system' => 'nullable|string',
+            'activityForm.quantity_code' => 'nullable|string',
+            'activityForm.daily_amount' => 'nullable|numeric',
+            'activityForm.description' => 'nullable|string',
+            'activityForm.product_reference' => 'nullable|string',
+            'activityForm.program' => 'nullable|string',
+            'activityForm.reason_code' => 'nullable|string',
+        ];
+
+        // Apply strict validation for device request positive integer quantities
+        $kindLower = strtolower($this->activityForm['kind']);
+        if (str_contains($kindLower, 'device')) {
+            $rules['activityForm.quantity'] = 'required|integer|min:1';
+        }
+
         try {
-            $validated = $this->validate([
-                'activityForm.kind' => 'required|string',
-                'activityForm.scheduled_period_start' => 'required|string',
-                'activityForm.quantity' => 'nullable|numeric',
-                'activityForm.quantity_system' => 'nullable|string',
-                'activityForm.quantity_code' => 'nullable|string',
-                'activityForm.daily_amount' => 'nullable|numeric',
-                'activityForm.description' => 'nullable|string',
-                'activityForm.product_reference' => 'nullable|string',
-            ]);
+            $validated = $this->validate($rules);
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             return;
         }
 
+        // Compile reason reference identifiers from linked justifications
+        $reasonReferences = collect($this->linkedGrounds)->map(fn($g) => $g['type'] . '/' . $g['uuid'])->toArray();
+
+        $activityData = [
+            'kind' => $validated['activityForm']['kind'],
+            'quantity' => !empty($validated['activityForm']['quantity']) ? $validated['activityForm']['quantity'] : null,
+            'quantity_system' => !empty($validated['activityForm']['quantity_system']) ? $validated['activityForm']['quantity_system'] : null,
+            'quantity_code' => !empty($validated['activityForm']['quantity_code']) ? $validated['activityForm']['quantity_code'] : null,
+            'daily_amount' => !empty($validated['activityForm']['daily_amount']) ? $validated['activityForm']['daily_amount'] : null,
+            'description' => !empty($validated['activityForm']['description']) ? $validated['activityForm']['description'] : null,
+            'product_reference' => !empty($validated['activityForm']['product_reference']) ? $validated['activityForm']['product_reference'] : null,
+            'program' => !empty($validated['activityForm']['program']) ? $validated['activityForm']['program'] : null,
+            'reason_code' => !empty($validated['activityForm']['reason_code']) ? $validated['activityForm']['reason_code'] : null,
+            'reason_reference' => !empty($reasonReferences) ? $reasonReferences : null,
+            'scheduled_period_start' => convertToYmd($validated['activityForm']['scheduled_period_start']),
+            'scheduled_period_end' => !empty($this->activityForm['scheduled_period_end'])
+                ? convertToYmd($this->activityForm['scheduled_period_end']) : null,
+        ];
+
         if (!empty($this->activityForm['id'])) {
-            $repository->updateById($this->activityForm['id'], [
-                'kind' => $validated['activityForm']['kind'],
-                'quantity' => !empty($validated['activityForm']['quantity']) ? $validated['activityForm']['quantity'] : null,
-                'quantity_system' => !empty($validated['activityForm']['quantity_system']) ? $validated['activityForm']['quantity_system'] : null,
-                'quantity_code' => !empty($validated['activityForm']['quantity_code']) ? $validated['activityForm']['quantity_code'] : null,
-                'daily_amount' => !empty($validated['activityForm']['daily_amount']) ? $validated['activityForm']['daily_amount'] : null,
-                'description' => !empty($validated['activityForm']['description']) ? $validated['activityForm']['description'] : null,
-                'product_reference' => !empty($validated['activityForm']['product_reference']) ? $validated['activityForm']['product_reference'] : null,
-                'scheduled_period_start' => convertToYmd($validated['activityForm']['scheduled_period_start']),
-                'scheduled_period_end' => !empty($this->activityForm['scheduled_period_end'])
-                    ? convertToYmd($this->activityForm['scheduled_period_end']) : null,
-            ]);
+            $repository->updateById($this->activityForm['id'], $activityData);
             Session::flash('success', __('care-plan.activity_updated'));
         } else {
-            $repository->create([
-                'care_plan_id' => $this->carePlan->id,
-                'author_id' => Auth::user()?->activeEmployee()?->id,
-                'status' => CarePlanStatus::DRAFT->value,
-                'kind' => $validated['activityForm']['kind'],
-                'quantity' => !empty($validated['activityForm']['quantity']) ? $validated['activityForm']['quantity'] : null,
-                'quantity_system' => !empty($validated['activityForm']['quantity_system']) ? $validated['activityForm']['quantity_system'] : null,
-                'quantity_code' => !empty($validated['activityForm']['quantity_code']) ? $validated['activityForm']['quantity_code'] : null,
-                'daily_amount' => !empty($validated['activityForm']['daily_amount']) ? $validated['activityForm']['daily_amount'] : null,
-                'description' => !empty($validated['activityForm']['description']) ? $validated['activityForm']['description'] : null,
-                'product_reference' => !empty($validated['activityForm']['product_reference']) ? $validated['activityForm']['product_reference'] : null,
-                'scheduled_period_start' => convertToYmd($validated['activityForm']['scheduled_period_start']),
-                'scheduled_period_end' => !empty($this->activityForm['scheduled_period_end'])
-                    ? convertToYmd($this->activityForm['scheduled_period_end']) : null,
-            ]);
+            $activityData['care_plan_id'] = $this->carePlan->id;
+            $activityData['author_id'] = Auth::user()?->activeEmployee()?->id;
+            $activityData['status'] = CarePlanStatus::DRAFT->value;
+
+            $repository->create($activityData);
             Session::flash('success', __('care-plan.activity_draft_saved'));
         }
 
@@ -236,6 +340,152 @@ class CarePlanShow extends Component
 
         // Close drawers
         $this->dispatch('close-drawers');
+    }
+
+    public function searchServices(): void
+    {
+        if (empty($this->searchQuery)) {
+            $this->searchResults = [];
+            return;
+        }
+
+        try {
+            $response = EHealth::service()->getMany([
+                'name' => $this->searchQuery,
+                'page' => $this->searchPage,
+                'page_size' => 15,
+            ]);
+
+            $this->searchResults = $response->getData()['data'] ?? [];
+        } catch (\Exception $e) {
+            Log::error("Failed to search services: " . $e->getMessage());
+            $this->searchResults = [];
+        }
+    }
+
+    public function searchMedications(): void
+    {
+        if (empty($this->searchQuery)) {
+            $this->searchResults = [];
+            return;
+        }
+
+        try {
+            $filters = [
+                'innm_name' => $this->searchQuery,
+                'page' => $this->searchPage,
+                'page_size' => 15,
+            ];
+
+            if (!empty($this->selectedProgram)) {
+                $filters['medical_program_id'] = $this->selectedProgram;
+            }
+
+            $response = EHealth::drug()->getMany($filters);
+
+            $this->searchResults = $response->getData()['data'] ?? [];
+        } catch (\Exception $e) {
+            Log::error("Failed to search medications: " . $e->getMessage());
+            $this->searchResults = [];
+        }
+    }
+
+    public function searchMedicalDevices(): void
+    {
+        if (empty($this->searchQuery)) {
+            $this->searchResults = [];
+            return;
+        }
+
+        try {
+            $filters = [
+                'name' => $this->searchQuery,
+                'page' => $this->searchPage,
+                'page_size' => 15,
+            ];
+
+            if (!empty($this->selectedProgram)) {
+                $filters['medical_program_id'] = $this->selectedProgram;
+            }
+
+            $response = EHealth::deviceDefinition()->getMany($filters);
+
+            $this->searchResults = $response->getData()['data'] ?? [];
+        } catch (\Exception $e) {
+            Log::error("Failed to search medical devices: " . $e->getMessage());
+            $this->searchResults = [];
+        }
+    }
+
+    public function selectProduct(array $product, string $kind): void
+    {
+        $this->selectedProduct = $product;
+        $this->activityForm['product_reference'] = $product['id'] ?? $product['uuid'] ?? $product['code'] ?? '';
+
+        if ($kind === 'service_request') {
+            $this->activityForm['product_codeable_concept'] = $product['code'] ?? '';
+            $this->activityForm['quantity_system'] = 'SERVICE_UNIT';
+            $this->activityForm['quantity_code'] = 'units';
+            $this->showServiceSearchDrawer = false;
+            $this->showServiceDrawer = true;
+        } elseif ($kind === 'medication_request') {
+            $this->activityForm['quantity_system'] = 'MEDICATION_UNIT';
+            $this->activityForm['quantity_code'] = $product['innm_dosage_form'] ?? 'ml';
+            $this->activityForm['program'] = $this->selectedProgram;
+            $this->showMedicationSearchDrawer = false;
+            $this->showMedicationFormDrawer = true;
+        } elseif ($kind === 'device_request') {
+            $this->activityForm['quantity_system'] = 'device_unit';
+            $this->activityForm['quantity_code'] = 'units';
+            $this->activityForm['program'] = $this->selectedProgram;
+            $this->showMedicalDeviceSearchDrawer = false;
+            $this->showMedicalDeviceFormDrawer = true;
+        }
+    }
+
+    public function addLinkedGround(string $type, string $uuid): void
+    {
+        $exists = collect($this->linkedGrounds)->contains('uuid', $uuid);
+        if ($exists) {
+            return;
+        }
+
+        $name = 'Unknown Record';
+        $date = '-';
+        if ($type === 'Condition') {
+            $item = collect($this->availableConditions)->firstWhere('uuid', $uuid);
+            if ($item) {
+                $name = $item['name'];
+                $date = $item['date'];
+            }
+        } elseif ($type === 'DiagnosticReport') {
+            $item = collect($this->availableReports)->firstWhere('uuid', $uuid);
+            if ($item) {
+                $name = $item['name'];
+                $date = $item['date'];
+            }
+        } elseif ($type === 'Observation') {
+            $item = collect($this->availableObservations)->firstWhere('uuid', $uuid);
+            if ($item) {
+                $name = $item['name'];
+                $date = $item['date'];
+            }
+        }
+
+        $this->linkedGrounds[] = [
+            'type' => $type,
+            'uuid' => $uuid,
+            'name' => $name,
+            'date' => $date,
+        ];
+    }
+
+    public function removeLinkedGround(string $uuid): void
+    {
+        $this->linkedGrounds = collect($this->linkedGrounds)
+            ->filter(fn($g) => $g['uuid'] !== $uuid)
+            ->values()
+            ->toArray();
     }
 
     public function sign(CarePlanRepository $repository, CarePlanActivityRepository $activityRepository): void
