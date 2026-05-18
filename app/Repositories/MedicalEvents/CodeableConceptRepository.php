@@ -101,9 +101,15 @@ class CodeableConceptRepository extends BaseRepository
      */
     public function attach(SqlIdentifier $identifier, array $codeableConceptData): SqlCodeableConcept
     {
-        /** @var SqlCodeableConcept $codeableConcept */
+        if (!$identifier->wasRecentlyCreated) {
+            $existing = $identifier->type()->first();
+            if ($existing) {
+                return $existing;
+            }
+        }
+
         $codeableConcept = $identifier->type()->create([
-            'text' => $codeableConceptData['identifier']['type']['text'] ?? ''
+            'text' => $codeableConceptData['identifier']['type']['text'] ?? null
         ]);
 
         $codeableConcept->coding()->create([

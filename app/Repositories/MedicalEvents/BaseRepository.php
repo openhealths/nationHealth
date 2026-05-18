@@ -208,6 +208,32 @@ abstract class BaseRepository
     }
 
     /**
+     * Sync a BelongsToMany pivot using already-loaded relation data to avoid an extra SELECT.
+     *
+     * @param  Model  $model
+     * @param  string  $relation
+     * @param  array  $newIds
+     * @return void
+     */
+    protected function syncPivot(Model $model, string $relation, array $newIds): void
+    {
+        $currentIds = $model->relationLoaded($relation)
+            ? $model->{$relation}->pluck('id')->toArray()
+            : [];
+
+        $toDetach = array_diff($currentIds, $newIds);
+        $toAttach = array_diff($newIds, $currentIds);
+
+        if ($toDetach) {
+            $model->{$relation}()->detach($toDetach);
+        }
+
+        if ($toAttach) {
+            $model->{$relation}()->attach($toAttach);
+        }
+    }
+
+    /**
      * Sync multiple codeable concepts for a BelongsToMany relationship.
      *
      * @param  Model|null  $existing

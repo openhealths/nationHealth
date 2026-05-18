@@ -119,8 +119,7 @@ class EncounterRepository extends BaseRepository
 
                 $role = Repository::codeableConcept()->store($diagnoseData['role']);
 
-                EncounterDiagnose::create([
-                    'encounter_id' => $encounter->id,
+                $encounter->diagnoses()->create([
                     'condition_id' => $condition->id,
                     'role_id' => $role->id,
                     'rank' => $diagnoseData['rank'] ?? null
@@ -318,17 +317,17 @@ class EncounterRepository extends BaseRepository
             foreach ($validatedData as $data) {
                 $existing = $existingEncounters->get($data['uuid']);
 
-                $class = $this->syncCoding($existing, $data['class'] ?? null, 'class');
-                $type = $this->syncCodeableConcept($existing, $data['type'] ?? null, 'type');
+                $class = $this->syncCoding($existing, $data['class'], 'class');
+                $type = $this->syncCodeableConcept($existing, $data['type'], 'type');
                 $priority = $this->syncCodeableConcept($existing, $data['priority'] ?? null, 'priority');
                 $performerSpeciality = $this->syncCodeableConcept(
                     $existing,
-                    $data['performer_speciality'] ?? null,
+                    $data['performer_speciality'],
                     'performerSpeciality'
                 );
 
                 $visit = $this->syncIdentifier($existing, $data['visit'] ?? null, 'visit');
-                $episode = $this->syncIdentifier($existing, $data['episode'] ?? null, 'episode');
+                $episode = $this->syncIdentifier($existing, $data['episode'], 'episode');
                 $incomingReferral = $this->syncIdentifier(
                     $existing,
                     $data['incoming_referral'] ?? null,
@@ -348,12 +347,12 @@ class EncounterRepository extends BaseRepository
                     'cancellation_reason' => $data['cancellation_reason'] ?? null,
                     'explanatory_letter' => $data['explanatory_letter'] ?? null,
                     'prescriptions' => $data['prescriptions'] ?? null,
-                    'class_id' => $class?->id,
-                    'type_id' => $type?->id,
+                    'class_id' => $class->id,
+                    'type_id' => $type->id,
                     'priority_id' => $priority?->id,
-                    'performer_speciality_id' => $performerSpeciality?->id,
+                    'performer_speciality_id' => $performerSpeciality->id,
                     'visit_id' => $visit?->id,
-                    'episode_id' => $episode?->id,
+                    'episode_id' => $episode->id,
                     'incoming_referral_id' => $incomingReferral?->id,
                     'origin_episode_id' => $originEpisode?->id,
                     'performer_id' => $performer?->id,
@@ -373,23 +372,33 @@ class EncounterRepository extends BaseRepository
 
                 Repository::period()->sync($encounter, $data['period']);
 
-                $encounter->reasons()->sync(
+                $this->syncPivot(
+                    $encounter,
+                    'reasons',
                     $this->syncCodeableConcepts($existing, $data['reasons'] ?? null, 'reasons')
                 );
-                $encounter->actions()->sync(
+                $this->syncPivot(
+                    $encounter,
+                    'actions',
                     $this->syncCodeableConcepts($existing, $data['actions'] ?? null, 'actions')
                 );
-                $encounter->actionReferences()->sync(
+                $this->syncPivot(
+                    $encounter,
+                    'actionReferences',
                     $this->syncIdentifiers($existing, $data['action_references'] ?? null, 'actionReferences')
                 );
-                $encounter->participants()->sync(
+                $this->syncPivot(
+                    $encounter,
+                    'participants',
                     $this->syncIdentifiers($existing, $data['participant'] ?? null, 'participants')
                 );
-                $encounter->supportingInfo()->sync(
+                $this->syncPivot(
+                    $encounter,
+                    'supportingInfo',
                     $this->syncIdentifiers($existing, $data['supporting_info'] ?? null, 'supportingInfo')
                 );
 
-                $this->syncDiagnoses($encounter, $data['diagnoses'] ?? [], $existing);
+                $this->syncDiagnoses($encounter, $data['diagnoses'] ?? []);
                 $this->syncHospitalization($encounter, $data['hospitalization'] ?? null);
 
                 if (!empty($data['paper_referral'])) {
@@ -406,21 +415,20 @@ class EncounterRepository extends BaseRepository
      *
      * @param  Encounter  $encounter
      * @param  array  $diagnosesData
-     * @param  Encounter|null  $existing
      * @return void
      */
-    protected function syncDiagnoses(Encounter $encounter, array $diagnosesData, ?Encounter $existing): void
+    protected function syncDiagnoses(Encounter $encounter, array $diagnosesData): void
     {
-        $existingDiagnoses = $existing?->diagnoses ?? collect();
+        $existingDiagnoses = $encounter->relationLoaded('diagnoses') ? $encounter->diagnoses : collect();
 
         if (empty($diagnosesData)) {
-            $existingDiagnoses->each(fn (EncounterDiagnose $d) => $d->delete());
+            $existingDiagnoses->each(fn (EncounterDiagnose $diagnose) => $diagnose->delete());
 
             return;
         }
 
         $existingByConditionValue = $existingDiagnoses->keyBy(
-            fn (EncounterDiagnose $d) => $d->condition?->value
+            fn (EncounterDiagnose $diagnose) => $diagnose->condition?->value
         );
 
         $newConditionValues = collect($diagnosesData)
@@ -429,12 +437,13 @@ class EncounterRepository extends BaseRepository
             ->toArray();
 
         $existingDiagnoses->filter(
-            fn (EncounterDiagnose $diagnose) => !in_array($diagnose->condition?->value, $newConditionValues, true)
+            fn (EncounterDiagnose $diagnose) => !in_array($diagnose->condition->value, $newConditionValues, true)
         )
             ->each(fn (EncounterDiagnose $diagnose) => $diagnose->delete());
 
         foreach ($diagnosesData as $diagnoseData) {
             $conditionValue = $diagnoseData['condition']['identifier']['value'];
+            /** @var EncounterDiagnose|null $existingDiagnose */
             $existingDiagnose = $existingByConditionValue->get($conditionValue);
 
             if ($existingDiagnose) {
@@ -447,11 +456,10 @@ class EncounterRepository extends BaseRepository
 
                 $role = Repository::codeableConcept()->store($diagnoseData['role']);
 
-                EncounterDiagnose::create([
-                    'encounter_id' => $encounter->id,
+                $encounter->diagnoses()->create([
                     'condition_id' => $condition->id,
                     'role_id' => $role->id,
-                    'rank' => $diagnoseData['rank'] ?? null,
+                    'rank' => $diagnoseData['rank'] ?? null
                 ]);
             }
         }
@@ -461,43 +469,43 @@ class EncounterRepository extends BaseRepository
      * Sync encounter hospitalization (HasOne) with nested codings and destination identifier.
      *
      * @param  Encounter  $encounter
-     * @param  array|null  $data
+     * @param  array|null  $hospitalization
      * @return void
      */
-    protected function syncHospitalization(Encounter $encounter, ?array $data): void
+    protected function syncHospitalization(Encounter $encounter, ?array $hospitalization): void
     {
-        if (empty($data)) {
+        if (empty($hospitalization)) {
             $encounter->hospitalization?->delete();
 
             return;
         }
 
-        $existingHospitalization = $encounter->hospitalization;
+        $existingHospitalization = $encounter->wasRecentlyCreated ? null : $encounter->hospitalization;
 
         $admitSource = $this->syncCoding(
             $existingHospitalization,
-            $data['admit_source']['coding'][0] ?? null,
+            $hospitalization['admit_source']['coding'][0] ?? null,
             'admitSource'
         );
         $reAdmission = $this->syncCoding(
             $existingHospitalization,
-            $data['re_admission']['coding'][0] ?? null,
+            $hospitalization['re_admission']['coding'][0] ?? null,
             'reAdmission'
         );
         $dischargeDisposition = $this->syncCoding(
             $existingHospitalization,
-            $data['discharge_disposition']['coding'][0] ?? null,
+            $hospitalization['discharge_disposition']['coding'][0] ?? null,
             'dischargeDisposition'
         );
         $dischargeDepartment = $this->syncCoding(
             $existingHospitalization,
-            $data['discharge_department']['coding'][0] ?? null,
+            $hospitalization['discharge_department']['coding'][0] ?? null,
             'dischargeDepartment'
         );
-        $destination = $this->syncIdentifier($existingHospitalization, $data['destination'] ?? null, 'destination');
+        $destination = $this->syncIdentifier($existingHospitalization, $hospitalization['destination'] ?? null, 'destination');
 
         $hospitalizationData = [
-            'pre_admission_identifier' => $data['pre_admission_identifier'] ?? null,
+            'pre_admission_identifier' => $hospitalization['pre_admission_identifier'] ?? null,
             'admit_source_id' => $admitSource?->id,
             're_admission_id' => $reAdmission?->id,
             'destination_id' => $destination?->id,

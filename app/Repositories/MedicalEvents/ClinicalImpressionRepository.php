@@ -7,14 +7,12 @@ namespace App\Repositories\MedicalEvents;
 use App\Core\Arr;
 use App\Models\MedicalEvents\Sql\ClinicalImpression;
 use App\Models\MedicalEvents\Sql\ClinicalImpressionFinding;
-use App\Models\MedicalEvents\Sql\ClinicalImpressionProblem;
-use App\Models\MedicalEvents\Sql\ClinicalImpressionSupportingInfo;
-use App\Models\MedicalEvents\Sql\Identifier;
-use Exception;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Throwable;
 
+/**
+ * @property ClinicalImpression $model
+ */
 class ClinicalImpressionRepository extends BaseRepository
 {
     /**
@@ -28,88 +26,68 @@ class ClinicalImpressionRepository extends BaseRepository
      */
     public function store(array $data, int $personId, int $createdEncounterId): void
     {
-        try {
-            DB::transaction(function () use ($data, $personId, $createdEncounterId) {
-                foreach ($data as $datum) {
-                    $code = Repository::codeableConcept()->store($datum['code']);
+        DB::transaction(function () use ($data, $personId, $createdEncounterId) {
+            foreach ($data as $datum) {
+                $code = Repository::codeableConcept()->store($datum['code']);
 
-                    $encounter = Repository::identifier()->store($datum['encounter']['identifier']['value']);
-                    Repository::codeableConcept()->attach($encounter, $datum['encounter']);
+                $encounter = Repository::identifier()->store($datum['encounter']['identifier']['value']);
+                Repository::codeableConcept()->attach($encounter, $datum['encounter']);
 
-                    $assessor = Repository::identifier()->store($datum['assessor']['identifier']['value']);
-                    Repository::codeableConcept()->attach($assessor, $datum['assessor']);
+                $assessor = Repository::identifier()->store($datum['assessor']['identifier']['value']);
+                Repository::codeableConcept()->attach($assessor, $datum['assessor']);
 
-                    if (isset($datum['previous'])) {
-                        $previous = Repository::identifier()->store($datum['previous']['identifier']['value']);
-                        Repository::codeableConcept()->attach($previous, $datum['previous']);
-                    }
+                if (isset($datum['previous'])) {
+                    $previous = Repository::identifier()->store($datum['previous']['identifier']['value']);
+                    Repository::codeableConcept()->attach($previous, $datum['previous']);
+                }
 
-                    /** @var ClinicalImpression $clinicalImpression */
-                    $clinicalImpression = $this->model::create([
-                        'uuid' => $datum['uuid'] ?? $datum['id'],
-                        'person_id' => $personId,
-                        'encounter_internal_id' => $createdEncounterId,
-                        'status' => $datum['status'],
-                        'description' => $datum['description'] ?? null,
-                        'code_id' => $code->id,
-                        'encounter_id' => $encounter->id,
-                        'assessor_id' => $assessor->id,
-                        'previous_id' => $previous->id ?? null,
-                        'note' => $datum['note'] ?? null
-                    ]);
+                $clinicalImpression = $this->model->create([
+                    'uuid' => $datum['uuid'] ?? $datum['id'],
+                    'person_id' => $personId,
+                    'encounter_internal_id' => $createdEncounterId,
+                    'status' => $datum['status'],
+                    'description' => $datum['description'] ?? null,
+                    'code_id' => $code->id,
+                    'encounter_id' => $encounter->id,
+                    'assessor_id' => $assessor->id,
+                    'previous_id' => $previous->id ?? null,
+                    'note' => $datum['note'] ?? null
+                ]);
 
-                    $clinicalImpression->effectivePeriod()->create([
-                        'start' => $datum['effectivePeriod']['start'],
-                        'end' => $datum['effectivePeriod']['end']
-                    ]);
+                $clinicalImpression->effectivePeriod()->create([
+                    'start' => $datum['effectivePeriod']['start'],
+                    'end' => $datum['effectivePeriod']['end']
+                ]);
 
-                    if (isset($datum['problems'])) {
-                        foreach ($datum['problems'] as $problem) {
-                            $identifier = Repository::identifier()->store($problem['identifier']['value']);
-                            Repository::codeableConcept()->attach($identifier, $problem);
+                if (isset($datum['problems'])) {
+                    foreach ($datum['problems'] as $problem) {
+                        $identifier = Repository::identifier()->store($problem['identifier']['value']);
+                        Repository::codeableConcept()->attach($identifier, $problem);
 
-                            ClinicalImpressionProblem::create([
-                                'clinical_impression_id' => $clinicalImpression->id,
-                                'identifier_id' => $identifier->id
-                            ]);
-                        }
-                    }
-
-                    if (isset($datum['findings'])) {
-                        foreach ($datum['findings'] as $problem) {
-                            $identifier = Repository::identifier()
-                                ->store($problem['itemReference']['identifier']['value']);
-                            Repository::codeableConcept()->attach($identifier, $problem['itemReference']);
-
-                            ClinicalImpressionFinding::create([
-                                'clinical_impression_id' => $clinicalImpression->id,
-                                'item_reference_id' => $identifier->id
-                            ]);
-                        }
-                    }
-
-                    if (isset($datum['supportingInfo'])) {
-                        foreach ($datum['supportingInfo'] as $supporting) {
-                            $identifier = Repository::identifier()->store($supporting['identifier']['value']);
-                            Repository::codeableConcept()->attach($identifier, $supporting);
-
-                            ClinicalImpressionSupportingInfo::create([
-                                'clinical_impression_id' => $clinicalImpression->id,
-                                'identifier_id' => $identifier->id
-                            ]);
-                        }
+                        $clinicalImpression->problems()->create(['identifier_id' => $identifier->id]);
                     }
                 }
-            });
-        } catch (Exception $e) {
-            Log::channel('db_errors')->error('Error saving clinical impression', [
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ]);
 
-            throw $e;
-        }
+                if (isset($datum['findings'])) {
+                    foreach ($datum['findings'] as $problem) {
+                        $identifier = Repository::identifier()
+                            ->store($problem['itemReference']['identifier']['value']);
+                        Repository::codeableConcept()->attach($identifier, $problem['itemReference']);
+
+                        $clinicalImpression->findings()->create(['item_reference_id' => $identifier->id]);
+                    }
+                }
+
+                if (isset($datum['supportingInfo'])) {
+                    foreach ($datum['supportingInfo'] as $supporting) {
+                        $identifier = Repository::identifier()->store($supporting['identifier']['value']);
+                        Repository::codeableConcept()->attach($identifier, $supporting);
+
+                        $clinicalImpression->supportingInfo()->create(['identifier_id' => $identifier->id]);
+                    }
+                }
+            }
+        });
     }
 
     /**
@@ -151,10 +129,10 @@ class ClinicalImpressionRepository extends BaseRepository
      */
     protected function resolveProblems(array $results): array
     {
-        return collect($results)->map(function ($result) {
+        return collect($results)->map(function (array $result) {
             if (!empty($result['problems'])) {
                 $result['problems'] = collect($result['problems'])
-                    ->map(function ($problem) {
+                    ->map(function (array $problem) {
                         $condition = Repository::condition()->getForProcedure($problem['identifier']['value']);
 
                         if ($condition) {
@@ -178,10 +156,10 @@ class ClinicalImpressionRepository extends BaseRepository
      */
     protected function resolveFindings(array $results): array
     {
-        return collect($results)->map(function ($result) {
+        return collect($results)->map(function (array $result) {
             if (!empty($result['findings'])) {
                 $result['findings'] = collect($result['findings'])
-                    ->map(function ($finding) {
+                    ->map(function (array $finding) {
                         if ($finding['item_reference']['identifier']['type'][0]['coding'][0]['code'] === 'condition') {
                             $condition = Repository::condition()->getForProcedure(
                                 $finding['item_reference']['identifier']['value']
@@ -215,7 +193,7 @@ class ClinicalImpressionRepository extends BaseRepository
      */
     protected function resolveSupportingInfoEpisodes(array $results): array
     {
-        return collect($results)->map(function ($result) {
+        return collect($results)->map(function (array $result) {
             if (!empty($result['supportingInfo'])) {
                 $result['supportingInfoEpisodes'] = collect($result['supportingInfo'])
                     ->filter(static function (array $supportingInfo) {
@@ -236,7 +214,7 @@ class ClinicalImpressionRepository extends BaseRepository
                     ->values()
                     ->toArray();
 
-                // Remove episode_of_care from supportingInfo
+                // Remove episode_of_care entries that are moved to supportingInfoEpisodes
                 $result['supportingInfo'] = collect($result['supportingInfo'])
                     ->reject(static function (array $supportingInfo) {
                         return $supportingInfo['identifier']['type'][0]['coding'][0]['code'] === 'episode_of_care';
@@ -257,10 +235,10 @@ class ClinicalImpressionRepository extends BaseRepository
      */
     protected function resolveSupportingInfo(array $results): array
     {
-        return collect($results)->map(function ($result) {
+        return collect($results)->map(function (array $result) {
             if (!empty($result['supportingInfo'])) {
                 $result['supportingInfo'] = collect($result['supportingInfo'])
-                    ->map(function ($supportingInfo) {
+                    ->map(function (array $supportingInfo) {
                         if ($supportingInfo['identifier']['type'][0]['coding'][0]['code'] === 'procedure') {
                             $procedure = Repository::procedure()
                                 ->getForClinicalImpression($supportingInfo['identifier']['value']);
@@ -305,8 +283,7 @@ class ClinicalImpressionRepository extends BaseRepository
         DB::transaction(function () use ($personId, $validatedData) {
             $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
 
-            // Load existing clinical impressions with relations
-            $existingClinicalImpressions = $this->model::whereIn('uuid', $apiUuids)
+            $existingClinicalImpressions = $this->model->whereIn('uuid', $apiUuids)
                 ->withAllRelations()
                 ->get()
                 ->keyBy('uuid');
@@ -314,11 +291,10 @@ class ClinicalImpressionRepository extends BaseRepository
             foreach ($validatedData as $data) {
                 $existing = $existingClinicalImpressions->get($data['uuid']);
 
-                // Sync relationships
                 $code = $this->syncCodeableConcept($existing, $data['code'], 'code');
                 $encounter = $this->syncIdentifier($existing, $data['encounter'], 'encounter');
                 $assessor = $this->syncIdentifier($existing, $data['assessor'], 'assessor');
-                $previous = $this->syncIdentifier($existing, $data['previous'], 'previous');
+                $previous = $this->syncIdentifier($existing, $data['previous'] ?? null, 'previous');
 
                 $clinicalImpressionData = [
                     'person_id' => $personId,
@@ -335,20 +311,25 @@ class ClinicalImpressionRepository extends BaseRepository
                     $existing->update($clinicalImpressionData);
                     $clinicalImpression = $existing;
                 } else {
-                    $clinicalImpression = $this->model::create(
+                    $clinicalImpression = $this->model->create(
                         array_merge(['uuid' => $data['uuid']], $clinicalImpressionData)
                     );
                 }
 
-                $problemIds = $this->syncIdentifiers($existing, $data['problems'], 'problems');
-                $clinicalImpression->problems()->sync($problemIds);
-
-                $supportingInfoIds = $this->syncIdentifiers($existing, $data['supporting_info'], 'supportingInfo');
-                $clinicalImpression->supportingInfo()->sync($supportingInfoIds);
+                $this->syncPivot(
+                    $clinicalImpression,
+                    'problems',
+                    $this->syncIdentifiers($existing, $data['problems'], 'problems')
+                );
+                $this->syncPivot(
+                    $clinicalImpression,
+                    'supportingInfo',
+                    $this->syncIdentifiers($existing, $data['supporting_info'], 'supportingInfo')
+                );
 
                 Repository::period()->sync($clinicalImpression, $data['effective_period'], 'effectivePeriod');
 
-                $this->syncFindings($existing, $data['findings'], $clinicalImpression);
+                $this->syncFindings($clinicalImpression, $data['findings'] ?? []);
             }
         });
     }
@@ -356,40 +337,44 @@ class ClinicalImpressionRepository extends BaseRepository
     /**
      * Sync findings for clinical impression.
      *
-     * @param  ClinicalImpression|null  $existing
-     * @param  array|null  $items
-     * @param  ClinicalImpression  $parent
+     * @param  ClinicalImpression  $clinicalImpression
+     * @param  array  $findings
      * @return void
      */
-    private function syncFindings(?ClinicalImpression $existing, ?array $items, ClinicalImpression $parent): void
+    private function syncFindings(ClinicalImpression $clinicalImpression, array $findings): void
     {
-        if (empty($items)) {
+        $existingFindings = $clinicalImpression->relationLoaded('findings')
+            ? $clinicalImpression->findings
+            : collect();
+
+        if (empty($findings)) {
+            $existingFindings->each(fn (ClinicalImpressionFinding $finding) => $finding->delete());
+
             return;
         }
 
-        $existingFindings = $existing?->findings ?? collect();
-
-        foreach ($items as $index => $item) {
+        foreach ($findings as $index => $finding) {
             $existingFinding = $existingFindings[$index] ?? null;
 
             if ($existingFinding) {
-                $existingFinding->update(['basis' => $item['basis']]);
+                $existingFinding->update(['basis' => $finding['basis']]);
 
-                // Update identifier
-                $identifier = $existingFinding->itemReference;
-                if ($identifier) {
-                    $this->updateIdentifier($identifier, $item['item_reference']);
+                if ($existingFinding->itemReference) {
+                    $this->updateIdentifier($existingFinding->itemReference, $finding['item_reference']);
                 }
             } else {
-                // New finding
-                $identifier = Repository::identifier()->store($item['item_reference']['identifier']['value']);
-                Repository::codeableConcept()->attach($identifier, $item['item_reference']);
+                $identifier = Repository::identifier()->store($finding['item_reference']['identifier']['value']);
+                Repository::codeableConcept()->attach($identifier, $finding['item_reference']);
 
-                $parent->findings()->create([
+                $clinicalImpression->findings()->create([
                     'item_reference_id' => $identifier->id,
-                    'basis' => $item['basis']
+                    'basis' => $finding['basis']
                 ]);
             }
+        }
+
+        foreach ($existingFindings->slice(count($findings)) as $extra) {
+            $extra->delete();
         }
     }
 }

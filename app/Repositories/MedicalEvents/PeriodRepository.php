@@ -24,7 +24,7 @@ class PeriodRepository extends BaseRepository
             return;
         }
 
-        $existing = $periodable->{$relation};
+        $existing = $periodable->wasRecentlyCreated ? null : $periodable->{$relation};
 
         if ($existing) {
             $existing->update($periodData);
