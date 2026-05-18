@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\HasOneThrough;
+use Override;
 
 class LegalEntity extends Model
 {
@@ -95,11 +96,6 @@ class LegalEntity extends Model
         'updated_by' => 'string',
         'contract_sync_status' => JobStatus::class,
         'contract_request_sync_status' => JobStatus::class,
-        'episode_sync_status' => JobStatus::class,
-        'encounter_sync_status' => JobStatus::class,
-        'clinical_impression_sync_status' => JobStatus::class,
-        'immunization_sync_status' => JobStatus::class,
-        'observation_sync_status' => JobStatus::class,
     ];
 
     protected $attributes = [
@@ -271,6 +267,20 @@ class LegalEntity extends Model
     public function getEntityStatus(?string $entityType = ''): JobStatus|string|null
     {
         return $this->{$entityType . 'sync_status'};
+    }
+
+    /**
+     * Memoize route-binding resolution per request to avoid duplicate queries
+     * when Livewire's persistent middleware re-runs SubstituteBindings.
+     */
+    #[Override]
+    public function resolveRouteBinding($value, $field = null): ?Model
+    {
+        return cache()->memo()->remember(
+            "legal_entity_route:$value:" . ($field ?? $this->getRouteKeyName()),
+            now()->addMinute(),
+            fn () => parent::resolveRouteBinding($value, $field)
+        );
     }
 
     /**
