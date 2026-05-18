@@ -8,6 +8,7 @@ use App\Classes\eHealth\Api\PatientApi;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\ObservationComponent;
 use App\Models\MedicalEvents\Sql\Quantity;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -213,8 +214,7 @@ class ObservationRepository extends BaseRepository
                             $componentData['interpretation']
                         );
 
-                        $component = ObservationComponent::create([
-                            'observation_id' => $observation->id,
+                        $component = $observation->components()->create([
                             'code_id' => $componentCode->id,
                             'interpretation_id' => $componentInterpretation->id
                         ]);
@@ -321,7 +321,7 @@ class ObservationRepository extends BaseRepository
             'components.value.valueCodeableConcept.coding',
             'components.interpretation.coding'
         ])
-            ->whereHas('context', fn ($query) => $query->where('value', $encounterUuid))
+            ->whereHas('context', fn (Builder $query) => $query->where('value', $encounterUuid))
             ->get()
             ?->toArray();
     }
@@ -356,9 +356,8 @@ class ObservationRepository extends BaseRepository
             $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
 
             if ($encounterUuid !== null) {
-                $this->model
-                    ->whereHas('context', fn ($q) => $q->where('value', $encounterUuid))
-                    ->whereNotIn('uuid', $apiUuids)
+                $this->model->whereNotIn('uuid', $apiUuids)
+                    ->whereHas('context', fn (Builder $q) => $q->where('value', $encounterUuid))
                     ->with(['components.value', 'value'])
                     ->get()
                     ->each(function (Observation $observation): void {
@@ -380,7 +379,6 @@ class ObservationRepository extends BaseRepository
             foreach ($validatedData as $data) {
                 $existing = $existingObservations->get($data['uuid']);
 
-                // Sync relationships
                 $code = $this->syncCodeableConcept($existing, $data['code'], 'code');
                 $context = $this->syncIdentifier($existing, $data['context'] ?? null, 'context');
                 $performer = $this->syncIdentifier($existing, $data['performer'] ?? null, 'performer');
@@ -414,8 +412,8 @@ class ObservationRepository extends BaseRepository
                     'body_site_id' => $bodySite?->id,
                     'method_id' => $method?->id,
                     'effective_date_time' => $data['effective_date_time'] ?? null,
-                    'issued' => $data['issued'] ?? null,
-                    'primary_source' => $data['primary_source'] ?? null,
+                    'issued' => $data['issued'],
+                    'primary_source' => $data['primary_source'],
                     'comment' => $data['comment'] ?? null
                 ];
 
@@ -430,12 +428,10 @@ class ObservationRepository extends BaseRepository
 
                 $this->syncValue($data, $observation);
 
-                // Sync categories
                 $categoryIds = $this->syncCodeableConcepts($existing, $data['categories'], 'categories');
-                $observation->categories()->sync($categoryIds);
+                $this->syncPivot($observation, 'categories', $categoryIds);
 
-                // Sync components
-                $this->syncComponents($observation, $existing, $data['components'] ?? []);
+                $this->syncComponents($observation, $data['components'] ?? []);
             }
         });
     }
@@ -444,13 +440,20 @@ class ObservationRepository extends BaseRepository
      * Sync observation components.
      *
      * @param  Observation  $observation
-     * @param  Observation|null  $existing
      * @param  array  $componentsData
      * @return void
      */
-    private function syncComponents(Observation $observation, ?Observation $existing, array $componentsData): void
+    private function syncComponents(Observation $observation, array $componentsData): void
     {
-        $existingComponents = $existing?->components ?? collect();
+        $existingComponents = $observation->relationLoaded('components')
+            ? $observation->components
+            : collect();
+
+        if (empty($componentsData)) {
+            $existingComponents->each(fn (ObservationComponent $component) => $component->delete());
+
+            return;
+        }
 
         foreach ($componentsData as $index => $componentData) {
             $existingComponent = $existingComponents[$index] ?? null;
@@ -490,14 +493,17 @@ class ObservationRepository extends BaseRepository
                     $componentInterpretation = Repository::codeableConcept()->store($componentData['interpretation']);
                 }
 
-                $component = ObservationComponent::create([
-                    'observation_id' => $observation->id,
+                $component = $observation->components()->create([
                     'code_id' => $componentCode->id,
                     'interpretation_id' => $componentInterpretation?->id
                 ]);
 
                 $this->syncValue($componentData, $component);
             }
+        }
+
+        foreach ($existingComponents->slice(count($componentsData)) as $extra) {
+            $extra->delete();
         }
     }
 
@@ -510,7 +516,7 @@ class ObservationRepository extends BaseRepository
      */
     private function syncValue(array $data, Observation|ObservationComponent $owner): void
     {
-        $existingValue = $owner->value;
+        $existingValue = $owner->relationLoaded('value') ? $owner->value : null;
         $valueData = [];
 
         if (isset($data['value_quantity'])) {

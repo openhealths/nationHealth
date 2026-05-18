@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
+use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DiagnosticReportPerformer extends Model
 {
+    use HasCamelCasing;
+
     protected $table = 'diagnostic_report_performer';
 
     protected $fillable = [

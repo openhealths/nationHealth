@@ -68,10 +68,7 @@ class ConditionRepository extends BaseRepository
                         if (!empty($evidence['codes'])) {
                             foreach ($evidence['codes'] as $evidenceCode) {
                                 $code = Repository::codeableConcept()->store($evidenceCode);
-                                ConditionEvidence::create([
-                                    'condition_id' => $condition->id,
-                                    'codes_id' => $code->id
-                                ]);
+                                $condition->evidencesRelation()->create(['codes_id' => $code->id]);
                             }
                         }
 
@@ -81,10 +78,7 @@ class ConditionRepository extends BaseRepository
                                     ->store($evidenceDetail['identifier']['value']);
                                 Repository::codeableConcept()->attach($identifier, $evidenceDetail);
 
-                                ConditionEvidence::create([
-                                    'condition_id' => $condition->id,
-                                    'details_id' => $identifier->id
-                                ]);
+                                $condition->evidencesRelation()->create(['details_id' => $identifier->id]);
                             }
                         }
                     }
@@ -183,7 +177,6 @@ class ConditionRepository extends BaseRepository
         DB::transaction(function () use ($personId, $validatedData) {
             $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
 
-            // Load existing conditions with relations
             $existingConditions = $this->model->whereIn('uuid', $apiUuids)
                 ->withAllRelations()
                 ->get()
@@ -192,7 +185,6 @@ class ConditionRepository extends BaseRepository
             foreach ($validatedData as $data) {
                 $existing = $existingConditions->get($data['uuid']);
 
-                // Sync relationships
                 $asserter = $this->syncIdentifier($existing, $data['asserter'] ?? null, 'asserter');
                 $reportOrigin = $this->syncCodeableConcept($existing, $data['report_origin'] ?? null, 'reportOrigin');
                 $context = $this->syncIdentifier($existing, $data['context'], 'context');
@@ -216,7 +208,9 @@ class ConditionRepository extends BaseRepository
                     'verification_status' => $data['verification_status'],
                     'primary_source' => $data['primary_source'],
                     'onset_date' => $data['onset_date'],
-                    'asserted_date' => $data['asserted_date'] ?? null
+                    'asserted_date' => $data['asserted_date'] ?? null,
+                    'ehealth_inserted_at' => $data['ehealth_inserted_at'] ?? null,
+                    'ehealth_updated_at' => $data['ehealth_updated_at'] ?? null
                 ];
 
                 if ($existing) {
@@ -228,12 +222,13 @@ class ConditionRepository extends BaseRepository
                     );
                 }
 
-                // Sync body sites
-                $categoryIds = $this->syncCodeableConcepts($existing, $data['body_sites'] ?? [], 'bodySites');
-                $condition->bodySites()->sync($categoryIds);
+                $this->syncPivot(
+                    $condition,
+                    'bodySites',
+                    $this->syncCodeableConcepts($existing, $data['body_sites'] ?? [], 'bodySites')
+                );
 
-                // Sync evidences
-                $this->syncEvidences($condition, $existing, $data['evidences'] ?? []);
+                $this->syncEvidences($condition, $data['evidences'] ?? []);
             }
         });
     }
@@ -242,71 +237,54 @@ class ConditionRepository extends BaseRepository
      * Sync condition evidences (codes and details).
      *
      * @param  Condition  $condition
-     * @param  Condition|null  $existing
-     * @param  array  $evidencesData
+     * @param  array  $evidences
      * @return void
      */
-    private function syncEvidences(Condition $condition, ?Condition $existing, array $evidencesData): void
+    private function syncEvidences(Condition $condition, array $evidences): void
     {
-        if (empty($evidencesData)) {
-            // Remove all evidences if empty array
-            $condition->evidencesRelation->each(fn (ConditionEvidence $evidence) => $evidence->delete());
+        $existingEvidences = $condition->relationLoaded('evidencesRelation')
+            ? $condition->evidencesRelation
+            : collect();
+
+        if (empty($evidences)) {
+            $existingEvidences->each(fn (ConditionEvidence $evidence) => $evidence->delete());
 
             return;
         }
 
         $newEvidenceIds = [];
 
-        // Get existing evidences
-        $existingEvidences = $existing->evidencesRelation ?? collect();
+        foreach ($evidences as $evidence) {
+            if (!empty($evidence['codes'])) {
+                $existingEvidenceCodes = $existingEvidences->whereNotNull('codes_id')->values();
 
-        foreach ($evidencesData as $evidenceData) {
-            // Sync codes
-            if (!empty($evidenceData['codes'])) {
-                $existingCodes = $existingEvidences
-                    ->whereNotNull('codes_id')
-                    ->pluck('codes')
-                    ->filter()
-                    ->values();
+                foreach ($evidence['codes'] as $index => $codeData) {
+                    $existingEvidence = $existingEvidenceCodes[$index] ?? null;
 
-                foreach ($evidenceData['codes'] as $index => $codeData) {
-                    $existingCode = $existingCodes->get($index);
-
-                    if ($existingCode) {
-                        // Update existing codeable concept
-                        $this->updateCodeableConcept($existingCode, $codeData);
-                        $codeId = $existingCode->id;
+                    if ($existingEvidence) {
+                        $this->updateCodeableConcept($existingEvidence->codes, $codeData);
+                        $newEvidenceIds[] = $existingEvidence->id;
                     } else {
-                        // Create new codeable concept
                         $codeableConcept = Repository::codeableConcept()->store($codeData);
-                        $codeId = $codeableConcept->id;
+                        $newEvidence = $condition->evidencesRelation()->create([
+                            'codes_id' => $codeableConcept->id,
+                            'details_id' => null
+                        ]);
+                        $newEvidenceIds[] = $newEvidence->id;
                     }
-
-                    $evidence = $condition->evidencesRelation()->updateOrCreate([
-                        'codes_id' => $codeId,
-                        'details_id' => null
-                    ]);
-                    $newEvidenceIds[] = $evidence->id;
                 }
             }
 
-            // Sync details
-            if (!empty($evidenceData['details'])) {
-                $existingDetails = $existingEvidences
-                    ->whereNotNull('details_id')
-                    ->pluck('details')
-                    ->filter()
-                    ->values();
+            if (!empty($evidence['details'])) {
+                $existingEvidenceDetails = $existingEvidences->whereNotNull('details_id')->values();
 
-                foreach ($evidenceData['details'] as $index => $detailData) {
-                    $existingDetail = $existingDetails->get($index);
+                foreach ($evidence['details'] as $index => $detailData) {
+                    $existingEvidence = $existingEvidenceDetails[$index] ?? null;
 
-                    if ($existingDetail) {
-                        // Update existing identifier
-                        $this->updateIdentifier($existingDetail, $detailData);
-                        $identifierId = $existingDetail->id;
+                    if ($existingEvidence) {
+                        $this->updateIdentifier($existingEvidence->details, $detailData);
+                        $newEvidenceIds[] = $existingEvidence->id;
                     } else {
-                        // Create new identifier
                         $identifier = Repository::identifier()->store(
                             $detailData['identifier']['value'],
                             $detailData['display_value'] ?? null
@@ -314,22 +292,17 @@ class ConditionRepository extends BaseRepository
                         if (isset($detailData['identifier']['type'])) {
                             Repository::codeableConcept()->attach($identifier, $detailData);
                         }
-                        $identifierId = $identifier->id;
+                        $newEvidence = $condition->evidencesRelation()->create([
+                            'codes_id' => null,
+                            'details_id' => $identifier->id
+                        ]);
+                        $newEvidenceIds[] = $newEvidence->id;
                     }
-
-                    $evidence = $condition->evidencesRelation()->updateOrCreate([
-                        'codes_id' => null,
-                        'details_id' => $identifierId
-                    ]);
-                    $newEvidenceIds[] = $evidence->id;
                 }
             }
         }
 
-        // Remove evidences that are no longer present
-        $condition->evidencesRelation()
-            ->whereNotIn('id', $newEvidenceIds)
-            ->get()
+        $existingEvidences->filter(fn (ConditionEvidence $evidence) => !in_array($evidence->id, $newEvidenceIds, true))
             ->each(fn (ConditionEvidence $evidence) => $evidence->delete());
     }
 }

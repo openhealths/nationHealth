@@ -59,7 +59,7 @@ class EpisodeFullSync extends EHealthJob
             return;
         }
 
-        Repository::episode()->sync($this->personId, $validatedData);
+        Repository::episode()->syncFull($this->personId, $validatedData);
     }
 
     /**

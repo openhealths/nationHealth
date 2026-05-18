@@ -6,8 +6,7 @@ namespace App\Repositories\MedicalEvents;
 
 use App\Classes\eHealth\Api\PatientApi;
 use App\Models\MedicalEvents\Sql\Procedure;
-use App\Models\MedicalEvents\Sql\ProcedureComplicationDetail;
-use App\Models\MedicalEvents\Sql\ProcedureReasonReference;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
@@ -202,10 +201,7 @@ class ProcedureRepository extends BaseRepository
                         $identifier = Repository::identifier()->store($reasonReference['identifier']['value']);
                         Repository::codeableConcept()->attach($identifier, $reasonReference);
 
-                        ProcedureReasonReference::create([
-                            'procedure_id' => $procedure->id,
-                            'identifier_id' => $identifier->id ?? null
-                        ]);
+                        $procedure->reasonReferences()->create(['identifier_id' => $identifier->id ?? null]);
                     }
                 }
 
@@ -216,10 +212,7 @@ class ProcedureRepository extends BaseRepository
                         );
                         Repository::codeableConcept()->attach($identifier, $complicationDetail);
 
-                        ProcedureComplicationDetail::create([
-                            'procedure_id' => $procedure->id,
-                            'identifier_id' => $identifier->id ?? null
-                        ]);
+                        $procedure->complicationDetails()->create(['identifier_id' => $identifier->id ?? null]);
                     }
                 }
 
@@ -239,6 +232,39 @@ class ProcedureRepository extends BaseRepository
                 }
             }
         });
+    }
+
+    /**
+     * Get data that is related to the encounter.
+     *
+     * @param  string  $encounterUuid
+     * @return array|null
+     */
+    public function get(string $encounterUuid): ?array
+    {
+        $results = $this->model::with([
+            'basedOn.type.coding',
+            'code.type.coding',
+            'encounter.type.coding',
+            'recordedBy.type.coding',
+            'performer.type.coding',
+            'reportOrigin.coding',
+            'division.type.coding',
+            'managingOrganization.type.coding',
+            'reasonReferences.type.coding',
+            'outcome.coding',
+            'complicationDetails.type.coding',
+            'category.coding',
+            'paperReferral',
+            'usedCodes.coding',
+            'performedPeriod'
+        ])
+            ->whereHas('encounter', fn (Builder $query) => $query->where('value', $encounterUuid))
+            ->get()
+            ->toArray();
+
+        // Hide array of relationship data, accessories are used
+        return array_map(static fn (array $item) => Arr::except($item, ['performedPeriod']), $results);
     }
 
     /**
@@ -290,7 +316,7 @@ class ProcedureRepository extends BaseRepository
                     'performer_id' => $performer?->id,
                     'report_origin_id' => $reportOrigin?->id,
                     'division_id' => $division?->id,
-                    'managing_organization_id' => $managingOrganization?->id,
+                    'managing_organization_id' => $managingOrganization->id,
                     'outcome_id' => $outcome?->id,
                     'category_id' => $category->id
                 ];
@@ -310,52 +336,31 @@ class ProcedureRepository extends BaseRepository
 
                 Repository::period()->sync($procedure, $data['performed_period'] ?? [], 'performedPeriod');
 
-                $reasonReferenceIds = $this->syncIdentifiers($existing, $data['reason_references'] ?? [], 'reasonReferences');
-                $procedure->reasonReferences()->sync($reasonReferenceIds);
+                $this->syncPivot(
+                    $procedure,
+                    'reasonReferences',
+                    $this->syncIdentifiers($existing, $data['reason_references'] ?? [], 'reasonReferences')
+                );
 
-                $complicationDetailIds = $this->syncIdentifiers($existing, $data['complication_details'] ?? [], 'complicationDetails');
-                $procedure->complicationDetails()->sync($complicationDetailIds);
+                $this->syncPivot(
+                    $procedure,
+                    'complicationDetails',
+                    $this->syncIdentifiers($existing, $data['complication_details'] ?? [], 'complicationDetails')
+                );
 
-                $usedReferenceIds = $this->syncIdentifiers($existing, $data['used_references'] ?? [], 'usedReferences');
-                $procedure->usedReferences()->sync($usedReferenceIds);
+                $this->syncPivot(
+                    $procedure,
+                    'usedReferences',
+                    $this->syncIdentifiers($existing, $data['used_references'] ?? [], 'usedReferences')
+                );
 
-                $usedCodeIds = $this->syncCodeableConcepts($existing, $data['used_codes'] ?? [], 'usedCodes');
-                $procedure->usedCodes()->sync($usedCodeIds);
+                $this->syncPivot(
+                    $procedure,
+                    'usedCodes',
+                    $this->syncCodeableConcepts($existing, $data['used_codes'] ?? [], 'usedCodes')
+                );
             }
         });
-    }
-
-    /**
-     * Get data that is related to the encounter.
-     *
-     * @param  string  $encounterUuid
-     * @return array|null
-     */
-    public function get(string $encounterUuid): ?array
-    {
-        $results = $this->model::with([
-            'basedOn.type.coding',
-            'code.type.coding',
-            'encounter.type.coding',
-            'recordedBy.type.coding',
-            'performer.type.coding',
-            'reportOrigin.coding',
-            'division.type.coding',
-            'managingOrganization.type.coding',
-            'reasonReferences.type.coding',
-            'outcome.coding',
-            'complicationDetails.type.coding',
-            'category.coding',
-            'paperReferral',
-            'usedCodes.coding',
-            'performedPeriod'
-        ])
-            ->whereHas('encounter', fn ($query) => $query->where('value', $encounterUuid))
-            ->get()
-            ->toArray();
-
-        // Hide array of relationship data, accessories are used
-        return array_map(static fn (array $item) => Arr::except($item, ['performedPeriod']), $results);
     }
 
     /**

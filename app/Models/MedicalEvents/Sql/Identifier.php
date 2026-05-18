@@ -15,7 +15,8 @@ class Identifier extends Model
 
     protected $fillable = [
         'value',
-        'display_value'
+        'display_value',
+        'identifier_id'
     ];
 
     protected $appends = ['identifier'];

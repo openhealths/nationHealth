@@ -6,6 +6,7 @@ namespace App\Repositories\MedicalEvents;
 
 use App\Models\MedicalEvents\Sql\Identifier as SqlIdentifier;
 
+/** @property SqlIdentifier $model  */
 class IdentifierRepository extends BaseRepository
 {
     /**
@@ -17,7 +18,7 @@ class IdentifierRepository extends BaseRepository
      */
     public function store(string $value, ?string $displayValue = null): SqlIdentifier
     {
-        return $this->model::create([
+        return $this->model->create([
             'value' => $value,
             'display_value' => $displayValue
         ]);
