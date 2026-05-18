@@ -42,17 +42,19 @@
             <input type="text"
                    class="input peer ps-10 w-full"
                    placeholder="{{ __('care-plan.medication_search_placeholder') }}"
+                   wire:model.live.debounce.400ms="searchQuery"
+                   wire:keydown.enter="searchMedications"
             />
         </div>
     </div>
 
     {{-- Action Buttons --}}
     <div class="flex flex-wrap gap-2 mb-6">
-        <button type="button" class="button-primary flex items-center gap-2">
+        <button type="button" wire:click="searchMedications" class="button-primary flex items-center gap-2">
             @icon('search', 'w-4 h-4')
             <span>{{ __('forms.search') }}</span>
         </button>
-        <button type="button" class="button-primary-outline-red">
+        <button type="button" wire:click="$set('searchQuery', '')" class="button-primary-outline-red">
             {{ __('forms.reset_all_filters') }}
         </button>
         <button type="button"
@@ -102,51 +104,32 @@
 
     {{-- Results --}}
     <div class="space-y-4 mb-6">
-        <fieldset class="fieldset">
-            <legend class="legend">
-                {{ __('care-plan.example_medication_name') }}
-            </legend>
+        @forelse($searchResults as $drug)
+            <fieldset class="fieldset">
+                <legend class="legend">
+                    {{ $drug['name'] ?? 'Лікарський засіб' }}
+                </legend>
 
-            <div class="space-y-1 text-sm text-gray-700 dark:text-gray-300 mb-4">
-                <p><span class="text-gray-500">{{ __('care-plan.inn_basic') }}:</span> дротаверин (drotaverine), 20.0 мг/мл/</p>
-                <p><span class="text-gray-500">{{ __('care-plan.dosage_form') }}:</span> розчин для ін'єкцій</p>
-                <p><span class="text-gray-500">{{ __('care-plan.release_form') }}:</span> ампула</p>
-                <p><span class="text-gray-500">{{ __('care-plan.package_quantity') }}:</span> №10, №20, №50, №200</p>
-                <p><span class="text-gray-500">{{ __('care-plan.otc_sign') }}:</span> так</p>
-                <p><span class="text-gray-500">{{ __('care-plan.maintenance_dose') }}:</span></p>
-                <p><span class="text-gray-500">{{ __('care-plan.max_daily_dose') }}:</span></p>
-                <p><span class="text-gray-500">{{ __('care-plan.prescription_form_type') }}:</span> Ф-1</p>
+                <div class="space-y-1 text-sm text-gray-700 dark:text-gray-300 mb-4">
+                    <p><span class="text-gray-500">{{ __('care-plan.inn_basic') }}:</span> {{ $drug['innm_name'] ?? 'МНН відсутнє' }}</p>
+                    <p><span class="text-gray-500">{{ __('care-plan.dosage_form') }}:</span> {{ $drug['dosage_form'] ?? 'Форма випуску відсутня' }}</p>
+                    <p><span class="text-gray-500">Код АТХ:</span> {{ $drug['medication_code_atc'] ?? '-' }}</p>
+                    <p><span class="text-gray-500">Одиниця виміру:</span> {{ $drug['package_unit'] ?? '-' }}</p>
+                </div>
+
+                <button type="button" wire:click="selectProduct({{ json_encode($drug) }}, 'medication_request')" class="button-primary">
+                    Обрати для призначення
+                </button>
+            </fieldset>
+        @empty
+            <div class="text-center py-8 text-gray-400 italic">
+                @if(empty($searchQuery))
+                    Введіть запит для пошуку лікарських засобів
+                @else
+                    Нічого не знайдено за запитом "{{ $searchQuery }}"
+                @endif
             </div>
-
-            <button type="button" class="button-primary" @click="showMedicationFormDrawer = true">
-                {{ __('forms.add') }}
-            </button>
-        </fieldset>
-
-        <fieldset class="fieldset">
-            <legend class="legend">
-                {{ __('care-plan.example_medication_name') }}
-            </legend>
-
-            <div class="space-y-1 text-sm text-gray-700 dark:text-gray-300 mb-4">
-                <p><span class="text-gray-500">{{ __('care-plan.inn_basic') }}:</span> дротаверин (drotaverine), 20.0 мг/мл/</p>
-                <p><span class="text-gray-500">{{ __('care-plan.dosage_form') }}:</span> розчин для ін'єкцій</p>
-                <p><span class="text-gray-500">{{ __('care-plan.release_form') }}:</span> ампула</p>
-                <p><span class="text-gray-500">{{ __('care-plan.package_quantity') }}:</span> №10, №20, №50, №200</p>
-                <p><span class="text-gray-500">{{ __('care-plan.otc_sign') }}:</span> так</p>
-                <p><span class="text-gray-500">{{ __('care-plan.maintenance_dose') }}:</span></p>
-                <p><span class="text-gray-500">{{ __('care-plan.max_daily_dose') }}:</span></p>
-                <p><span class="text-gray-500">{{ __('care-plan.prescription_form_type') }}:</span> Ф-1</p>
-            </div>
-
-            <button type="button" class="button-primary" @click="showMedicationFormDrawer = true">
-                {{ __('forms.add') }}
-            </button>
-        </fieldset>
-    </div>
-
-    <div class="mt-8 pl-3.5 pb-8 lg:pl-8 2xl:pl-5">
-        {{--{{ $care-plan->links() }}--}}
+        @endforelse
     </div>
 
     <div class="mt-6">

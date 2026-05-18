@@ -42,17 +42,19 @@
             <input type="text"
                    class="input peer ps-10 w-full"
                    placeholder="Киснева терапія"
+                   wire:model.live.debounce.400ms="searchQuery"
+                   wire:keydown.enter="searchServices"
             />
         </div>
     </div>
 
     {{-- Action Buttons --}}
     <div class="flex flex-wrap gap-2 mb-6">
-        <button type="button" class="button-primary flex items-center gap-2">
+        <button type="button" wire:click="searchServices" class="button-primary flex items-center gap-2">
             @icon('search', 'w-4 h-4')
             <span>{{ __('forms.search') }}</span>
         </button>
-        <button type="button" class="button-primary-outline-red">
+        <button type="button" wire:click="$set('searchQuery', '')" class="button-primary-outline-red">
             {{ __('forms.reset_all_filters') }}
         </button>
         <button type="button"
@@ -109,46 +111,48 @@
                     <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.allowed_in_em_short') }}</th>
                     <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.code') }}</th>
                     <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.status') }}</th>
-                    <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.action') }}</th>
+                    <th scope="col" class="px-4 py-3 font-medium text-right">{{ __('care-plan.action') }}</th>
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td class="px-4 py-3">
-                        <div>
-                            <p class="font-medium text-gray-500 dark:text-white">Направлення до спеціаліста</p>
-                            <p class="text-xs text-gray-500">e1230-0f3</p>
-                        </div>
-                    </td>
-                    <td class="px-4 py-3 text-gray-500">+</td>
-                    <td class="px-4 py-3"></td>
-                    <td class="px-4 py-3">
-                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">{{ __('care-plan.active') }}</span>
-                    </td>
-                    <td class="px-4 py-3"></td>
-                </tr>
-                <tr>
-                    <td class="px-4 py-3">
-                        <span class="font-medium text-gray-500 dark:text-white">Лікувально-діагностичні процедури</span>
-                    </td>
-                    <td class="px-4 py-3 text-gray-500">+</td>
-                    <td class="px-4 py-3"></td>
-                    <td class="px-4 py-3">
-                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">{{ __('care-plan.inactive') }}</span>
-                    </td>
-                    <td class="px-4 py-3"></td>
-                </tr>
-                <tr>
-                    <td class="px-4 py-3">
-                        <span class="font-medium text-gray-500 dark:text-white">Діагностичні процедури</span>
-                    </td>
-                    <td class="px-4 py-3 text-gray-500">+</td>
-                    <td class="px-4 py-3"></td>
-                    <td class="px-4 py-3">
-                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">{{ __('care-plan.active') }}</span>
-                    </td>
-                    <td class="px-4 py-3"></td>
-                </tr>
+                @forelse($searchResults as $service)
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td class="px-4 py-3">
+                            <div>
+                                <p class="font-medium text-gray-900 dark:text-white">{{ $service['name'] ?? '' }}</p>
+                                <p class="text-xs text-gray-500">{{ $service['code'] ?? '' }}</p>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-gray-500">
+                            {{ ($service['request_allowed'] ?? true) ? '+' : '-' }}
+                        </td>
+                        <td class="px-4 py-3 font-mono text-xs">
+                            {{ $service['code'] ?? '' }}
+                        </td>
+                        <td class="px-4 py-3">
+                            @if($service['is_active'] ?? true)
+                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">{{ __('care-plan.active') }}</span>
+                            @else
+                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">{{ __('care-plan.inactive') }}</span>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <button type="button" wire:click="selectProduct({{ json_encode($service) }}, 'service_request')" class="button-primary-outline text-xs">
+                                Обрати
+                            </button>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="5" class="px-4 py-8 text-center text-gray-400 italic">
+                            @if(empty($searchQuery))
+                                Введіть запит для пошуку послуг
+                            @else
+                                Нічого не знайдено за запитом "{{ $searchQuery }}"
+                            @endif
+                        </td>
+                    </tr>
+                @endforelse
             </tbody>
         </table>
     </div>
