@@ -11,6 +11,7 @@ use App\Traits\SyncsMorphManyRelations;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Employee\EmployeeRequest;
 use Eloquence\Behaviours\HasCamelCasing;
+use App\Models\ReorganizationEmployeeDeclaration;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
@@ -70,6 +71,11 @@ class Party extends Model
     public function employees(): HasMany
     {
         return $this->hasMany(Employee::class, 'party_id');
+    }
+
+    public function reorganizedEmployees(): HasMany
+    {
+        return $this->hasMany(ReorganizationEmployeeDeclaration::class, 'party_id');
     }
 
     public function employeeRequests(): HasMany

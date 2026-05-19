@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Models\Relations\Party;
 use Illuminate\Database\Eloquent\Relations\Pivot;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ReorganizationEmployeeDeclaration extends Pivot
 {
@@ -23,4 +25,9 @@ class ReorganizationEmployeeDeclaration extends Pivot
         'authorize_with',
         'updated_at'
     ];
+
+    public function party(): BelongsTo
+    {
+        return $this->belongsTo(Party::class, 'party_id');
+    }
 }

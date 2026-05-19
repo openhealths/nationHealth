@@ -251,7 +251,7 @@
                     <span class="ms-1">{{__('forms.not_process_of_reorganization')}}</span>
                 </div>
                 @else
-                <div class="status-alert-cyan status-alert-full mb-6">
+                <div class="status-info-cyan status-alert-full mb-6">
                     <span class="flex-shrink-0">
                         @icon('check-circle', 'w-5 h-5 text-green-700 mr-3')
                     </span>
