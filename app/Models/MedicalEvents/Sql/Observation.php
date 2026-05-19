@@ -225,7 +225,13 @@ class Observation extends Model
             'referenceRanges',
             'components.code.coding',
             'components.interpretation.coding',
+            'components.value.valueQuantity',
             'components.value.valueCodeableConcept.coding',
+            'components.value.valueRange.low',
+            'components.value.valueRange.high',
+            'components.value.valueRatio.numerator',
+            'components.value.valueRatio.denominator',
+            'components.value.valueSampledData',
             'components.referenceRanges'
         ]);
     }
