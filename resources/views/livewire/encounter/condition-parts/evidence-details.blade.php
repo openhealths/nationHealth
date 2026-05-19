@@ -32,10 +32,9 @@
                     ></td>
                     <td class="td-input"
                         x-text="`${ detail.codeCode } - ${
-                            $wire.dictionaries['eHealth/LOINC/observation_codes']?.[detail.codeCode] ||
-                            $wire.dictionaries['eHealth/ICF/classifiers']?.[detail.codeCode] ||
-                            $wire.dictionaries['eHealth/ICPC2/condition_codes']?.[detail.codeCode] ||
-                            $wire.dictionaries['eHealth/ICD10_AM/condition_codes']?.[detail.codeCode]
+                            $wire.dictionaries['eHealth/LOINC/observation_codes'][detail.codeCode] ||
+                            $wire.dictionaries['eHealth/ICF/classifiers'][detail.codeCode] ||
+                            $wire.dictionaries['eHealth/ICPC2/condition_codes'][detail.codeCode]
                         }`"
                     ></td>
                     <td class="td-input">
@@ -178,7 +177,7 @@
                                     {{-- Search button --}}
                                     <div>
                                         <button @click.prevent="
-                                                $wire.searchConditionsOrObservations(modalEvidenceDetail.type).then(() => {
+                                                $wire.searchEvidenceDetails(modalEvidenceDetail.type).then(() => {
                                                     searchResults = JSON.parse(JSON.stringify($wire.evidenceDetails));
                                                     selectedEvidenceDetailIds = [];
                                                 })"
@@ -217,10 +216,9 @@
                                                         </th>
                                                         <td class="td-input"
                                                             x-text="`${ condition.codeCode } - ${
-                                                                $wire.dictionaries['eHealth/LOINC/observation_codes']?.[condition.codeCode] ||
-                                                                $wire.dictionaries['eHealth/ICF/classifiers']?.[condition.codeCode] ||
-                                                                $wire.dictionaries['eHealth/ICPC2/condition_codes']?.[condition.codeCode] ||
-                                                                $wire.dictionaries['eHealth/ICD10_AM/condition_codes']?.[condition.codeCode]
+                                                                $wire.dictionaries['eHealth/LOINC/observation_codes'][condition.codeCode] ||
+                                                                $wire.dictionaries['eHealth/ICF/classifiers'][condition.codeCode] ||
+                                                                $wire.dictionaries['eHealth/ICPC2/condition_codes'][condition.codeCode]
                                                             }`"
                                                         ></td>
                                                         <td class="td-input">

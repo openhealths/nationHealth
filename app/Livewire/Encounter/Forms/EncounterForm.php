@@ -565,7 +565,7 @@ class EncounterForm extends BaseForm
             ],
 
             //            'clinicalImpressions' => ['nullable', 'array'],
-                            // for edit page
+            // for edit page
             //            'clinicalImpressions.*.uuid' => ['nullable', 'uuid'],
             //            'clinicalImpressions.*.code.coding.*.code' => [
             //                'required_with:clinicalImpressions',

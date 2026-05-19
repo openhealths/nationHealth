@@ -70,7 +70,7 @@
                     <div>
                         <div class="form-row-2">
                             <div class="form-group group">
-                                <input x-model="modalProcedure.paperReferralRequisition"
+                                <input x-model="modalProcedure.paperReferral.requisition"
                                        type="text"
                                        name="requisition"
                                        id="requisition"
@@ -82,13 +82,13 @@
                                     {{ __('forms.number') }}
                                 </label>
 
-                                @error('form.procedures.*.paperReferralRequisition')
+                                @error('form.procedures.paperReferral.requisition')
                                 <p class="text-error">{{ $message }}</p>
                                 @enderror
                             </div>
 
                             <div class="form-group group">
-                                <input x-model="modalProcedure.paperReferralRequesterEmployeeName"
+                                <input x-model="modalProcedure.paperReferral.requesterEmployeeName"
                                        type="text"
                                        name="requesterEmployeeName"
                                        id="requesterEmployeeName"
@@ -100,7 +100,7 @@
                                     {{ __('patients.author') }}
                                 </label>
 
-                                @error('form.procedures.*.paperReferralRequesterEmployeeName')
+                                @error('form.procedures.paperReferral.requesterEmployeeName')
                                 <p class="text-error">{{ $message }}</p>
                                 @enderror
                             </div>
@@ -108,7 +108,7 @@
 
                         <div class="form-row-2">
                             <div class="form-group group">
-                                <input x-model="modalProcedure.paperReferralRequesterLegalEntityEdrpou"
+                                <input x-model="modalProcedure.paperReferral.requesterLegalEntityEdrpou"
                                        type="text"
                                        name="requesterLegalEntityEdrpou"
                                        id="requesterLegalEntityEdrpou"
@@ -122,13 +122,13 @@
                                     {{ __('patients.edrpou_of_the_issuing_institution') }}
                                 </label>
 
-                                @error('form.procedures.*.paperReferralRequesterLegalEntityEdrpou')
+                                @error('form.procedures.paperReferral.requesterLegalEntityEdrpou')
                                 <p class="text-error">{{ $message }}</p>
                                 @enderror
                             </div>
 
                             <div class="form-group group">
-                                <input x-model="modalProcedure.paperReferralRequesterLegalEntityName"
+                                <input x-model="modalProcedure.paperReferral.requesterLegalEntityName"
                                        type="text"
                                        name="requesterLegalEntityName"
                                        id="requesterLegalEntityName"
@@ -141,7 +141,7 @@
                                     {{ __('patients.name_of_the_institution_that_issued_it') }}
                                 </label>
 
-                                @error('form.procedures.*.paperReferralRequesterLegalEntityName')
+                                @error('form.procedures.paperReferral.requesterLegalEntityName')
                                 <p class="text-error">{{ $message }}</p>
                                 @enderror
                             </div>
@@ -150,7 +150,7 @@
                         <div class="form-row-modal">
                             <div class="form-group group">
                                 <div class="datepicker-wrapper">
-                                    <input x-model="modalProcedure.paperReferralServiceRequestDate"
+                                    <input x-model="modalProcedure.paperReferral.serviceRequestDate"
                                            type="text"
                                            name="serviceRequestDate"
                                            id="serviceRequestDate"
@@ -163,14 +163,14 @@
                                         {{ __('forms.date') }}
                                     </label>
 
-                                    @error('form.procedures.*.paperReferralServiceRequestDate')
+                                    @error('form.procedures.paperReferral.serviceRequestDate')
                                     <p class="text-error">{{ $message }}</p>
                                     @enderror
                                 </div>
                             </div>
 
                             <div class="form-group group">
-                                <input x-model="modalProcedure.paperReferralNote"
+                                <input x-model="modalProcedure.paperReferral.note"
                                        type="text"
                                        name="paperNote"
                                        id="paperNote"
@@ -182,7 +182,7 @@
                                     {{ __('patients.notes') }}
                                 </label>
 
-                                @error('form.procedures.*.paperReferralNote')
+                                @error('form.procedures.paperReferral.note')
                                 <p class="text-error">{{ $message }}</p>
                                 @enderror
                             </div>
@@ -195,7 +195,7 @@
         {{-- Category --}}
         <div class="form-row-2">
             <div class="form-group group">
-                <select x-model="modalProcedure.categoryCode"
+                <select x-model="modalProcedure.category.coding[0].code"
                         id="category"
                         class="input-select peer"
                         type="text"
@@ -209,7 +209,7 @@
                     @endforeach
                 </select>
 
-                @error('form.procedures.*.categoryCode')
+                @error('form.procedures.category.coding.*.code')
                 <p class="text-error">{{ $message }}</p>
                 @enderror
             </div>
@@ -218,7 +218,7 @@
         {{-- Services --}}
         <div class="form-row-2 relative z-1">
             <div class="form-group group">
-                <x-select2 modelPath="modalProcedure.codeValue"
+                <x-select2 modelPath="modalProcedure.code.identifier.value"
                            dictionaryName="custom/services"
                            id="serviceCode"
                            class="input peer"
@@ -227,7 +227,7 @@
                     {{ __('forms.select')}} {{ mb_strtolower(__('forms.services')) }} *
                 </label>
 
-                @error('form.procedures.*.codeValue')
+                @error('form.procedures.code.identifier.value')
                 <p class="text-error">{{ $message }}</p>
                 @enderror
             </div>
@@ -236,10 +236,10 @@
         {{-- Divisions --}}
         <div class="form-row-2">
             <div class="form-group group">
-                <select x-model="modalProcedure.divisionId"
+                <select x-model="modalProcedure.division.identifier.value"
                         @if(count($divisions) === 1)
                             {{-- Set division by default if only one exist --}}
-                            x-init="modalProcedure.divisionId = '{{ $divisions[0]['uuid'] }}';"
+                            x-init="modalProcedure.division.identifier.value = '{{ $divisions[0]['uuid'] }}';"
                         @endif
                         id="divisionNames"
                         class="input-select peer"
@@ -252,7 +252,7 @@
                     @endforeach
                 </select>
 
-                @error('form.procedures.*.divisionId')
+                @error('form.procedures.division.identifier.value')
                 <p class="text-error">{{ $message }}</p>
                 @enderror
             </div>
@@ -261,7 +261,7 @@
         {{-- Outcome --}}
         <div class="form-row-modal">
             <div class="form-group group">
-                <select x-model="modalProcedure.outcomeCode"
+                <select x-model="modalProcedure.outcome.coding[0].code"
                         id="outcome"
                         class="input-select peer"
                         type="text"
@@ -274,7 +274,7 @@
                     @endforeach
                 </select>
 
-                @error('form.procedures.*.outcomeCode')
+                @error('form.procedures.outcome.coding.*.code')
                 <p class="text-error">{{ $message }}</p>
                 @enderror
             </div>

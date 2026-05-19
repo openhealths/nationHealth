@@ -1,20 +1,20 @@
-<div class="relative" id="immunizations-section">
-    <fieldset class="fieldset"
-              x-data="{
-                  immunizations: $wire.entangle('form.immunizations'),
-                  openModal: false,
-                  showDuplicateCodeWarning: false,
-                  modalImmunization: new Immunization(),
-                  newImmunization: false,
-                  item: 0,
-                  vaccineCodesDictionary: $wire.dictionaries['eHealth/vaccine_codes'],
-                  reasonExplanationsDictionary: $wire.dictionaries['eHealth/reason_explanations'],
-                  reasonNotGivenExplanationsDictionary: $wire.dictionaries['eHealth/reason_not_given_explanations']
-              }"
-    >
-        <legend class="legend">
-            <h2>{{ __('patients.immunizations') }}</h2>
-        </legend>
+<div class="p-4 sm:p-8"
+     id="immunizations-section"
+     x-data="{
+         immunizations: $wire.entangle('form.immunizations'),
+         openModal: false,
+         showDuplicateCodeWarning: false,
+         modalImmunization: new Immunization(),
+         newImmunization: false,
+         item: 0,
+         vaccineCodesDictionary: $wire.dictionaries['eHealth/vaccine_codes'],
+         reasonExplanationsDictionary: $wire.dictionaries['eHealth/reason_explanations'],
+         reasonNotGivenExplanationsDictionary: $wire.dictionaries['eHealth/reason_not_given_explanations']
+     }"
+>
+    <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
+        {{ __('patients.immunizations') }}
+    </h2>
 
         <table class="table-input w-inherit">
             <thead class="thead-input">
@@ -73,7 +73,7 @@
                                  }
                              }"
                              @keydown.escape.prevent.stop="close($refs.button)"
-                             @focusin.window="!$refs.panel.contains($event.target) && close()"
+                             @focusin.window="! $refs.panel.contains($event.target) && close()"
                              x-id="['dropdown-button']"
                              class="relative"
                         >
@@ -248,7 +248,6 @@
                 </div>
             </template>
         </div>
-    </fieldset>
 </div>
 
 <script>

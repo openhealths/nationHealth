@@ -1,7 +1,4 @@
-<fieldset class="fieldset" id="patient-data-section">
-    <legend class="legend">
-        {{ __('patients.main_data') }}
-    </legend>
+<div class="p-4 sm:p-8" id="patient-data-section">
 
     <div x-data="{ isReferralAvailable: false }">
         <div class="form-row-3">
@@ -198,4 +195,4 @@
             </div>
         </template>
     </div>
-</fieldset>
+</div>

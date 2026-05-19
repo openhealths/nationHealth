@@ -1,17 +1,17 @@
-<div class="relative" id="diagnostic-reports-section">
-    <fieldset class="fieldset"
-              x-data="{
-                  diagnosticReports: $wire.entangle('form.diagnosticReports'),
-                  modalDiagnosticReport: new DiagnosticReport(),
-                  newDiagnosticReport: false,
-                  item: 0,
-                  diagnosticReportCategoriesDictionary: $wire.dictionaries['eHealth/diagnostic_report_categories'],
-                  servicesDictionary: $wire.dictionaries['custom/services']
-              }"
-    >
-        <legend class="legend">
-            <h2>{{ __('patients.diagnostic_reports') }}</h2>
-        </legend>
+<div class="p-4 sm:p-8"
+     id="diagnostic-reports-section"
+     x-data="{
+         diagnosticReports: $wire.entangle('form.diagnosticReports'),
+         modalDiagnosticReport: new DiagnosticReport(),
+         newDiagnosticReport: false,
+         item: 0,
+         diagnosticReportCategoriesDictionary: $wire.dictionaries['eHealth/diagnostic_report_categories'],
+         servicesDictionary: $wire.dictionaries['custom/services']
+     }"
+>
+    <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
+        {{ __('patients.diagnostic_reports') }}
+    </h2>
 
         {{-- Show saved data in table --}}
         <table class="table-input w-inherit">
@@ -53,7 +53,7 @@
                                  }
                              }"
                              @keydown.escape.prevent.stop="close($refs.button)"
-                             @focusin.window="!$refs.panel.contains($event.target) && close()"
+                             @focusin.window="! $refs.panel.contains($event.target) && close()"
                              x-id="['dropdown-button']"
                              class="relative"
                         >
@@ -180,7 +180,6 @@
                 </form>
             </div>
         </template>
-    </fieldset>
 </div>
 
 <script>
@@ -190,7 +189,7 @@
     class DiagnosticReport {
         constructor(obj = null) {
             const now = new Date();
-            const startTime = new Date(now.getTime() - 15 * 60 * 1000);
+            const endTime = new Date(now.getTime() + 15 * 60 * 1000);
 
             this.categoryCode = '';
             this.codeValue = '';
@@ -212,10 +211,10 @@
             this.resultsInterpreterEmployeeId = '';
             this.issuedDate = now.toISOString().split('T')[0];
             this.issuedTime = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
-            this.effectivePeriodStartDate = startTime.toISOString().split('T')[0];
-            this.effectivePeriodStartTime = startTime.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
-            this.effectivePeriodEndDate = now.toISOString().split('T')[0];
-            this.effectivePeriodEndTime = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
+            this.effectivePeriodStartDate = now.toISOString().split('T')[0];
+            this.effectivePeriodStartTime = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
+            this.effectivePeriodEndDate = endTime.toISOString().split('T')[0];
+            this.effectivePeriodEndTime = endTime.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
 
             if (obj) {
                 Object.assign(this, JSON.parse(JSON.stringify(obj)));
