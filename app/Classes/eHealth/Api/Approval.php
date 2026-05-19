@@ -77,6 +77,8 @@ class Approval extends Request
      */
     public function resendSms(string $patientId, string $approvalId): PromiseInterface|EHealthResponse
     {
+        // Зворотна сумісність: спочатку пробуємо новий ендпоінт без префіксу пацієнта (згідно нової специфікації).
+        // Якщо отримуємо HTTP-помилку (наприклад 404, яка викидає виняток), робимо fallback-запит на стару адресу з patientId.
         try {
             return $this->post("/api/approvals/{$approvalId}/actions/resend", []);
         } catch (\Exception $e) {
