@@ -14,6 +14,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use App\Core\Arr;
 
 class Observation extends PatientApiBase
 {
@@ -63,7 +64,7 @@ class Observation extends PatientApiBase
     {
         $this->setDefaultPageSize();
 
-        $mergedQuery = array_merge($this->options['query'], $query ?? []);
+        $mergedQuery = array_merge($this->options['query'], $this->format($query, ['issued_from', 'issued_to']));
 
         return $this->get(self::URL . "/$patientId/summary/observations", $mergedQuery);
     }
@@ -125,7 +126,7 @@ class Observation extends PatientApiBase
     {
         $replaced = [];
         foreach ($response->getData() as $data) {
-            $replaced[] = $this->replaceEHealthPropNames($data);
+            $replaced[] = $this->replaceEHealthPropNames(Arr::toSnakeCase($data));
         }
 
         $rules = collect($this->observationValidationRules())
@@ -186,16 +187,48 @@ class Observation extends PatientApiBase
             // Effective period
             ValidationRuleBuilder::periodRules(),
 
+            // Observation value
+            $this->valueValidationRules(),
+
             // Components
             [
                 'components' => ['nullable', 'array'],
                 'components.*.reference_ranges' => ['nullable', 'array'],
-
-                'components.*.value_codeable_concept.coding.*.extension' => ['nullable', 'array']
+                'components.*.value_codeable_concept.coding.*.extension' => ['nullable', 'array'],
             ],
             ValidationRuleBuilder::codeableConceptRules('components.*.code'),
             ValidationRuleBuilder::codeableConceptRules('components.*.interpretation'),
-            ValidationRuleBuilder::codeableConceptRules('components.*.value_codeable_concept')
+            $this->valueValidationRules('components.*.')
+        );
+    }
+
+    /**
+     * Validation rules for observation value fields.
+     *
+     * @param  string  $prefix
+     * @return array
+     */
+    private function valueValidationRules(string $prefix = ''): array
+    {
+        return ValidationRuleBuilder::merge(
+            [
+                $prefix . 'value_quantity' => ['nullable', 'array'],
+                $prefix . 'value_quantity.value' => ['required_with:' . $prefix . 'value_quantity', 'numeric'],
+                $prefix . 'value_quantity.comparator' => ['nullable', 'string', 'max:255'],
+                $prefix . 'value_quantity.unit' => ['nullable', 'string', 'max:255'],
+                $prefix . 'value_quantity.system' => ['nullable', 'string', 'max:255'],
+                $prefix . 'value_quantity.code' => ['nullable', 'string', 'max:255'],
+
+                $prefix . 'value_string' => ['nullable', 'string'],
+                $prefix . 'value_boolean' => ['nullable', 'boolean'],
+                $prefix . 'value_date_time' => ['nullable', 'date'],
+                $prefix . 'value_time' => ['nullable', 'string', 'max:255'],
+
+                $prefix . 'value_range' => ['nullable', 'array'],
+                $prefix . 'value_ratio' => ['nullable', 'array'],
+                $prefix . 'value_sampled_data' => ['nullable', 'array'],
+            ],
+            ValidationRuleBuilder::codeableConceptRules($prefix . 'value_codeable_concept')
         );
     }
 

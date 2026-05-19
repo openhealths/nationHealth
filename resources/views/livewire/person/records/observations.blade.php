@@ -948,11 +948,11 @@
                                         <div>
                                             <div class="record-inner-label">{{ __('patients.value') }}</div>
                                             <div class="record-inner-value">
-                                                {{ data_get($observation, 'components.0.') ?? '-' }}
+                                                {{ $this->displayObservationValue($observation) }}
                                             </div>
                                         </div>
                                         <div>
-                                            <div class="record-inner-label">{{ __('patients.getting_indicators') }}</div>
+                                            <div class="record-inner-label">Отримання показників</div>
                                             <div class="record-inner-value">
                                                 {{ data_get($observation, 'effectiveDate')
                                                     ? substr(data_get($observation, 'effectiveDate'), 8, 2) . '.' . substr(data_get($observation, 'effectiveDate'), 5, 2) . '.' . substr(data_get($observation, 'effectiveDate'), 0, 4) . (data_get($observation, 'effectiveTime') ? ' ' . data_get($observation, 'effectiveTime') : '')
@@ -1025,7 +1025,7 @@
                                     </div>
                                 </div>
                                 <div class="min-w-0">
-                                    <div class="record-inner-label">{{ __('patients.medical_record_id') }}</div>
+                                    <div class="record-inner-label">ID Мед. Запису</div>
                                     <div class="record-inner-id-value">
                                         {{ data_get($observation, 'context.identifier.value') ?? '-' }}
                                     </div>
@@ -1035,7 +1035,7 @@
                     </div>
                 @empty
                     <div class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-sm text-gray-500 dark:text-gray-400">
-                        {{ __('patients.observations_not_found') }}
+                        Обстежень не знайдено
                     </div>
                 @endforelse
             </div>

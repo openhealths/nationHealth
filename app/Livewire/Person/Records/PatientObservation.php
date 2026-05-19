@@ -13,6 +13,7 @@ use App\Models\LegalEntity;
 use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
+use Carbon\CarbonImmutable;
 use Illuminate\View\View;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Session;
@@ -27,16 +28,6 @@ class PatientObservation extends BasePatientComponent
     use WithPagination;
     
     public array $observations = [];
-
-    public array $episodes = [];
-
-    public array $encounters = [];
-
-    public array $diagnosticReports = [];
-
-    public array $devices = [];
-
-    public array $specimens = [];
 
     public array $filterCodeOptions = [];
 
@@ -182,7 +173,7 @@ class PatientObservation extends BasePatientComponent
             Session::flash('success', __('patients.messages.observation_synced_successfully'));
         }
 
-        $this->observations = Arr::toCamelCase($this->formatDatesForDisplay($validatedData));
+       $this->loadObservationsFromDb();
     }
 
     public function updatedPage(): void
@@ -448,6 +439,111 @@ class PatientObservation extends BasePatientComponent
         $this->observations = Arr::toCamelCase($observations);
     }
 
+    public function displayObservationValue(array $observation): string
+    {
+        $directValue = $this->resolveObservationValue($observation);
+
+        if ($directValue !== null) {
+            return $directValue;
+        }
+
+        $componentValues = collect(data_get($observation, 'components', []))
+            ->map(function (array $component): ?string {
+                $value = $this->resolveObservationValue($component);
+
+                if ($value === null) {
+                    return null;
+                }
+
+                $code = $this->displayCodeableConcept(data_get($component, 'code'));
+
+                return $code ? $code . ': ' . $value : $value;
+            })
+            ->filter()
+            ->values()
+            ->toArray();
+
+        return $componentValues ? implode('; ', $componentValues) : '-';
+    }
+
+    private function resolveObservationValue(array $item): ?string
+    {
+        $quantity = data_get($item, 'valueQuantity') ?? data_get($item, 'value.valueQuantity');
+
+        if (is_array($quantity)) {
+            return collect([
+                data_get($quantity, 'value'),
+                data_get($quantity, 'unit') ?: data_get($quantity, 'code'),
+            ])->filter(static fn ($value) => $value !== null && $value !== '')->implode(' ') ?: null;
+        }
+
+        $codeableConcept = data_get($item, 'valueCodeableConcept') ?? data_get($item, 'value.valueCodeableConcept');
+
+        if (is_array($codeableConcept)) {
+            return $this->displayCodeableConcept($codeableConcept);
+        }
+
+        foreach (['valueString', 'value.valueString'] as $path) {
+            $value = data_get($item, $path);
+
+            if ($value !== null && $value !== '') {
+                return (string) $value;
+            }
+        }
+
+        $missing = '__missing_observation_value__';
+        foreach (['valueBoolean', 'value.valueBoolean'] as $path) {
+            $value = data_get($item, $path, $missing);
+
+            if ($value !== $missing && $value !== null && $value !== '') {
+                return (bool) $value ? 'Так' : 'Ні';
+            }
+        }
+
+        foreach (['valueDateTime', 'value.valueDateTime', 'valueTime', 'value.valueTime'] as $path) {
+            $value = data_get($item, $path);
+
+            if ($value !== null && $value !== '') {
+                return $this->formatObservationValueDate((string) $value);
+            }
+        }
+
+        return null;
+    }
+
+    private function displayCodeableConcept(?array $codeableConcept): ?string
+    {
+        if (!$codeableConcept) {
+            return null;
+        }
+
+        $code = data_get($codeableConcept, 'coding.0.code');
+        $system = data_get($codeableConcept, 'coding.0.system');
+
+        if (!$code) {
+            return data_get($codeableConcept, 'text');
+        }
+
+        return data_get(
+            $this->dictionaries,
+            $system . '.' . $code,
+            data_get($codeableConcept, 'text', $code)
+        );
+    }
+
+    private function formatObservationValueDate(string $value): string
+    {
+        try {
+            if (preg_match('/^\d{2}:\d{2}/', $value)) {
+                return substr($value, 0, 5);
+            }
+
+            return CarbonImmutable::parse($value)->format(str_contains($value, ':') ? 'd.m.Y H:i' : 'd.m.Y');
+        } catch (Throwable) {
+            return $value;
+        }
+    }
+    
     private function buildSearchParams(): array
     {
         return array_filter([
@@ -490,7 +586,7 @@ class PatientObservation extends BasePatientComponent
         ];
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.person.records.observations', [
             'paginatedObservations' => $this->buildPaginator(),

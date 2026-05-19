@@ -318,7 +318,13 @@ class ObservationRepository extends BaseRepository
             'value.valueCodeableConcept.coding',
             'reactionOn.type.coding',
             'components.code.coding',
+            'components.value.valueQuantity',
             'components.value.valueCodeableConcept.coding',
+            'components.value.valueRange.low',
+            'components.value.valueRange.high',
+            'components.value.valueRatio.numerator',
+            'components.value.valueRatio.denominator',
+            'components.value.valueSampledData',
             'components.interpretation.coding'
         ])
             ->whereHas('context', fn ($query) => $query->where('value', $encounterUuid))
@@ -329,7 +335,7 @@ class ObservationRepository extends BaseRepository
      /**
      * Get observations data that is related to the person.
      *
-     * @param  string  $personId
+     * @param  int  $personId
      * @return array|null
      */
     public function getByPersonId(int $personId): array
@@ -337,7 +343,9 @@ class ObservationRepository extends BaseRepository
         return $this->model
             ->withAllRelations()
             ->where('person_id', $personId)
-            ->orderByDesc('created_at')
+            ->orderByDesc('issued')
+            ->orderByDesc('ehealth_inserted_at')
+            ->orderByDesc('id')
             ->get()
             ->toArray();
     }

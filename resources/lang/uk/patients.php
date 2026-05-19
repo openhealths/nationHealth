@@ -390,6 +390,9 @@ return [
     'observation_method' => 'Метод спостереження',
     'interpretation_of_observation' => 'Інтерпретація спостереження',
     'date_and_time_of_receiving_the_indicators' => 'Дата та час отримання показників',
+    'diagnostic_report_id' => 'ID діагностичного звіту',
+    'device_id' => 'ID девайсу',
+    'nothing_found' => 'Нічого не знайдено',
 
     // Procedures
     'procedure' => 'Процедура',
