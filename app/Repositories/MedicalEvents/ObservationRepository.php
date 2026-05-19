@@ -326,6 +326,22 @@ class ObservationRepository extends BaseRepository
             ?->toArray();
     }
 
+     /**
+     * Get observations data that is related to the person.
+     *
+     * @param  string  $personId
+     * @return array|null
+     */
+    public function getByPersonId(int $personId): array
+    {
+        return $this->model
+            ->withAllRelations()
+            ->where('person_id', $personId)
+            ->orderByDesc('created_at')
+            ->get()
+            ->toArray();
+    }
+
     /**
      * Get the observation for the procedure based on the provided UUID to display the selected complication detail.
      *
@@ -416,7 +432,10 @@ class ObservationRepository extends BaseRepository
                     'effective_date_time' => $data['effective_date_time'] ?? null,
                     'issued' => $data['issued'] ?? null,
                     'primary_source' => $data['primary_source'] ?? null,
-                    'comment' => $data['comment'] ?? null
+                    'comment' => $data['comment'] ?? null,
+                    'ehealth_inserted_at' => $data['ehealth_inserted_at'] ?? null,
+                    'ehealth_updated_at' => $data['ehealth_updated_at'] ?? null,
+                    'explanatory_letter' => $data['explanatory_letter'] ?? null,
                 ];
 
                 if ($existing) {

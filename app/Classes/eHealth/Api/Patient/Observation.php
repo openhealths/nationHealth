@@ -95,7 +95,7 @@ class Observation extends PatientApiBase
         $this->setValidator($this->validateObservations(...));
         $this->setDefaultPageSize();
 
-        $mergedQuery = array_merge($this->options['query'], $query ?? []);
+        $mergedQuery = array_merge($this->options['query'], $this->format($query, ['issued_from', 'issued_to']));
 
         return $this->get(self::URL . "/$patientId/observations", $mergedQuery);
     }

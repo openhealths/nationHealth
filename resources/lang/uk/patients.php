@@ -265,6 +265,7 @@ return [
     'visual_studies' => 'Візуальні дослідження',
     'doctor_conclusion' => 'Заключення лікаря',
     'performed_status' => 'Виконано',
+    'observations_not_found' => 'Обстежень не знайдено',
 
     // Encounter
     'encounters' => 'Взаємодії',
