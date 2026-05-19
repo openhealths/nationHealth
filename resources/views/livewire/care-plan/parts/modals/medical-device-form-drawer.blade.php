@@ -27,11 +27,7 @@
      tabindex="-1"
 >
     <h3 class="modal-header">
-        @if(isset($activityForm['id']) && $activityForm['id'])
-            {{ __('care-plan.edit_medical_device_prescription') }}
-        @else
-            {{ __('care-plan.new_medical_device_prescription') }}
-        @endif
+        {{ __('care-plan.new_medical_device_prescription') }}
     </h3>
 
     {{-- Content --}}
@@ -52,7 +48,6 @@
                         <select id="device_name"
                                 name="device_name"
                                 class="input-select peer pr-12"
-                                wire:model="activityForm.product_reference"
                         >
                             <option selected value="">{{ __('care-plan.select_medical_device') }}</option>
                         </select>

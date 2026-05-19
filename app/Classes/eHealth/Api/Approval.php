@@ -77,6 +77,8 @@ class Approval extends Request
      */
     public function resendSms(string $patientId, string $approvalId): PromiseInterface|EHealthResponse
     {
+        // Fallback for backwards compatibility: try the new endpoint without patient prefix first.
+        // If it throws an HTTP exception (e.g., 404), fallback to the old endpoint with patientId.
         try {
             return $this->post("/api/approvals/{$approvalId}/actions/resend", []);
         } catch (\Exception $e) {

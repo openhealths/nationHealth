@@ -22,10 +22,10 @@
                                 <td class="index-table-td">
                                     <div class="flex flex-col">
                                         <span class="font-medium text-gray-900 dark:text-white">
-                                            {{ $approval['grantedTo']['name'] ?? $approval['granted_to_id'] ?? '-' }}
+                                            {{ $approval['granted_to']['name'] ?? $approval['granted_to']['id'] }}
                                         </span>
                                         <span class="text-xs text-gray-500">
-                                            {{ $approval['granted_to_type'] ?? '' }}
+                                            {{ $approval['granted_to']['type'] ?? '' }}
                                         </span>
                                     </div>
                                 </td>
@@ -35,12 +35,12 @@
                                     </span>
                                 </td>
                                 <td class="index-table-td">
-                                    {{ isset($approval['created_at']) ? \Carbon\Carbon::parse($approval['created_at'])->format('d.m.Y H:i') : '-' }}
+                                    {{ isset($approval['inserted_at']) ? \Carbon\Carbon::parse($approval['inserted_at'])->format('d.m.Y H:i') : '-' }}
                                 </td>
                                 <td class="index-table-td-actions">
                                     @if(($approval['status'] ?? '') === 'active')
-                                        <button type="button"
-                                                wire:click="cancelApproval('{{ $approval['uuid'] }}')"
+                                        <button type="button" 
+                                                wire:click="cancelApproval('{{ $approval['id'] }}')"
                                                 wire:confirm="{{ __('care-plan.confirm_cancel_approval') }}"
                                                 class="text-red-500 hover:text-red-700">
                                             @icon('close-outline', 'w-4 h-4')
@@ -62,11 +62,6 @@
 
         {{-- Create New Approval Form --}}
         <div>
-            @if(empty($carePlanUuid))
-                <div class="mb-4 p-4 text-sm text-yellow-800 rounded-lg bg-yellow-50 dark:bg-gray-800 dark:text-yellow-300" role="alert">
-                    {{ __('care-plan.cannot_grant_unregistered') }}
-                </div>
-            @else
             <div class="card p-4">
                 <h4 class="font-medium mb-4">{{ __('care-plan.grant_access') }}</h4>
                 <form wire:submit.prevent="createApproval" class="flex flex-col gap-4">
@@ -91,8 +86,6 @@
                     </button>
                 </form>
             </div>
-            @endif
         </div>
     </div>
-
 </div>
