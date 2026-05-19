@@ -6,16 +6,32 @@ namespace App\Livewire\Person\Records;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Enums\JobStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
-use Illuminate\Http\Client\ConnectionException;
+use App\Jobs\ImmunizationSync;
+use App\Models\LegalEntity;
+use App\Repositories\MedicalEvents\Repository;
+use App\Traits\BatchLegalEntityQueries;
+use App\Traits\HandlesSyncBatch;
 use Illuminate\View\View;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Livewire\WithPagination;
+use Throwable;
 
 class PatientImmunization extends BasePatientComponent
 {
+    use BatchLegalEntityQueries;
+    use HandlesSyncBatch;
+    use WithPagination;
+
     public array $immunizations = [];
 
     public array $episodes = [];
+
+    public string $syncStatus = '';
 
     public string $filterVaccine = '';
 
@@ -26,6 +42,20 @@ class PatientImmunization extends BasePatientComponent
     public string $filterDateTo = '';
 
     public bool $showAdditionalParams = false;
+
+    public int $totalEntries = 0;
+
+    public int $pageSize = 10;
+
+    protected array $dictionaryNames = [
+        'eHealth/vaccine_codes',
+        'eHealth/vaccination_routes',
+        'eHealth/immunization_body_sites',
+        'eHealth/reason_explanations',
+        'eHealth/immunization_dosage_units',
+        'eHealth/vaccination_authorities',
+        'eHealth/vaccination_target_diseases',
+    ];
 
     protected function initializeComponent(): void
     {
@@ -120,6 +150,7 @@ class PatientImmunization extends BasePatientComponent
             'filterDateTo',
         ]);
 
+        $this->resetPage();
         $this->loadImmunizations();
     }
 
@@ -157,6 +188,10 @@ class PatientImmunization extends BasePatientComponent
 
             $validatedData = $response->validate();
 
+            $paging = $response->getPaging();
+            $this->totalEntries = $paging['total_entries'] ?? 0;
+            $this->pageSize = $paging['page_size'] ?? 10;
+
             $this->immunizations = Arr::toCamelCase($validatedData);
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             $this->immunizations = [];
@@ -190,7 +225,19 @@ class PatientImmunization extends BasePatientComponent
             'episode_id' => $this->filterEpisodeId ?: null,
             'date_from' => $this->filterDateFrom ?: null,
             'date_to' => $this->filterDateTo ?: null,
+            'page' => $this->getPage(),
         ], static fn ($value) => $value !== null && $value !== '');
+    }
+
+    private function buildPaginator(): LengthAwarePaginator
+    {
+        return new LengthAwarePaginator(
+            $this->immunizations,
+            $this->totalEntries,
+            $this->pageSize,
+            $this->getPage(),
+            ['path' => request()->url()]
+        );
     }
 
     private function filterValidationRules(): array
@@ -205,6 +252,8 @@ class PatientImmunization extends BasePatientComponent
 
     public function render(): View
     {
-        return view('livewire.person.records.immunization');
+        return view('livewire.person.records.immunization', [
+            'paginatedImmunizations' => $this->buildPaginator(),
+        ]);
     }
 }

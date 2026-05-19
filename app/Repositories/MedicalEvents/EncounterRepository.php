@@ -72,7 +72,7 @@ class EncounterRepository extends BaseRepository
                 $division = Repository::identifier()->store($encounterData['division']['identifier']['value']);
                 Repository::codeableConcept()->attach($division, $encounterData['division']);
             }
-
+            
             if (isset($encounterData['incomingReferral'])) {
                 $incomingReferral = Repository::identifier()->store(
                     $encounterData['incomingReferral']['identifier']['value']
@@ -90,7 +90,8 @@ class EncounterRepository extends BaseRepository
                 'type_id' => $type->id,
                 'priority_id' => $priority->id ?? null,
                 'performer_id' => $performer->id,
-                'division_id' => $division->id ?? null
+                'division_id' => $division->id ?? null,
+                'incoming_referral_id' => $incomingReferral->id ?? null
             ]);
 
             $encounter->period()->create([

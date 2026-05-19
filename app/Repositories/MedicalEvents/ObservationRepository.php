@@ -318,12 +318,36 @@ class ObservationRepository extends BaseRepository
             'value.valueCodeableConcept.coding',
             'reactionOn.type.coding',
             'components.code.coding',
+            'components.value.valueQuantity',
             'components.value.valueCodeableConcept.coding',
+            'components.value.valueRange.low',
+            'components.value.valueRange.high',
+            'components.value.valueRatio.numerator',
+            'components.value.valueRatio.denominator',
+            'components.value.valueSampledData',
             'components.interpretation.coding'
         ])
             ->whereHas('context', fn ($query) => $query->where('value', $encounterUuid))
             ->get()
             ?->toArray();
+    }
+
+     /**
+     * Get observations data that is related to the person.
+     *
+     * @param  int  $personId
+     * @return array|null
+     */
+    public function getByPersonId(int $personId): array
+    {
+        return $this->model
+            ->withAllRelations()
+            ->where('person_id', $personId)
+            ->orderByDesc('issued')
+            ->orderByDesc('ehealth_inserted_at')
+            ->orderByDesc('id')
+            ->get()
+            ->toArray();
     }
 
     /**
@@ -416,7 +440,10 @@ class ObservationRepository extends BaseRepository
                     'effective_date_time' => $data['effective_date_time'] ?? null,
                     'issued' => $data['issued'] ?? null,
                     'primary_source' => $data['primary_source'] ?? null,
-                    'comment' => $data['comment'] ?? null
+                    'comment' => $data['comment'] ?? null,
+                    'ehealth_inserted_at' => $data['ehealth_inserted_at'] ?? null,
+                    'ehealth_updated_at' => $data['ehealth_updated_at'] ?? null,
+                    'explanatory_letter' => $data['explanatory_letter'] ?? null,
                 ];
 
                 if ($existing) {
