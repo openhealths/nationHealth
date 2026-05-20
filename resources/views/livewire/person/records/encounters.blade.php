@@ -86,7 +86,7 @@
                         @endforeach
                     </select>
                     <label for="filterEpisode" class="label">
-                        {{ __('patients.episode') }}
+                        {{ __('care-plan.episode') }}
                     </label>
                 </div>
             </div>
@@ -316,7 +316,7 @@
                                 </div>
                                 <div class="min-w-0">
                                     <div class="record-inner-label text-[10px] uppercase">
-                                        ID {{ __('patients.episode') }}
+                                        ID {{ __('care-plan.episode') }}
                                     </div>
                                     <div class="record-inner-value text-[14px] font-semibold break-words leading-tight">
                                         {{ data_get($encounter, 'episode.identifier.value', '-') }}

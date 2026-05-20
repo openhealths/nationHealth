@@ -33,7 +33,7 @@
             <div class="flex-1 flex flex-col min-h-0">
                 <div class="flex items-center pb-5 mb-6">
                     <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
-                        {{ __('patients.search_medical_records') }}
+                        {{ __('care-plan.search_medical_records') }}
                     </h2>
                 </div>
 
@@ -50,13 +50,13 @@
                                 id="drawerSelectedType"
                                 class="input-select peer w-full"
                         >
-                            <option value="ALL">{{ __('patients.all_types') }}</option>
+                            <option value="ALL">{{ __('forms.all') }}</option>
                             <option value="condition">{{ __('patients.conditions') }}</option>
                             <option value="observation">{{ __('patients.medical_observation') }}</option>
                             <option value="diagnostic-report">{{ __('patients.diagnostic_reports') }}</option>
                         </select>
                         <label for="drawerSelectedType" class="label">
-                            {{ __('patients.type_of_medical_records') }}
+                            {{ __('forms.type') }}
                         </label>
                     </div>
 
@@ -65,12 +65,12 @@
                                 id="drawerSelectedEpisode"
                                 class="input-select peer w-full"
                         >
-                            <option value="ALL">{{ __('patients.all_episodes') }}</option>
+                            <option value="ALL">{{ __('forms.all') }}</option>
                             <option value="ep-1">{{ __('patients.mock.episode_1') }}</option>
                             <option value="ep-2">{{ __('patients.mock.episode_2') }}</option>
                         </select>
                         <label for="drawerSelectedEpisode" class="label">
-                            {{ __('patients.episode') }}
+                            {{ __('care-plan.episode') }}
                         </label>
                     </div>
                 </div>

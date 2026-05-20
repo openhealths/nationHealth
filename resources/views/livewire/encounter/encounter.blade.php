@@ -83,19 +83,19 @@
 
                 <div class="mt-4">
                     <fieldset class="fieldset-card p-4 sm:p-8 sm:pb-10 mb-4">
-                        <legend class="legend">{{ __('patients.ehealth_status') }}</legend>
+                        <legend class="legend">{{ __('forms.status.label') }}</legend>
                         
                         <div class="flex flex-col sm:flex-row sm:items-end gap-6 mb-2">
                             <div class="form-group group flex-1">
                                 <input type="text"
                                        id="ehealthStatus"
                                        class="input peer text-gray-500"
-                                       value="{{ __('patients.signed') }}"
+                                       value="{{ __('forms.status.signed') }}"
                                        readonly
                                        placeholder=" "
                                 />
                                 <label for="ehealthStatus" class="label">
-                                    {{ __('patients.signing_status') }}
+                                    {{ __('forms.status.label') }}
                                 </label>
                             </div>
                             

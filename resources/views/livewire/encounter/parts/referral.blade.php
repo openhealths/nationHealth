@@ -1,8 +1,13 @@
 <div id="referral-section">
     <div x-data="{
-        isReferralAvailable: false,
-        referralType: $wire.entangle('form.encounter.referralType')
-    }">
+             isReferralAvailable: false,
+             referralType: $wire.entangle('form.encounter.referralType')
+         }"
+         x-init="
+             isReferralAvailable = referralType !== '';
+             $watch('isReferralAvailable', value => { if (!value) referralType = '' })
+         "
+    >
         <div class="mb-8 mt-2">
             <div class="form-group group">
                 <input x-model="isReferralAvailable"

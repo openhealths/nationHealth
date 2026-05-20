@@ -226,7 +226,7 @@
 
     <div class="pt-4 border-t border-gray-100 dark:border-gray-700 space-y-4">
         <h3 class="text-[15px] font-bold text-gray-900 dark:text-white">
-            {{ __('patients.medical_records_referenced_by_interaction') }}
+            {{ __('care-plan.search_medical_records') }}
         </h3>
 
         <div x-show="selectedReferences.length > 0" x-cloak class="my-3 overflow-x-auto">

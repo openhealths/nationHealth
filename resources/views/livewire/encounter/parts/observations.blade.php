@@ -49,7 +49,7 @@
                     <td class="td-input"
                         x-text="
                             observation.valueBoolean !== undefined
-                                ? (observation.valueBoolean ? '{{ __('patients.yes') }}' : '{{ __('patients.no') }}')
+                                ? (observation.valueBoolean ? '{{ __('forms.yes') }}' : '{{ __('forms.no') }}')
                             : observation.valueString !== undefined
                                 ? observation.valueString
                             : (observation.valueDate !== undefined && observation.valueTime !== undefined)

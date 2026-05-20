@@ -1,5 +1,4 @@
 <div class="p-4 sm:p-8" id="patient-data-section">
-
     <div class="form-row-3">
         <div class="form-group group">
             <select wire:model="form.encounter.classCode"

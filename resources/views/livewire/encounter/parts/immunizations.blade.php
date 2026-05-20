@@ -41,7 +41,7 @@
                         "
                     ></td>
                     <td class="td-input"
-                        x-text="immunization.notGiven === false ? '{{ __('patients.done') }}' : '{{ __('patients.not_done') }}'"
+                        x-text="immunization.notGiven === false ? '{{ __('forms.yes') }}' : '{{ __('forms.no') }}'"
                     ></td>
                     <td class="td-input"
                         x-text="

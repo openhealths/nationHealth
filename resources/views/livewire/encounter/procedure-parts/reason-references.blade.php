@@ -169,12 +169,12 @@
                                     <div class="form-group group">
                                         <select id="episodeId" class="input-modal peer" x-model="selectedEpisodeId">
                                             <option value="" selected>
-                                                {{ __('forms.select') }} {{ mb_strtolower(__('patients.episode')) }}
+                                                {{ __('forms.select') }} {{ mb_strtolower(__('care-plan.episode')) }}
                                             </option>
                                             @foreach($episodes as $key => $episode)
                                                 <option value="{{ $episode['uuid'] }}">
                                                     {{ $episode['name'] }} ({{ __('patients.status.' . $episode['status']) }})
-                                                    {{ __('patients.from') }} {{ CarbonImmutable::parse($episode['ehealth_inserted_at'])->format('d.m.Y') }}
+                                                    {{ __('forms.start') }} {{ CarbonImmutable::parse($episode['ehealth_inserted_at'])->format('d.m.Y') }}
                                                 </option>
                                             @endforeach
                                         </select>

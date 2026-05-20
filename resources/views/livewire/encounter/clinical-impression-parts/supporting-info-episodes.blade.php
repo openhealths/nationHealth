@@ -24,7 +24,7 @@
                         x-text="new Date(supporting.inserted_at).toLocaleDateString('uk-UA')"
                     ></td>
                     <td class="td-input"
-                                    x-text="'{{ __('patients.episode') }}' + `${ supporting.code ? ' : ' + supporting.code + ' ' + (
+                        x-text="'{{ __('care-plan.episode') }}' + `${ supporting.code ? ' : ' + supporting.code + ' ' + (
                             $wire.dictionaries['eHealth/LOINC/observation_codes'][supporting.code] ||
                             $wire.dictionaries['eHealth/ICF/classifiers'][supporting.code] ||
                             $wire.dictionaries['eHealth/ICPC2/condition_codes'][supporting.code] || ''
@@ -121,7 +121,7 @@
                     "
                     class="item-add my-5"
             >
-                {{ __('forms.add') }} {{ mb_strtolower(__('patients.episode')) }}
+                {{ __('forms.add') }} {{ mb_strtolower(__('care-plan.episode')) }}
             </button>
 
             {{-- Modal --}}
@@ -169,7 +169,7 @@
                                                 </tr>
                                                 </thead>
                                                 <tbody>
-                                                <template x-for="(episode, index) in $wire.episodes" :key="episode.id || episode.uuid || index">
+                                                <template x-for="episode in $wire.episodes" :key="episode.uuid">
                                                     <tr class="border-b dark:border-gray-700">
                                                         <th scope="row" class="table-cell-primary">
                                                             <div class="text-base"
@@ -194,7 +194,7 @@
 
                                                         <td class="td-input">
                                                             <button @click.prevent="
-                                                                    const id = episode.id || episode.uuid;
+                                                                    const id = episode.uuid;
                                                                     const index = selectedSupportingInfoIds.indexOf(id);
                                                                     if (index === -1) {
                                                                         selectedSupportingInfoIds.push(id);
@@ -202,7 +202,7 @@
                                                                         selectedSupportingInfoIds.splice(index, 1); // toggle off
                                                                     }"
                                                                     class="button-primary w-28"
-                                                                    x-text="selectedSupportingInfoIds.includes(episode.id || episode.uuid)
+                                                                    x-text="selectedSupportingInfoIds.includes(episode.uuid)
                                                                         ? '{{ __('patients.added') }}'
                                                                         : '{{ __('forms.add') }}'"
                                                             >
@@ -229,14 +229,14 @@
                                     <button @click.prevent
                                             @click="
                                                 modalClinicalImpression.supportingInfoEpisodes = $wire.episodes
-                                                    .filter(episode => selectedSupportingInfoIds.includes(episode.id || episode.uuid))
+                                                    .filter(episode => selectedSupportingInfoIds.includes(episode.uuid))
                                                     .map(episode => {
                                                         const currentDiagnosis = episode.current_diagnoses.find(diagnosis =>
                                                             diagnosis.role.coding[0].code === 'primary'
                                                         );
 
                                                         return {
-                                                            id: episode.id || episode.uuid,
+                                                            id: episode.uuid,
                                                             inserted_at: episode.inserted_at,
                                                             code: currentDiagnosis?.code?.coding?.[0]?.code ?? ''
                                                         };

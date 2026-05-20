@@ -62,7 +62,7 @@
                         {{-- Content --}}
                         <form>
                             <div class="space-y-2">
-                                <p class="default-p">{{ __('patients.details') }}:</p>
+                                <p class="default-p">{{ __('forms.details') }}:</p>
                                 <div class="space-y-2 border-2 rounded-md border-dashed border-white dark:border-white">
                                     <template
                                         x-for="(detail, index) in $wire.dictionaries['custom/rule_engine_details'][modalClinicalImpression.code.coding[0].code]?.items"
