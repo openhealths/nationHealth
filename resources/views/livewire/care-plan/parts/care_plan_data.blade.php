@@ -172,7 +172,7 @@
 </div>
 
 {{-- Warning shown always when period_end has a value (per TZ 3.10.1.2.4) --}}
-@if(!empty($form['periodEnd']))
+@if(!empty($form->periodEnd))
 <div class="bg-red-100 rounded-lg mt-4">
     <div class="p-4">
         <div class="flex items-center gap-2 mb-2">

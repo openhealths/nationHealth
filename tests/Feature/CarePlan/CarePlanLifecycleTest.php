@@ -146,6 +146,21 @@ class CarePlanLifecycleTest extends TestCase
         parent::tearDown();
     }
 
+    private function createTestCarePlan(string $title, string $status = 'draft'): CarePlan
+    {
+        return CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id,
+            'status' => $status,
+            'title' => $title,
+            'period_start' => now()->subDays(5),
+            'period_end' => now()->addDays(5),
+        ]);
+    }
+
+
     public function test_full_care_plan_lifecycle_flow(): void
     {
         $this->actingAs($this->user);
@@ -322,12 +337,7 @@ class CarePlanLifecycleTest extends TestCase
     {
         $this->actingAs($this->user);
         
-        $carePlan = CarePlan::create([
-            'uuid' => (string) Str::uuid(),
-            'person_id' => $this->person->id,
-            'title' => 'Service Plan',
-            'status' => 'draft',
-        ]);
+        $carePlan = $this->createTestCarePlan('Service Plan');
 
         $condition = \App\Models\MedicalEvents\Sql\Condition::first();
 
@@ -361,12 +371,7 @@ class CarePlanLifecycleTest extends TestCase
     {
         $this->actingAs($this->user);
         
-        $carePlan = CarePlan::create([
-            'uuid' => (string) Str::uuid(),
-            'person_id' => $this->person->id,
-            'title' => 'Medication Plan',
-            'status' => 'draft',
-        ]);
+        $carePlan = $this->createTestCarePlan('Medication Plan');
 
         $condition = \App\Models\MedicalEvents\Sql\Condition::first();
 
@@ -381,8 +386,7 @@ class CarePlanLifecycleTest extends TestCase
         Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
             ->call('initActivityForm', 'medication_request')
             ->set('selectedProgram', 'program-id')
-            ->set('selectedProduct', ['code' => 'INN-123', 'name' => 'Aspirin'])
-            ->set('activityForm.product_reference', 'INN-123')
+            ->call('selectProduct', ['id' => 'INN-123', 'name' => 'Aspirin', 'innm_dosage_form' => 'ml'], 'medication_request')
             ->call('addLinkedGround', 'Condition', $condition->uuid)
             ->set('activityForm.quantity', 30)
             ->set('activityForm.daily_amount', 1.5)
@@ -401,12 +405,7 @@ class CarePlanLifecycleTest extends TestCase
     {
         $this->actingAs($this->user);
         
-        $carePlan = CarePlan::create([
-            'uuid' => (string) Str::uuid(),
-            'person_id' => $this->person->id,
-            'title' => 'Device Plan',
-            'status' => 'draft',
-        ]);
+        $carePlan = $this->createTestCarePlan('Device Plan');
 
         $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
         $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
@@ -440,4 +439,59 @@ class CarePlanLifecycleTest extends TestCase
             'quantity' => 10,
         ]);
     }
+
+    public function test_activity_referral_eligibility(): void
+    {
+        $carePlan = $this->createTestCarePlan('Test Eligibility Plan', 'active');
+
+        $activity = CarePlanActivity::create([
+            'uuid' => (string) Str::uuid(),
+            'care_plan_id' => $carePlan->id,
+            'author_id' => $this->employee->id,
+            'status' => 'active',
+            'kind' => 'device_request',
+            'scheduled_period_start' => now()->subDays(2),
+            'scheduled_period_end' => now()->addDays(2),
+        ]);
+
+        // 1. Should be eligible under standard active state
+        $this->assertTrue($activity->isEligibleForReferral());
+
+        // 2. Parent Care Plan status is completed/cancelled/terminated -> ineligible
+        $carePlan->update(['status' => 'completed']);
+        $this->assertFalse($activity->isEligibleForReferral());
+
+        // Reset plan status
+        $carePlan->update(['status' => 'active']);
+
+        // 3. Activity status is cancelled/completed -> ineligible
+        $activity->update(['status' => 'completed']);
+        $activity->refresh();
+        $this->assertFalse($activity->isEligibleForReferral());
+
+        $activity->update(['status' => 'active']);
+        $activity->refresh();
+
+        // 4. Care Plan expired -> ineligible
+        $carePlan->update([
+            'period_start' => now()->subDays(10),
+            'period_end' => now()->subDays(1),
+        ]);
+        $this->assertFalse($activity->isEligibleForReferral());
+
+        // Reset plan period
+        $carePlan->update([
+            'period_start' => now()->subDays(5),
+            'period_end' => now()->addDays(5),
+        ]);
+
+        // 5. Activity expired -> ineligible
+        $activity->update([
+            'scheduled_period_start' => now()->subDays(10),
+            'scheduled_period_end' => now()->subDays(1),
+        ]);
+        $activity->refresh();
+        $this->assertFalse($activity->isEligibleForReferral());
+    }
 }
+

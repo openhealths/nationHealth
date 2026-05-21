@@ -330,7 +330,7 @@
                         <button type="button" class="button-minor text-red-500 border-red-200 hover:bg-red-50" @click="$wire.openSignatureModal('cancel')">
                             Скасувати
                         </button>
-                        <button type="button" class="button-danger-outline" @click="$wire.openSignatureModal('complete')">
+                        <button type="button" class="button-danger-outline" @click="$wire.openSignatureModal('revoke')">
                             Відмінити план лікування
                         </button>
                         <button type="button" class="button-primary" @click="$wire.openSignatureModal('complete')">

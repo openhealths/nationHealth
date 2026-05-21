@@ -121,17 +121,22 @@ class CarePlanShow extends Component
 
         try {
             $basics = app(\App\Services\Dictionary\DictionaryManager::class)->basics();
-            $this->dictionaries['care_plan_categories'] = $basics->byName('eHealth/care_plan_categories')
-                ?->asCodeDescription()
-                ?->toArray() ?? [];
             
-            $this->dictionaries['care_plan_activity_outcomes'] = $basics->byName('eHealth/care_plan_activity_outcomes')
-                ?->asCodeDescription()
-                ?->toArray() ?? [];
+            $loadDictionary = function (string $name) use ($basics) {
+                try {
+                    return $basics->byName($name)->asCodeDescription()->toArray();
+                } catch (\InvalidArgumentException $e) {
+                    Log::warning("CarePlanShow: dictionary '{$name}' not found: " . $e->getMessage());
+                    return [];
+                }
+            };
 
-            $this->dictionaries['care_plan_cancel_reasons'] = $basics->byName('eHealth/care_plan_cancel_reasons')
-                ?->asCodeDescription()
-                ?->toArray() ?? [];
+            $this->dictionaries['care_plan_categories'] = $loadDictionary('eHealth/care_plan_categories');
+            $this->dictionaries['care_plan_activity_outcomes'] = $loadDictionary('eHealth/care_plan_activity_outcomes');
+            $this->dictionaries['care_plan_cancel_reasons'] = $loadDictionary('eHealth/care_plan_cancel_reasons');
+            $this->dictionaries['care_plan_complete_reasons'] = $loadDictionary('eHealth/care_plan_complete_reasons');
+            $this->dictionaries['care_plan_activity_cancel_reasons'] = $loadDictionary('eHealth/care_plan_activity_cancel_reasons');
+            $this->dictionaries['care_plan_activity_complete_reasons'] = $loadDictionary('eHealth/care_plan_activity_complete_reasons');
 
             // Load medical programs
             $this->dictionaries['medical_programs'] = app(\App\Services\Dictionary\DictionaryManager::class)
@@ -144,6 +149,18 @@ class CarePlanShow extends Component
 
         $this->carePlanUuid = $this->carePlan->uuid;
         $this->patientId = $this->carePlan->person->uuid;
+    }
+
+    public function getStatusReasonsProperty(): array
+    {
+        return match ($this->actionType) {
+            'cancel' => $this->dictionaries['care_plan_cancel_reasons'] ?? [],
+            'revoke' => $this->dictionaries['care_plan_cancel_reasons'] ?? [],
+            'complete' => $this->dictionaries['care_plan_complete_reasons'] ?? [],
+            'cancel_activity' => $this->dictionaries['care_plan_activity_cancel_reasons'] ?? [],
+            'complete_activity' => $this->dictionaries['care_plan_activity_complete_reasons'] ?? [],
+            default => [],
+        };
     }
 
     protected function rulesForSigning(): array
@@ -302,6 +319,7 @@ class CarePlanShow extends Component
             $validated = $this->validate($rules);
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
+            $this->setErrorBag($exception->validator->getMessageBag());
             return;
         }
 
@@ -495,7 +513,6 @@ class CarePlanShow extends Component
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
-            $this->showSignatureModal = false;
             return;
         }
 
@@ -522,6 +539,7 @@ class CarePlanShow extends Component
         // Action-specific payload
         $statusMap = [
             'cancel' => CarePlanStatus::ENTERED_IN_ERROR->value,
+            'revoke' => CarePlanStatus::REVOKED->value,
             'complete' => CarePlanStatus::COMPLETED->value,
         ];
 
@@ -799,6 +817,11 @@ class CarePlanShow extends Component
 
         $activity = $activityRepository->findById($this->activityToSign);
         if (!$activity) return;
+
+        $statusMap = [
+            'cancel_activity' => 'cancelled',
+            'complete_activity' => 'completed',
+        ];
 
         $payload = [
             'status' => $statusMap[$this->actionType] ?? 'cancelled',
