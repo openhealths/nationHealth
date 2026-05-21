@@ -87,6 +87,7 @@ class CarePlanShow extends Component
 
     public string $outcomeCode = ''; // For outcomeCodeableConcept
     public array $outcomeReferences = []; // For outcomeReference (IDs of identifiers)
+    public string $selectedOutcomeReference = '';
 
     public array $availableConditions = [];
 
@@ -162,18 +163,73 @@ class CarePlanShow extends Component
         };
     }
 
+    protected array $validationAttributes = [
+        'statusReason' => 'Обґрунтування зміни статусу',
+        'outcomeCode' => 'Результат (довідник)',
+    ];
+
     protected function rulesForSigning(): array
     {
         $statusReasonRule = in_array($this->actionType, ['sign_activity', 'sign_plan'])
             ? 'nullable|string'
             : 'required|string';
 
-        return [
+        $rules = [
             'statusReason' => $statusReasonRule,
             'form.knedp' => 'required|string',
             'form.keyContainerUpload' => 'required|file|max:1024',
             'form.password' => 'required|string',
         ];
+
+        if ($this->actionType === 'complete_activity') {
+            $rules['outcomeCode'] = 'required|string';
+        }
+
+        return $rules;
+    }
+
+    public function addOutcomeReference(): void
+    {
+        if ($this->selectedOutcomeReference && !in_array($this->selectedOutcomeReference, $this->outcomeReferences)) {
+            $this->outcomeReferences[] = $this->selectedOutcomeReference;
+            $this->selectedOutcomeReference = ''; // Reset selection
+        }
+    }
+
+    public function removeOutcomeReference(string $uuid): void
+    {
+        $this->outcomeReferences = array_values(array_diff($this->outcomeReferences, [$uuid]));
+    }
+
+    public function getSelectedOutcomeReferencesDetailsProperty(): array
+    {
+        $details = [];
+        
+        $lookup = [];
+        foreach ($this->availableConditions as $c) {
+            $lookup[$c['uuid']] = ['type' => 'Стан/Діагноз', 'name' => $c['name'], 'date' => $c['date']];
+        }
+        foreach ($this->availableObservations as $o) {
+            $lookup[$o['uuid']] = ['type' => 'Спостереження', 'name' => $o['name'], 'date' => $o['date']];
+        }
+        foreach ($this->availableReports as $r) {
+            $lookup[$r['uuid']] = ['type' => 'Діагностичний звіт', 'name' => $r['name'], 'date' => $r['date']];
+        }
+
+        foreach ($this->outcomeReferences as $uuid) {
+            if (isset($lookup[$uuid])) {
+                $details[] = array_merge(['uuid' => $uuid], $lookup[$uuid]);
+            } else {
+                $details[] = [
+                    'uuid' => $uuid,
+                    'type' => 'Невідомий документ',
+                    'name' => $uuid,
+                    'date' => '-',
+                ];
+            }
+        }
+
+        return $details;
     }
 
     public function openSignatureModal(string $actionType, ?int $activityId = null): void
@@ -183,6 +239,7 @@ class CarePlanShow extends Component
         $this->statusReason = ''; // Reset reason
         $this->outcomeCode = ''; // Reset outcome
         $this->outcomeReferences = []; // Reset references
+        $this->selectedOutcomeReference = ''; // Reset selected outcome reference
         $this->showSignatureModal = true;
     }
 

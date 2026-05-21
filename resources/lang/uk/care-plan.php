@@ -50,6 +50,9 @@ return [
     'add_medications' => 'Додати ліки',
     'add_medical_devices' => 'Додати медичні вироби',
     'complete_care_plan' => 'Завершити план лікування',
+    'service_prescription' => 'Призначення на послуги',
+    'medication_prescription' => 'Призначення на ліки',
+    'medical_device_prescription' => 'Призначення на медичні вироби',
 
     // Services drawer
     'new_service_prescription' => 'Нове призначення на послуги',

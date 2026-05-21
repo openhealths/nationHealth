@@ -493,5 +493,58 @@ class CarePlanLifecycleTest extends TestCase
         $activity->refresh();
         $this->assertFalse($activity->isEligibleForReferral());
     }
+
+    public function test_complete_activity_flow(): void
+    {
+        $this->actingAs($this->user);
+        $carePlan = $this->createTestCarePlan('Complete Activity Plan', 'active');
+        $activity = CarePlanActivity::create([
+            'uuid' => (string) Str::uuid(),
+            'care_plan_id' => $carePlan->id,
+            'author_id' => $this->employee->id,
+            'status' => 'scheduled',
+            'kind' => 'service_request',
+            'scheduled_period_start' => now()->subDays(2),
+            'scheduled_period_end' => now()->addDays(2),
+        ]);
+
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
+
+        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
+        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $mockSignatureService->shouldReceive('signData')->andReturn('mock-base64-signature');
+        $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
+
+        $activityCompleteResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $activityCompleteResponse->shouldReceive('getData')->andReturn(['id' => $activity->uuid, 'status' => 'completed']);
+        $activityCompleteResponse->shouldReceive('getStatusCode')->andReturn(200);
+        $mockActivityApi->shouldReceive('complete')->once()->andReturn($activityCompleteResponse);
+
+        $outcomeReferenceUuid = (string) Str::uuid();
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->set('form.knedp', '1.2.3.4')
+            ->set('form.password', 'secret')
+            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.jks', 100))
+            ->call('openSignatureModal', 'complete_activity', $activity->id)
+            // outcomeCode is required when completing
+            ->call('sign')
+            ->assertHasErrors(['outcomeCode'])
+            ->set('outcomeCode', 'completed_successfully')
+            ->set('statusReason', 'completed')
+            // add an outcome reference
+            ->set('selectedOutcomeReference', $outcomeReferenceUuid)
+            ->call('addOutcomeReference')
+            ->assertSet('outcomeReferences', [$outcomeReferenceUuid])
+            // sign again, should pass
+            ->call('sign')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('care_plan_activities', [
+            'id' => $activity->id,
+            'status' => 'completed',
+        ]);
+    }
 }
 
