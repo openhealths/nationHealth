@@ -87,7 +87,7 @@ return [
     'yes' => 'Так',
     'allowed_in_em_short' => 'Дозволяється у ЕМ',
     'code' => 'Код',
-    'status' => 'Статус',
+    'status_title' => 'Статус',
     'active' => 'Активна',
     'inactive' => 'Неактивна',
     'procedures_on_nervous_system' => 'Процедури на нервовій системі',

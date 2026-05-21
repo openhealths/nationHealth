@@ -89,6 +89,194 @@
                         <div class="record-inner-label">{{ __('care-plan.extended_description') }}</div>
                         <div class="record-inner-value whitespace-pre-line">{{ $carePlan->description }}</div>
                     </div>
+
+                    <div>
+                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Назва плану лікування</div>
+                        <div class="text-gray-900 dark:text-white font-medium">{{ $carePlan->title }}</div>
+                    </div>
+
+                    <div>
+                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Намір (Intent)</div>
+                        <div class="text-gray-900 dark:text-white font-medium">{{ $intent ?: '-' }}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Умови надання послуг</div>
+                        <div class="text-gray-900 dark:text-white font-medium">{{ $tos ?: '-' }}</div>
+                    </div>
+
+                    <div>
+                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Дата початку плану лікування</div>
+                        <div class="text-gray-900 dark:text-white font-medium flex items-center gap-2">
+                            @icon('calendar', 'w-4 h-4 text-blue-400')
+                            {{ $carePlan->period_start?->format('d.m.Y') ?? '-' }}
+                            <span class="text-gray-400 ml-2 flex items-center gap-1">
+                                @icon('clock', 'w-4 h-4')
+                                09:00 AM
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Дата завершення плану лікування</div>
+                        <div class="text-gray-900 dark:text-white font-medium flex items-center gap-2">
+                            @icon('calendar', 'w-4 h-4 text-blue-400')
+                            {{ $carePlan->period_end ? $carePlan->period_end->format('d.m.Y') : 'Безтерміново' }}
+                            @if($carePlan->period_end)
+                                <span class="text-gray-400 ml-2 flex items-center gap-1">
+                                    @icon('clock', 'w-4 h-4')
+                                    06:00 PM
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Condition/Diagnosis --}}
+            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center gap-2">
+                    @icon('alert-circle', 'w-5 h-5 text-blue-500')
+                    Стан/діагноз
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 dark:bg-gray-700">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Дата</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Назва</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                            @forelse($carePlan->addresses ?? [] as $address)
+                                @php
+                                    $condId = is_array($address['reference'] ?? null) ? ($address['reference']['identifier']['value'] ?? null) : ($address['reference'] ?? null);
+                                    if(str_contains($condId ?? '', '/')) {
+                                        $condId = last(explode('/', $condId));
+                                    }
+                                    $condition = null;
+                                    if ($condId) {
+                                        $condition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $condId)->first();
+                                    }
+                                @endphp
+                                <tr>
+                                    <td class="px-4 py-4 text-gray-600 dark:text-gray-400">{{ $condition?->onset_date?->format('d.m.Y') ?? '-' }}</td>
+                                    <td class="px-4 py-4 text-gray-900 dark:text-white font-medium">{{ $condition ? ($condition->typeConcept?->text ?? $condition->typeConcept?->coding->first()?->display ?? '-') : '-' }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="2" class="px-4 py-8 text-center text-gray-400 italic">Немає пов'язаних станів</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {{-- Supporting Info --}}
+            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center gap-2">
+                    @icon('file-text', 'w-5 h-5 text-blue-500')
+                    Допоміжна інформація (епізоди, процедури чи діагностичні звіти)
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 dark:bg-gray-700">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Дата</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Назва / ОПИС</th>
+                                <th class="px-4 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-wider w-20">Дії</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                            @php
+                                $episodes = $carePlan->supporting_info['episodes'] ?? [];
+                                $medical_records = $carePlan->supporting_info['medical_records'] ?? [];
+                                $allSupporting = array_merge($episodes, $medical_records);
+                            @endphp
+                            @forelse($allSupporting as $item)
+                                @php
+                                    $ref = $item['reference'] ?? '';
+                                    if(str_contains($ref, '/')) {
+                                        $ref = last(explode('/', $ref));
+                                    }
+                                    $type = $item['type'] ?? '';
+                                @endphp
+                                <tr>
+                                    <td class="px-4 py-4 text-gray-600 dark:text-gray-400">{{ \Carbon\CarbonImmutable::now()->format('d.m.Y') }}</td>
+                                    <td class="px-4 py-4 text-gray-900 dark:text-white font-medium">{{ $ref }} ({{ $type }})</td>
+                                    <td class="px-4 py-4 text-right">
+                                        <button type="button" class="text-gray-400 hover:text-red-500 transition-colors">
+                                            @icon('trash', 'w-5 h-5')
+                                        </button>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="3" class="px-4 py-8 text-center text-gray-400 italic">Немає допоміжної інформації</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {{-- Additional Info --}}
+            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center gap-2">
+                    @icon('settings', 'w-5 h-5 text-blue-500')
+                    Додаткова інформація
+                </h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                    <div>
+                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Клінічний протокол</div>
+                        <div class="text-gray-900 dark:text-white font-medium">{{ $carePlan->clinical_protocol ?: '-' }}</div>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    <div>
+                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Розширений опис</div>
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 text-gray-700 dark:text-gray-300 text-sm border border-gray-100 dark:border-gray-600 min-h-[100px] whitespace-pre-line">
+                            {{ $carePlan->description ?: 'Опис відсутній' }}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Нотатки</div>
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 text-gray-700 dark:text-gray-300 text-sm border border-gray-100 dark:border-gray-600 min-h-[100px] whitespace-pre-line">
+                            {{ $carePlan->note ?: 'Нотатки відсутні' }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Approvals --}}
+            <div class="mt-4">
+                @livewire('care-plan.care-plan-approvals', ['carePlan' => $carePlan])
+            </div>
+
+            {{-- Bottom Actions --}}
+            <div class="mt-12 flex items-center justify-between pt-8 pb-12 border-t border-gray-100 dark:border-gray-700">
+                <a href="{{ route('persons.care-plans', [legalEntity(), $carePlan->person_id]) }}" class="button-minor flex items-center gap-2" wire:navigate>
+                    @icon('arrow-left', 'w-4 h-4')
+                    <span>{{ __('forms.back') }}</span>
+                </a>
+
+                <div class="flex items-center gap-4">
+                    @if(!$carePlan->uuid && in_array(strtoupper($status), [Status::NEW->value, 'DRAFT', 'PENDING']))
+                        <button type="button" class="button-primary-outline" @click="$wire.openSignatureModal('sign_plan')">
+                            Підписати та відправити План
+                        </button>
+                    @elseif($carePlan->uuid && strtoupper($status) === 'NEW')
+                        <button type="button" class="button-primary" wire:click="openMethodSelectionModal">
+                            Активувати план (Дозвіл пацієнта)
+                        </button>
+                    @elseif($carePlan->uuid && in_array(strtoupper($status), [Status::ACTIVE->value]))
+                        <button type="button" class="button-minor text-red-500 border-red-200 hover:bg-red-50" @click="$wire.openSignatureModal('cancel')">
+                            Скасувати
+                        </button>
+                        <button type="button" class="button-danger-outline" @click="$wire.openSignatureModal('revoke')">
+                            Відмінити план лікування
+                        </button>
+                        <button type="button" class="button-primary" @click="$wire.openSignatureModal('complete')">
+                            Завершити план лікування
+                        </button>
+
                     @endif
                 </div>
             </div>

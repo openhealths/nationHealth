@@ -107,4 +107,52 @@ class CarePlanActivity extends Model
     {
         return $this->belongsToMany(Identifier::class, 'care_plan_activity_outcomes', 'activity_id', 'identifier_id');
     }
+
+    /**
+     * Check if this activity/prescription is eligible for issuing an E-Request (ServiceRequest/DeviceRequest).
+     * Enforces TZ 3.20.4.3 and 3.20.4.4.
+     *
+     * @return bool
+     */
+    public function isEligibleForReferral(): bool
+    {
+        $carePlan = $this->carePlan()->first();
+        if (!$carePlan) {
+            return false;
+        }
+
+        // 1. Check parent Care Plan statuses (3.20.4.4)
+        $blockedPlanStatuses = ['terminated', 'cancelled', 'completed'];
+        if (in_array(strtolower($carePlan->status ?? ''), $blockedPlanStatuses)) {
+            return false;
+        }
+
+        // 2. Check Prescription/Activity statuses (3.20.4.4)
+        $blockedActivityStatuses = ['cancelled', 'completed'];
+        if (in_array(strtolower($this->status ?? ''), $blockedActivityStatuses)) {
+            return false;
+        }
+
+        // 3. Verify validity periods are active (3.20.4.3)
+        $now = now()->startOfDay();
+
+        // Check Care Plan period
+        if ($carePlan->period_start && $now->lt($carePlan->period_start->startOfDay())) {
+            return false;
+        }
+        if ($carePlan->period_end && $now->gt($carePlan->period_end->startOfDay())) {
+            return false;
+        }
+
+        // Check Activity scheduled period
+        if ($this->scheduled_period_start && $now->lt($this->scheduled_period_start->startOfDay())) {
+            return false;
+        }
+        if ($this->scheduled_period_end && $now->gt($this->scheduled_period_end->startOfDay())) {
+            return false;
+        }
+
+        return true;
+    }
 }
+
