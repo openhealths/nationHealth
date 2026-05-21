@@ -91,7 +91,7 @@
                             </td>
                             <td class="index-table-td-actions">
                                 @if(isset($plan->id))
-                                    <a href="{{ route('carePlan.show', [legalEntity(), $plan->id]) }}"
+                                    <a href="{{ route('care-plan.show', [legalEntity(), $plan->id]) }}"
                                        class="text-blue-500 hover:underline text-sm">
                                         {{ __('forms.show') }}
                                     </a>
