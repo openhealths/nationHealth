@@ -7,8 +7,7 @@ namespace App\Repositories\MedicalEvents;
 use App\Classes\eHealth\Api\PatientApi;
 use App\Core\Arr;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
-use App\Models\MedicalEvents\Sql\DiagnosticReportPerformer;
-use App\Models\MedicalEvents\Sql\DiagnosticReportResultsInterpreter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -190,8 +189,7 @@ class DiagnosticReportRepository extends BaseRepository
                         Repository::codeableConcept()->attach($reference, $datum['performer']['reference']);
                     }
 
-                    DiagnosticReportPerformer::create([
-                        'diagnostic_report_id' => $diagnosticReport->id,
+                    $diagnosticReport->performer()->create([
                         'reference_id' => $reference->id ?? null,
                         'text' => $datum['performer']['text'] ?? null
                     ]);
@@ -207,8 +205,7 @@ class DiagnosticReportRepository extends BaseRepository
                         );
                     }
 
-                    DiagnosticReportResultsInterpreter::create([
-                        'diagnostic_report_id' => $diagnosticReport->id,
+                    $diagnosticReport->resultsInterpreter()->create([
                         'reference_id' => $reference->id ?? null,
                         'text' => $datum['resultsInterpreter']['text'] ?? null
                     ]);
@@ -245,7 +242,7 @@ class DiagnosticReportRepository extends BaseRepository
             'reportOrigin.coding',
             'resultsInterpreter.reference.type.coding'
         ])
-            ->whereHas('encounter', fn ($query) => $query->where('value', $encounterUuid))
+            ->whereHas('encounter', fn (Builder $query) => $query->where('value', $encounterUuid))
             ->get()
             ->toArray();
 
@@ -296,7 +293,6 @@ class DiagnosticReportRepository extends BaseRepository
         DB::transaction(function () use ($personId, $validatedData) {
             $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
 
-            // Load existing diagnostic reports with relations
             $existingDiagnosticReports = $this->model->whereIn('uuid', $apiUuids)
                 ->withAllRelations()
                 ->get()
@@ -305,7 +301,6 @@ class DiagnosticReportRepository extends BaseRepository
             foreach ($validatedData as $data) {
                 $existing = $existingDiagnosticReports->get($data['uuid']);
 
-                // Sync relationships
                 $basedOn = $this->syncIdentifier($existing, $data['based_on'] ?? null, 'basedOn');
                 $code = $this->syncIdentifier($existing, $data['code'], 'code');
                 $encounter = $this->syncIdentifier($existing, $data['encounter'] ?? null, 'encounter');
@@ -341,10 +336,10 @@ class DiagnosticReportRepository extends BaseRepository
                     'report_origin_id' => $reportOrigin?->id,
                     'origin_episode_id' => $originEpisode?->id,
                     'cancellation_reason_id' => $cancellationReason?->id,
-                    'status' => $data['status'] ?? null,
-                    'issued' => $data['issued'] ?? null,
+                    'status' => $data['status'],
+                    'issued' => $data['issued'],
                     'conclusion' => $data['conclusion'] ?? null,
-                    'primary_source' => $data['primary_source'] ?? null
+                    'primary_source' => $data['primary_source']
                 ];
 
                 if ($existing) {
@@ -360,149 +355,77 @@ class DiagnosticReportRepository extends BaseRepository
                     Repository::paperReferral()->sync($data['paper_referral'], $diagnosticReport, $existing);
                 }
 
-                // Sync categories
-                $categoriesIds = $this->syncCodeableConcepts($existing, $data['category'] ?? [], 'category');
-                $diagnosticReport->category()->sync($categoriesIds);
+                $this->syncPivot(
+                    $diagnosticReport,
+                    'category',
+                    $this->syncCodeableConcepts($existing, $data['category'], 'category')
+                );
 
                 Repository::period()->sync($diagnosticReport, $data['effective_period'] ?? [], 'effectivePeriod');
 
-                $this->syncPerformer($existing, $data['performer'] ?? null, $diagnosticReport);
+                $this->syncHasOneReference($diagnosticReport, 'performer', $data['performer'] ?? []);
+                $this->syncHasOneReference($diagnosticReport, 'resultsInterpreter', $data['results_interpreter'] ?? []);
 
-                $this->syncResultsInterpreter($existing, $data['results_interpreter'] ?? null, $diagnosticReport);
-
-                $specimenIds = $this->syncIdentifiers($existing, $data['specimens'] ?? [], 'specimens');
-                $diagnosticReport->specimens()->sync($specimenIds);
-
-                $usedReferencesIds = $this->syncIdentifiers(
-                    $existing,
-                    $data['used_references'] ?? [],
-                    'usedReferences'
+                $this->syncPivot(
+                    $diagnosticReport,
+                    'specimens',
+                    $this->syncIdentifiers($existing, $data['specimens'] ?? [], 'specimens')
                 );
-                $diagnosticReport->usedReferences()->sync($usedReferencesIds);
+                $this->syncPivot(
+                    $diagnosticReport,
+                    'usedReferences',
+                    $this->syncIdentifiers($existing, $data['used_references'] ?? [], 'usedReferences')
+                );
             }
         });
     }
 
     /**
-     * Sync performer relationship with comparison logic.
+     * Sync a HasOne reference entity (performer or resultsInterpreter).
      *
-     * @param  DiagnosticReport|null  $existing
-     * @param  array|null  $performerData
      * @param  DiagnosticReport  $diagnosticReport
+     * @param  string  $relationName
+     * @param  array  $entityData
      * @return void
      */
-    private function syncPerformer(
-        ?DiagnosticReport $existing,
-        ?array $performerData,
-        DiagnosticReport $diagnosticReport
+    private function syncHasOneReference(
+        DiagnosticReport $diagnosticReport,
+        string $relationName,
+        array $entityData
     ): void {
-        $existingPerformer = $existing?->performer;
+        $existing = $diagnosticReport->relationLoaded($relationName) ? $diagnosticReport->{$relationName} : null;
 
-        if (!$performerData) {
-            // Remove existing performer if no data provided
-            if ($existingPerformer) {
-                $existingPerformer->delete();
-            }
+        if (empty($entityData)) {
+            $existing?->delete();
 
             return;
         }
 
         $referenceId = null;
-        $text = $performerData['text'] ?? null;
+        $text = $entityData['text'] ?? null;
 
-        // Handle reference if provided
-        if (isset($performerData['reference'])) {
-            if ($existingPerformer && $existingPerformer->reference) {
-                // Update existing reference
-                $this->updateIdentifier($existingPerformer->reference, $performerData['reference']);
-                $referenceId = $existingPerformer->reference->id;
+        if (isset($entityData['reference'])) {
+            if ($existing && $existing->reference) {
+                $this->updateIdentifier($existing->reference, $entityData['reference']);
+                $referenceId = $existing->reference->id;
             } else {
-                // Create new reference
-                $reference = Repository::identifier()->store($performerData['reference']['identifier']['value']);
-                Repository::codeableConcept()->attach($reference, $performerData['reference']);
+                $reference = Repository::identifier()->store($entityData['reference']['identifier']['value']);
+                Repository::codeableConcept()->attach($reference, $entityData['reference']);
                 $referenceId = $reference->id;
             }
         }
 
-        if ($existingPerformer) {
-            // Check if data has changed
-            $hasChanged =
-                ($existingPerformer->reference_id !== $referenceId) ||
-                ($existingPerformer->text !== $text);
+        if ($existing) {
+            $hasChanged = ($existing->referenceId !== $referenceId) || ($existing->text !== $text);
 
             if ($hasChanged) {
-                $existingPerformer->update([
+                $existing->update([
                     'reference_id' => $referenceId,
                     'text' => $text
                 ]);
             }
         } else {
-            // Create new performer
-            DiagnosticReportPerformer::create([
-                'diagnostic_report_id' => $diagnosticReport->id,
-                'reference_id' => $referenceId,
-                'text' => $text
-            ]);
-        }
-    }
-
-    /**
-     * Sync results interpreter relationship with comparison logic.
-     *
-     * @param  DiagnosticReport|null  $existing
-     * @param  array|null  $interpreterData
-     * @param  DiagnosticReport  $diagnosticReport
-     * @return void
-     */
-    private function syncResultsInterpreter(
-        ?DiagnosticReport $existing,
-        ?array $interpreterData,
-        DiagnosticReport $diagnosticReport
-    ): void {
-        $existingInterpreter = $existing?->resultsInterpreter;
-
-        if (!$interpreterData) {
-            // Remove existing interpreter if no data provided
-            if ($existingInterpreter) {
-                $existingInterpreter->delete();
-            }
-
-            return;
-        }
-
-        $referenceId = null;
-        $text = $interpreterData['text'] ?? null;
-
-        // Handle reference if provided
-        if (isset($interpreterData['reference'])) {
-            if ($existingInterpreter && $existingInterpreter->reference) {
-                // Update existing reference
-                $this->updateIdentifier($existingInterpreter->reference, $interpreterData['reference']);
-                $referenceId = $existingInterpreter->reference->id;
-            } else {
-                // Create new reference
-                $reference = Repository::identifier()->store($interpreterData['reference']['identifier']['value']);
-                Repository::codeableConcept()->attach($reference, $interpreterData['reference']);
-                $referenceId = $reference->id;
-            }
-        }
-
-        if ($existingInterpreter) {
-            // Check if data has changed
-            $hasChanged =
-                ($existingInterpreter->reference_id !== $referenceId) ||
-                ($existingInterpreter->text !== $text);
-
-            if ($hasChanged) {
-                $existingInterpreter->update([
-                    'reference_id' => $referenceId,
-                    'text' => $text
-                ]);
-            }
-        } else {
-            // Create new interpreter
-            DiagnosticReportResultsInterpreter::create([
-                'diagnostic_report_id' => $diagnosticReport->id,
+            $diagnosticReport->{$relationName}()->create([
                 'reference_id' => $referenceId,
                 'text' => $text
             ]);

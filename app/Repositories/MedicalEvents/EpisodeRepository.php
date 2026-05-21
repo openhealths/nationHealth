@@ -6,7 +6,9 @@ namespace App\Repositories\MedicalEvents;
 
 use App\Core\Arr;
 use App\Models\MedicalEvents\Sql\Episode;
+use App\Models\MedicalEvents\Sql\EpisodeCurrentDiagnosis;
 use App\Models\MedicalEvents\Sql\EpisodeDiagnosesHistory;
+use App\Models\MedicalEvents\Sql\EpisodeDiagnosesHistoryItem;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -109,7 +111,6 @@ class EpisodeRepository extends BaseRepository
         DB::transaction(function () use ($personId, $validatedData) {
             $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
 
-            // Load existing episodes with relations
             $existingEpisodes = $this->model->whereIn('uuid', $apiUuids)
                 ->with('period')
                 ->get()
@@ -150,35 +151,21 @@ class EpisodeRepository extends BaseRepository
             $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
 
             $existingEpisodes = $this->model->whereIn('uuid', $apiUuids)
-                ->with([
-                    'type',
-                    'managingOrganization.type.coding',
-                    'careManager.type.coding',
-                    'statusReason.coding',
-                    'period',
-                    'currentDiagnoses.code.coding',
-                    'currentDiagnoses.condition.type.coding',
-                    'currentDiagnoses.role.coding',
-                    'diagnosesHistory.evidence.type.coding',
-                    'diagnosesHistory.diagnoses.code.coding',
-                    'diagnosesHistory.diagnoses.condition.type.coding',
-                    'diagnosesHistory.diagnoses.role.coding',
-                    'statusHistory.statusReason.coding'
-                ])
+                ->withRelationships()
                 ->get()
                 ->keyBy('uuid');
 
             foreach ($validatedData as $data) {
                 $existing = $existingEpisodes->get($data['uuid']);
 
-                $type = $this->syncCoding($existing, $data['type'] ?? null, 'type');
+                $type = $this->syncCoding($existing, $data['type'], 'type');
                 $managingOrganization = $this->syncIdentifier(
                     $existing,
-                    $data['managing_organization'] ?? null,
+                    $data['managing_organization'],
                     'managingOrganization'
                 );
-                $careManager = $this->syncIdentifier($existing, $data['care_manager'] ?? null, 'careManager');
-                $statusReason = $this->syncCodeableConcept($existing, $data['status_reason'] ?? null, 'statusReason');
+                $careManager = $this->syncIdentifier($existing, $data['care_manager'], 'careManager');
+                $statusReason = $this->syncCodeableConcept($existing, $data['status_reason'], 'statusReason');
 
                 $episodeData = [
                     'person_id' => $personId,
@@ -186,27 +173,25 @@ class EpisodeRepository extends BaseRepository
                     'name' => $data['name'],
                     'closing_summary' => $data['closing_summary'] ?? null,
                     'explanatory_letter' => $data['explanatory_letter'] ?? null,
-                    'episode_type_id' => $type?->id,
-                    'managing_organization_id' => $managingOrganization?->id,
-                    'care_manager_id' => $careManager?->id,
+                    'episode_type_id' => $type->id,
+                    'managing_organization_id' => $managingOrganization->id,
+                    'care_manager_id' => $careManager->id,
                     'status_reason_id' => $statusReason?->id,
-                    'ehealth_inserted_at' => $data['ehealth_inserted_at'] ?? null,
-                    'ehealth_updated_at' => $data['ehealth_updated_at'] ?? null
+                    'ehealth_inserted_at' => $data['ehealth_inserted_at'],
+                    'ehealth_updated_at' => $data['ehealth_updated_at']
                 ];
 
                 if ($existing) {
                     $existing->update($episodeData);
                     $episode = $existing;
                 } else {
-                    $episode = $this->model->create(
-                        array_merge(['uuid' => $data['uuid']], $episodeData)
-                    );
+                    $episode = $this->model->create(array_merge(['uuid' => $data['uuid']], $episodeData));
                 }
 
-                Repository::period()->sync($episode, $data['period'] ?? null);
-                $this->syncCurrentDiagnoses($episode, $existing, $data['current_diagnoses'] ?? []);
-                $this->syncDiagnosesHistory($episode, $existing, $data['diagnoses_history'] ?? []);
-                $this->syncStatusHistory($episode, $existing, $data['status_history'] ?? []);
+                Repository::period()->sync($episode, $data['period']);
+                $this->syncCurrentDiagnoses($episode, $data['current_diagnoses'] ?? []);
+                $this->syncDiagnosesHistory($episode, $data['diagnoses_history'] ?? []);
+                $this->syncStatusHistory($episode, $data['status_history']);
             }
         });
     }
@@ -215,38 +200,43 @@ class EpisodeRepository extends BaseRepository
      * Sync current diagnoses by comparing existing entries with API data by index.
      *
      * @param  Episode  $episode
-     * @param  Episode|null  $existing
-     * @param  array  $items
+     * @param  array  $currentDiagnoses
      * @return void
      */
-    private function syncCurrentDiagnoses(Episode $episode, ?Episode $existing, array $items): void
+    private function syncCurrentDiagnoses(Episode $episode, array $currentDiagnoses): void
     {
-        $existingDiagnoses = $existing?->currentDiagnoses ?? collect();
+        $existingDiagnoses = $episode->relationLoaded('currentDiagnoses') ? $episode->currentDiagnoses : collect();
 
-        foreach ($items as $index => $item) {
-            $existingDiagnosis = $existingDiagnoses[$index] ?? null;
+        if (empty($currentDiagnoses)) {
+            $existingDiagnoses->each(fn (EpisodeCurrentDiagnosis $diagnose) => $diagnose->delete());
 
-            if ($existingDiagnosis) {
-                $this->updateCodeableConcept($existingDiagnosis->code, $item['code']);
-                $this->updateIdentifier($existingDiagnosis->condition, $item['condition']);
-                $this->updateCodeableConcept($existingDiagnosis->role, $item['role']);
-                $existingDiagnosis->update(['rank' => $item['rank'] ?? null]);
+            return;
+        }
+
+        foreach ($currentDiagnoses as $index => $currentDiagnose) {
+            $existingDiagnose = $existingDiagnoses[$index] ?? null;
+
+            if ($existingDiagnose) {
+                $this->updateCodeableConcept($existingDiagnose->code, $currentDiagnose['code']);
+                $this->updateIdentifier($existingDiagnose->condition, $currentDiagnose['condition']);
+                $this->updateCodeableConcept($existingDiagnose->role, $currentDiagnose['role']);
+                $existingDiagnose->update(['rank' => $currentDiagnose['rank'] ?? null]);
             } else {
-                $code = Repository::codeableConcept()->store($item['code']);
-                $condition = Repository::identifier()->store($item['condition']['identifier']['value']);
-                Repository::codeableConcept()->attach($condition, $item['condition']);
-                $role = Repository::codeableConcept()->store($item['role']);
+                $code = Repository::codeableConcept()->store($currentDiagnose['code']);
+                $condition = Repository::identifier()->store($currentDiagnose['condition']['identifier']['value']);
+                Repository::codeableConcept()->attach($condition, $currentDiagnose['condition']);
+                $role = Repository::codeableConcept()->store($currentDiagnose['role']);
 
                 $episode->currentDiagnoses()->create([
                     'code_id' => $code->id,
                     'condition_id' => $condition->id,
                     'role_id' => $role->id,
-                    'rank' => $item['rank'] ?? null
+                    'rank' => $currentDiagnose['rank'] ?? null
                 ]);
             }
         }
 
-        foreach ($existingDiagnoses->slice(count($items)) as $extra) {
+        foreach ($existingDiagnoses->slice(count($currentDiagnoses)) as $extra) {
             $extra->delete();
         }
     }
@@ -255,63 +245,52 @@ class EpisodeRepository extends BaseRepository
      * Sync diagnoses history by comparing existing entries with API data by index.
      *
      * @param  Episode  $episode
-     * @param  Episode|null  $existing
-     * @param  array  $items
+     * @param  array  $diagnosesHistory
      * @return void
      */
-    private function syncDiagnosesHistory(Episode $episode, ?Episode $existing, array $items): void
+    private function syncDiagnosesHistory(Episode $episode, array $diagnosesHistory): void
     {
-        $existingHistory = $existing?->diagnosesHistory ?? collect();
+        $existingHistory = $episode->relationLoaded('diagnosesHistory') ? $episode->diagnosesHistory : collect();
 
-        foreach ($items as $index => $item) {
+        if (empty($diagnosesHistory)) {
+            $existingHistory->each(fn (EpisodeDiagnosesHistory $entry) => $entry->delete());
+
+            return;
+        }
+
+        foreach ($diagnosesHistory as $index => $diagnoseHistory) {
             $existingEntry = $existingHistory[$index] ?? null;
 
             if ($existingEntry) {
-                if ($existingEntry->evidence && !empty($item['evidence'])) {
-                    $this->updateIdentifier($existingEntry->evidence, $item['evidence']);
-                } elseif (!$existingEntry->evidence && !empty($item['evidence'])) {
-                    $evidence = Repository::identifier()->store($item['evidence']['identifier']['value']);
-                    Repository::codeableConcept()->attach($evidence, $item['evidence']);
+                if ($existingEntry->evidence) {
+                    $this->updateIdentifier($existingEntry->evidence, $diagnoseHistory['evidence']);
+                } else {
+                    $evidence = Repository::identifier()->store($diagnoseHistory['evidence']['identifier']['value']);
+                    Repository::codeableConcept()->attach($evidence, $diagnoseHistory['evidence']);
                     $existingEntry->update(['evidence_id' => $evidence->id]);
                 }
 
                 $existingEntry->update([
-                    'date' => $item['date'] ?? null,
-                    'is_active' => $item['is_active'] ?? false
+                    'date' => $diagnoseHistory['date'],
+                    'is_active' => $diagnoseHistory['is_active']
                 ]);
 
-                $this->syncDiagnosesHistoryItems($existingEntry, $item['diagnoses'] ?? []);
+                $this->syncDiagnosesHistoryItems($existingEntry, $diagnoseHistory['diagnoses']);
             } else {
-                $evidence = null;
-
-                if (!empty($item['evidence'])) {
-                    $evidence = Repository::identifier()->store($item['evidence']['identifier']['value']);
-                    Repository::codeableConcept()->attach($evidence, $item['evidence']);
-                }
+                $evidence = Repository::identifier()->store($diagnoseHistory['evidence']['identifier']['value']);
+                Repository::codeableConcept()->attach($evidence, $diagnoseHistory['evidence']);
 
                 $historyEntry = $episode->diagnosesHistory()->create([
-                    'evidence_id' => $evidence?->id,
-                    'date' => $item['date'] ?? null,
-                    'is_active' => $item['is_active'] ?? false
+                    'evidence_id' => $evidence->id,
+                    'date' => $diagnoseHistory['date'],
+                    'is_active' => $diagnoseHistory['is_active']
                 ]);
 
-                foreach ($item['diagnoses'] ?? [] as $diagnosisData) {
-                    $code = Repository::codeableConcept()->store($diagnosisData['code']);
-                    $condition = Repository::identifier()->store($diagnosisData['condition']['identifier']['value']);
-                    Repository::codeableConcept()->attach($condition, $diagnosisData['condition']);
-                    $role = Repository::codeableConcept()->store($diagnosisData['role']);
-
-                    $historyEntry->diagnoses()->create([
-                        'code_id' => $code->id,
-                        'condition_id' => $condition->id,
-                        'role_id' => $role->id,
-                        'rank' => $diagnosisData['rank'] ?? null
-                    ]);
-                }
+                $this->syncDiagnosesHistoryItems($historyEntry, $diagnoseHistory['diagnoses']);
             }
         }
 
-        foreach ($existingHistory->slice(count($items)) as $extra) {
+        foreach ($existingHistory->slice(count($diagnosesHistory)) as $extra) {
             $extra->delete();
         }
     }
@@ -325,7 +304,13 @@ class EpisodeRepository extends BaseRepository
      */
     private function syncDiagnosesHistoryItems(EpisodeDiagnosesHistory $historyEntry, array $items): void
     {
-        $existingItems = $historyEntry->diagnoses ?? collect();
+        $existingItems = $historyEntry->relationLoaded('diagnoses') ? $historyEntry->diagnoses : collect();
+
+        if (empty($items)) {
+            $existingItems->each(fn (EpisodeDiagnosesHistoryItem $item) => $item->delete());
+
+            return;
+        }
 
         foreach ($items as $index => $item) {
             $existingItem = $existingItems[$index] ?? null;
@@ -359,19 +344,18 @@ class EpisodeRepository extends BaseRepository
      * Sync status history by comparing existing entries with API data by index.
      *
      * @param  Episode  $episode
-     * @param  Episode|null  $existing
-     * @param  array  $items
+     * @param  array  $statusHistory
      * @return void
      */
-    private function syncStatusHistory(Episode $episode, ?Episode $existing, array $items): void
+    private function syncStatusHistory(Episode $episode, array $statusHistory): void
     {
-        $existingHistory = $existing?->statusHistory ?? collect();
+        $existingHistory = $episode->relationLoaded('statusHistory') ? $episode->statusHistory : collect();
 
-        foreach ($items as $index => $item) {
+        foreach ($statusHistory as $index => $item) {
             $existingEntry = $existingHistory[$index] ?? null;
 
             if ($existingEntry) {
-                $statusReasonId = $existingEntry->status_reason_id;
+                $statusReasonId = $existingEntry->statusReasonId;
 
                 if ($existingEntry->statusReason && !empty($item['status_reason'])) {
                     $this->updateCodeableConcept($existingEntry->statusReason, $item['status_reason']);
@@ -401,6 +385,10 @@ class EpisodeRepository extends BaseRepository
                     'status_reason_id' => $statusReasonId
                 ]);
             }
+        }
+
+        foreach ($existingHistory->slice(count($statusHistory)) as $extra) {
+            $extra->delete();
         }
     }
 }

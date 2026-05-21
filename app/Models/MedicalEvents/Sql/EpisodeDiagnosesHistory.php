@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
+use App\Casts\EHealthTimestampCast;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,6 +22,8 @@ class EpisodeDiagnosesHistory extends Model
         'date',
         'is_active'
     ];
+
+    protected $casts = ['date' => EHealthTimestampCast::class];
 
     protected $hidden = [
         'id',

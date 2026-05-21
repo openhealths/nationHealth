@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
+use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Model;
 
 class ImmunizationDoseQuantity extends Model
 {
+    use HasCamelCasing;
+
     protected $fillable = [
         'immunization_id',
         'value',
