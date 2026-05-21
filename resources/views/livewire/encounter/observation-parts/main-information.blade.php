@@ -287,8 +287,8 @@
                     <label for="valueQuantity" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                         {{ __('patients.value') }}
                         <span x-text="
-                                  valueMap[modalObservation.codeCode][2] !== '' && modalObservation.codeCode !== 'Обрати' && valueMap[modalObservation.codeCode]?.[2] ?
-                                  `(одиниця виміру &quot;${$wire.dictionaries['eHealth/ucum/units'][valueMap[modalObservation.codeCode][2]]}&quot;)` :
+                                  valueMap[modalObservation.codeCode][2] !== '' && modalObservation.codeCode !== '{{ __('forms.select') }}' && valueMap[modalObservation.codeCode]?.[2] ?
+                                  `({{ __('forms.unit') }} &quot;${$wire.dictionaries['eHealth/ucum/units'][valueMap[modalObservation.codeCode][2]]}&quot;)` :
                                   ''
                               "
                         ></span>
@@ -376,8 +376,8 @@
 
                     <p id="quantity" class="mt-2 text-sm text-gray-500 dark:text-gray-400">
                         <span x-text="
-                            modalObservation?.codeCode && valueMap[modalObservation.codeCode]?.[0] ?
-                            'від ' + valueMap[modalObservation.codeCode][0].split('-')[0] + ' до ' + valueMap[modalObservation.codeCode][0].split('-')[1] :
+                            modalObservation?.codeCode && valueMap[modalObservation.codeCode]?.[0] && valueMap[modalObservation.codeCode][0].includes('-') ?
+                            '{{ __('forms.start') }} ' + valueMap[modalObservation.codeCode][0].split('-')[0] + ' {{ __('forms.end') }} ' + valueMap[modalObservation.codeCode][0].split('-')[1] :
                             ''
                         "
                         ></span>

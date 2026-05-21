@@ -1,55 +1,4 @@
-<fieldset class="fieldset" id="patient-data-section">
-    <legend class="legend">
-        {{ __('patients.main_data') }}
-    </legend>
-
-    <div x-data="{ isReferralAvailable: false }">
-        <div class="form-row-3">
-            <div class="form-group group">
-                <input @click="isReferralAvailable = !isReferralAvailable"
-                       type="checkbox"
-                       name="isReferralAvailable"
-                       id="isReferralAvailable"
-                       class="default-checkbox mb-1"
-                />
-                <label class="default-p" for="isReferralAvailable">
-                    {{ __('patients.referral_available') }}
-                </label>
-            </div>
-
-            {{-- When referral is avaliable --}}
-            <div x-show="isReferralAvailable" class="form-group group" x-cloak>
-                <input wire:model="form.referralNumber"
-                       type="text"
-                       name="requisitionNumber"
-                       id="requisitionNumber"
-                       class="input peer @error('form.referralNumber') input-error @enderror"
-                       placeholder=" "
-                       required
-                       autocomplete="off"
-                />
-                <label for="requisitionNumber" class="label">
-                    {{ __('patients.referral_number') }}
-                </label>
-
-                @error('form.referralNumber')
-                <p class="text-error">
-                    {{ $message }}
-                </p>
-                @enderror
-            </div>
-
-            <div x-show="isReferralAvailable" class="form-group group" x-cloak>
-                <button wire:click.prevent="searchForReferralNumber"
-                        class="flex items-center gap-2 button-primary"
-                >
-                    @icon('search', 'w-4 h-4')
-                    <span>{{ __('patients.search_for_referral') }}</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
+<div class="p-4 sm:p-8" id="patient-data-section">
     <div class="form-row-3">
         <div class="form-group group">
             <select wire:model="form.encounter.classCode"
@@ -57,7 +6,8 @@
                     class="input-select peer @error('form.encounter.classCode') input-error @enderror"
                     required
             >
-                <option value="" selected>{{ __('forms.select') }} {{ mb_strtolower(__('patients.interaction_class')) }}*
+                <option value="" selected>{{ __('forms.select') }} {{ mb_strtolower(__('patients.interaction_class')) }}
+                    *
                 </option>
                 @foreach($this->dictionaries['eHealth/encounter_classes'] as $key => $encounterClass)
                     <option value="{{ $key }}">{{ $encounterClass }}</option>
@@ -159,7 +109,8 @@
                             class="input-select peer @error('form.episode.typeCode') input-error @enderror"
                             required
                     >
-                        <option value="" selected>{{ __('forms.select') }} {{ mb_strtolower(__('patients.episode_type')) }}*
+                        <option value=""
+                                selected>{{ __('forms.select') }} {{ mb_strtolower(__('patients.episode_type')) }}*
                         </option>
                         @foreach($this->dictionaries['eHealth/episode_types'] as $key => $episodeType)
                             <option value="{{ $key }}">{{ $episodeType }}</option>
@@ -198,4 +149,4 @@
             </div>
         </template>
     </div>
-</fieldset>
+</div>

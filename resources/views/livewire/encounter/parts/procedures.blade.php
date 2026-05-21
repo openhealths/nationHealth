@@ -1,15 +1,15 @@
-<div class="relative" id="procedures-section">
-    <fieldset class="fieldset"
-              x-data="{
-                  procedures: $wire.entangle('form.procedures'),
-                  modalProcedure: new Procedure(),
-                  newProcedure: false,
-                  item: 0
-              }"
-    >
-        <legend class="legend">
-            <h2>{{ __('patients.procedures') }}</h2>
-        </legend>
+<div class="p-4 sm:p-8"
+     id="procedures-section"
+     x-data="{
+         procedures: $wire.entangle('form.procedures'),
+         modalProcedure: new Procedure(),
+         newProcedure: false,
+         item: 0
+     }"
+>
+    <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
+        {{ __('patients.procedures') }}
+    </h2>
 
         <table class="table-input w-inherit">
             <thead class="thead-input">
@@ -49,7 +49,7 @@
                                  }
                              }"
                              @keydown.escape.prevent.stop="close($refs.button)"
-                             @focusin.window="!$refs.panel.contains($event.target) && close()"
+                             @focusin.window="! $refs.panel.contains($event.target) && close()"
                              x-id="['dropdown-button']"
                              class="relative"
                         >
@@ -183,7 +183,6 @@
                 </div>
             </template>
         </div>
-    </fieldset>
 </div>
 
 <script>

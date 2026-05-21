@@ -1,8 +1,6 @@
-
-<div class="relative"> {{-- This required for table overflow scrolling --}}
+<div class="relative">
     <fieldset class="fieldset"
-              {{-- Binding ComplicationDetail to Alpine, it will be re-used in the modal.
-                Note that it's necessary for modal to work properly --}}
+
               x-data="{
                   openModal: false,
                   modalComplicationDetail: new ComplicationDetail(),
@@ -39,7 +37,6 @@
                         }`"
                     ></td>
                     <td class="td-input">
-                        {{-- That all that is needed for the dropdown --}}
                         <div x-data="{
                                  openDropdown: false,
                                  toggle() {
@@ -64,7 +61,6 @@
                              x-id="['dropdown-button']"
                              class="relative"
                         >
-                            {{-- Dropdown Button --}}
                             <button x-ref="button"
                                     @click="toggle()"
                                     :aria-expanded="openDropdown"
@@ -80,7 +76,6 @@
                                 </svg>
                             </button>
 
-                            {{-- Dropdown Panel --}}
                             <div class="absolute" style="left: 50%"> {{-- Center a dropdown panel --}}
                                 <div x-ref="panel"
                                      x-show="openDropdown"
@@ -106,7 +101,6 @@
         </table>
 
         <div>
-            {{-- Button to trigger the modal --}}
             <button @click.prevent="
                         openModal = true;
                         newComplicationDetail = true;
@@ -121,22 +115,18 @@
                 {{ __('forms.add') }}
             </button>
 
-            {{-- Modal --}}
-            <template x-teleport="body"> {{-- This moves the modal at the end of the body tag --}}
+            <template x-teleport="body">
                 <div x-show="openModal"
                      style="display: none"
                      @keydown.escape.prevent.stop="openModal = false"
                      role="dialog"
                      aria-modal="true"
                      x-id="['modal-title']"
-                     :aria-labelledby="$id('modal-title')" {{-- This associates the modal with unique ID --}}
-                     class="modal"
+                     :aria-labelledby="$id('modal-title')"
                 >
 
-                    {{-- Overlay --}}
                     <div x-show="openModal" x-transition.opacity class="fixed inset-0 bg-black/25"></div>
 
-                    {{-- Panel --}}
                     <div x-show="openModal"
                          x-transition
                          @click="openModal = false"
@@ -146,14 +136,11 @@
                              x-trap.noscroll.inert="openModal"
                              class="modal-content h-fit w-full lg:max-w-4xl"
                         >
-                            {{-- Title --}}
                             <h3 class="modal-header" :id="$id('modal-title')">{{ __('forms.add') }}</h3>
 
-                            {{-- Content --}}
                             <form>
                                 <x-forms.loading/>
 
-                                {{-- A table that shows the results of the found data --}}
                                 <template x-if="searchResults.length > 0">
                                     <div class="table-container">
                                         <div class="overflow-visible">
@@ -211,7 +198,6 @@
                                     <p class="default-p">{{ __('forms.nothing_found') }}</p>
                                 </template>
 
-                                {{-- Action buttons --}}
                                 <div class="mt-6 flex justify-between space-x-2">
                                     <button @click.prevent
                                             type="button"

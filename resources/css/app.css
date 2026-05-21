@@ -122,6 +122,10 @@ input[required] ~ label:after {
     @apply p-4 sm:p-8 sm:pb-10 mb-16 border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 max-w-[1120px];
 }
 
+.fieldset-card {
+    @apply bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-none;
+}
+
 .fieldset-table {
     @apply pb-4 sm:pb-10 mb-16 relative overflow-x-auto
 }

@@ -1,24 +1,24 @@
-<div class="relative" id="observations-section">
-    <fieldset class="fieldset"
-              x-data="{
-                  observations: $wire.entangle('form.observations'),
-                  openModal: false,
-                  showDuplicateCodeWarning: false,
-                  modalObservation: new Observation(),
-                  newObservation: false,
-                  item: 0,
-                  valueMap: $wire.entangle('observationValueMap'),
-                  observationCategoriesDictionary: $wire.dictionaries['eHealth/observation_categories'],
-                  icfObservationCategoriesDictionary: $wire.dictionaries['eHealth/ICF/observation_categories'],
-                  observationCodesDictionary: $wire.dictionaries['eHealth/LOINC/observation_codes'],
-                  icfObservationCodesDictionary: $wire.dictionaries['eHealth/ICF/classifiers'],
-                  customObservationCodesDictionary: $wire.dictionaries['eHealth/custom/observation_codes'],
-                  observationInterpretationsDictionary: $wire.dictionaries['eHealth/observation_interpretations']
-              }"
-    >
-        <legend class="legend">
-            <h2>{{ __('patients.observation') }}</h2>
-        </legend>
+<div class="p-4 sm:p-8"
+     id="observations-section"
+     x-data="{
+         observations: $wire.entangle('form.observations'),
+         openModal: false,
+         showDuplicateCodeWarning: false,
+         modalObservation: new Observation(),
+         newObservation: false,
+         item: 0,
+         valueMap: $wire.entangle('observationValueMap'),
+         observationCategoriesDictionary: $wire.dictionaries['eHealth/observation_categories'],
+         icfObservationCategoriesDictionary: $wire.dictionaries['eHealth/ICF/observation_categories'],
+         observationCodesDictionary: $wire.dictionaries['eHealth/LOINC/observation_codes'],
+         icfObservationCodesDictionary: $wire.dictionaries['eHealth/ICF/classifiers'],
+         customObservationCodesDictionary: $wire.dictionaries['eHealth/custom/observation_codes'],
+         observationInterpretationsDictionary: $wire.dictionaries['eHealth/observation_interpretations']
+     }"
+>
+    <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
+        {{ __('patients.observation') }}
+    </h2>
 
         <table class="table-input w-inherit">
             <thead class="thead-input">
@@ -49,7 +49,7 @@
                     <td class="td-input"
                         x-text="
                             observation.valueBoolean !== undefined
-                                ? (observation.valueBoolean ? 'Так' : 'Ні')
+                                ? (observation.valueBoolean ? '{{ __('forms.yes') }}' : '{{ __('forms.no') }}')
                             : observation.valueString !== undefined
                                 ? observation.valueString
                             : (observation.valueDate !== undefined && observation.valueTime !== undefined)
@@ -84,7 +84,7 @@
                                  }
                              }"
                              @keydown.escape.prevent.stop="close($refs.button)"
-                             @focusin.window="!$refs.panel.contains($event.target) && close()"
+                             @focusin.window="! $refs.panel.contains($event.target) && close()"
                              x-id="['dropdown-button']"
                              class="relative"
                         >
@@ -258,7 +258,6 @@
                 </div>
             </template>
         </div>
-    </fieldset>
 </div>
 
 <script>

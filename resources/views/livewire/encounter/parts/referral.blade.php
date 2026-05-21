@@ -1,8 +1,4 @@
-<fieldset class="fieldset" id="referral-section">
-    <legend class="legend">
-        {{ __('patients.referrals') }}
-    </legend>
-
+<div id="referral-section">
     <div x-data="{
              isReferralAvailable: false,
              referralType: $wire.entangle('form.encounter.referralType')
@@ -12,7 +8,7 @@
              $watch('isReferralAvailable', value => { if (!value) referralType = '' })
          "
     >
-        <div class="mb-8">
+        <div class="mb-8 mt-2">
             <div class="form-group group">
                 <input x-model="isReferralAvailable"
                        type="checkbox"
@@ -86,9 +82,10 @@
                                        id="paperReferralNumber"
                                        class="input !pr-7 peer @error('form.encounter.paperReferral.requisition') input-error @enderror"
                                        placeholder=" "
+                                       required
                                 />
-                                <label for="paperReferralNumber" class="label">
-                                    {{ __('patients.referral_number') }}*
+                                <label for="paperReferralNumber" class="label required">
+                                    {{ __('patients.referral_number') }}
                                 </label>
                                 <div class="absolute inset-y-0 end-0 flex items-center">
                                     <button type="button"
@@ -111,9 +108,10 @@
                                        id="paperReferralAuthor"
                                        class="input !pr-7 peer @error('form.encounter.paperReferral.requesterEmployeeName') input-error @enderror"
                                        placeholder=" "
+                                       required
                                 />
-                                <label for="paperReferralAuthor" class="label">
-                                    {{ __('patients.paper_referral_author') }}*
+                                <label for="paperReferralAuthor" class="label required">
+                                    {{ __('patients.paper_referral_author') }}
                                 </label>
                                 <div class="absolute inset-y-0 end-0 flex items-center">
                                     <button type="button"
@@ -138,9 +136,10 @@
                                        id="paperReferralEdrpou"
                                        class="input !pr-7 peer @error('form.encounter.paperReferral.requesterLegalEntityEdrpou') input-error @enderror"
                                        placeholder=" "
+                                       required
                                 />
-                                <label for="paperReferralEdrpou" class="label">
-                                    {{ __('patients.paper_referral_edrpou_short') }}*
+                                <label for="paperReferralEdrpou" class="label required">
+                                    {{ __('patients.paper_referral_edrpou_short') }}
                                 </label>
                                 <div class="absolute inset-y-0 end-0 flex items-center">
                                     <button type="button"
@@ -192,9 +191,10 @@
                                        class="datepicker-input with-leading-icon input peer @error('form.encounter.paperReferral.serviceRequestDate') input-error @enderror"
                                        placeholder=" "
                                        autocomplete="off"
+                                       required
                                 />
-                                <label for="paperReferralDate" class="wrapped-label">
-                                    {{ __('patients.paper_referral_date') }}*
+                                <label for="paperReferralDate" class="wrapped-label required">
+                                    {{ __('patients.paper_referral_date') }}
                                 </label>
                             </div>
                             @error('form.encounter.paperReferral.serviceRequestDate')
@@ -231,4 +231,4 @@
             </template>
         </div>
     </div>
-</fieldset>
+</div>
