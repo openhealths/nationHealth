@@ -13,6 +13,11 @@ class CarePlanIndex extends Component
 {
     public $carePlans = [];
     public string $searchRequisition = '';
+    public string $status = '';
+    public string $startDateFrom = '';
+    public string $endDateFrom = '';
+    public string $isPartOfCarePlan = '';
+    public string $includesCarePlan = '';
 
     public function mount(CarePlanRepository $repository): void
     {
@@ -77,8 +82,60 @@ class CarePlanIndex extends Component
         }
     }
 
+    public function syncWithEHealth(): void
+    {
+        $this->sync();
+    }
+
+    public function resetFilters(): void
+    {
+        $this->searchRequisition = '';
+        $this->status = '';
+        $this->startDateFrom = '';
+        $this->endDateFrom = '';
+        $this->isPartOfCarePlan = '';
+        $this->includesCarePlan = '';
+    }
+
     public function render()
     {
+        $legalEntity = legalEntity();
+        if ($legalEntity) {
+            $query = \App\Models\CarePlan::where('legal_entity_id', $legalEntity->id)
+                ->with(['person', 'author.party', 'encounter.diagnoses.condition'])
+                ->latest();
+
+            if (!empty($this->searchRequisition)) {
+                $query->where('requisition', 'like', '%' . $this->searchRequisition . '%');
+            }
+
+            if (!empty($this->status)) {
+                $query->where('status', $this->status);
+            }
+
+            if (!empty($this->startDateFrom)) {
+                try {
+                    $query->where('period_start', '>=', \Carbon\Carbon::parse($this->startDateFrom)->startOfDay());
+                } catch (\Throwable $e) {}
+            }
+
+            if (!empty($this->endDateFrom)) {
+                try {
+                    $query->where('period_end', '<=', \Carbon\Carbon::parse($this->endDateFrom)->endOfDay());
+                } catch (\Throwable $e) {}
+            }
+
+            if (!empty($this->isPartOfCarePlan)) {
+                $query->where('title', 'like', '%' . $this->isPartOfCarePlan . '%');
+            }
+
+            if (!empty($this->includesCarePlan)) {
+                $query->where('description', 'like', '%' . $this->includesCarePlan . '%');
+            }
+
+            $this->carePlans = $query->get();
+        }
+
         return view('livewire.care-plan.care-plan-index');
     }
 }
