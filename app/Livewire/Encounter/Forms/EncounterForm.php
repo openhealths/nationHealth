@@ -401,7 +401,7 @@ class EncounterForm extends BaseForm
             'observations.*.codeCode' => [
                 'required_with:observations',
                 'string',
-                new InDictionary(['eHealth/LOINC/observation_codes', 'eHealth/ICF/classifiers'])
+                new InDictionary(['eHealth/LOINC/observation_codes', 'eHealth/custom/observation_codes', 'eHealth/ICF/classifiers'])
             ],
             'observations.*.effectiveDate' => ['nullable', 'date', 'before_or_equal:now'],
             'observations.*.effectiveTime' => ['nullable', 'date_format:H:i'],
@@ -414,7 +414,7 @@ class EncounterForm extends BaseForm
             'observations.*.primarySource' => ['required_with:observations', 'boolean'],
             'observations.*.reportOriginCode' => Rule::forEach(function (mixed $value, string $attribute) {
                 $index = (int)explode('.', $attribute)[1];
-                $primarySource = $this->observations[$index]['primarySource'] ?? null;
+                $primarySource = $this->observations[$index]['primarySource'];
 
                 return [
                     Rule::requiredIf($primarySource === false),

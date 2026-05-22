@@ -112,13 +112,11 @@ class ImmunizationMapper implements FhirMapperContract
      * Convert a FHIR immunization (from DB) to a flat form structure.
      *
      * @param  array  $data  FHIR immunization data
+     * @param  mixed  ...$context
      * @return array
      */
     public function fromFhir(array $data, mixed ...$context): array
     {
-        $date = CarbonImmutable::parse(data_get($data, 'date'));
-        $rawTime = data_get($data, 'time');
-        $time = $rawTime ? CarbonImmutable::parse($rawTime) : $date;
         $notGiven = data_get($data, 'notGiven', false);
         $reasons = $notGiven ? [] : collect(data_get($data, 'explanation.reasons', []))
             ->map(fn (array $reason) => ['code' => data_get($reason, 'coding.0.code', '')])
@@ -135,15 +133,17 @@ class ImmunizationMapper implements FhirMapperContract
             'primarySource' => data_get($data, 'primarySource'),
             'notGiven' => $notGiven,
             'vaccineCode' => data_get($data, 'vaccineCode.coding.0.code'),
-            'date' => $date->format('Y-m-d'),
-            'time' => $time->format('H:i'),
+            'date' => CarbonImmutable::createFromFormat('d.m.Y H:i', data_get($data, 'date'))->format('d.m.Y'),
+            'time' => data_get($data, 'time'),
             'reasons' => $reasons,
             'reasonNotGivenCode' => data_get($data, 'explanation.reasonsNotGiven.0.coding.0.code', ''),
             'reportOriginCode' => data_get($data, 'reportOrigin.coding.0.code', ''),
             'reportOriginText' => data_get($data, 'reportOrigin.text', ''),
             'manufacturer' => data_get($data, 'manufacturer', ''),
             'lotNumber' => data_get($data, 'lotNumber', ''),
-            'expirationDate' => data_get($data, 'expirationDate', ''),
+            'expirationDate' => data_get($data, 'expirationDate')
+                ? convertToAppDateFormat(data_get($data, 'expirationDate'))
+                : '',
             'siteCode' => data_get($data, 'site.coding.0.code', ''),
             'routeCode' => data_get($data, 'route.coding.0.code', ''),
             'doseQuantityValue' => data_get($data, 'doseQuantity.value'),

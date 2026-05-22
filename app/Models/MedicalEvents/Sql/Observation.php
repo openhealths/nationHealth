@@ -6,6 +6,7 @@ namespace App\Models\MedicalEvents\Sql;
 
 use App\Casts\EHealthTimestampCast;
 use App\Enums\Person\ObservationStatus;
+use Carbon\CarbonImmutable;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -66,8 +67,6 @@ class Observation extends Model
         'person_id',
         'diagnostic_report_id',
         'code_id',
-        'effective_date_time',
-        'issued',
         'performer_id',
         'report_origin_id',
         'interpretation_id',
@@ -85,28 +84,32 @@ class Observation extends Model
     protected function issuedDate(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->issued ? substr($this->issued, 0, 10) : ''
+            get: fn (): string => convertToAppDateFormat($this->issued),
         );
     }
 
     protected function issuedTime(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->issued ? substr($this->issued, 11, 5) : ''
+            get: fn (): string => CarbonImmutable::parse($this->issued)->format('H:i'),
         );
     }
 
     protected function effectiveDate(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->effectiveDateTime ? substr($this->effectiveDateTime, 0, 10) : ''
+            get: fn (): string => $this->effectiveDateTime
+                ? convertToAppDateFormat($this->effectiveDateTime)
+                : '',
         );
     }
 
     protected function effectiveTime(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->effectiveDateTime ? substr($this->effectiveDateTime, 11, 5) : ''
+            get: fn (): string => $this->effectiveDateTime
+                ? CarbonImmutable::parse($this->effectiveDateTime)->format('H:i')
+                : '',
         );
     }
 

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Repositories\MedicalEvents;
 
 use App\Classes\eHealth\Api\PatientApi;
-use App\Core\Arr;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -125,10 +124,6 @@ class DiagnosticReportRepository extends BaseRepository
                 $code = Repository::identifier()->store($datum['code']['identifier']['value']);
                 Repository::codeableConcept()->attach($code, $datum['code']);
 
-                if (isset($datum['conclusionCode'])) {
-                    $conclusionCode = Repository::codeableConcept()->store($datum['conclusionCode']);
-                }
-
                 $recordedBy = Repository::identifier()->store($datum['recordedBy']['identifier']['value']);
                 Repository::codeableConcept()->attach($recordedBy, $datum['recordedBy']);
 
@@ -139,13 +134,10 @@ class DiagnosticReportRepository extends BaseRepository
                     ->store($datum['managingOrganization']['identifier']['value']);
                 Repository::codeableConcept()->attach($managingOrganization, $datum['managingOrganization']);
 
+                $division = null;
                 if (isset($datum['division'])) {
                     $division = Repository::identifier()->store($datum['division']['identifier']['value']);
                     Repository::codeableConcept()->attach($division, $datum['division']);
-                }
-
-                if (isset($datum['reportOrigin'])) {
-                    $reportOrigin = Repository::codeableConcept()->store($datum['reportOrigin']);
                 }
 
                 $diagnosticReport = $this->model->create([
@@ -155,13 +147,17 @@ class DiagnosticReportRepository extends BaseRepository
                     'code_id' => $code->id,
                     'issued' => $datum['issued'],
                     'conclusion' => $datum['conclusion'] ?? null,
-                    'conclusion_code_id' => $conclusionCode->id ?? null,
+                    'conclusion_code_id' => isset($datum['conclusionCode'])
+                        ? Repository::codeableConcept()->store($datum['conclusionCode'])->id
+                        : null,
                     'recorded_by_id' => $recordedBy->id,
                     'encounter_id' => $encounter->id ?? null,
                     'primary_source' => $datum['primarySource'],
                     'managing_organization_id' => $managingOrganization->id,
-                    'division_id' => $division->id ?? null,
-                    'report_origin_id' => $reportOrigin->id ?? null
+                    'division_id' => $division?->id,
+                    'report_origin_id' => isset($datum['reportOrigin'])
+                        ? Repository::codeableConcept()->store($datum['reportOrigin'])->id
+                        : null
                 ]);
 
                 if (isset($datum['paperReferral'])) {
@@ -183,6 +179,7 @@ class DiagnosticReportRepository extends BaseRepository
                 ]);
 
                 if (isset($datum['performer'])) {
+                    $reference = null;
                     if (isset($datum['performer']['reference'])) {
                         $reference = Repository::identifier()
                             ->store($datum['performer']['reference']['identifier']['value']);
@@ -190,12 +187,13 @@ class DiagnosticReportRepository extends BaseRepository
                     }
 
                     $diagnosticReport->performer()->create([
-                        'reference_id' => $reference->id ?? null,
+                        'reference_id' => $reference?->id,
                         'text' => $datum['performer']['text'] ?? null
                     ]);
                 }
 
                 if (isset($datum['resultsInterpreter'])) {
+                    $reference = null;
                     if (isset($datum['resultsInterpreter']['reference'])) {
                         $reference = Repository::identifier()
                             ->store($datum['resultsInterpreter']['reference']['identifier']['value']);
@@ -206,7 +204,7 @@ class DiagnosticReportRepository extends BaseRepository
                     }
 
                     $diagnosticReport->resultsInterpreter()->create([
-                        'reference_id' => $reference->id ?? null,
+                        'reference_id' => $reference?->id,
                         'text' => $datum['resultsInterpreter']['text'] ?? null
                     ]);
                 }
@@ -246,8 +244,7 @@ class DiagnosticReportRepository extends BaseRepository
             ->get()
             ->toArray();
 
-        // Hide raw relationship array — model accessors already expose the formatted flat fields
-        return array_map(static fn (array $item) => Arr::except($item, ['effectivePeriod']), $results);
+        return $results;
     }
 
     /**

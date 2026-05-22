@@ -37,7 +37,8 @@
     </div>
 
     <div x-data="{
-             codeMap: $wire.entangle('observationCodeMap'),
+             loincCodeMap: $wire.entangle('observationLoincCodeMap'),
+             customCodeMap: $wire.entangle('observationCustomCodeMap'),
              codeableConceptValues: $wire.entangle('codeableConceptValues')
          }"
     >
@@ -137,8 +138,8 @@
                     >
                         <option value="" selected>{{ __('forms.select') }}</option>
                         @foreach($this->dictionaries['eHealth/custom/observation_codes'] as $key => $code)
-                            <template x-if="codeMap[modalObservation.categoryCode]?.includes('{{ $key }}')">
-                                <option value="{{ $key }}">{{ $code }}</option>
+                            <template x-if="(customCodeMap[modalObservation.categoryCode] ?? []).includes('{{ $key }}')">
+                                <option value="{{ $key }}" :selected="modalObservation.codeCode === '{{ $key }}'">{{ $code }}</option>
                             </template>
                         @endforeach
                     </select>
@@ -151,15 +152,15 @@
                 >
                     <select class="input-modal"
                             x-model="modalObservation.codeCode"
-                            x-effect="$nextTick(() => $el.value = modalObservation.codeCode)"
                             id="performerCode"
                             type="text"
                             required
                     >
                         <option value="" selected>{{ __('forms.select') }}</option>
-                        <template x-for="key in (codeMap[modalObservation.categoryCode] ?? [])" :key="key">
-                            <option :value="key"
-                                    x-text="$wire.dictionaries['eHealth/LOINC/observation_codes'][key] ?? key"
+                        <template x-for="code in (loincCodeMap[modalObservation.categoryCode] ?? [])" :key="code">
+                            <option :value="code"
+                                    :selected="code === modalObservation.codeCode"
+                                    x-text="$wire.dictionaries['eHealth/LOINC/observation_codes'][code]"
                             ></option>
                         </template>
                     </select>
@@ -191,7 +192,7 @@
 
                     <select class="input-modal"
                             x-model="modalObservation.valueCodeableConcept"
-                            x-init="$nextTick(() => { if (modalObservation.valueCodeableConcept) $el.value = modalObservation.valueCodeableConcept })"
+                            x-effect="if (codeableConceptValues[valueMap[modalObservation.codeCode]?.[0]] && modalObservation.valueCodeableConcept) $nextTick(() => $el.value = modalObservation.valueCodeableConcept)"
                             id="valueCodeableConcept"
                             type="text"
                             required
@@ -218,12 +219,12 @@
 
                 <div>
                     <input @change="modalObservation.valueBoolean = true"
-                           x-model.boolean="modalObservation.valueBoolean"
                            id="valueBooleanYes"
                            type="radio"
                            value="yes"
                            name="valueBoolean"
                            class="default-radio"
+                           :checked="modalObservation.valueBoolean === true"
                     >
                     <label for="valueBooleanYes" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
                         {{ __('forms.yes') }}
@@ -232,12 +233,12 @@
 
                 <div>
                     <input @change="modalObservation.valueBoolean = false"
-                           x-model.boolean="modalObservation.valueBoolean"
                            id="valueBooleanNo"
                            type="radio"
                            value="no"
                            name="valueBoolean"
                            class="default-radio"
+                           :checked="modalObservation.valueBoolean === false"
                     >
                     <label for="valueBooleanNo" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
                         {{ __('forms.no') }}
@@ -288,12 +289,12 @@
                         {{ __('patients.value') }}
                         <span x-text="
                                   valueMap[modalObservation.codeCode][2] !== '' && modalObservation.codeCode !== '{{ __('forms.select') }}' && valueMap[modalObservation.codeCode]?.[2] ?
-                                  `({{ __('forms.unit') }} &quot;${$wire.dictionaries['eHealth/ucum/units'][valueMap[modalObservation.codeCode][2]]}&quot;)` :
+                                  `(одиниця виміру &quot;${$wire.dictionaries['eHealth/ucum/units'][valueMap[modalObservation.codeCode][2]]}&quot;)` :
                                   ''
                               "
                         ></span>
                     </label>
-                    <div class="relative flex items-center max-w-[8rem]"
+                    <div class="relative flex items-center max-w-32"
                          x-data="{
                              get min() {
                                  const range = this.valueMap[this.modalObservation.codeCode]?.[0]?.split('-');

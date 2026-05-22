@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
+use App\Casts\EHealthTimestampCast;
 use App\Enums\Person\ImmunizationStatus;
 use Carbon\CarbonImmutable;
 use Eloquence\Behaviours\HasCamelCasing;
@@ -41,7 +42,7 @@ class Immunization extends Model
     ];
 
     protected $casts = [
-        'date' => 'date:Y-m-d',
+        'date' => EHealthTimestampCast::class,
         'status' => ImmunizationStatus::class
     ];
 
@@ -66,7 +67,7 @@ class Immunization extends Model
     protected function time(): Attribute
     {
         return Attribute::make(
-            get: fn () => CarbonImmutable::parse($this->attributes['date'])->toTimeString()
+            get: fn () => CarbonImmutable::parse($this->date)->format('H:i')
         );
     }
 

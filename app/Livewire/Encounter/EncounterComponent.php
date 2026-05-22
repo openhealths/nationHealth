@@ -126,11 +126,18 @@ class EncounterComponent extends Component
     public array $results;
 
     /**
-     * List of observation codes for categories.
+     * List of LOINC observation codes per category.
      *
      * @var array
      */
-    public array $observationCodeMap;
+    public array $observationLoincCodeMap;
+
+    /**
+     * List of custom observation codes per category.
+     *
+     * @var array
+     */
+    public array $observationCustomCodeMap;
 
     /**
      * List of observation values and type of data for specific categories.
@@ -273,7 +280,8 @@ class EncounterComponent extends Component
     {
         $this->getDictionary();
 
-        $this->observationCodeMap = config('observation.category_codes');
+        $this->observationLoincCodeMap = config('observation.category_codes.loinc', []);
+        $this->observationCustomCodeMap = config('observation.category_codes.custom', []);
         $this->observationValueMap = config('observation.code_values');
 
         $this->dictionaries['eHealth/ICF/classifiers'] = dictionary()->basics()

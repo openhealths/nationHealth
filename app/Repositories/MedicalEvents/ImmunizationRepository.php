@@ -32,21 +32,10 @@ class ImmunizationRepository extends BaseRepository
                 $context = Repository::identifier()->store($datum['context']['identifier']['value']);
                 Repository::codeableConcept()->attach($context, $datum['context']);
 
+                $performer = null;
                 if (isset($datum['performer'])) {
                     $performer = Repository::identifier()->store($datum['performer']['identifier']['value']);
                     Repository::codeableConcept()->attach($performer, $datum['performer']);
-                }
-
-                if (isset($datum['reportOrigin'])) {
-                    $reportOrigin = Repository::codeableConcept()->store($datum['reportOrigin']);
-                }
-
-                if (isset($datum['site'])) {
-                    $site = Repository::codeableConcept()->store($datum['site']);
-                }
-
-                if (isset($datum['route'])) {
-                    $route = Repository::codeableConcept()->store($datum['route']);
                 }
 
                 $immunization = $this->model->create([
@@ -58,13 +47,19 @@ class ImmunizationRepository extends BaseRepository
                     'context_id' => $context->id,
                     'date' => $datum['date'] ?? null,
                     'primary_source' => $datum['primarySource'],
-                    'performer_id' => $performer->id ?? null,
-                    'report_origin_id' => $reportOrigin->id ?? null,
+                    'performer_id' => $performer?->id,
+                    'report_origin_id' => isset($datum['reportOrigin'])
+                        ? Repository::codeableConcept()->store($datum['reportOrigin'])->id
+                        : null,
                     'manufacturer' => $datum['manufacturer'] ?? null,
                     'lot_number' => $datum['lotNumber'] ?? null,
                     'expiration_date' => $datum['expirationDate'] ?? null,
-                    'site_id' => $site->id ?? null,
-                    'route_id' => $route->id ?? null
+                    'site_id' => isset($datum['site'])
+                        ? Repository::codeableConcept()->store($datum['site'])->id
+                        : null,
+                    'route_id' => isset($datum['route'])
+                        ? Repository::codeableConcept()->store($datum['route'])->id
+                        : null
                 ]);
 
                 if (isset($datum['doseQuantity'])) {

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Core;
 
-use App\Rules\SigningRules;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\Form;
 
@@ -18,6 +17,10 @@ class BaseForm extends Form
 
     public function signingRules(): array
     {
-        return SigningRules::rules();
+        return [
+            'knedp' => ['required', 'string'],
+            'password' => ['required', 'string'],
+            'keyContainerUpload' => ['required', 'file', 'extensions:dat,pfx,pk8,zs2,jks,p7s']
+        ];
     }
 }

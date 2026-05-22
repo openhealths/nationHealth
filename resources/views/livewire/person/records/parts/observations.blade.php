@@ -14,8 +14,8 @@
                 $codeSystem = data_get($observation, 'code.coding.0.system');
                 $codeValue = data_get($observation, 'code.coding.0.code');
 
-                $categoryLabel = $this->dictionaries[$categorySystem][$categoryCode];
-                $codeLabel = $this->dictionaries[$codeSystem][$codeValue];
+                $categoryLabel = $this->dictionaries[$categorySystem][$categoryCode] ?? $categoryCode;
+                $codeLabel = $this->dictionaries[$codeSystem][$codeValue] ?? $codeValue;
             @endphp
             <div class="record-inner-column flex-1">
                 <div class="record-inner-label">{{ __('patients.category_and_code') }}</div>
@@ -63,7 +63,7 @@
                     <div>
                         <div class="record-inner-label">{{ __('patients.getting_indicators') }}</div>
                         <div class="record-inner-subvalue">
-                            {{ data_get($observation, 'effectiveDate', '-') }}
+                            {{ data_get($observation, 'effectiveDateTime') ? convertToAppDateFormat(data_get($observation, 'effectiveDateTime')) : '-' }}
                         </div>
                     </div>
                     <div>

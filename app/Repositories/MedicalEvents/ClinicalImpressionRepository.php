@@ -35,6 +35,7 @@ class ClinicalImpressionRepository extends BaseRepository
                 $assessor = Repository::identifier()->store($datum['assessor']['identifier']['value']);
                 Repository::codeableConcept()->attach($assessor, $datum['assessor']);
 
+                $previous = null;
                 if (isset($datum['previous'])) {
                     $previous = Repository::identifier()->store($datum['previous']['identifier']['value']);
                     Repository::codeableConcept()->attach($previous, $datum['previous']);
@@ -48,7 +49,7 @@ class ClinicalImpressionRepository extends BaseRepository
                     'code_id' => $code->id,
                     'encounter_id' => $encounter->id,
                     'assessor_id' => $assessor->id,
-                    'previous_id' => $previous->id ?? null,
+                    'previous_id' => $previous?->id,
                     'note' => $datum['note'] ?? null
                 ]);
 

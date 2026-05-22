@@ -143,6 +143,7 @@ class ObservationRepository extends BaseRepository
     {
         DB::transaction(function () use ($data, $personId, $diagnosticReportId) {
             foreach ($data as $datum) {
+                $diagnosticReport = null;
                 if ($diagnosticReportId) {
                     $diagnosticReport = Repository::identifier()
                         ->store($datum['diagnosticReport']['identifier']['value']);
@@ -151,27 +152,13 @@ class ObservationRepository extends BaseRepository
 
                 $code = Repository::codeableConcept()->store($datum['code']);
 
+                $performer = null;
                 if (isset($datum['performer'])) {
                     $performer = Repository::identifier()->store($datum['performer']['identifier']['value']);
                     Repository::codeableConcept()->attach($performer, $datum['performer']);
                 }
 
-                if (isset($datum['reportOrigin'])) {
-                    $reportOrigin = Repository::codeableConcept()->store($datum['reportOrigin']);
-                }
-
-                if (isset($datum['interpretation'])) {
-                    $interpretation = Repository::codeableConcept()->store($datum['interpretation']);
-                }
-
-                if (isset($datum['bodySite'])) {
-                    $bodySite = Repository::codeableConcept()->store($datum['bodySite']);
-                }
-
-                if (isset($datum['method'])) {
-                    $method = Repository::codeableConcept()->store($datum['method']);
-                }
-
+                $context = null;
                 if (isset($datum['context'])) {
                     $context = Repository::identifier()->store($datum['context']['identifier']['value']);
                     Repository::codeableConcept()->attach($context, $datum['context']);
@@ -181,18 +168,26 @@ class ObservationRepository extends BaseRepository
                     'uuid' => $datum['uuid'] ?? $datum['id'],
                     'person_id' => $personId,
                     'status' => $datum['status'],
-                    'diagnostic_report_id' => $diagnosticReport->id ?? null,
+                    'diagnostic_report_id' => $diagnosticReport?->id,
                     'code_id' => $code->id,
                     'effective_date_time' => $datum['effectiveDateTime'] ?? null,
                     'issued' => $datum['issued'],
                     'primary_source' => $datum['primarySource'],
-                    'performer_id' => $performer->id ?? null,
-                    'report_origin_id' => $reportOrigin->id ?? null,
-                    'interpretation_id' => $interpretation->id ?? null,
+                    'performer_id' => $performer?->id,
+                    'report_origin_id' => isset($datum['reportOrigin'])
+                        ? Repository::codeableConcept()->store($datum['reportOrigin'])->id
+                        : null,
+                    'interpretation_id' => isset($datum['interpretation'])
+                        ? Repository::codeableConcept()->store($datum['interpretation'])->id
+                        : null,
                     'comment' => $datum['comment'] ?? null,
-                    'body_site_id' => $bodySite->id ?? null,
-                    'method_id' => $method->id ?? null,
-                    'context_id' => $context->id ?? null
+                    'body_site_id' => isset($datum['bodySite'])
+                        ? Repository::codeableConcept()->store($datum['bodySite'])->id
+                        : null,
+                    'method_id' => isset($datum['method'])
+                        ? Repository::codeableConcept()->store($datum['method'])->id
+                        : null,
+                    'context_id' => $context?->id
                 ]);
 
                 $this->storeValue($datum, $observation);
@@ -333,11 +328,11 @@ class ObservationRepository extends BaseRepository
     }
 
     /**
-    * Get observations data that is related to the person.
-    *
+     * Get observations data that is related to the person.
+     *
      * @param  int  $personId
-     * @return array|null
-    */
+     * @return array
+     */
     public function getByPersonId(int $personId): array
     {
         return $this->model
@@ -348,21 +343,6 @@ class ObservationRepository extends BaseRepository
             ->orderByDesc('id')
             ->get()
             ->toArray();
-    }
-
-    /**
-     * Get the observation for the procedure based on the provided UUID to display the selected complication detail.
-     *
-     * @param  string  $uuid
-     * @return array|null
-     */
-    public function getForProcedure(string $uuid): ?array
-    {
-        return Observation::whereUuid($uuid)
-            ->select(['id', 'onset_date', 'code_id'])
-            ->with('code.coding')
-            ->first()
-            ?->toArray();
     }
 
     /**
@@ -381,7 +361,7 @@ class ObservationRepository extends BaseRepository
 
             if ($encounterUuid !== null) {
                 $this->model->whereNotIn('uuid', $apiUuids)
-                    ->whereHas('context', fn (Builder $q) => $q->where('value', $encounterUuid))
+                    ->whereHas('context', fn (Builder $query) => $query->where('value', $encounterUuid))
                     ->with(['components.value', 'value'])
                     ->get()
                     ->each(function (Observation $observation): void {

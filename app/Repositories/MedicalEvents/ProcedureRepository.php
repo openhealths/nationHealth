@@ -133,6 +133,7 @@ class ProcedureRepository extends BaseRepository
     {
         DB::transaction(function () use ($data, $personId) {
             foreach ($data as $datum) {
+                $basedOn = null;
                 if (isset($datum['basedOn'])) {
                     $basedOn = Repository::identifier()->store($datum['basedOn']['identifier']['value']);
                     Repository::codeableConcept()->attach($basedOn, $datum['basedOn']);
@@ -141,6 +142,7 @@ class ProcedureRepository extends BaseRepository
                 $code = Repository::identifier()->store($datum['code']['identifier']['value']);
                 Repository::codeableConcept()->attach($code, $datum['code']);
 
+                $encounter = null;
                 if (isset($datum['encounter'])) {
                     $encounter = Repository::identifier()->store($datum['encounter']['identifier']['value']);
                     Repository::codeableConcept()->attach($encounter, $datum['encounter']);
@@ -149,15 +151,13 @@ class ProcedureRepository extends BaseRepository
                 $recordedBy = Repository::identifier()->store($datum['recordedBy']['identifier']['value']);
                 Repository::codeableConcept()->attach($recordedBy, $datum['recordedBy']);
 
+                $performer = null;
                 if (isset($datum['performer'])) {
                     $performer = Repository::identifier()->store($datum['performer']['identifier']['value']);
                     Repository::codeableConcept()->attach($performer, $datum['performer']);
                 }
 
-                if (isset($datum['reportOrigin'])) {
-                    $reportOrigin = Repository::codeableConcept()->store($datum['reportOrigin']);
-                }
-
+                $division = null;
                 if (isset($datum['division'])) {
                     $division = Repository::identifier()->store($datum['division']['identifier']['value']);
                     Repository::codeableConcept()->attach($division, $datum['division']);
@@ -167,26 +167,26 @@ class ProcedureRepository extends BaseRepository
                     ->store($datum['managingOrganization']['identifier']['value']);
                 Repository::codeableConcept()->attach($managingOrganization, $datum['managingOrganization']);
 
-                if (isset($datum['outcome'])) {
-                    $outcome = Repository::codeableConcept()->store($datum['outcome']);
-                }
-
                 $category = Repository::codeableConcept()->store($datum['category']);
 
                 $procedure = $this->model->create([
                     'uuid' => $datum['uuid'] ?? $datum['id'],
                     'person_id' => $personId,
                     'status' => $datum['status'],
-                    'based_on_id' => $basedOn->id ?? null,
+                    'based_on_id' => $basedOn?->id,
                     'code_id' => $code->id,
-                    'encounter_id' => $encounter->id ?? null,
+                    'encounter_id' => $encounter?->id,
                     'recorded_by_id' => $recordedBy->id,
                     'primary_source' => $datum['primarySource'],
-                    'performer_id' => $performer->id ?? null,
-                    'report_origin_id' => $reportOrigin->id ?? null,
-                    'division_id' => $division->id ?? null,
+                    'performer_id' => $performer?->id,
+                    'report_origin_id' => isset($datum['reportOrigin'])
+                        ? Repository::codeableConcept()->store($datum['reportOrigin'])->id
+                        : null,
+                    'division_id' => $division?->id,
                     'managing_organization_id' => $managingOrganization->id,
-                    'outcome_id' => $outcome->id ?? null,
+                    'outcome_id' => isset($datum['outcome'])
+                        ? Repository::codeableConcept()->store($datum['outcome'])->id
+                        : null,
                     'note' => $datum['note'] ?? null,
                     'category_id' => $category->id
                 ]);

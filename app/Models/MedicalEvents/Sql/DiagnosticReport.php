@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
-use App\Casts\EHealthTimestampCast;
 use App\Enums\Person\DiagnosticReportStatus;
 use Carbon\CarbonImmutable;
 use Eloquence\Behaviours\HasCamelCasing;
@@ -49,7 +48,6 @@ class DiagnosticReport extends Model
         'person_id',
         'based_on_id',
         'code_id',
-        'issued',
         'conclusion_code_id',
         'recorded_by_id',
         'division_id',
@@ -62,68 +60,24 @@ class DiagnosticReport extends Model
         'updated_at'
     ];
 
-    protected $casts = [
-        'issued' => EHealthTimestampCast::class,
-        'effective_date_time' => EHealthTimestampCast::class,
-        'status' => DiagnosticReportStatus::class
-    ];
-
     protected $appends = [
         'issued_date',
-        'issued_time',
-        'effective_period_start_date',
-        'effective_period_start_time',
-        'effective_period_end_date',
-        'effective_period_end_time'
+        'issued_time'
     ];
+
+    protected $casts = ['status' => DiagnosticReportStatus::class];
 
     protected function issuedDate(): Attribute
     {
         return Attribute::make(
-            get: fn () => CarbonImmutable::parse($this->issued)->toDateString()
+            get: fn (): string => convertToAppDateFormat($this->issued),
         );
     }
 
     protected function issuedTime(): Attribute
     {
         return Attribute::make(
-            get: fn () => CarbonImmutable::parse($this->issued)->toTimeString()
-        );
-    }
-
-    protected function effectivePeriodStartDate(): Attribute
-    {
-        return Attribute::make(
-            get: fn () => isset($this->effectivePeriod['start'])
-                ? CarbonImmutable::parse($this->effectivePeriod['start'])->toDateString()
-                : null
-        );
-    }
-
-    protected function effectivePeriodStartTime(): Attribute
-    {
-        return Attribute::make(
-            get: fn () => isset($this->effectivePeriod['start'])
-                ? CarbonImmutable::parse($this->effectivePeriod['start'])->toTimeString()
-                : null
-        );
-    }
-
-    protected function effectivePeriodEndDate(): Attribute
-    {
-        return Attribute::make(
-            get: fn () => isset($this->effectivePeriod['end'])
-                ? CarbonImmutable::parse($this->effectivePeriod['end'])->toDateString()
-                : null
-        );
-    }
-
-    protected function effectivePeriodEndTime(): Attribute
-    {
-        return Attribute::make(
-            get: fn () => isset($this->effectivePeriod['end'])
-                ? CarbonImmutable::parse($this->effectivePeriod['end'])->toTimeString()
-                : null
+            get: fn (): string => CarbonImmutable::parse($this->issued)->format('H:i'),
         );
     }
 

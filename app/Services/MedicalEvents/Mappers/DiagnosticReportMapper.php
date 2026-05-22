@@ -125,7 +125,7 @@ class DiagnosticReportMapper implements FhirMapperContract
             'uuid' => data_get($data, 'uuid'),
             'categoryCode' => data_get($data, 'category.0.coding.0.code', ''),
             'codeValue' => data_get($data, 'code.identifier.value', ''),
-            'primarySource' => data_get($data, 'primarySource', true),
+            'primarySource' => data_get($data, 'primarySource'),
             'reportOriginCode' => data_get($data, 'reportOrigin.coding.0.code', ''),
             'reportOriginText' => data_get($data, 'reportOrigin.text', ''),
             'isReferralAvailable' => $hasPaperReferral || $hasBasedOn,
@@ -144,13 +144,12 @@ class DiagnosticReportMapper implements FhirMapperContract
             'conclusion' => data_get($data, 'conclusion', ''),
             'divisionId' => data_get($data, 'division.identifier.value', ''),
             'resultsInterpreterEmployeeId' => data_get($data, 'resultsInterpreter.reference.identifier.value', ''),
-            // The model exposes these as flat accessors (H:i:s), trimmed to H:i for the form
-            'issuedDate' => data_get($data, 'issuedDate', ''),
-            'issuedTime' => substr(data_get($data, 'issuedTime', ''), 0, 5),
-            'effectivePeriodStartDate' => data_get($data, 'effectivePeriodStartDate', ''),
-            'effectivePeriodStartTime' => substr(data_get($data, 'effectivePeriodStartTime', ''), 0, 5),
-            'effectivePeriodEndDate' => data_get($data, 'effectivePeriodEndDate', ''),
-            'effectivePeriodEndTime' => substr(data_get($data, 'effectivePeriodEndTime', ''), 0, 5),
+            'issuedDate' => data_get($data, 'issuedDate'),
+            'issuedTime' => data_get($data, 'issuedTime'),
+            'effectivePeriodStartDate' => data_get($data, 'effectivePeriod.start') ? substr(data_get($data, 'effectivePeriod.start'), 0, 10) : '',
+            'effectivePeriodStartTime' => data_get($data, 'effectivePeriod.start') ? substr(data_get($data, 'effectivePeriod.start'), 11, 5) : '',
+            'effectivePeriodEndDate' => data_get($data, 'effectivePeriod.end') ? substr(data_get($data, 'effectivePeriod.end'), 0, 10) : '',
+            'effectivePeriodEndTime' => data_get($data, 'effectivePeriod.end') ? substr(data_get($data, 'effectivePeriod.end'), 11, 5) : '',
             'query' => '',
         ];
     }

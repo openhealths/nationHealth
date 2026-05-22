@@ -33,7 +33,6 @@ class ObservationMapper implements FhirMapperContract
                 FhirResource::make()
                     ->coding($data['categorySystem'], $data['categoryCode'])
                     ->toCodeableConcept()
-                // todo must me array of categories, in frontend now can choose only 1 category
             ],
             'code' => FhirResource::make()
                 ->coding($data['codeSystem'], $data['codeCode'])
@@ -84,8 +83,6 @@ class ObservationMapper implements FhirMapperContract
 
         $result = array_merge($result, $this->buildValue($data));
 
-        // todo: add reference_ranges
-
         // todo: add reaction_on
 
         $fhirComponents = collect($data['components'] ?? [])
@@ -98,7 +95,6 @@ class ObservationMapper implements FhirMapperContract
                     'interpretation' => FhirResource::make()
                         ->coding('eHealth/observation_interpretations', $component['interpretationCode'])
                         ->toCodeableConcept(),
-                    // todo: add reference_ranges
                 ],
                 $this->buildValue([
                     'valueCodeableConcept' => $component['valueCode'],
@@ -111,8 +107,6 @@ class ObservationMapper implements FhirMapperContract
         if (!empty($fhirComponents)) {
             $result['components'] = $fhirComponents;
         }
-
-        // todo: add specimen
 
         // todo: add device
 
@@ -192,12 +186,14 @@ class ObservationMapper implements FhirMapperContract
      * Convert a FHIR observation (from DB) to a flat form structure.
      *
      * @param  array  $data  FHIR observation data
+     * @param  mixed  ...$context
      * @return array
      */
     public function fromFhir(array $data, mixed ...$context): array
     {
         $categorySystem = data_get($data, 'categories.0.coding.0.system');
         $codeSystem = data_get($data, 'code.coding.0.system');
+
         if (str_contains($categorySystem, 'ICF')) {
             $codingSystem = 'icf';
         } elseif ($codeSystem === 'eHealth/custom/observation_codes') {
@@ -211,9 +207,9 @@ class ObservationMapper implements FhirMapperContract
             'codingSystem' => $codingSystem,
             'categorySystem' => $categorySystem,
             'codeSystem' => data_get($data, 'code.coding.0.system'),
-            'primarySource' => data_get($data, 'primarySource', true),
+            'primarySource' => data_get($data, 'primarySource'),
             'reportOriginCode' => data_get($data, 'reportOrigin.coding.0.code', ''),
-            'categoryCode' => data_get($data, 'categories.0.coding.0.code', ''),
+            'categoryCode' => data_get($data, 'categories.0.coding.0.code'),
             'codeCode' => data_get($data, 'code.coding.0.code'),
             'methodCode' => data_get($data, 'method.coding.0.code', ''),
             'interpretationCode' => data_get($data, 'interpretation.coding.0.code', ''),
@@ -224,11 +220,11 @@ class ObservationMapper implements FhirMapperContract
             'valueQuantitySystem' => data_get($data, 'value.valueQuantity.system', ''),
             'valueQuantityCode' => data_get($data, 'value.valueQuantity.code', ''),
             'comment' => data_get($data, 'comment', ''),
-            'issuedDate' => data_get($data, 'issuedDate', ''),
-            'issuedTime' => substr(data_get($data, 'issuedTime', ''), 0, 5),
+            'issuedDate' => data_get($data, 'issuedDate'),
+            'issuedTime' => data_get($data, 'issuedTime'),
             'effectiveDate' => data_get($data, 'effectiveDate', ''),
-            'effectiveTime' => substr(data_get($data, 'effectiveTime', ''), 0, 5),
-            'components' => $this->componentsFromFhir(data_get($data, 'components', [])),
+            'effectiveTime' => data_get($data, 'effectiveTime', ''),
+            'components' => $this->componentsFromFhir(data_get($data, 'components', []))
         ];
 
         if (($valueCode = data_get($data, 'value.valueCodeableConcept.coding.0.code')) !== null) {
@@ -245,13 +241,12 @@ class ObservationMapper implements FhirMapperContract
         }
 
         if (($valueDateTime = data_get($data, 'value.valueDateTime')) !== null) {
-            $valueParsed = CarbonImmutable::parse($valueDateTime);
-            $flat['valueDate'] = $valueParsed->format('Y-m-d');
-            $flat['valueTime'] = $valueParsed->format('H:i');
+            $flat['valueDate'] = convertToAppDateFormat($valueDateTime);
+            $flat['valueTime'] = CarbonImmutable::parse($valueDateTime)->format('H:i');
         }
 
         if (($valueTime = data_get($data, 'value.valueTime')) !== null) {
-            $flat['valueTime'] = substr($valueTime, 0, 5);
+            $flat['valueTime'] = CarbonImmutable::parse($valueTime)->format('H:i');
         }
 
         return $flat;
@@ -281,9 +276,9 @@ class ObservationMapper implements FhirMapperContract
             ->map(fn (array $component) => [
                 'codeCode' => data_get($component, 'code.coding.0.code', ''),
                 'codeSystem' => data_get($component, 'code.coding.0.system', 'eHealth/ICF/qualifiers'),
-                'valueCode' => data_get($component, 'value.valueCodeableConcept.coding.0.code', ''),
-                'valueSystem' => data_get($component, 'value.valueCodeableConcept.coding.0.system', ''),
-                'interpretationCode' => data_get($component, 'interpretation.coding.0.code', ''),
+                'valueCode' => data_get($component, 'value.valueCodeableConcept.coding.0.code'),
+                'valueSystem' => data_get($component, 'value.valueCodeableConcept.coding.0.system'),
+                'interpretationCode' => data_get($component, 'interpretation.coding.0.code', '')
             ])
             ->toArray();
     }

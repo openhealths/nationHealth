@@ -92,7 +92,7 @@
                     const rawData = this.$wire.dictionaries?.[dictionaryKey] ?? {};
 
                     if (dictionaryKey === 'eHealth/LOINC/observation_codes') {
-                        const allowedCodes = new Set(this.$wire.observationCodeMap?.laboratory ?? []);
+                        const allowedCodes = new Set(this.$wire.observationLoincCodeMap?.laboratory ?? []);
                         this.options = Object.entries(rawData)
                             .filter(([value]) => allowedCodes.has(value))
                             .map(([value, label]) => this.makeOption(value, label));
