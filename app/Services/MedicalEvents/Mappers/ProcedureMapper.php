@@ -7,6 +7,7 @@ namespace App\Services\MedicalEvents\Mappers;
 use App\Contracts\FhirMapperContract;
 use App\Enums\Person\ProcedureStatus;
 use App\Services\MedicalEvents\FhirResource;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 
 class ProcedureMapper implements FhirMapperContract
@@ -70,14 +71,12 @@ class ProcedureMapper implements FhirMapperContract
         }
 
         if (!empty($data['reasonReferences'])) {
-            $result['reasonReferences'] = collect($data['reasonReferences'])
-                ->map(
-                    fn (array $reasonReference) => FhirResource::make()
-                        ->coding('eHealth/resources', $reasonReference['type'])
-                        ->toIdentifier($reasonReference['id'])
-                )
-                ->values()
-                ->toArray();
+            $result['reasonReferences'] = array_values(array_map(
+                static fn (array $reasonReference) => FhirResource::make()
+                    ->coding('eHealth/resources', $reasonReference['type'])
+                    ->toIdentifier($reasonReference['id']),
+                $data['reasonReferences']
+            ));
         }
 
         if (!empty($data['outcomeCode'])) {
@@ -87,14 +86,12 @@ class ProcedureMapper implements FhirMapperContract
         }
 
         if (!empty($data['complicationDetails'])) {
-            $result['complicationDetails'] = collect($data['complicationDetails'])
-                ->map(
-                    fn (array $detail) => FhirResource::make()
-                        ->coding('eHealth/resources', 'condition')
-                        ->toIdentifier($detail['id'])
-                )
-                ->values()
-                ->toArray();
+            $result['complicationDetails'] = array_values(array_map(
+                static fn (array $detail) => FhirResource::make()
+                    ->coding('eHealth/resources', 'condition')
+                    ->toIdentifier($detail['id']),
+                $data['complicationDetails']
+            ));
         }
 
         if (!empty($data['note'])) {
@@ -113,14 +110,12 @@ class ProcedureMapper implements FhirMapperContract
         }
 
         if (!empty($data['usedCodes'])) {
-            $result['usedCodes'] = collect($data['usedCodes'])
-                ->map(
-                    fn (array $uc) => FhirResource::make()
-                        ->coding('eHealth/assistive_products', $uc['code'])
-                        ->toCodeableConcept()
-                )
-                ->values()
-                ->toArray();
+            $result['usedCodes'] = array_values(array_map(
+                static fn (array $usedCode) => FhirResource::make()
+                    ->coding('eHealth/assistive_products', $usedCode['code'])
+                    ->toCodeableConcept(),
+                $data['usedCodes']
+            ));
         }
 
         // todo: used_references
@@ -165,41 +160,47 @@ class ProcedureMapper implements FhirMapperContract
             'paperReferralRequesterLegalEntityName' => data_get($data, 'paperReferral.requesterLegalEntityName', ''),
             'paperReferralServiceRequestDate' => data_get($data, 'paperReferral.serviceRequestDate', ''),
             'paperReferralNote' => data_get($data, 'paperReferral.note', ''),
-            // Model appends these as flat accessors (H:i:s), trimmed to H:i for the form
-            'performedPeriodStartDate' => data_get($data, 'performedPeriodStartDate', ''),
-            'performedPeriodStartTime' => substr(data_get($data, 'performedPeriodStartTime', ''), 0, 5),
-            'performedPeriodEndDate' => data_get($data, 'performedPeriodEndDate', ''),
-            'performedPeriodEndTime' => substr(data_get($data, 'performedPeriodEndTime', ''), 0, 5),
-            'reasonReferences' => collect(data_get($data, 'reasonReferences', []))
-                ->map(function (array $rr) use ($detailsMap) {
-                    $uuid = data_get($rr, 'identifier.value');
+            'performedPeriodStartDate' => convertToAppDateFormat(data_get($data, 'performedPeriodStartDate')),
+            'performedPeriodStartTime' => data_get($data, 'performedPeriodStartTime')
+                ? CarbonImmutable::parse(data_get($data, 'performedPeriodStartTime'))->format('H:i')
+                : '',
+            'performedPeriodEndDate' => convertToAppDateFormat(data_get($data, 'performedPeriodEndDate')),
+            'performedPeriodEndTime' => data_get($data, 'performedPeriodEndTime')
+                ? CarbonImmutable::parse(data_get($data, 'performedPeriodEndTime'))->format('H:i')
+                : '',
+            'reasonReferences' => array_map(
+                static function (array $reasonReference) use ($detailsMap) {
+                    $uuid = data_get($reasonReference, 'identifier.value');
                     $details = $detailsMap[$uuid] ?? [];
 
                     return [
                         'id' => $uuid,
-                        'type' => data_get($rr, 'identifier.type.coding.0.code'),
+                        'type' => data_get($reasonReference, 'identifier.type.coding.0.code'),
                         'ehealthInsertedAt' => $details['ehealthInsertedAt'] ?? null,
-                        'codeCode' => $details['codeCode'] ?? null,
+                        'codeCode' => $details['codeCode'],
+                        'codeSystem' => $details['codeSystem'] ?? null
                     ];
-                })
-                ->toArray(),
-            'usedCodes' => collect(data_get($data, 'usedCodes', []))
-                ->map(fn (array $uc) => [
-                    'code' => data_get($uc, 'coding.0.code', '')
-                ])
-                ->toArray(),
-            'complicationDetails' => collect(data_get($data, 'complicationDetails', []))
-                ->map(function (array $cd) use ($detailsMap) {
-                    $uuid = data_get($cd, 'identifier.value');
+                },
+                data_get($data, 'reasonReferences', [])
+            ),
+            'usedCodes' => array_map(
+                static fn (array $usedCode) => ['code' => data_get($usedCode, 'coding.0.code', '')],
+                data_get($data, 'usedCodes', [])
+            ),
+            'complicationDetails' => array_map(
+                static function (array $complicationDetail) use ($detailsMap) {
+                    $uuid = data_get($complicationDetail, 'identifier.value');
                     $details = $detailsMap[$uuid] ?? [];
 
                     return [
                         'id' => $uuid,
                         'ehealthInsertedAt' => $details['ehealthInsertedAt'] ?? null,
-                        'codeCode' => $details['codeCode'] ?? null,
+                        'codeCode' => $details['codeCode'],
+                        'codeSystem' => $details['codeSystem']
                     ];
-                })
-                ->toArray(),
+                },
+                data_get($data, 'complicationDetails', [])
+            ),
         ];
     }
 }

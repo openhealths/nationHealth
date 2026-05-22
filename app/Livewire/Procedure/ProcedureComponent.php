@@ -18,6 +18,7 @@ use App\Models\Person\Person;
 use App\Traits\FormTrait;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Locked;
@@ -147,10 +148,13 @@ class ProcedureComponent extends Component
                 ))
                 ->map(static fn (array $item) => [
                     'id' => data_get($item, 'uuid'),
-                    'ehealthInsertedAt' => data_get($item, 'ehealth_inserted_at'),
+                    'ehealthInsertedAt' => convertToAppDateFormat(data_get($item, 'ehealth_inserted_at')),
                     'codeCode' => data_get($item, 'code.coding.0.code'),
+                    'codeSystem' => data_get($item, 'code.coding.0.system'),
                     'type' => $type
                 ])->values()->all();
+
+            $this->loadIcd10Descriptions($this->reasonReferenceResults);
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             $this->handleEHealthExceptions($exception, 'Error while searching conditions or observations');
 

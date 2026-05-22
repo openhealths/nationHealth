@@ -129,7 +129,7 @@ class EncounterRepository extends BaseRepository
             ->get();
 
         $conditionUuids = $encounters
-            ->map(fn (EncounterSql $e) => data_get($e->toArray(), 'diagnoses.0.condition.identifier.value'))
+            ->map(fn (EncounterSql $encounter) => data_get($encounter->toArray(), 'diagnoses.0.condition.identifier.value'))
             ->filter()
             ->unique()
             ->values()
@@ -147,10 +147,10 @@ class EncounterRepository extends BaseRepository
 
                 return [
                     $encounter->uuid => [
-                        'ehealthInsertedAt' => $encounter->period?->start ?? null,
+                        'ehealthInsertedAt' => convertToAppDateFormat($encounter->period?->start),
                         'codeCode' => data_get($condition?->toArray(), 'code.coding.0.code'),
-                        'type' => 'encounter',
-                    ],
+                        'type' => 'encounter'
+                    ]
                 ];
             })
             ->toArray();

@@ -101,7 +101,7 @@ class EpisodeRepository extends BaseRepository
         )
             ->mapWithKeys(fn (array $episode) => [
                 $episode['uuid'] => [
-                    'ehealthInsertedAt' => $episode['createdAt'] ?? null,
+                    'ehealthInsertedAt' => convertToAppDateFormat($episode['createdAt'] ?? null),
                     'codeCode' => $episode['name'] ?? null,
                     'type' => 'episode_of_care',
                 ],

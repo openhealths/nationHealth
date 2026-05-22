@@ -480,18 +480,23 @@ class EncounterComponent extends Component
             ['managing_organization_id' => legalEntity()->uuid]
         );
 
-        return collect($response->validate())
+        $results = collect($response->validate())
             ->when($type === 'observation', fn ($collection) => $collection->filter(
                 static fn (array $item) => data_get($item, 'status') !== ObservationStatus::ENTERED_IN_ERROR->value
             ))
             ->map(static fn (array $item) => [
                 'id' => data_get($item, 'uuid'),
-                'ehealthInsertedAt' => data_get($item, 'ehealth_inserted_at'),
+                'ehealthInsertedAt' => convertToAppDateFormat(data_get($item, 'ehealth_inserted_at')),
                 'codeCode' => data_get($item, 'code.coding.0.code'),
+                'codeSystem' => data_get($item, 'code.coding.0.system'),
                 'type' => $type
             ])
             ->values()
             ->all();
+
+        $this->loadIcd10Descriptions($results);
+
+        return $results;
     }
 
     /**

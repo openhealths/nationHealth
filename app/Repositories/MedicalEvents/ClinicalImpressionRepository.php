@@ -102,7 +102,7 @@ class ClinicalImpressionRepository extends BaseRepository
             ->get()
             ->mapWithKeys(fn (ClinicalImpression $clinicalImpression) => [
                 $clinicalImpression->uuid => [
-                    'ehealthInsertedAt' => $clinicalImpression->ehealthInsertedAt,
+                    'ehealthInsertedAt' => convertToAppDateFormat($clinicalImpression->ehealthInsertedAt),
                     'codeCode' => data_get($clinicalImpression->code?->toArray(), 'coding.0.code'),
                     'type' => 'clinical_impression',
                 ],

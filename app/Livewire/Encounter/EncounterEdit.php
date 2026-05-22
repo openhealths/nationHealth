@@ -282,6 +282,15 @@ class EncounterEdit extends EncounterComponent
         $this->form->procedures = collect($procedures)
             ->map(fn (array $procedure) => Fhir::procedure()->fromFhir($procedure, $detailsMap))
             ->toArray();
+
+        $icd10Items = collect($this->form->procedures)
+            ->flatMap(fn (array $procedure) => array_merge(
+                $procedure['reasonReferences'] ?? [],
+                $procedure['complicationDetails'] ?? []
+            ))
+            ->toArray();
+
+        $this->loadIcd10Descriptions($icd10Items);
     }
 
     protected function loadClinicalImpressions(string $encounterUuid): void

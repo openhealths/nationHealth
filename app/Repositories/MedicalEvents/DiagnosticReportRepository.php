@@ -275,7 +275,7 @@ class DiagnosticReportRepository extends BaseRepository
             ->get()
             ->mapWithKeys(fn (DiagnosticReport $diagnosticReport) => [
                 $diagnosticReport->uuid => [
-                    'ehealthInsertedAt' => $diagnosticReport->ehealthInsertedAt,
+                    'ehealthInsertedAt' => convertToAppDateFormat($diagnosticReport->ehealthInsertedAt),
                     'codeCode' => $diagnosticReport->code?->value,
                     'type' => 'diagnostic_report',
                 ],

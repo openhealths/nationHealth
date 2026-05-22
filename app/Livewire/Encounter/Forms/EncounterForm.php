@@ -487,7 +487,7 @@ class EncounterForm extends BaseForm
             'procedures.*.primarySource' => ['required_with:procedures', 'boolean'],
             'procedures.*.reportOriginCode' => Rule::forEach(function (mixed $value, string $attribute) {
                 $index = (int)explode('.', $attribute)[1];
-                $primarySource = $this->procedures[$index]['primarySource'] ?? null;
+                $primarySource = $this->procedures[$index]['primarySource'];
 
                 return [
                     Rule::requiredIf($primarySource === false),

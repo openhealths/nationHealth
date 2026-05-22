@@ -162,6 +162,7 @@ class ConditionRepository extends BaseRepository
                 $condition['uuid'] => [
                     'ehealthInsertedAt' => $condition['ehealthInsertedAt'] ?? null,
                     'codeCode' => data_get($condition, 'code.coding.0.code'),
+                    'codeSystem' => data_get($condition, 'code.coding.0.system'),
                     'type' => 'condition'
                 ]
             ])

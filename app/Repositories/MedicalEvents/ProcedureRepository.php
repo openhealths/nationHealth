@@ -201,7 +201,7 @@ class ProcedureRepository extends BaseRepository
                         $identifier = Repository::identifier()->store($reasonReference['identifier']['value']);
                         Repository::codeableConcept()->attach($identifier, $reasonReference);
 
-                        $procedure->reasonReferences()->create(['identifier_id' => $identifier->id ?? null]);
+                        $procedure->reasonReferences()->attach($identifier->id);
                     }
                 }
 
@@ -212,7 +212,7 @@ class ProcedureRepository extends BaseRepository
                         );
                         Repository::codeableConcept()->attach($identifier, $complicationDetail);
 
-                        $procedure->complicationDetails()->create(['identifier_id' => $identifier->id ?? null]);
+                        $procedure->complicationDetails()->attach($identifier->id);
                     }
                 }
 
@@ -376,7 +376,7 @@ class ProcedureRepository extends BaseRepository
             ->get()
             ->mapWithKeys(fn (Procedure $procedure) => [
                 $procedure->uuid => [
-                    'ehealthInsertedAt' => $procedure->performedPeriod?->start ?? null,
+                    'ehealthInsertedAt' => convertToAppDateFormat($procedure->performedPeriod?->start),
                     'codeCode' => data_get($procedure->code?->toArray(), 'identifier.type.coding.0.code'),
                     'type' => 'procedure',
                 ],

@@ -11,6 +11,7 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use Carbon\CarbonImmutable;
 use Exception;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
@@ -253,8 +254,10 @@ trait FormTrait
      * @param  string  $message
      * @return void
      */
-    protected function logEHealthException(EHealthValidationException|EHealthResponseException $exception, string $message): void
-    {
+    protected function logEHealthException(
+        EHealthValidationException|EHealthResponseException $exception,
+        string $message
+    ): void {
         $caller = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2)[1] ?? [];
 
         Log::channel('e_health_errors')->error($message, [
@@ -391,6 +394,26 @@ trait FormTrait
 
     private function isDate(string $value): bool
     {
-        return (bool) preg_match('/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/', $value);
+        return (bool)preg_match('/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/', $value);
+    }
+
+    protected function loadIcd10Descriptions(array $results): void
+    {
+        $icd10Codes = collect($results)
+            ->filter(fn (array $item) => ($item['codeSystem'] ?? null) === 'eHealth/ICD10_AM/condition_codes')
+            ->pluck('codeCode')
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+
+        if (empty($icd10Codes)) {
+            return;
+        }
+
+        $this->dictionaries['eHealth/ICD10_AM/condition_codes'] = DB::table('icd_10')
+            ->whereIn('code', $icd10Codes)
+            ->pluck('description', 'code')
+            ->toArray();
     }
 }
