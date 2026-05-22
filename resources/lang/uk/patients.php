@@ -328,6 +328,10 @@ return [
     'evidence' => 'Докази',
     'evidence_observations' => 'Спостереження',
     'severity' => 'Ступінь тяжкості',
+    'conditions_not_found' => 'Станів не знайдено',
+    'end_date' => 'Дата кінця',
+    'loading' => 'Завантаження...', 
+    'input_code_or_name' => 'Почніть вводити код або назву',
 
     // Additional data
     'additional_data' => 'Додаткові дані',

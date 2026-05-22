@@ -95,7 +95,9 @@ class Condition extends PatientApiBase
         $this->setValidator($this->validateConditions(...));
         $this->setDefaultPageSize();
 
-        return $this->get(self::URL . "/$patientId/conditions", $query);
+        $mergedQuery = array_merge($this->options['query'], $this->format($query, ['onset_date_from', 'onset_date_to']));
+
+        return $this->get(self::URL . "/$patientId/conditions", $mergedQuery);
     }
 
     /**
