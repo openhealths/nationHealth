@@ -392,6 +392,10 @@ input:-webkit-autofill ~ .label {
     @apply flex items-center justify-between cursor-pointer w-full p-5 font-medium rtl:text-right text-gray-500 border border-gray-200 focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 gap-3;
 }
 
+.pagination {
+    @apply mt-14 pl-3.5 pb-8 lg:pl-8 2xl:pl-5;
+}
+
 /* Ensure Back + additional buttons align perfectly */
 .additional-actions > a,
 .additional-actions > button,

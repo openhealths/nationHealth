@@ -498,7 +498,7 @@
             </div>
         </div>
 
-        <div class="mt-8 pl-3.5 pb-8 lg:pl-8 2xl:pl-5" wire:key="pagination-{{ $filterKey }}">
+        <div class="mt-8 pl-3.5 pb-8 lg:pl-8 2xl:pl-5 max-w-[1280px]" wire:key="pagination-{{ $filterKey }}">
             {{ $parties->links() }}
         </div>
     </x-section>

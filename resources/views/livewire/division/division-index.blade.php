@@ -265,7 +265,7 @@ class="flex items-center gap-2 w-full last-of-type:rounded-b-md px-4 py-2.5 text
                     </table>
                 </div>
 
-                <div class="mt-8 pl-3.5 pb-8 lg:pl-8 2xl:pl-5">
+                <div class="pagination">
                     {{ $divisions->links() }}
                 </div>
             @else

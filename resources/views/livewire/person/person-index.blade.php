@@ -233,7 +233,7 @@
                     </div>
                 </fieldset>
             @empty
-                <fieldset class="fieldset pl-[3.5px] ml-0 mr-auto w-full max-w-full">
+                <fieldset class="fieldset shift-content pl-[3.5px] ml-0 mr-auto w-full max-w-full">
                     <legend class="legend relative -top-5 ml-0">
                         @icon('nothing-found', 'w-28 h-28')
                     </legend>
