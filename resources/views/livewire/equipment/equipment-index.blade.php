@@ -266,7 +266,7 @@
                                     {{ $equipment->division?->name ?? '-' }}
                                 </td>
                                 <td class="index-table-td">
-                                    {{ $equipment->ehealthInsertedAt?->format('d.m.Y') ?? $equipment->createdAt->format('d.m.Y') }}
+                                    {{ $equipment->ehealthInsertedAt?->format(config('app.date_format')) ?? $equipment->createdAt->format(config('app.date_format')) }}
                                 </td>
                                 <td class="index-table-td">
                                     <span class="inline-flex items-center whitespace-nowrap {{

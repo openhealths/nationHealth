@@ -132,7 +132,7 @@
 
             <div class="form-group datepicker-wrapper relative w-full">
                 <input type="text"
-                       value="{{ $equipment->ehealthInsertedAt?->format('d.m.Y') ?? $equipment->createdAt->format('d.m.Y') }}"
+                       value="{{ $equipment->ehealthInsertedAt?->format(config('app.date_format')) ?? $equipment->createdAt->format(config('app.date_format')) }}"
                        name="insertedAt"
                        id="insertedAt"
                        placeholder=" "

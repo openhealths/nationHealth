@@ -142,7 +142,7 @@
         <div class="form-group group">
             <div class="datepicker-wrapper">
                 <input x-model="modalDiagnosticReport.issuedDate"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="text"
                        name="issuedDate"
                        id="issuedDate"
@@ -166,7 +166,7 @@
                 @icon('mingcute-time-fill', 'svg-input left-2.5')
                 <input x-model="modalDiagnosticReport.issuedTime"
                        @input="$event.target.blur()"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="time"
                        name="issuedTime"
                        id="issuedTime"
@@ -187,7 +187,7 @@
         <div class="form-group group">
             <div class="datepicker-wrapper">
                 <input x-model="modalDiagnosticReport.effectivePeriodStartDate"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="text"
                        name="effectivePeriodStartDate"
                        id="effectivePeriodStartDate"
@@ -211,7 +211,7 @@
                 @icon('mingcute-time-fill', 'svg-input left-2.5')
                 <input x-model="modalDiagnosticReport.effectivePeriodStartTime"
                        @input="$event.target.blur()"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="time"
                        name="effectivePeriodStartTime"
                        id="effectivePeriodStartTime"
@@ -232,7 +232,7 @@
         <div class="form-group group">
             <div class="datepicker-wrapper">
                 <input x-model="modalDiagnosticReport.effectivePeriodEndDate"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="text"
                        name="effectivePeriodEndDate"
                        id="effectivePeriodEndDate"
@@ -256,7 +256,7 @@
                 @icon('mingcute-time-fill', 'svg-input left-2.5')
                 <input x-model="modalDiagnosticReport.effectivePeriodEndTime"
                        @input="$event.target.blur()"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="time"
                        name="effectivePeriodEndTime"
                        id="effectivePeriodEndTime"

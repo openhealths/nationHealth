@@ -27,7 +27,7 @@
         <div class="form-group group">
             <div class="datepicker-wrapper">
                 <input x-model="modalClinicalImpression.effectivePeriodStartDate"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="text"
                        name="effectivePeriodStartDate"
                        id="effectivePeriodStartDate"
@@ -47,7 +47,7 @@
                 @icon('mingcute-time-fill', 'svg-input left-2.5')
                 <input x-model="modalClinicalImpression.effectivePeriodStartTime"
                        @input="$event.target.blur()"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="time"
                        name="effectivePeriodStartTime"
                        id="effectivePeriodStartTime"
@@ -64,7 +64,7 @@
         <div class="form-group group">
             <div class="datepicker-wrapper">
                 <input x-model="modalClinicalImpression.effectivePeriodEndDate"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="text"
                        name="effectivePeriodEndDate"
                        id="effectivePeriodEndDate"
@@ -84,7 +84,7 @@
                 @icon('mingcute-time-fill', 'svg-input left-2.5')
                 <input x-model="modalClinicalImpression.effectivePeriodEndTime"
                        @input="$event.target.blur()"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="time"
                        name="effectivePeriodEndTime"
                        id="effectivePeriodEndTime"

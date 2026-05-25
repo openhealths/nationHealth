@@ -50,14 +50,14 @@ class LicenseForm extends Form
             ],
             'licenseNumber' => ['nullable', 'string', 'max:255'],
             'issuedBy' => ['required', 'string', 'max:255'],
-            'issuedDate' => ['required', 'date_format:d.m.Y', 'before_or_equal:activeFromDate'],
+            'issuedDate' => ['required', 'date_format:' . config('app.date_format'), 'before_or_equal:activeFromDate'],
             'expiryDate' => [
                 'required_if:type,' . Type::PHARMACY_DRUGS->value,
-                'date_format:d.m.Y',
+                'date_format:' . config('app.date_format'),
                 'after_or_equal:today',
                 'after_or_equal:activeFromDate'
             ],
-            'activeFromDate' => ['required', 'date_format:d.m.Y', 'before_or_equal:expiryDate'],
+            'activeFromDate' => ['required', 'date_format:' . config('app.date_format'), 'before_or_equal:expiryDate'],
             'whatLicensed' => ['required', 'string', 'max:255'],
             'orderNo' => ['required', 'string', 'max:255'],
             'isPrimary' => ['required', Rule::in([false])]

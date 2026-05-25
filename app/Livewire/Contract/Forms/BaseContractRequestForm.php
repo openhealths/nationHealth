@@ -7,7 +7,6 @@ namespace App\Livewire\Contract\Forms;
 use App\Core\Arr;
 use App\Core\BaseForm;
 use Carbon\CarbonImmutable;
-use Illuminate\Validation\Rule;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 abstract class BaseContractRequestForm extends BaseForm
@@ -53,7 +52,7 @@ abstract class BaseContractRequestForm extends BaseForm
             'contractorBase' => ['required', 'string', 'max:255'],
             'startDate' => [
                 'required',
-                'date_format:d.m.Y',
+                'date_format:' . config('app.date_format'),
                 // the year in start_date must be equal to current or next year (current+1)
                 function ($attribute, $value, $fail) {
                     $date = CarbonImmutable::parse($value);
@@ -65,7 +64,7 @@ abstract class BaseContractRequestForm extends BaseForm
             ],
             'endDate' => [
                 'required',
-                'date_format:d.m.Y',
+                'date_format:' . config('app.date_format'),
                 'after_or_equal:startDate',
             ],
             'contractorPaymentDetails' => ['required', 'array'],

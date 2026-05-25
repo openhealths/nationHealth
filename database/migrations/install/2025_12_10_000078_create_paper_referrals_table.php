@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('requester_legal_entity_name')->nullable();
             $table->string('requester_legal_entity_edrpou');
             $table->string('requester_employee_name');
-            $table->string('service_request_date');
+            $table->dateTime('service_request_date');
             $table->text('note')->nullable();
             $table->morphs('paper_referralable', 'ppr_morph');
             $table->timestamps();

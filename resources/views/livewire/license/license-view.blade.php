@@ -110,7 +110,7 @@
                 <label for="issuedDate" class="label">
                     {{ __('licenses.issued_date') }}
                 </label>
-                <input value="{{ CarbonImmutable::parse($license->issuedDate)->format('d.m.Y') }}"
+                <input value="{{ CarbonImmutable::parse($license->issuedDate)->format(config('app.date_format')) }}"
                        type="text"
                        name="issuedDate"
                        id="issuedDate"
@@ -127,7 +127,7 @@
                 <label for="activeFromDate" class="label">
                     {{ __('licenses.active_from_date') }}
                 </label>
-                <input value="{{ CarbonImmutable::parse($license->activeFromDate)->format('d.m.Y') }}"
+                <input value="{{ CarbonImmutable::parse($license->activeFromDate)->format(config('app.date_format')) }}"
                        type="text"
                        name="activeFromDate"
                        id="activeFromDate"
@@ -142,7 +142,7 @@
                 <label for="expiryDate" class="label">
                     {{ __('licenses.expiry_date') }}
                 </label>
-                <input value="{{ CarbonImmutable::parse($license->expiryDate)->format('d.m.Y') }}"
+                <input value="{{ CarbonImmutable::parse($license->expiryDate)->format(config('app.date_format')) }}"
                        type="text"
                        name="expiryDate"
                        id="expiryDate"

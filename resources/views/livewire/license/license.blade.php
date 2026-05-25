@@ -141,7 +141,7 @@
                    class="peer input pl-10 appearance-none datepicker-input"
                    placeholder=" "
                    required
-                   datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                   datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
             />
             <label for="dateOfLicenseIssuance" class="wrapped-label">{{ __('licenses.issued_date') }}</label>
 
@@ -160,7 +160,7 @@
                    class="peer input pl-10 appearance-none datepicker-input"
                    placeholder=" "
                    required
-                   datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                   datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
             />
             <label for="activeFromDate" class="wrapped-label">{{ __('licenses.active_from_date') }}</label>
 
@@ -176,7 +176,7 @@
                    id="expiryDate"
                    class="peer input pl-10 appearance-none datepicker-input"
                    placeholder=" "
-                   datepicker-min-date="{{ now()->format('d.m.Y') }}"
+                   datepicker-min-date="{{ now()->format(config('app.date_format')) }}"
             />
             <label for="expiryDate" class="wrapped-label">{{ __('licenses.expiry_date') }}</label>
 

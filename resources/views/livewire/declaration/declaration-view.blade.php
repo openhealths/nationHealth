@@ -48,7 +48,7 @@
                     <label for="startDate" class="label">
                         {{ __('declarations.start_date') }}
                     </label>
-                    <input value="{{ CarbonImmutable::parse($declaration->startDate)->format('d.m.Y') }}"
+                    <input value="{{ CarbonImmutable::parse($declaration->startDate)->format(config('app.date_format')) }}"
                            type="text"
                            name="startDate"
                            id="startDate"
@@ -80,7 +80,7 @@
                     <label for="endDate" class="label">
                         {{ __('declarations.end_date') }}
                     </label>
-                    <input value="{{ CarbonImmutable::parse($declaration->endDate)->format('d.m.Y') }}"
+                    <input value="{{ CarbonImmutable::parse($declaration->endDate)->format(config('app.date_format')) }}"
                            type="text"
                            name="endDate"
                            id="endDate"
@@ -144,7 +144,7 @@
                     <label for="birthDate" class="label">
                         {{ __('patients.patient_birth_date') }}
                     </label>
-                    <input value="{{ CarbonImmutable::parse($declaration->person->birth_date)->format('d.m.Y') }}"
+                    <input value="{{ CarbonImmutable::parse($declaration->person->birth_date)->format(config('app.date_format')) }}"
                            type="text"
                            name="birthDate"
                            id="birthDate"

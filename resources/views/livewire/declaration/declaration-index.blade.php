@@ -112,7 +112,7 @@
                                 <tr wire:key="{{ $declaration->declarationNumber }}">
                                     <td class="td-input">{{ $declaration->person->fullName }}</td>
                                     <td class="td-input">{{ $declaration->declarationNumber }}</td>
-                                    <td class="td-input">{{ CarbonImmutable::parse($declaration->person->birth_date)->format('d.m.Y') }}</td>
+                                    <td class="td-input">{{ CarbonImmutable::parse($declaration->person->birth_date)->format(config('app.date_format')) }}</td>
                                     <td class="td-input">{{ $declaration->employee->fullName }}</td>
 
                                     <td class="td-input">

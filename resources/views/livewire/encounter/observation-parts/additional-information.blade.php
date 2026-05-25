@@ -66,7 +66,7 @@
             <div class="relative flex items-center">
                 @icon('calendar-week', 'w-5 h-5 svg-input absolute left-2.5 pointer-events-none')
                 <input x-model="modalObservation.effectiveDate"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="text"
                        name="effectiveDate"
                        id="effectiveDate"
@@ -86,7 +86,7 @@
                 @icon('mingcute-time-fill', 'svg-input left-2.5')
                 <input x-model="modalObservation.effectiveTime"
                        @input="$event.target.blur()"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="time"
                        name="effectiveTime"
                        id="effectiveTime"
@@ -104,7 +104,7 @@
             <div class="relative flex items-center">
                 @icon('calendar-week', 'w-5 h-5 svg-input absolute left-2.5 pointer-events-none')
                 <input x-model="modalObservation.issuedDate"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="text"
                        name="issuedDate"
                        id="issuedDate"
@@ -128,7 +128,7 @@
                 @icon('mingcute-time-fill', 'svg-input left-2.5')
                 <input x-model="modalObservation.issuedTime"
                        @input="$event.target.blur()"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="time"
                        name="issuedTime"
                        id="issuedTime"

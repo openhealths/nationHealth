@@ -82,7 +82,7 @@
         <div class="form-group group">
             <div class="datepicker-wrapper">
                 <input x-model="modalProcedure.performedPeriodStartDate"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="text"
                        name="performedPeriodStartDate"
                        id="performedPeriodStartDate"
@@ -106,7 +106,7 @@
                 @icon('mingcute-time-fill', 'svg-input left-2.5')
                 <input x-model="modalProcedure.performedPeriodStartTime"
                        @input="$event.target.blur()"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="time"
                        name="performedPeriodStartTime"
                        id="performedPeriodStartTime"
@@ -127,7 +127,7 @@
         <div class="form-group group">
             <div class="datepicker-wrapper">
                 <input x-model="modalProcedure.performedPeriodEndDate"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="text"
                        name="performedPeriodEndDate"
                        id="performedPeriodEndDate"
@@ -151,7 +151,7 @@
                 @icon('mingcute-time-fill', 'svg-input left-2.5')
                 <input x-model="modalProcedure.performedPeriodEndTime"
                        @input="$event.target.blur()"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="time"
                        name="performedPeriodEndTime"
                        id="performedPeriodEndTime"

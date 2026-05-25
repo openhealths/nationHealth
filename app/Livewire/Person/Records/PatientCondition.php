@@ -6,7 +6,6 @@ namespace App\Livewire\Person\Records;
 
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Exceptions\EHealth\EHealthResponseException;
-use App\Livewire\Person\Records\BasePatientComponent;
 use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Jobs\ConditionSync;
@@ -79,22 +78,22 @@ class PatientCondition extends BasePatientComponent
         return ConditionSync::BATCH_NAME;
     }
 
-    protected function getJobClass(string $entityType): string 
+    protected function getJobClass(string $entityType): string
     {
         return ConditionSync::class;
     }
 
-    protected function getEntityConstant(string $entityType): string 
+    protected function getEntityConstant(string $entityType): string
     {
         return LegalEntity::ENTITY_CONDITION;
     }
 
-    protected function onSyncStatusChanged(string $entityType, JobStatus $status): void 
+    protected function onSyncStatusChanged(string $entityType, JobStatus $status): void
     {
         $this->syncStatus = $status->value;
     }
 
-    public function initializeComponent(): void 
+    public function initializeComponent(): void
     {
         $this->getDictionary();
 
@@ -120,6 +119,7 @@ class PatientCondition extends BasePatientComponent
 
         if ($this->shouldResumeSync('condition')) {
             $this->handleResumeLogic('condition');
+
             return;
         }
 
@@ -130,6 +130,7 @@ class PatientCondition extends BasePatientComponent
             );
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             $this->handleEHealthExceptions($exception, 'Error while synchronizing condition');
+
             return;
         }
 
@@ -139,6 +140,7 @@ class PatientCondition extends BasePatientComponent
         } catch (Throwable $exception) {
             $this->logDatabaseErrors($exception, 'Error while synchronizing condition');
             Session::flash('error', __('patients.messages.condition_sync_database_error'));
+
             return;
         }
 
@@ -165,7 +167,7 @@ class PatientCondition extends BasePatientComponent
         } else {
             $this->loadConditions($this->buildSearchParams());
         }
-        
+
     }
 
     public function searchCodes(string $search = ''): void
@@ -188,7 +190,7 @@ class PatientCondition extends BasePatientComponent
         $this->loadConditions($this->buildSearchParams());
     }
 
-    private function loadFilters(): void 
+    private function loadFilters(): void
     {
         $this->loadCodesFromDb();
 
@@ -334,28 +336,28 @@ class PatientCondition extends BasePatientComponent
         }
     }
 
-    private function loadEpisodesFromDb(): void 
+    private function loadEpisodesFromDb(): void
     {
         $filterEpisodeOptions = Repository::episode()->getByPersonId($this->personId);
 
         $this->filterEpisodeOptions = collect($filterEpisodeOptions)
-                ->map(function (array $episode) {
-                    $episodeId = data_get($episode, 'uuid');
+            ->map(function (array $episode) {
+                $episodeId = data_get($episode, 'uuid');
 
-                    if (!$episodeId) {
-                        return null;
-                    }
+                if (!$episodeId) {
+                    return null;
+                }
 
-                    return [
-                        'value' => $episodeId,
-                        'label' => data_get($episode, 'name') ?: $episodeId,
-                        'description' => $episodeId,
-                    ];
-                })
-                ->filter()
-                ->unique('value')
-                ->values()
-                ->toArray();
+                return [
+                    'value' => $episodeId,
+                    'label' => data_get($episode, 'name') ?: $episodeId,
+                    'description' => $episodeId,
+                ];
+            })
+            ->filter()
+            ->unique('value')
+            ->values()
+            ->toArray();
     }
 
     private function loadEncounters(): void
@@ -477,14 +479,14 @@ class PatientCondition extends BasePatientComponent
             $this->pageSize = $paging['page_size'] ?? 10;
 
             $this->conditions = Arr::toCamelCase($validateData);
-        } catch(ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             $this->conditions = [];
 
             $this->handleEHealthExceptions($exception, 'Error while loading conditions');
         }
     }
 
-    private function loadConditionsFromDb(): void 
+    private function loadConditionsFromDb(): void
     {
         $conditions = Repository::condition()->getByPersonIdPaginated(
             $this->personId,
@@ -497,7 +499,7 @@ class PatientCondition extends BasePatientComponent
         $this->conditions = Arr::toCamelCase($conditions);
     }
 
-    private function buildSearchParams(): array 
+    private function buildSearchParams(): array
     {
         return array_filter([
             'code' => $this->filterCode ?: null,
@@ -522,14 +524,14 @@ class PatientCondition extends BasePatientComponent
         );
     }
 
-    private function filterValidationRules(): array 
+    private function filterValidationRules(): array
     {
         return [
             'filterCode' => ['nullable', 'string', 'max:255'],
             'filterEncounterId' => ['nullable', 'string', 'max:255'],
             'filterEpisodeId' => ['nullable', 'string', 'max:255'],
-            'filterOnsetDateFrom' => ['nullable', 'date_format:d.m.Y'],
-            'filterOnsetDateTo' => ['nullable', 'date_format:d.m.Y'],
+            'filterOnsetDateFrom' => ['nullable', 'date_format:' . config('app.date_format')],
+            'filterOnsetDateTo' => ['nullable', 'date_format:' . config('app.date_format')],
         ];
     }
 

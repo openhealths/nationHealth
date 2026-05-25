@@ -79,22 +79,22 @@ class PatientDiagnosticReports extends BasePatientComponent
         return DiagnosticReportSync::BATCH_NAME;
     }
 
-    protected function getJobClass(string $entityType): string 
+    protected function getJobClass(string $entityType): string
     {
         return DiagnosticReportSync::class;
     }
 
-    protected function getEntityConstant(string $entityType): string 
+    protected function getEntityConstant(string $entityType): string
     {
         return LegalEntity::ENTITY_DIAGNOSTIC_REPORT;
     }
 
-    protected function onSyncStatusChanged(string $entityType, JobStatus $status): void 
+    protected function onSyncStatusChanged(string $entityType, JobStatus $status): void
     {
         $this->syncStatus = $status->value;
     }
 
-    public function initializeComponent(): void 
+    public function initializeComponent(): void
     {
         $this->getDictionary();
 
@@ -110,7 +110,7 @@ class PatientDiagnosticReports extends BasePatientComponent
         $this->validate($this->filterValidationRules());
 
         $this->resetPage();
-        
+
         $this->loadDiagnosticReports($this->buildSearchParams());
     }
 
@@ -141,6 +141,7 @@ class PatientDiagnosticReports extends BasePatientComponent
 
         if ($this->shouldResumeSync('diagnostic_report')) {
             $this->handleResumeLogic('diagnostic_report');
+
             return;
         }
 
@@ -151,6 +152,7 @@ class PatientDiagnosticReports extends BasePatientComponent
             );
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             $this->handleEHealthExceptions($exception, 'Error while synchronizing diagnostic report');
+
             return;
         }
 
@@ -160,6 +162,7 @@ class PatientDiagnosticReports extends BasePatientComponent
         } catch (Throwable $exception) {
             $this->logDatabaseErrors($exception, 'Error while synchronizing diagnostic report');
             Session::flash('error', __('patients.messages.diagnostic_report_sync_database_error'));
+
             return;
         }
 
@@ -181,7 +184,7 @@ class PatientDiagnosticReports extends BasePatientComponent
         $this->loadDiagnosticReports($this->buildSearchParams());
     }
 
-    private function loadFilters(): void 
+    private function loadFilters(): void
     {
         $this->loadServices();
 
@@ -192,8 +195,7 @@ class PatientDiagnosticReports extends BasePatientComponent
 
     private function loadDiagnosticReports(array $params = []): void
     {
-        try
-        {
+        try {
             $response = EHealth::diagnosticReport()->getBySearchParams($this->uuid, $params);
 
             $validateData = $response->validate();
@@ -203,9 +205,7 @@ class PatientDiagnosticReports extends BasePatientComponent
             $this->pageSize = $paging['page_size'] ?? 10;
 
             $this->diagnosticReports = Arr::toCamelCase($validateData);
-        }
-        catch(ConnectionException|EHealthValidationException|EHealthResponseException $exception)
-        {
+        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             $this->diagnosticReports = [];
 
             $this->handleEHealthExceptions($exception, 'Error while loading diagnostic reports');
@@ -259,30 +259,30 @@ class PatientDiagnosticReports extends BasePatientComponent
         }
     }
 
-    private function loadEpisodesFromDb(): void 
+    private function loadEpisodesFromDb(): void
     {
         $filterEpisodeOptions = Repository::episode()->getByPersonId($this->personId);
 
         $this->totalEntries = count($filterEpisodeOptions);
 
         $this->filterEpisodeOptions = collect($filterEpisodeOptions)
-                ->map(function (array $episode) {
-                    $episodeId = data_get($episode, 'uuid');
+            ->map(function (array $episode) {
+                $episodeId = data_get($episode, 'uuid');
 
-                    if (!$episodeId) {
-                        return null;
-                    }
+                if (!$episodeId) {
+                    return null;
+                }
 
-                    return [
-                        'value' => $episodeId,
-                        'label' => data_get($episode, 'name') ?: $episodeId,
-                        'description' => $episodeId,
-                    ];
-                })
-                ->filter()
-                ->unique('value')
-                ->values()
-                ->toArray();
+                return [
+                    'value' => $episodeId,
+                    'label' => data_get($episode, 'name') ?: $episodeId,
+                    'description' => $episodeId,
+                ];
+            })
+            ->filter()
+            ->unique('value')
+            ->values()
+            ->toArray();
     }
 
     private function loadEncounters(): void
@@ -371,7 +371,7 @@ class PatientDiagnosticReports extends BasePatientComponent
         );
     }
 
-    private function filterValidationRules(): array 
+    private function filterValidationRules(): array
     {
         return [
             'filterCategory' => ['nullable', 'string', 'max:255'],
@@ -379,8 +379,8 @@ class PatientDiagnosticReports extends BasePatientComponent
             'filterEncounterId' => ['nullable', 'uuid'],
             'filterContextEpisodeId' => ['nullable', 'uuid'],
             'filterOriginEpisodeId' => ['nullable', 'uuid'],
-            'filterIssuedFrom' => ['nullable', 'date_format:d.m.Y'],
-            'filterIssuedTo' => ['nullable', 'date_format:d.m.Y'],
+            'filterIssuedFrom' => ['nullable', 'date_format:' . config('app.date_format')],
+            'filterIssuedTo' => ['nullable', 'date_format:' . config('app.date_format')],
             'filterBasedOn' => ['nullable', 'uuid'],
             'filterSpecimenId' => ['nullable', 'uuid'],
         ];

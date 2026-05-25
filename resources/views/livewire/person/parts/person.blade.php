@@ -59,7 +59,7 @@
         <div class="form-group group">
             <div class="datepicker-wrapper">
                 <input wire:model="form.person.birthDate"
-                       datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                       datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        type="text"
                        name="birthDate"
                        id="birthDate"

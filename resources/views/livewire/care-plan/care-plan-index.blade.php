@@ -252,7 +252,7 @@
                                 <div>
                                     <div class="record-inner-label">Створено</div>
                                     <div class="record-inner-value">
-                                        {{ \Carbon\Carbon::parse($plan['created_at'] ?? $plan->created_at ?? now())->format('d.m.Y') }}
+                                        {{ \Carbon\Carbon::parse($plan['created_at'] ?? $plan->created_at ?? now())->format(config('app.date_format')) }}
                                     </div>
                                 </div>
 
@@ -260,9 +260,9 @@
                                     <div class="record-inner-label">Початок</div>
                                     <div class="record-inner-value">
                                         @if(isset($plan['period']['start']))
-                                            {{ \Carbon\Carbon::parse($plan['period']['start'])->format('d.m.Y') }}
+                                            {{ \Carbon\Carbon::parse($plan['period']['start'])->format(config('app.date_format')) }}
                                         @elseif($plan->period_start ?? null)
-                                            {{ $plan->period_start->format('d.m.Y') }}
+                                            {{ $plan->period_start->format(config('app.date_format')) }}
                                         @endif
                                     </div>
                                 </div>
@@ -271,9 +271,9 @@
                                     <div class="record-inner-label">Кінець</div>
                                     <div class="record-inner-value">
                                         @if(isset($plan['period']['end']))
-                                            {{ \Carbon\Carbon::parse($plan['period']['end'])->format('d.m.Y') }}
+                                            {{ \Carbon\Carbon::parse($plan['period']['end'])->format(config('app.date_format')) }}
                                         @elseif($plan->period_end ?? null)
-                                            {{ $plan->period_end->format('d.m.Y') }}
+                                            {{ $plan->period_end->format(config('app.date_format')) }}
                                         @endif
                                     </div>
                                 </div>

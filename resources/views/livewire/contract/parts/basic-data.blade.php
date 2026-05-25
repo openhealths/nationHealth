@@ -53,7 +53,7 @@
             <div class="form-group group">
                 <input id="contract-period"
                        type="text"
-                       value="{{ \Carbon\Carbon::parse($contract->start_date)->format('d.m.Y') }} – {{ \Carbon\Carbon::parse($contract->end_date)->format('d.m.Y') }}"
+                       value="{{ \Carbon\Carbon::parse($contract->start_date)->format(config('app.date_format')) }} – {{ \Carbon\Carbon::parse($contract->end_date)->format(config('app.date_format')) }}"
                        class="input peer"
                        placeholder=" "
                        disabled

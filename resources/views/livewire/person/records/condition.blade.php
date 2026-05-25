@@ -663,7 +663,7 @@
                                         <div class="min-w-0">
                                             <div class="record-inner-label text-[10px] uppercase">{{ __('patients.start_date') }}</div>
                                             <div class="record-inner-value text-[14px] font-semibold">
-                                                {{ optional(\Carbon\Carbon::make(data_get($condition, 'onsetDate')))->format('d.m.Y') ?? '-' }}
+                                                {{ optional(\Carbon\Carbon::make(data_get($condition, 'onsetDate')))->format(config('app.date_format')) ?? '-' }}
                                             </div>
                                         </div>
                                     </div>
@@ -672,7 +672,7 @@
                                         <div class="min-w-0">
                                             <div class="record-inner-label text-[10px] uppercase">{{ __('patients.created') }}</div>
                                             <div class="record-inner-value text-[14px] font-semibold">
-                                                {{ optional(\Carbon\Carbon::make(data_get($condition, 'assertedDate')))->format('d.m.Y') ?? '-' }}
+                                                {{ optional(\Carbon\Carbon::make(data_get($condition, 'assertedDate')))->format(config('app.date_format')) ?? '-' }}
                                             </div>
                                         </div>
                                     </div>

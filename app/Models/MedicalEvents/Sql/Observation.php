@@ -98,9 +98,7 @@ class Observation extends Model
     protected function effectiveDate(): Attribute
     {
         return Attribute::make(
-            get: fn (): string => $this->effectiveDateTime
-                ? convertToAppDateFormat($this->effectiveDateTime)
-                : '',
+            get: fn (): string => $this->effectiveDateTime ? convertToAppDateFormat($this->effectiveDateTime) : '',
         );
     }
 

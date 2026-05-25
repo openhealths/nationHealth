@@ -79,7 +79,7 @@ class EquipmentForm extends Form
             ],
             'manufacturer' => ['nullable', 'string', 'max:255'],
             'manufactureDate' => ['nullable', Rule::date()->beforeOrEqual(today())],
-            'expirationDate' => ['nullable', 'date_format:d.m.Y'],
+            'expirationDate' => ['nullable', 'date_format:' . config('app.date_format')],
             'modelNumber' => ['nullable', 'string', 'max:255'],
             'lotNumber' => ['nullable', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:1000'],

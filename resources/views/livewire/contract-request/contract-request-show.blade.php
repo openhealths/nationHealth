@@ -69,9 +69,9 @@
                     <dt class="text-sm font-medium text-gray-500">Період дії</dt>
                     <dd class="mt-1 text-sm text-gray-900">
                         {{-- ФІКС: Безпечний парсинг дат --}}
-                        {{ $contract->start_date ? Carbon::parse($contract->start_date)->format('d.m.Y') : '-' }}
+                        {{ $contract->start_date ? Carbon::parse($contract->start_date)->format(config('app.date_format')) : '-' }}
                         —
-                        {{ $contract->end_date ? Carbon::parse($contract->end_date)->format('d.m.Y') : '-' }}
+                        {{ $contract->end_date ? Carbon::parse($contract->end_date)->format(config('app.date_format')) : '-' }}
                     </dd>
                 </div>
 

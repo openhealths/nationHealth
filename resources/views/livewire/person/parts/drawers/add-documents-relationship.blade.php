@@ -89,7 +89,7 @@
                 <div class="form-group group">
                     <div class="datepicker-wrapper">
                         <input type="text"
-                               datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                               datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                                name="documentIssueDate"
                                id="documentIssueDate"
                                class="datepicker-input with-leading-icon input peer"
@@ -107,7 +107,7 @@
                 <div class="form-group group">
                     <div class="datepicker-wrapper">
                         <input type="text"
-                               datepicker-min-date="{{ now()->format('d.m.Y') }}"
+                               datepicker-min-date="{{ now()->format(config('app.date_format')) }}"
                                name="documentExpiryDate"
                                id="documentExpiryDate"
                                class="datepicker-input with-leading-icon input peer"

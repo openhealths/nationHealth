@@ -392,7 +392,7 @@
                                         {{ __('forms.start_date') }}
                                     </label>
                                     <input x-model="modalCondition.onsetDate"
-                                           datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                                           datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                                            type="text"
                                            name="onsetDate"
                                            id="onsetDate"
@@ -415,7 +415,7 @@
                                     </label>
                                     <input x-model="modalCondition.onsetTime"
                                            @input="$event.target.blur()"
-                                           datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                                           datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                                            type="time"
                                            name="onsetTime"
                                            id="onsetTime"
@@ -437,7 +437,7 @@
                                         {{ __('patients.entry_date') }}
                                     </label>
                                     <input x-model="modalCondition.assertedDate"
-                                           datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                                           datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                                            type="text"
                                            name="assertedDate"
                                            id="assertedDate"
@@ -454,7 +454,7 @@
                                     </label>
                                     <input x-model="modalCondition.assertedTime"
                                            @input="$event.target.blur()"
-                                           datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                                           datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                                            type="time"
                                            name="assertedTime"
                                            id="assertedTime"

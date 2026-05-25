@@ -130,10 +130,10 @@
                                     <x-status-badge :status="$item->status"/>
                                 </td>
                                 <td class="index-table-td text-sm text-gray-500">
-                                    {{ $item->start_date?->format('d.m.Y') }} - {{ $item->end_date?->format('d.m.Y') }}
+                                    {{ $item->start_date?->format(config('app.date_format')) }} - {{ $item->end_date?->format(config('app.date_format')) }}
                                 </td>
                                 <td class="index-table-td text-sm text-gray-500">
-                                    {{ $item->start_date?->format('d.m.Y') ?? $item->created_at?->format('d.m.Y') }}
+                                    {{ $item->start_date?->format(config('app.date_format')) ?? $item->created_at?->format(config('app.date_format')) }}
                                 </td>
 
                                 <td class="index-table-td-actions">

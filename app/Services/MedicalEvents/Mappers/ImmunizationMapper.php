@@ -133,7 +133,7 @@ class ImmunizationMapper implements FhirMapperContract
             'primarySource' => data_get($data, 'primarySource'),
             'notGiven' => $notGiven,
             'vaccineCode' => data_get($data, 'vaccineCode.coding.0.code'),
-            'date' => CarbonImmutable::createFromFormat('d.m.Y H:i', data_get($data, 'date'))->format('d.m.Y'),
+            'date' => CarbonImmutable::createFromFormat(config('app.date_format') . ' H:i', data_get($data, 'date'))->format(config('app.date_format')),
             'time' => data_get($data, 'time'),
             'reasons' => $reasons,
             'reasonNotGivenCode' => data_get($data, 'explanation.reasonsNotGiven.0.coding.0.code', ''),

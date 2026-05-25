@@ -1,8 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Person\Records;
 
-use App\Livewire\Person\Records\BasePatientComponent;
 use App\Core\Arr;
 use App\Classes\eHealth\EHealth;
 use App\Enums\JobStatus;
@@ -26,7 +27,7 @@ class PatientObservation extends BasePatientComponent
     use BatchLegalEntityQueries;
     use HandlesSyncBatch;
     use WithPagination;
-    
+
     public array $observations = [];
 
     public array $filterCodeOptions = [];
@@ -50,7 +51,7 @@ class PatientObservation extends BasePatientComponent
     public string $filterEpisodeId = '';
 
     public string $filterIssuedFrom = '';
-    
+
     public string $filterIssuedTo = '';
 
     public string $filterDeviceId = '';
@@ -94,22 +95,22 @@ class PatientObservation extends BasePatientComponent
         return ObservationSync::BATCH_NAME;
     }
 
-    protected function getJobClass(string $entityType): string 
+    protected function getJobClass(string $entityType): string
     {
         return ObservationSync::class;
     }
 
-    protected function getEntityConstant(string $entityType): string 
+    protected function getEntityConstant(string $entityType): string
     {
         return LegalEntity::ENTITY_OBSERVATION;
     }
 
-    protected function onSyncStatusChanged(string $entityType, JobStatus $status): void 
+    protected function onSyncStatusChanged(string $entityType, JobStatus $status): void
     {
         $this->syncStatus = $status->value;
     }
 
-    public function initializeComponent(): void 
+    public function initializeComponent(): void
     {
         $this->getDictionary();
 
@@ -173,7 +174,7 @@ class PatientObservation extends BasePatientComponent
             Session::flash('success', __('patients.messages.observation_synced_successfully'));
         }
 
-       $this->loadObservationsFromDb();
+        $this->loadObservationsFromDb();
     }
 
     public function updatedPage(): void
@@ -242,28 +243,28 @@ class PatientObservation extends BasePatientComponent
             ->toArray();
     }
 
-    private function loadEpisodesFromDb(): void 
+    private function loadEpisodesFromDb(): void
     {
         $filterEpisodeOptions = Repository::episode()->getByPersonId($this->personId);
 
         $this->filterEpisodeOptions = collect($filterEpisodeOptions)
-                ->map(function (array $episode) {
-                    $episodeId = data_get($episode, 'uuid');
+            ->map(function (array $episode) {
+                $episodeId = data_get($episode, 'uuid');
 
-                    if (!$episodeId) {
-                        return null;
-                    }
+                if (!$episodeId) {
+                    return null;
+                }
 
-                    return [
-                        'value' => $episodeId,
-                        'label' => data_get($episode, 'name') ?: $episodeId,
-                        'description' => $episodeId,
-                    ];
-                })
-                ->filter()
-                ->unique('value')
-                ->values()
-                ->toArray();
+                return [
+                    'value' => $episodeId,
+                    'label' => data_get($episode, 'name') ?: $episodeId,
+                    'description' => $episodeId,
+                ];
+            })
+            ->filter()
+            ->unique('value')
+            ->values()
+            ->toArray();
     }
 
     private function loadEncountersFromDb(): void
@@ -543,7 +544,7 @@ class PatientObservation extends BasePatientComponent
             return $value;
         }
     }
-    
+
     private function buildSearchParams(): array
     {
         return array_filter([
@@ -579,8 +580,8 @@ class PatientObservation extends BasePatientComponent
             'filterEncounterId' => ['nullable', 'uuid'],
             'filterDiagnosticReportId' => ['nullable', 'uuid'],
             'filterEpisodeId' => ['nullable', 'uuid'],
-            'filterIssuedFrom' => ['nullable', 'date_format:d.m.Y'],
-            'filterIssuedTo' => ['nullable', 'date_format:d.m.Y'],
+            'filterIssuedFrom' => ['nullable', 'date_format:' . config('app.date_format')],
+            'filterIssuedTo' => ['nullable', 'date_format:' . config('app.date_format')],
             'filterDeviceId' => ['nullable', 'uuid'],
             'filterSpecimenId' => ['nullable', 'uuid'],
         ];

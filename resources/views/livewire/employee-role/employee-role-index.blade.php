@@ -177,10 +177,10 @@
                                     {{ $dictionaries['PROVIDING_CONDITION'][$employeeRole->healthcareService->providingCondition] }}
                                 </td>
                                 <td class="index-table-td">
-                                    {{ $employeeRole->startDate->format('d.m.Y') }}
+                                    {{ $employeeRole->startDate->format(config('app.date_format')) }}
                                 </td>
                                 <td class="index-table-td">
-                                    {{ $employeeRole->endDate?->format('d.m.Y') }}
+                                    {{ $employeeRole->endDate?->format(config('app.date_format')) }}
                                 </td>
                                 <td class="index-table-td">
                                     <span class="{{

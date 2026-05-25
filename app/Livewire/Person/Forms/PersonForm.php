@@ -142,7 +142,7 @@ class PersonForm extends BaseForm
             'person.firstName' => ['required', 'min:3', new NameFields()],
             'person.lastName' => ['required', 'min:3', new NameFields()],
             'person.secondName' => ['nullable', 'min:3', new NameFields()],
-            'person.birthDate' => ['required', 'date_format:d.m.Y'],
+            'person.birthDate' => ['required', 'date_format:' . config('app.date_format')],
             'person.birthCountry' => ['required', 'string'],
             'person.birthSettlement' => ['required', 'string'],
             'person.gender' => ['required', 'string', new InDictionary('GENDER')],
@@ -161,11 +161,11 @@ class PersonForm extends BaseForm
             'person.documents.*.issuedBy' => ['required', 'string', 'max:255'],
             'person.documents.*.issuedAt' => [
                 'required',
-                'date_format:d.m.Y',
+                'date_format:' . config('app.date_format'),
                 'before:today',
                 'after:person.birthDate'
             ],
-            'person.documents.*.expirationDate' => ['nullable', 'date_format:d.m.Y', 'after:today'],
+            'person.documents.*.expirationDate' => ['nullable', 'date_format:' . config('app.date_format'), 'after:today'],
 
             'person.noTaxId' => ['nullable', 'boolean'],
             'person.taxId' => ['nullable', 'required_if:person.noTaxId,false', 'numeric', 'digits:10'],
@@ -229,7 +229,7 @@ class PersonForm extends BaseForm
             'firstName' => ['required', 'min:3'],
             'lastName' => ['required', 'min:3'],
             'secondName' => ['nullable', 'min:3'],
-            'birthDate' => ['required', 'date_format:d.m.Y'],
+            'birthDate' => ['required', 'date_format:' . config('app.date_format')],
             'taxId' => ['nullable', 'numeric'],
             'phoneNumber' => ['nullable', 'string', 'min:13', 'max:13'],
             'birthCertificate' => ['nullable', 'string']
@@ -254,8 +254,8 @@ class PersonForm extends BaseForm
             'documentsRelationship.*.type' => ['required', new InDictionary('DOCUMENT_RELATIONSHIP_TYPE')],
             'documentsRelationship.*.number' => ['required', 'string', 'max:255'],
             'documentsRelationship.*.issuedBy' => ['required', 'string', 'max:255'],
-            'documentsRelationship.*.issuedAt' => ['required', 'date_format:d.m.Y'],
-            'documentsRelationship.*.activeTo' => ['nullable', 'date_format:d.m.Y']
+            'documentsRelationship.*.issuedAt' => ['required', 'date_format:' . config('app.date_format')],
+            'documentsRelationship.*.activeTo' => ['nullable', 'date_format:' . config('app.date_format')]
         ];
     }
 
@@ -267,7 +267,7 @@ class PersonForm extends BaseForm
             'documents.*.type' => ['required', 'string', new InDictionary('DOCUMENT_RELATIONSHIP_TYPE')],
             'documents.*.number' => ['required', 'string', 'max:255'],
             'documents.*.issuedBy' => ['required', 'string', 'max:255'],
-            'documents.*.issuedAt' => ['required', 'date_format:d.m.Y']
+            'documents.*.issuedAt' => ['required', 'date_format:' . config('app.date_format')]
         ];
     }
 

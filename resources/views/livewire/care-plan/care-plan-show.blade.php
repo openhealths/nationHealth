@@ -67,11 +67,11 @@
 
                         <div class="record-inner-column border-t border-gray-100 dark:border-gray-700 pt-3">
                             <div class="record-inner-label">{{ __('forms.start_date') }}</div>
-                            <div class="record-inner-value">{{ $carePlan->period_start?->format('d.m.Y') ?? '-' }}</div>
+                            <div class="record-inner-value">{{ $carePlan->period_start?->format(config('app.date_format')) ?? '-' }}</div>
                         </div>
                         <div class="record-inner-column border-t border-gray-100 dark:border-gray-700 pt-3">
                             <div class="record-inner-label">{{ __('forms.end_date') }}</div>
-                            <div class="record-inner-value">{{ $carePlan->period_end ? $carePlan->period_end->format('d.m.Y') : __('care-plan.no_end_date') }}</div>
+                            <div class="record-inner-value">{{ $carePlan->period_end ? $carePlan->period_end->format(config('app.date_format')) : __('care-plan.no_end_date') }}</div>
                         </div>
 
                         <div class="record-inner-column border-t border-gray-100 dark:border-gray-700 pt-3">
@@ -163,7 +163,7 @@
                                     @endif
                                 </td>
                                 <td class="td-input break-words whitespace-normal align-top">
-                                    {{ $activity->scheduled_period_start?->format('d.m.Y') }}
+                                    {{ $activity->scheduled_period_start?->format(config('app.date_format')) }}
                                 </td>
                                 <td class="td-input break-words whitespace-normal align-top">
                                     @php

@@ -98,15 +98,9 @@ class ProcedureMapper implements FhirMapperContract
             $result['note'] = $data['note'];
         }
 
-        if (!empty($data['paperReferralRequesterLegalEntityEdrpou'])) {
-            $result['paperReferral'] = [
-                'requisition' => $data['paperReferralRequisition'] ?? '',
-                'requesterEmployeeName' => $data['paperReferralRequesterEmployeeName'] ?? '',
-                'requesterLegalEntityEdrpou' => $data['paperReferralRequesterLegalEntityEdrpou'],
-                'requesterLegalEntityName' => $data['paperReferralRequesterLegalEntityName'],
-                'serviceRequestDate' => $data['paperReferralServiceRequestDate'],
-                'note' => $data['paperReferralNote'] ?? ''
-            ];
+        $paperReferral = PaperReferralMapper::toFhir($data);
+        if ($paperReferral !== null) {
+            $result['paperReferral'] = $paperReferral;
         }
 
         if (!empty($data['usedCodes'])) {
@@ -135,8 +129,6 @@ class ProcedureMapper implements FhirMapperContract
     public function fromFhir(array $data, mixed ...$context): array
     {
         $detailsMap = $context[0] ?? [];
-        $hasPaperReferral = !empty(data_get($data, 'paperReferral'));
-        $hasBasedOn = !empty(data_get($data, 'basedOn'));
 
         return [
             'uuid' => data_get($data, 'uuid'),
@@ -148,18 +140,7 @@ class ProcedureMapper implements FhirMapperContract
             'divisionId' => data_get($data, 'division.identifier.value', ''),
             'outcomeCode' => data_get($data, 'outcome.coding.0.code', ''),
             'note' => data_get($data, 'note', ''),
-            'isReferralAvailable' => $hasPaperReferral || $hasBasedOn,
-            'referralType' => match (true) {
-                $hasPaperReferral => 'paper',
-                $hasBasedOn => 'electronic',
-                default => '',
-            },
-            'paperReferralRequisition' => data_get($data, 'paperReferral.requisition', ''),
-            'paperReferralRequesterEmployeeName' => data_get($data, 'paperReferral.requesterEmployeeName', ''),
-            'paperReferralRequesterLegalEntityEdrpou' => data_get($data, 'paperReferral.requesterLegalEntityEdrpou', ''),
-            'paperReferralRequesterLegalEntityName' => data_get($data, 'paperReferral.requesterLegalEntityName', ''),
-            'paperReferralServiceRequestDate' => data_get($data, 'paperReferral.serviceRequestDate', ''),
-            'paperReferralNote' => data_get($data, 'paperReferral.note', ''),
+            ...PaperReferralMapper::fromFhir($data),
             'performedPeriodStartDate' => convertToAppDateFormat(data_get($data, 'performedPeriodStartDate')),
             'performedPeriodStartTime' => data_get($data, 'performedPeriodStartTime')
                 ? CarbonImmutable::parse(data_get($data, 'performedPeriodStartTime'))->format('H:i')

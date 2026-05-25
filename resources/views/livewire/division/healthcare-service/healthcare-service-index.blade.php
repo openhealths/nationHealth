@@ -232,7 +232,7 @@
                                 </td>
 
                                 <td class="index-table-td">
-                                    {{ $service->ehealthInsertedAt?->format('d.m.Y') ?? $service->createdAt->format('d.m.Y') }}
+                                    {{ $service->ehealthInsertedAt?->format(config('app.date_format')) ?? $service->createdAt->format(config('app.date_format')) }}
                                 </td>
 
                                 <td class="index-table-td">

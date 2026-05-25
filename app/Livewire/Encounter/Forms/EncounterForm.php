@@ -317,12 +317,7 @@ class EncounterForm extends BaseForm
                 new InDictionary('eHealth/report_origins')
             ],
             'diagnosticReports.*.reportOriginText' => ['nullable', 'string'],
-            'diagnosticReports.*.paperReferralRequisition' => ['nullable', 'string', 'max:255'],
-            'diagnosticReports.*.paperReferralRequesterEmployeeName' => ['nullable', 'string', 'max:255'],
-            'diagnosticReports.*.paperReferralRequesterLegalEntityEdrpou' => ['nullable', 'digits_between:8,10'],
-            'diagnosticReports.*.paperReferralRequesterLegalEntityName' => ['nullable', 'string', 'max:255'],
-            'diagnosticReports.*.paperReferralServiceRequestDate' => ['nullable', 'date'],
-            'diagnosticReports.*.paperReferralNote' => ['nullable', 'string'],
+            ...$this->paperReferralRules('diagnosticReports.*'),
             'diagnosticReports.*.conclusionCode' => [
                 'nullable',
                 'string',
@@ -341,7 +336,7 @@ class EncounterForm extends BaseForm
             ]),
             'diagnosticReports.*.divisionId' => ['nullable', 'uuid'],
             'diagnosticReports.*.resultsInterpreterEmployeeId' => ['nullable', 'uuid'],
-            'diagnosticReports.*.issuedDate' => ['required_with:diagnosticReports', 'date', 'before_or_equal:today'],
+            'diagnosticReports.*.issuedDate' => ['required_with:diagnosticReports', 'date_format:' . config('app.date_format'), 'before_or_equal:today'],
             'diagnosticReports.*.issuedTime' => Rule::forEach(fn (mixed $value, string $attribute) => [
                 'required_with:diagnosticReports',
                 'date_format:H:i',
@@ -349,7 +344,7 @@ class EncounterForm extends BaseForm
             ]),
             'diagnosticReports.*.effectivePeriodStartDate' => [
                 'required_with:diagnosticReports',
-                'date',
+                'date_format:' . config('app.date_format'),
                 'before_or_equal:today'
             ],
             'diagnosticReports.*.effectivePeriodStartTime' => Rule::forEach(fn (mixed $value, string $attribute) => [
@@ -357,7 +352,7 @@ class EncounterForm extends BaseForm
                 'date_format:H:i',
                 new PastDateTime($this->diagnosticReports[(int)explode('.', $attribute)[1]]['effectivePeriodStartDate'])
             ]),
-            'diagnosticReports.*.effectivePeriodEndDate' => ['required_with:diagnosticReports', 'date'],
+            'diagnosticReports.*.effectivePeriodEndDate' => ['required_with:diagnosticReports', 'date_format:' . config('app.date_format')],
             'diagnosticReports.*.effectivePeriodEndTime' => Rule::forEach(function (mixed $value, string $attribute) {
                 $index = (int)explode('.', $attribute)[1];
                 $report = $this->diagnosticReports[$index];
@@ -375,9 +370,9 @@ class EncounterForm extends BaseForm
                             return;
                         }
 
-                        $end = Carbon::createFromFormat('Y-m-d H:i', $report['effectivePeriodEndDate'] . ' ' . $value);
+                        $end = Carbon::createFromFormat(config('app.date_format') . ' H:i', $report['effectivePeriodEndDate'] . ' ' . $value);
                         $issued = Carbon::createFromFormat(
-                            'Y-m-d H:i',
+                            config('app.date_format') . ' H:i',
                             $report['issuedDate'] . ' ' . $report['issuedTime']
                         );
 
@@ -527,12 +522,7 @@ class EncounterForm extends BaseForm
                 ];
             }),
             'procedures.*.note' => ['nullable', 'string'],
-            'procedures.*.paperReferralRequisition' => ['nullable', 'string', 'max:255'],
-            'procedures.*.paperReferralRequesterEmployeeName' => ['nullable', 'string', 'max:255'],
-            'procedures.*.paperReferralRequesterLegalEntityEdrpou' => ['nullable', 'digits_between:8,10'],
-            'procedures.*.paperReferralRequesterLegalEntityName' => ['nullable', 'string', 'max:255'],
-            'procedures.*.paperReferralServiceRequestDate' => ['nullable', 'date'],
-            'procedures.*.paperReferralNote' => ['nullable', 'string'],
+            ...$this->paperReferralRules('procedures.*'),
             'procedures.*.usedCodes' => ['nullable', 'array'],
             'procedures.*.usedCodes.*.code' => [
                 'required',
@@ -845,6 +835,24 @@ class EncounterForm extends BaseForm
                 $fail(__('validation.custom.conditions.speciality_condition_code_forbidden', ['code' => $codeCode]));
             }
         };
+    }
+
+    /**
+     * Rules for paper referral data.
+     *
+     * @param  string  $prefix  e.g. 'diagnosticReports.*' or 'procedures.*'
+     * @return array
+     */
+    private function paperReferralRules(string $prefix): array
+    {
+        return [
+            "$prefix.paperReferralRequisition" => ['nullable', 'string', 'max:255'],
+            "$prefix.paperReferralRequesterEmployeeName" => ['nullable', 'string', 'max:255'],
+            "$prefix.paperReferralRequesterLegalEntityEdrpou" => ['nullable', 'digits_between:8,10'],
+            "$prefix.paperReferralRequesterLegalEntityName" => ['nullable', 'string', 'max:255'],
+            "$prefix.paperReferralServiceRequestDate" => ['nullable', 'date_format:' . config('app.date_format')],
+            "$prefix.paperReferralNote" => ['nullable', 'string']
+        ];
     }
 
     /**

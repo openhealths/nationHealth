@@ -93,7 +93,7 @@
                    name="manufactureDate"
                    id="manufactureDate"
                    class="peer input pl-10 datepicker-input"
-                   datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                   datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                    placeholder=" "
                    @disabled($context === 'view')
             >

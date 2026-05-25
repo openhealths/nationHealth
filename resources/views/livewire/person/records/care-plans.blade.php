@@ -309,17 +309,17 @@
                                     <div class="min-w-0">
                                         <div class="record-inner-label text-[10px] uppercase">Створено</div>
                                         <div
-                                            class="record-inner-value text-[14px] font-semibold break-words">{{ $plan->created_at?->format('d.m.Y') ?? '-' }}</div>
+                                            class="record-inner-value text-[14px] font-semibold break-words">{{ $plan->created_at?->format(config('app.date_format')) ?? '-' }}</div>
                                     </div>
                                     <div class="min-w-0">
                                         <div class="record-inner-label text-[10px] uppercase">Початок</div>
                                         <div
-                                            class="record-inner-value text-[14px] font-semibold break-words">{{ $plan->period_start?->format('d.m.Y') ?? '-' }}</div>
+                                            class="record-inner-value text-[14px] font-semibold break-words">{{ $plan->period_start?->format(config('app.date_format')) ?? '-' }}</div>
                                     </div>
                                     <div class="min-w-0">
                                         <div class="record-inner-label text-[10px] uppercase">Кінець</div>
                                         <div
-                                            class="record-inner-value text-[14px] font-semibold break-words">{{ $plan->period_end?->format('d.m.Y') ?? '-' }}</div>
+                                            class="record-inner-value text-[14px] font-semibold break-words">{{ $plan->period_end?->format(config('app.date_format')) ?? '-' }}</div>
                                     </div>
                                     <div class="min-w-0">
                                         <div class="record-inner-label text-[10px] uppercase">Лікар</div>

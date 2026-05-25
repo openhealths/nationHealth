@@ -41,9 +41,7 @@ class DiagnosticReportMapper implements FhirMapperContract
                     $data['effectivePeriodEndDate'] . ' ' . $data['effectivePeriodEndTime']
                 ),
             ],
-            'issued' => convertToEHealthISO8601(
-                $data['issuedDate'] . ' ' . $data['issuedTime']
-            ),
+            'issued' => convertToEHealthISO8601($data['issuedDate'] . ' ' . $data['issuedTime']),
             'recordedBy' => FhirResource::make()
                 ->coding('eHealth/resources', 'employee')
                 ->toIdentifier($uuids['employee']),
@@ -56,15 +54,9 @@ class DiagnosticReportMapper implements FhirMapperContract
                 ->toIdentifier(legalEntity()->uuid)
         ];
 
-        if (!empty($data['paperReferralRequesterLegalEntityEdrpou'])) {
-            $result['paperReferral'] = [
-                'requisition' => $data['paperReferralRequisition'] ?? '',
-                'requesterEmployeeName' => $data['paperReferralRequesterEmployeeName'] ?? '',
-                'requesterLegalEntityEdrpou' => $data['paperReferralRequesterLegalEntityEdrpou'],
-                'requesterLegalEntityName' => $data['paperReferralRequesterLegalEntityName'],
-                'serviceRequestDate' => $data['paperReferralServiceRequestDate'],
-                'note' => $data['paperReferralNote'] ?? ''
-            ];
+        $paperReferral = PaperReferralMapper::toFhir($data);
+        if ($paperReferral !== null) {
+            $result['paperReferral'] = $paperReferral;
         }
 
         if (!empty($data['conclusion'])) {
@@ -114,43 +106,29 @@ class DiagnosticReportMapper implements FhirMapperContract
      * Convert a FHIR diagnostic report (from DB) to a flat form structure.
      *
      * @param  array  $data  FHIR diagnostic report data
+     * @param  mixed  ...$context
      * @return array
      */
     public function fromFhir(array $data, mixed ...$context): array
     {
-        $hasPaperReferral = !empty(data_get($data, 'paperReferral'));
-        $hasBasedOn = !empty(data_get($data, 'basedOn'));
-
         return [
             'uuid' => data_get($data, 'uuid'),
-            'categoryCode' => data_get($data, 'category.0.coding.0.code', ''),
+            'categoryCode' => data_get($data, 'category.0.coding.0.code'),
             'codeValue' => data_get($data, 'code.identifier.value', ''),
             'primarySource' => data_get($data, 'primarySource'),
             'reportOriginCode' => data_get($data, 'reportOrigin.coding.0.code', ''),
             'reportOriginText' => data_get($data, 'reportOrigin.text', ''),
-            'isReferralAvailable' => $hasPaperReferral || $hasBasedOn,
-            'referralType' => match (true) {
-                $hasPaperReferral => 'paper',
-                $hasBasedOn => 'electronic',
-                default => '',
-            },
-            'paperReferralRequisition' => data_get($data, 'paperReferral.requisition', ''),
-            'paperReferralRequesterEmployeeName' => data_get($data, 'paperReferral.requesterEmployeeName', ''),
-            'paperReferralRequesterLegalEntityEdrpou' => data_get($data, 'paperReferral.requesterLegalEntityEdrpou', ''),
-            'paperReferralRequesterLegalEntityName' => data_get($data, 'paperReferral.requesterLegalEntityName', ''),
-            'paperReferralServiceRequestDate' => data_get($data, 'paperReferral.serviceRequestDate', ''),
-            'paperReferralNote' => data_get($data, 'paperReferral.note', ''),
+            ...PaperReferralMapper::fromFhir($data),
             'conclusionCode' => data_get($data, 'conclusionCode.coding.0.code', ''),
             'conclusion' => data_get($data, 'conclusion', ''),
             'divisionId' => data_get($data, 'division.identifier.value', ''),
             'resultsInterpreterEmployeeId' => data_get($data, 'resultsInterpreter.reference.identifier.value', ''),
             'issuedDate' => data_get($data, 'issuedDate'),
             'issuedTime' => data_get($data, 'issuedTime'),
-            'effectivePeriodStartDate' => data_get($data, 'effectivePeriod.start') ? substr(data_get($data, 'effectivePeriod.start'), 0, 10) : '',
-            'effectivePeriodStartTime' => data_get($data, 'effectivePeriod.start') ? substr(data_get($data, 'effectivePeriod.start'), 11, 5) : '',
-            'effectivePeriodEndDate' => data_get($data, 'effectivePeriod.end') ? substr(data_get($data, 'effectivePeriod.end'), 0, 10) : '',
-            'effectivePeriodEndTime' => data_get($data, 'effectivePeriod.end') ? substr(data_get($data, 'effectivePeriod.end'), 11, 5) : '',
-            'query' => '',
+            'effectivePeriodStartDate' => data_get($data, 'effectivePeriodStartDate', ''),
+            'effectivePeriodStartTime' => data_get($data, 'effectivePeriodStartTime', ''),
+            'effectivePeriodEndDate' => data_get($data, 'effectivePeriodEndDate', ''),
+            'effectivePeriodEndTime' => data_get($data, 'effectivePeriodEndTime', '')
         ];
     }
 }

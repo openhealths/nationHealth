@@ -123,11 +123,11 @@ class HealthcareServiceForm extends Form
                 'after:availableTime.*.availableStartTime'
             ],
             'notAvailable' => ['array', 'nullable'],
-            'notAvailable.*.during.startDate' => ['required', 'date_format:d.m.Y'],
+            'notAvailable.*.during.startDate' => ['required', 'date_format:' . config('app.date_format')],
             'notAvailable.*.during.startTime' => ['required', 'date_format:H:i'],
             'notAvailable.*.during.endDate' => [
                 'required',
-                'date_format:d.m.Y',
+                'date_format:' . config('app.date_format'),
                 'after_or_equal:notAvailable.*.during.startDate'
             ],
             'notAvailable.*.during.endTime' => ['required', 'date_format:H:i'],
