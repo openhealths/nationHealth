@@ -18,6 +18,23 @@ use Illuminate\Validation\Rule;
 class ClinicalImpression extends PatientApiBase
 {
     /**
+     * Get clinical impression by ID.
+     *
+     * @param  string  $patientId
+     * @param  string  $clinicalImpressionId
+     * @return PromiseInterface|EHealthResponse
+     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     *
+     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/clinical-impression/get-clinical-impression-by-id
+     */
+    public function getById(string $patientId, string $clinicalImpressionId): PromiseInterface|EHealthResponse
+    {
+        $this->setValidator($this->validateClinicalImpression(...));
+
+        return $this->get(self::URL . "/$patientId/clinical_impressions/$clinicalImpressionId");
+    }
+
+    /**
      * Get a list of summary info about clinical impressions.
      *
      * @param  string  $patientId
@@ -38,7 +55,20 @@ class ClinicalImpression extends PatientApiBase
     }
 
     /**
-     * Validate clinical impressions data from eHealth API.
+     * Validate a single clinical impression from eHealth API response.
+     *
+     * @param  EHealthResponse  $response
+     * @return array
+     */
+    protected function validateClinicalImpression(EHealthResponse $response): array
+    {
+        $replaced = [$this->replaceEHealthPropNames($response->getData())];
+
+        return $this->runClinicalImpressionValidation($replaced)[0];
+    }
+
+    /**
+     * Validate a list of clinical impressions from eHealth API response.
      *
      * @param  EHealthResponse  $response
      * @return array
@@ -50,11 +80,22 @@ class ClinicalImpression extends PatientApiBase
             $replaced[] = $this->replaceEHealthPropNames($data);
         }
 
+        return $this->runClinicalImpressionValidation($replaced);
+    }
+
+    /**
+     * Apply clinical impression validation rules to a pre-processed list of clinical impression data.
+     *
+     * @param  array  $replacedItems
+     * @return array
+     */
+    private function runClinicalImpressionValidation(array $replacedItems): array
+    {
         $rules = collect($this->clinicalImpressionValidationRules())
             ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
             ->toArray();
 
-        $validator = Validator::make($replaced, $rules);
+        $validator = Validator::make($replacedItems, $rules);
 
         if ($validator->fails()) {
             Log::channel('e_health_errors')->error(

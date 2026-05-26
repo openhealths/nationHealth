@@ -37,15 +37,16 @@ class Procedure extends PatientApiBase
      *
      * @param  string  $patientId
      * @param  string  $procedureId
-     * @param  array  $data
      * @return PromiseInterface|EHealthResponse
      * @throws ConnectionException|EHealthValidationException|EHealthResponseException
      *
      * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/procedures/get-procedures-by-id
      */
-    public function getById(string $patientId, string $procedureId, array $data = []): PromiseInterface|EHealthResponse
+    public function getById(string $patientId, string $procedureId): PromiseInterface|EHealthResponse
     {
-        return $this->get(self::URL . "/$patientId/procedures/$procedureId", $data);
+        $this->setValidator($this->validateProcedure(...));
+
+        return $this->get(self::URL . "/$patientId/procedures/$procedureId");
     }
 
     /**
@@ -81,7 +82,23 @@ class Procedure extends PatientApiBase
     }
 
     /**
-     * Validate procedures response from eHealth API.
+     * Validate a single procedure from eHealth API response.
+     *
+     * @param  EHealthResponse  $response
+     * @return array
+     */
+    protected function validateProcedure(EHealthResponse $response): array
+    {
+        $replaced = [$this->replaceEHealthPropNames($response->getData())];
+
+        return $this->runProcedureValidation($replaced)[0];
+    }
+
+    /**
+     * Validate a list of procedures from eHealth API response.
+     *
+     * @param  EHealthResponse  $response
+     * @return array
      */
     protected function validateProcedures(EHealthResponse $response): array
     {
@@ -90,11 +107,22 @@ class Procedure extends PatientApiBase
             $replaced[] = $this->replaceEHealthPropNames($data);
         }
 
+        return $this->runProcedureValidation($replaced);
+    }
+
+    /**
+     * Apply procedure validation rules to a pre-processed list of procedure data.
+     *
+     * @param  array  $replacedItems
+     * @return array
+     */
+    private function runProcedureValidation(array $replacedItems): array
+    {
         $rules = collect($this->procedureValidationRules())
             ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
             ->toArray();
 
-        $validator = Validator::make($replaced, $rules);
+        $validator = Validator::make($replacedItems, $rules);
 
         if ($validator->fails()) {
             Log::channel('e_health_errors')->error(

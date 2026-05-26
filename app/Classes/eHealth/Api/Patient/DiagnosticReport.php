@@ -44,6 +44,8 @@ class DiagnosticReport extends PatientApiBase
      */
     public function getById(string $patientId, string $diagnosticReportId): PromiseInterface|EHealthResponse
     {
+        $this->setValidator($this->validateDiagnosticReport(...));
+
         return $this->get(self::URL . "/$patientId/diagnostic_reports/$diagnosticReportId");
     }
 
@@ -99,7 +101,20 @@ class DiagnosticReport extends PatientApiBase
     }
 
     /**
-     * Validate diagnostic reports response from eHealth API.
+     * Validate a single diagnostic report from eHealth API response.
+     *
+     * @param  EHealthResponse  $response
+     * @return array
+     */
+    protected function validateDiagnosticReport(EHealthResponse $response): array
+    {
+        $replaced = [$this->replaceEHealthPropNames($response->getData())];
+
+        return $this->runDiagnosticReportValidation($replaced)[0];
+    }
+
+    /**
+     * Validate a list of diagnostic reports from eHealth API response.
      *
      * @param  EHealthResponse  $response
      * @return array
@@ -111,11 +126,22 @@ class DiagnosticReport extends PatientApiBase
             $replaced[] = $this->replaceEHealthPropNames($data);
         }
 
+        return $this->runDiagnosticReportValidation($replaced);
+    }
+
+    /**
+     * Apply diagnostic report validation rules to a pre-processed list of diagnostic report data.
+     *
+     * @param  array  $replacedItems
+     * @return array
+     */
+    private function runDiagnosticReportValidation(array $replacedItems): array
+    {
         $rules = collect($this->diagnosticReportValidationRules())
             ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
             ->toArray();
 
-        $validator = Validator::make($replaced, $rules);
+        $validator = Validator::make($replacedItems, $rules);
 
         if ($validator->fails()) {
             Log::channel('e_health_errors')->error(

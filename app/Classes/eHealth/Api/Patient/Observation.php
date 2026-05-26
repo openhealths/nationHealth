@@ -47,6 +47,8 @@ class Observation extends PatientApiBase
      */
     public function getById(string $patientId, string $observationId): PromiseInterface|EHealthResponse
     {
+        $this->setValidator($this->validateObservation(...));
+
         return $this->get(self::URL . "/$patientId/episodes/$observationId");
     }
 
@@ -117,7 +119,20 @@ class Observation extends PatientApiBase
     }
 
     /**
-     * Validate observations response from eHealth API.
+     * Validate a single observation from eHealth API response.
+     *
+     * @param  EHealthResponse  $response
+     * @return array
+     */
+    protected function validateObservation(EHealthResponse $response): array
+    {
+        $replaced = [$this->replaceEHealthPropNames(Arr::toSnakeCase($response->getData()))];
+
+        return $this->runObservationValidation($replaced)[0];
+    }
+
+    /**
+     * Validate a list of observations from eHealth API response.
      *
      * @param  EHealthResponse  $response
      * @return array
@@ -129,11 +144,22 @@ class Observation extends PatientApiBase
             $replaced[] = $this->replaceEHealthPropNames(Arr::toSnakeCase($data));
         }
 
+        return $this->runObservationValidation($replaced);
+    }
+
+    /**
+     * Apply observation validation rules to a pre-processed list of observation data.
+     *
+     * @param  array  $replacedItems
+     * @return array
+     */
+    private function runObservationValidation(array $replacedItems): array
+    {
         $rules = collect($this->observationValidationRules())
             ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
             ->toArray();
 
-        $validator = Validator::make($replaced, $rules);
+        $validator = Validator::make($replacedItems, $rules);
 
         if ($validator->fails()) {
             Log::channel('e_health_errors')->error(

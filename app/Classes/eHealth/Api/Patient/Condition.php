@@ -68,6 +68,8 @@ class Condition extends PatientApiBase
      */
     public function getById(string $patientId, string $conditionId): PromiseInterface|EHealthResponse
     {
+        $this->setValidator($this->validateCondition(...));
+
         return $this->get(self::URL . "/$patientId/conditions/$conditionId");
     }
 
@@ -101,7 +103,20 @@ class Condition extends PatientApiBase
     }
 
     /**
-     * Validate conditions data from eHealth API.
+     * Validate a single condition from eHealth API response.
+     *
+     * @param  EHealthResponse  $response
+     * @return array
+     */
+    protected function validateCondition(EHealthResponse $response): array
+    {
+        $replaced = [$this->replaceEHealthPropNames($response->getData())];
+
+        return $this->runConditionValidation($replaced)[0];
+    }
+
+    /**
+     * Validate a list of conditions from eHealth API response.
      *
      * @param  EHealthResponse  $response
      * @return array
@@ -113,11 +128,22 @@ class Condition extends PatientApiBase
             $replaced[] = $this->replaceEHealthPropNames($data);
         }
 
+        return $this->runConditionValidation($replaced);
+    }
+
+    /**
+     * Apply condition validation rules to a pre-processed list of condition data.
+     *
+     * @param  array  $replacedItems
+     * @return array
+     */
+    private function runConditionValidation(array $replacedItems): array
+    {
         $rules = collect($this->conditionValidationRules())
             ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
             ->toArray();
 
-        $validator = Validator::make($replaced, $rules);
+        $validator = Validator::make($replacedItems, $rules);
 
         if ($validator->fails()) {
             Log::channel('e_health_errors')->error(

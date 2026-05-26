@@ -77,6 +77,8 @@ class Encounter extends PatientApiBase
      */
     public function getById(string $patientId, string $encounterId, array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator($this->validateEncounter(...));
+
         return $this->get(self::URL . "/$patientId/encounters/$encounterId", $query);
     }
 
@@ -112,7 +114,7 @@ class Encounter extends PatientApiBase
     }
 
     /**
-     * Validate encounters data from eHealth API.
+     * Validate a list of short encounters from eHealth API response.
      *
      * @param  EHealthResponse  $response
      * @return array
@@ -139,6 +141,25 @@ class Encounter extends PatientApiBase
         return $validator->validate();
     }
 
+    /**
+     * Validate a single encounter from eHealth API response.
+     *
+     * @param  EHealthResponse  $response
+     * @return array
+     */
+    protected function validateEncounter(EHealthResponse $response): array
+    {
+        $replaced = [$this->replaceEHealthPropNames($response->getData())];
+
+        return $this->runEncounterValidation($replaced)[0];
+    }
+
+    /**
+     * Validate a list of encounters from eHealth API response.
+     *
+     * @param  EHealthResponse  $response
+     * @return array
+     */
     protected function validateEncounters(EHealthResponse $response): array
     {
         $replaced = [];
@@ -146,11 +167,22 @@ class Encounter extends PatientApiBase
             $replaced[] = $this->replaceEHealthPropNames($data);
         }
 
+        return $this->runEncounterValidation($replaced);
+    }
+
+    /**
+     * Apply encounter validation rules to a pre-processed list of encounter data.
+     *
+     * @param  array  $replacedItems
+     * @return array
+     */
+    private function runEncounterValidation(array $replacedItems): array
+    {
         $rules = collect($this->encounterValidationRules())
             ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
             ->toArray();
 
-        $validator = Validator::make($replaced, $rules);
+        $validator = Validator::make($replacedItems, $rules);
 
         if ($validator->fails()) {
             Log::channel('e_health_errors')->error(

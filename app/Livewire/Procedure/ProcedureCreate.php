@@ -10,7 +10,7 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Core\Arr;
 use App\Repositories\MedicalEvents\Repository;
-use App\Traits\HandlesReasonReferences;
+use App\Services\MedicalEvents\EnsureEntityExistsService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -20,8 +20,6 @@ use Throwable;
 
 class ProcedureCreate extends ProcedureComponent
 {
-    use HandlesReasonReferences;
-
     /**
      * Validate and save data.
      *
@@ -30,7 +28,7 @@ class ProcedureCreate extends ProcedureComponent
      */
     public function save(array $data): void
     {
-        if (Auth::user()?->cannot('create', Procedure::class)) {
+        if (Auth::user()->cannot('create', Procedure::class)) {
             Session::flash('error', 'У вас немає дозволу на створення процедури.');
 
             return;
@@ -70,7 +68,7 @@ class ProcedureCreate extends ProcedureComponent
      */
     public function sign(array $data): void
     {
-        if (Auth::user()?->cannot('create', Procedure::class)) {
+        if (Auth::user()->cannot('create', Procedure::class)) {
             Session::flash('error', 'У вас немає дозволу на створення процедури.');
 
             return;
@@ -142,8 +140,8 @@ class ProcedureCreate extends ProcedureComponent
         DB::transaction(function () use ($formattedData) {
             Repository::procedure()->store([$formattedData], $this->personId);
 
-            // Save the selected condition and observation locally if they don't exist in our database.
-            $this->processReasonReferences($formattedData);
+            app(EnsureEntityExistsService::class, [$this->patientUuid, $this->personId])
+                ->processReasonReferences($formattedData);
         });
     }
 }

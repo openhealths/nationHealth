@@ -1,5 +1,7 @@
 <?php
 
+// TODO: remove this file — logic moved to MedicalEventSyncService
+
 declare(strict_types=1);
 
 namespace App\Traits;
@@ -8,6 +10,7 @@ use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Models\MedicalEvents\Sql\ClinicalImpression;
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Observation;
@@ -52,10 +55,10 @@ trait HandlesReasonReferences
         }
 
         try {
-            $conditionData = EHealth::condition()->getById($this->patientUuid, $uuid)->getData();
+            $conditionData = EHealth::condition()->getById($this->patientUuid, $uuid)->validate();
 
             try {
-                Repository::condition()->store([Arr::toCamelCase($conditionData)], $this->personId);
+                Repository::condition()->sync($this->personId, [$conditionData]);
             } catch (Throwable $exception) {
                 $this->logDatabaseErrors($exception, 'Error while creating condition');
                 Session::flash('error', __('messages.database_error'));
@@ -72,31 +75,57 @@ trait HandlesReasonReferences
     /**
      * Check is encounter exist, if not create it. Return created or existed ID of encounter.
      *
-     * @param  string  $encounterUuid
-     * @return int|null
+     * @param  string  $uuid
+     * @return void
      */
-    private function ensureEncounterExist(string $encounterUuid): ?int
+    private function ensureEncounterExist(string $uuid): void
     {
-        $encounterId = Encounter::whereUuid($encounterUuid)->value('id');
-
-        if ($encounterId) {
-            return $encounterId;
+        if (Encounter::whereUuid($uuid)->exists()) {
+            return;
         }
 
         try {
-            $encounterData = EHealth::encounter()->getById($this->patientUuid, $encounterUuid)->getData();
+            $encounterData = EHealth::encounter()->getById($this->patientUuid, $uuid)->validate();
 
-            return Repository::encounter()->store($encounterData, $this->personId);
+            Repository::encounter()->sync($this->personId, [$encounterData]);
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             $this->handleEHealthExceptions($exception, 'Failed while ensuring encounter existence');
         } catch (Throwable $exception) {
             $this->logDatabaseErrors($exception, 'Error while storing encounter');
             Session::flash('error', __('messages.database_error'));
 
-            return null;
+            return;
+        }
+    }
+
+    /**
+     * Checks if a clinical impression exists and creates it if necessary.
+     *
+     * @param  string  $uuid
+     * @return void
+     */
+    private function ensureClinicalImpressionExists(string $uuid): void
+    {
+        if (ClinicalImpression::whereUuid($uuid)->exists()) {
+            return;
         }
 
-        return null;
+        try {
+            $clinicalImpressionData = EHealth::clinicalImpression()->getById($this->patientUuid, $uuid)->validate();
+
+            try {
+                Repository::clinicalImpression()->sync($this->personId, [$clinicalImpressionData]);
+            } catch (Throwable $exception) {
+                $this->logDatabaseErrors($exception, 'Error while storing clinical impression');
+                Session::flash('error', __('messages.database_error'));
+
+                return;
+            }
+        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+            $this->handleEHealthExceptions($exception, 'Failed while getting clinical impression by ID');
+
+            return;
+        }
     }
 
     /**
