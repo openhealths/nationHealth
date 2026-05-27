@@ -10,7 +10,6 @@ use App\Models\LegalEntity;
 use App\Repositories\Repository;
 use App\Traits\FormTrait;
 use App\Traits\InteractsWithApprovals;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Locked;
@@ -31,6 +30,10 @@ class CarePlanApprovals extends Component
     public array $approvals = [];
 
     public bool $isLoading = false;
+
+    protected $listeners = [
+        'refreshApprovals' => 'fetchApprovals',
+    ];
 
     // For creating new approval
     public array $newApproval = [

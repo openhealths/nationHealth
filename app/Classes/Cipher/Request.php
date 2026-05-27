@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Classes\Cipher;
 
 use App\Classes\Cipher\Errors\ErrorHandler;
@@ -24,7 +26,6 @@ class Request
         $this->params = $params;
     }
 
-
     /**
      * @throws ApiException
      */
@@ -34,24 +35,38 @@ class Request
 
         $url = $apiBase . $this->url;
 
+        \Illuminate\Support\Facades\Log::debug("Cipher API Request: {$this->method} {$url}", [
+            'body_length' => strlen($this->params)
+        ]);
+
         $response = Http::acceptJson()
-            ->withBody($this->params )
+            ->withBody($this->params)
             ->{$this->method}($url);
 
         if ($response->successful()) {
             $success = json_decode($response->body(), true);
             $success['status'] = $response->status();
+
             return $success ?? [];
         }
 
         if ($response->failed()) {
-            $error = json_decode($response->body(), true);
+            $responseBody = $response->body();
+            \Illuminate\Support\Facades\Log::error("Cipher API Request Failed: {$this->method} {$url}", [
+                'status' => $response->status(),
+                'response' => $responseBody,
+                'request_body' => $this->params
+            ]);
+            $error = json_decode($responseBody, true) ?? [];
             $error = ErrorHandler::handleError($error);
             throw new ApiException($error);
         }
 
+        \Illuminate\Support\Facades\Log::error("Cipher API Unexpected Response: {$this->method} {$url}", [
+            'status' => $response->status(),
+            'response' => $response->body()
+        ]);
         throw new ApiException(['code' => $response->status()], 'Unexpected response');
     }
-
 
 }

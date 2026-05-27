@@ -27,7 +27,7 @@
             $status = is_array($carePlan->status) ? ($carePlan->status['coding'][0]['code'] ?? ($carePlan->status['text'] ?? '')) : $carePlan->status;
             $statusDisplay = is_array($carePlan->status) ? ($carePlan->status['text'] ?? ($carePlan->status['coding'][0]['display'] ?? $status)) : $status;
             
-            $categoryLabel = $carePlan->categoryConcept?->text ?? $carePlan->categoryConcept?->coding?->first()?->display;
+            $categoryLabel = $carePlan->categoryConcept?->text ?? $carePlan->categoryConcept?->coding?->first()?->code;
             if (!$categoryLabel) {
                 $categoryCode = is_array($carePlan->category) ? ($carePlan->category['coding'][0]['code'] ?? ($carePlan->category['text'] ?? '')) : $carePlan->category;
                 $categoryLabel = $dictionaries['care_plan_categories'][$categoryCode] ?? $categoryCode;
@@ -89,47 +89,10 @@
                         <div class="record-inner-label">{{ __('care-plan.extended_description') }}</div>
                         <div class="record-inner-value whitespace-pre-line">{{ $carePlan->description }}</div>
                     </div>
-
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Назва плану лікування</div>
-                        <div class="text-gray-900 dark:text-white font-medium">{{ $carePlan->title }}</div>
-                    </div>
-
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Намір (Intent)</div>
-                        <div class="text-gray-900 dark:text-white font-medium">{{ $intent ?: '-' }}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Умови надання послуг</div>
-                        <div class="text-gray-900 dark:text-white font-medium">{{ $tos ?: '-' }}</div>
-                    </div>
-
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Дата початку плану лікування</div>
-                        <div class="text-gray-900 dark:text-white font-medium flex items-center gap-2">
-                            @icon('calendar', 'w-4 h-4 text-blue-400')
-                            {{ $carePlan->period_start?->format('d.m.Y') ?? '-' }}
-                            <span class="text-gray-400 ml-2 flex items-center gap-1">
-                                @icon('clock', 'w-4 h-4')
-                                09:00 AM
-                            </span>
-                        </div>
-                    </div>
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Дата завершення плану лікування</div>
-                        <div class="text-gray-900 dark:text-white font-medium flex items-center gap-2">
-                            @icon('calendar', 'w-4 h-4 text-blue-400')
-                            {{ $carePlan->period_end ? $carePlan->period_end->format('d.m.Y') : 'Безтерміново' }}
-                            @if($carePlan->period_end)
-                                <span class="text-gray-400 ml-2 flex items-center gap-1">
-                                    @icon('clock', 'w-4 h-4')
-                                    06:00 PM
-                                </span>
-                            @endif
-                        </div>
-                    </div>
+                    @endif
                 </div>
             </div>
+        </div>
 
             {{-- Condition/Diagnosis --}}
             <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
@@ -159,7 +122,7 @@
                                 @endphp
                                 <tr>
                                     <td class="px-4 py-4 text-gray-600 dark:text-gray-400">{{ $condition?->onset_date?->format('d.m.Y') ?? '-' }}</td>
-                                    <td class="px-4 py-4 text-gray-900 dark:text-white font-medium">{{ $condition ? ($condition->typeConcept?->text ?? $condition->typeConcept?->coding->first()?->display ?? '-') : '-' }}</td>
+                                    <td class="px-4 py-4 text-gray-900 dark:text-white font-medium">{{ $condition ? ($condition->code?->text ?? $condition->code?->coding?->first()?->code ?? '-') : '-' }}</td>
                                 </tr>
                             @empty
                                 <tr><td colspan="2" class="px-4 py-8 text-center text-gray-400 italic">Немає пов'язаних станів</td></tr>
@@ -266,136 +229,130 @@
                         <button type="button" class="button-primary" wire:click="openMethodSelectionModal">
                             Активувати план (Дозвіл пацієнта)
                         </button>
-                    @elseif($carePlan->uuid && in_array(strtoupper($status), [Status::ACTIVE->value]))
-                        <button type="button" class="button-minor text-red-500 border-red-200 hover:bg-red-50" @click="$wire.openSignatureModal('cancel')">
-                            Скасувати
-                        </button>
-                        <button type="button" class="button-danger-outline" @click="$wire.openSignatureModal('revoke')">
-                            Відмінити план лікування
-                        </button>
-                        <button type="button" class="button-primary" @click="$wire.openSignatureModal('complete')">
-                            Завершити план лікування
-                        </button>
-
                     @endif
                 </div>
             </div>
-        </div>
-
-        {{-- Activities Table --}}
-        <fieldset class="fieldset mt-6">
-            <div class="flex items-center justify-between mb-4">
-                <legend class="legend mb-0">{{ __('care-plan.activities') }}</legend>
-                
-                @if(in_array(strtoupper($status), ['ACTIVE', 'active']))
-                    {{-- Dropdown for New Prescription --}}
-                    <div class="relative">
-                        <button type="button" 
-                                @click="openDropdown = !openDropdown" 
-                                @click.away="openDropdown = false"
-                                class="button-primary flex items-center gap-2">
-                            <span>+ {{ __('care-plan.new_prescription') }}</span>
-                            <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 9-7 7-7-7"/>
-                            </svg>
-                        </button>
-                        
-                        <div x-show="openDropdown" 
-                             x-transition
-                             style="display: none;"
-                             class="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:bg-gray-700">
-                            <div class="py-1" role="none">
-                                <button type="button" @click="openDropdown = false; showServiceDrawer = true" wire:click="initActivityForm('service_request')" class="text-gray-700 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600">
-                                    {{ __('care-plan.service_prescription') }}
-                                </button>
-                                <button type="button" @click="openDropdown = false; showMedicationDrawer = true" wire:click="initActivityForm('medication_request')" class="text-gray-700 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600">
-                                    {{ __('care-plan.medication_prescription') }}
-                                </button>
-                                <button type="button" @click="openDropdown = false; showMedicalDeviceDrawer = true" wire:click="initActivityForm('device_request')" class="text-gray-700 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600">
-                                    {{ __('care-plan.medical_device_prescription') }}
-                                </button>
+            {{-- Activities Table --}}
+            <fieldset class="fieldset mt-6" x-data="{ openDropdown: false }">
+                <div class="flex items-center justify-between mb-4">
+                    <legend class="legend mb-0">{{ __('care-plan.activities') }}</legend>
+                    
+                    @if(in_array(strtoupper($status), ['ACTIVE', 'active']))
+                        {{-- Dropdown for New Prescription --}}
+                        <div class="relative">
+                            <button type="button" 
+                                    @click="openDropdown = !openDropdown" 
+                                    @click.away="openDropdown = false"
+                                    class="button-primary flex items-center gap-2">
+                                <span>+ {{ __('care-plan.new_prescription') }}</span>
+                                <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 9-7 7-7-7"/>
+                                </svg>
+                            </button>
+                            
+                            <div x-show="openDropdown" 
+                                 x-transition
+                                 style="display: none;"
+                                 class="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:bg-gray-700">
+                                <div class="py-1" role="none">
+                                    <button type="button" @click="openDropdown = false; showServiceDrawer = true" wire:click="initActivityForm('service_request')" class="text-gray-700 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600">
+                                        {{ __('care-plan.service_prescription') }}
+                                    </button>
+                                    <button type="button" @click="openDropdown = false; showMedicationDrawer = true" wire:click="initActivityForm('medication_request')" class="text-gray-700 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600">
+                                        {{ __('care-plan.medication_prescription') }}
+                                    </button>
+                                    <button type="button" @click="openDropdown = false; showMedicalDeviceDrawer = true" wire:click="initActivityForm('device_request')" class="text-gray-700 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600">
+                                        {{ __('care-plan.medical_device_prescription') }}
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                @endif
-            </div>
+                    @endif
+                </div>
 
-            <div class="flow-root mt-4">
-                <table class="table-input w-full table-fixed min-w-[800px] text-sm">
-                    <thead class="thead-input">
-                        <tr>
-                            <th scope="col" class="th-input w-[30%]">{{ __('care-plan.kind') }}</th>
-                            <th scope="col" class="th-input w-[15%]">{{ __('care-plan.quantity') }}</th>
-                            <th scope="col" class="th-input w-[20%]">{{ __('forms.start_date') }}</th>
-                            <th scope="col" class="th-input w-[20%]">{{ __('forms.status.label') }}</th>
-                            <th scope="col" class="th-input w-[15%]"></th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        @forelse($carePlan->activities ?? [] as $activity)
+                <div class="flow-root mt-4">
+                    <table class="table-input w-full table-fixed min-w-[800px] text-sm">
+                        <thead class="thead-input">
                             <tr>
-                                <td class="td-input break-words whitespace-normal align-top">
-                                    @if($activity->kindConcept)
-                                        {{ $activity->kindConcept->text ?? $activity->kindConcept->coding->first()?->display ?? $activity->kindConcept->coding->first()?->code ?? '-' }}
-                                    @elseif(is_array($activity->kind))
-                                        {{ $activity->kind['text'] ?? $activity->kind['coding'][0]['display'] ?? $activity->kind['coding'][0]['code'] ?? '-' }}
-                                    @else
-                                        {{ $activity->kind ?? '-' }}
-                                    @endif
-                                </td>
-                                <td class="td-input break-words whitespace-normal align-top">
-                                    @if(is_array($activity->quantity))
-                                        {{ $activity->quantity['value'] ?? '-' }} {{ $activity->quantity['unit'] ?? '' }}
-                                    @else
-                                        {{ $activity->quantity ?? '-' }}
-                                    @endif
-                                </td>
-                                <td class="td-input break-words whitespace-normal align-top">
-                                    {{ $activity->scheduled_period_start?->format(config('app.date_format')) }}
-                                </td>
-                                <td class="td-input break-words whitespace-normal align-top">
-                                    @php
-                                        $activityStatus = is_array($activity->status) ? ($activity->status['coding'][0]['code'] ?? ($activity->status['text'] ?? '')) : $activity->status;
-                                        $activityStatusDisplay = is_array($activity->status) ? ($activity->status['text'] ?? ($activity->status['coding'][0]['display'] ?? $activityStatus)) : $activityStatus;
-                                    @endphp
-                                    <span class="badge {{ in_array(strtoupper($activityStatus), ['NEW', 'DRAFT']) ? 'badge-warning' : 'badge-success' }}">
-                                        {{ $activityStatusDisplay }}
-                                    </span>
-                                </td>
-                                <td class="td-input text-right align-middle">
-                                    @if(in_array(strtoupper($activityStatus), ['NEW', 'DRAFT']))
-                                        <button type="button"
-                                                class="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                                                wire:click="openSignatureModal('sign_activity', {{ $activity->id }})">
-                                            {{ __('forms.sign') }}
-                                        </button>
-                                    @elseif(in_array(strtoupper($activityStatus), ['ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD']))
-                                        <div class="flex flex-col space-y-2 lg:flex-row lg:space-y-0 lg:space-x-3 items-end lg:items-center">
-                                            <button type="button"
-                                                    class="text-green-600 hover:text-green-800 text-sm font-medium"
-                                                    wire:click="openSignatureModal('complete_activity', {{ $activity->id }})">
-                                                Завершити
-                                            </button>
-                                            <button type="button"
-                                                    class="text-red-500 hover:text-red-700 text-sm font-medium"
-                                                    wire:click="openSignatureModal('cancel_activity', {{ $activity->id }})">
-                                                Скасувати
-                                            </button>
-                                        </div>
-                                    @endif
-                                </td>
+                                <th scope="col" class="th-input w-[30%]">{{ __('care-plan.kind') }}</th>
+                                <th scope="col" class="th-input w-[15%]">{{ __('care-plan.quantity') }}</th>
+                                <th scope="col" class="th-input w-[20%]">{{ __('forms.start_date') }}</th>
+                                <th scope="col" class="th-input w-[20%]">{{ __('forms.status.label') }}</th>
+                                <th scope="col" class="th-input w-[15%]"></th>
                             </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5" class="td-input text-center py-8 text-gray-400">
-                                    {{ __('care-plan.no_activities') }}
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </fieldset>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @forelse($carePlan->activities ?? [] as $activity)
+                                <tr>
+                                    <td class="td-input break-words whitespace-normal align-top">
+                                        @if($activity->kindConcept)
+                                            {{ $activity->kindConcept->text ?? $activity->kindConcept->coding->first()?->display ?? $activity->kindConcept->coding->first()?->code ?? '-' }}
+                                        @elseif(is_array($activity->kind))
+                                            {{ $activity->kind['text'] ?? $activity->kind['coding'][0]['display'] ?? $activity->kind['coding'][0]['code'] ?? '-' }}
+                                        @else
+                                            {{ $activity->kind ?? '-' }}
+                                        @endif
+                                    </td>
+                                    <td class="td-input break-words whitespace-normal align-top">
+                                        @if(is_array($activity->quantity))
+                                            {{ $activity->quantity['value'] ?? '-' }} {{ $activity->quantity['unit'] ?? '' }}
+                                        @else
+                                            {{ $activity->quantity ?? '-' }}
+                                        @endif
+                                    </td>
+                                    <td class="td-input break-words whitespace-normal align-top">
+                                        {{ $activity->scheduled_period_start?->format(config('app.date_format')) }}
+                                    </td>
+                                    <td class="td-input break-words whitespace-normal align-top">
+                                        @php
+                                            $activityStatus = is_array($activity->status) ? ($activity->status['coding'][0]['code'] ?? ($activity->status['text'] ?? '')) : $activity->status;
+                                            $activityStatusDisplay = is_array($activity->status) ? ($activity->status['text'] ?? ($activity->status['coding'][0]['display'] ?? $activityStatus)) : $activityStatus;
+                                        @endphp
+                                        <span class="badge {{ in_array(strtoupper($activityStatus), ['NEW', 'DRAFT']) ? 'badge-warning' : 'badge-success' }}">
+                                            {{ $activityStatusDisplay }}
+                                        </span>
+                                    </td>
+                                    <td class="td-input text-right align-middle">
+                                        @if(in_array(strtoupper($activityStatus), ['NEW', 'DRAFT']))
+                                            <div class="flex flex-col space-y-2 lg:flex-row lg:space-y-0 lg:space-x-3 items-end lg:items-center justify-end">
+                                                <button type="button"
+                                                        class="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                                        wire:click="editActivity({{ $activity->id }})">
+                                                    {{ __('forms.edit') }}
+                                                </button>
+                                                <button type="button"
+                                                        class="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                                        wire:click="openSignatureModal('sign_activity', {{ $activity->id }})">
+                                                    {{ __('forms.sign') }}
+                                                </button>
+                                            </div>
+                                        @elseif(in_array(strtoupper($activityStatus), ['ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD']))
+                                            <div class="flex flex-col space-y-2 lg:flex-row lg:space-y-0 lg:space-x-3 items-end lg:items-center">
+                                                <button type="button"
+                                                        class="text-green-600 hover:text-green-800 text-sm font-medium"
+                                                        wire:click="openSignatureModal('complete_activity', {{ $activity->id }})">
+                                                    Завершити
+                                                </button>
+                                                <button type="button"
+                                                        class="text-red-500 hover:text-red-700 text-sm font-medium"
+                                                        wire:click="openSignatureModal('cancel_activity', {{ $activity->id }})">
+                                                    Скасувати
+                                                </button>
+                                            </div>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="td-input text-center py-8 text-gray-400 italic">
+                                        {{ __('care-plan.no_activities') }}
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </fieldset>
 
         {{-- Action Buttons --}}
         <div class="mt-6 flex flex-row items-center gap-4 pt-6">
@@ -413,13 +370,24 @@
                 <div class="flex flex-col gap-4 flex-1">
                     @if(in_array($actionType, ['complete_activity', 'cancel_activity']))
                         @if($actionType === 'complete_activity')
-                            <x-forms.select
-                                id="outcomeCode"
-                                name="outcomeCode"
-                                label="{{ __('care-plan.outcome_dictionary') }}"
-                                wire:model="outcomeCode"
-                                :options="$dictionaries['care_plan_activity_outcomes'] ?? []"
-                            />
+                            <div class="form-group group">
+                                <select id="outcomeCode"
+                                        name="outcomeCode"
+                                        class="input-select peer w-full"
+                                        wire:model="outcomeCode"
+                                >
+                                    <option value="">{{ __('forms.select') }}</option>
+                                    @foreach($dictionaries['care_plan_activity_outcomes'] ?? [] as $code => $description)
+                                        <option value="{{ $code }}">{{ $description }}</option>
+                                    @endforeach
+                                </select>
+                                <label for="outcomeCode" class="label">
+                                    {{ __('care-plan.outcome_dictionary') }}
+                                </label>
+                                @error('outcomeCode')
+                                    <p class="text-error">{{ $message }}</p>
+                                @enderror
+                            </div>
 
                             @if(!empty($availableConditions))
                                 <div class="mt-2">

@@ -35,10 +35,10 @@ class CarePlanIndex extends Component
         try {
             $response = EHealth::carePlan()->getMany(['requisition' => $this->searchRequisition]);
             $data = $response->validate();
-            
+
             // Sync with local DB if found
             app(CarePlanRepository::class)->syncCarePlans($data);
-            
+
             $this->mount(app(CarePlanRepository::class));
         } catch (\Throwable $e) {
             Log::error('CarePlan search error: ' . $e->getMessage());
@@ -54,8 +54,8 @@ class CarePlanIndex extends Component
                 return;
             }
 
-            $employee = auth()->user()->activeEmployee();
-            
+            $employee = auth()->user()->getCarePlanWriterEmployee() ?? auth()->user()->activeEmployee();
+
             $query = [
                 'managing_organization_id' => $legalEntity->uuid,
             ];

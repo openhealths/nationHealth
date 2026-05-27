@@ -32,6 +32,13 @@ class SignatureService
         ?UploadedFile $keyFile,
         string $taxId
     ): string|array {
+        Log::debug('SignatureService: signData starting', [
+            'knedp' => $knedp,
+            'taxId' => $taxId,
+            'keyFileName' => $keyFile?->getClientOriginalName(),
+            'keyFileSize' => $keyFile?->getSize(),
+            'passwordLength' => strlen($password),
+        ]);
 
         try {
             $base64FileContent = $this->getBase64KepFileContent($keyFile);
@@ -44,20 +51,40 @@ class SignatureService
                 $taxId
             );
 
+            if (is_array($signedContent)) {
+                Log::error('SignatureService: signing failed, returned errors', [
+                    'errors' => $signedContent
+                ]);
+                $errorMessage = collect($signedContent)->flatten()->first() ?? __('forms.invalid_kep_password');
+                throw new RuntimeException((string) $errorMessage);
+            }
+
             if (empty($signedContent) || !is_string($signedContent)) {
+                Log::error('SignatureService: signing returned empty/invalid response', [
+                    'response_type' => gettype($signedContent)
+                ]);
                 throw new RuntimeException(__('employees.errors.signature_failed_unexpected'));
             }
+
+            Log::debug('SignatureService: signData completed successfully');
 
             return $signedContent;
 
         } catch (ApiException $e) {
+            Log::error('SignatureService: ApiException caught', [
+                'message' => $e->getMessage(),
+                'errors' => $e->getErrors()
+            ]);
             $errors = $e->getErrors();
             $errorMessage = collect($errors)->flatten()->first() ?? __('forms.invalid_kep_password');
 
-            throw new RuntimeException($errorMessage);
+            throw new RuntimeException((string) $errorMessage);
         } catch (\Exception $e) {
-            Log::error('An unexpected error occurred in SignatureService: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-            throw new RuntimeException(__('employees.errors.signature_failed_unexpected'));
+            Log::error('SignatureService: unexpected error occurred: ' . $e->getMessage(), [
+                'exception' => get_class($e),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw new RuntimeException($e->getMessage());
         }
     }
 

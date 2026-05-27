@@ -22,3 +22,9 @@ yarn-error.log
 _ide_helper.php
 _ide_helper_models.php
 storage/debugbar
+
+# Local test and scratch files
+/check_plans.php
+/scratch_test.php
+/get_token.php
+/storage/cli-testing/

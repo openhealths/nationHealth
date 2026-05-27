@@ -15,7 +15,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class CarePlanActivity extends Model
 {
-    use HasFactory, HasCamelCasing;
+    use HasFactory;
+    use HasCamelCasing;
 
     protected $fillable = [
         'uuid',
@@ -32,6 +33,12 @@ class CarePlanActivity extends Model
         'daily_amount',
         'daily_amount_system',
         'daily_amount_code',
+        'quantity_per_time',
+        'quantity_per_time_unit',
+        'frequency',
+        'frequency_unit',
+        'duration',
+        'duration_unit',
         'reason_code',
         'reason_reference',
         'goal',
@@ -53,7 +60,9 @@ class CarePlanActivity extends Model
         'do_not_perform' => 'boolean',
         'quantity' => 'integer',
         'daily_amount' => 'decimal:4',
+        'quantity_per_time' => 'decimal:2',
         'reason_reference' => 'array',
+        'goal' => 'array',
         'scheduled_period_start' => 'date',
         'scheduled_period_end' => 'date',
     ];
@@ -155,4 +164,3 @@ class CarePlanActivity extends Model
         return true;
     }
 }
-

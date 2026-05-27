@@ -141,7 +141,6 @@ return [
     'box_50_pieces' => 'Коробка 50 штук',
     'program_participants' => 'Учасники програми',
 
-
     // Index view
     'no_care_plans' => 'Планів лікування поки немає',
     'search_by_requisition' => 'Пошук за реквізиційним номером',
@@ -173,11 +172,15 @@ return [
     'ehealth_error_prefix' => 'Помилка від ЕСОЗ: ',
     'unexpected_error' => 'Виникла помилка. Зверніться до адміністратора.',
     'activity_draft_saved' => 'Чернетку призначення успішно збережено.',
+    'activity_updated' => 'Чернетку призначення успішно оновлено.',
     'care_plan_not_synced' => 'Цей план лікування ще не синхронізовано з ЕСОЗ.',
     'care_plan_updated' => 'План лікування успішно оновлено в ЕСОЗ.',
     'no_activity_selected' => 'Не вказано призначення для підпису.',
     'activity_not_found' => 'Призначення не знайдено.',
     'activity_signed' => 'Призначення успішно підписано та створено в ЕСОЗ.',
+    'care_plan_activated' => 'План лікування успішно активовано.',
+    'sms_resent' => 'SMS надіслано повторно.',
+    'data_synced' => 'Дані успішно синхронізовано з ЕСОЗ.',
     'no_diagnoses' => 'Діагнозів не знайдено',
     'medical_record' => 'Медичний запис',
     'current_interaction' => 'Поточна взаємодія',
@@ -207,10 +210,12 @@ return [
     'approval_create_error' => 'Помилка при створенні дозволу.',
     'approval_cancelled' => 'Дозвіл на доступ скасовано.',
     'approval_cancel_error' => 'Помилка при скасуванні дозволу.',
+    'approval_verify_error' => 'Помилка при підтвердженні дозволу.',
     'approvals_fetch_error' => 'Помилка при отриманні списку дозволів.',
     'no_approvals_found' => 'Дозволів на доступ не знайдено',
     'confirm_cancel_approval' => 'Ви впевнені, що хочете скасувати цей дозвіл?',
     'reason_placeholder' => 'Вкажіть причину надання доступу...',
+    'auth_methods_fetch_error' => 'Не вдалося завантажити методи автентифікації.',
 
     // Outcomes
     'outcome_dictionary' => 'Результат (довідник)',

@@ -1,25 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature\CarePlan;
 
 use App\Classes\eHealth\Api\Approval;
-use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
-use App\Classes\eHealth\Api\CarePlanActivity as ActivityApi;
-use App\Classes\eHealth\EHealthResponse;
-use App\Enums\CarePlanStatus;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\Person\Person;
 use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\Employees\Sql\Employee;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
 use Mockery;
 
 use Illuminate\Support\Str;
-use App\Classes\eHealth\EHealth;
-use Illuminate\Support\Facades\Log;
 
 class CarePlanLifecycleTest extends TestCase
 {
@@ -33,7 +27,7 @@ class CarePlanLifecycleTest extends TestCase
         putenv('DB_PASSWORD=password');
 
         parent::setUp();
-        
+
         \Illuminate\Support\Facades\DB::beginTransaction();
 
         // Setup initial data
@@ -66,14 +60,14 @@ class CarePlanLifecycleTest extends TestCase
         ]);
         $conditionCc = \App\Models\MedicalEvents\Sql\CodeableConcept::create();
         $conditionCc->save();
-        
+
         $conditionCoding = new \App\Models\MedicalEvents\Sql\Coding();
         $conditionCoding->code = 'D02';
         $conditionCoding->system = 'eHealth/ICPC2/condition_codes';
         $conditionCoding->codeable_type = \App\Models\MedicalEvents\Sql\CodeableConcept::class;
         $conditionCoding->codeable_id = $conditionCc->id;
         $conditionCoding->save();
-        
+
         $condition = \App\Models\MedicalEvents\Sql\Condition::create([
             'uuid' => $conditionIdentifier->value,
             'person_id' => $this->person->id,
@@ -84,7 +78,7 @@ class CarePlanLifecycleTest extends TestCase
             'context_id' => $identifierId,
             'onset_date' => now(),
         ]);
-        
+
         \App\Models\MedicalEvents\Sql\EncounterDiagnose::create([
             'encounter_id' => $this->encounter->id,
             'condition_id' => $conditionIdentifier->id,
@@ -92,7 +86,7 @@ class CarePlanLifecycleTest extends TestCase
             'rank' => 1
         ]);
 
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id') 
+        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
             ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = \App\Models\LegalEntity::create([
@@ -132,9 +126,9 @@ class CarePlanLifecycleTest extends TestCase
             'user_id' => $this->user->id,
             'party_id' => $this->party->id,
         ]);
-        
+
         $this->user->employees()->attach($this->employee->id);
-        
+
         if (config('permission.teams')) {
             setPermissionsTeamId($legalEntity->id);
         }
@@ -159,7 +153,6 @@ class CarePlanLifecycleTest extends TestCase
             'period_end' => now()->addDays(5),
         ]);
     }
-
 
     public function test_full_care_plan_lifecycle_flow(): void
     {
@@ -205,6 +198,34 @@ class CarePlanLifecycleTest extends TestCase
             ]
         ]);
         $mockJobApi->shouldReceive('getDetails')->andReturn($jobResponse);
+
+        // Mock getDetails for post-creation sync
+        $detailsResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $detailsResponse->shouldReceive('validate')->andReturn([
+            'uuid' => $carePlanUuid,
+            'status' => 'active',
+            'title' => 'Test Plan',
+            'category' => [
+                'coding' => [
+                    ['system' => 'http://e-health.gov.ua/systems/care-plan-category', 'code' => '736382003']
+                ],
+                'text' => 'Treatment plan'
+            ],
+            'period' => [
+                'start' => now()->toIso8601String()
+            ],
+            'encounter' => [
+                'identifier' => [
+                    'value' => $this->encounter->uuid
+                ]
+            ],
+            'author' => [
+                'identifier' => [
+                    'value' => $this->employee->uuid
+                ]
+            ]
+        ]);
+        $mockCarePlanApi->shouldReceive('getDetails')->andReturn($detailsResponse);
 
         // 2. Mock Approval Flow
         $approvalCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
@@ -278,6 +299,7 @@ class CarePlanLifecycleTest extends TestCase
             ->call('initActivityForm', 'service_request')
             ->set('activityForm.kind', 'ServiceRequest')
             ->set('activityForm.quantity', 1)
+            ->set('activityForm.scheduled_period_end', now()->addDays(5)->format('d.m.Y'))
             ->call('saveActivity')
             ->assertHasNoErrors();
 
@@ -293,7 +315,7 @@ class CarePlanLifecycleTest extends TestCase
         $activitySignResponse->shouldReceive('getData')->andReturn(['id' => $activityUuid, 'status' => 'scheduled']);
         $activitySignResponse->shouldReceive('getStatusCode')->andReturn(200);
         $mockActivityApi->shouldReceive('create')->andReturn($activitySignResponse);
-        
+
         $activitySummaryResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
         $activitySummaryResponse->shouldReceive('getData')->andReturn(['data' => []]);
         $activitySummaryResponse->shouldReceive('getStatusCode')->andReturn(200);
@@ -336,7 +358,7 @@ class CarePlanLifecycleTest extends TestCase
     public function test_create_service_activity_with_linked_grounds(): void
     {
         $this->actingAs($this->user);
-        
+
         $carePlan = $this->createTestCarePlan('Service Plan');
 
         $condition = \App\Models\MedicalEvents\Sql\Condition::first();
@@ -357,6 +379,7 @@ class CarePlanLifecycleTest extends TestCase
             ->call('addLinkedGround', 'Condition', $condition->uuid)
             ->assertSet('linkedGrounds.0.uuid', $condition->uuid)
             ->set('activityForm.quantity', 2)
+            ->set('activityForm.scheduled_period_end', now()->addDays(5)->format('d.m.Y'))
             ->call('saveActivity')
             ->assertHasNoErrors();
 
@@ -370,7 +393,7 @@ class CarePlanLifecycleTest extends TestCase
     public function test_create_medication_activity_with_program_and_linked_grounds(): void
     {
         $this->actingAs($this->user);
-        
+
         $carePlan = $this->createTestCarePlan('Medication Plan');
 
         $condition = \App\Models\MedicalEvents\Sql\Condition::first();
@@ -390,6 +413,7 @@ class CarePlanLifecycleTest extends TestCase
             ->call('addLinkedGround', 'Condition', $condition->uuid)
             ->set('activityForm.quantity', 30)
             ->set('activityForm.daily_amount', 1.5)
+            ->set('activityForm.scheduled_period_end', now()->addDays(5)->format('d.m.Y'))
             ->call('saveActivity')
             ->assertHasNoErrors();
 
@@ -404,7 +428,7 @@ class CarePlanLifecycleTest extends TestCase
     public function test_create_device_activity_with_positive_quantity_validation(): void
     {
         $this->actingAs($this->user);
-        
+
         $carePlan = $this->createTestCarePlan('Device Plan');
 
         $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
@@ -421,6 +445,7 @@ class CarePlanLifecycleTest extends TestCase
             ->set('selectedProduct', ['code' => 'DEV-456', 'name' => 'Test strips'])
             ->set('activityForm.product_reference', 'DEV-456')
             ->set('activityForm.quantity', -5)
+            ->set('activityForm.scheduled_period_end', now()->addDays(5)->format('d.m.Y'))
             ->call('saveActivity')
             ->assertHasErrors(['activityForm.quantity']);
 
@@ -430,6 +455,7 @@ class CarePlanLifecycleTest extends TestCase
             ->set('selectedProduct', ['code' => 'DEV-456', 'name' => 'Test strips'])
             ->set('activityForm.product_reference', 'DEV-456')
             ->set('activityForm.quantity', 10)
+            ->set('activityForm.scheduled_period_end', now()->addDays(5)->format('d.m.Y'))
             ->call('saveActivity')
             ->assertHasNoErrors();
 
@@ -546,5 +572,21 @@ class CarePlanLifecycleTest extends TestCase
             'status' => 'completed',
         ]);
     }
-}
 
+    public function test_delete_draft_care_plan(): void
+    {
+        $this->actingAs($this->user);
+        $carePlan = $this->createTestCarePlan('Draft Care Plan to Delete', 'draft');
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanUpdate::class, [
+            'legalEntity' => \App\Models\LegalEntity::first(),
+            'carePlan' => $carePlan,
+        ])
+            ->call('delete')
+            ->assertRedirect(route('persons.care-plans', [legalEntity(), $this->person->id]));
+
+        $this->assertDatabaseMissing('care_plans', [
+            'id' => $carePlan->id,
+        ]);
+    }
+}

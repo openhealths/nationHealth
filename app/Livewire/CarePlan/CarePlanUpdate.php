@@ -23,19 +23,18 @@ class CarePlanUpdate extends CarePlanCreate
 
     public CarePlan $carePlan;
 
-    public function mount(?LegalEntity $legalEntity = null, ?int $id = null): void
+    public function mount(LegalEntity $legalEntity, $carePlan = null, $encounter = null): void
     {
-        $carePlan = request()->route('carePlan');
+        $carePlan = $carePlan ?? request()->route('carePlan');
         if (!$carePlan instanceof CarePlan) {
             // Fallback for cases where route binding might not have resolved to model yet
             $carePlan = CarePlan::findOrFail($carePlan);
         }
 
         $this->carePlan = $carePlan;
-        $this->id = $carePlan->person_id;
         $this->patientUuid = $carePlan->person?->uuid ?? '';
 
-        parent::mount($legalEntity, $this->id);
+        parent::mount($legalEntity, $carePlan->person_id);
 
         // Hydrate form from model
         $this->form->patient = $carePlan->person?->full_name ?? '';
@@ -148,7 +147,7 @@ class CarePlanUpdate extends CarePlanCreate
 
         session()->flash('success', __('care-plan.draft_updated') ?? 'План лікування успішно збережено');
 
-        $this->redirectRoute('care-plan.edit', [legalEntity(), $this->carePlan->id], navigate: true);
+        $this->redirectRoute('care-plans.edit', [legalEntity(), $this->carePlan->id], navigate: true);
     }
 
     /**
@@ -177,7 +176,7 @@ class CarePlanUpdate extends CarePlanCreate
             $this->form->toArray(),
             $this->form->encounter ?: null,
             $encounterData,
-            Auth::user()?->activeEmployee()?->uuid
+            Auth::user()?->getCarePlanWriterEmployee()?->uuid ?? Auth::user()?->activeEmployee()?->uuid
         );
 
         try {
@@ -241,27 +240,39 @@ class CarePlanUpdate extends CarePlanCreate
             ]);
 
             // Update local model with eHealth response
-            $repository->updateById($this->carePlan->id, [
-                'uuid' => $carePlanUuid,
-                'status' => $carePlanStatus,
-                'requisition' => $carePlanRequisition,
-                // Update other fields too just in case they were changed before signing
-                'category' => $this->form->category,
-                'title' => $this->form->title,
-                'period_start' => convertToYmd($this->form->periodStart),
-                'period_end' => !empty($this->form->periodEnd)
-                    ? convertToYmd($this->form->periodEnd) : null,
-                'encounter_id' => $encounterData['id'],
-                'addresses' => $encounterData['addresses'],
-                'supporting_info' => [
-                    'episodes' => $this->form->episodes,
-                    'medical_records' => $this->form->medicalRecords,
-                ],
-            ]);
+            if ($carePlanUuid) {
+                try {
+                    $detailsResponse = EHealth::carePlan()->getDetails($this->patientUuid ?: $this->uuid, $carePlanUuid);
+                    $repository->syncCarePlans($detailsResponse->validate(), $this->carePlan->person_id);
+                } catch (\Throwable $e) {
+                    Log::warning('CarePlanUpdate: failed to sync care plan after update: ' . $e->getMessage());
+                    // Fallback update
+                    $repository->updateById($this->carePlan->id, [
+                        'uuid' => $carePlanUuid,
+                        'status' => $carePlanStatus,
+                        'requisition' => $carePlanRequisition,
+                        'category' => $this->form->category,
+                        'title' => $this->form->title,
+                        'period_start' => convertToYmd($this->form->periodStart),
+                        'period_end' => !empty($this->form->periodEnd) ? convertToYmd($this->form->periodEnd) : null,
+                        'encounter_id' => $encounterData['id'],
+                        'addresses' => $encounterData['addresses'],
+                        'supporting_info' => [
+                            'episodes' => $this->form->episodes,
+                            'medical_records' => $this->form->medicalRecords,
+                        ],
+                    ]);
+                }
+            } else {
+                $repository->updateById($this->carePlan->id, [
+                    'status' => $carePlanStatus,
+                    'requisition' => $carePlanRequisition,
+                ]);
+            }
 
             session()->flash('success', __('care-plan.signed_and_sent'));
 
-            $this->redirectRoute('care-plan.show', [legalEntity(), $this->carePlan->id], navigate: true);
+            $this->redirectRoute('care-plans.show', [legalEntity(), $this->carePlan->id], navigate: true);
 
         } catch (EHealthConnectionException $exception) {
             Log::error('CarePlan: connection error: ' . $exception->getMessage());

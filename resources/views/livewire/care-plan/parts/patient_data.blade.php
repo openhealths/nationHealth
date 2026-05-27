@@ -4,15 +4,16 @@
     </legend>
 
     <div class="form-row-2">
-        <div class="form-group group relative" x-data="{ open: true }">
+        <div class="form-group group relative" x-data="{ open: false }">
             <input type="text"
                    name="patient"
                    id="patient"
-                   class="input peer"
+                   class="input peer {{ $personId ? 'bg-gray-50 dark:bg-gray-900' : '' }}"
                    placeholder=" "
                    autocomplete="off"
                    wire:model.live.debounce.300ms="form.patient"
                    @focus="open = true"
+                   {{ $personId ? 'readonly' : '' }}
                    required
             >
 
@@ -20,13 +21,13 @@
                 {{ __('care-plan.patient') }}
             </label>
 
-            @if(!empty($patientSuggestions))
+            @if(!$personId && !empty($patientSuggestions))
                 <div x-show="open"
                      @click.away="open = false"
                      class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto"
                 >
                     @foreach($patientSuggestions as $suggestion)
-                        <div wire:click="selectPatient('{{ $suggestion['uuid'] }}', '{{ $suggestion['name'] }}')"
+                        <div wire:click="selectPatient('{{ $suggestion['uuid'] }}', '{{ addslashes($suggestion['name']) }}')"
                              @click="open = false"
                              class="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-50 dark:border-gray-700 last:border-0"
                         >

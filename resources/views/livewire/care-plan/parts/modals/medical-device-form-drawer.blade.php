@@ -124,16 +124,16 @@
                                id="device_quantity_per_time"
                                name="device_quantity_per_time"
                                class="input peer w-full"
-                               value="1"
+                               wire:model="activityForm.quantity_per_time"
                         >
-                        <select class="input-select peer w-20">
-                            <option selected value="units">{{ __('care-plan.units') }}</option>
+                        <select class="input-select peer w-20" wire:model="activityForm.quantity_per_time_unit">
+                            <option value="units">{{ __('care-plan.units') }}</option>
                         </select>
                     </div>
                 </div>
                 <div class="form-group group">
                     <label class="label">
-                        {{ __('care-plan.end_date') }}:
+                        {{ __('care-plan.end_date') }}*
                     </label>
                     <div class="relative">
                         <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
@@ -175,10 +175,10 @@
                                id="device_number_of_times"
                                name="device_number_of_times"
                                class="input peer w-full"
-                               value="1"
+                               wire:model="activityForm.frequency"
                         >
-                        <select class="input-select peer w-28">
-                            <option selected value="per_day">{{ __('care-plan.per_day') }}</option>
+                        <select class="input-select peer w-28" wire:model="activityForm.frequency_unit">
+                            <option value="per_day">{{ __('care-plan.per_day') }}</option>
                         </select>
                     </div>
                 </div>
@@ -190,13 +190,13 @@
                            id="device_duration"
                            name="device_duration"
                            class="input peer w-full"
-                           value="10"
+                           wire:model="activityForm.duration"
                     >
                 </div>
                 <div class="form-group group">
                     <label class="label">&nbsp;</label>
-                    <select class="input-select peer w-full">
-                        <option selected value="days">{{ __('care-plan.days') }}</option>
+                    <select class="input-select peer w-full" wire:model="activityForm.duration_unit">
+                        <option value="days">{{ __('care-plan.days') }}</option>
                     </select>
                 </div>
             </div>
@@ -302,8 +302,12 @@
                     <select id="device_expected_result"
                             name="device_expected_result"
                             class="input-select peer w-full"
+                            wire:model="activityForm.goal"
                     >
-                        <option selected value="">{{ __('care-plan.select_result') }}</option>
+                        <option value="">{{ __('care-plan.select_result') }}</option>
+                        @foreach(($dictionaries['care_plan_activity_goals'] ?? []) as $code => $name)
+                            <option value="{{ $code }}">{{ $name }}</option>
+                        @endforeach
                     </select>
                 </div>
             </div>
