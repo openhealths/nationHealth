@@ -9,7 +9,7 @@ use App\Classes\eHealth\EHealthResponse;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Http\Client\ConnectionException;
+use App\Exceptions\EHealth\EHealthConnectionException;
 
 class Approval extends Request
 {
@@ -18,9 +18,9 @@ class Approval extends Request
     /**
      * Get Approvals by search parameters.
      *
-     * @param array $query query params: granted_resource_type=care_plan, status, etc.
+     * @param  array  $query  query params: granted_resource_type=care_plan, status, etc.
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function getMany(array $query = []): PromiseInterface|EHealthResponse
     {
@@ -30,10 +30,10 @@ class Approval extends Request
     /**
      * Create a new Approval request for a patient entity.
      *
-     * @param string $patientId
-     * @param array $payload
+     * @param  string  $patientId
+     * @param  array  $payload
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function createApproval(string $patientId, array $payload): PromiseInterface|EHealthResponse
     {
@@ -44,9 +44,10 @@ class Approval extends Request
      * Create a new Approval request for a Care Plan.
      *
      * @deprecated Use createApproval instead.
-     * @param array $payload
+     *
+     * @param  array  $payload
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function create(array $payload): PromiseInterface|EHealthResponse
     {
@@ -56,11 +57,11 @@ class Approval extends Request
     /**
      * Verify Approval via OTP.
      *
-     * @param string $patientId
-     * @param string $approvalId
-     * @param array $payload
+     * @param  string  $patientId
+     * @param  string  $approvalId
+     * @param  array  $payload
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function verify(string $patientId, string $approvalId, array $payload): PromiseInterface|EHealthResponse
     {
@@ -70,10 +71,10 @@ class Approval extends Request
     /**
      * Resend SMS code for Approval.
      *
-     * @param string $patientId
-     * @param string $approvalId
+     * @param  string  $patientId
+     * @param  string  $approvalId
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function resendSms(string $patientId, string $approvalId): PromiseInterface|EHealthResponse
     {
@@ -89,8 +90,8 @@ class Approval extends Request
     /**
      * Cancel an Approval.
      *
-     * @param string $id
-     * @param array $payload
+     * @param  string  $id
+     * @param  array  $payload
      * @return array
      */
     public static function cancelApproval(string $id, array $payload = []): array

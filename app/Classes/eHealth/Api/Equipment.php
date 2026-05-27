@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\LegalEntity as LegalEntityModel;
@@ -15,7 +16,6 @@ use Illuminate\Support\Facades\Log;
 use App\Classes\eHealth\EHealthResponse;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Http\Client\ConnectionException;
 use App\Classes\eHealth\EHealthRequest as Request;
 use Illuminate\Validation\Rule;
 
@@ -49,7 +49,7 @@ class Equipment extends Request
      *     page_size?: int
      * }  $query
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
      * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/equipment/get-equipment-list
      */
@@ -69,7 +69,7 @@ class Equipment extends Request
      *
      * @param  array  $data  // Data for API request
      * @return EHealthResponse|PromiseInterface
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
      * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/equipment/create-equipment
      */
@@ -87,7 +87,7 @@ class Equipment extends Request
      * @param  string  $uuid
      * @param  array  $data
      * @return EHealthResponse|PromiseInterface
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
      * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/equipment/change-equipment-status
      */
@@ -104,7 +104,7 @@ class Equipment extends Request
      * @param  string  $uuid
      * @param  array  $data
      * @return EHealthResponse|PromiseInterface
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
      * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/equipment/change-equipment-availability-status
      */

@@ -6,11 +6,11 @@ namespace App\Livewire\CarePlan;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\CarePlan;
 use App\Repositories\CarePlanRepository;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -701,7 +701,7 @@ class CarePlanCreate extends BasePatientComponent
             Session::flash('flash_message', 'План лікування успішно створено.');
             $this->redirectRoute('care-plan.show', [legalEntity(), $carePlan->id], navigate: true);
 
-        } catch (ConnectionException $exception) {
+        } catch (EHealthConnectionException $exception) {
             Log::error('CarePlan: connection error: ' . $exception->getMessage());
             session()->flash('error', __('care-plan.connection_error'));
             $this->showSignatureModal = false;

@@ -7,12 +7,12 @@ namespace App\Classes\eHealth\Api;
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
 use App\Enums\Status;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\Employee\Employee as EmployeeModel;
 use App\Models\HealthcareService as HealthcareServiceModel;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -27,7 +27,7 @@ class EmployeeRole extends Request
      * @param  string  $url
      * @param  $query
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function getMany(string $url = self::URL, $query = null): PromiseInterface|EHealthResponse
     {
@@ -46,7 +46,7 @@ class EmployeeRole extends Request
      *
      * @param  array  $data
      * @return EHealthResponse|PromiseInterface
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function create(array $data = []): PromiseInterface|EHealthResponse
     {
@@ -61,7 +61,7 @@ class EmployeeRole extends Request
      *
      * @param  string  $uuid
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function deactivate(string $uuid): PromiseInterface|EHealthResponse
     {

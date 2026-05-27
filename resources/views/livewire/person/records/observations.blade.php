@@ -144,7 +144,7 @@
 
                             <template x-if="filteredOptions.length === 0">
                                 <div class="px-3 py-2 text-sm text-gray-500">
-                                    {{ __('patients.nothing_found') }}
+                                    {{ __('forms.nothing_found') }}
                                 </div>
                             </template>
                         </div>
@@ -587,7 +587,7 @@
 
                                 <template x-if="filteredOptions.length === 0">
                                     <div class="px-3 py-2 text-sm text-gray-500">
-                                        {{ __('patients.nothing_found') }}
+                                        {{ __('forms.nothing_found') }}
                                     </div>
                                 </template>
                             </div>
@@ -705,7 +705,7 @@
 
                                 <template x-if="filteredOptions.length === 0">
                                     <div class="px-3 py-2 text-sm text-gray-500">
-                                        {{ __('patients.nothing_found') }}
+                                        {{ __('forms.nothing_found') }}
                                     </div>
                                 </template>
                             </div>
@@ -825,7 +825,7 @@
 
                                 <template x-if="filteredOptions.length === 0">
                                     <div class="px-3 py-2 text-sm text-gray-500">
-                                        {{ __('patients.nothing_found') }}
+                                        {{ __('forms.nothing_found') }}
                                     </div>
                                 </template>
                             </div>

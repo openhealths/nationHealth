@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Services\MedicalEvents;
 
 use App\Classes\eHealth\EHealth;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\MedicalEvents\Sql\ClinicalImpression;
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
@@ -16,7 +14,8 @@ use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Repositories\MedicalEvents\Repository;
 use App\Traits\LogsExceptions;
-use Illuminate\Http\Client\ConnectionException;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
 class EnsureEntityExistsService
@@ -153,10 +152,10 @@ class EnsureEntityExistsService
         try {
             $episodeData = EHealth::episode()->getById($this->patientUuid, $uuid)->validate();
             Repository::episode()->syncFull($this->personId, [$episodeData]);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Failed while getting episode by ID');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Failed while getting episode by ID');
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Failed to store episode');
+            $this->handleDatabaseErrors($exception, 'Failed to store episode');
         }
     }
 
@@ -175,10 +174,10 @@ class EnsureEntityExistsService
         try {
             $procedureData = EHealth::procedure()->getById($this->patientUuid, $uuid)->validate();
             Repository::procedure()->sync($this->personId, [$procedureData]);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Failed while getting procedure by ID');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Failed while getting procedure by ID');
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Failed to store procedure');
+            $this->handleDatabaseErrors($exception, 'Failed to store procedure');
         }
     }
 
@@ -197,10 +196,10 @@ class EnsureEntityExistsService
         try {
             $diagnosticReportData = EHealth::diagnosticReport()->getById($this->patientUuid, $uuid)->validate();
             Repository::diagnosticReport()->sync($this->personId, [$diagnosticReportData]);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Failed while getting diagnostic report by ID');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Failed while getting diagnostic report by ID');
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Failed to store diagnostic report');
+            $this->handleDatabaseErrors($exception, 'Failed to store diagnostic report');
         }
     }
 
@@ -219,10 +218,10 @@ class EnsureEntityExistsService
         try {
             $conditionData = EHealth::condition()->getById($this->patientUuid, $uuid)->validate();
             Repository::condition()->sync($this->personId, [$conditionData]);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while getting condition by ID');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while getting condition by ID');
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Error while creating condition');
+            $this->handleDatabaseErrors($exception, 'Error while creating condition');
         }
     }
 
@@ -241,10 +240,10 @@ class EnsureEntityExistsService
         try {
             $observationData = EHealth::observation()->getById($this->patientUuid, $uuid)->validate();
             Repository::observation()->sync($this->personId, [$observationData]);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Failed while getting observation by ID');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Failed while getting observation by ID');
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Error while storing observation');
+            $this->handleDatabaseErrors($exception, 'Error while storing observation');
         }
     }
 
@@ -263,10 +262,10 @@ class EnsureEntityExistsService
         try {
             $clinicalImpressionData = EHealth::clinicalImpression()->getById($this->patientUuid, $uuid)->validate();
             Repository::clinicalImpression()->sync($this->personId, [$clinicalImpressionData]);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Failed while getting clinical impression by ID');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Failed while getting clinical impression by ID');
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Error while storing clinical impression');
+            $this->handleDatabaseErrors($exception, 'Error while storing clinical impression');
         }
     }
 
@@ -285,10 +284,10 @@ class EnsureEntityExistsService
         try {
             $encounterData = EHealth::encounter()->getById($this->patientUuid, $uuid)->validate();
             Repository::encounter()->sync($this->personId, [$encounterData]);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Failed while ensuring encounter existence');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Failed while ensuring encounter existence');
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Error while storing encounter');
+            $this->handleDatabaseErrors($exception, 'Error while storing encounter');
         }
     }
 }

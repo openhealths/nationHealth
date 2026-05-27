@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Dictionary;
 
 use App\Classes\eHealth\EHealth;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Models\LegalEntity;
 use App\Traits\FormTrait;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
@@ -76,8 +75,8 @@ class ConditionDiagnose extends Component
             }
 
             return $details;
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when searching for group of diagnoses details.');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when searching for group of diagnoses details.');
 
             return [];
         }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Exceptions\EHealth\EHealthConnectionException;
 use Throwable;
 use App\Core\EHealthJob;
 use App\Enums\JobStatus;
@@ -18,7 +19,6 @@ use App\Models\Relations\ConfidantPerson;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Middleware\RateLimited;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
 
 class ConfidantPersonSync extends EHealthJob
@@ -50,7 +50,7 @@ class ConfidantPersonSync extends EHealthJob
     // Get data from EHealth API
 
     /**
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse|null
     {

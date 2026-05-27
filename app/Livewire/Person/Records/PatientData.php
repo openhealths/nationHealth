@@ -7,15 +7,14 @@ namespace App\Livewire\Person\Records;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Person\AuthenticationMethodAction;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\Person\Records\Forms\PersonForm as Form;
 use App\Models\Person\Person;
 use App\Repositories\Repository;
 use App\Traits\FormTrait;
 use Exception;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 
@@ -81,13 +80,12 @@ class PatientData extends BasePatientComponent
 
                 $this->verificationStatus = $response->getData()['verification_status'];
             } catch (Exception $exception) {
-                $this->logDatabaseErrors($exception, 'Error when updating person verification status');
-                Session::flash('error', __('messages.database_error'));
+                $this->handleDatabaseErrors($exception, 'Error when updating person verification status');
 
                 return;
             }
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when getting person verification details');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting person verification details');
 
             return;
         }
@@ -104,8 +102,8 @@ class PatientData extends BasePatientComponent
             $response = EHealth::person()->getConfidantPersonRelationships($this->uuid, ['is_expired' => false]);
 
             $this->confidantPersonRelationships = $response->getData();
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when getting confidant person relationships');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting confidant person relationships');
 
             return;
         }
@@ -122,8 +120,8 @@ class PatientData extends BasePatientComponent
             $response = EHealth::person()->getAuthMethods($this->uuid);
 
             $this->authenticationMethods = Arr::toCamelCase($response->getData());
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when getting auth methods');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting auth methods');
 
             return;
         }
@@ -150,8 +148,8 @@ class PatientData extends BasePatientComponent
 
         try {
             EHealth::person()->createAuthMethod($this->uuid, Arr::toSnakeCase($validated));
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when deactivating auth method request');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when deactivating auth method request');
 
             return;
         }
@@ -182,8 +180,8 @@ class PatientData extends BasePatientComponent
             if ($response->successful()) {
                 $this->authMethodId = $response->getData()['id'];
             }
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when creating auth method request');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when creating auth method request');
 
             return;
         }
@@ -202,8 +200,8 @@ class PatientData extends BasePatientComponent
             if ($response->getData()['status'] === 'new') {
                 Session::flash('success', __('patients.messages.sms_sent_successfully'));
             }
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when resending sms to person');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when resending sms to person');
 
             return;
         }

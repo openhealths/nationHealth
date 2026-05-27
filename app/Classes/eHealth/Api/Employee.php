@@ -10,7 +10,7 @@ use App\Classes\eHealth\Exceptions\ApiException;
 use App\Classes\eHealth\Request;
 use App\Core\Arr;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Http\Client\ConnectionException;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
@@ -30,7 +30,7 @@ class Employee extends EHealthRequest
      * @param  array  $filters  An associative array of query parameters to filter the results.
      * @param  int  $page  The page number to fetch.
      * @return PromiseInterface|EHealthResponse The EHealthResponse object containing the validated and transformed data.
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     public function getMany(array $filters, int $page = 1): PromiseInterface|EHealthResponse
     {
@@ -47,7 +47,7 @@ class Employee extends EHealthRequest
     }
 
     /**
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     public function getDetails(string $uuid, $query = null, bool $groupByEntities = false): PromiseInterface|EHealthResponse
     {

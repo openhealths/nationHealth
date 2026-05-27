@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire\DiagnosticReport;
 
 use App\Classes\eHealth\EHealth;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Core\Arr;
 use App\Repositories\MedicalEvents\Repository;
 use Exception;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
@@ -50,8 +49,7 @@ class DiagnosticReportCreate extends DiagnosticReportComponent
         try {
             $this->storeValidatedData($formattedData);
         } catch (Exception|Throwable $exception) {
-            Session::flash('error', __('messages.database_error'));
-            $this->logDatabaseErrors($exception, 'Error while saving diagnostic report');
+            $this->handleDatabaseErrors($exception, 'Error while saving diagnostic report');
 
             return;
         }
@@ -91,8 +89,7 @@ class DiagnosticReportCreate extends DiagnosticReportComponent
         try {
             $this->storeValidatedData($formattedData);
         } catch (Exception|Throwable $exception) {
-            Session::flash('error', __('messages.database_error'));
-            $this->logDatabaseErrors($exception, 'Error while saving diagnostic report');
+            $this->handleDatabaseErrors($exception, 'Error while saving diagnostic report');
 
             return;
         }
@@ -110,8 +107,8 @@ class DiagnosticReportCreate extends DiagnosticReportComponent
 
             Session::flash('success', 'Заявку на створення діагностичного звіту успішно відправлено.');
             $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when creating a diagnostic report');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when creating a diagnostic report');
 
             return;
         }

@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Exceptions\EHealth;
 
-use Exception;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Session;
 
-class EHealthResponseException extends Exception
+class EHealthResponseException extends EHealthException
 {
     public function __construct(public readonly Response $response)
     {
@@ -27,24 +28,44 @@ class EHealthResponseException extends Exception
     }
 
     /**
+     * Log the exception and flash a user-facing error message.
+     *
+     * @param  string  $logMessage
+     * @return void
+     */
+    public function handle(string $logMessage): void
+    {
+        $caller = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2)[1] ?? [];
+
+        Log::channel('e_health_errors')->error($logMessage, [
+            'class' => $caller['class'] ?? 'unknown_class',
+            'method' => $caller['function'] ?? 'unknown_method',
+            'exception_type' => static::class,
+            'error_message' => $this->getDetails()
+        ]);
+
+        Session::flash('error', __('messages.ehealth_error', ['message' => $this->getMessage()]));
+    }
+
+    /**
      * Report the exception.
      *
      * @return void
      */
     public function report(): void
     {
-        \Illuminate\Support\Facades\Log::error('eHealth API Error Detail', [
+        Log::error('eHealth API Error Detail', [
             'status' => $this->response->status(),
             'reason' => $this->response->reason(),
-            'url'    => $this->response->effectiveUri()?->__toString(),
-            'body'   => $this->response->body(),
+            'url' => $this->response->effectiveUri()?->__toString(),
+            'body' => $this->response->body(),
         ]);
     }
 
     /**
      * Helper method to extract the most relevant error message.
      *
-     * @param Response $response
+     * @param  Response  $response
      * @return string
      */
     protected function extractErrorMessage(Response $response): string

@@ -43,8 +43,7 @@ class DeclarationCreate extends DeclarationComponent
 
             $this->redirectRoute('declaration.index', [legalEntity()], navigate: true);
         } catch (Exception $exception) {
-            $this->logDatabaseErrors($exception, 'Error saving declaration request');
-            Session::flash('error', __('messages.database_error'));
+            $this->handleDatabaseErrors($exception, 'Error saving declaration request');
 
             return;
         }

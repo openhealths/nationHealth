@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Exceptions\EHealth\EHealthConnectionException;
 use Throwable;
 use App\Core\Arr;
 use Carbon\Carbon;
@@ -22,12 +23,11 @@ use App\Models\Employee\EmployeeRequest;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Middleware\RateLimited;
-use Illuminate\Http\Client\ConnectionException;
 
 class EmployeeDetailsUpsert extends EHealthJob
 {
-    use Dispatchable,
-        SerializesModels;
+    use Dispatchable;
+    use SerializesModels;
 
     public const string BATCH_NAME = 'EmployeeDetailsSync';
 
@@ -47,7 +47,7 @@ class EmployeeDetailsUpsert extends EHealthJob
     // Get data from EHealth API
 
     /**
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse|null
     {

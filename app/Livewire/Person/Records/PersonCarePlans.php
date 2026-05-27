@@ -5,13 +5,11 @@ declare(strict_types=1);
 namespace App\Livewire\Person\Records;
 
 use App\Classes\eHealth\EHealth;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
-use App\Models\LegalEntity;
 use App\Repositories\CarePlanRepository;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Session;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
 class PersonCarePlans extends BasePatientComponent
@@ -59,13 +57,14 @@ class PersonCarePlans extends BasePatientComponent
                 $this->uuid,
                 [] // Removed managing_organization_id to see all plans
             );
-            
+
             \Illuminate\Support\Facades\Log::info('PersonCarePlans: sync response', [
                 'count' => count($response->getData()),
                 'patient_uuid' => $this->uuid
             ]);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while synchronizing care plans');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while synchronizing care plans');
+
             return;
         }
 
@@ -77,8 +76,8 @@ class PersonCarePlans extends BasePatientComponent
                 'message' => $exception->getMessage(),
                 'trace' => $exception->getTraceAsString()
             ]);
-            $this->logDatabaseErrors($exception, 'Error while synchronizing care plans');
-            Session::flash('error', __('patients.messages.care_plan_sync_database_error') ?? 'Помилка збереження планів лікування: ' . $exception->getMessage());
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing care plans');
+
             return;
         }
 

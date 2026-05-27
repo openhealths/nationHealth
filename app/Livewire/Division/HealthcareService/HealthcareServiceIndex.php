@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Division\HealthcareService;
 
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Exception;
 use Throwable;
 use App\Classes\eHealth\EHealth;
 use App\Enums\JobStatus;
 use App\Enums\Status;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use App\Jobs\HealthcareServiceSync;
 use App\Models\Division;
 use App\Models\HealthcareService;
@@ -21,7 +21,6 @@ use App\Repositories\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\FormTrait;
 use Illuminate\Bus\Batch;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
@@ -165,8 +164,8 @@ class HealthcareServiceIndex extends Component
 
         try {
             $response = EHealth::healthcareService()->activate($healthcareService->uuid);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, "Error when activate $healthcareService->uuid a healthcare service");
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle("Error when activate $healthcareService->uuid a healthcare service");
 
             return;
         }
@@ -176,8 +175,7 @@ class HealthcareServiceIndex extends Component
 
             Session::flash('success', 'Послугу успішно активовано');
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, "Failed to activate $healthcareService->uuid healthcare service");
-            Session::flash('error', __('messages.database_error'));
+            $this->handleDatabaseErrors($exception, "Failed to activate $healthcareService->uuid healthcare service");
 
             return;
         }
@@ -193,8 +191,8 @@ class HealthcareServiceIndex extends Component
 
         try {
             $response = EHealth::healthcareService()->deactivate($healthcareService->uuid);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, "Error when deactivating $healthcareService->uuid a healthcare service");
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle("Error when deactivating $healthcareService->uuid a healthcare service");
 
             return;
         }
@@ -204,8 +202,7 @@ class HealthcareServiceIndex extends Component
 
             Session::flash('success', 'Послугу успішно деактивовано');
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, "Failed to deactivate $healthcareService->uuid healthcare service");
-            Session::flash('error', __('messages.database_error'));
+            $this->handleDatabaseErrors($exception, "Failed to deactivate $healthcareService->uuid healthcare service");
 
             return;
         }
@@ -224,8 +221,7 @@ class HealthcareServiceIndex extends Component
 
             Session::flash('success', 'Чернетку послуги успішно видалено');
         } catch (Exception $exception) {
-            $this->logDatabaseErrors($exception, 'Error while deleting healthcare service: ');
-            Session::flash('error', __('messages.database_error'));
+            $this->handleDatabaseErrors($exception, 'Error while deleting healthcare service: ');
 
             return;
         }
@@ -250,7 +246,6 @@ class HealthcareServiceIndex extends Component
 
         // Try to resume previous sync if it was paused or failed
         if ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value) {
-
             $this->resumeSynchronization($user, $token);
 
             Session::flash('success', __('Відновлення попередньої синхронізації розпочато'));
@@ -264,8 +259,8 @@ class HealthcareServiceIndex extends Component
             $query = $this->divisionUuid ? ['division_id' => $this->divisionUuid] : [];
 
             $response = EHealth::healthcareService()->getMany($query);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error connecting when getting a healthcare service list');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error connecting when getting a healthcare service list');
 
             return;
         }
@@ -274,8 +269,11 @@ class HealthcareServiceIndex extends Component
             $validated = $response->validate();
             Repository::healthcareService()->sync($response->map($validated));
         } catch (Throwable $exception) {
-            Session::flash('error', 'Виникла помилка. Оновіть список місць надання послуг та спробуйте ще раз');
-            $this->logDatabaseErrors($exception, 'Error while synchronizing healthcare services with eHealth: ');
+            $this->handleDatabaseErrors(
+                $exception,
+                'Error while synchronizing healthcare services with eHealth: ',
+                'Виникла помилка. Оновіть список місць надання послуг та спробуйте ще раз'
+            );
 
             return;
         }
@@ -299,15 +297,15 @@ class HealthcareServiceIndex extends Component
     }
 
     /**
-    * Resume the synchronization process for a user with the provided token.
-    *
-    * This method handles the continuation of a previously initiated synchronization
-    * operation for a specific user using an authentication or session token.
-    *
+     * Resume the synchronization process for a user with the provided token.
+     *
+     * This method handles the continuation of a previously initiated synchronization
+     * operation for a specific user using an authentication or session token.
+     *
      * @param  User  $user  The user instance for whom synchronization should be resumed
      * @param  string  $token  The authentication or session token used to resume the sync process
      * @return void
-    */
+     */
     protected function resumeSynchronization(User $user, string $token): void
     {
         $encryptedToken = Crypt::encryptString($token);

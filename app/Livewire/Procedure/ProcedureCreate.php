@@ -5,17 +5,16 @@ declare(strict_types=1);
 namespace App\Livewire\Procedure;
 
 use App\Classes\eHealth\EHealth;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Core\Arr;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\EnsureEntityExistsService;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
 class ProcedureCreate extends ProcedureComponent
@@ -50,8 +49,7 @@ class ProcedureCreate extends ProcedureComponent
         try {
             $this->storeValidatedData($formattedData);
         } catch (Throwable $exception) {
-            Session::flash('error', __('messages.database_error'));
-            $this->logDatabaseErrors($exception, 'Error saving procedure');
+            $this->handleDatabaseErrors($exception, 'Error saving procedure');
 
             return;
         }
@@ -91,8 +89,7 @@ class ProcedureCreate extends ProcedureComponent
         try {
             $this->storeValidatedData($formattedData);
         } catch (Throwable $exception) {
-            Session::flash('error', __('messages.database_error'));
-            $this->logDatabaseErrors($exception, 'Error saving procedure');
+            $this->handleDatabaseErrors($exception, 'Error saving procedure');
 
             return;
         }
@@ -110,8 +107,8 @@ class ProcedureCreate extends ProcedureComponent
 
             Session::flash('success', 'Заявку на створення процедури успішно відправлено.');
             $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when creating a procedure');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when creating a procedure');
 
             return;
         }

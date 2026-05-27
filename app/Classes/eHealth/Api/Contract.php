@@ -8,7 +8,7 @@ use App\Classes\eHealth\EHealthRequest;
 use App\Classes\eHealth\EHealthResponse;
 use App\Exceptions\EHealth\EHealthResponseException;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Http\Client\ConnectionException;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -23,9 +23,9 @@ class Contract extends EHealthRequest
     /**
      * Get the details of the signed contract by ID
      *
-     * @param string $id contract UUID
+     * @param  string  $id  contract UUID
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     public function getDetails(string $id): PromiseInterface|EHealthResponse
     {
@@ -35,9 +35,9 @@ class Contract extends EHealthRequest
     /**
      * Get a list of contracts with validation logic.
      *
-     * @param array $queryParams
+     * @param  array  $queryParams
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     public function getMany(array $queryParams = []): PromiseInterface|EHealthResponse
     {
@@ -60,13 +60,14 @@ class Contract extends EHealthRequest
                 $replaced[$name] = $value;
             }
         }
+
         return $replaced;
     }
 
     /**
      * Internal validator for contract list response.
      *
-     * @param EHealthResponse $response
+     * @param  EHealthResponse  $response
      * @return array
      * @throws ValidationException
      * @throws EHealthResponseException

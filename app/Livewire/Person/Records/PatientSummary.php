@@ -7,6 +7,8 @@ namespace App\Livewire\Person\Records;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\JobStatus;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Jobs\EpisodeSync;
@@ -28,7 +30,6 @@ use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use InvalidArgumentException;
@@ -157,8 +158,8 @@ class PatientSummary extends BasePatientComponent
 
         try {
             $response = EHealth::episode()->getShortEpisodes($this->uuid);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while synchronizing episodes');
+        } catch (EHealthConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+            $exception->handle('Error while synchronizing episodes');
 
             return;
         }
@@ -167,8 +168,7 @@ class PatientSummary extends BasePatientComponent
             $validatedData = $response->validate();
             Repository::episode()->sync($this->personId, $validatedData);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Error while synchronizing episodes');
-            Session::flash('error', __('patients.messages.episode_sync_database_error'));
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing episodes');
 
             return;
         }
@@ -202,8 +202,8 @@ class PatientSummary extends BasePatientComponent
 
         try {
             $response = EHealth::encounter()->getShortBySearchParams($this->uuid);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while synchronizing encounters');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while synchronizing encounters');
 
             return;
         }
@@ -212,8 +212,7 @@ class PatientSummary extends BasePatientComponent
             $validatedData = $response->validate();
             Repository::encounter()->sync($this->personId, $validatedData);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Error while synchronizing encounters');
-            Session::flash('error', __('patients.messages.encounter_sync_database_error'));
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing encounters');
 
             return;
         }
@@ -250,8 +249,8 @@ class PatientSummary extends BasePatientComponent
 
         try {
             $response = EHealth::clinicalImpression()->getSummary($this->uuid);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while synchronizing clinical impressions');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while synchronizing clinical impressions');
 
             return;
         }
@@ -260,8 +259,7 @@ class PatientSummary extends BasePatientComponent
             $validatedData = $response->validate();
             Repository::clinicalImpression()->sync($this->personId, $validatedData);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Error while synchronizing clinical impressions');
-            Session::flash('error', __('patients.messages.clinical_impression_sync_database_error'));
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing clinical impressions');
 
             return;
         }
@@ -298,8 +296,8 @@ class PatientSummary extends BasePatientComponent
 
         try {
             $response = EHealth::immunization()->getSummary($this->uuid);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while synchronizing immunizations');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while synchronizing immunizations');
 
             return;
         }
@@ -308,8 +306,7 @@ class PatientSummary extends BasePatientComponent
             $validatedData = $response->validate();
             Repository::immunization()->sync($this->personId, $validatedData);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Error while synchronizing immunizations');
-            Session::flash('error', __('patients.messages.immunization_sync_database_error'));
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing immunizations');
 
             return;
         }
@@ -318,7 +315,6 @@ class PatientSummary extends BasePatientComponent
             $this->dispatchRemainingPages(self::ENTITY_TYPE_IMMUNIZATION);
         } else {
             legalEntity()->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_IMMUNIZATION);
-            Session::flash('success', __('patients.messages.immunizations_synced_successfully'));
         }
 
         $this->immunizations = Arr::toCamelCase($this->formatDatesForDisplay($validatedData));
@@ -349,8 +345,8 @@ class PatientSummary extends BasePatientComponent
                 $this->uuid,
                 ['managing_organization_id' => legalEntity()->uuid]
             );
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while synchronizing observations');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while synchronizing observations');
 
             return;
         }
@@ -359,8 +355,7 @@ class PatientSummary extends BasePatientComponent
             $validatedData = $response->validate();
             Repository::observation()->sync($this->personId, $validatedData);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Error while synchronizing observations');
-            Session::flash('error', __('patients.messages.observation_sync_database_error'));
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing observations');
 
             return;
         }
@@ -390,8 +385,8 @@ class PatientSummary extends BasePatientComponent
 
             // Refresh data for display
             $this->diagnoses = Arr::toCamelCase($this->formatDatesForDisplay($response->getData()));
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when getting diagnoses');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting diagnoses');
 
             return;
         }
@@ -419,8 +414,8 @@ class PatientSummary extends BasePatientComponent
                 $this->uuid,
                 ['managing_organization_id' => legalEntity()->uuid]
             );
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while synchronizing conditions');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while synchronizing conditions');
 
             return;
         }
@@ -429,8 +424,7 @@ class PatientSummary extends BasePatientComponent
             $validatedData = $response->validate();
             Repository::condition()->sync($this->personId, $validatedData);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Error while synchronizing conditions');
-            Session::flash('error', __('patients.messages.condition_sync_database_error'));
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing conditions');
 
             return;
         }
@@ -473,8 +467,8 @@ class PatientSummary extends BasePatientComponent
                 $this->uuid,
                 ['managing_organization_id' => legalEntity()->uuid]
             );
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while synchronizing diagnostic reports');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while synchronizing diagnostic reports');
 
             return;
         }
@@ -483,8 +477,7 @@ class PatientSummary extends BasePatientComponent
             $validatedData = $response->validate();
             Repository::diagnosticReport()->sync($this->personId, $validatedData);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Error while synchronizing diagnostic reports');
-            Session::flash('error', __('patients.messages.diagnostic_report_sync_database_error'));
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing diagnostic reports');
 
             return;
         }
@@ -512,8 +505,8 @@ class PatientSummary extends BasePatientComponent
         try {
             $response = EHealth::patient()->getAllergyIntolerances($this->uuid);
             $validatedData = $response->validate();
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when getting allergy intolerances');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting allergy intolerances');
 
             return;
         }
@@ -524,8 +517,8 @@ class PatientSummary extends BasePatientComponent
         try {
             $response = EHealth::patient()->getRiskAssessments($this->uuid);
             $validatedData = $response->validate();
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when getting risk assessments');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting risk assessments');
 
             return;
         }
@@ -536,8 +529,8 @@ class PatientSummary extends BasePatientComponent
         try {
             $response = EHealth::patient()->getDevices($this->uuid);
             $validatedData = $response->validate();
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when getting devices');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting devices');
 
             return;
         }
@@ -548,8 +541,8 @@ class PatientSummary extends BasePatientComponent
         try {
             $response = EHealth::patient()->getMedicationStatements($this->uuid);
             $validatedData = $response->validate();
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when getting medication statements');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting medication statements');
 
             return;
         }

@@ -7,8 +7,6 @@ namespace App\Livewire\Person;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Person\Status;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\Person\Forms\PersonForm as Form;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
@@ -16,10 +14,11 @@ use App\Models\Person\PersonRequest;
 use App\Rules\InDictionary;
 use App\Rules\PhoneNumber;
 use App\Traits\FormTrait;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Exception;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
@@ -186,8 +185,8 @@ class PersonIndex extends Component
             try {
                 $validatedEhealth = EHealth::person()->searchForPersonByParams($buildSearchRequest)->validate();
                 $validatedEhealth = $this->setPersonSource($validatedEhealth, 'ehealth');
-            } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-                $this->handleEHealthExceptions($exception, 'Error while submitting encounter');
+            } catch (EHealthException|EHealthConnectionException $exception) {
+                $exception->handle('Error while submitting encounter');
 
                 return;
             }
@@ -292,7 +291,6 @@ class PersonIndex extends Component
 
             return $person;
         } catch (Exception $exception) {
-            Session::flash('error', 'Виникла помилка, зверніться до адміністратора.');
             $this->logDatabaseErrors($exception, 'Error while creating new person');
 
             return null;

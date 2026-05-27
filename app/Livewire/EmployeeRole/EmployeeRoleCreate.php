@@ -6,8 +6,6 @@ namespace App\Livewire\EmployeeRole;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\EmployeeRole\Forms\EmployeeRoleForm as Form;
 use App\Models\Employee\Employee;
 use App\Models\EmployeeRole;
@@ -15,12 +13,13 @@ use App\Models\HealthcareService;
 use App\Models\LegalEntity;
 use App\Repositories\Repository;
 use App\Traits\FormTrait;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Component;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
 class EmployeeRoleCreate extends Component
@@ -79,8 +78,8 @@ class EmployeeRoleCreate extends Component
 
         try {
             $response = EHealth::employeeRole()->create(Arr::toSnakeCase($validated));
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when creating an employee role');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when creating an employee role');
 
             return;
         }
@@ -93,8 +92,7 @@ class EmployeeRoleCreate extends Component
             Session::flash('success', 'Роль успішно додано.');
             $this->redirectRoute('employee-role.index', [legalEntity()], navigate: true);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Failed to store employee role');
-            Session::flash('error', __('messages.database_error'));
+            $this->handleDatabaseErrors($exception, 'Failed to store employee role');
 
             return;
         }

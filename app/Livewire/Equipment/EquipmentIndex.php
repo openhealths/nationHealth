@@ -8,8 +8,6 @@ use App\Classes\eHealth\EHealth;
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Equipment\Status;
 use App\Enums\JobStatus;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use App\Jobs\EquipmentSync;
 use App\Livewire\Equipment\Traits\StatusTrait;
 use App\Models\Equipment;
@@ -21,7 +19,6 @@ use App\Traits\BatchLegalEntityQueries;
 use App\Traits\FormTrait;
 use Illuminate\Bus\Batch;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
@@ -32,6 +29,8 @@ use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithPagination;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
 class EquipmentIndex extends Component
@@ -153,10 +152,10 @@ class EquipmentIndex extends Component
 
         // Return true if either sync is in progress
         return $equipmentSync ||
-               $legalEntitySync ||
-               $divisionSync ||
-               $healthCareServiceSync ||
-               $employeeSync;
+            $legalEntitySync ||
+            $divisionSync ||
+            $healthCareServiceSync ||
+            $employeeSync;
     }
 
     public function boot(): void
@@ -208,7 +207,6 @@ class EquipmentIndex extends Component
 
         // Try to resume previous sync if it was paused or failed
         if ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value) {
-
             $this->resumeSynchronization($user, $token);
 
             Session::flash('success', __('Відновлення попередньої синхронізації розпочато'));
@@ -220,8 +218,8 @@ class EquipmentIndex extends Component
 
         try {
             $response = EHealth::equipment()->getMany();
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error connecting when getting a equipment list');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error connecting when getting a equipment list');
 
             return;
         }
@@ -231,8 +229,11 @@ class EquipmentIndex extends Component
 
             Repository::equipment()->sync($response->map($validated));
         } catch (Throwable $exception) {
-            Session::flash('error', 'Виникла помилка. Оновіть список місць надання послуг та співробітників і спробуйте ще раз');
-            $this->logDatabaseErrors($exception, 'Error while synchronizing equipments with eHealth: ');
+            $this->handleDatabaseErrors(
+                $exception,
+                'Error while synchronizing equipments with eHealth: ',
+                'Виникла помилка. Оновіть список місць надання послуг та співробітників і спробуйте ще раз'
+            );
 
             return;
         }

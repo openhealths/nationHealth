@@ -7,8 +7,6 @@ namespace App\Livewire\Person\Records;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\JobStatus;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use App\Jobs\EncounterFullSync;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
@@ -17,9 +15,10 @@ use App\Models\MedicalEvents\Sql\Identifier;
 use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Session;
 use Illuminate\View\View;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
 class PatientEncounters extends BasePatientComponent
@@ -132,8 +131,8 @@ class PatientEncounters extends BasePatientComponent
                 $this->uuid,
                 ['managing_organization_id' => legalEntity()->uuid]
             );
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while synchronizing encounters');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while synchronizing encounters');
 
             return;
         }
@@ -142,8 +141,7 @@ class PatientEncounters extends BasePatientComponent
             $validatedData = $response->validate();
             Repository::encounter()->sync($this->personId, $validatedData);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Error while synchronizing encounters');
-            Session::flash('error', __('patients.messages.encounter_sync_database_error'));
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing encounters');
 
             return;
         }
@@ -171,8 +169,8 @@ class PatientEncounters extends BasePatientComponent
         try {
             $response = EHealth::encounter()->getBySearchParams($this->uuid, $params);
             $this->encounters = Arr::toCamelCase($this->formatDatesForDisplay($response->validate()));
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while searching encounters');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while searching encounters');
         }
     }
 

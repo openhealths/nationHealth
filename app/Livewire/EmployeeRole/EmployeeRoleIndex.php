@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\EmployeeRole;
 
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 use App\Models\User;
 use Livewire\Component;
@@ -25,10 +27,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Session;
 use App\Traits\BatchLegalEntityQueries;
 use App\Notifications\SyncNotification;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Pagination\LengthAwarePaginator;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 
 class EmployeeRoleIndex extends Component
 {
@@ -155,8 +154,8 @@ class EmployeeRoleIndex extends Component
 
         try {
             $response = EHealth::employeeRole()->deactivate($employeeRole->uuid);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, "Error when deactivating $employeeRole->uuid employee role");
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle("Error when deactivating $employeeRole->uuid employee role");
 
             return;
         }
@@ -167,8 +166,7 @@ class EmployeeRoleIndex extends Component
             $this->dispatch('deactivate-success');
             Session::flash('success', 'Роль успішно деактивовано');
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, "Failed to deactivate $employeeRole->uuid employee role");
-            Session::flash('error', __('messages.database_error'));
+            $this->handleDatabaseErrors($exception, "Failed to deactivate $employeeRole->uuid employee role");
 
             return;
         }
@@ -192,7 +190,6 @@ class EmployeeRoleIndex extends Component
         $token = Session::get(config('ehealth.api.oauth.bearer_token'));
 
         if ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value) {
-
             $this->resumeSynchronization($user, $token);
 
             Session::flash('success', __('Відновлення попередньої синхронізації розпочато'));
@@ -204,8 +201,8 @@ class EmployeeRoleIndex extends Component
 
         try {
             $response = EHealth::employeeRole()->getMany();
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error connecting when getting a employee role list');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error connecting when getting a employee role list');
 
             return;
         }
@@ -215,8 +212,11 @@ class EmployeeRoleIndex extends Component
 
             Repository::employeeRole()->sync($response->map($validated));
         } catch (Throwable $exception) {
-            Session::flash('error', 'Виникла помилка. Оновіть список співробітників і послуги та спробуйте ще раз');
-            $this->logDatabaseErrors($exception, 'Error while synchronizing employee roles with eHealth: ');
+            $this->handleDatabaseErrors(
+                $exception,
+                'Error while synchronizing employee roles with eHealth: ',
+                'Виникла помилка. Оновіть список співробітників і послуги та спробуйте ще раз'
+            );
 
             return;
         }

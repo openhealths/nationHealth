@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Actions;
 
 use App\Classes\eHealth\EHealth;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
-use Illuminate\Http\Client\ConnectionException;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -26,7 +25,7 @@ class Logout
         ) {
             try {
                 EHealth::auth()->logout(Session::get('auth_token'));
-            } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+            } catch (EHealthException|EHealthConnectionException $exception) {
                 // Log the error but don't prevent logout
                 Log::channel('e_health_errors')->error("Error while logout: {$exception->getMessage()}", [
                     'exception' => $exception,

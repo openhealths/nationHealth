@@ -6,19 +6,18 @@ namespace App\Livewire\Person\Records;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
-use App\Exceptions\EHealth\EHealthValidationException;
-use App\Exceptions\EHealth\EHealthResponseException;
 use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Jobs\DiagnosticReportSync;
 use App\Traits\HandlesSyncBatch;
 use App\Models\LegalEntity;
 use App\Enums\JobStatus;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Session;
 use Illuminate\View\View;
 use Livewire\WithPagination;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
 class PatientDiagnosticReports extends BasePatientComponent
@@ -150,8 +149,8 @@ class PatientDiagnosticReports extends BasePatientComponent
                 $this->uuid,
                 $this->buildSearchParams(),
             );
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while synchronizing diagnostic report');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while synchronizing diagnostic report');
 
             return;
         }
@@ -160,8 +159,7 @@ class PatientDiagnosticReports extends BasePatientComponent
             $validatedData = $response->validate();
             Repository::diagnosticReport()->sync($this->personId, $validatedData);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Error while synchronizing diagnostic report');
-            Session::flash('error', __('patients.messages.diagnostic_report_sync_database_error'));
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing diagnostic report');
 
             return;
         }
@@ -205,10 +203,10 @@ class PatientDiagnosticReports extends BasePatientComponent
             $this->pageSize = $paging['page_size'] ?? 10;
 
             $this->diagnosticReports = Arr::toCamelCase($validateData);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+        } catch (EHealthException|EHealthConnectionException $exception) {
             $this->diagnosticReports = [];
 
-            $this->handleEHealthExceptions($exception, 'Error while loading diagnostic reports');
+            $exception->handle('Error while loading diagnostic reports');
         }
     }
 
@@ -252,10 +250,10 @@ class PatientDiagnosticReports extends BasePatientComponent
                 ->sortBy('label')
                 ->values()
                 ->toArray();
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+        } catch (EHealthException|EHealthConnectionException $exception) {
             $this->filterEpisodeOptions = [];
 
-            $this->handleEHealthExceptions($exception, 'Error while loading episodes');
+            $exception->handle('Error while loading episodes');
         }
     }
 
@@ -299,10 +297,10 @@ class PatientDiagnosticReports extends BasePatientComponent
             $validatedData = $response->validate();
 
             $this->filterEncounterOptions = Arr::toCamelCase($validatedData);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+        } catch (EHealthException|EHealthConnectionException $exception) {
             $this->filterEncounterOptions = [];
 
-            $this->handleEHealthExceptions($exception, 'Error while loading encounters');
+            $exception->handle('Error while loading encounters');
         }
     }
 

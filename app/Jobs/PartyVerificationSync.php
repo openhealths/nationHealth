@@ -10,7 +10,6 @@ use App\Classes\eHealth\EHealth;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\ProcessesPartyVerificationResponses;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -24,7 +23,7 @@ class PartyVerificationSync extends EHealthJob
     public const string SCOPE_REQUIRED = 'party_verification:read';
 
     /**
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse
     {

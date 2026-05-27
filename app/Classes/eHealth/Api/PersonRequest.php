@@ -16,7 +16,7 @@ use App\Rules\TaxId;
 use App\Rules\Zip;
 use App\Models\Person\Person as PersonModel;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Http\Client\ConnectionException;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
@@ -31,7 +31,7 @@ class PersonRequest extends Request
      *
      * @param  array  $data
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
      * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/create/update-person-request-v2
      */
@@ -51,7 +51,7 @@ class PersonRequest extends Request
      * @param  string  $id
      * @param  array  $data
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
      * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/approve-person-request-v2
      */
@@ -65,7 +65,7 @@ class PersonRequest extends Request
      *
      * @param  string  $id
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
      * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/reject-person-request-v2
      */
@@ -80,7 +80,7 @@ class PersonRequest extends Request
      * @param  string  $id
      * @param  array  $data
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
      * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/sign-person-request-v2
      */
@@ -95,7 +95,7 @@ class PersonRequest extends Request
      * @param  string  $id
      * @param  array  $query
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
      * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/get-person-request-by-id-v2
      */
@@ -112,7 +112,7 @@ class PersonRequest extends Request
      *
      * @param  array{status?: 'NEW'|'APPROVED'|'SIGNED'|'REJECTED'|'CANCELLED', page?: int, page_size?: int}  $query
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
      * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/get-person-requests-list
      */
@@ -131,7 +131,7 @@ class PersonRequest extends Request
      * @param  string  $id
      * @param  array  $data
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
      * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/resend-authorization-otp-on-person-request
      */

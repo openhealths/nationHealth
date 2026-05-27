@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Dictionary;
 
 use App\Classes\eHealth\EHealthResponse;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Jobs\UpdateDictionaryCache;
@@ -23,7 +24,6 @@ use App\Services\Dictionary\Dictionaries\ForbiddenGroupDictionary;
 use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
 use App\Services\Dictionary\Dictionaries\ServiceDictionary;
 use Exception;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Illuminate\Support\Collection;
@@ -178,8 +178,8 @@ class DictionaryManager
                 }
 
                 return collect($freshData);
-            } catch (ConnectionException $e) {
-                Log::error("Dictionary '$key' connection failed", ['error' => $e->getMessage()]);
+            } catch (EHealthConnectionException $exception) {
+                $exception->handle("Dictionary '$key' connection failed");
 
                 return collect(Cache::get($cacheKey, []));
             } catch (EHealthResponseException|EHealthValidationException $e) {

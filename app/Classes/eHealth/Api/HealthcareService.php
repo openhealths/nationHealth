@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\LegalEntity as LegalEntityModel;
@@ -13,7 +14,6 @@ use Illuminate\Support\Facades\Log;
 use App\Classes\eHealth\EHealthResponse;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Http\Client\ConnectionException;
 use App\Classes\eHealth\EHealthRequest as Request;
 
 class HealthcareService extends Request
@@ -38,7 +38,7 @@ class HealthcareService extends Request
      *     page_size?: int
      * } $query
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function getMany(array $query = []): PromiseInterface|EHealthResponse
     {
@@ -59,7 +59,7 @@ class HealthcareService extends Request
      * @param  string  $uuid
      * @param  array  $data  // Data for API request
      * @return EHealthResponse|PromiseInterface
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function update(string $uuid, array $data = []): PromiseInterface|EHealthResponse
     {
@@ -73,7 +73,7 @@ class HealthcareService extends Request
      *
      * @param  array  $data  // Data for API request
      * @return EHealthResponse|PromiseInterface
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function create(array $data = []): PromiseInterface|EHealthResponse
     {
@@ -88,7 +88,7 @@ class HealthcareService extends Request
      *
      * @param  string  $uuid  unique eHealth identifier
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function activate(string $uuid): PromiseInterface|EHealthResponse
     {
@@ -102,7 +102,7 @@ class HealthcareService extends Request
      *
      * @param  string  $uuid  unique eHealth identifier
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function deactivate(string $uuid): PromiseInterface|EHealthResponse
     {

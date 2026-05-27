@@ -7,14 +7,13 @@ namespace App\Livewire\Equipment;
 use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthResponse;
 use App\Enums\User\Role;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\Equipment;
 use App\Models\LegalEntity;
 use App\Traits\FormTrait;
 use App\Livewire\Equipment\Forms\EquipmentForm as Form;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Http\Client\ConnectionException;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
@@ -139,8 +138,8 @@ class EquipmentComponent extends Component
     {
         try {
             return EHealth::equipment()->create($validated);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when creating equipment');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when creating equipment');
 
             return null;
         }

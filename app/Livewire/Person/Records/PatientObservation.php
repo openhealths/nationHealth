@@ -7,8 +7,6 @@ namespace App\Livewire\Person\Records;
 use App\Core\Arr;
 use App\Classes\eHealth\EHealth;
 use App\Enums\JobStatus;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use App\Jobs\ObservationSync;
 use App\Models\LegalEntity;
 use App\Repositories\MedicalEvents\Repository;
@@ -16,10 +14,11 @@ use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
 use Carbon\CarbonImmutable;
 use Illuminate\View\View;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\WithPagination;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
 class PatientObservation extends BasePatientComponent
@@ -151,8 +150,8 @@ class PatientObservation extends BasePatientComponent
                 $this->uuid,
                 $this->buildSearchParams(),
             );
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while synchronizing observation');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while synchronizing observation');
 
             return;
         }
@@ -161,8 +160,7 @@ class PatientObservation extends BasePatientComponent
             $validatedData = $response->validate();
             Repository::observation()->sync($this->personId, $validatedData);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Error while synchronizing observation');
-            Session::flash('error', __('patients.messages.observation_sync_database_error'));
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing observation');
 
             return;
         }
@@ -424,10 +422,10 @@ class PatientObservation extends BasePatientComponent
             $this->pageSize = $paging['page_size'] ?? 10;
 
             $this->observations = Arr::toCamelCase($validatedData);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+        } catch (EHealthException|EHealthConnectionException $exception) {
             $this->observations = [];
 
-            $this->handleEHealthExceptions($exception, 'Error while loading observations');
+            $exception->handle('Error while loading observations');
         }
     }
 

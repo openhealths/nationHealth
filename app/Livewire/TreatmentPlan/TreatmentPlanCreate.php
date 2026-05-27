@@ -6,11 +6,11 @@ namespace App\Livewire\TreatmentPlan;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\TreatmentPlan;
 use App\Repositories\TreatmentPlanRepository;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -32,18 +32,18 @@ class TreatmentPlanCreate extends BasePatientComponent
 
     // Care Plan form data
     public array $form = [
-        'author'      => '',
-        'coAuthors'   => [],
-        'category'    => '',
-        'title'       => '',
-        'intent'      => 'order',
+        'author' => '',
+        'coAuthors' => [],
+        'category' => '',
+        'title' => '',
+        'intent' => 'order',
         'terms_of_service' => '',
         'period_start' => '',
-        'period_end'   => '',
-        'encounter'    => '',
-        'description'  => '',
-        'note'        => '',
-        'inform_with'  => '',
+        'period_end' => '',
+        'encounter' => '',
+        'description' => '',
+        'note' => '',
+        'inform_with' => '',
         'supporting_info' => [],
     ];
 
@@ -75,15 +75,15 @@ class TreatmentPlanCreate extends BasePatientComponent
     protected function rules(): array
     {
         return [
-            'form.category'         => 'required|string',
-            'form.title'            => 'required|string',
-            'form.period_start'     => 'required|string',
-            'form.period_end'       => 'nullable|string',
-            'form.encounter'        => 'required|string',
+            'form.category' => 'required|string',
+            'form.title' => 'required|string',
+            'form.period_start' => 'required|string',
+            'form.period_end' => 'nullable|string',
+            'form.encounter' => 'required|string',
             'form.terms_of_service' => 'nullable|string',
-            'form.description'      => 'nullable|string',
-            'form.note'             => 'nullable|string',
-            'form.inform_with'      => 'nullable|string',
+            'form.description' => 'nullable|string',
+            'form.note' => 'nullable|string',
+            'form.inform_with' => 'nullable|string',
         ];
     }
 
@@ -93,9 +93,9 @@ class TreatmentPlanCreate extends BasePatientComponent
     protected function rulesForSigning(): array
     {
         return array_merge($this->rules(), [
-            'knedp'              => 'required|string',
+            'knedp' => 'required|string',
             'keyContainerUpload' => 'required|file|max:1024',
-            'password'           => 'required|string',
+            'password' => 'required|string',
         ]);
     }
 
@@ -105,7 +105,8 @@ class TreatmentPlanCreate extends BasePatientComponent
     public function updatedFormPeriodEnd(): void
     {
         if (!empty($this->form['period_end'])) {
-            Session::flash('warning',
+            Session::flash(
+                'warning',
                 'Увага! Ви зазначаєте кінцевий термін періоду дійсності ' .
                 'плану лікування. Зауважте, що отримання пацієнтом медичних послуг, ' .
                 'медичних виробів або лікарських засобів за призначенням з цього ' .
@@ -121,6 +122,7 @@ class TreatmentPlanCreate extends BasePatientComponent
     {
         if (Auth::user()?->cannot('create', TreatmentPlan::class)) {
             Session::flash('error', 'У вас немає дозволу на створення плану лікування.');
+
             return;
         }
 
@@ -129,6 +131,7 @@ class TreatmentPlanCreate extends BasePatientComponent
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
+
             return;
         }
 
@@ -137,21 +140,21 @@ class TreatmentPlanCreate extends BasePatientComponent
         $encounterData = $this->resolveEncounterData();
 
         $repository->create([
-            'person_id'       => $this->resolvePersonId(),
-            'author_id'       => Auth::user()?->activeEmployee()?->id,
+            'person_id' => $this->resolvePersonId(),
+            'author_id' => Auth::user()?->activeEmployee()?->id,
             'legal_entity_id' => $legalEntity?->id,
-            'status'          => 'NEW',
-            'category'        => $this->form['category'],
-            'title'           => $this->form['title'],
-            'period_start'    => convertToYmd($this->form['period_start']),
-            'period_end'      => !empty($this->form['period_end'])
+            'status' => 'NEW',
+            'category' => $this->form['category'],
+            'title' => $this->form['title'],
+            'period_start' => convertToYmd($this->form['period_start']),
+            'period_end' => !empty($this->form['period_end'])
                 ? convertToYmd($this->form['period_end']) : null,
             'terms_of_service' => $this->form['terms_of_service'] ?? null,
-            'encounter_id'    => $encounterData['id'],
-            'addresses'       => $encounterData['addresses'],
-            'description'     => $this->form['description'] ?? null,
-            'note'            => $this->form['note'] ?? null,
-            'inform_with'     => $this->form['inform_with'] ?? null,
+            'encounter_id' => $encounterData['id'],
+            'addresses' => $encounterData['addresses'],
+            'description' => $this->form['description'] ?? null,
+            'note' => $this->form['note'] ?? null,
+            'inform_with' => $this->form['inform_with'] ?? null,
         ]);
 
         Session::flash('success', 'Чернетку плану лікування успішно збережено.');
@@ -165,6 +168,7 @@ class TreatmentPlanCreate extends BasePatientComponent
     {
         if (Auth::user()?->cannot('create', TreatmentPlan::class)) {
             Session::flash('error', 'У вас немає дозволу на створення плану лікування.');
+
             return;
         }
 
@@ -174,6 +178,7 @@ class TreatmentPlanCreate extends BasePatientComponent
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
             $this->showSignatureModal = false;
+
             return;
         }
 
@@ -183,21 +188,21 @@ class TreatmentPlanCreate extends BasePatientComponent
 
         // Build eHealth payload
         $carePlanPayload = removeEmptyKeys([
-            'intent'          => 'order',
-            'status'          => 'new',
-            'category'        => $this->form['category'],
-            'title'           => $this->form['title'],
-            'period'          => array_filter([
+            'intent' => 'order',
+            'status' => 'new',
+            'category' => $this->form['category'],
+            'title' => $this->form['title'],
+            'period' => array_filter([
                 'start' => convertToYmd($this->form['period_start']),
-                'end'   => !empty($this->form['period_end'])
+                'end' => !empty($this->form['period_end'])
                     ? convertToYmd($this->form['period_end']) : null,
             ]),
-            'addresses'       => $encounterData['addresses'],
-            'encounter'       => ['identifier' => ['value' => $this->form['encounter']]],
-            'care_manager'    => ['identifier' => ['value' => Auth::user()?->activeEmployee()?->uuid]],
-            'description'     => $this->form['description'] ?: null,
-            'note'            => $this->form['note'] ?: null,
-            'inform_with'     => $this->form['inform_with'] ?: null,
+            'addresses' => $encounterData['addresses'],
+            'encounter' => ['identifier' => ['value' => $this->form['encounter']]],
+            'care_manager' => ['identifier' => ['value' => Auth::user()?->activeEmployee()?->uuid]],
+            'description' => $this->form['description'] ?: null,
+            'note' => $this->form['note'] ?: null,
+            'inform_with' => $this->form['inform_with'] ?: null,
             'terms_of_service' => $this->form['terms_of_service'] ?: null,
         ]);
 
@@ -211,7 +216,7 @@ class TreatmentPlanCreate extends BasePatientComponent
             );
 
             $eHealthResponse = EHealth::carePlan()->create([
-                'signed_content'          => $signedContent,
+                'signed_content' => $signedContent,
                 'signed_content_encoding' => 'base64',
             ]);
 
@@ -219,25 +224,24 @@ class TreatmentPlanCreate extends BasePatientComponent
 
             // Store eHealth response locally
             $repository->create([
-                'uuid'            => $responseData['id'] ?? null,
-                'person_id'       => $this->resolvePersonId(),
-                'author_id'       => Auth::user()?->activeEmployee()?->id,
+                'uuid' => $responseData['id'] ?? null,
+                'person_id' => $this->resolvePersonId(),
+                'author_id' => Auth::user()?->activeEmployee()?->id,
                 'legal_entity_id' => $legalEntity?->id,
-                'status'          => $responseData['status'] ?? 'new',
-                'category'        => $this->form['category'],
-                'title'           => $this->form['title'],
-                'period_start'    => convertToYmd($this->form['period_start']),
-                'period_end'      => !empty($this->form['period_end'])
+                'status' => $responseData['status'] ?? 'new',
+                'category' => $this->form['category'],
+                'title' => $this->form['title'],
+                'period_start' => convertToYmd($this->form['period_start']),
+                'period_end' => !empty($this->form['period_end'])
                     ? convertToYmd($this->form['period_end']) : null,
-                'requisition'     => $responseData['requisition'] ?? null,
+                'requisition' => $responseData['requisition'] ?? null,
             ]);
 
             Session::flash('success', 'План лікування успішно підписано та відправлено до ЕСОЗ.');
             $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
 
-        } catch (ConnectionException $exception) {
-            Log::error('CarePlan: connection error: ' . $exception->getMessage());
-            Session::flash('error', "Виникла помилка. Відсутній зв'язок із ЕСОЗ.");
+        } catch (EHealthConnectionException $exception) {
+            $exception->handle('CarePlan: connection error: ' . $exception->getMessage());
             $this->showSignatureModal = false;
         } catch (EHealthValidationException|EHealthResponseException $exception) {
             Log::error('CarePlan: eHealth error: ' . $exception->getMessage());
@@ -261,6 +265,7 @@ class TreatmentPlanCreate extends BasePatientComponent
         if (empty($this->patientUuid)) {
             return null;
         }
+
         return \App\Models\Person\Person::where('uuid', $this->patientUuid)->value('id');
     }
 
@@ -283,7 +288,7 @@ class TreatmentPlanCreate extends BasePatientComponent
 
             // Extract the UUID of the conditions (addresses for the care plan)
             $conditionUuids = $encounter->diagnoses
-                ->map(fn($d) => $d->condition?->value)
+                ->map(fn ($d) => $d->condition?->value)
                 ->filter()
                 ->values()
                 ->toArray();

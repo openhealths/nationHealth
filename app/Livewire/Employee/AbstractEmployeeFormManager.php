@@ -12,6 +12,7 @@ use App\Enums\Employee\RequestStatus;
 use App\Enums\Employee\RevisionStatus;
 use App\Enums\JobStatus;
 use App\Enums\User\Role;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\Employee\BaseEmployee;
@@ -23,7 +24,6 @@ use App\Models\User;
 use Auth;
 use Carbon\Carbon;
 use Exception;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -253,7 +253,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
      * An employee cannot have more than one specialty marked 'Main'.
      * - 422 with 'tax_id': The provided Tax ID already exists in the system.
      *
-     * @param EHealthResponseException $e
+     * @param  EHealthResponseException  $e
      * @return void
      */
     protected function handleEHealthResponseException(EHealthResponseException $e): void
@@ -632,7 +632,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         }
     }
 
-    private function handleConnectionException(ConnectionException $e): void
+    private function handleConnectionException(EHealthConnectionException $e): void
     {
         $this->dispatch('flashMessage', ['message' => __('errors.ehealth_connection_error'), 'type' => 'error', 'persistent' => true]);
         Log::error('EHealth connection error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
@@ -686,7 +686,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $e instanceof ValidationException => $this->handleValidationException($e),
             $e instanceof EHealthValidationException => $this->handleEHealthValidationError($e),
             $e instanceof EHealthResponseException => $this->handleEHealthResponseException($e),
-            $e instanceof ConnectionException => $this->handleConnectionException($e),
+            $e instanceof EHealthConnectionException => $this->handleConnectionException($e),
             default => $this->handleException($e),
         };
         $this->dispatch('close-signature-modal');

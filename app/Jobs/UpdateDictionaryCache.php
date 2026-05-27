@@ -10,7 +10,6 @@ use App\Services\Dictionary\DictionaryManager;
 use Exception;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -88,7 +87,7 @@ class UpdateDictionaryCache implements ShouldQueue
                     'total_items' => count($updatedData)
                 ]);
             }
-        } catch (ConnectionException $e) {
+        } catch (EHealthConnectionException $e) {
             Log::warning("Dictionary API connection failed - will retry", [
                 'dictionary' => $this->dictionaryKey,
                 'page' => $this->pageNumber,

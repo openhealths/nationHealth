@@ -9,7 +9,7 @@ use App\Classes\eHealth\EHealthResponse;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Http\Client\ConnectionException;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
@@ -30,7 +30,7 @@ class DeclarationRequest extends Request
      *
      * @param  array  $data
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function create(array $data = []): PromiseInterface|EHealthResponse
     {
@@ -43,7 +43,7 @@ class DeclarationRequest extends Request
      * @param  string  $id  Declaration ID
      * @param  array  $data
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function resendAuthOtp(string $id, array $data = []): PromiseInterface|EHealthResponse
     {
@@ -56,7 +56,7 @@ class DeclarationRequest extends Request
      * @param  string  $uploadUrl
      * @param  UploadedFile  $document
      * @return PromiseInterface|Response
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function uploadDocument(string $uploadUrl, UploadedFile $document): PromiseInterface|Response
     {
@@ -75,7 +75,7 @@ class DeclarationRequest extends Request
      * @param  string  $id
      * @param  array  $data
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function approve(string $id, array $data = []): PromiseInterface|EHealthResponse
     {
@@ -88,7 +88,7 @@ class DeclarationRequest extends Request
      * @param  string  $id
      * @param  array  $data
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function sign(string $id, array $data = []): PromiseInterface|EHealthResponse
     {
@@ -101,7 +101,7 @@ class DeclarationRequest extends Request
      * @param  string  $id
      * @param  array  $data
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function reject(string $id, array $data = []): PromiseInterface|EHealthResponse
     {
@@ -114,7 +114,7 @@ class DeclarationRequest extends Request
      * @param  string  $url
      * @param  $query
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function getMany(string $url = self::URL, $query = null): PromiseInterface|EHealthResponse
     {
@@ -136,7 +136,7 @@ class DeclarationRequest extends Request
      * @param  string  $uuid  Request identifier (UUID)
      * @param  $query
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function get(string $uuid, $query = null): PromiseInterface|EHealthResponse
     {

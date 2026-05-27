@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Person\Records;
 
-use App\Exceptions\EHealth\EHealthValidationException;
-use App\Exceptions\EHealth\EHealthResponseException;
 use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Jobs\ConditionSync;
@@ -14,11 +12,13 @@ use App\Traits\HandlesSyncBatch;
 use App\Models\LegalEntity;
 use App\Enums\JobStatus;
 use App\Core\Arr;
-use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\DB;
 use Livewire\WithPagination;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
 class PatientCondition extends BasePatientComponent
@@ -128,8 +128,8 @@ class PatientCondition extends BasePatientComponent
                 $this->uuid,
                 $this->buildSearchParams(),
             );
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while synchronizing condition');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while synchronizing condition');
 
             return;
         }
@@ -138,8 +138,7 @@ class PatientCondition extends BasePatientComponent
             $validatedData = $response->validate();
             Repository::condition()->sync($this->personId, $validatedData);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Error while synchronizing condition');
-            Session::flash('error', __('patients.messages.condition_sync_database_error'));
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing condition');
 
             return;
         }
@@ -329,10 +328,10 @@ class PatientCondition extends BasePatientComponent
                 ->sortBy('label')
                 ->values()
                 ->toArray();
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+        } catch (EHealthException|EHealthConnectionException $exception) {
             $this->filterEpisodeOptions = [];
 
-            $this->handleEHealthExceptions($exception, 'Error while loading episodes');
+            $exception->handle('Error while loading episodes');
         }
     }
 
@@ -374,10 +373,10 @@ class PatientCondition extends BasePatientComponent
             $validatedData = Arr::toCamelCase($response->validate());
 
             $this->filterEncounterOptions = $this->mapEncounterOptions($validatedData);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+        } catch (EHealthException|EHealthConnectionException $exception) {
             $this->filterEncounterOptions = [];
 
-            $this->handleEHealthExceptions($exception, 'Error while loading encounters');
+            $exception->handle('Error while loading encounters');
         }
     }
 
@@ -479,10 +478,10 @@ class PatientCondition extends BasePatientComponent
             $this->pageSize = $paging['page_size'] ?? 10;
 
             $this->conditions = Arr::toCamelCase($validateData);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+        } catch (EHealthException|EHealthConnectionException $exception) {
             $this->conditions = [];
 
-            $this->handleEHealthExceptions($exception, 'Error while loading conditions');
+            $exception->handle('Error while loading conditions');
         }
     }
 
@@ -535,7 +534,7 @@ class PatientCondition extends BasePatientComponent
         ];
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.person.records.condition', [
             'paginatedConditions' => $this->buildPaginator(),

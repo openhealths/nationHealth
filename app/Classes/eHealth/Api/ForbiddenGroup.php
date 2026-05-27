@@ -6,10 +6,10 @@ namespace App\Classes\eHealth\Api;
 
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Http\Client\ConnectionException;
 
 class ForbiddenGroup extends Request
 {
@@ -20,7 +20,7 @@ class ForbiddenGroup extends Request
      *
      * @param  array{name?: string, page?: int, page_size?: int}  $filters
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
      * @see https://ehealthmisapi1.docs.apiary.io/#reference/public.-forbidden-groups/get-forbidden-group-list/get-forbidden-group-list
      */
@@ -41,7 +41,7 @@ class ForbiddenGroup extends Request
      *
      * @param  string  $uuid
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
      * @see https://ehealthmisapi1.docs.apiary.io/#reference/public.-forbidden-groups/get-forbidden-group-details/get-forbidden-group-details
      */

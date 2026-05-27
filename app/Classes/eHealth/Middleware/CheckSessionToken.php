@@ -9,7 +9,7 @@ use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use Closure;
 use App\Auth\EHealth\Services\TokenStorage;
-use Illuminate\Http\Client\ConnectionException;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -61,7 +61,7 @@ class CheckSessionToken
             if ($timeSinceLastActivity > $inactivityLimitSeconds) {
                 try {
                     EHealth::auth()->logout($this->tokenStorage->getBearerToken());
-                } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+                } catch (EHealthConnectionException|EHealthValidationException|EHealthResponseException $exception) {
                     Log::channel('e_health_errors')->error("Error while logout: {$exception->getMessage()}", [
                         'exception' => $exception
                     ]);

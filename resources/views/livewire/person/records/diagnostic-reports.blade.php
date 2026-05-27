@@ -203,7 +203,7 @@
 
                             <template x-if="filteredServices.length === 0">
                                 <div class="px-3 py-2 text-sm text-gray-500">
-                                    {{ __('patients.nothing_found') }}
+                                    {{ __('forms.nothing_found') }}
                                 </div>
                             </template>
                         </div>
@@ -400,7 +400,7 @@
 
                                 <template x-if="filteredOptions.length === 0">
                                     <div class="px-3 py-2 text-sm text-gray-500">
-                                        {{ __('patients.nothing_found') }}
+                                        {{ __('forms.nothing_found') }}
                                     </div>
                                 </template>
                             </div>
@@ -832,7 +832,7 @@
                     </div>
                     @empty
                     <div class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-sm text-gray-500 dark:text-gray-400">
-                        {{ __('diagnosticReport.diagnostic_report_not_found') }}
+                        {{ __('patients.diagnostic_report_not_found') }}
                     </div>
                 @endforelse
             </div>

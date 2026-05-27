@@ -8,13 +8,13 @@ use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\Cipher\Exceptions\CipherApiException;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Fhir;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
@@ -104,8 +104,7 @@ class EncounterEdit extends EncounterComponent
                 array_map($this->fhirToSync(...), $fhirClinicalImpressions)
             );
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Failed to sync encounter package data');
-            Session::flash('error', __('messages.database_error'));
+            $this->handleDatabaseErrors($exception, 'Failed to sync encounter package data');
 
             return null;
         }
@@ -176,8 +175,8 @@ class EncounterEdit extends EncounterComponent
             ]);
 
             logger()->debug('Job ID to further debug', $resp->getData());
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while submitting encounter');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while submitting encounter');
 
             return;
         }

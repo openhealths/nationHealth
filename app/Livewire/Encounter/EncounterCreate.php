@@ -8,8 +8,8 @@ use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\Cipher\Exceptions\CipherApiException;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Repositories\MedicalEvents\Repository;
@@ -68,8 +68,7 @@ class EncounterCreate extends EncounterComponent
         try {
             $encounterId = $this->storeValidatedData($formattedData);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Failed to store validated data');
-            Session::flash('error', __('messages.database_error'));
+            $this->handleDatabaseErrors($exception, 'Failed to store validated data');
 
             return;
         }
@@ -116,8 +115,7 @@ class EncounterCreate extends EncounterComponent
         try {
             $this->storeValidatedData($formattedData);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Failed to store validated data');
-            Session::flash('error', __('messages.database_error'));
+            $this->handleDatabaseErrors($exception, 'Failed to store validated data');
 
             return;
         }
@@ -153,8 +151,8 @@ class EncounterCreate extends EncounterComponent
             ]);
 
             logger()->debug('Job ID to further debug', $resp->getData());
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while submitting encounter');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while submitting encounter');
 
             return;
         }
@@ -243,8 +241,8 @@ class EncounterCreate extends EncounterComponent
     {
         try {
             EHealth::episode()->create($this->patientUuid, Arr::toSnakeCase($formattedEpisode));
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when create episode');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when create episode');
 
             return;
         }

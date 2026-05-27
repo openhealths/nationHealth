@@ -13,6 +13,8 @@ use App\Enums\Person\ConfidantPersonRelationshipRequestStatus;
 use App\Models\ConfidantPersonRelationshipRequest;
 use App\Models\Relations\AuthenticationMethod as AuthenticationMethodModel;
 use App\Enums\Person\AuthenticationMethod;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\LegalEntity;
@@ -251,14 +253,10 @@ class PersonUpdate extends PersonComponent
                 $this->authenticationMethods = Arr::toCamelCase($newAuthMethods->toArray());
                 Session::flash('success', __('patients.messages.auth_methods_synced'));
             } catch (Throwable $exception) {
-                $this->logDatabaseErrors($exception, 'Failed to update authentication methods');
-                Session::flash(
-                    'error',
-                    'Виникла помилка при оновленні методів автентифікації. Зверніться до адміністратора.'
-                );
+                $this->handleDatabaseErrors($exception, 'Failed to update authentication methods');
             }
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when getting auth methods');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting auth methods');
 
             return;
         }
@@ -316,8 +314,8 @@ class PersonUpdate extends PersonComponent
         try {
             // update
             $response = EHealth::personRequest()->create($validated);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when updating a person request');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when updating a person request');
 
             return;
         }
@@ -327,8 +325,7 @@ class PersonUpdate extends PersonComponent
             try {
                 Repository::personRequest()->update(removeEmptyKeys($response->map($response->validate())));
             } catch (Throwable $exception) {
-                $this->logDatabaseErrors($exception, 'Failed to update person request');
-                Session::flash('error', __('messages.database_error'));
+                $this->handleDatabaseErrors($exception, 'Failed to update person request');
 
                 return;
             }
@@ -362,8 +359,8 @@ class PersonUpdate extends PersonComponent
             $this->requestId = $response->validate()['id'];
             $this->uploadedDocuments = $response->validate()['documents'];
             $this->authStep = AuthStep::CHANGE_FROM_OFFLINE;
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when creating auth method request');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when creating auth method request');
 
             return;
         }
@@ -387,18 +384,14 @@ class PersonUpdate extends PersonComponent
                     ->create($response->validate());
             } catch (Throwable $exception) {
                 $this->logDatabaseErrors($exception, 'Failed to create authentication method');
-                Session::flash(
-                    'error',
-                    'Виникла помилка при збереженні методу автентифікації. Зверніться до адміністратора.'
-                );
 
                 return;
             }
 
             $this->showAuthMethodModal = false;
             Session::flash('success', __('patients.messages.offline_auth_method_added'));
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when approving offline auth method');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when approving offline auth method');
 
             return;
         }
@@ -429,13 +422,8 @@ class PersonUpdate extends PersonComponent
 
                 return;
             }
-        } catch (ConnectionException $exception) {
-            Log::channel('e_health_errors')->error('Error when finding for OTP verification', [
-                'message' => $exception->getMessage(),
-                'file' => $exception->getFile(),
-                'line' => $exception->getLine()
-            ]);
-            Session::flash('error', "Виникла помилка. Відсутній зв'язок із ЕСОЗ");
+        } catch (EHealthConnectionException $exception) {
+            $exception->handle('Error when finding for OTP verification');
 
             return;
         } catch (EHealthValidationException|EHealthResponseException $exception) {
@@ -444,8 +432,8 @@ class PersonUpdate extends PersonComponent
                 try {
                     EHealth::verification()->initialize(['phone_number' => $validated['form']['phoneNumber']]);
                     $this->authStep = AuthStep::VERIFY_PHONE;
-                } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-                    $this->handleEHealthExceptions($exception, 'Error when initialize OTP verification request');
+                } catch (EHealthException|EHealthConnectionException $exception) {
+                    $exception->handle('Error when initialize OTP verification request');
 
                     return;
                 }
@@ -472,8 +460,8 @@ class PersonUpdate extends PersonComponent
         try {
             EHealth::verification()->complete($this->form->phoneNumber, $validated);
             $this->authStep = AuthStep::COMPLETE_VERIFICATION;
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when complete OTP verification request');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when complete OTP verification request');
 
             return;
         }
@@ -510,18 +498,14 @@ class PersonUpdate extends PersonComponent
 
                 Session::flash('success', __('patients.messages.phone_number_changed'));
             } catch (Throwable $exception) {
-                $this->logDatabaseErrors($exception, 'Failed to update authentication method phone number');
-                Session::flash(
-                    'error',
-                    'Виникла помилка при оновленні методу автентифікації. Зверніться до адміністратора.'
-                );
+                $this->handleDatabaseErrors($exception, 'Failed to update authentication method phone number');
 
                 return;
             }
 
             $this->showAuthMethodModal = false;
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when approving changing auth phone number');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when approving changing auth phone number');
 
             return;
         }
@@ -545,19 +529,15 @@ class PersonUpdate extends PersonComponent
                     ->whereType(AuthenticationMethod::OFFLINE)
                     ->update(['uuid' => $response->validate()['id'], 'type' => AuthenticationMethod::OTP]);
             } catch (Throwable $exception) {
-                $this->logDatabaseErrors($exception, 'Failed to update authentication method type');
-                Session::flash(
-                    'error',
-                    'Виникла помилка при зміні методу автентифікації. Зверніться до адміністратора.'
-                );
+                $this->handleDatabaseErrors($exception, 'Failed to update authentication method type');
 
                 return;
             }
 
             $this->showAuthMethodModal = false;
             Session::flash('success', __('patients.messages.auth_method_changed_offline_to_sms'));
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when approving auth method (from OFFLINE to OTP)');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when approving auth method (from OFFLINE to OTP)');
 
             return;
         }
@@ -586,19 +566,15 @@ class PersonUpdate extends PersonComponent
                 AuthenticationMethodModel::whereUuid($this->selectedAuthMethodUuid)
                     ->update(['alias' => $validated['alias']]);
             } catch (Throwable $exception) {
-                $this->logDatabaseErrors($exception, 'Failed to update authentication method type');
-                Session::flash(
-                    'error',
-                    'Виникла помилка при зміні методу автентифікації. Зверніться до адміністратора.'
-                );
+                $this->handleDatabaseErrors($exception, 'Failed to update authentication method type');
 
                 return;
             }
 
             $this->authStep = AuthStep::UPDATE_ALIAS;
             Session::flash('success', __('patients.messages.method_name_updated'));
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when updating alias auth method');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when updating alias auth method');
 
             return;
         }
@@ -624,19 +600,15 @@ class PersonUpdate extends PersonComponent
                 // Update alias value
                 AuthenticationMethodModel::whereUuid($this->selectedAuthMethodUuid)->update(['alias' => $this->alias]);
             } catch (Throwable $exception) {
-                $this->logDatabaseErrors($exception, 'Failed to update authentication method alias');
-                Session::flash(
-                    'error',
-                    'Виникла помилка при оновленні назви методу автентифікації. Зверніться до адміністратора.'
-                );
+                $this->handleDatabaseErrors($exception, 'Failed to update authentication method alias');
 
                 return;
             }
 
             $this->showAuthMethodModal = false;
             Session::flash('success', __('patients.messages.auth_method_name_changed'));
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when approving auth method request');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when approving auth method request');
 
             return;
         }
@@ -662,8 +634,8 @@ class PersonUpdate extends PersonComponent
             $response = EHealth::person()->deactivateAuthMethod($this->uuid, $authMethodUuid);
             $this->requestId = $response->getData()['id'];
             $this->authStep = AuthStep::APPROVE_DEACTIVATING_METHOD;
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when deactivating auth method');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when deactivating auth method');
             Session::flash(
                 'error',
                 'Виникла помилка при деактивації методу автентифікації. Зверніться до адміністратора.'
@@ -698,16 +670,12 @@ class PersonUpdate extends PersonComponent
                 $this->showAuthMethodModal = false;
                 Session::flash('success', __('patients.messages.auth_method_deactivated'));
             } catch (Throwable $exception) {
-                $this->logDatabaseErrors($exception, 'Error when approving deactivate auth method');
-                Session::flash(
-                    'error',
-                    'Виникла помилка при підтвердженні деактивації методу автентифікації. Зверніться до адміністратора.'
-                );
+                $this->handleDatabaseErrors($exception, 'Error when approving deactivate auth method');
 
                 return;
             }
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when approve deactivating auth method');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when approve deactivating auth method');
 
             return;
         }
@@ -744,8 +712,8 @@ class PersonUpdate extends PersonComponent
             );
             $this->requestId = $response->getData()['id'];
             $this->authStep = AuthStep::APPROVE_ADDING_NEW_METHOD;
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when adding auth method from relation');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when adding auth method from relation');
 
             return;
         }
@@ -777,18 +745,14 @@ class PersonUpdate extends PersonComponent
 
                 Session::flash('success', __('patients.messages.new_auth_method_added'));
             } catch (Throwable $exception) {
-                $this->logDatabaseErrors($exception, 'Failed to update authentication method phone number');
-                Session::flash(
-                    'error',
-                    'Виникла помилка при оновленні методу автентифікації. Зверніться до адміністратора.'
-                );
+                $this->handleDatabaseErrors($exception, 'Failed to update authentication method phone number');
 
                 return;
             }
 
             $this->showAuthMethodModal = false;
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when approving changing auth phone number');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when approving changing auth phone number');
 
             return;
         }
@@ -804,8 +768,8 @@ class PersonUpdate extends PersonComponent
         try {
             EHealth::person()->resendAuthOtp($this->uuid, $this->requestId);
             Session::flash('success', __('patients.messages.code_resent_to_phone'));
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when resending SMS');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when resending SMS');
 
             return;
         }
@@ -820,8 +784,8 @@ class PersonUpdate extends PersonComponent
     {
         try {
             $response = EHealth::person()->getConfidantPersonRelationships($this->uuid);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when getting auth methods');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting auth methods');
 
             return;
         }
@@ -895,13 +859,12 @@ class PersonUpdate extends PersonComponent
 
                 ConfidantPersonRelationshipRequest::create($dataForCreate);
             } catch (Throwable $exception) {
-                $this->logDatabaseErrors($exception, 'Failed to create confidant person relationship request');
-                Session::flash('error', 'Виникла помилка при збереженні. Зверніться до адміністратора.');
+                $this->handleDatabaseErrors($exception, 'Failed to create confidant person relationship request');
 
                 return;
             }
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when creating confidant person relationship');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when creating confidant person relationship');
 
             return;
         }
@@ -931,8 +894,8 @@ class PersonUpdate extends PersonComponent
             );
 
             Session::flash('success', __('patients.messages.code_resent_to_phone'));
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when resending SMS');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when resending SMS');
 
             return;
         }
@@ -988,8 +951,8 @@ class PersonUpdate extends PersonComponent
             );
 
             $this->approvedData = $response->getData();
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when approving confidant person relationship');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when approving confidant person relationship');
 
             return;
         }
@@ -1063,13 +1026,12 @@ class PersonUpdate extends PersonComponent
 
                 Session::flash('success', __('patients.messages.new_confidant_person_added'));
             } catch (Exception $exception) {
-                $this->logDatabaseErrors($exception, 'Failed to create confidant person relationship');
-                Session::flash('error', 'Виникла помилка при збереженні. Зверніться до адміністратора.');
+                $this->handleDatabaseErrors($exception, 'Failed to create confidant person relationship');
 
                 return;
             }
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when signing confidant person relationship');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when signing confidant person relationship');
 
             return;
         }
@@ -1084,11 +1046,8 @@ class PersonUpdate extends PersonComponent
     {
         try {
             $response = EHealth::person()->getConfidantPersonRelationshipRequestsList($this->uuid);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions(
-                $exception,
-                'Error when getting confidant person relationship requests list'
-            );
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting confidant person relationship requests list');
 
             return;
         }
@@ -1176,13 +1135,12 @@ class PersonUpdate extends PersonComponent
 
                 ConfidantPersonRelationshipRequest::create($dataForCreate);
             } catch (Throwable $exception) {
-                $this->logDatabaseErrors($exception, 'Failed to create confidant person relationship request');
-                Session::flash('error', 'Виникла помилка при збереженні. Зверніться до адміністратора.');
+                $this->handleDatabaseErrors($exception, 'Failed to create confidant person relationship request');
 
                 return;
             }
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when deactivating auth method');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when deactivating auth method');
 
             return;
         }
@@ -1220,8 +1178,8 @@ class PersonUpdate extends PersonComponent
             } else {
                 $this->authStep = AuthStep::CHANGE_PHONE;
             }
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when creating auth method request');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when creating auth method request');
 
             return;
         }

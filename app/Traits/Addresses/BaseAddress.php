@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Traits\Addresses;
 
 use App\Classes\eHealth\EHealth;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
-use Illuminate\Http\Client\ConnectionException;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 
 trait BaseAddress
 {
@@ -190,8 +189,8 @@ trait BaseAddress
 
         try {
             $this->{$districts} = EHealth::address()->getDistricts(['region' => $area, 'name' => $region])->getData();
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when searching for districts');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when searching for districts');
 
             return;
         }
@@ -212,8 +211,8 @@ trait BaseAddress
             $this->{$settlements} = EHealth::address()->getSettlements(
                 ['region' => $area, 'district' => $region, 'name' => $settlement]
             )->getData();
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when searching for settlements');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when searching for settlements');
 
             return;
         }
@@ -234,8 +233,8 @@ trait BaseAddress
             $this->{$streets} = EHealth::address()->getStreets(
                 ['settlement_id' => $settlementId, 'type' => $streetType, 'name' => $street]
             )->getData();
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when searching for streets');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when searching for streets');
 
             return;
         }

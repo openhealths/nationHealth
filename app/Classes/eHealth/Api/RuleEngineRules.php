@@ -7,7 +7,7 @@ namespace App\Classes\eHealth\Api;
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Http\Client\ConnectionException;
+use App\Exceptions\EHealth\EHealthConnectionException;
 
 class RuleEngineRules extends Request
 {
@@ -17,9 +17,9 @@ class RuleEngineRules extends Request
      * Get rule engine rule details filtered by ID with active rules.
      *
      * @param  string  $url
-     * @param $query
+     * @param  $query
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     public function get(string $url, $query = null): PromiseInterface|EHealthResponse
     {
@@ -30,9 +30,9 @@ class RuleEngineRules extends Request
      * Get a catalog of all active rule engine rules.
      *
      * @param  string  $url
-     * @param $query
+     * @param  $query
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     public function getMany(string $url = self::URL, $query = null): PromiseInterface|EHealthResponse
     {

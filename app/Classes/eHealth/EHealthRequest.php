@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth;
 
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Traits\EHealthApiFormatter;
@@ -12,6 +13,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\HigherOrderTapProxy;
 
 abstract class EHealthRequest extends PendingRequest
@@ -66,13 +68,18 @@ abstract class EHealthRequest extends PendingRequest
      * @param  string  $url  The endpoint URL.
      * @param  array  $options  Additional request options (query, body, headers, etc.).
      * @return EHealthResponse|Response
-     * @throws EHealthValidationException|EHealthResponseException|ConnectionException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function send(string $method, string $url, array $options = []): EHealthResponse|Response
     {
-        \Illuminate\Support\Facades\Log::debug("eHealth Request: {$method} {$url}", ['options' => $options]);
-        $response = parent::send($method, $url, $options);
-        
+        Log::debug("eHealth Request: {$method} {$url}", ['options' => $options]);
+
+        try {
+            $response = parent::send($method, $url, $options);
+        } catch (ConnectionException $exception) {
+            throw new EHealthConnectionException($exception->getMessage(), $exception->getCode(), $exception);
+        }
+
         if (!is_a($response, EHealthResponse::class)) {
             return $response;
         }

@@ -9,6 +9,7 @@ use App\Classes\eHealth\EHealth;
 use App\Enums\JobStatus;
 use App\Enums\Status;
 use App\Enums\User\Role;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Jobs\EmployeeSync;
 use App\Models\Employee\Employee;
@@ -22,7 +23,6 @@ use App\Repositories\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use Illuminate\Bus\Batch;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
@@ -40,8 +40,8 @@ use Throwable;
 #[AllowDynamicProperties]
 class EmployeeIndex extends EmployeeComponent
 {
-    use WithPagination,
-        BatchLegalEntityQueries;
+    use WithPagination;
+    use BatchLegalEntityQueries;
 
     protected const string BATCH_NAME = 'EmployeeFullSync';
     protected const string DEPENDENT_BATCH_NAME = 'EmployeeDetailsSync';
@@ -89,7 +89,7 @@ class EmployeeIndex extends EmployeeComponent
      */
     public string $syncStatus = '';
 
-   #[Computed]
+    #[Computed]
     public function isSync(): bool
     {
         return $this->isSyncProcessing();
@@ -317,7 +317,7 @@ class EmployeeIndex extends EmployeeComponent
                 // This handles cases where email might be 'N/A' or user doesn't exist locally
                 $party = $employee->party;
                 $partyEmployees = $party->employees->where('legal_entity_id', $this->legalEntity->id);
-                $employeesWithUser = $partyEmployees->filter(fn(Employee $employee) => $employee->user_id !== null);
+                $employeesWithUser = $partyEmployees->filter(fn (Employee $employee) => $employee->user_id !== null);
 
                 $partyUsers = $party->users->whereIn('id', $employeesWithUser->pluck('user_id')); // filter by legal entity id
 
@@ -408,7 +408,7 @@ class EmployeeIndex extends EmployeeComponent
 
         try {
             $response = EHealth::employee()->getMany(['legal_entity_id' => legalEntity()->uuid]);
-        } catch (ConnectionException $e) {
+        } catch (EHealthConnectionException $e) {
             Log::error('Employee sync failed: No connection to E-Health.', ['error' => $e->getMessage()]);
             $this->dispatch(
                 'flashMessage',
@@ -506,8 +506,8 @@ class EmployeeIndex extends EmployeeComponent
      * This method handles the continuation of a previously initiated synchronization
      * operation for a specific user using an authentication or session token.
      *
-     * @param User $user The user instance for whom synchronization should be resumed
-     * @param string $token The authentication or session token used to resume the sync process
+     * @param  User  $user  The user instance for whom synchronization should be resumed
+     * @param  string  $token  The authentication or session token used to resume the sync process
      * @return void
      */
     protected function resumeSynchronization(User $user, string $token): void

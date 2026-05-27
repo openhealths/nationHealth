@@ -9,6 +9,8 @@ use App\Classes\Cipher\Exceptions\CipherApiException;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Person\Status;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\Person\Forms\PersonForm as Form;
@@ -223,8 +225,8 @@ class PersonComponent extends Component
             $this->confidantPerson = Arr::toCamelCase(
                 EHealth::person()->searchForPersonByParams($validated)->getData()
             );
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when searching for person');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when searching for person');
 
             return;
         }
@@ -263,8 +265,8 @@ class PersonComponent extends Component
 
         try {
             $response = EHealth::personRequest()->create($validated);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when creating a person request');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when creating a person request');
 
             return;
         }
@@ -290,8 +292,7 @@ class PersonComponent extends Component
                     );
                 }
             } catch (Throwable $exception) {
-                $this->logDatabaseErrors($exception, 'Failed to store person request');
-                Session::flash('error', __('validation.custom.database_error'));
+                $this->handleDatabaseErrors($exception, 'Failed to store person request');
 
                 return;
             }
@@ -356,8 +357,7 @@ class PersonComponent extends Component
                 $successMessage = __('patients.messages.person_request_created');
             }
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Failed to store person request');
-            Session::flash('error', __('messages.database_error'));
+            $this->handleDatabaseErrors($exception, 'Failed to store person request');
 
             return;
         }
@@ -426,8 +426,8 @@ class PersonComponent extends Component
         try {
             $this->approvePersonRequest();
             $this->showLeafletModal = true;
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when approving person request');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when approving person request');
 
             return;
         }
@@ -468,8 +468,8 @@ class PersonComponent extends Component
 
         try {
             $response = EHealth::personRequest()->resendAuthOtp($this->form->person['id']);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when resending sms to person');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when resending sms to person');
 
             return;
         }
@@ -512,8 +512,8 @@ class PersonComponent extends Component
             $this->approvePersonRequest(['verification_code' => $validated['verificationCode']]);
             Session::flash('success', __('patients.messages.person_request_approved'));
             $this->showLeafletModal = true;
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when approving person request');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when approving person request');
 
             return;
         }
@@ -548,8 +548,8 @@ class PersonComponent extends Component
 
         try {
             $response = EHealth::personRequest()->reject($personRequest->uuid);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when rejecting person request');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when rejecting person request');
 
             return;
         }
@@ -558,8 +558,7 @@ class PersonComponent extends Component
             try {
                 Repository::personRequest()->updateStatusByUuid($response->getData());
             } catch (Exception|Throwable $exception) {
-                $this->logDatabaseErrors($exception, $exception->getMessage());
-                Session::flash('error', __('messages.database_error'));
+                $this->handleDatabaseErrors($exception, $exception->getMessage());
 
                 return;
             }
@@ -594,8 +593,8 @@ class PersonComponent extends Component
         try {
             $approvedPersonRequest = EHealth::personRequest()->getById($this->form->person['id']);
             $personRequestData = $approvedPersonRequest->getData();
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when getting person request by ID');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting person request by ID');
 
             return;
         }
@@ -621,8 +620,8 @@ class PersonComponent extends Component
                 ->withHeaders(['msp_drfo' => Auth::user()->party->taxId])
                 ->signed($this->form->person['id'], ['signed_content' => $signedContent->getBase64Data()]);
             $responseData = $signResponse->getData();
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when sign person request');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when sign person request');
 
             return;
         }
@@ -648,8 +647,7 @@ class PersonComponent extends Component
                     }
                 });
             } catch (Exception|Throwable $exception) {
-                $this->logDatabaseErrors($exception, $exception->getMessage());
-                Session::flash('error', __('messages.database_error'));
+                $this->handleDatabaseErrors($exception, $exception->getMessage());
 
                 return;
             }
@@ -730,7 +728,7 @@ class PersonComponent extends Component
      *
      * @param  array  $requestData
      * @return void
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     private function approvePersonRequest(array $requestData = []): void
     {
@@ -741,8 +739,7 @@ class PersonComponent extends Component
             try {
                 Repository::personRequest()->updateStatusByUuid($responseData);
             } catch (Exception $exception) {
-                $this->logDatabaseErrors($exception, 'Failed to update person request status');
-                Session::flash('error', __('messages.database_error'));
+                $this->handleDatabaseErrors($exception, 'Failed to update person request status');
 
                 return;
             }

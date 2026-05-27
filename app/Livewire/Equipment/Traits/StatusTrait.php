@@ -8,17 +8,16 @@ use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Equipment\Status;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\Equipment;
 use App\Repositories\Repository;
 use App\Rules\InDictionary;
 use App\Traits\FormTrait;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
 trait StatusTrait
@@ -49,8 +48,8 @@ trait StatusTrait
 
         try {
             $response = EHealth::equipment()->changeStatus($equipment->uuid, removeEmptyKeys(Arr::toSnakeCase($validated)));
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when updating status of equipment');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when updating status of equipment');
 
             return;
         }
@@ -61,8 +60,7 @@ trait StatusTrait
             Session::flash('success', __('equipments.success.status_updated'));
             $this->dispatch('close-update-status-modal');
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Failed to store equipment');
-            Session::flash('error', __('messages.database_error'));
+            $this->handleDatabaseErrors($exception, 'Failed to store equipment');
 
             return;
         }
@@ -91,8 +89,8 @@ trait StatusTrait
                 $uuid,
                 removeEmptyKeys(Arr::toSnakeCase($validated))
             );
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when updating availability status of equipment');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when updating availability status of equipment');
 
             return;
         }
@@ -103,8 +101,7 @@ trait StatusTrait
             Session::flash('success', __('equipments.success.availability_status_updated'));
             $this->dispatch('close-update-availability-status-modal');
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Failed to store equipment');
-            Session::flash('error', __('messages.database_error'));
+            $this->handleDatabaseErrors($exception, 'Failed to store equipment');
 
             return;
         }

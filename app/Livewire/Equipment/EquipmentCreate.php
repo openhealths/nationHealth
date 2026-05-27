@@ -54,8 +54,7 @@ class EquipmentCreate extends EquipmentComponent
             Session::flash('success', __('equipments.success.created'));
             $this->redirectRoute('equipment.index', [legalEntity()], navigate: true);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Failed to store equipment');
-            Session::flash('error', __('messages.database_error'));
+            $this->handleDatabaseErrors($exception, 'Failed to store equipment');
 
             return;
         }
@@ -92,8 +91,7 @@ class EquipmentCreate extends EquipmentComponent
             Session::flash('success', __('equipments.success.draft_created'));
             $this->redirectRoute('equipment.index', [legalEntity()], navigate: true);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Failed to store equipment');
-            Session::flash('error', __('messages.database_error'));
+            $this->handleDatabaseErrors($exception, 'Failed to store equipment');
 
             return;
         }

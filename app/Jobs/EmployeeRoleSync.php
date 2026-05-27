@@ -12,7 +12,6 @@ use App\Classes\eHealth\EHealth;
 use GuzzleHttp\Promise\PromiseInterface;
 use App\Classes\eHealth\EHealthResponse;
 use App\Models\LegalEntity;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Queue\Middleware\RateLimited;
 use Throwable;
 
@@ -29,7 +28,7 @@ class EmployeeRoleSync extends EHealthJob
      *
      * @param  string  $token
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthResponseException|EHealthValidationException
+     * @throws EHealthConnectionException|EHealthResponseException|EHealthValidationException
      */
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse
     {

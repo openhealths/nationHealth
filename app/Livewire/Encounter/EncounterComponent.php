@@ -14,6 +14,8 @@ use App\Enums\Person\EpisodeStatus;
 use App\Enums\Person\ObservationStatus;
 use App\Enums\Status;
 use App\Enums\User\Role;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\Encounter\Forms\Api\EncounterRequestApi;
@@ -21,7 +23,6 @@ use App\Models\Employee\Employee;
 use App\Models\Person\Person;
 use App\Traits\FormTrait;
 use Illuminate\Database\Query\Builder;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -431,8 +432,8 @@ class EncounterComponent extends Component
     {
         try {
             $this->evidenceDetails = $this->fetchConditionsOrObservations($type);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while getting evidence details');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while getting evidence details');
         }
     }
 
@@ -446,8 +447,8 @@ class EncounterComponent extends Component
     {
         try {
             $this->findingResults = $this->fetchConditionsOrObservations($type);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while getting findings');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while getting findings');
         }
     }
 
@@ -460,8 +461,8 @@ class EncounterComponent extends Component
     {
         try {
             $this->complicationDetailResults = $this->fetchConditionsOrObservations('condition');
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while getting complication details');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while getting complication details');
         }
     }
 
@@ -475,15 +476,15 @@ class EncounterComponent extends Component
     {
         try {
             $this->reasonReferenceResults = $this->fetchConditionsOrObservations($type);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while getting reason references');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while getting reason references');
         }
     }
 
     /**
      * @param  string  $type  'condition' or 'observation'
      * @return array
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     private function fetchConditionsOrObservations(string $type): array
     {
@@ -536,8 +537,8 @@ class EncounterComponent extends Component
 
                 return $item;
             })->all();
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while getting clinical impressions');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while getting clinical impressions');
 
             return;
         }
@@ -570,8 +571,8 @@ class EncounterComponent extends Component
                 ->all();
 
             $this->loadIcd10Descriptions($this->problems);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while searching for problems');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while searching for problems');
         }
     }
 
@@ -630,8 +631,8 @@ class EncounterComponent extends Component
                     ->all(),
                 default => []
             };
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, "Error while searching for $type in Encounter Component");
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle("Error while searching for $type in Encounter Component");
         }
     }
 
@@ -708,8 +709,8 @@ class EncounterComponent extends Component
                 )
                 ->validate();
             $this->episodes = Arr::toCamelCase($this->episodes);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when getting episodes');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting episodes');
 
             return;
         }

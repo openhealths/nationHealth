@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Exceptions\EHealth\EHealthConnectionException;
 use Throwable;
 use App\Core\Arr;
 use App\Core\EHealthJob;
@@ -20,13 +21,12 @@ use GuzzleHttp\Promise\PromiseInterface;
 use App\Classes\eHealth\EHealthResponse;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Middleware\RateLimited;
-use Illuminate\Http\Client\ConnectionException;
 
 class DeclarationRequestDetailsSync extends EHealthJob
 {
-    use Dispatchable,
-        SerializesModels,
-        BatchLegalEntityQueries;
+    use Dispatchable;
+    use SerializesModels;
+    use BatchLegalEntityQueries;
 
     protected const int RATE_LIMIT_DELAY = 4;
 
@@ -48,11 +48,9 @@ class DeclarationRequestDetailsSync extends EHealthJob
     /**
      * Get declaration request data from EHealth API
      *
-     * @param string $token
-     *
+     * @param  string  $token
      * @return PromiseInterface|EHealthResponse|null
-     *
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse|null
     {
@@ -62,8 +60,7 @@ class DeclarationRequestDetailsSync extends EHealthJob
     /**
      * Store or update all the declaration request data in the database
      *
-     * @param EHealthResponse|null $response
-     *
+     * @param  EHealthResponse|null  $response
      * @throws Throwable
      */
     protected function processResponse(?EHealthResponse $response): void
@@ -112,15 +109,15 @@ class DeclarationRequestDetailsSync extends EHealthJob
      * Queries Spatie\Permission\Models\Role by name and guard_name.
      * Returns an empty collection if the role is not defined for any of the checked guards.
      *
-     * @param string $role The role name to check across guards.
-     *
+     * @param  string  $role  The role name to check across guards.
      * @return Collection<int, string> Collection of guard names that have this role defined.
      */
     protected function getGuardsForRole(string $role): Collection
     {
         $guards = collect(['web', 'ehealth']);
 
-        return $guards->filter(fn ($guard) =>
+        return $guards->filter(
+            fn ($guard) =>
                 Role::where('name', $role)
                     ->where('guard_name', $guard)
                     ->exists()

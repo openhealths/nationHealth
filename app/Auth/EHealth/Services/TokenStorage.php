@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Auth\EHealth\Services;
 
 use App\Classes\eHealth\EHealth;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Models\LegalEntity;
 use Carbon\Carbon;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 
@@ -101,7 +100,7 @@ class TokenStorage
             $this->store($response->validate());
 
             return true;
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+        } catch (EHealthException|EHealthConnectionException $exception) {
             Log::channel('e_health_errors')->error("Error while extend token lifetime {$exception->getMessage()}", [
                 'exception' => $exception
             ]);

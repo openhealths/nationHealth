@@ -15,7 +15,7 @@ use GuzzleHttp\Promise\PromiseInterface;
 use App\Classes\eHealth\EHealthResponse;
 use App\Models\Division as DivisionModel;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Http\Client\ConnectionException;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Classes\eHealth\EHealthRequest as Request;
 
 class Division extends Request
@@ -39,7 +39,7 @@ class Division extends Request
      * @param  string  $url  The request URL.
      * @param  array|null  $query  Optional query parameters. If provided, it replaces any existing 'query' options.
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function getMany(string $url = self::URL, $query = null): PromiseInterface|EHealthResponse
     {
@@ -61,6 +61,7 @@ class Division extends Request
      * @param  string  $uuid
      * @param  mixed  $data  // Data for API request
      * @return EHealthResponse|PromiseInterface
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function update(?string $uuid, $data = []): PromiseInterface|EHealthResponse
     {
@@ -89,9 +90,8 @@ class Division extends Request
 
     /**
      * @param  string  $uuid  unique eHealth identifier of the license
-     * @param  array  $data
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     public function activate(string $uuid): PromiseInterface|EHealthResponse
     {
@@ -102,7 +102,7 @@ class Division extends Request
      * @param  string  $uuid  unique eHealth identifier of the license
      * @param  array  $data
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     public function deactivate(string $uuid): PromiseInterface|EHealthResponse
     {

@@ -16,8 +16,8 @@ enum ReorganizedStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::TO_BE_RESIGNED => __('patients.status.to_be_resigned'),
-            self::RESIGNED => __('patients.status.resigned')
+            self::TO_BE_RESIGNED => __('declarations.status.to_be_resigned'),
+            self::RESIGNED => __('declarations.status.resigned')
         };
     }
 }

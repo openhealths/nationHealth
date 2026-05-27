@@ -6,8 +6,6 @@ namespace App\Livewire\Division\HealthcareService;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\Division\Forms\HealthcareServiceForm as Form;
 use App\Models\Division;
 use App\Models\HealthcareService;
@@ -15,12 +13,13 @@ use App\Models\LegalEntity;
 use App\Repositories\Repository;
 use App\Traits\FormTrait;
 use App\Traits\WorkTimeUtilities;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Component;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
 class HealthcareServiceUpdate extends Component
@@ -81,8 +80,8 @@ class HealthcareServiceUpdate extends Component
                 $this->healthcareServiceUuid,
                 $this->form->formatForApi($validated)
             );
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when updating a healthcare service');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when updating a healthcare service');
 
             return;
         }
@@ -98,8 +97,7 @@ class HealthcareServiceUpdate extends Component
             Session::flash('success', 'Послугу успішно оновлено.');
             $this->redirectRoute('healthcare-service.index', [legalEntity()], navigate: true);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Failed to update healthcare service');
-            Session::flash('error', __('messages.database_error'));
+            $this->handleDatabaseErrors($exception, 'Failed to update healthcare service');
 
             return;
         }

@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 use App\Classes\eHealth\EHealthResponse;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Http\Client\ConnectionException;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Classes\eHealth\EHealthRequest as Request;
 
 class LegalEntity extends Request
@@ -22,10 +22,8 @@ class LegalEntity extends Request
      * Get full details data of a current legal entity
      *
      * @param  string  $url
-     *
      * @return PromiseInterface|EHealthResponse
-     *
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function getDetails(string $url = self::URL): PromiseInterface|EHealthResponse
     {
@@ -39,12 +37,10 @@ class LegalEntity extends Request
      *
      * @see https://ehealthmisapi1.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/legal-entities/get-legators-legal-entities
      *
-     * @param  string  $uuid     UUID of the legal entity to fetch legators for.
-     * @param  int     $page     Page number for paginated results.
-     *
+     * @param  string  $uuid  UUID of the legal entity to fetch legators for.
+     * @param  int  $page  Page number for paginated results.
      * @return PromiseInterface|EHealthResponse
-     *
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function getLegators(string $uuid, int $page = 1): PromiseInterface|EHealthResponse
     {
@@ -75,7 +71,7 @@ class LegalEntity extends Request
             '*.merged_from_legal_entity.uuid' => 'required|uuid',
             '*.merged_from_legal_entity.edrpou' => 'required|string',
 
-            '*.is_active'=> 'required|boolean',
+            '*.is_active' => 'required|boolean',
 
             "*.reason" => 'nullable|string',
             "*.reason_date" => 'required|date',

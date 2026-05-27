@@ -6,11 +6,10 @@ namespace App\Livewire\Dictionary;
 
 use App\Classes\eHealth\EHealth;
 use App\Enums\MedicalProgram\Type;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Models\LegalEntity;
 use App\Traits\FormTrait;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Session;
@@ -161,8 +160,8 @@ class DeviceDefinition extends Component
 
         try {
             $deviceDefinitionsData = collect(EHealth::deviceDefinition()->getMany($filters)->getData());
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when searching for device definitions list.');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when searching for device definitions list.');
 
             return new LengthAwarePaginator([], 0, config('pagination.per_page'), 1);
         }

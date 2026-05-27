@@ -10,7 +10,7 @@ use App\Classes\eHealth\EHealthResponse;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Http\Client\ConnectionException;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
@@ -29,7 +29,7 @@ class Declaration extends Request
      * @param  $query
      * @param  bool  $groupByEntities
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function getMany($query = null, bool $groupByEntities = false): PromiseInterface|EHealthResponse
     {
@@ -53,7 +53,7 @@ class Declaration extends Request
      * @param  string  $uuid  Request identifier
      * @param  $query  Optional query parameters
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function getDeclarationById(string $uuid, $query = null): PromiseInterface|EHealthResponse
     {

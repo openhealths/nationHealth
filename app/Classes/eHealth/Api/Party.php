@@ -6,8 +6,8 @@ namespace App\Classes\eHealth\Api;
 
 use App\Classes\eHealth\EHealthRequest;
 use App\Classes\eHealth\EHealthResponse;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -29,7 +29,7 @@ class Party extends EHealthRequest
      * @param  array  $filters  An array of filters to apply to the query.
      * @param  int  $page
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     public function getMany(array $filters = [], int $page = 1): PromiseInterface|EHealthResponse
     {
@@ -70,7 +70,7 @@ class Party extends EHealthRequest
      * @param  string  $uuid  The UUID of the party.
      * @param  array|null  $query  Optional query parameters.
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     public function getDetails(string $uuid, ?array $query = null): PromiseInterface|EHealthResponse
     {
@@ -85,7 +85,7 @@ class Party extends EHealthRequest
      * @param  string  $uuid  The UUID of the party to update.
      * @param  array  $data  The data for the update request.
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     public function update(string $uuid, array $data = []): PromiseInterface|EHealthResponse
     {

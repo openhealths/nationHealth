@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 namespace App\Livewire\CarePlan;
- 
+
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Traits\InteractsWithApprovals;
 use App\Enums\CarePlanStatus;
 use App\Classes\eHealth\EHealth;
@@ -14,7 +15,6 @@ use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Repositories\CarePlanRepository;
 use App\Repositories\CarePlanActivityRepository;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -71,11 +71,11 @@ class CarePlanShow extends Component
     public function mount(CarePlan $carePlan): void
     {
         $this->carePlan = $carePlan;
-        
+
         // Fetch patient conditions for outcomeReference selection
         $this->availableConditions = \App\Models\MedicalEvents\Sql\Condition::whereHas('context', function ($query) {
             $query->where('person_id', $this->carePlan->person_id);
-        })->with('code.coding')->get()->map(fn($c) => [
+        })->with('code.coding')->get()->map(fn ($c) => [
             'uuid' => $c->uuid,
             'name' => ($c->code?->text ?: null) ?? ($c->code?->coding?->first()?->code ?: null) ?? 'Unknown Condition',
             'date' => $c->onset_date ? \Carbon\Carbon::parse($c->onset_date)->format('d.m.Y') : '-',
@@ -86,7 +86,7 @@ class CarePlanShow extends Component
             $this->dictionaries['care_plan_categories'] = $basics->byName('eHealth/care_plan_categories')
                 ?->asCodeDescription()
                 ?->toArray() ?? [];
-            
+
             $this->dictionaries['care_plan_activity_outcomes'] = $basics->byName('eHealth/care_plan_activity_outcomes')
                 ?->asCodeDescription()
                 ?->toArray() ?? [];
@@ -104,8 +104,8 @@ class CarePlanShow extends Component
 
     protected function rulesForSigning(): array
     {
-        $statusReasonRule = in_array($this->actionType, ['sign_activity', 'sign_plan']) 
-            ? 'nullable|string' 
+        $statusReasonRule = in_array($this->actionType, ['sign_activity', 'sign_plan'])
+            ? 'nullable|string'
             : 'required|string';
 
         return [
@@ -150,7 +150,9 @@ class CarePlanShow extends Component
     public function editActivity(int $activityId, CarePlanActivityRepository $repository): void
     {
         $activity = $repository->findById($activityId);
-        if (!$activity) return;
+        if (!$activity) {
+            return;
+        }
 
         $this->activityForm = [
             'id' => $activity->id,
@@ -196,6 +198,7 @@ class CarePlanShow extends Component
             ]);
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
+
             return;
         }
 
@@ -246,26 +249,31 @@ class CarePlanShow extends Component
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
             $this->showSignatureModal = false;
+
             return;
         }
 
         if ($this->actionType === 'sign_activity') {
             $this->signActivity($repository, $activityRepository);
+
             return;
         }
 
         if (in_array($this->actionType, ['complete_activity', 'cancel_activity'])) {
             $this->signStatusActivity($activityRepository);
+
             return;
         }
 
         if (empty($this->carePlan->uuid)) {
             if ($this->actionType === 'sign_plan') {
                 $this->signPlan($repository);
+
                 return;
             }
             Session::flash('error', __('care-plan.care_plan_not_synced'));
             $this->showSignatureModal = false;
+
             return;
         }
 
@@ -291,12 +299,12 @@ class CarePlanShow extends Component
 
             // Send to eHealth based on action type
             $apiMethod = $this->actionType === 'complete' ? 'complete' : 'cancel';
-            
+
             $eHealthResponse = EHealth::carePlan()->{$apiMethod}(
                 $this->carePlan->person->uuid,
                 $this->carePlan->uuid,
                 [
-                    'signed_data'          => $signedContent,
+                    'signed_data' => $signedContent,
                     'signed_data_encoding' => 'base64',
                 ]
             );
@@ -333,7 +341,7 @@ class CarePlanShow extends Component
             Session::flash('success', __('care-plan.care_plan_updated'));
             $this->showSignatureModal = false;
 
-        } catch (ConnectionException $exception) {
+        } catch (EHealthConnectionException $exception) {
             Log::error('CarePlanShow: connection error: ' . $exception->getMessage());
             Session::flash('error', __('care-plan.connection_error'));
             $this->showSignatureModal = false;
@@ -372,8 +380,8 @@ class CarePlanShow extends Component
             ]),
             'addresses' => $this->carePlan->addresses, // Already stored as array of diagnoses
             'supporting_info' => array_merge(
-                array_map(fn($e) => ['display' => $e['name']], $this->carePlan->supporting_info['episodes'] ?? []),
-                array_map(fn($m) => ['display' => $m['name']], $this->carePlan->supporting_info['medical_records'] ?? [])
+                array_map(fn ($e) => ['display' => $e['name']], $this->carePlan->supporting_info['episodes'] ?? []),
+                array_map(fn ($m) => ['display' => $m['name']], $this->carePlan->supporting_info['medical_records'] ?? [])
             ),
             'encounter' => $this->carePlan->encounter?->uuid ? ['identifier' => ['value' => $this->carePlan->encounter->uuid]] : null,
             'care_manager' => ['identifier' => ['value' => Auth::user()?->activeEmployee()?->uuid]],
@@ -410,7 +418,7 @@ class CarePlanShow extends Component
             Session::flash('success', __('care-plan.signed_and_sent'));
             $this->showSignatureModal = false;
 
-        } catch (ConnectionException $exception) {
+        } catch (EHealthConnectionException $exception) {
             Log::error('CarePlanShow: connection error: ' . $exception->getMessage());
             Session::flash('error', __('care-plan.connection_error'));
             $this->showSignatureModal = false;
@@ -436,6 +444,7 @@ class CarePlanShow extends Component
         if (!$this->activityToSign) {
             Session::flash('error', __('care-plan.no_activity_selected'));
             $this->showSignatureModal = false;
+
             return;
         }
 
@@ -443,6 +452,7 @@ class CarePlanShow extends Component
         if (!$activity) {
             Session::flash('error', __('care-plan.activity_not_found'));
             $this->showSignatureModal = false;
+
             return;
         }
 
@@ -485,7 +495,7 @@ class CarePlanShow extends Component
             // Extract the actual CarePlanActivity data
             $activityUuid = $finalResponse['id'] ?? null;
             $activityStatus = $finalResponse['status'] ?? 'new';
-            
+
             if (isset($finalResponse['result']) && is_array($finalResponse['result'])) {
                 $entity = $finalResponse['result'][0] ?? $finalResponse['result'];
                 $activityUuid = $entity['id'] ?? $activityUuid;
@@ -493,7 +503,7 @@ class CarePlanShow extends Component
             }
 
             // Store to Mongo
-            /* 
+            /*
             try {
                 \App\Models\MedicalEvents\Mongo\CarePlanActivity::create($finalResponse);
             } catch (\Exception $e) {
@@ -518,7 +528,7 @@ class CarePlanShow extends Component
             Session::flash('success', __('care-plan.activity_signed'));
             $this->showSignatureModal = false;
 
-        } catch (ConnectionException $exception) {
+        } catch (EHealthConnectionException $exception) {
             Log::error('CarePlanActivity: connection error: ' . $exception->getMessage());
             Session::flash('error', __('care-plan.connection_error'));
             $this->showSignatureModal = false;
@@ -544,11 +554,14 @@ class CarePlanShow extends Component
         if (!$this->activityToSign) {
             Session::flash('error', __('care-plan.no_activity_selected'));
             $this->showSignatureModal = false;
+
             return;
         }
 
         $activity = $activityRepository->findById($this->activityToSign);
-        if (!$activity) return;
+        if (!$activity) {
+            return;
+        }
 
         $payload = [
             'status' => $statusMap[$this->actionType] ?? 'cancelled',
@@ -566,9 +579,9 @@ class CarePlanShow extends Component
                     ]
                 ];
             }
-            
+
             if (!empty($this->outcomeReferences)) {
-                $payload['outcome_reference'] = collect($this->outcomeReferences)->map(fn($id) => [
+                $payload['outcome_reference'] = collect($this->outcomeReferences)->map(fn ($id) => [
                     'identifier' => [
                         'value' => $id, // Assuming these are UUIDs of clinical documents
                     ]
@@ -586,13 +599,13 @@ class CarePlanShow extends Component
             );
 
             $apiMethod = $this->actionType === 'complete_activity' ? 'complete' : 'cancel';
-            
+
             $eHealthResponse = EHealth::carePlanActivity()->{$apiMethod}(
                 $this->carePlan->person->uuid,
                 $this->carePlan->uuid,
                 $activity->uuid,
                 [
-                    'signed_data'          => $signedContent,
+                    'signed_data' => $signedContent,
                     'signed_data_encoding' => 'base64',
                 ]
             );
@@ -662,6 +675,7 @@ class CarePlanShow extends Component
     {
         if (empty($this->carePlan->uuid)) {
             $this->dispatch('flashMessage', ['type' => 'error', 'message' => 'План лікування ще не синхронізовано з ЕСОЗ.']);
+
             return;
         }
 
@@ -772,7 +786,9 @@ class CarePlanShow extends Component
 
     public function resendSms(): void
     {
-        if ($this->smsResent) return;
+        if ($this->smsResent) {
+            return;
+        }
         try {
             EHealth::approval()->resendSms($this->carePlan->person->uuid, $this->approvalId);
             $this->smsResent = true;

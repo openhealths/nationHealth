@@ -57,8 +57,7 @@ class HealthcareServiceEdit extends HealthcareServiceComponent
             Session::flash('success', 'Послугу успішно створено.');
             $this->redirectRoute('healthcare-service.index', [legalEntity(), $this->divisionId], navigate: true);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Failed to store healthcare service');
-            Session::flash('error', __('messages.database_error'));
+            $this->handleDatabaseErrors($exception, 'Failed to store healthcare service');
 
             return;
         }

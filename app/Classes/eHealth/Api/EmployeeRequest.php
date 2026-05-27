@@ -7,8 +7,10 @@ namespace App\Classes\eHealth\Api;
 use App\Classes\eHealth\EHealthRequest;
 use App\Classes\eHealth\EHealthResponse;
 use App\Enums\Status;
+use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Http\Client\ConnectionException;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Arr;
 use App\Models\Division;
@@ -32,7 +34,7 @@ class EmployeeRequest extends EHealthRequest
      *
      * @param  string  $signedContent  The base64 encoded signed string.
      * @return array The response data from eHealth on success.
-     * @throws ConnectionException|RuntimeException
+     * @throws EHealthConnectionException|RuntimeException
      */
     public function create(string $signedContent): array
     {
@@ -89,7 +91,6 @@ class EmployeeRequest extends EHealthRequest
         ];
     }
 
-
     // Trasform Employee Request data received from eHealth to the format suitable for save to DB
     public function mapRequestCreate(array $ehealthData, LegalEntity $legalEntity, ?int $userId = null, ?int $partyId = null): array
     {
@@ -99,7 +100,7 @@ class EmployeeRequest extends EHealthRequest
         $mappedData['division_id'] = null;
 
         foreach ($ehealthData as $key => $value) {
-            switch($key) {
+            switch ($key) {
                 case 'uuid':
                     $mappedData['uuid'] = $value;
                     break;
@@ -153,7 +154,7 @@ class EmployeeRequest extends EHealthRequest
      * @param  array  $filters  An associative array of query parameters to filter the results.
      * @param  int|null  $page  The page number to fetch. Pass null when filtering by a single 'id'.
      * @return PromiseInterface|EHealthResponse
-     * @throws ConnectionException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function getMany(array $filters, ?int $page = 1): PromiseInterface|EHealthResponse
     {
@@ -182,7 +183,7 @@ class EmployeeRequest extends EHealthRequest
      *
      * @param  string  $uuid
      * @return Response|PromiseInterface
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     public function getDetails(string $uuid): PromiseInterface|Response
     {
@@ -192,7 +193,6 @@ class EmployeeRequest extends EHealthRequest
 
         $getEndpoint = '/api/employee_requests';
         $url = $getEndpoint . '/' . $uuid;
-
 
         return $this->get($url);
     }
@@ -245,16 +245,16 @@ class EmployeeRequest extends EHealthRequest
         $validator = Validator::make($transformedData, [
             "employee_type" => 'required|string',
             'division_uuid' => 'nullable|uuid',
-		    "uuid" => 'required|uuid',
-		    "inserted_at" => 'required|date',
+            "uuid" => 'required|uuid',
+            "inserted_at" => 'required|date',
             "created_at" => 'required|date', // The same as 'inserted_at' date
-		    "legal_entity_uuid" => 'required|uuid',
+            "legal_entity_uuid" => 'required|uuid',
             'party' => 'required|array',
             "email" => 'required|string',
-		    "position" => 'required|string',
-		    "start_date" => 'nullable|date',
-		    "status" => ['required', Rule::enum(Status::class)],
-		    "updated_at" => 'required|date'
+            "position" => 'required|string',
+            "start_date" => 'nullable|date',
+            "status" => ['required', Rule::enum(Status::class)],
+            "updated_at" => 'required|date'
         ]);
 
         if ($validator->fails()) {
@@ -278,7 +278,7 @@ class EmployeeRequest extends EHealthRequest
         $replaced = [];
 
         foreach ($properties as $name => $value) {
-            switch($name) {
+            switch ($name) {
                 case 'id':
                     $replaced['uuid'] = $value;
                     break;
@@ -588,11 +588,11 @@ class EmployeeRequest extends EHealthRequest
         ];
     }
 
-    public function mapRevisionData(EHealthResponse $response):array
+    public function mapRevisionData(EHealthResponse $response): array
     {
         foreach ($response->getData() as $key => $value) {
 
-            switch($key) {
+            switch ($key) {
                 case 'position':
                     $mappedData['employee_request_data'][$key] = $value;
                     break;

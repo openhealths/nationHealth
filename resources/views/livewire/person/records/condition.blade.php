@@ -68,7 +68,7 @@
                         },
 
                         searchCodes() {
-                            clearTimeout(this.searchTimeout);                            
+                            clearTimeout(this.searchTimeout);
 
                             if (!this.search.trim()) {
                                 this.isLoading = false;
@@ -177,7 +177,7 @@
 
                             <template x-if="!isLoading && search.trim() && filteredOptions.length === 0">
                                 <div class="px-3 py-2 text-sm text-gray-500">
-                                    {{ __('patients.nothing_found') }}
+                                    {{ __('forms.nothing_found') }}
                                 </div>
                             </template>
                         </div>
@@ -349,7 +349,7 @@
 
                                 <template x-if="filteredOptions.length === 0">
                                     <div class="px-3 py-2 text-sm text-gray-500">
-                                        {{ __('patients.nothing_found') }}
+                                        {{ __('forms.nothing_found') }}
                                     </div>
                                 </template>
                             </div>
@@ -526,9 +526,9 @@
                             <div class="record-inner-column !pl-4 flex-1">
                                 <div class="record-inner-label">{{ __('patients.code_and_name') }}</div>
                                 <div class="record-inner-value text-[17px] font-semibold text-gray-900 dark:text-gray-100">
-                                    {{ 
-                                        data_get($condition, 'code.coding.0.code') ?? '-' 
-                                    }} - {{ 
+                                    {{
+                                        data_get($condition, 'code.coding.0.code') ?? '-'
+                                    }} - {{
                                         data_get( $this->dictionaries, 'eHealth/ICPC2/condition_codes.' . data_get($condition, 'code.coding.0.code') ?? '-')
                                     }}
                                 </div>

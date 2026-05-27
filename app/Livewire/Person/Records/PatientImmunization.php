@@ -7,18 +7,17 @@ namespace App\Livewire\Person\Records;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\JobStatus;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use App\Jobs\ImmunizationSync;
 use App\Models\LegalEntity;
 use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
 use Illuminate\View\View;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\WithPagination;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
 class PatientImmunization extends BasePatientComponent
@@ -74,17 +73,17 @@ class PatientImmunization extends BasePatientComponent
         return ImmunizationSync::BATCH_NAME;
     }
 
-    protected function getJobClass(string $entityType): string 
+    protected function getJobClass(string $entityType): string
     {
         return ImmunizationSync::class;
     }
 
-    protected function getEntityConstant(string $entityType): string 
+    protected function getEntityConstant(string $entityType): string
     {
         return LegalEntity::ENTITY_IMMUNIZATION;
     }
 
-    protected function onSyncStatusChanged(string $entityType, JobStatus $status): void 
+    protected function onSyncStatusChanged(string $entityType, JobStatus $status): void
     {
         $this->syncStatus = $status->value;
     }
@@ -113,8 +112,8 @@ class PatientImmunization extends BasePatientComponent
                 $this->uuid,
                 $this->buildSearchParams(),
             );
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while synchronizing immunizations');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while synchronizing immunizations');
 
             return;
         }
@@ -123,8 +122,7 @@ class PatientImmunization extends BasePatientComponent
             $validatedData = $response->validate();
             Repository::immunization()->sync($this->personId, $validatedData);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Error while synchronizing immunizations');
-            Session::flash('error', __('patients.messages.immunization_sync_database_error'));
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing immunizations');
 
             return;
         }
@@ -170,7 +168,7 @@ class PatientImmunization extends BasePatientComponent
         );
     }
 
-    private function loadEpisodesFromDb(): void 
+    private function loadEpisodesFromDb(): void
     {
         $episodes = Repository::episode()->getByPersonId($this->personId);
 
@@ -179,7 +177,7 @@ class PatientImmunization extends BasePatientComponent
         $this->episodes = Arr::toCamelCase(
             $this->formatDatesForDisplay($episodes)
         );
-    }   
+    }
 
     private function loadImmunizations(array $params = []): void
     {
@@ -193,10 +191,10 @@ class PatientImmunization extends BasePatientComponent
             $this->pageSize = $paging['page_size'] ?? 10;
 
             $this->immunizations = Arr::toCamelCase($validatedData);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+        } catch (EHealthException|EHealthConnectionException $exception) {
             $this->immunizations = [];
 
-            $this->handleEHealthExceptions($exception, 'Error while loading immunizations');
+            $exception->handle('Error while loading immunizations');
         }
     }
 
@@ -211,10 +209,10 @@ class PatientImmunization extends BasePatientComponent
             $validatedData = $response->validate();
 
             $this->episodes = Arr::toCamelCase($validatedData);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
+        } catch (EHealthException|EHealthConnectionException $exception) {
             $this->episodes = [];
 
-            $this->handleEHealthExceptions($exception, 'Error while loading episodes');
+            $exception->handle('Error while loading episodes');
         }
     }
 

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire\Party;
 
 use App\Classes\eHealth\EHealth;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -35,7 +35,7 @@ class PartyVerificationIndex extends Component
     /**
      * @throws ContainerExceptionInterface
      * @throws NotFoundExceptionInterface
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     public function render(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\View\View
     {

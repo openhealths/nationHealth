@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Exceptions\EHealth\EHealthConnectionException;
 use Throwable;
 use App\Core\Arr;
 use Carbon\Carbon;
@@ -11,11 +12,8 @@ use App\Models\User;
 use App\Core\EHealthJob;
 use App\Enums\JobStatus;
 use App\Models\LegalEntity;
-use App\Models\Relations\Party;
 use App\Repositories\Repository;
 use App\Classes\eHealth\EHealth;
-use Spatie\Permission\Models\Role;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Queue\SerializesModels;
 use App\Classes\eHealth\EHealthResponse;
@@ -24,12 +22,11 @@ use App\Models\Employee\EmployeeRequest;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Middleware\RateLimited;
-use Illuminate\Http\Client\ConnectionException;
 
 class EmployeeRequestDetailsUpsert extends EHealthJob
 {
-    use Dispatchable,
-        SerializesModels;
+    use Dispatchable;
+    use SerializesModels;
 
     public const string BATCH_NAME = 'EmployeeRequestDetailsSync';
 
@@ -51,7 +48,7 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
     /**
      * Get data from EHealth API
      *
-     * @throws ConnectionException
+     * @throws EHealthConnectionException
      */
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse|null
     {
@@ -67,7 +64,7 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
     {
         $validatedData = $response->validate();
 
-        $validatedData['inserted_at'] = Carbon::parse($validatedData['inserted_at'] )->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s');
+        $validatedData['inserted_at'] = Carbon::parse($validatedData['inserted_at'])->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s');
 
         Log::info('Processing EmployeeRequestDetailsUpsert for employee_request:' . $this->employeeRequest->id . ', LE:' . ($this->legalEntity->id ?? 'N/A'));
 
@@ -79,12 +76,13 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
 
         $employeeRequestPartyId = $employeeRequestUser?->partyId;
 
-        $this->employeeRequest->fill(array_merge(
-            $response->map($validatedData, $this->legalEntity, $employeeRequestUser?->id ?? null, $employeeRequestPartyId ?? null),
+        $this->employeeRequest->fill(
+            array_merge(
+                $response->map($validatedData, $this->legalEntity, $employeeRequestUser?->id ?? null, $employeeRequestPartyId ?? null),
                 [
                     'sync_status' => JobStatus::COMPLETED->value,
-                    'inserted_at' => Carbon::parse($validatedData['inserted_at'] )->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? Carbon::now(),
-                    'applied_at' => Carbon::parse($validatedData['updated_at'] )->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? Carbon::now()
+                    'inserted_at' => Carbon::parse($validatedData['inserted_at'])->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? Carbon::now(),
+                    'applied_at' => Carbon::parse($validatedData['updated_at'])->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? Carbon::now()
                 ]
             )
         );

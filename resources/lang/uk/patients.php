@@ -44,6 +44,7 @@ return [
     'seconds_short' => 'с)',
     'was_performed' => 'Чи була проведена',
     'date_time_entered' => 'Дата та час внесення',
+    'episode' => 'Епізод',
 
     // Summary sections fields
     'status_clinical' => 'Статус клінічний',
@@ -126,12 +127,9 @@ return [
         'COURT_DECISION' => 'Рішення суду',
         'DOCUMENT' => 'Документ'
     ],
-    'encounter_create' => 'Створення медичного запису',
-    'save_to_application' => 'Зберегти в заявки',
 
     // patient search
     'patient_search' => 'Пошук пацієнта',
-    'patient_filter' => 'Фільтр пацієнтів',
     'search' => 'Шукати',
     'male' => 'Чоловік',
     'female' => 'Жінка',
@@ -155,11 +153,9 @@ return [
     'search_for_confidant' => 'Шукати представника',
     'confidant_person_documents_relationship' => 'Документи, що підтверджують законність представництва',
     'alias' => 'Роль',
-    'leaflet' => "Пам’ятка",
     'informed' => "інформація з пам'ятки повідомлена пацієнту",
     'reject' => 'Відхилити заявку',
     'print_leaflet_for_patient' => "Роздрукувати пам'ятку для ознайомлення пацієнтом",
-    'print_leaflet' => "Надрукувати пам'ятку",
 
     'status' => [
         // PERSON_VERIFICATION_STATUSES
@@ -191,11 +187,7 @@ return [
         'differential' => 'диференціальний',
         'provisional' => 'попередній',
         'refuted' => 'спростований',
-        'not_done' => 'Не виконана',
-
-        // Statuses for reorganized declarations
-        'to_be_resigned' => 'Потребує переукладання',
-        'resigned' => 'Переукладена'
+        'not_done' => 'Не виконана'
     ],
 
     'source' => [
@@ -231,11 +223,9 @@ return [
     'channel' => 'Канал',
     'cancel_request' => 'Скасувати запит',
     'mis_system' => 'МІС',
-    'confirm_deactivation' => 'Підтвердити деактивацію',
 
     // Summary record
     'summary' => 'Зведені дані',
-    'get_access_to_medical_data' => 'Отримати доступ до медичних даних',
     'data_access' => 'Доступ до даних',
     'sync_ehealth_data' => 'Синхронізувати дані з ЕСОЗ',
     'sync_success' => 'Дані успішно синхронізовані',
@@ -247,15 +237,12 @@ return [
     // Episodes record
     'episodes' => 'Епізоди',
     'search_episode' => 'Пошук епізоду',
-    'filter_name' => 'Назва',
     'filter_code' => 'ЕСОЗ ID',
     'reset_filters' => 'Скинути фільтри',
     'additional_params' => 'Додаткові параметри пошуку',
     'group_actions' => 'Групові дії',
     'revoke_access' => 'Відкликати доступ до записів',
     'filter_created_at_range' => 'Створено від - до',
-    'filter_icd_diagnosis' => 'Діагноз за МКХ',
-    'filter_icpc_diagnosis' => 'Діагноз за ICPC',
 
     // Diagnoses record
     'diagnoses_search' => 'Пошук діагнозів',
@@ -265,11 +252,6 @@ return [
     // Observations record
     'observations' => 'Обстеження',
     'condition_search' => 'Пошук станів',
-    'vaccination_search' => 'Пошук вакцинації',
-    'visual_studies' => 'Візуальні дослідження',
-    'doctor_conclusion' => 'Заключення лікаря',
-    'performed_status' => 'Виконано',
-    'observations_not_found' => 'Обстежень не знайдено',
 
     // Encounter
     'encounters' => 'Взаємодії',
@@ -300,7 +282,6 @@ return [
     'paper_referral_institution_short' => 'Найменування закладу',
     'paper_referral_date' => 'Дата направлення',
     'paper_referral_notes' => 'Нотатки',
-    'search_for_referral' => 'Шукати направлення',
     'interaction_class' => 'Клас взаємодії',
     'interaction_type' => 'Тип взаємодії',
     'existing_episode' => 'Існуючий епізод',
@@ -328,9 +309,8 @@ return [
     'evidence' => 'Докази',
     'evidence_observations' => 'Спостереження',
     'severity' => 'Ступінь тяжкості',
-    'conditions_not_found' => 'Станів не знайдено',
     'end_date' => 'Дата кінця',
-    'loading' => 'Завантаження...', 
+    'loading' => 'Завантаження...',
     'input_code_or_name' => 'Почніть вводити код або назву',
 
     // Additional data
@@ -338,6 +318,9 @@ return [
     'assignments' => 'Призначення',
     'period_start' => 'Час початку',
     'period_end' => 'Час закінчення',
+    'add_coauthor' => 'Додати співавтора',
+    'find_doctor' => 'Знайти лікаря',
+    'coauthor' => 'Співавтор',
 
     // Immunizations
     'immunizations' => 'Вакцинації',
@@ -369,6 +352,7 @@ return [
     'date_to' => 'Дата проведення до',
     'episodes_not_found' => 'Епізоди не знайдено',
     'immunizations_not_found' => 'Вакцинації не знайдено',
+    'immunization_search' => 'Пошук вакцинації',
 
     // Diagnostic reports
     'diagnostic_report' => 'Діагностичний звіт',
@@ -379,19 +363,16 @@ return [
     'edrpou_of_the_issuing_institution' => 'ЄДРПОУ закладу, що виписав',
     'name_of_the_institution_that_issued_it' => 'Найменування закладу, що виписав',
     'the_doctor_who_interpreted_the_results' => 'Лікар, що інтерпретував результати',
-    'full_name_of_the_doctor_who_interpreted_the_results' => 'ПІБ лікаря, що інтерпретував результати',
     'doctor_submitting_a_report_to_the_system' => 'Лікар, що передає в систему звіт',
     'reception_start_date_and_time' => 'Дата та час початку прийому',
     'reception_end_date_and_time' => 'Дата та час завершення прийому',
     'specimen_id' => 'ID зразка',
-    'unnamed' => 'Без назви',
     'context_episode_id' => 'ID контекстного епізоду',
     'origin_episode_id' => 'ID первинного епізоду',
     'encounter_id' => 'ID взаємодії',
     'ehealth_id' => 'ID ЕСОЗ',
 
     // Observations
-    'code' => 'Код',
     'value' => 'Значення',
     'coding_system' => 'Система кодувань',
     'components' => 'Компоненти',
@@ -407,7 +388,6 @@ return [
     'date_and_time_of_receiving_the_indicators' => 'Дата та час отримання показників',
     'diagnostic_report_id' => 'ID діагностичного звіту',
     'device_id' => 'ID девайсу',
-    'nothing_found' => 'Нічого не знайдено',
 
     // Procedures
     'procedure' => 'Процедура',
@@ -416,7 +396,6 @@ return [
     'procedure_start_date_and_time' => 'Дата та час початку процедури',
     'procedure_end_date_and_time' => 'Дата та час завершення процедури',
     'reason_for_performing' => 'Причина проведення',
-    'episode' => 'Епізод',
     'added' => 'Додано',
     'rehabilitation_aids' => 'Допоміжні засоби реабілітації',
     'complications_arising_during_the_procedure' => 'Ускладнення, що виникли під час процедури',
@@ -431,8 +410,6 @@ return [
     'supporting_medical_information' => 'Підтверджуючі медичні дані',
     'medical_records_type' => 'тип медичних записів',
     'employee_who_created' => 'Співробітник, який створив',
-    'description' => 'Опис',
-    'medical_record' => 'медичний запис',
 
     // Auth methods
     'authentication_methods' => 'Методи автентифікації',
@@ -455,34 +432,12 @@ return [
     'enter_new_phone' => 'Введіть будь ласка новий номер телефону',
     'enter_a_new_phone_number' => 'Введіть новий номер телефону',
     'authentication_SMS' => 'Автентифікація через СМС',
-    'method_name' => 'Назва методу',
     'update_method_alias' => 'Оновлення назви методу автентифікації',
     'load_person_documents' => 'Завантажте будь ласка документи пацієнта',
     'new_alias_method' => 'Введіть будь ласка нову назву методу автентифікації',
     'add_authentication_method' => 'Додати метод автентифікації',
-    'authentication_from_SMS' => 'Автентифікація через СМС',
     'adding_authentication_method_SMS' => 'Додавання методу автентифікації - через СМС',
     'authentication_method_name' => 'Назва методу автентифікації',
-    'authentication_through_documents' => 'Автентифікація через документи',
-    'file_not_selected' => 'Файл не обрано',
-    'select_file' => 'Вибрати файл',
-    'the_size_uploaded_file' => 'Розмір завантажуваного файлу не більше 10МБ у форматі jpeg',
-    'send_files' => 'Відправити файли',
-    'add_authentication_documents' => 'Додати документи',
-    'auth_through_another_person' => 'Автентифікація через іншу особу',
-    'medical_worker_confirmation' => 'Ви, як медичний працівник закладу охорони здоров\'я:',
-    'confirm_identity' => 'Підтверджуєте, що пацієнта як особу ідентифіковано;',
-    'confirm_legal_representative' => 'Підтверджуєте, що повідомили законному представнику пацієнта мету та підстави обробки персональних даних;',
-    'confirm_verification' => 'Підтверджуєте перевірку повноважень представника пацієнта (у разі надання даних про законного представника).',
-    'leaflet_description' => 'Надайте копії законному представнику пацієнта, від імені пацієнта, для якого створюєте запис в електронній системі охорони здоров\'я.',
-    'leaflet_description_full' => 'Надаючи код законний представник пацієнта, від імені пацієнта, для якого створюється запис в електронній системі охорони здоров\'я:
-- підтверджує, що інформована/ий медичним працівником закладу охорони здоров\'я про мету та підстави обробки персональних даних пацієнта, для якого створюється запис в реєстрі пацієнтів Електронної системи охорони здоров\'я;
-- надає згоду медичному працівнику закладу охорони здоров\'я створити запис про пацієнта у Електронній системі охорони здоров\'я.',
-    'leaflet_intro' => 'Надаючи код законний представник пацієнта, від імені пацієнта, для якого створюється запис в електронній системі охорони здоров\'я:',
-    'leaflet_point_1' => 'підтверджує, що інформована/ий медичним працівником закладу охорони здоров\'я про мету та підстави обробки персональних даних пацієнта, для якого створюється запис в реєстрі пацієнтів Електронної системи охорони здоров\'я;',
-    'leaflet_point_2' => 'надає згоду медичному працівнику закладу охорони здоров\'я створити запис про пацієнта у Електронній системі охорони здоров\'я.',
-    'confirmation_code_sms' => 'Код підтвердження з СМС',
-    'resend_code' => 'Відправити ще раз (через 60 с)',
     'terminate_relationship_warning_1' => 'При розірванні зв’язку з законним представником, буде деактивовано метод автентифікації "Автентифікація через іншу особу", пов’язаний з даним законним представником.',
     'terminate_relationship_warning_2' => 'Якщо пацієнт не має інших законних представників - необхідно створити зв’язок принаймні з одним законним представником для продовження роботи з даним недієздатним пацієнтом.',
     'auth_method_name_title' => 'Назва методу автентифікації',
@@ -523,9 +478,7 @@ return [
         'person_created' => 'Пацієнт успішно створений',
         'files_uploaded_successfully' => 'Всі файли успішно завантажено',
         'sms_sent_successfully' => 'SMS успішно надіслано!',
-        'data_processing_error' => 'Помилка обробки даних. Зверніться до адміністратора.',
         'upload_all_files' => 'Будь ласка завантажте всі файли!',
-        'ehealth_error' => 'Помилка від ЕСОЗ: :message',
         'auth_methods_synced' => 'Методи автентифікації успішно синхронізовані.',
         'offline_auth_method_added' => 'Метод автентифікації через документи успішно додано.',
         'phone_number_changed' => 'Номер телефону успішно змінено.',
@@ -543,53 +496,41 @@ return [
         'episodes_first_page_synced_successfully' => 'Перша сторінка епізодів синхронізована, решта обробляється у фоні',
         'episode_sync_already_running' => 'Синхронізація епізодів вже запущена. Будь ласка, зачекайте її завершення.',
         'episode_sync_resume_started' => 'Відновлення попередньої синхронізації епізодів розпочато',
-        'episode_sync_database_error' => 'Виникла помилка під час синхронізації епізодів',
         'episode_sync_background_dispatch_error' => 'Помилка запуску фонової синхронізації епізодів',
         'encounters_synced_successfully' => 'Взаємодії успішно синхронізовані',
         'encounters_first_page_synced_successfully' => 'Перша сторінка взаємодій синхронізована, інші сторінки обробляються у фоновому режимі',
         'encounter_sync_already_running' => 'Синхронізація взаємодій вже запущена. Будь ласка, зачекайте її завершення.',
         'encounter_sync_resume_started' => 'Відновлення попередньої синхронізації взаємодій розпочато',
-        'encounter_sync_database_error' => 'Виникла помилка під час синхронізації взаємодій',
         'encounter_sync_background_dispatch_error' => 'Помилка запуску фонової синхронізації взаємодій',
         'clinical_impressions_synced_successfully' => 'Клінічні взаємодії успішно синхронізовані',
         'clinical_impressions_first_page_synced_successfully' => 'Перша сторінка клінічних оцінок синхронізована, решта обробляється у фоні',
         'clinical_impression_sync_already_running' => 'Синхронізація клінічних оцінок вже запущена. Будь ласка, зачекайте її завершення.',
         'clinical_impression_sync_resume_started' => 'Відновлення попередньої синхронізації клінічних оцінок розпочато',
-        'clinical_impression_sync_database_error' => 'Виникла помилка під час синхронізації клінічних оцінок',
         'clinical_impression_sync_background_dispatch_error' => 'Помилка запуску фонової синхронізації клінічних оцінок',
         'immunizations_synced_successfully' => 'Вакцинації успішно синхронізовані',
         'immunizations_first_page_synced_successfully' => 'Перша сторінка вакцинацій синхронізована, решта обробляється у фоні',
         'immunization_sync_already_running' => 'Синхронізація вакцинацій вже запущена. Будь ласка, зачекайте її завершення.',
         'immunization_sync_resume_started' => 'Відновлення попередньої синхронізації вакцинацій розпочато',
-        'immunization_sync_database_error' => 'Виникла помилка під час синхронізації вакцинацій',
         'immunization_sync_background_dispatch_error' => 'Помилка запуску фонової синхронізації вакцинацій',
         'observations_synced_successfully' => 'Обстеження успішно синхронізовані',
         'observations_first_page_synced_successfully' => 'Перша сторінка обстежень синхронізована, решта обробляється у фоні',
         'observation_sync_already_running' => 'Синхронізація обстежень вже запущена. Будь ласка, зачекайте її завершення.',
         'observation_sync_resume_started' => 'Відновлення попередньої синхронізації обстежень розпочато',
-        'observation_sync_database_error' => 'Виникла помилка під час синхронізації обстежень',
         'observation_sync_background_dispatch_error' => 'Помилка запуску фонової синхронізації обстежень',
         'conditions_synced_successfully' => 'Стани успішно синхронізовані',
         'conditions_first_page_synced_successfully' => 'Перша сторінка станів синхронізована, решта обробляється у фоні',
         'condition_sync_already_running' => 'Синхронізація станів вже запущена. Будь ласка, зачекайте її завершення.',
         'condition_sync_resume_started' => 'Відновлення попередньої синхронізації станів розпочато',
-        'condition_sync_database_error' => 'Виникла помилка під час синхронізації станів',
         'condition_sync_background_dispatch_error' => 'Помилка запуску фонової синхронізації станів',
         'diagnostic_reports_synced_successfully' => 'Діагностичні звіти успішно синхронізовані',
         'diagnostic_reports_first_page_synced_successfully' => 'Перша сторінка діагностичних звітів синхронізована, решта обробляється у фоні',
         'diagnostic_report_sync_already_running' => 'Синхронізація діагностичних звітів вже запущена. Будь ласка, зачекайте її завершення.',
         'diagnostic_report_sync_resume_started' => 'Відновлення попередньої синхронізації діагностичних звітів розпочато',
-        'diagnostic_report_sync_database_error' => 'Виникла помилка під час синхронізації діагностичних звітів',
         'diagnostic_report_sync_background_dispatch_error' => 'Помилка запуску фонової синхронізації діагностичних звітів',
         'care_plans_synced_successfully' => 'Плани лікування успішно синхронізовані',
         'care_plans_first_page_synced_successfully' => 'Перша сторінка планів лікування синхронізована, решта обробляється у фоні',
         'care_plan_sync_already_running' => 'Синхронізація планів лікування вже запущена. Будь ласка, зачекайте її завершення.',
         'care_plan_sync_resume_started' => 'Відновлення попередньої синхронізації планів лікування розпочато',
-        'care_plan_sync_database_error' => 'Виникла помилка під час синхронізації планів лікування',
         'care_plan_sync_background_dispatch_error' => 'Помилка запуску фонової синхронізації планів лікування',
-    ],
-    'add_coauthor' => 'Додати співавтора',
-    'find_doctor' => 'Знайти лікаря',
-    'coauthor' => 'Співавтор',
-
+    ]
 ];

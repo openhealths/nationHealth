@@ -9,16 +9,15 @@ use App\Core\Arr;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use App\Enums\JobStatus;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use App\Jobs\EpisodeFullSync;
 use App\Models\LegalEntity;
 use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Session;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
 class PatientEpisodes extends BasePatientComponent
@@ -89,8 +88,8 @@ class PatientEpisodes extends BasePatientComponent
                 $this->uuid,
                 ['managing_organization_id' => legalEntity()->uuid]
             );
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while synchronizing episodes');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while synchronizing episodes');
 
             return;
         }
@@ -99,8 +98,7 @@ class PatientEpisodes extends BasePatientComponent
             $validatedData = $response->validate();
             Repository::episode()->syncFull($this->personId, $validatedData);
         } catch (Throwable $exception) {
-            $this->logDatabaseErrors($exception, 'Error while synchronizing episodes');
-            Session::flash('error', __('patients.messages.episode_sync_database_error'));
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing episodes');
 
             return;
         }
@@ -140,8 +138,8 @@ class PatientEpisodes extends BasePatientComponent
         try {
             $response = EHealth::episode()->getBySearchParams($this->uuid, $params);
             $this->episodes = Arr::toCamelCase($this->formatDatesForDisplay($response->validate()));
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while searching episodes');
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while searching episodes');
         }
     }
 
