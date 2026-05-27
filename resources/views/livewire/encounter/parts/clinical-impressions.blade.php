@@ -4,9 +4,9 @@
          clinicalImpressions: $wire.entangle('form.clinicalImpressions'),
          modalClinicalImpression: new ClinicalImpression(),
          newClinicalImpression: false,
+         openClinicalImpressionDrawer: false,
          item: 0,
-         dictionary: $wire.dictionaries['eHealth/clinical_impression_patient_categories'],
-         showDrawer: false
+         dictionary: $wire.dictionaries['eHealth/clinical_impression_patient_categories']
      }"
 >
     <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
@@ -90,7 +90,7 @@
                                                 {{-- Replace the previous clinicalImpression with the current, don't assign object directly (modalClinicalImpression = clinicalImpression) to avoid reactiveness --}}
                                                 modalClinicalImpression = JSON.parse(JSON.stringify(clinicalImpressions[index]));
                                                 newClinicalImpression = false; {{-- This clinical impression is already created --}}
-                                                showDrawer = true;
+                                                openClinicalImpressionDrawer = true;
                                             "
                                             class="dropdown-button"
                                     >
@@ -118,7 +118,7 @@
                         modalClinicalImpression = new ClinicalImpression(); {{-- Replace the data of the previous clinicalImpression with a new one--}}
                         $wire.problems = [];
                         $wire.findings = [];
-                        showDrawer = true;
+                        openClinicalImpressionDrawer = true;
                     "
                     class="item-add my-5"
             >
@@ -126,44 +126,40 @@
             </button>
 
             {{-- Modal --}}
-            <template x-teleport="body">
-                <x-dialog-drawer x-model="showDrawer" maxWidth="4/5" wire:ignore>
-                    <x-slot name="title">
-                        {{ __('patients.clinical_impression') }}
-                    </x-slot>
+            <x-dialog-drawer x-model="openClinicalImpressionDrawer" maxWidth="4/5" wire:ignore>
+                <x-slot name="title">
+                    {{ __('patients.clinical_impression') }}
+                </x-slot>
 
-                    <x-slot name="content">
-                        <form class="space-y-6">
-                            @include('livewire.encounter.clinical-impression-parts.main-information')
-                            @include('livewire.encounter.clinical-impression-parts.problems')
-                            @include('livewire.encounter.clinical-impression-parts.findings')
-                            @include('livewire.encounter.clinical-impression-parts.supporting-info')
-                            @include('livewire.encounter.clinical-impression-parts.additional-information')
-                        </form>
-                    </x-slot>
+                    <form>
+                        @include('livewire.encounter.clinical-impression-parts.main-information')
+                        @include('livewire.encounter.clinical-impression-parts.problems')
+                        @include('livewire.encounter.clinical-impression-parts.findings')
+                        @include('livewire.encounter.clinical-impression-parts.supporting-info')
+                        @include('livewire.encounter.clinical-impression-parts.additional-information')
 
-                    <x-slot name="footer">
-                        <button type="button"
-                                class="button-minor"
-                                @click="showDrawer = false"
-                        >
-                            {{ __('forms.cancel') }}
-                        </button>
+                        <div class="mt-6 flex justify-between space-x-2">
+                            <button type="button"
+                                    @click="openClinicalImpressionDrawer = false"
+                                    class="button-minor"
+                            >
+                                {{ __('forms.cancel') }}
+                            </button>
 
-                        <button @click.prevent="
-                                    newClinicalImpression !== false
-                                        ? clinicalImpressions.push(modalClinicalImpression)
-                                        : clinicalImpressions[item] = modalClinicalImpression;
-                                    showDrawer = false;
-                                "
-                                class="button-primary"
-                                :disabled="!modalClinicalImpression.codeCode.trim()"
-                        >
-                            {{ __('forms.save') }}
-                        </button>
-                    </x-slot>
-                </x-dialog-drawer>
-            </template>
+                            <button @click.prevent="
+                                        newClinicalImpression !== false
+                                            ? clinicalImpressions.push(modalClinicalImpression)
+                                            : clinicalImpressions[item] = modalClinicalImpression;
+                                        openClinicalImpressionDrawer = false;
+                                    "
+                                    class="button-primary"
+                                    :disabled="!modalClinicalImpression.codeCode.trim()"
+                            >
+                                {{ __('forms.save') }}
+                            </button>
+                        </div>
+                    </form>
+            </x-dialog-drawer>
         </div>
 </div>
 

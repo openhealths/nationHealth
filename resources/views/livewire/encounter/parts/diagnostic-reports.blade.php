@@ -4,10 +4,10 @@
          diagnosticReports: $wire.entangle('form.diagnosticReports'),
          modalDiagnosticReport: new DiagnosticReport(),
          newDiagnosticReport: false,
+         openDiagnosticReportDrawer: false,
          item: 0,
          diagnosticReportCategoriesDictionary: $wire.dictionaries['eHealth/diagnostic_report_categories'],
-         servicesDictionary: $wire.dictionaries['custom/services'],
-         showDrawer: false
+         servicesDictionary: $wire.dictionaries['custom/services']
      }"
 >
     <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
@@ -94,7 +94,7 @@
                                                 {{-- Replace the previous diagnosticReport with the current, don't assign object directly (modalDiagnosticReport = diagnosticReport) to avoid reactiveness --}}
                                                 modalDiagnosticReport = JSON.parse(JSON.stringify(diagnosticReports[index]));
                                                 newDiagnosticReport = false; {{-- This diagnosticReport is already created --}}
-                                                showDrawer = true;
+                                                openDiagnosticReportDrawer = true;
                                             "
                                     >
                                         {{ __('forms.edit') }}
@@ -118,31 +118,26 @@
         <button @click.prevent="
                     newDiagnosticReport = true; {{-- We are adding a new diagnostic report --}}
                     modalDiagnosticReport = new DiagnosticReport(); {{-- Replace the data of the previous diagnostic report with a new one--}}
-                    showDrawer = true;
+                    openDiagnosticReportDrawer = true;
                 "
                 class="item-add my-5"
         >
             {{ __('forms.add') }}
         </button>
 
-        {{-- Content --}}
-        <template x-teleport="body">
-            <x-dialog-drawer x-model="showDrawer" maxWidth="4/5" wire:ignore>
-                <x-slot name="title">
-                    {{ __('patients.diagnostic_report') }}
-                </x-slot>
+        <x-dialog-drawer x-model="openDiagnosticReportDrawer" maxWidth="4/5" wire:ignore>
+            <x-slot name="title">
+                {{ __('patients.diagnostic_report') }}
+            </x-slot>
 
-                <x-slot name="content">
-                    <form class="space-y-6">
-                        @include('livewire.encounter.diagnostic-report-parts.main-information')
-                        @include('livewire.encounter.diagnostic-report-parts.additional-information', ['context' => 'diagnostic-report'])
-                    </form>
-                </x-slot>
+            <form>
+                @include('livewire.encounter.diagnostic-report-parts.main-information')
+                @include('livewire.encounter.diagnostic-report-parts.additional-information', ['context' => 'diagnostic-report'])
 
-                <x-slot name="footer">
+                <div class="mt-6 flex justify-between space-x-2">
                     <button type="button"
+                            @click="openDiagnosticReportDrawer = false"
                             class="button-minor"
-                            @click="showDrawer = false"
                     >
                         {{ __('forms.cancel') }}
                     </button>
@@ -151,7 +146,7 @@
                                 newDiagnosticReport !== false
                                     ? diagnosticReports.push(modalDiagnosticReport)
                                     : diagnosticReports[item] = modalDiagnosticReport;
-                                showDrawer = false;
+                                openDiagnosticReportDrawer = false;
                             "
                             class="button-primary"
                             :disabled="!(
@@ -161,9 +156,9 @@
                     >
                         {{ __('forms.save') }}
                     </button>
-                </x-slot>
-            </x-dialog-drawer>
-        </template>
+                </div>
+            </form>
+        </x-dialog-drawer>
 </div>
 
 <script>

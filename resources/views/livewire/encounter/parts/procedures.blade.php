@@ -4,8 +4,8 @@
          procedures: $wire.entangle('form.procedures'),
          modalProcedure: new Procedure(),
          newProcedure: false,
-         item: 0,
-         showDrawer: false
+         openProcedureDrawer: false,
+         item: 0
      }"
 >
     <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
@@ -90,7 +90,7 @@
                                                 {{-- Replace the previous procedure with the current, don't assign object directly (modalProcedure = procedure) to avoid reactiveness --}}
                                                 modalProcedure = JSON.parse(JSON.stringify(procedures[index]));
                                                 newProcedure = false; {{-- This procedure is already created --}}
-                                                showDrawer = true;
+                                                openProcedureDrawer = true;
                                             "
                                             class="dropdown-button"
                                     >
@@ -116,55 +116,51 @@
             <button @click.prevent="
                         newProcedure = true; {{-- We are adding a new procedure --}}
                         modalProcedure = new Procedure(); {{-- Replace the data of the previous procedure with a new one--}}
-                        showDrawer = true;
+                        openProcedureDrawer = true;
                     "
                     class="item-add my-5"
             >
                 {{ __('forms.add') }}
             </button>
 
-            {{-- Content --}}
-            <template x-teleport="body">
-                <x-dialog-drawer x-model="showDrawer" maxWidth="4/5" wire:ignore>
-                    <x-slot name="title">
-                        {{ __('patients.procedure') }}
-                    </x-slot>
+            <x-dialog-drawer x-model="openProcedureDrawer" maxWidth="4/5" wire:ignore>
+                <x-slot name="title">
+                    {{ __('patients.procedure') }}
+                </x-slot>
 
-                    <x-slot name="content">
-                        <form class="space-y-6">
-                            @include('livewire.encounter.procedure-parts.main-information', ['context' => 'encounter'])
-                            @include('livewire.encounter.procedure-parts.additional-information', ['context' => 'encounter'])
-                            @include('livewire.encounter.procedure-parts.reason-references')
-                            @include('livewire.encounter.procedure-parts.used-codes')
-                            @include('livewire.encounter.procedure-parts.complication-details')
-                        </form>
-                    </x-slot>
+                    {{-- Content --}}
+                    <form>
+                        @include('livewire.encounter.procedure-parts.main-information', ['context' => 'encounter'])
+                        @include('livewire.encounter.procedure-parts.additional-information', ['context' => 'encounter'])
+                        @include('livewire.encounter.procedure-parts.reason-references')
+                        @include('livewire.encounter.procedure-parts.used-codes')
+                        @include('livewire.encounter.procedure-parts.complication-details')
 
-                    <x-slot name="footer">
-                        <button type="button"
-                                class="button-minor"
-                                @click="showDrawer = false"
-                        >
-                            {{ __('forms.cancel') }}
-                        </button>
+                        <div class="mt-6 flex justify-between space-x-2">
+                            <button type="button"
+                                    @click="openProcedureDrawer = false"
+                                    class="button-minor"
+                            >
+                                {{ __('forms.cancel') }}
+                            </button>
 
-                        <button @click.prevent="
-                                    newProcedure !== false
-                                        ? procedures.push(modalProcedure)
-                                        : procedures[item] = modalProcedure;
-                                    showDrawer = false;
-                                "
-                                class="button-primary"
-                                :disabled="!(
-                                    modalProcedure.categoryCode.trim() &&
-                                    modalProcedure.codeValue.trim()
-                                )"
-                        >
-                            {{ __('forms.save') }}
-                        </button>
-                    </x-slot>
-                </x-dialog-drawer>
-            </template>
+                            <button @click.prevent="
+                                        newProcedure !== false
+                                            ? procedures.push(modalProcedure)
+                                            : procedures[item] = modalProcedure;
+                                        openProcedureDrawer = false;
+                                    "
+                                    class="button-primary"
+                                    :disabled="!(
+                                        modalProcedure.categoryCode.trim() &&
+                                        modalProcedure.codeValue.trim()
+                                    )"
+                            >
+                                {{ __('forms.save') }}
+                            </button>
+                        </div>
+                    </form>
+            </x-dialog-drawer>
         </div>
 </div>
 

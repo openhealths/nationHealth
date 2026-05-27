@@ -25,6 +25,10 @@
         @endonce
 
         @vite(['resources/css/app.css'])
+
+        <!-- Alpine plugins -->
+        <script defer src="https://unpkg.com/@alpinejs/ui@3.x.x/dist/cdn.min.js"></script>
+        <script defer src="https://unpkg.com/@alpinejs/focus@3.x.x/dist/cdn.min.js"></script>
     </head>
 
     <body>
