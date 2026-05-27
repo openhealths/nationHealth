@@ -17,7 +17,7 @@ class CarePlanRepository
     public function getByLegalEntity(int $legalEntityId): Collection
     {
         return CarePlan::where('legal_entity_id', $legalEntityId)
-            ->with(['person', 'author.party', 'encounter.diagnoses.condition'])
+            ->with(['person', 'author.party', 'encounter.diagnoses.conditionModel.code.coding'])
             ->latest()
             ->get();
     }
@@ -25,7 +25,7 @@ class CarePlanRepository
     public function getByPersonId(int $personId, array $filters = []): Collection
     {
         $query = CarePlan::where('person_id', $personId)
-            ->with(['person', 'author.party', 'encounter.diagnoses.condition']);
+            ->with(['person', 'author.party', 'encounter.diagnoses.conditionModel.code.coding']);
 
         if (!empty($filters['name'])) {
             $query->where('title', 'like', '%' . $filters['name'] . '%');
@@ -336,16 +336,79 @@ class CarePlanRepository
                         ->first();
                 }
 
+                $encounterId = null;
+                $localEncounter = null;
+                $encounterUuid = $rawFhir['encounter']['identifier']['value'] ?? null;
+                if ($encounterUuid) {
+                    $localEncounter = \App\Models\MedicalEvents\Sql\Encounter::where('uuid', $encounterUuid)->first();
+                    if ($localEncounter) {
+                        $encounterId = $localEncounter->id;
+                    }
+                }
+
+                $incomingTitle = isset($rawFhir['title']) ? trim($rawFhir['title']) : '';
+                $isGenericIncoming = ($incomingTitle === '' || $incomingTitle === 'План лікування');
+
+                $title = null;
+                if (!$isGenericIncoming) {
+                    $title = $incomingTitle;
+                } elseif ($carePlan && $carePlan->title && trim($carePlan->title) !== '' && trim($carePlan->title) !== 'План лікування') {
+                    $title = $carePlan->title;
+                } else {
+                    // Generate dynamically from linked encounter's diagnosis
+                    $diagnosisText = null;
+                    if ($localEncounter) {
+                        $localEncounter->loadMissing('diagnoses.conditionModel.code.coding');
+                        $diagnosis = $localEncounter->diagnoses->first();
+                        if ($diagnosis && $diagnosis->conditionModel) {
+                            $condition = $diagnosis->conditionModel;
+                            $code = $condition->code_string;
+                            $description = $condition->code_display;
+                            if ($code) {
+                                $diagnosisText = $description ? "$code - $description" : $code;
+                            }
+                        }
+                    }
+
+                    if ($diagnosisText) {
+                        $title = "План лікування: " . $diagnosisText;
+                    } else {
+                        // Fallback to category text
+                        $categoryText = null;
+                        if (isset($categoryData['text'])) {
+                            $categoryText = $categoryData['text'];
+                        } elseif (isset($categoryData['coding'][0]['code'])) {
+                            $code = $categoryData['coding'][0]['code'];
+                            try {
+                                $dict = dictionary()->basics()->byName('eHealth/care_plan_categories');
+                                if ($dict) {
+                                    $categoryText = $dict->asCodeDescription()->get($code);
+                                }
+                            } catch (\Throwable $e) {
+                                // ignore
+                            }
+                            $categoryText ??= $code;
+                        }
+
+                        if ($categoryText) {
+                            $title = "План лікування: " . $categoryText;
+                        } else {
+                            $title = 'План лікування';
+                        }
+                    }
+                }
+
                 if ($carePlan) {
                     $carePlan->update([
                         'uuid' => $rawFhir['id'] ?? $rawFhir['uuid'] ?? null,
                         'author_id' => $authorId,
                         'legal_entity_id' => $legalEntityId,
                         'status' => $rawFhir['status'] ?? CarePlanStatus::ACTIVE->value,
-                        'title' => $rawFhir['title'] ?? 'План лікування',
+                        'title' => $title,
                         'description' => $rawFhir['description'] ?? null,
                         'note' => $rawFhir['note'] ?? null,
                         'category_id' => $category?->id,
+                        'encounter_id' => $encounterId,
                         'encounter_identifier_id' => $encounterIdentifier?->id,
                         'care_manager_id' => $careManager?->id,
                         'period_start' => isset($rawFhir['period']['start'])
@@ -363,10 +426,11 @@ class CarePlanRepository
                         'author_id' => $authorId,
                         'legal_entity_id' => $legalEntityId,
                         'status' => $rawFhir['status'] ?? CarePlanStatus::ACTIVE->value,
-                        'title' => $rawFhir['title'] ?? 'План лікування',
+                        'title' => $title,
                         'description' => $rawFhir['description'] ?? null,
                         'note' => $rawFhir['note'] ?? null,
                         'category_id' => $category?->id,
+                        'encounter_id' => $encounterId,
                         'encounter_identifier_id' => $encounterIdentifier?->id,
                         'care_manager_id' => $careManager?->id,
                         'period_start' => isset($rawFhir['period']['start'])
@@ -378,6 +442,7 @@ class CarePlanRepository
                         'terms_of_service' => $rawFhir['terms_of_service']['coding'][0]['code'] ?? null,
                     ]);
                 }
+
 
                 if (isset($rawFhir['period'])) {
                     MedicalEventsRepository::period()->sync($carePlan, $rawFhir['period'], 'effectivePeriod');

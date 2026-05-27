@@ -66,9 +66,10 @@ class CarePlanUpdate extends CarePlanCreate
 
         // Load encounter diagnoses for UI
         if ($carePlan->encounter) {
+            $carePlan->encounter->loadMissing('diagnoses.conditionModel.code.coding');
             $this->diagnoses = $carePlan->encounter->diagnoses->map(fn ($d) => [
-                'date' => $d->condition?->asserted_date?->format('d.m.Y') ?? '-',
-                'name' => $d->condition?->code_display ?? $d->condition?->code ?? '-',
+                'date' => $d->conditionModel?->asserted_date?->format('d.m.Y') ?? '-',
+                'name' => $d->conditionModel?->code_display ?? $d->conditionModel?->code_string ?? '-',
             ])->toArray();
         }
 

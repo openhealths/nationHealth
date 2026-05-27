@@ -173,4 +173,167 @@ class CarePlanSyncTest extends TestCase
         $this->assertEquals('ServiceRequest', $activity->kindConcept->coding->first()->code);
         $this->assertEquals('J00', $activity->reasonConcept->coding->first()->code);
     }
+
+    public function test_care_plan_sync_preserves_title_or_generates_descriptive_title(): void
+    {
+        // 1. Setup - Create a person, legal entity, and employee
+        $person = Person::create([
+            'uuid' => '540d6f4c-1d7c-4a3d-a51b-5e04f981e8d6',
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'birth_date' => '1990-01-01',
+            'gender' => 'MALE',
+            'patient_signed' => true,
+            'process_disclosure_data_consent' => true,
+        ]);
+
+        $legalEntity = \App\Models\LegalEntity::create([
+            'uuid' => 'd5a6c9d0-8f6b-4a3d-a2e6-c1b8df7902d4',
+            'name' => 'Test Clinic',
+            'status' => 'ACTIVE',
+            'edrpou' => '12345678',
+            'public_name' => 'Test Clinic',
+            'mis_client_secret' => 'secret',
+            'email' => 'clinic@example.com',
+            'legal_entity_type_id' => 1,
+        ]);
+
+        $party = \App\Models\Relations\Party::create([
+            'first_name' => 'Doctor',
+            'last_name' => 'Who',
+            'birth_date' => '1980-01-01',
+            'gender' => 'MALE',
+            'verification_status' => 'VERIFIED',
+        ]);
+
+        $employee = \App\Models\Employee\Employee::create([
+            'uuid' => 'd5a6c9d0-8f6b-4a3d-a2e6-c1b8df7902d3',
+            'legal_entity_id' => $legalEntity->id,
+            'legal_entity_uuid' => $legalEntity->uuid,
+            'party_id' => $party->id,
+            'employee_type' => 'DOCTOR',
+            'position' => 'DOCTOR',
+            'status' => 'APPROVED',
+            'start_date' => '2020-01-01',
+            'is_active' => true,
+        ]);
+
+        // Create an encounter, diagnosis, and condition in the DB
+        $encounterUuid = 'd06efb40-9a3d-4c3e-b8d4-510bf36ad0b6';
+        $episodeIdentifier = \App\Models\MedicalEvents\Sql\Identifier::create([
+            'value' => 'd5a6c9d0-8f6b-4a3d-a2e6-c1b8df7902d5',
+        ]);
+
+        $classCoding = \App\Models\MedicalEvents\Sql\Coding::create([
+            'system' => 'eHealth/encounter_classes',
+            'code' => 'AMB',
+        ]);
+
+        $typeCodeableConcept = \App\Models\MedicalEvents\Sql\CodeableConcept::create([
+            'text' => 'Encounter Type',
+        ]);
+
+        $encounter = \App\Models\MedicalEvents\Sql\Encounter::create([
+            'uuid' => $encounterUuid,
+            'person_id' => $person->id,
+            'status' => 'finished',
+            'episode_id' => $episodeIdentifier->id,
+            'class_id' => $classCoding->id,
+            'type_id' => $typeCodeableConcept->id,
+        ]);
+
+        $conditionUuid = '44df1f24-28b9-4bd4-9a72-88be373c39af';
+        
+        $coding = \App\Models\MedicalEvents\Sql\Coding::create([
+            'system' => 'eHealth/ICPC2/condition_codes',
+            'code' => 'A01',
+        ]);
+
+        $codeableConcept = \App\Models\MedicalEvents\Sql\CodeableConcept::create();
+        $codeableConcept->coding()->save($coding);
+
+        $contextIdentifier = \App\Models\MedicalEvents\Sql\Identifier::create([
+            'value' => $encounterUuid,
+        ]);
+
+        $condition = \App\Models\MedicalEvents\Sql\Condition::create([
+            'uuid' => $conditionUuid,
+            'person_id' => $person->id,
+            'code_id' => $codeableConcept->id,
+            'clinical_status' => 'active',
+            'verification_status' => 'provisional',
+            'primary_source' => true,
+            'context_id' => $contextIdentifier->id,
+            'onset_date' => now(),
+        ]);
+
+        $identifier = \App\Models\MedicalEvents\Sql\Identifier::create([
+            'value' => $conditionUuid,
+        ]);
+
+        $roleCodeableConcept = \App\Models\MedicalEvents\Sql\CodeableConcept::create([
+            'text' => 'Primary Diagnosis',
+        ]);
+
+        $encounter->diagnoses()->create([
+            'condition_id' => $identifier->id,
+            'role_id' => $roleCodeableConcept->id,
+            'rank' => 1,
+        ]);
+
+        // 2. Sync care plan with a generic title - should generate dynamic title based on diagnosis
+        $carePlanUuid = 'c0280b2c-686b-4e63-a262-429d4791ea82';
+        $carePlanData = [
+            'data' => [
+                [
+                    'id' => $carePlanUuid,
+                    'status' => 'active',
+                    'title' => 'План лікування', // Generic
+                    'category' => [
+                        'coding' => [
+                            ['system' => 'http://e-health.gov.ua/systems/care-plan-category', 'code' => '736382003']
+                        ],
+                        'text' => 'Treatment plan'
+                    ],
+                    'period' => [
+                        'start' => '2026-04-14',
+                    ],
+                    'encounter' => [
+                        'identifier' => [
+                            'value' => $encounterUuid
+                        ]
+                    ],
+                    'author' => [
+                        'identifier' => [
+                            'value' => 'd5a6c9d0-8f6b-4a3d-a2e6-c1b8df7902d3'
+                        ]
+                    ],
+                ]
+            ]
+        ];
+
+        // Mock API dependencies to prevent real HTTP calls during syncActivities
+        $mockActivityResponse = \Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $mockActivityResponse->shouldReceive('getData')->andReturn(['data' => []]);
+
+        $mockActivityApi = $this->mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $mockActivityApi->shouldReceive('getSummary')->andReturn($mockActivityResponse);
+
+        $repo = app(CarePlanRepository::class);
+        $repo->syncCarePlans($carePlanData, $person->id);
+
+        // Verify encounter_id is set and title is generated
+        $carePlan = CarePlan::where('uuid', $carePlanUuid)->with('encounter')->first();
+        $this->assertEquals($encounter->id, $carePlan->encounter_id);
+        // "A01 - Біль загальний / множинної локалізації" comes from the dictionary for A01
+        $this->assertEquals('План лікування: A01 - Біль загальний / множинної локалізації', $carePlan->title);
+        $this->assertEquals('A01 - Біль загальний / множинної локалізації', $carePlan->medical_condition);
+
+        // 3. Sync again but with custom local title - it should be preserved
+        $carePlan->update(['title' => 'Мій Особливий План']);
+
+        $repo->syncCarePlans($carePlanData, $person->id);
+        $carePlan->refresh();
+        $this->assertEquals('Мій Особливий План', $carePlan->title);
+    }
 }
