@@ -1,4 +1,4 @@
-@props(['id' => null, 'maxWidth' => null])
+@props(['maxWidth' => null])
 
 @php
     $maxWidth = [

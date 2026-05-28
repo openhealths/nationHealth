@@ -3,7 +3,6 @@
               x-data="{
                   openEvidenceDrawer: false,
                   selectedType: 'condition',
-                  selectedEpisodeId: '{{ $episodes[0]['uuid'] ?? '' }}',
                   searchQuery: '',
                   isLoading: false,
                   searchResults: [],
@@ -13,7 +12,6 @@
                       this.$watch('openEvidenceDrawer', (val) => {
                           if (val) {
                               this.selectedType = 'condition';
-                              this.selectedEpisodeId = '{{ $episodes[0]['uuid'] ?? '' }}';
                               this.searchQuery = '';
                               this.searchResults = [];
                               this.fetchRecords();
@@ -36,9 +34,6 @@
                   },
                   filteredRecords() {
                       return this.searchResults.filter(rec => {
-                          if (this.selectedEpisodeId && rec.episodeId !== this.selectedEpisodeId) {
-                              return false;
-                          }
                           const dictionaryName = this.selectedType === 'condition'
                               ? 'eHealth/ICPC2/condition_codes'
                               : 'eHealth/LOINC/observation_codes';
@@ -181,7 +176,7 @@
                     <p>{{ __('forms.search') }}</p>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="mb-6">
                     <div class="form-group group">
                         <select x-model="selectedType"
                                 id="drawerSelectedType"
@@ -192,26 +187,6 @@
                         </select>
                         <label for="drawerSelectedType" class="label">
                             {{ mb_ucfirst(__('patients.medical_records_type')) }}
-                        </label>
-                    </div>
-
-                    <div class="form-group group">
-                        <select x-model="selectedEpisodeId"
-                                id="drawerSelectedEpisode"
-                                class="input-select peer w-full"
-                        >
-                            <option
-                                value="">{{ __('forms.select') }} {{ mb_strtolower(__('patients.episode')) }}</option>
-                            @foreach($episodes as $key => $episode)
-                                <option value="{{ $episode['uuid'] }}">
-                                    {{ $episode['name'] }}
-                                    ({{ mb_strtolower(__('patients.status.' . $episode['status'])) }})
-                                    від {{ \Carbon\CarbonImmutable::parse($episode['ehealthInsertedAt'] ?? $episode['insertedAt'] ?? $episode['createdAt'] ?? now())->format('j.m.Y') }}
-                                </option>
-                            @endforeach
-                        </select>
-                        <label for="drawerSelectedEpisode" class="label">
-                            {{ mb_ucfirst(__('patients.episode')) }}
                         </label>
                     </div>
                 </div>

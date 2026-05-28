@@ -376,7 +376,7 @@
                                         @icon('calendar-week', 'w-4 h-4 text-gray-400')
                                     </div>
                                     <input x-model="modalCondition.onsetDate"
-                                           datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                                           datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                                            type="text"
                                            name="onsetDate"
                                            id="onsetDate"
@@ -415,7 +415,7 @@
                                         @icon('calendar-week', 'w-4 h-4 text-gray-400')
                                     </div>
                                     <input x-model="modalCondition.assertedDate"
-                                           datepicker-max-date="{{ now()->format('d.m.Y') }}"
+                                           datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                                            type="text"
                                            name="assertedDate"
                                            id="assertedDate"
@@ -632,20 +632,13 @@
                         <div class="mt-8 flex justify-start items-center gap-4">
                             <button type="button"
                                     @click="
-                                        if (!newCondition) {
-                                            conditions.splice(item, 1);
-                                            diagnoses.splice(item, 1);
-                                        }
                                         showPrimaryWarning = false;
                                         showDuplicateCodeWarning = false;
                                         openConditionDrawer = false;
                                     "
-                                    :class="newCondition
-                                        ? 'button-minor'
-                                        : 'cursor-pointer border border-red-600 text-red-600 hover:bg-red-50 focus:ring-4 focus:ring-red-100 font-medium rounded-lg text-sm px-5 py-2.5 transition-colors'"
+                                    class="button-minor"
                             >
-                                <span
-                                    x-text="newCondition ? '{{ __('forms.cancel') }}' : '{{ __('forms.delete') }}'"></span>
+                                <span>{{ __('forms.cancel') }}</span>
                             </button>
 
                             <button @click.prevent="
