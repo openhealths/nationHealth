@@ -1,3 +1,10 @@
+@php 
+    $categories = $categories ?? $dictionaries['care_plan_categories'] ?? []; 
+    $intent = array_key_exists('intent', $carePlan->getAttributes()) ? $carePlan->intent : 'order';
+    $categoryVal = array_key_exists('category', $carePlan->getAttributes()) ? $carePlan->category : ($carePlan->categoryConcept?->code ?? '');
+    $contextVal = $carePlan->context ?? $carePlan->encounter?->class ?? '';
+@endphp
+
 <fieldset class="fieldset bg-white dark:bg-gray-800 !rounded-xl !shadow-none !border-gray-100 dark:!border-gray-700 !max-w-full !p-6 !mb-6">
     <legend class="legend">
         {{ __('care-plan.care_plan_data') }}
@@ -8,11 +15,17 @@
             <select id="category"
                     name="category"
                     class="input-select peer"
+                    @if($isReadOnly ?? false)
+                    @else
                     wire:model="form.category"
+                    @endif
+                    :disabled="$isReadOnly ?? false"
             >
                 <option value="">{{ __('forms.select') }}</option>
                 @foreach($categories as $code => $description)
-                    <option value="{{ $code }}">{{ $description }}</option>
+                    <option value="{{ $code }}"
+                            @if(($isReadOnly ?? false) && $categoryVal === $code) selected @endif
+                    >{{ $description }}</option>
                 @endforeach
             </select>
             <label for="category" class="label">
@@ -31,8 +44,13 @@
                    class="input peer"
                    placeholder=" "
                    autocomplete="off"
+                   @if($isReadOnly ?? false)
+                   value="{{ $carePlan->title }}"
+                   @else
                    wire:model="form.title"
+                   @endif
                    required
+                   :disabled="$isReadOnly ?? false"
             >
             <label for="title" class="label required">
                 {{ __('care-plan.name_care_plan') }}
@@ -48,11 +66,15 @@
             <select id="intent"
                     name="intent"
                     class="input-select peer"
+                    @if($isReadOnly ?? false)
+                    @else
                     wire:model="form.intent"
+                    @endif
+                    :disabled="$isReadOnly ?? false"
             >
-                <option value="order">{{ __('care-plan.order') ?? 'Призначення' }}</option>
-                <option value="proposal">{{ __('care-plan.proposal') ?? 'Пропозиція' }}</option>
-                <option value="plan">{{ __('care-plan.plan') ?? 'План' }}</option>
+                <option value="order" @if(($isReadOnly ?? false) && $intent === 'order') selected @endif>{{ __('care-plan.order') ?? 'Призначення' }}</option>
+                <option value="proposal" @if(($isReadOnly ?? false) && $intent === 'proposal') selected @endif>{{ __('care-plan.proposal') ?? 'Пропозиція' }}</option>
+                <option value="plan" @if(($isReadOnly ?? false) && $intent === 'plan') selected @endif>{{ __('care-plan.plan') ?? 'План' }}</option>
             </select>
             <label for="intent" class="label">
                 {{ __('care-plan.intention') }}
@@ -67,12 +89,18 @@
             <select id="context"
                     name="context"
                     class="input-select peer"
+                    @if($isReadOnly ?? false)
+                    @else
                     wire:model="form.context"
+                    @endif
+                    :disabled="$isReadOnly ?? false"
             >
                 <option value="">{{ __('forms.select') }}</option>
                 @isset($dictionaries['encounter_classes'])
                     @foreach($dictionaries['encounter_classes'] as $code => $description)
-                        <option value="{{ $code }}">{{ $description }}</option>
+                        <option value="{{ $code }}"
+                                @if(($isReadOnly ?? false) && $contextVal === $code) selected @endif
+                        >{{ $description }}</option>
                     @endforeach
                 @endisset
             </select>
@@ -92,7 +120,11 @@
                 <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
                     @icon('calendar-week', 'w-5 h-5 text-gray-400')
                 </div>
-                <input wire:model.lazy="form.period_start"
+                <input @if($isReadOnly ?? false)
+                       value="{{ $carePlan->period_start ? \Carbon\Carbon::parse($carePlan->period_start)->format(frontendDateFormat()) : '' }}"
+                       @else
+                       wire:model.lazy="form.period_start"
+                       @endif
                        type="text"
                        name="period_start"
                        id="period_start"
@@ -102,6 +134,7 @@
                        autocomplete="off"
                        datepicker-autohide
                        datepicker-format="{{ frontendDateFormat() }}"
+                       :disabled="$isReadOnly ?? false"
                 >
                 <label for="period_start" class="wrapped-label required">
                     {{ __('care-plan.start_date') ?? 'Дата початку' }}
@@ -115,7 +148,11 @@
                 <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
                     @icon('mingcute-time-fill', 'w-5 h-5 text-gray-400')
                 </div>
-                <input wire:model.lazy="form.period_start_time"
+                <input @if($isReadOnly ?? false)
+                       value="{{ $carePlan->period_start ? \Carbon\Carbon::parse($carePlan->period_start)->format('H:i') : '' }}"
+                       @else
+                       wire:model.lazy="form.period_start_time"
+                       @endif
                        type="text"
                        name="period_start_time"
                        id="period_start_time"
@@ -123,6 +160,7 @@
                        placeholder=" "
                        required
                        autocomplete="off"
+                       :disabled="$isReadOnly ?? false"
                 />
                 <label for="period_start_time" class="wrapped-label required">
                     {{ __('care-plan.time') ?? 'Час' }}
@@ -137,7 +175,11 @@
                 <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
                     @icon('calendar-week', 'w-5 h-5 text-gray-400')
                 </div>
-                <input wire:model.lazy="form.period_end"
+                <input @if($isReadOnly ?? false)
+                       value="{{ $carePlan->period_end ? \Carbon\Carbon::parse($carePlan->period_end)->format(frontendDateFormat()) : '' }}"
+                       @else
+                       wire:model.lazy="form.period_end"
+                       @endif
                        type="text"
                        name="period_end"
                        id="period_end"
@@ -146,6 +188,7 @@
                        autocomplete="off"
                        datepicker-autohide
                        datepicker-format="{{ frontendDateFormat() }}"
+                       :disabled="$isReadOnly ?? false"
                 >
                 <label for="period_end" class="wrapped-label">
                     {{ __('care-plan.end_date') ?? 'Дата завершення' }}
@@ -159,13 +202,18 @@
                 <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
                     @icon('mingcute-time-fill', 'w-5 h-5 text-gray-400')
                 </div>
-                <input wire:model.lazy="form.period_end_time"
+                <input @if($isReadOnly ?? false)
+                       value="{{ $carePlan->period_end ? \Carbon\Carbon::parse($carePlan->period_end)->format('H:i') : '' }}"
+                       @else
+                       wire:model.lazy="form.period_end_time"
+                       @endif
                        type="text"
                        name="period_end_time"
                        id="period_end_time"
                        class="timepicker-uk with-leading-icon input peer @error('form.period_end_time') input-error @enderror"
                        placeholder=" "
                        autocomplete="off"
+                       :disabled="$isReadOnly ?? false"
                 />
                 <label for="period_end_time" class="wrapped-label">
                     {{ __('care-plan.time') ?? 'Час' }}
@@ -175,6 +223,7 @@
         </div>
     </div>
 
+    @if(!($isReadOnly ?? false))
     {{-- Warning message (purely frontend) --}}
     <div x-data="{ show: true }" x-show="show" class="mt-4 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 relative">
         <div class="flex items-center gap-3 pr-8">
@@ -194,4 +243,5 @@
             @icon('close', 'w-4 h-4')
         </button>
     </div>
+    @endif
 </fieldset>

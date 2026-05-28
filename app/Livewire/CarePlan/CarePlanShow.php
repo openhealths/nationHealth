@@ -47,6 +47,7 @@ class CarePlanShow extends Component
     public bool $showMedicalDeviceDrawer = false;
     public bool $showMedicalDeviceSearchDrawer = false;
     public bool $showMedicalDeviceFormDrawer = false;
+    public bool $showMedicalRecordsSearchDrawer = false;
 
     // Search and selection parameters
     public string $searchQuery = '';
@@ -361,7 +362,7 @@ class CarePlanShow extends Component
             'activityForm.quantity_code' => 'nullable|string',
             'activityForm.daily_amount' => 'nullable|numeric',
             'activityForm.description' => 'nullable|string',
-            'activityForm.product_reference' => 'nullable|string',
+            'activityForm.product_reference' => 'required|string',
             'activityForm.program' => 'nullable|string',
             'activityForm.reason_code' => 'nullable|string',
         ];

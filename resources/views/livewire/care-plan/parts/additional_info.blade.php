@@ -8,7 +8,7 @@
             <label for="based_on" class="label">
                 {{ __('care-plan.based_care_plan') }}
             </label>
-            <select id="based_on" name="based_on" class="input-select peer" wire:model="form.based_on">
+            <select id="based_on" name="based_on" class="input-select peer" wire:model="form.based_on" :disabled="$isReadOnly ?? false">
                 <option value="">{{ __('care-plan.choose_care_plan') }}</option>
             </select>
         </div>
@@ -17,7 +17,7 @@
             <label for="part_of" class="label">
                 {{ __('care-plan.part_care_plan') }}
             </label>
-            <select id="part_of" name="part_of" class="input-select peer" wire:model="form.part_of">
+            <select id="part_of" name="part_of" class="input-select peer" wire:model="form.part_of" :disabled="$isReadOnly ?? false">
                 <option value="">{{ __('care-plan.choose_care_plan') }}</option>
             </select>
         </div>
@@ -32,7 +32,8 @@
                 id="description"
                 class="textarea !text-gray-500 dark:!text-gray-400 min-h-[100px]"
                 placeholder="{{ __('forms.write_comment_here') }}"
-                wire:model="form.description">
+                wire:model="form.description"
+                :disabled="$isReadOnly ?? false">
             </textarea>
             @error('form.description') <p class="text-error">{{ $message }}</p> @enderror
         </div>
@@ -47,7 +48,8 @@
                 id="note"
                 class="textarea !text-gray-500 dark:!text-gray-400 min-h-[100px]"
                 placeholder="{{ __('forms.write_comment_here') }}"
-                wire:model="form.note">
+                wire:model="form.note"
+                :disabled="$isReadOnly ?? false">
             </textarea>
             @error('form.note') <p class="text-error">{{ $message }}</p> @enderror
         </div>

@@ -1,4 +1,9 @@
-{{-- Service Search Drawer Overlay --}}
+{{-- Service Search Drawer
+     Second drawer — appears on top of the services form drawer when the user clicks
+     the "Послуга" picker button inside the services drawer.
+     The first drawer remains visible at ~15% on the left (darkened). --}}
+
+{{-- Dimmed left strip (shows 15% of first drawer behind) --}}
 <div x-show="showServiceSearchDrawer"
      x-transition:enter="transition ease-out duration-300"
      x-transition:enter-start="opacity-0"
@@ -8,12 +13,11 @@
      x-transition:leave-end="opacity-0"
      x-cloak
      @click="showServiceSearchDrawer = false"
-     aria-controls="service-search-drawer-right"
-     class="fixed top-0 right-0 h-screen pt-20 w-4/5 bg-gray-900/50"
-     style="z-index: 44;"
+     class="fixed top-0 right-0 h-screen bg-gray-900/40"
+     style="z-index: 54; width: 85%; left: 15%;"
 ></div>
 
-{{-- Service Search Drawer --}}
+{{-- Service Search Drawer Panel (85% wide, slides from right) --}}
 <div id="service-search-drawer-right"
      x-show="showServiceSearchDrawer"
      x-transition:enter="transition ease-out duration-300"
@@ -23,15 +27,18 @@
      x-transition:leave-start="translate-x-0"
      x-transition:leave-end="translate-x-full"
      x-cloak
-     class="fixed top-0 right-0 h-screen pt-20 p-4 overflow-y-auto bg-white dark:bg-gray-800 shadow-2xl"
-     style="z-index: 45; width: calc(80% - 30px);"
+     class="fixed top-0 right-0 h-screen p-8 pt-16 overflow-y-auto bg-white dark:bg-gray-800 shadow-2xl flex flex-col"
+     style="z-index: 55; width: 85%;"
      tabindex="-1"
      aria-labelledby="service-search-drawer-label"
      x-data="{ showFilter: false }"
 >
-    <h3 class="modal-header" id="service-search-drawer-label">
-        {{ __('care-plan.search_service') }}
-    </h3>
+    {{-- Header --}}
+    <div class="mb-6">
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white" id="service-search-drawer-label">
+            {{ __('care-plan.search_service') }}
+        </h2>
+    </div>
 
     {{-- Search Input --}}
     <div class="mb-4">
@@ -40,6 +47,7 @@
                 @icon('search-outline', 'w-5 h-5 text-gray-500')
             </div>
             <input type="text"
+                   id="service-search-input"
                    class="input peer ps-10 w-full"
                    placeholder="Киснева терапія"
                    wire:model.live.debounce.400ms="searchQuery"
@@ -66,7 +74,7 @@
         </button>
     </div>
 
-    {{-- Filters --}}
+    {{-- Advanced Filters (collapsible, same pattern as person-index) --}}
     <div x-show="showFilter" x-cloak x-transition class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div class="form-group group">
             <label class="label">
@@ -103,7 +111,7 @@
     </div>
 
     {{-- Results Table --}}
-    <div class="overflow-x-auto mb-6">
+    <div class="overflow-x-auto mb-6 flex-1">
         <table class="w-full text-sm text-left">
             <thead class="thead-input">
                 <tr>
@@ -137,7 +145,10 @@
                             @endif
                         </td>
                         <td class="px-4 py-3 text-right">
-                            <button type="button" wire:click="selectProduct({{ json_encode($service) }}, 'service_request')" class="button-primary-outline text-xs">
+                            <button type="button"
+                                    wire:click="selectProduct({{ json_encode($service) }}, 'service_request')"
+                                    class="button-primary-outline text-xs"
+                            >
                                 Обрати
                             </button>
                         </td>
@@ -157,10 +168,10 @@
         </table>
     </div>
 
-    <div class="mt-6">
+    {{-- Footer --}}
+    <div class="mt-auto pt-6 border-t border-gray-100 dark:border-gray-700">
         <button type="button"
                 class="button-minor"
-                aria-controls="service-search-drawer-right"
                 @click="showServiceSearchDrawer = false"
         >
             {{ __('forms.cancel') }}

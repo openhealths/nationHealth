@@ -1,3 +1,7 @@
+@php
+    $diagnoses = $diagnoses ?? $carePlan->addresses ?? [];
+@endphp
+
 <fieldset class="fieldset bg-white dark:bg-gray-800 !rounded-xl !shadow-none !border-gray-100 dark:!border-gray-700 !max-w-full !p-6 !mb-6">
     <legend class="legend">
         {{ __('care-plan.condition_diagnosis') ?? 'Стан/діагноз' }}
@@ -19,8 +23,8 @@
 
             @forelse($diagnoses as $item)
                 <tr class="index-table-tr">
-                    <td class="index-table-td">{{ $item['date'] }}</td>
-                    <td class="index-table-td-primary">{{ $item['name'] }}</td>
+                    <td class="index-table-td">{{ $item['date'] ?? '-' }}</td>
+                    <td class="index-table-td-primary">{{ $item['name'] ?? '' }}</td>
                 </tr>
             @empty
                 <tr>

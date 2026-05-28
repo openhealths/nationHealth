@@ -77,7 +77,7 @@ class CarePlan extends Model
 
     public function activities(): HasMany
     {
-        return $this->hasMany(CarePlanActivity::class);
+        return $this->hasMany(CarePlanActivity::class)->with(['kindConcept', 'productConcept']);
     }
 
     public function categoryConcept(): BelongsTo

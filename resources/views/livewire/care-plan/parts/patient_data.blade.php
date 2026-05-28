@@ -14,13 +14,14 @@
                    wire:model.live.debounce.300ms="form.patient"
                    @focus="open = true"
                    required
+                   :disabled="$isReadOnly ?? false"
             >
 
             <label for="patient" class="label">
                 {{ __('care-plan.patient') }}
             </label>
 
-            @if(!empty($patientSuggestions))
+            @if(!($isReadOnly ?? false) && !empty($patientSuggestions))
                 <div x-show="open"
                      @click.away="open = false"
                      class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto"

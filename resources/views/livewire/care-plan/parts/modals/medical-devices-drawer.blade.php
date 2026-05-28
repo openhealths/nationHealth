@@ -16,7 +16,7 @@
      >
         <div class="absolute inset-0 bg-gray-900/50"
              aria-hidden="true"
-             @click="showMedicalDeviceDrawer = false"
+             @click="$wire.set('showMedicalDeviceDrawer', false)"
         ></div>
 
         <div id="medical-devices-drawer-right"
@@ -64,20 +64,19 @@
                 <button type="button"
                         class="button-minor"
                         aria-controls="medical-devices-drawer-right"
-                        @click="showMedicalDeviceDrawer = false"
+                        @click="$wire.set('showMedicalDeviceDrawer', false)"
                 >
                     {{ __('forms.cancel') }}
                 </button>
 
                 <button type="button"
                         class="button-primary"
-                        @click="showMedicalDeviceDrawer = false; showMedicalDeviceSearchDrawer = true"
+                        @click="$wire.set('showMedicalDeviceDrawer', false); $wire.set('showMedicalDeviceSearchDrawer', true)"
                 >
                     {{ __('forms.continue') }}
                 </button>
             </div>
         </form>
         </div>
-    </div>
     </div>
 </template>

@@ -1,3 +1,5 @@
+@php $doctors = $doctors ?? []; @endphp
+
 <fieldset class="fieldset bg-white dark:bg-gray-800 !rounded-xl !shadow-none !border-gray-100 dark:!border-gray-700 !max-w-full !p-6 !mb-6"
           x-data="{ coAuthors: $wire.entangle('form.coAuthors') }"
           x-init="if (!Array.isArray(coAuthors)) { coAuthors = [] }">
@@ -9,12 +11,17 @@
         <div class="form-row-2">
             <div class="form-group">
                 <input type="text"
+                       @if($isReadOnly ?? false)
+                       value="{{ $carePlan->author->party->full_name ?? $carePlan->author->party->fullName ?? '' }}"
+                       @else
                        wire:model="form.author"
+                       @endif
                        name="author"
                        id="author"
                        class="peer input text-gray-500"
                        placeholder=" "
-                       required>
+                       required
+                       :disabled="$isReadOnly ?? false">
                 <label for="author" class="label">
                     {{ __('care-plan.author') ?? 'Автор' }}
                 </label>
@@ -28,7 +35,8 @@
                     <div class="form-group flex-1">
                         <select x-model="coAuthors[index]"
                                 class="input-select peer"
-                                :id="'coAuthor_' + index">
+                                :id="'coAuthor_' + index"
+                                :disabled="$isReadOnly ?? false">
                             <option value="">{{ __('care-plan.find_doctor') }}</option>
                             @foreach($doctors as $doctor)
                                 <option value="{{ $doctor['uuid'] }}">{{ $doctor['name'] }}</option>
@@ -38,16 +46,19 @@
                             {{ __('care-plan.co-author') }}
                         </label>
 
+                        @if(!($isReadOnly ?? false))
                         <button type="button"
                                 @click="coAuthors.splice(index, 1)"
                                 class="absolute -right-8 top-3 text-red-500 hover:text-red-700">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                         </button>
+                        @endif
                     </div>
                 </div>
             </template>
         </div>
 
+        @if(!($isReadOnly ?? false))
         <div class="mt-4">
             <button type="button"
                     @click="coAuthors.push('')"
@@ -56,5 +67,6 @@
                 <span>{{ __('Додати співавтора') }}</span>
             </button>
         </div>
+        @endif
     </div>
 </fieldset>

@@ -15,12 +15,14 @@ class CarePlanActivityRepository
 {
     public function findById(int $id): ?CarePlanActivity
     {
-        return CarePlanActivity::find($id);
+        return CarePlanActivity::with(['kindConcept', 'productConcept'])->find($id);
     }
 
     public function getByCarePlanId(int $carePlanId)
     {
-        return CarePlanActivity::where('care_plan_id', $carePlanId)->get();
+        return CarePlanActivity::with(['kindConcept', 'productConcept'])
+            ->where('care_plan_id', $carePlanId)
+            ->get();
     }
 
     public function create(array $data): CarePlanActivity
