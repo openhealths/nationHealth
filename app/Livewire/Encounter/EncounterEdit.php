@@ -30,7 +30,16 @@ class EncounterEdit extends EncounterComponent
 
     public function getEpisodes(): void
     {
-        $this->episodes = Episode::wherePersonId($this->personId)->get()->toArray();
+        $this->episodes = Episode::wherePersonId($this->personId)
+            ->get()
+            ->map(static function (Episode $episode): array {
+                $episode = $episode->toArray();
+                $episode['ehealth_inserted_at'] = $episode['ehealth_inserted_at'] ?? $episode['ehealthInsertedAt'] ?? null;
+                $episode['ehealth_updated_at'] = $episode['ehealth_updated_at'] ?? $episode['ehealthUpdatedAt'] ?? null;
+
+                return $episode;
+            })
+            ->toArray();
     }
 
     public function mount(LegalEntity $legalEntity, int $personId, int $encounterId): void
@@ -39,8 +48,11 @@ class EncounterEdit extends EncounterComponent
         $this->encounterId = $encounterId;
 
         $encounter = Encounter::withRelationships()->whereId($encounterId)->firstOrFail()->toArray();
+        $supportingInfoDetails = $this->getEncounterSupportingInfoDetailsMap($encounter);
+        $this->selectedServiceOptions = $this->selectedServiceOptionsFromEncounter($encounter);
+        $this->selectedEmployeeOptions = $this->selectedEmployeeOptionsFromEncounter($encounter);
 
-        $this->form->encounter = Fhir::encounter()->fromFhir($encounter);
+        $this->form->encounter = Fhir::encounter()->fromFhir($encounter, $supportingInfoDetails);
         $this->episodeType = 'existing';
         $this->form->episode = array_merge($this->form->episode, Fhir::episode()->fromFhir($encounter));
 
@@ -353,6 +365,25 @@ class EncounterEdit extends EncounterComponent
             ->toArray();
 
         $this->loadIcd10Descriptions($icd10Items);
+    }
+
+    /**
+     * Get details for selected encounter supporting info records.
+     *
+     * @param  array  $encounter
+     * @return array
+     */
+    private function getEncounterSupportingInfoDetailsMap(array $encounter): array
+    {
+        $uuidsByType = collect(data_get($encounter, 'supporting_info', []))
+            ->groupBy(fn (array $item) => data_get($item, 'identifier.type.coding.0.code'))
+            ->map(fn ($group) => $group->pluck('identifier.value')->filter()->unique()->values()->toArray());
+
+        return array_merge(
+            Repository::condition()->getDetailsMapByUuids($uuidsByType->get('condition', [])),
+            Repository::observation()->getDetailsMapByUuids($uuidsByType->get('observation', [])),
+            Repository::diagnosticReport()->getDetailsMapByUuids($uuidsByType->get('diagnostic_report', []))
+        );
     }
 
     /**

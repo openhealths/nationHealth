@@ -110,6 +110,30 @@ class DiagnosticReportRepository extends BaseRepository
     }
 
     /**
+     * Build a UUID => [insertedAt, codeCode] map for the given diagnostic report UUIDs.
+     *
+     * @param  array  $uuids
+     * @return array
+     */
+    public function getDetailsMapByUuids(array $uuids): array
+    {
+        return collect(
+            $this->model->whereIn('uuid', $uuids)
+                ->with('code.coding')
+                ->get()
+                ->toArray()
+        )
+            ->mapWithKeys(fn (array $diagnosticReport) => [
+                $diagnosticReport['uuid'] => [
+                    'insertedAt' => $diagnosticReport['ehealthInsertedAt'] ?? null,
+                    'codeCode' => data_get($diagnosticReport, 'code.coding.0.code'),
+                    'type' => 'diagnostic_report'
+                ]
+            ])
+            ->toArray();
+    }
+
+    /**
      * Store condition in DB.
      *
      * @param  array  $data
@@ -262,26 +286,26 @@ class DiagnosticReportRepository extends BaseRepository
             ->toArray();
     }
 
-    /**
-     * Get the diagnostic report for the clinical impression based on the provided UUID to display the selected supporting info.
-     *
-     * @param  array  $uuids
-     * @return array
-     */
-    public function getDetailsMapByUuids(array $uuids): array
-    {
-        return $this->model->whereIn('uuid', $uuids)
-            ->with('code')
-            ->get()
-            ->mapWithKeys(fn (DiagnosticReport $diagnosticReport) => [
-                $diagnosticReport->uuid => [
-                    'ehealthInsertedAt' => convertToAppDateFormat($diagnosticReport->ehealthInsertedAt),
-                    'codeCode' => $diagnosticReport->code?->value,
-                    'type' => 'diagnostic_report',
-                ],
-            ])
-            ->toArray();
-    }
+    // /**
+    //  * Get the diagnostic report for the clinical impression based on the provided UUID to display the selected supporting info.
+    //  *
+    //  * @param  array  $uuids
+    //  * @return array
+    //  */
+    // public function getDetailsMapByUuids(array $uuids): array
+    // {
+    //     return $this->model->whereIn('uuid', $uuids)
+    //         ->with('code')
+    //         ->get()
+    //         ->mapWithKeys(fn (DiagnosticReport $diagnosticReport) => [
+    //             $diagnosticReport->uuid => [
+    //                 'ehealthInsertedAt' => convertToAppDateFormat($diagnosticReport->ehealthInsertedAt),
+    //                 'codeCode' => $diagnosticReport->code?->value,
+    //                 'type' => 'diagnostic_report',
+    //             ],
+    //         ])
+    //         ->toArray();
+    // }
 
     /**
      * Sync diagnostic report data and related data by deleting and creating.

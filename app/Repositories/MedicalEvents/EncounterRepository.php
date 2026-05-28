@@ -67,7 +67,8 @@ class EncounterRepository extends BaseRepository
                 'priority_id' => $priority->id ?? null,
                 'performer_id' => $performer->id,
                 'division_id' => $division->id ?? null,
-                'incoming_referral_id' => $incomingReferral->id ?? null
+                'incoming_referral_id' => $incomingReferral->id ?? null,
+                'prescriptions' => $data['prescriptions'] ?? null
             ]);
 
             $encounter->period()->create([
@@ -81,15 +82,17 @@ class EncounterRepository extends BaseRepository
 
             $reasonIds = [];
 
-            foreach ($data['reasons'] as $reasonData) {
+            foreach (($data['reasons'] ?? []) as $reasonData) {
                 $reason = Repository::codeableConcept()->store($reasonData);
 
                 $reasonIds[] = $reason->id;
             }
 
-            $encounter->reasons()->attach($reasonIds);
+            if (!empty($reasonIds)) {
+                $encounter->reasons()->attach($reasonIds);
+            }
 
-            foreach ($data['diagnoses'] as $diagnoseData) {
+            foreach (($data['diagnoses'] ?? []) as $diagnoseData) {
                 $condition = Repository::identifier()->store($diagnoseData['condition']['identifier']['value']);
                 Repository::codeableConcept()->attach($condition, $diagnoseData['condition']);
 
@@ -104,16 +107,59 @@ class EncounterRepository extends BaseRepository
 
             $actionIds = [];
 
-            foreach ($data['actions'] as $actionData) {
+            foreach (($data['actions'] ?? []) as $actionData) {
                 $action = Repository::codeableConcept()->store($actionData);
 
                 $actionIds[] = $action->id;
             }
 
-            $encounter->actions()->attach($actionIds);
+            if (!empty($actionIds)) {
+                $encounter->actions()->attach($actionIds);
+            }
+
+            $this->attachIdentifierReferences($encounter, 'actionReferences', $data['actionReferences'] ?? []);
+            $this->attachIdentifierReferences($encounter, 'participants', $data['participant'] ?? []);
+            $this->attachIdentifierReferences($encounter, 'supportingInfo', $data['supportingInfo'] ?? []);
 
             return $encounter->id;
         });
+    }
+
+
+    /**
+     * Attach identifier-based encounter relations on create.
+     *
+     * @param  Encounter  $encounter
+     * @param  string  $relation
+     * @param  array  $items
+     * @return void
+     */
+    private function attachIdentifierReferences(Encounter $encounter, string $relation, array $items): void
+    {
+        $identifierIds = [];
+
+        foreach ($items as $item) {
+            $value = data_get($item, 'identifier.value');
+
+            if (empty($value)) {
+                continue;
+            }
+
+            $identifier = Repository::identifier()->store(
+                $value,
+                data_get($item, 'display_value')
+            );
+
+            if (data_get($item, 'identifier.type')) {
+                Repository::codeableConcept()->attach($identifier, $item);
+            }
+
+            $identifierIds[] = $identifier->id;
+        }
+
+        if (!empty($identifierIds)) {
+            $encounter->{$relation}()->syncWithoutDetaching(array_unique($identifierIds));
+        }
     }
 
     /**

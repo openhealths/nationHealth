@@ -98,6 +98,7 @@ return [
     'date' => 'Дата',
     'start' => 'Початок',
     'end' => 'Кінець',
+    'all' => 'Всі',
 
     // Legal Entity
     'institution' => 'Заклад',
