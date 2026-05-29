@@ -628,6 +628,25 @@ class EncounterComponent extends Component
                     ])
                     ->values()
                     ->all(),
+                'condition' => collect(EHealth::condition()->getBySearchParams($this->patientUuid, $params)->validate())
+                    ->map(static fn (array $condition) => [
+                        'uuid' => data_get($condition, 'uuid'),
+                        'ehealthInsertedAt' => convertToAppDateFormat(data_get($condition, 'ehealth_inserted_at')),
+                        'code' => data_get($condition, 'code.coding.0.code'),
+                        'type' => 'condition'
+                    ])
+                    ->values()
+                    ->all(),
+                'observation' => collect(EHealth::observation()->getBySearchParams($this->patientUuid, $params)->validate())
+                    ->filter(static fn (array $observation) => data_get($observation, 'status') !== ObservationStatus::ENTERED_IN_ERROR->value)
+                    ->map(static fn (array $observation) => [
+                        'uuid' => data_get($observation, 'uuid'),
+                        'ehealthInsertedAt' => convertToAppDateFormat(data_get($observation, 'ehealth_inserted_at')),
+                        'code' => data_get($observation, 'code.coding.0.code'),
+                        'type' => 'observation'
+                    ])
+                    ->values()
+                    ->all(),
                 default => []
             };
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
@@ -694,7 +713,7 @@ class EncounterComponent extends Component
     }
 
     /**
-     * Get all episodes for current patient.
+     * Get active episodes for current patient.
      *
      * @return void
      */

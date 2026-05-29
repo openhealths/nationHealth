@@ -67,7 +67,8 @@ class EncounterRepository extends BaseRepository
                 'priority_id' => $priority->id ?? null,
                 'performer_id' => $performer->id,
                 'division_id' => $division->id ?? null,
-                'incoming_referral_id' => $incomingReferral->id ?? null
+                'incoming_referral_id' => $incomingReferral->id ?? null,
+                'prescriptions' => $data['prescriptions'] ?? null
             ]);
 
             $encounter->period()->create([
@@ -79,15 +80,13 @@ class EncounterRepository extends BaseRepository
                 Repository::paperReferral()->store($data['paperReferral'], $encounter);
             }
 
-            $reasonIds = [];
-
-            foreach ($data['reasons'] as $reasonData) {
-                $reason = Repository::codeableConcept()->store($reasonData);
-
-                $reasonIds[] = $reason->id;
+            if (!empty($data['reasons'])) {
+                $encounter->reasons()->attach(
+                    collect($data['reasons'])
+                        ->map(static fn (array $reasonData) => Repository::codeableConcept()->store($reasonData)->id)
+                        ->all()
+                );
             }
-
-            $encounter->reasons()->attach($reasonIds);
 
             foreach ($data['diagnoses'] as $diagnoseData) {
                 $condition = Repository::identifier()->store($diagnoseData['condition']['identifier']['value']);
@@ -102,15 +101,46 @@ class EncounterRepository extends BaseRepository
                 ]);
             }
 
-            $actionIds = [];
-
-            foreach ($data['actions'] as $actionData) {
-                $action = Repository::codeableConcept()->store($actionData);
-
-                $actionIds[] = $action->id;
+            if (!empty($data['actions'])) {
+                $encounter->actions()->attach(
+                    collect($data['actions'])
+                        ->map(static fn (array $actionData) => Repository::codeableConcept()->store($actionData)->id)
+                        ->all()
+                );
             }
 
-            $encounter->actions()->attach($actionIds);
+            if (isset($data['actionReferences'])) {
+                foreach ($data['actionReferences'] as $actionReference) {
+                    $identifier = Repository::identifier()->store(
+                        $actionReference['identifier']['value'],
+                        $actionReference['display_value'] ?? null
+                    );
+                    Repository::codeableConcept()->attach($identifier, $actionReference);
+                    $encounter->actionReferences()->attach($identifier->id);
+                }
+            }
+
+            if (isset($data['participant'])) {
+                foreach ($data['participant'] as $participant) {
+                    $identifier = Repository::identifier()->store(
+                        $participant['identifier']['value'],
+                        $participant['display_value'] ?? null
+                    );
+                    Repository::codeableConcept()->attach($identifier, $participant);
+                    $encounter->participants()->attach($identifier->id);
+                }
+            }
+
+            if (isset($data['supportingInfo'])) {
+                foreach ($data['supportingInfo'] as $supporting) {
+                    $identifier = Repository::identifier()->store(
+                        $supporting['identifier']['value'],
+                        $supporting['display_value'] ?? null
+                    );
+                    Repository::codeableConcept()->attach($identifier, $supporting);
+                    $encounter->supportingInfo()->attach($identifier->id);
+                }
+            }
 
             return $encounter->id;
         });

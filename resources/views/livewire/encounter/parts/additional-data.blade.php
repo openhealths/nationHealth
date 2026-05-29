@@ -1,53 +1,120 @@
-<script>
-    window.encounterMockRecords = [
-        { id: 'rec-1', date: '08.05.2025', type: 'condition', typeLabel: @json(__('patients.condition_or_diagnosis')), code: 'A98', name: @json(__('patients.mock.name_A98')), episode: 'ep-1', episodeLabel: @json(__('patients.mock.episode_1')) },
-        { id: 'rec-2', date: '08.05.2025', type: 'observation', typeLabel: @json(__('patients.medical_observation')), code: '59041-4', name: @json(__('patients.mock.name_59041_4')), episode: 'ep-1', episodeLabel: @json(__('patients.mock.episode_1')) },
-        { id: 'rec-3', date: '08.05.2025', type: 'diagnostic-report', typeLabel: @json(__('patients.medical_diagnostic_report')), code: '11502-2', name: @json(__('patients.mock.name_11502_2')), episode: 'ep-1', episodeLabel: @json(__('patients.mock.episode_1')) },
-        { id: 'rec-4', date: '01.05.2025', type: 'condition', typeLabel: @json(__('patients.condition_or_diagnosis')), code: 'I10', name: @json(__('patients.mock.name_I10')), episode: 'ep-2', episodeLabel: @json(__('patients.mock.episode_2')) },
-        { id: 'rec-5', date: '01.05.2025', type: 'observation', typeLabel: @json(__('patients.medical_observation')), code: '85354-9', name: @json(__('patients.mock.name_85354_9')), episode: 'ep-2', episodeLabel: @json(__('patients.mock.episode_2')) }
-    ];
-</script>
+<div class="p-5 space-y-6"
+     x-data="{
+        showReferencesDrawer: false,
+        selectedType: '',
+        searchQuery: '',
+        selectedReferences: $wire.entangle('form.encounter.supportingInfo'),
+        allRecords: [],
+        medicalRecordsLoading: false,
+        hasSearchedMedicalRecords: false,
 
-<div class="p-5 space-y-6" x-data="{
-    showReferencesDrawer: false,
-    selectedType: 'condition',
-    selectedEpisode: 'ep-1',
-    searchQuery: '',
-    selectedReferences: [],
+        init() {
+            this.selectedReferences = (this.selectedReferences ?? []).filter(reference => reference?.uuid && reference?.type);
+        },
 
-    allRecords: window.encounterMockRecords,
+        openReferencesDrawer() {
+            this.showReferencesDrawer = true;
+            this.selectedType = '';
+            this.searchQuery = '';
+            this.allRecords = [];
+            this.medicalRecordsLoading = false;
+            this.hasSearchedMedicalRecords = false;
+        },
 
-    addReference(record) {
-        if (!this.selectedReferences.some(r => r.id === record.id)) {
-            this.selectedReferences.push(record);
-        }
-        this.showReferencesDrawer = false;
-        this.searchQuery = '';
-    },
-    cancelSelection() {
-        this.showReferencesDrawer = false;
-        this.searchQuery = '';
-    },
-    removeReference(id) {
-        this.selectedReferences = this.selectedReferences.filter(r => r.id !== id);
-    },
-    filteredRecords() {
-        return this.allRecords.filter(rec => {
-            if (this.searchQuery) {
-                const query = this.searchQuery.toLowerCase();
-                const matchesSearch = rec.name.toLowerCase().includes(query) || rec.code.toLowerCase().includes(query);
-                if (!matchesSearch) return false;
+        loadMedicalRecords() {
+            if (this.selectedType === '') {
+                this.allRecords = [];
+                this.medicalRecordsLoading = false;
+                this.hasSearchedMedicalRecords = false;
+
+                return;
             }
-            if (this.selectedType !== 'ALL') {
-                if (rec.type !== this.selectedType) return false;
+
+            this.medicalRecordsLoading = true;
+            this.hasSearchedMedicalRecords = true;
+            this.allRecords = [];
+
+            const typeLabels = {
+                condition: '{{ __("patients.condition_or_diagnosis") }}',
+                observation: '{{ __("patients.medical_observation") }}',
+                diagnosticReport: '{{ __("patients.medical_diagnostic_report") }}',
+            };
+
+            $wire.searchSupportingInfo(this.selectedType)
+                .then(() => {
+                    const dicts = $wire.dictionaries;
+                    const lookupName = (code) =>
+                        dicts['eHealth/ICPC2/condition_codes']?.[code] ||
+                        dicts['eHealth/ICD10_AM/condition_codes']?.[code] ||
+                        dicts['eHealth/LOINC/observation_codes']?.[code] ||
+                        dicts['eHealth/custom/observation_codes']?.[code] ||
+                        dicts['eHealth/ICF/classifiers']?.[code] ||
+                        '';
+
+                    this.allRecords = ($wire.supportingInfoResults ?? []).map(result => ({
+                        uuid: result.uuid,
+                        type: result.type,
+                        typeLabel: typeLabels[this.selectedType] || result.type,
+                        code: result.code,
+                        name: lookupName(result.code),
+                        date: result.ehealthInsertedAt,
+                    }));
+                })
+                .finally(() => {
+                    this.medicalRecordsLoading = false;
+                });
+        },
+
+        addReference(record) {
+            const alreadySelected = this.selectedReferences.some(
+                reference => reference.uuid === record.uuid && reference.type === record.type
+            );
+
+            if (!alreadySelected) {
+                this.selectedReferences = [...this.selectedReferences, {
+                    uuid: record.uuid,
+                    type: record.type,
+                    typeLabel: record.typeLabel,
+                    code: record.code,
+                    name: record.name,
+                    date: record.date,
+                }];
             }
-            if (this.selectedEpisode !== 'ALL') {
-                if (rec.episode !== this.selectedEpisode) return false;
-            }
-            return true;
-        });
-    }
-}">
+
+            this.showReferencesDrawer = false;
+            this.searchQuery = '';
+        },
+
+        cancelSelection() {
+            this.showReferencesDrawer = false;
+            this.searchQuery = '';
+        },
+
+        removeReference(uuid, type) {
+            this.selectedReferences = this.selectedReferences.filter(
+                reference => !(reference.uuid === uuid && reference.type === type)
+            );
+        },
+
+        filteredRecords() {
+            return this.allRecords.filter((record) => {
+                if (this.searchQuery) {
+                    const query = this.searchQuery.toLowerCase();
+                    const matchesSearch = [record.code, record.name, record.typeLabel]
+                        .filter(Boolean)
+                        .some((value) => String(value).toLowerCase().includes(query));
+
+                    if (!matchesSearch) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+        },
+
+     }"
+>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div class="form-group group">
             <div class="relative">
@@ -161,49 +228,169 @@
     </div>
 
     <div class="space-y-2">
-        <label class="text-[13px] font-medium text-gray-500 dark:text-gray-400 ml-1">
+        <label for="encounterPrescriptions" class="text-[13px] font-medium text-gray-500 dark:text-gray-400 ml-1">
             {{ __('patients.assignments') }}
         </label>
-        <textarea
-            class="w-full min-h-[120px] p-4 text-[15px] text-gray-900 dark:text-white bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none resize-none"
-            placeholder="{{ __('patients.write_assignments_here') }}"
+        <textarea wire:model="form.encounter.prescriptions"
+                  id="encounterPrescriptions"
+                  class="w-full min-h-30 p-4 text-[15px] text-gray-900 dark:text-white bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none resize-none @error('form.encounter.prescriptions') input-error @enderror"
+                  placeholder="{{ __('patients.write_assignments_here') }}"
         ></textarea>
     </div>
 
-    <div x-data="{ services: [''], coAuthors: [''] }" class="space-y-6">
+    <div x-data="{
+            services: $wire.entangle('form.encounter.actionReferences'),
+            coAuthors: $wire.entangle('form.encounter.participant'),
+            serviceOptions: [],
+            serviceSearches: [],
+            serviceDropdowns: [],
+
+            init() {
+                this.serviceOptions = Object.entries($wire.dictionaries['custom/services'] ?? {})
+                    .map(([key, service]) => ({
+                        id: String(typeof service === 'object' ? (service.id ?? key) : key),
+                        code: String(typeof service === 'object' ? (service.code ?? '') : ''),
+                        name: String(typeof service === 'object' ? (service.name ?? '') : service),
+                    }))
+                    .filter(service => service.id);
+
+                this.services = Array.isArray(this.services) && this.services.length ? this.services : [{uuid: ''}];
+                this.coAuthors = Array.isArray(this.coAuthors) && this.coAuthors.length ? this.coAuthors : [{uuid: ''}];
+
+                this.serviceSearches = this.services.map(service => {
+                    if (!service.uuid) { return ''; }
+                    const option = this.serviceOptions.find(opt => opt.id === service.uuid);
+                    return option ? this.serviceLabel(option) : '';
+                });
+                this.serviceDropdowns = this.services.map(() => false);
+            },
+
+            addService() {
+                this.services = [...(Array.isArray(this.services) ? this.services : []), {uuid: ''}];
+                this.serviceSearches = [...this.serviceSearches, ''];
+                this.serviceDropdowns = [...this.serviceDropdowns, false];
+            },
+
+            removeService(index) {
+                this.services = this.services.filter((_, rowIndex) => rowIndex !== index);
+                this.serviceSearches = this.serviceSearches.filter((_, rowIndex) => rowIndex !== index);
+                this.serviceDropdowns = this.serviceDropdowns.filter((_, rowIndex) => rowIndex !== index);
+
+                if (!this.services.length) {
+                    this.services = [{uuid: ''}];
+                    this.serviceSearches = [''];
+                    this.serviceDropdowns = [false];
+                }
+            },
+
+            serviceLabel(service) {
+                return [service.code, service.name].filter(Boolean).join(' / ');
+            },
+
+            filteredServiceOptions(index) {
+                const query = String(this.serviceSearches[index] ?? '').toLowerCase();
+
+                return this.serviceOptions.filter((service) => {
+                    if (!query) {
+                        return true;
+                    }
+
+                    return [service.code, service.name]
+                        .filter(Boolean)
+                        .some((value) => String(value).toLowerCase().includes(query));
+                });
+            },
+
+            selectService(index, service) {
+                this.services[index] = {uuid: service.id};
+                this.serviceSearches[index] = this.serviceLabel(service);
+                this.serviceDropdowns[index] = false;
+            },
+
+            clearService(index) {
+                this.services[index] = {uuid: ''};
+                this.serviceSearches[index] = '';
+                this.serviceDropdowns[index] = true;
+            },
+
+            addCoAuthor() {
+                this.coAuthors = [...(Array.isArray(this.coAuthors) ? this.coAuthors : []), {uuid: ''}];
+            },
+
+            removeCoAuthor(index) {
+                this.coAuthors = this.coAuthors.filter((_, rowIndex) => rowIndex !== index);
+                this.coAuthors = this.coAuthors.length ? this.coAuthors : [''];
+            },
+        }"
+         class="space-y-6"
+    >
         <div class="space-y-3">
             <template x-for="(service, index) in services" :key="index">
                 <div class="relative pr-10">
-                    <div class="form-group group">
-                        <select class="input-select peer" :id="'service_' + index" x-model="services[index]">
-                            <option value="" selected>{{ __('dictionaries.service_catalog.search_services') }}</option>
-                            @foreach($this->dictionaries['custom/services'] ?? [] as $key => $service)
-                                <option value="{{ $service['id'] ?? $key }}">{{ $service['name'] ?? $service }}</option>
-                            @endforeach
-                        </select>
+                    <div class="form-group group relative" @click.away="serviceDropdowns[index] = false">
+                        <input type="text"
+                               class="input peer @error('form.encounter.actionReferences.0') input-error @enderror"
+                               :id="'service_' + index"
+                               x-model="serviceSearches[index]"
+                               @input="services[index] = {uuid: ''}; serviceDropdowns[index] = true;"
+                               placeholder=" "
+                               autocomplete="off"
+                        >
                         <label :for="'service_' + index" class="label">{{ __('care-plan.services') }}</label>
+
+                        <div x-show="serviceDropdowns[index]"
+                             x-cloak
+                             class="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                        >
+                            <template x-if="filteredServiceOptions(index).length === 0">
+                                <div class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                                    {{ __('forms.not_found') }}
+                                </div>
+                            </template>
+
+                            <template x-for="serviceOption in filteredServiceOptions(index)" :key="serviceOption.id">
+                                <button type="button"
+                                        class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                                        @click="selectService(index, serviceOption)"
+                                >
+                                    <span x-text="serviceLabel(serviceOption)"></span>
+                                </button>
+                            </template>
+                        </div>
                     </div>
                     <button type="button"
                             x-show="index > 0"
-                            @click="services.splice(index, 1)"
-                            class="absolute right-0 top-3 text-gray-400 dark:text-gray-500 hover:text-red-500 transition-colors">
+                            x-cloak
+                            @click="removeService(index)"
+                            class="absolute right-0 top-3 text-gray-400 dark:text-gray-500 hover:text-red-500 transition-colors"
+                    >
                         @icon('delete', 'w-6 h-6')
                     </button>
                 </div>
             </template>
-            <button type="button" @click="services.push('')" class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors ml-1">
+
+            <button type="button"
+                    @click="addService()"
+                    class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors ml-1"
+            >
                 @icon('plus', 'w-4 h-4')
                 <span>{{ __('care-plan.add_service') }}</span>
             </button>
+            @error('form.encounter.actionReferences.0')
+                <p class="text-error">{{ $message }}</p>
+            @enderror
         </div>
 
         <div class="space-y-3">
             <template x-for="(coAuthor, index) in coAuthors" :key="index">
                 <div class="relative pr-10">
                     <div class="form-group group">
-                        <select class="input-select peer" :id="'coAuthor_' + index" x-model="coAuthors[index]">
+                        <select class="input-select peer @error('form.encounter.participant.0') input-error @enderror"
+                                :id="'coAuthor_' + index"
+                                x-model="coAuthors[index].uuid"
+                        >
                             <option value="" selected>{{ __('patients.find_doctor') }}</option>
-                            @foreach($employees as $employee)
+                            @foreach($this->employees as $employee)
                                 <option value="{{ $employee['uuid'] }}">{{ $employee['name'] }}</option>
                             @endforeach
                         </select>
@@ -211,16 +398,25 @@
                     </div>
                     <button type="button"
                             x-show="index > 0"
-                            @click="coAuthors.splice(index, 1)"
-                            class="absolute right-0 top-3 text-gray-400 dark:text-gray-500 hover:text-red-500 transition-colors">
+                            x-cloak
+                            @click="removeCoAuthor(index)"
+                            class="absolute right-0 top-3 text-gray-400 dark:text-gray-500 hover:text-red-500 transition-colors"
+                    >
                         @icon('delete', 'w-6 h-6')
                     </button>
                 </div>
             </template>
-            <button type="button" @click="coAuthors.push('')" class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors ml-1">
+
+            <button type="button"
+                    @click="addCoAuthor()"
+                    class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors ml-1"
+            >
                 @icon('plus', 'w-4 h-4')
                 <span>{{ __('patients.add_coauthor') }}</span>
             </button>
+            @error('form.encounter.participant.0')
+                <p class="text-error">{{ $message }}</p>
+            @enderror
         </div>
     </div>
 
@@ -239,13 +435,28 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <template x-for="ref in selectedReferences" :key="ref.id">
+                    <template x-for="ref in selectedReferences" :key="ref.type + '-' + ref.uuid">
                         <tr class="border-b border-gray-200 dark:border-gray-700">
-                            <td class="td-input text-[14px] text-gray-900 dark:text-gray-300" x-text="ref.date"></td>
-                            <td class="td-input text-[14px] text-gray-900 dark:text-white" x-text="ref.typeLabel + ' ' + ref.name"></td>
+                            <td class="td-input text-[14px] text-gray-900 dark:text-gray-300" x-text="ref.date || '—'"></td>
+                            <td class="td-input text-[14px] text-gray-900 dark:text-white"
+                                x-text="(() => {
+                                    const dictName = $wire.dictionaries['eHealth/LOINC/observation_codes'][ref.code] ||
+                                                     $wire.dictionaries['eHealth/ICF/classifiers'][ref.code] ||
+                                                     $wire.dictionaries['eHealth/ICPC2/condition_codes'][ref.code];
+
+                                    const codeName = dictName
+                                        ? `${ ref.code } - ${ dictName }`
+                                        : (() => {
+                                            const serviceOption = Object.values($wire.dictionaries['custom/services']).find(serviceOption => serviceOption.id === ref.code);
+                                            return serviceOption ? `${ serviceOption.code } / ${ serviceOption.name }` : (ref.name || ref.code || '—');
+                                          })();
+
+                                    return [ref.typeLabel, codeName].filter(Boolean).join(' ');
+                                })()"
+                            ></td>
                             <td class="td-input text-right pr-8">
                                 <button type="button"
-                                        @click="removeReference(ref.id)"
+                                        @click="removeReference(ref.uuid, ref.type)"
                                         class="text-gray-400 dark:text-gray-500 hover:text-red-500 transition-colors p-1"
                                 >
                                     @icon('delete', 'w-5 h-5')
@@ -258,12 +469,20 @@
         </div>
 
         <button type="button"
-                @click="showReferencesDrawer = true"
-                class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors block">
+                @click="openReferencesDrawer()"
+                class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors block"
+        >
             @icon('plus', 'w-4 h-4')
             <span>{{ __('patients.add_observations_reports_conditions') }}</span>
         </button>
 
-        @include('livewire.encounter.parts.references-drawer')
+        @error('form.encounter.supportingInfo.0.uuid')
+            <p class="text-error">{{ $message }}</p>
+        @enderror
+        @error('form.encounter.supportingInfo.0.type')
+            <p class="text-error">{{ $message }}</p>
+        @enderror
     </div>
+
+    @include('livewire.encounter.parts.references-drawer')
 </div>

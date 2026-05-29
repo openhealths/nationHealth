@@ -12,7 +12,6 @@ use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\MedicalEvents\Sql\Episode;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Fhir;
 use Illuminate\Http\Client\ConnectionException;
@@ -28,19 +27,15 @@ class EncounterEdit extends EncounterComponent
     #[Locked]
     public int $encounterId;
 
-    public function getEpisodes(): void
-    {
-        $this->episodes = Episode::wherePersonId($this->personId)->get()->toArray();
-    }
-
     public function mount(LegalEntity $legalEntity, int $personId, int $encounterId): void
     {
         $this->initializeComponent($personId);
         $this->encounterId = $encounterId;
 
         $encounter = Encounter::withRelationships()->whereId($encounterId)->firstOrFail()->toArray();
+        $supportingInfoDetails = $this->getEncounterSupportingInfoDetailsMap($encounter);
 
-        $this->form->encounter = Fhir::encounter()->fromFhir($encounter);
+        $this->form->encounter = Fhir::encounter()->fromFhir($encounter, $supportingInfoDetails);
         $this->episodeType = 'existing';
         $this->form->episode = array_merge($this->form->episode, Fhir::episode()->fromFhir($encounter));
 
@@ -353,6 +348,25 @@ class EncounterEdit extends EncounterComponent
             ->toArray();
 
         $this->loadIcd10Descriptions($icd10Items);
+    }
+
+    /**
+     * Get details for selected encounter supporting info records.
+     *
+     * @param  array  $encounter
+     * @return array
+     */
+    private function getEncounterSupportingInfoDetailsMap(array $encounter): array
+    {
+        $uuidsByType = collect(data_get($encounter, 'supporting_info', []))
+            ->groupBy(fn (array $item) => data_get($item, 'identifier.type.coding.0.code'))
+            ->map(fn ($group) => $group->pluck('identifier.value')->filter()->unique()->values()->toArray());
+
+        return array_merge(
+            Repository::condition()->getDetailsMapByUuids($uuidsByType->get('condition', [])),
+            Repository::observation()->getDetailsMapByUuids($uuidsByType->get('observation', [])),
+            Repository::diagnosticReport()->getDetailsMapByUuids($uuidsByType->get('diagnostic_report', []))
+        );
     }
 
     /**

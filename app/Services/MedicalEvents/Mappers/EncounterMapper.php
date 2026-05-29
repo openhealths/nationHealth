@@ -89,20 +89,51 @@ class EncounterMapper implements FhirMapperContract
             );
         }
 
-        // todo: action_references
+        if (!empty($data['actionReferences'])) {
+            $result['actionReferences'] = collect($data['actionReferences'])
+                ->pluck('uuid')
+                ->filter()
+                ->unique()
+                ->map(fn (string $uuid) => FhirResource::make()
+                    ->coding('eHealth/resources', 'service')
+                    ->toIdentifier($uuid))
+                ->values()
+                ->toArray();
+        }
 
         if (!empty($data['divisionId'])) {
             $result['division'] = FhirResource::make()->coding('eHealth/resources', 'division')
                 ->toIdentifier($data['divisionId']);
         }
 
-        // todo: prescriptions
+        if (!empty($data['prescriptions'])) {
+            $result['prescriptions'] = $data['prescriptions'];
+        }
 
-        // todo: supporting_info
+        if (!empty($data['supportingInfo'])) {
+            $result['supportingInfo'] = collect($data['supportingInfo'])
+                ->filter(fn (array $item) => !empty($item['uuid']) && !empty($item['type']))
+                ->unique(fn (array $item) => $item['type'] . ':' . $item['uuid'])
+                ->map(fn (array $item) => FhirResource::make()
+                    ->coding('eHealth/resources', $item['type'])
+                    ->toIdentifier($item['uuid'], $item['typeLabel'] ?? ''))
+                ->values()
+                ->toArray();
+        }
 
         // todo: hospitalization
 
-        // todo: participant
+        if (!empty($data['participant'])) {
+            $result['participant'] = collect($data['participant'])
+                ->pluck('uuid')
+                ->filter()
+                ->unique()
+                ->map(fn (string $uuid) => FhirResource::make()
+                    ->coding('eHealth/resources', 'employee')
+                    ->toIdentifier($uuid))
+                ->values()
+                ->toArray();
+        }
 
         return $result;
     }
@@ -116,6 +147,8 @@ class EncounterMapper implements FhirMapperContract
      */
     public function fromFhir(array $data, mixed ...$context): array
     {
+        $supportingInfoDetails = $context[0] ?? [];
+
         return [
             'classCode' => data_get($data, 'class.code'),
             'typeCode' => data_get($data, 'type.coding.0.code'),
@@ -154,7 +187,35 @@ class EncounterMapper implements FhirMapperContract
             'paperReferral' => [
                 ...(data_get($data, 'paper_referral') ?? []),
                 'serviceRequestDate' => convertToAppDateFormat(data_get($data, 'paper_referral.serviceRequestDate'))
-            ]
+            ],
+            'prescriptions' => data_get($data, 'prescriptions', ''),
+            'actionReferences' => collect(data_get($data, 'action_references', []))
+                ->map(static fn (array $item) => ['uuid' => data_get($item, 'identifier.value')])
+                ->filter(static fn (array $item) => !empty($item['uuid']))
+                ->values()
+                ->toArray(),
+            'participant' => collect(data_get($data, 'participants', []))
+                ->map(static fn (array $item) => ['uuid' => data_get($item, 'identifier.value')])
+                ->filter(static fn (array $item) => !empty($item['uuid']))
+                ->values()
+                ->toArray(),
+            'supportingInfo' => collect(data_get($data, 'supporting_info', []))
+                ->map(function (array $item) use ($supportingInfoDetails) {
+                    $uuid = data_get($item, 'identifier.value');
+                    $type = data_get($item, 'identifier.type.coding.0.code');
+                    $details = $supportingInfoDetails[$uuid] ?? [];
+
+                    return [
+                        'uuid' => $uuid,
+                        'type' => $type,
+                        'date' => $details['ehealthInsertedAt'] ?? null,
+                        'code' => $details['codeCode'] ?? null,
+                        'name' => '',
+                        'typeLabel' => ''
+                    ];
+                })
+                ->values()
+                ->toArray(),
         ];
     }
 }

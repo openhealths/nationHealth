@@ -250,8 +250,8 @@ class DiagnosticReportRepository extends BaseRepository
     /**
      * Get diagnostic reports data that is related to the person.
      *
-     * @param  string  $personId
-     * @return array|null
+     * @param  int  $personId
+     * @return array
      */
     public function getByPersonId(int $personId): array
     {
@@ -277,7 +277,7 @@ class DiagnosticReportRepository extends BaseRepository
                 $diagnosticReport->uuid => [
                     'ehealthInsertedAt' => convertToAppDateFormat($diagnosticReport->ehealthInsertedAt),
                     'codeCode' => $diagnosticReport->code?->value,
-                    'type' => 'diagnostic_report',
+                    'type' => 'diagnostic_report'
                 ],
             ])
             ->toArray();

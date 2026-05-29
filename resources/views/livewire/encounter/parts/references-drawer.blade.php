@@ -44,67 +44,80 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="mb-8">
                     <div class="form-group group">
                         <select x-model="selectedType"
                                 id="drawerSelectedType"
                                 class="input-select peer w-full"
+                                @change="loadMedicalRecords()"
                         >
-                            <option value="ALL">{{ __('forms.all') }}</option>
-                            <option value="condition">{{ __('patients.conditions') }}</option>
+                            <option value="">{{ __('forms.select') }} {{ mb_strtolower(__('forms.type')) }}</option>
+                            <option value="condition">{{ __('patients.condition_or_diagnosis') }}</option>
                             <option value="observation">{{ __('patients.medical_observation') }}</option>
-                            <option value="diagnostic-report">{{ __('patients.diagnostic_reports') }}</option>
+                            <option value="diagnosticReport">{{ __('patients.medical_diagnostic_report') }}</option>
                         </select>
                         <label for="drawerSelectedType" class="label">
                             {{ __('forms.type') }}
                         </label>
                     </div>
-
-                    <div class="form-group group">
-                        <select x-model="selectedEpisode"
-                                id="drawerSelectedEpisode"
-                                class="input-select peer w-full"
-                        >
-                            <option value="ALL">{{ __('forms.all') }}</option>
-                            <option value="ep-1">{{ __('patients.mock.episode_1') }}</option>
-                            <option value="ep-2">{{ __('patients.mock.episode_2') }}</option>
-                        </select>
-                        <label for="drawerSelectedEpisode" class="label">
-                            {{ __('care-plan.episode') }}
-                        </label>
-                    </div>
                 </div>
 
                 <div class="flex-1 overflow-y-auto min-h-0 mb-6 pr-1">
-                    <table class="table-input w-inherit">
-                        <thead class="thead-input">
-                            <tr>
-                                <th scope="col" class="th-input w-[15%] uppercase">{{ mb_strtoupper(__('forms.date')) }}</th>
-                                <th scope="col" class="th-input w-[20%] uppercase">{{ mb_strtoupper(__('forms.type')) }}</th>
-                                <th scope="col" class="th-input w-[55%] uppercase">{{ mb_strtoupper(__('forms.name')) }}</th>
-                                <th scope="col" class="th-input text-center w-[10%] uppercase">{{ mb_strtoupper(__('forms.actions')) }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <template x-for="record in filteredRecords()" :key="record.id">
-                                <tr class="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
-                                    <td class="td-input text-[14px] text-gray-900 dark:text-gray-300" x-text="record.date"></td>
-                                    <td class="td-input text-[14px] text-gray-900 dark:text-gray-300" x-text="record.typeLabel"></td>
-                                    <td class="td-input text-[14px] text-gray-900 dark:text-white" x-text="record.name"></td>
-                                    <td class="td-input text-center">
-                                        <button type="button"
-                                                @click="addReference(record)"
-                                                class="inline-flex items-center justify-center text-gray-900 hover:text-blue-600 dark:text-white dark:hover:text-blue-400 transition-colors p-1"
-                                        >
-                                            @icon('plus-circle', 'w-6 h-6')
-                                        </button>
-                                    </td>
+                    <div x-show="medicalRecordsLoading"
+                         class="text-center py-8 text-gray-500 dark:text-gray-400"
+                         x-cloak
+                    >
+                        Завантаження...
+                    </div>
+
+                    <div x-show="!medicalRecordsLoading && hasSearchedMedicalRecords" x-cloak>
+                        <table class="table-input w-inherit">
+                            <thead class="thead-input">
+                                <tr>
+                                    <th scope="col" class="th-input w-[15%] uppercase">{{ mb_strtoupper(__('forms.date')) }}</th>
+                                    <th scope="col" class="th-input w-[20%] uppercase">{{ mb_strtoupper(__('forms.type')) }}</th>
+                                    <th scope="col" class="th-input w-[55%] uppercase">{{ mb_strtoupper(__('forms.name')) }}</th>
+                                    <th scope="col" class="th-input text-center w-[10%] uppercase">{{ mb_strtoupper(__('forms.actions')) }}</th>
                                 </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                    <div x-show="filteredRecords().length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400" x-cloak>
-                        {{ __('forms.nothing_found') }}
+                            </thead>
+                            <tbody>
+                                <template x-for="record in filteredRecords()" :key="record.type + '-' + record.uuid">
+                                    <tr class="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+                                        <td class="td-input text-[14px] text-gray-900 dark:text-gray-300" x-text="record.date || '—'"></td>
+                                        <td class="td-input text-[14px] text-gray-900 dark:text-gray-300" x-text="record.typeLabel || record.type"></td>
+                                        <td class="td-input text-[14px] text-gray-900 dark:text-white"
+                                            x-text="(() => {
+                                                const dictName = $wire.dictionaries['eHealth/LOINC/observation_codes'][record.code] ||
+                                                                 $wire.dictionaries['eHealth/ICF/classifiers'][record.code] ||
+                                                                 $wire.dictionaries['eHealth/ICPC2/condition_codes'][record.code];
+
+                                                if (dictName) {
+                                                    return `${ record.code } - ${ dictName }`;
+                                                }
+
+                                                const service = Object.values($wire.dictionaries['custom/services']).find(serviceOption => serviceOption.id === record.code);
+                                                return service ? `${ service.code } / ${ service.name }` : (record.name || record.code || '—');
+                                            })()"
+                                        ></td>
+                                        <td class="td-input text-center">
+                                            <button type="button"
+                                                    @click="addReference(record)"
+                                                    class="inline-flex items-center justify-center text-gray-900 hover:text-blue-600 dark:text-white dark:hover:text-blue-400 transition-colors p-1"
+                                            >
+                                                @icon('plus-circle', 'w-6 h-6')
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+
+                        <div x-show="hasSearchedMedicalRecords && filteredRecords().length === 0"
+                             class="text-center py-8 text-gray-500 dark:text-gray-400"
+                             x-cloak
+                        >
+                            {{ __('forms.nothing_found') }}
+                        </div>
                     </div>
                 </div>
             </div>

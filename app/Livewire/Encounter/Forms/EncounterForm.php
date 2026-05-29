@@ -22,7 +22,10 @@ class EncounterForm extends BaseForm
         'diagnoses' => [],
         'reasons' => [],
         'actions' => [],
-        'referralType' => ''
+        'referralType' => '',
+        'actionReferences' => [],
+        'participant' => [],
+        'supportingInfo' => []
     ];
 
     public array $episode = ['id' => '', 'typeCode' => '', 'name' => ''];
@@ -124,6 +127,22 @@ class EncounterForm extends BaseForm
                 'date'
             ],
             'encounter.paperReferral.note' => ['nullable', 'string', 'max:1000'],
+            'encounter.prescriptions' => ['nullable', 'string', 'max:3000'],
+            'encounter.actionReferences' => ['nullable', 'array'],
+            'encounter.actionReferences.*.uuid' => ['nullable', 'uuid'],
+            'encounter.participant' => ['nullable', 'array'],
+            'encounter.participant.*.uuid' => ['nullable', 'uuid'],
+            'encounter.supportingInfo' => ['nullable', 'array'],
+            'encounter.supportingInfo.*.uuid' => ['required_with:encounter.supportingInfo', 'uuid'],
+            'encounter.supportingInfo.*.type' => [
+                'required_with:encounter.supportingInfo',
+                'string',
+                'in:condition,observation,diagnostic_report'
+            ],
+            'encounter.supportingInfo.*.code' => ['nullable', 'string'],
+            'encounter.supportingInfo.*.name' => ['nullable', 'string'],
+            'encounter.supportingInfo.*.date' => ['nullable', 'string'],
+            'encounter.supportingInfo.*.typeLabel' => ['nullable', 'string'],
 
             'episode.id' => [
                 'nullable',
