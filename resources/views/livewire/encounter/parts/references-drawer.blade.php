@@ -44,7 +44,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="mb-8">
                     <div class="form-group group">
                         <select x-model="selectedType"
                                 id="drawerSelectedType"
@@ -52,45 +52,12 @@
                                 @change="loadMedicalRecords()"
                         >
                             <option value="">{{ __('forms.select') }} {{ mb_strtolower(__('forms.type')) }}</option>
-                            <option value="ALL">{{ __('forms.all') }}</option>
                             <option value="condition">{{ __('patients.condition_or_diagnosis') }}</option>
                             <option value="observation">{{ __('patients.medical_observation') }}</option>
-                            <option value="diagnostic_report">{{ __('patients.medical_diagnostic_report') }}</option>
+                            <option value="diagnosticReport">{{ __('patients.medical_diagnostic_report') }}</option>
                         </select>
                         <label for="drawerSelectedType" class="label">
                             {{ __('forms.type') }}
-                        </label>
-                    </div>
-
-                    <div class="form-group group">
-                        <select x-model="selectedEpisode"
-                                id="drawerSelectedEpisode"
-                                class="input-select peer w-full"
-                                @change="loadMedicalRecords()"
-                        >
-                            <option value="">{{ __('forms.select') }} {{ mb_strtolower(__('care-plan.episode')) }}</option>
-                            <option value="ALL">{{ __('forms.all') }}</option>
-                            @foreach($medicalRecordEpisodes as $episode)
-                                @php
-                                    $episodeStartDate = data_get($episode, 'ehealth_inserted_at')
-                                        ?? data_get($episode, 'ehealthInsertedAt');
-
-                                    $episodeStartDate = $episodeStartDate
-                                        ? convertToAppDateFormat($episodeStartDate)
-                                        : '';
-                                @endphp
-
-                                <option value="{{ $episode['uuid'] ?? '' }}">
-                                    {{ $episode['name'] ?? data_get($episode, 'type.code', $episode['uuid'] ?? '') }}
-
-                                    @if($episodeStartDate)
-                                        ({{ __('forms.start') }} {{ $episodeStartDate }})
-                                    @endif
-                                </option>
-                            @endforeach
-                        </select>
-                        <label for="drawerSelectedEpisode" class="label">
-                            {{ __('care-plan.episode') }}
                         </label>
                     </div>
                 </div>
@@ -114,11 +81,24 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <template x-for="record in filteredRecords()" :key="record.type + '-' + record.id">
+                                <template x-for="record in filteredRecords()" :key="record.type + '-' + record.uuid">
                                     <tr class="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
                                         <td class="td-input text-[14px] text-gray-900 dark:text-gray-300" x-text="record.date || '—'"></td>
                                         <td class="td-input text-[14px] text-gray-900 dark:text-gray-300" x-text="record.typeLabel || record.type"></td>
-                                        <td class="td-input text-[14px] text-gray-900 dark:text-white" x-text="recordTitle(record)"></td>
+                                        <td class="td-input text-[14px] text-gray-900 dark:text-white"
+                                            x-text="(() => {
+                                                const dictName = $wire.dictionaries['eHealth/LOINC/observation_codes'][record.code] ||
+                                                                 $wire.dictionaries['eHealth/ICF/classifiers'][record.code] ||
+                                                                 $wire.dictionaries['eHealth/ICPC2/condition_codes'][record.code];
+
+                                                if (dictName) {
+                                                    return `${ record.code } - ${ dictName }`;
+                                                }
+
+                                                const service = Object.values($wire.dictionaries['custom/services']).find(serviceOption => serviceOption.id === record.code);
+                                                return service ? `${ service.code } / ${ service.name }` : (record.name || record.code || '—');
+                                            })()"
+                                        ></td>
                                         <td class="td-input text-center">
                                             <button type="button"
                                                     @click="addReference(record)"

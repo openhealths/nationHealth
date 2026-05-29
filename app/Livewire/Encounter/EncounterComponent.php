@@ -25,13 +25,10 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use App\Livewire\Encounter\Forms\EncounterForm as Form;
-use Carbon\CarbonImmutable;
 use Livewire\WithFileUploads;
-use Throwable;
 
 class EncounterComponent extends Component
 {
@@ -71,14 +68,6 @@ class EncounterComponent extends Component
      * @var array
      */
     public array $episodes = [];
-
-    /**
-     * List of patient episodes used only in the medical records search drawer.
-     * This list is not limited to active episodes, because old medical records can belong to closed episodes.
-     *
-     * @var array
-     */
-    public array $medicalRecordEpisodes = [];
 
     /**
      * List of existing patient clinical impressions.
@@ -172,8 +161,6 @@ class EncounterComponent extends Component
      */
     public array $codeableConceptValues;
 
-    public array $medicalRecordOptions = [];
-
     /**
      * List of employees of current legal entity.
      *
@@ -187,20 +174,6 @@ class EncounterComponent extends Component
      * @var array
      */
     public array $evidenceDetails = [];
-
-    /**
-     * Selected services that should be displayed on edit even if they are not in the current dictionary list.
-     *
-     * @var array
-     */
-    public array $selectedServiceOptions = [];
-
-    /**
-     * Selected employees that should be displayed on edit even if they are not in the current legal entity list.
-     *
-     * @var array
-     */
-    public array $selectedEmployeeOptions = [];
 
     /**
      * List of founded conditions and observations.
@@ -655,343 +628,31 @@ class EncounterComponent extends Component
                     ])
                     ->values()
                     ->all(),
+                'condition' => collect(EHealth::condition()->getBySearchParams($this->patientUuid, $params)->validate())
+                    ->map(static fn (array $condition) => [
+                        'uuid' => data_get($condition, 'uuid'),
+                        'ehealthInsertedAt' => convertToAppDateFormat(data_get($condition, 'ehealth_inserted_at')),
+                        'code' => data_get($condition, 'code.coding.0.code'),
+                        'type' => 'condition'
+                    ])
+                    ->values()
+                    ->all(),
+                'observation' => collect(EHealth::observation()->getBySearchParams($this->patientUuid, $params)->validate())
+                    ->filter(static fn (array $observation) => data_get($observation, 'status') !== ObservationStatus::ENTERED_IN_ERROR->value)
+                    ->map(static fn (array $observation) => [
+                        'uuid' => data_get($observation, 'uuid'),
+                        'ehealthInsertedAt' => convertToAppDateFormat(data_get($observation, 'ehealth_inserted_at')),
+                        'code' => data_get($observation, 'code.coding.0.code'),
+                        'type' => 'observation'
+                    ])
+                    ->values()
+                    ->all(),
                 default => []
             };
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             $this->handleEHealthExceptions($exception, "Error while searching for $type in Encounter Component");
         }
     }
-
-    public function searchMedicalRecords(string $type = 'ALL', string $episodeId = 'ALL'): array
-    {
-        $episodeId = trim($episodeId);
-        $type = trim($type);
-
-        if (empty($this->medicalRecordEpisodes)) {
-            $this->getMedicalRecordEpisodes();
-        }
-
-        $allowedTypes = ['condition', 'observation', 'diagnostic_report'];
-        $types = $type === 'ALL' || $type === ''
-            ? $allowedTypes
-            : array_values(array_intersect([$type], $allowedTypes));
-
-        if (empty($types)) {
-            return $this->medicalRecordOptions = [];
-        }
-
-        try {
-            return $this->medicalRecordOptions = collect($types)
-                ->flatMap(function (string $recordType) use ($episodeId) {
-                    return collect($this->medicalRecordEpisodeIdsForSearch($episodeId))
-                        ->flatMap(fn (?string $recordEpisodeId) => $this->searchMedicalRecordsByType($recordType, $recordEpisodeId))
-                        ->toArray();
-                })
-                ->unique(fn (array $record) => $record['type'].'-'.$record['id'])
-                ->sortByDesc('sortDate')
-                ->take(10)
-                ->map(static function (array $record) {
-                    unset($record['sortDate']);
-
-                    return $record;
-                })
-                ->values()
-                ->toArray();
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error while searching medical records for Encounter');
-
-            return $this->medicalRecordOptions = [];
-        } catch (Throwable $exception) {
-            Log::error('Error while searching medical records for Encounter', [
-                'message' => $exception->getMessage(),
-                'type' => $type,
-                'episode_id' => $episodeId,
-            ]);
-
-            return $this->medicalRecordOptions = [];
-        }
-    }
-
-    private function searchMedicalRecordsByType(string $type, ?string $episodeId = null): array
-    {
-        $params = [
-            'managing_organization_id' => legalEntity()->uuid,
-        ];
-
-        if (filled($episodeId)) {
-            if ($type === 'diagnostic_report') {
-                $params['origin_episode_id'] = $episodeId;
-            } else {
-                $params['episode_id'] = $episodeId;
-            }
-        }
-
-        $response = match ($type) {
-            'condition' => EHealth::condition()->getBySearchParams($this->patientUuid, $params),
-            'observation' => EHealth::observation()->getBySearchParams($this->patientUuid, $params),
-            'diagnostic_report' => EHealth::diagnosticReport()->getBySearchParams($this->patientUuid, $params),
-        };
-
-        return collect($this->medicalRecordsData($response))
-            ->when($type === 'observation', fn ($collection) => $collection->reject(
-                static fn (array $item) => data_get($item, 'status') === ObservationStatus::ENTERED_IN_ERROR->value
-            ))
-            ->map(fn (array $record) => $this->medicalRecordOption($record, $type))
-            ->values()
-            ->toArray();
-    }
-
-    private function medicalRecordEpisodeIdsForSearch(string $episodeId): array
-    {
-        if ($episodeId !== '' && $episodeId !== 'ALL') {
-            return [$episodeId];
-        }
-
-        $episodeIds = collect($this->medicalRecordEpisodes)
-            ->map(fn (array $episode) => data_get($episode, 'uuid'))
-            ->filter()
-            ->unique()
-            ->values()
-            ->toArray();
-
-        return $episodeIds ?: [null];
-    }
-
-    private function medicalRecordsData(mixed $response): array
-    {
-        $data = $response->getData();
-
-        return data_get($data, 'data', $data) ?: [];
-    }
-
-    private function medicalRecordOption(array $record, string $type): array
-    {
-        $code = $this->medicalRecordCode($record, $type);
-        $name = $this->medicalRecordName($record, $type, $code);
-        $rawDate = collect($this->medicalRecordDatePaths($type))
-            ->map(fn (string $path) => data_get($record, $path))
-            ->first(fn ($value) => filled($value));
-
-        return [
-            'id' => data_get($record, 'uuid', data_get($record, 'id')),
-            'type' => $type,
-            'typeLabel' => $this->medicalRecordTypeLabel($type),
-            'code' => $code,
-            'name' => $name ?: $code,
-            'date' => $this->formatRecordDate($rawDate),
-            'episode' => $this->medicalRecordEpisode($record),
-            'sortDate' => $rawDate,
-        ];
-    }
-
-    private function medicalRecordCode(array $record, string $type): string
-    {
-        if ($type === 'diagnostic_report') {
-            return collect([
-                'code.identifier.value',
-                'codeIdentifier.value',
-                'code.value',
-                'codeValue',
-            ])
-                ->map(fn (string $path) => data_get($record, $path))
-                ->first(fn ($value) => filled($value));
-        }
-
-        return collect([
-            'code.coding.0.code',
-            'codeCode',
-            'code.code',
-        ])
-            ->map(fn (string $path) => data_get($record, $path))
-            ->first(fn ($value) => filled($value));
-    }
-
-    private function medicalRecordName(array $record, string $type, string $code): string
-    {
-        if ($type === 'diagnostic_report') {
-            $fallback = collect([
-                'code.displayValue',
-                'code.display_value',
-                'code.identifier.type.text',
-                'conclusion',
-            ])
-                ->map(fn (string $path) => data_get($record, $path))
-                ->first(fn ($value) => filled($value));
-
-            return $this->serviceLabel($code, $fallback);
-        }
-
-        $system = collect([
-            'code.coding.0.system',
-            'codeSystem',
-            'code.system',
-        ])
-            ->map(fn (string $path) => data_get($record, $path))
-            ->first(fn ($value) => filled($value));
-
-        $fallback = collect([
-            'code.text',
-            'codeText',
-            'name',
-        ])
-            ->map(fn (string $path) => data_get($record, $path))
-            ->first(fn ($value) => filled($value));
-
-        return $this->dictionaryLabel($system, $code, $fallback);
-    }
-
-    private function medicalRecordEpisode(array $record): ?string
-    {
-        return collect([
-            'episode.identifier.value',
-            'episode.value',
-            'episode.uuid',
-            'episodeId',
-            'episode_id',
-            'originEpisode.identifier.value',
-            'originEpisodeId',
-            'origin_episode_id',
-            'contextEpisode.identifier.value',
-            'contextEpisodeId',
-            'context_episode_id',
-        ])
-            ->map(fn (string $path) => data_get($record, $path))
-            ->first(fn ($value) => filled($value));
-    }
-
-    private function medicalRecordDatePaths(string $type): array
-    {
-        return match ($type) {
-            'condition' => ['onsetDate', 'onset_date', 'assertedDate', 'asserted_date', 'ehealthInsertedAt', 'ehealth_inserted_at'],
-            'observation' => ['effectiveDateTime', 'effective_date_time', 'issued', 'issuedDate', 'ehealthInsertedAt', 'ehealth_inserted_at'],
-            'diagnostic_report' => ['issued', 'issuedDate', 'effectivePeriod.start', 'effective_period.start', 'ehealthInsertedAt', 'ehealth_inserted_at'],
-            default => ['ehealthInsertedAt', 'ehealth_inserted_at'],
-        };
-    }
-
-    private function formatRecordDate(mixed $date): string
-    {
-        if (empty($date)) {
-            return '';
-        }
-
-        try {
-            return CarbonImmutable::parse($date)->format('d.m.Y');
-        } catch (Throwable) {
-            return $date;
-        }
-    }
-
-    private function dictionaryLabel(?string $system, ?string $code, ?string $fallback = ''): string
-    {
-        if (!$system || !$code) {
-            return ($fallback ?: $code ?: '');
-        }
-
-        $value = data_get($this->dictionaries, "$system.$code");
-
-        if (is_array($value)) {
-            return data_get($value, 'name', data_get($value, 'label', $code));
-        }
-
-        return ($value ?: $fallback ?: $code);
-    }
-
-    private function serviceLabel(?string $id, ?string $fallback = ''): string
-    {
-        if (!$id) {
-            return $fallback;
-        }
-
-        $service = $this->serviceOptionById($id);
-
-        return data_get($service, 'name', $fallback ?: $id);
-    }
-
-    protected function selectedServiceOptionsFromEncounter(array $encounter): array
-    {
-        return collect(data_get($encounter, 'action_references', []))
-            ->map(function (array $item) {
-                $id = data_get($item, 'identifier.value', '');
-
-                if ($id === '') {
-                    return null;
-                }
-
-                $service = $this->serviceOptionById($id);
-
-                return [
-                    'id' => $id,
-                    'code' => data_get($service, 'code', ''),
-                    'name' => (data_get($service, 'name', '')),
-                ];
-            })
-            ->filter()
-            ->unique('id')
-            ->values()
-            ->toArray();
-    }
-
-    private function serviceOptionById(string $id): ?array
-    {
-        $service = collect($this->dictionaries['custom/services'] ?? [])
-            ->first(fn ($service, $key) => data_get($service, 'id', $key) === $id);
-
-        return is_array($service) ? $service : null;
-    }
-
-    protected function selectedEmployeeOptionsFromEncounter(array $encounter): array
-    {
-        $ids = collect(data_get($encounter, 'participants', []))
-            ->map(fn (array $item) => data_get($item, 'identifier.value', ''))
-            ->filter()
-            ->unique()
-            ->values();
-
-        if ($ids->isEmpty()) {
-            return [];
-        }
-
-        $employees = Employee::query()
-            ->whereIn('uuid', $ids->all())
-            ->select(['uuid', 'position', 'party_id'])
-            ->with('party:id,last_name,first_name,second_name')
-            ->get()
-            ->map(fn (Employee $employee) => [
-                'id' => $employee->uuid,
-                'name' => $employee->fullName,
-                'position' => $employee->position,
-            ])
-            ->keyBy('id');
-
-        return $ids
-            ->map(function (string $id) use ($employees) {
-                $employee = $employees->get($id);
-
-                if ($employee) {
-                    return $employee;
-                }
-
-                return [
-                    'id' => $id,
-                    'name' => $id,
-                    'position' => '',
-                ];
-            })
-            ->values()
-            ->toArray();
-    }
-
-    private function medicalRecordTypeLabel(string $type): string
-    {
-        return match ($type) {
-            'condition' => __('patients.condition_or_diagnosis'),
-            'observation' => __('patients.medical_observation'),
-            'diagnostic_report' => __('patients.diagnostic_reports'),
-            default => $type,
-        };
-    }
-
 
     protected function setPatientData(): void
     {
@@ -1017,7 +678,7 @@ class EncounterComponent extends Component
 
         $this->adjustDictionary('eHealth/episode_types', $keys);
     }
-    
+
     /**
      * Show encounter classes based on legal entity and employee type.
      *
@@ -1050,72 +711,27 @@ class EncounterComponent extends Component
 
         $this->adjustDictionary('eHealth/encounter_types', $keys);
     }
-    
+
     /**
      * Get active episodes for current patient.
-     * Used by the main encounter episode selector.
      *
      * @return void
      */
     protected function getEpisodes(): void
     {
         try {
-            $this->episodes = $this->getEpisodesBySearchParams([
-                'managing_organization_id' => legalEntity()->uuid,
-                'status' => EpisodeStatus::ACTIVE->value,
-            ]);
+            $this->episodes = EHealth::episode()
+                ->getBySearchParams(
+                    $this->patientUuid,
+                    ['managing_organization_id' => legalEntity()->uuid, 'status' => EpisodeStatus::ACTIVE->value]
+                )
+                ->validate();
+            $this->episodes = Arr::toCamelCase($this->episodes);
         } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             $this->handleEHealthExceptions($exception, 'Error when getting episodes');
 
             return;
         }
-    }
-
-    /**
-     * Get all available episodes for current patient.
-     * Used by the medical records search drawer.
-     *
-     * @return void
-     */
-    protected function getMedicalRecordEpisodes(): void
-    {
-        try {
-            $this->medicalRecordEpisodes = $this->getEpisodesBySearchParams([
-                'managing_organization_id' => legalEntity()->uuid,
-            ]);
-        } catch (ConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-            $this->handleEHealthExceptions($exception, 'Error when getting episodes for medical records search');
-
-            return;
-        }
-    }
-
-    /**
-     * Get all pages for episodes search params.
-     *
-     * @param  array  $params
-     * @return array
-     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
-     */
-    private function getEpisodesBySearchParams(array $params): array
-    {
-        $episodes = collect();
-        $page = 1;
-
-        do {
-            $response = EHealth::episode()->getBySearchParams(
-                $this->patientUuid,
-                array_merge($params, ['page' => $page, 'page_size' => 100])
-            );
-
-            $episodes = $episodes->merge($response->validate());
-            $page++;
-        } while ($response->isNotLast());
-
-        return $episodes
-            ->unique('uuid')
-            ->values()
-            ->toArray();
     }
 
     /**

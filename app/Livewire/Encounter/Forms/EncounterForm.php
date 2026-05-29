@@ -23,7 +23,6 @@ class EncounterForm extends BaseForm
         'reasons' => [],
         'actions' => [],
         'referralType' => '',
-        'prescriptions' => '',
         'actionReferences' => [],
         'participant' => [],
         'supportingInfo' => []
@@ -128,14 +127,13 @@ class EncounterForm extends BaseForm
                 'date'
             ],
             'encounter.paperReferral.note' => ['nullable', 'string', 'max:1000'],
-
             'encounter.prescriptions' => ['nullable', 'string', 'max:3000'],
             'encounter.actionReferences' => ['nullable', 'array'],
-            'encounter.actionReferences.*' => ['nullable', 'uuid'],
+            'encounter.actionReferences.*.uuid' => ['nullable', 'uuid'],
             'encounter.participant' => ['nullable', 'array'],
-            'encounter.participant.*' => ['nullable', 'uuid'],
+            'encounter.participant.*.uuid' => ['nullable', 'uuid'],
             'encounter.supportingInfo' => ['nullable', 'array'],
-            'encounter.supportingInfo.*.id' => ['required_with:encounter.supportingInfo', 'uuid'],
+            'encounter.supportingInfo.*.uuid' => ['required_with:encounter.supportingInfo', 'uuid'],
             'encounter.supportingInfo.*.type' => [
                 'required_with:encounter.supportingInfo',
                 'string',

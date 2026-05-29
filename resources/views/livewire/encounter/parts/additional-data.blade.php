@@ -1,33 +1,7 @@
-@php
-    $serviceOptions = collect($this->dictionaries['custom/services'] ?? [])
-        ->map(function ($service, $key) {
-            return [
-                'id' => (string) (is_array($service) ? data_get($service, 'id', $key) : $key),
-                'code' => (string) (is_array($service) ? data_get($service, 'code', '') : ''),
-                'name' => (string) (is_array($service) ? data_get($service, 'name', '') : $service),
-            ];
-        })
-        ->merge($selectedServiceOptions ?? [])
-        ->filter(fn (array $service) => !empty($service['id']))
-        ->unique('id')
-        ->values();
-
-    $employeeOptions = collect($employees ?? [])
-        ->map(fn (array $employee) => [
-            'id' => (string) ($employee['uuid'] ?? $employee['id'] ?? ''),
-            'name' => (string) ($employee['name'] ?? $employee['fullName'] ?? $employee['id'] ?? ''),
-        ])
-        ->merge($selectedEmployeeOptions ?? [])
-        ->filter(fn (array $employee) => !empty($employee['id']))
-        ->unique('id')
-        ->values();
-@endphp
-
 <div class="p-5 space-y-6"
      x-data="{
         showReferencesDrawer: false,
         selectedType: '',
-        selectedEpisode: '',
         searchQuery: '',
         selectedReferences: $wire.entangle('form.encounter.supportingInfo'),
         allRecords: [],
@@ -35,22 +9,12 @@
         hasSearchedMedicalRecords: false,
 
         init() {
-            this.selectedReferences = Array.isArray(this.selectedReferences) ? this.selectedReferences : [];
-            this.syncSelectedReferences();
-        },
-
-        syncSelectedReferences() {
-            this.selectedReferences = Array.isArray(this.selectedReferences)
-                ? this.selectedReferences.filter(reference => reference && reference.id && reference.type)
-                : [];
-
-            $wire.set('form.encounter.supportingInfo', this.selectedReferences, false);
+            this.selectedReferences = (this.selectedReferences ?? []).filter(reference => reference?.uuid && reference?.type);
         },
 
         openReferencesDrawer() {
             this.showReferencesDrawer = true;
             this.selectedType = '';
-            this.selectedEpisode = '';
             this.searchQuery = '';
             this.allRecords = [];
             this.medicalRecordsLoading = false;
@@ -58,7 +22,7 @@
         },
 
         loadMedicalRecords() {
-        if (this.selectedType === '' && this.selectedEpisode === '') {
+            if (this.selectedType === '') {
                 this.allRecords = [];
                 this.medicalRecordsLoading = false;
                 this.hasSearchedMedicalRecords = false;
@@ -70,9 +34,31 @@
             this.hasSearchedMedicalRecords = true;
             this.allRecords = [];
 
-            Promise.resolve($wire.searchMedicalRecords(this.selectedType || 'ALL', this.selectedEpisode || 'ALL'))
-                .then((records) => {
-                    this.allRecords = Array.isArray(records) ? records : [];
+            const typeLabels = {
+                condition: '{{ __("patients.condition_or_diagnosis") }}',
+                observation: '{{ __("patients.medical_observation") }}',
+                diagnosticReport: '{{ __("patients.medical_diagnostic_report") }}',
+            };
+
+            $wire.searchSupportingInfo(this.selectedType)
+                .then(() => {
+                    const dicts = $wire.dictionaries;
+                    const lookupName = (code) =>
+                        dicts['eHealth/ICPC2/condition_codes']?.[code] ||
+                        dicts['eHealth/ICD10_AM/condition_codes']?.[code] ||
+                        dicts['eHealth/LOINC/observation_codes']?.[code] ||
+                        dicts['eHealth/custom/observation_codes']?.[code] ||
+                        dicts['eHealth/ICF/classifiers']?.[code] ||
+                        '';
+
+                    this.allRecords = ($wire.supportingInfoResults ?? []).map(result => ({
+                        uuid: result.uuid,
+                        type: result.type,
+                        typeLabel: typeLabels[this.selectedType] || result.type,
+                        code: result.code,
+                        name: lookupName(result.code),
+                        date: result.ehealthInsertedAt,
+                    }));
                 })
                 .finally(() => {
                     this.medicalRecordsLoading = false;
@@ -81,23 +67,18 @@
 
         addReference(record) {
             const alreadySelected = this.selectedReferences.some(
-                reference => reference.id === record.id && reference.type === record.type
+                reference => reference.uuid === record.uuid && reference.type === record.type
             );
 
             if (!alreadySelected) {
-                this.selectedReferences = [
-                    ...this.selectedReferences,
-                    {
-                        id: record.id,
-                        type: record.type,
-                        typeLabel: record.typeLabel,
-                        code: record.code,
-                        name: record.name,
-                        date: record.date,
-                    },
-                ];
-
-                this.syncSelectedReferences();
+                this.selectedReferences = [...this.selectedReferences, {
+                    uuid: record.uuid,
+                    type: record.type,
+                    typeLabel: record.typeLabel,
+                    code: record.code,
+                    name: record.name,
+                    date: record.date,
+                }];
             }
 
             this.showReferencesDrawer = false;
@@ -109,12 +90,10 @@
             this.searchQuery = '';
         },
 
-        removeReference(id, type) {
+        removeReference(uuid, type) {
             this.selectedReferences = this.selectedReferences.filter(
-                reference => !(reference.id === id && reference.type === type)
+                reference => !(reference.uuid === uuid && reference.type === type)
             );
-
-            this.syncSelectedReferences();
         },
 
         filteredRecords() {
@@ -130,21 +109,10 @@
                     }
                 }
 
-                if (this.selectedType && this.selectedType !== 'ALL' && record.type !== this.selectedType) {
-                    return false;
-                }
-
-                if (this.selectedEpisode && this.selectedEpisode !== 'ALL' && String(record.episode ?? '') !== String(this.selectedEpisode)) {
-                    return false;
-                }
-
                 return true;
             });
         },
 
-        recordTitle(record) {
-            return [record.code, record.name].filter(Boolean).join(' — ') || '—';
-        },
      }"
 >
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -153,7 +121,7 @@
                 <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
                     @icon('calendar-week', 'w-5 h-5 text-gray-400')
                 </div>
-                <input wire:model.defer="form.encounter.periodDate"
+                <input wire:model="form.encounter.periodDate"
                        datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                        datepicker-autoselect-today
                        type="text"
@@ -178,7 +146,7 @@
                 <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
                     @icon('mingcute-time-fill', 'w-5 h-5 text-gray-400')
                 </div>
-                <input wire:model.defer="form.encounter.periodStart"
+                <input wire:model="form.encounter.periodStart"
                        type="text"
                        name="periodStart"
                        id="periodStart"
@@ -201,7 +169,7 @@
                 <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
                     @icon('mingcute-time-fill', 'w-5 h-5 text-gray-400')
                 </div>
-                <input wire:model.defer="form.encounter.periodEnd"
+                <input wire:model="form.encounter.periodEnd"
                        type="text"
                        name="periodEnd"
                        id="periodEnd"
@@ -221,7 +189,7 @@
     </div>
 
     <div class="form-group group">
-        <select wire:model.defer="form.encounter.divisionId"
+        <select wire:model="form.encounter.divisionId"
                 id="divisionNames"
                 class="input-select peer @error('form.encounter.divisionId') input-error @enderror"
         >
@@ -241,7 +209,7 @@
     </div>
 
     <div class="form-group group">
-        <select wire:model.defer="form.encounter.priorityCode"
+        <select wire:model="form.encounter.priorityCode"
                 id="priority"
                 class="input-select peer @error('form.encounter.priorityCode') input-error @enderror"
                 required
@@ -265,7 +233,7 @@
         </label>
         <textarea wire:model="form.encounter.prescriptions"
                   id="encounterPrescriptions"
-                  class="w-full min-h-[120px] p-4 text-[15px] text-gray-900 dark:text-white bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none resize-none @error('form.encounter.prescriptions') input-error @enderror"
+                  class="w-full min-h-30 p-4 text-[15px] text-gray-900 dark:text-white bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none resize-none @error('form.encounter.prescriptions') input-error @enderror"
                   placeholder="{{ __('patients.write_assignments_here') }}"
         ></textarea>
     </div>
@@ -273,36 +241,32 @@
     <div x-data="{
             services: $wire.entangle('form.encounter.actionReferences'),
             coAuthors: $wire.entangle('form.encounter.participant'),
-            serviceOptions: @js($serviceOptions),
+            serviceOptions: [],
             serviceSearches: [],
             serviceDropdowns: [],
 
             init() {
-                this.services = Array.isArray(this.services) && this.services.length ? this.services : [''];
-                this.coAuthors = Array.isArray(this.coAuthors) && this.coAuthors.length ? this.coAuthors : [''];
-                this.syncServiceSearches();
-                this.syncServicesToLivewire();
-                this.syncCoAuthorsToLivewire();
-            },
+                this.serviceOptions = Object.entries($wire.dictionaries['custom/services'] ?? {})
+                    .map(([key, service]) => ({
+                        id: String(typeof service === 'object' ? (service.id ?? key) : key),
+                        code: String(typeof service === 'object' ? (service.code ?? '') : ''),
+                        name: String(typeof service === 'object' ? (service.name ?? '') : service),
+                    }))
+                    .filter(service => service.id);
 
-            syncServicesToLivewire() {
-                const selectedServices = (Array.isArray(this.services) ? this.services : [])
-                    .filter((serviceId) => serviceId !== null && serviceId !== undefined && String(serviceId).trim() !== '')
-                    .map((serviceId) => String(serviceId));
+                this.services = Array.isArray(this.services) && this.services.length ? this.services : [{uuid: ''}];
+                this.coAuthors = Array.isArray(this.coAuthors) && this.coAuthors.length ? this.coAuthors : [{uuid: ''}];
 
-                $wire.set('form.encounter.actionReferences', selectedServices, false);
-            },
-
-            syncCoAuthorsToLivewire() {
-                const selectedCoAuthors = (Array.isArray(this.coAuthors) ? this.coAuthors : [])
-                    .filter((employeeId) => employeeId !== null && employeeId !== undefined && String(employeeId).trim() !== '')
-                    .map((employeeId) => String(employeeId));
-
-                $wire.set('form.encounter.participant', selectedCoAuthors, false);
+                this.serviceSearches = this.services.map(service => {
+                    if (!service.uuid) { return ''; }
+                    const option = this.serviceOptions.find(opt => opt.id === service.uuid);
+                    return option ? this.serviceLabel(option) : '';
+                });
+                this.serviceDropdowns = this.services.map(() => false);
             },
 
             addService() {
-                this.services = [...(Array.isArray(this.services) ? this.services : []), ''];
+                this.services = [...(Array.isArray(this.services) ? this.services : []), {uuid: ''}];
                 this.serviceSearches = [...this.serviceSearches, ''];
                 this.serviceDropdowns = [...this.serviceDropdowns, false];
             },
@@ -313,21 +277,10 @@
                 this.serviceDropdowns = this.serviceDropdowns.filter((_, rowIndex) => rowIndex !== index);
 
                 if (!this.services.length) {
-                    this.services = [''];
+                    this.services = [{uuid: ''}];
                     this.serviceSearches = [''];
                     this.serviceDropdowns = [false];
                 }
-
-                this.syncServicesToLivewire();
-            },
-
-            syncServiceSearches() {
-                this.serviceSearches = this.services.map((serviceId) => {
-                    const service = this.serviceOptions.find((option) => String(option.id) === String(serviceId));
-
-                    return service ? this.serviceLabel(service) : '';
-                });
-                this.serviceDropdowns = this.services.map(() => false);
             },
 
             serviceLabel(service) {
@@ -349,27 +302,24 @@
             },
 
             selectService(index, service) {
-                this.services[index] = service.id;
+                this.services[index] = {uuid: service.id};
                 this.serviceSearches[index] = this.serviceLabel(service);
                 this.serviceDropdowns[index] = false;
-                this.syncServicesToLivewire();
             },
 
             clearService(index) {
-                this.services[index] = '';
+                this.services[index] = {uuid: ''};
                 this.serviceSearches[index] = '';
                 this.serviceDropdowns[index] = true;
-                this.syncServicesToLivewire();
             },
 
             addCoAuthor() {
-                this.coAuthors = [...(Array.isArray(this.coAuthors) ? this.coAuthors : []), ''];
+                this.coAuthors = [...(Array.isArray(this.coAuthors) ? this.coAuthors : []), {uuid: ''}];
             },
 
             removeCoAuthor(index) {
                 this.coAuthors = this.coAuthors.filter((_, rowIndex) => rowIndex !== index);
                 this.coAuthors = this.coAuthors.length ? this.coAuthors : [''];
-                this.syncCoAuthorsToLivewire();
             },
         }"
          class="space-y-6"
@@ -382,8 +332,7 @@
                                class="input peer @error('form.encounter.actionReferences.0') input-error @enderror"
                                :id="'service_' + index"
                                x-model="serviceSearches[index]"
-                               @focus="serviceDropdowns[index] = true"
-                               @input="services[index] = ''; serviceDropdowns[index] = true; syncServicesToLivewire()"
+                               @input="services[index] = {uuid: ''}; serviceDropdowns[index] = true;"
                                placeholder=" "
                                autocomplete="off"
                         >
@@ -438,12 +387,11 @@
                     <div class="form-group group">
                         <select class="input-select peer @error('form.encounter.participant.0') input-error @enderror"
                                 :id="'coAuthor_' + index"
-                                x-model="coAuthors[index]"
-                                @change="syncCoAuthorsToLivewire()"
+                                x-model="coAuthors[index].uuid"
                         >
                             <option value="" selected>{{ __('patients.find_doctor') }}</option>
-                            @foreach($employeeOptions as $employee)
-                                <option value="{{ $employee['id'] }}">{{ $employee['name'] }}</option>
+                            @foreach($this->employees as $employee)
+                                <option value="{{ $employee['uuid'] }}">{{ $employee['name'] }}</option>
                             @endforeach
                         </select>
                         <label :for="'coAuthor_' + index" class="label">{{ __('patients.coauthor') }}</label>
@@ -487,13 +435,28 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <template x-for="ref in selectedReferences" :key="ref.type + '-' + ref.id">
+                    <template x-for="ref in selectedReferences" :key="ref.type + '-' + ref.uuid">
                         <tr class="border-b border-gray-200 dark:border-gray-700">
                             <td class="td-input text-[14px] text-gray-900 dark:text-gray-300" x-text="ref.date || '—'"></td>
-                            <td class="td-input text-[14px] text-gray-900 dark:text-white" x-text="[ref.typeLabel, recordTitle(ref)].filter(Boolean).join(' ')"></td>
+                            <td class="td-input text-[14px] text-gray-900 dark:text-white"
+                                x-text="(() => {
+                                    const dictName = $wire.dictionaries['eHealth/LOINC/observation_codes'][ref.code] ||
+                                                     $wire.dictionaries['eHealth/ICF/classifiers'][ref.code] ||
+                                                     $wire.dictionaries['eHealth/ICPC2/condition_codes'][ref.code];
+
+                                    const codeName = dictName
+                                        ? `${ ref.code } - ${ dictName }`
+                                        : (() => {
+                                            const serviceOption = Object.values($wire.dictionaries['custom/services']).find(serviceOption => serviceOption.id === ref.code);
+                                            return serviceOption ? `${ serviceOption.code } / ${ serviceOption.name }` : (ref.name || ref.code || '—');
+                                          })();
+
+                                    return [ref.typeLabel, codeName].filter(Boolean).join(' ');
+                                })()"
+                            ></td>
                             <td class="td-input text-right pr-8">
                                 <button type="button"
-                                        @click="removeReference(ref.id, ref.type)"
+                                        @click="removeReference(ref.uuid, ref.type)"
                                         class="text-gray-400 dark:text-gray-500 hover:text-red-500 transition-colors p-1"
                                 >
                                     @icon('delete', 'w-5 h-5')
@@ -513,7 +476,7 @@
             <span>{{ __('patients.add_observations_reports_conditions') }}</span>
         </button>
 
-        @error('form.encounter.supportingInfo.0.id')
+        @error('form.encounter.supportingInfo.0.uuid')
             <p class="text-error">{{ $message }}</p>
         @enderror
         @error('form.encounter.supportingInfo.0.type')

@@ -12,7 +12,6 @@ use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\MedicalEvents\Sql\Episode;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Fhir;
 use Illuminate\Http\Client\ConnectionException;
@@ -28,20 +27,6 @@ class EncounterEdit extends EncounterComponent
     #[Locked]
     public int $encounterId;
 
-    public function getEpisodes(): void
-    {
-        $this->episodes = Episode::wherePersonId($this->personId)
-            ->get()
-            ->map(static function (Episode $episode): array {
-                $episode = $episode->toArray();
-                $episode['ehealth_inserted_at'] = $episode['ehealth_inserted_at'] ?? $episode['ehealthInsertedAt'] ?? null;
-                $episode['ehealth_updated_at'] = $episode['ehealth_updated_at'] ?? $episode['ehealthUpdatedAt'] ?? null;
-
-                return $episode;
-            })
-            ->toArray();
-    }
-
     public function mount(LegalEntity $legalEntity, int $personId, int $encounterId): void
     {
         $this->initializeComponent($personId);
@@ -49,8 +34,6 @@ class EncounterEdit extends EncounterComponent
 
         $encounter = Encounter::withRelationships()->whereId($encounterId)->firstOrFail()->toArray();
         $supportingInfoDetails = $this->getEncounterSupportingInfoDetailsMap($encounter);
-        $this->selectedServiceOptions = $this->selectedServiceOptionsFromEncounter($encounter);
-        $this->selectedEmployeeOptions = $this->selectedEmployeeOptionsFromEncounter($encounter);
 
         $this->form->encounter = Fhir::encounter()->fromFhir($encounter, $supportingInfoDetails);
         $this->episodeType = 'existing';
