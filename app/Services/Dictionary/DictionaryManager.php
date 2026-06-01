@@ -14,7 +14,7 @@ use App\Services\Dictionary\Collections\DeviceDefinitionCollection;
 use App\Services\Dictionary\Collections\DiagnoseGroupCollection;
 use App\Services\Dictionary\Collections\DrugCollection;
 use App\Services\Dictionary\Collections\ForbiddenGroupCollection;
-use App\Services\Dictionary\Collections\MedicalProgramCollection;
+use App\Services\Dictionary\Collections\RuleEngineRuleCollection;
 use App\Services\Dictionary\Collections\ServiceCollection;
 use App\Services\Dictionary\Dictionaries\BasicDictionary;
 use App\Services\Dictionary\Dictionaries\DeviceDefinitionDictionary;
@@ -22,6 +22,7 @@ use App\Services\Dictionary\Dictionaries\DiagnoseGroupDictionary;
 use App\Services\Dictionary\Dictionaries\DrugDictionary;
 use App\Services\Dictionary\Dictionaries\ForbiddenGroupDictionary;
 use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
+use App\Services\Dictionary\Dictionaries\RuleEngineRuleDictionary;
 use App\Services\Dictionary\Dictionaries\ServiceDictionary;
 use Exception;
 use Illuminate\Support\Facades\Log;
@@ -63,11 +64,11 @@ class DictionaryManager
     /**
      * Get medical programs dictionary collection.
      *
-     * @return MedicalProgramCollection Collection with medical program data
+     * @return Collection Medical program data
      */
-    public function medicalPrograms(): MedicalProgramCollection
+    public function medicalPrograms(): Collection
     {
-        return new MedicalProgramCollection($this->get(MedicalProgramDictionary::KEY));
+        return $this->get(MedicalProgramDictionary::KEY);
     }
 
     /**
@@ -77,7 +78,7 @@ class DictionaryManager
      */
     public function services(): ServiceCollection
     {
-        return new ServiceCollection($this->get(ServiceDictionary::KEY));
+        return ServiceCollection::make($this->get(ServiceDictionary::KEY));
     }
 
     /**
@@ -87,7 +88,7 @@ class DictionaryManager
      */
     public function basics(): BasicDictionaryCollection
     {
-        return new BasicDictionaryCollection($this->get(BasicDictionary::KEY));
+        return BasicDictionaryCollection::make($this->get(BasicDictionary::KEY));
     }
 
     /**
@@ -97,7 +98,7 @@ class DictionaryManager
      */
     public function drugs(): DrugCollection
     {
-        return new DrugCollection($this->get(DrugDictionary::KEY));
+        return DrugCollection::make($this->get(DrugDictionary::KEY));
     }
 
     /**
@@ -107,7 +108,7 @@ class DictionaryManager
      */
     public function diagnoseGroups(): DiagnoseGroupCollection
     {
-        return new DiagnoseGroupCollection($this->get(DiagnoseGroupDictionary::KEY));
+        return DiagnoseGroupCollection::make($this->get(DiagnoseGroupDictionary::KEY));
     }
 
     /**
@@ -117,7 +118,7 @@ class DictionaryManager
      */
     public function forbiddenGroups(): ForbiddenGroupCollection
     {
-        return new ForbiddenGroupCollection($this->get(ForbiddenGroupDictionary::KEY));
+        return ForbiddenGroupCollection::make($this->get(ForbiddenGroupDictionary::KEY));
     }
 
     /**
@@ -127,7 +128,25 @@ class DictionaryManager
      */
     public function deviceDefinitions(): DeviceDefinitionCollection
     {
-        return new DeviceDefinitionCollection($this->get(DeviceDefinitionDictionary::KEY));
+        return DeviceDefinitionCollection::make($this->get(DeviceDefinitionDictionary::KEY));
+    }
+
+    /**
+     * Get rule engine rules collection with per-rule details.
+     *
+     * The rule list and its details are fetched together in RuleEngineRuleDictionary::fetch(),
+     * so both caches are always in sync. Details are read directly from cache here.
+     *
+     * @return RuleEngineRuleCollection Collection with ruleList() and details() accessors
+     */
+    public function ruleEngineRules(): RuleEngineRuleCollection
+    {
+        $rules = $this->get(RuleEngineRuleDictionary::KEY);
+        $details = Cache::get(RuleEngineRuleDictionary::DETAILS_CACHE_KEY, []);
+
+        return RuleEngineRuleCollection::make(
+            $rules->map(static fn (array $rule) => array_merge($rule, ['details' => $details[data_get($rule, 'code.code')]]))
+        );
     }
 
     /**
@@ -217,20 +236,11 @@ class DictionaryManager
      * @param  string  $dictionaryKey  Dictionary key
      * @param  int  $page  Page number (1-based)
      * @return EHealthResponse
+     * @throws InvalidArgumentException When dictionary key not found
      */
-    public static function fetchDictionaryPage(string $dictionaryKey, int $page = 1): EHealthResponse
+    public function fetchPage(string $dictionaryKey, int $page = 1): EHealthResponse
     {
-        // Create dictionary instance based on key and use its fetch method
-        $dictionary = match ($dictionaryKey) {
-            MedicalProgramDictionary::KEY => new MedicalProgramDictionary(),
-            ServiceDictionary::KEY => new ServiceDictionary(),
-            BasicDictionary::KEY => new BasicDictionary(),
-            DrugDictionary::KEY => new DrugDictionary(),
-            DiagnoseGroupDictionary::KEY => new DiagnoseGroupDictionary(),
-            ForbiddenGroupDictionary::KEY => new ForbiddenGroupDictionary(),
-            DeviceDefinitionDictionary::KEY => new DeviceDefinitionDictionary(),
-            default => throw new InvalidArgumentException("Unknown dictionary key: $dictionaryKey")
-        };
+        $dictionary = $this->dictionaries[$dictionaryKey] ?? throw new InvalidArgumentException("Dictionary '$dictionaryKey' not found");
 
         return $dictionary->fetch($page);
     }

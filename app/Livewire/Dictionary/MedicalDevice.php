@@ -34,7 +34,7 @@ class MedicalDevice extends Component
         $this->getDictionary();
 
         $user = Auth::user();
-        $roles = $user->allowedRoles->get();
+        $roles = $user->allowedRoles;
         $mainSpeciality = $user->getMainSpeciality($legalEntity);
         $filteredPrograms = dictionary()->medicalPrograms()
             ->where('is_active', '=', true)

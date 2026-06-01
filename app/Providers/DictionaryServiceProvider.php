@@ -10,6 +10,7 @@ use App\Services\Dictionary\Dictionaries\DiagnoseGroupDictionary;
 use App\Services\Dictionary\Dictionaries\DrugDictionary;
 use App\Services\Dictionary\Dictionaries\ForbiddenGroupDictionary;
 use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
+use App\Services\Dictionary\Dictionaries\RuleEngineRuleDictionary;
 use App\Services\Dictionary\Dictionaries\ServiceDictionary;
 use App\Services\Dictionary\DictionaryManager;
 use Illuminate\Contracts\Foundation\Application;
@@ -35,6 +36,7 @@ class DictionaryServiceProvider extends ServiceProvider implements DeferrablePro
             $manager->register($app->make(DiagnoseGroupDictionary::class));
             $manager->register($app->make(ForbiddenGroupDictionary::class));
             $manager->register($app->make(DeviceDefinitionDictionary::class));
+            $manager->register($app->make(RuleEngineRuleDictionary::class));
 
             return $manager;
         });

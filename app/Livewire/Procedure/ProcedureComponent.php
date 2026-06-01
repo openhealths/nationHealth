@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Procedure;
 
-use App\Classes\Cipher\Traits\Cipher;
 use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\Exceptions\ApiException as eHealthApiException;
 use App\Core\Arr;
@@ -25,7 +24,6 @@ use Livewire\WithFileUploads;
 class ProcedureComponent extends Component
 {
     use FormTrait;
-    use Cipher;
     use WithFileUploads;
 
     public Form $form;

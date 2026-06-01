@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Services\Dictionary\DictionaryManager;
@@ -33,21 +34,21 @@ class UpdateDictionaryCache implements ShouldQueue
     public function __construct(
         private readonly string $dictionaryKey,
         private readonly int $pageNumber = 1,
-        public ?string $bearerToken = null
+        private readonly ?string $bearerToken = null
     ) {
     }
 
     /**
      * Execute the job.
      */
-    public function handle(): void
+    public function handle(DictionaryManager $manager): void
     {
         try {
             if ($this->bearerToken) {
                 session()->put(config('ehealth.api.oauth.bearer_token'), $this->bearerToken);
             }
 
-            $response = DictionaryManager::fetchDictionaryPage($this->dictionaryKey, $this->pageNumber);
+            $response = $manager->fetchPage($this->dictionaryKey, $this->pageNumber);
             $paging = $response->getPaging();
             $currentPageData = $response->getData();
 

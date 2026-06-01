@@ -6,7 +6,6 @@ namespace App\Livewire\Encounter;
 
 use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\Exceptions\ApiException as eHealthApiException;
-use App\Classes\Cipher\Traits\Cipher;
 use App\Classes\eHealth\Api\ServiceRequestApi;
 use App\Core\Arr;
 use App\Enums\Person\ClinicalImpressionStatus;
@@ -24,7 +23,6 @@ use App\Models\Person\Person;
 use App\Traits\FormTrait;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -34,7 +32,6 @@ use Livewire\WithFileUploads;
 class EncounterComponent extends Component
 {
     use FormTrait;
-    use Cipher;
     use WithFileUploads;
 
     public Form $form;
@@ -299,17 +296,7 @@ class EncounterComponent extends Component
         $this->observationCustomCodeMap = config('observation.category_codes.custom', []);
         $this->observationValueMap = config('observation.code_values');
 
-        $this->dictionaries['eHealth/ICF/classifiers'] = dictionary()->basics()
-            ->byName('eHealth/ICF/classifiers')
-            ->flattenedChildValues()
-            ->toArray();
-        $this->dictionaries['eHealth/assistive_products'] = dictionary()->basics()
-            ->byName('eHealth/assistive_products')
-            ->flattenedChildValues()
-            ->toArray();
-
-        $this->dictionaries['custom/services'] = dictionary()->services()->flattened()->toArray();
-        $this->loadRuleEngineRules();
+        $this->loadCustomDictionaries();
 
         $this->codeableConceptValues = collect(config('observation.code_values'))
             ->filter(static fn (array $value) => $value[1] === 'valueCodeableConcept')
@@ -736,29 +723,25 @@ class EncounterComponent extends Component
     }
 
     /**
-     * Load rules from the API and save them into the cache.
+     * Load dictionaries that are not part of the standard eHealth basic dictionary list.
      *
      * @return void
      */
-    protected function loadRuleEngineRules(): void
+    protected function loadCustomDictionaries(): void
     {
-        $this->dictionaries['custom/rule_engine_rule_list'] = Cache::remember(
-            'rule_engine_rule_list',
-            now()->addDays(7),
-            static fn () => EHealth::ruleEngineRules()->getMany()->getData()
-        );
+        $basics = dictionary()->basics();
 
-        foreach ($this->dictionaries['custom/rule_engine_rule_list'] as $dictionary) {
-            $cacheKey = "rule_engine_details_{$dictionary['code']['code']}";
+        $this->dictionaries['eHealth/ICF/classifiers'] = $basics->byName('eHealth/ICF/classifiers')
+            ->flattenedChildValues()
+            ->toArray();
+        $this->dictionaries['eHealth/assistive_products'] = $basics->byName('eHealth/assistive_products')
+            ->flattenedChildValues()
+            ->toArray();
+        $this->dictionaries['custom/services'] = dictionary()->services()->flattened()->toArray();
 
-            $details = Cache::remember(
-                $cacheKey,
-                now()->addDays(7),
-                static fn () => EHealth::ruleEngineRules()->get($dictionary['id'])->getData()
-            );
-
-            $this->dictionaries['custom/rule_engine_details'][$details['code']['code']] = $details;
-        }
+        $ruleEngineRules = dictionary()->ruleEngineRules();
+        $this->dictionaries['custom/rule_engine_rule_list'] = $ruleEngineRules->ruleList();
+        $this->dictionaries['custom/rule_engine_details'] = $ruleEngineRules->details();
     }
 
     /**

@@ -11,9 +11,7 @@ class BasicDictionaryCollection extends Collection
 {
     /**
      * Get dictionary values by dictionary name.
-     *
-     * Searches for a specific dictionary by name and returns its values
-     * as a new BasicDictionaryCollection instance.
+     * Searches for a specific dictionary by name and returns its values.
      *
      * @param  string  $name  Dictionary name to search for
      * @return self Collection containing dictionary values
@@ -32,12 +30,10 @@ class BasicDictionaryCollection extends Collection
 
     /**
      * Get multiple dictionaries by names with code => description mapping.
+     * Retrieves multiple dictionaries and formats them as code-description pairs, filtering out empty dictionaries.
      *
-     * Retrieves multiple dictionaries and formats them as code-description
-     * pairs, filtering out empty dictionaries.
-     *
-     * @param  array<string>  $names  Array of dictionary names to retrieve
-     * @return Collection<string, Collection> Mapped collection of dictionaries
+     * @param  array  $names  Array of dictionary names to retrieve
+     * @return Collection
      */
     public function getMultipleFormatted(array $names): Collection
     {
@@ -45,13 +41,13 @@ class BasicDictionaryCollection extends Collection
             ->mapWithKeys(fn (string $name) => [
                 $name => $this->byName($name)->asCodeDescription()
             ])
-            ->filter(fn ($dictionary) => $dictionary->isNotEmpty());
+            ->filter(fn (Collection $dictionary) => $dictionary->isNotEmpty());
     }
 
     /**
      * Get simple code => description mapping from complex structure.
      *
-     * @return Collection<string, string> Simple code-description mapping
+     * @return Collection
      */
     public function asCodeDescription(): Collection
     {
@@ -64,7 +60,7 @@ class BasicDictionaryCollection extends Collection
     /**
      * Format as large dictionary with extended data structure.
      *
-     * @return Collection<string, array> Extended dictionary with metadata
+     * @return Collection
      */
     public function asLargeDictionary(): Collection
     {
@@ -80,12 +76,10 @@ class BasicDictionaryCollection extends Collection
 
     /**
      * Get flattened values with child values recursively processed.
-     *
      * Recursively processes dictionary items and their child values,
-     * creating a flat collection of all codes and descriptions including
-     * nested child elements.
+     * creating a flat collection of all codes and descriptions including nested child elements.
      *
-     * @return Collection<string, string> Flattened code-description pairs
+     * @return Collection
      */
     public function flattenedChildValues(): Collection
     {
