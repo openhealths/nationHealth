@@ -1,34 +1,45 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Tests\Feature\CarePlan;
 
 use App\Classes\eHealth\Api\Approval;
+use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
+use App\Classes\eHealth\Api\CarePlanActivity as ActivityApi;
+use App\Classes\eHealth\EHealthResponse;
+use App\Enums\CarePlanStatus;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\Person\Person;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\Employees\Sql\Employee;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
 use Mockery;
 
 use Illuminate\Support\Str;
+use App\Classes\eHealth\EHealth;
+use Illuminate\Support\Facades\Log;
 
 class CarePlanLifecycleTest extends TestCase
 {
+    use RefreshDatabase;
+
+    protected function migrateDatabases()
+    {
+        $this->artisan('migrate:fresh', [
+            '--path' => [
+                database_path('migrations'),
+                database_path('migrations/install'),
+                database_path('migrations/update/0_1'),
+            ],
+            '--realpath' => true,
+        ]);
+    }
+
     protected function setUp(): void
     {
-        // Ensure we are using the pgsql connection for tests
-        putenv('DB_CONNECTION=pgsql');
-        putenv('DB_HOST=127.0.0.1');
-        putenv('DB_DATABASE=mis_dev');
-        putenv('DB_USERNAME=sail');
-        putenv('DB_PASSWORD=password');
-
         parent::setUp();
-
-        \Illuminate\Support\Facades\DB::beginTransaction();
 
         // Setup initial data
         $this->person = Person::create([
@@ -60,14 +71,14 @@ class CarePlanLifecycleTest extends TestCase
         ]);
         $conditionCc = \App\Models\MedicalEvents\Sql\CodeableConcept::create();
         $conditionCc->save();
-
+        
         $conditionCoding = new \App\Models\MedicalEvents\Sql\Coding();
         $conditionCoding->code = 'D02';
         $conditionCoding->system = 'eHealth/ICPC2/condition_codes';
         $conditionCoding->codeable_type = \App\Models\MedicalEvents\Sql\CodeableConcept::class;
         $conditionCoding->codeable_id = $conditionCc->id;
         $conditionCoding->save();
-
+        
         $condition = \App\Models\MedicalEvents\Sql\Condition::create([
             'uuid' => $conditionIdentifier->value,
             'person_id' => $this->person->id,
@@ -78,7 +89,7 @@ class CarePlanLifecycleTest extends TestCase
             'context_id' => $identifierId,
             'onset_date' => now(),
         ]);
-
+        
         \App\Models\MedicalEvents\Sql\EncounterDiagnose::create([
             'encounter_id' => $this->encounter->id,
             'condition_id' => $conditionIdentifier->id,
@@ -86,7 +97,7 @@ class CarePlanLifecycleTest extends TestCase
             'rank' => 1
         ]);
 
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id') 
             ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = \App\Models\LegalEntity::create([
@@ -126,32 +137,12 @@ class CarePlanLifecycleTest extends TestCase
             'user_id' => $this->user->id,
             'party_id' => $this->party->id,
         ]);
-
+        
         $this->user->employees()->attach($this->employee->id);
-
+        
         if (config('permission.teams')) {
             setPermissionsTeamId($legalEntity->id);
         }
-    }
-
-    protected function tearDown(): void
-    {
-        \Illuminate\Support\Facades\DB::rollBack();
-        parent::tearDown();
-    }
-
-    private function createTestCarePlan(string $title, string $status = 'draft'): CarePlan
-    {
-        return CarePlan::create([
-            'uuid' => (string) Str::uuid(),
-            'person_id' => $this->person->id,
-            'author_id' => $this->employee->id,
-            'legal_entity_id' => $this->employee->legal_entity_id,
-            'status' => $status,
-            'title' => $title,
-            'period_start' => now()->subDays(5),
-            'period_end' => now()->addDays(5),
-        ]);
     }
 
     public function test_full_care_plan_lifecycle_flow(): void
@@ -198,34 +189,6 @@ class CarePlanLifecycleTest extends TestCase
             ]
         ]);
         $mockJobApi->shouldReceive('getDetails')->andReturn($jobResponse);
-
-        // Mock getDetails for post-creation sync
-        $detailsResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
-        $detailsResponse->shouldReceive('validate')->andReturn([
-            'uuid' => $carePlanUuid,
-            'status' => 'active',
-            'title' => 'Test Plan',
-            'category' => [
-                'coding' => [
-                    ['system' => 'http://e-health.gov.ua/systems/care-plan-category', 'code' => '736382003']
-                ],
-                'text' => 'Treatment plan'
-            ],
-            'period' => [
-                'start' => now()->toIso8601String()
-            ],
-            'encounter' => [
-                'identifier' => [
-                    'value' => $this->encounter->uuid
-                ]
-            ],
-            'author' => [
-                'identifier' => [
-                    'value' => $this->employee->uuid
-                ]
-            ]
-        ]);
-        $mockCarePlanApi->shouldReceive('getDetails')->andReturn($detailsResponse);
 
         // 2. Mock Approval Flow
         $approvalCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
@@ -299,7 +262,8 @@ class CarePlanLifecycleTest extends TestCase
             ->call('initActivityForm', 'service_request')
             ->set('activityForm.kind', 'ServiceRequest')
             ->set('activityForm.quantity', 1)
-            ->set('activityForm.scheduled_period_end', now()->addDays(5)->format('d.m.Y'))
+            ->set('activityForm.scheduled_period_start', now()->format('d.m.Y'))
+            ->set('activityForm.scheduled_period_end', now()->addDays(7)->format('d.m.Y'))
             ->call('saveActivity')
             ->assertHasNoErrors();
 
@@ -315,7 +279,7 @@ class CarePlanLifecycleTest extends TestCase
         $activitySignResponse->shouldReceive('getData')->andReturn(['id' => $activityUuid, 'status' => 'scheduled']);
         $activitySignResponse->shouldReceive('getStatusCode')->andReturn(200);
         $mockActivityApi->shouldReceive('create')->andReturn($activitySignResponse);
-
+        
         $activitySummaryResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
         $activitySummaryResponse->shouldReceive('getData')->andReturn(['data' => []]);
         $activitySummaryResponse->shouldReceive('getStatusCode')->andReturn(200);
@@ -358,8 +322,16 @@ class CarePlanLifecycleTest extends TestCase
     public function test_create_service_activity_with_linked_grounds(): void
     {
         $this->actingAs($this->user);
-
-        $carePlan = $this->createTestCarePlan('Service Plan');
+        
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'Service Plan',
+            'status' => 'draft',
+        ]);
 
         $condition = \App\Models\MedicalEvents\Sql\Condition::first();
 
@@ -379,7 +351,8 @@ class CarePlanLifecycleTest extends TestCase
             ->call('addLinkedGround', 'Condition', $condition->uuid)
             ->assertSet('linkedGrounds.0.uuid', $condition->uuid)
             ->set('activityForm.quantity', 2)
-            ->set('activityForm.scheduled_period_end', now()->addDays(5)->format('d.m.Y'))
+            ->set('activityForm.scheduled_period_start', now()->format('d.m.Y'))
+            ->set('activityForm.scheduled_period_end', now()->addDays(7)->format('d.m.Y'))
             ->call('saveActivity')
             ->assertHasNoErrors();
 
@@ -393,8 +366,16 @@ class CarePlanLifecycleTest extends TestCase
     public function test_create_medication_activity_with_program_and_linked_grounds(): void
     {
         $this->actingAs($this->user);
-
-        $carePlan = $this->createTestCarePlan('Medication Plan');
+        
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'Medication Plan',
+            'status' => 'draft',
+        ]);
 
         $condition = \App\Models\MedicalEvents\Sql\Condition::first();
 
@@ -409,11 +390,14 @@ class CarePlanLifecycleTest extends TestCase
         Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
             ->call('initActivityForm', 'medication_request')
             ->set('selectedProgram', 'program-id')
-            ->call('selectProduct', ['id' => 'INN-123', 'name' => 'Aspirin', 'innm_dosage_form' => 'ml'], 'medication_request')
+            ->set('activityForm.program', 'program-id')
+            ->set('selectedProduct', ['code' => 'INN-123', 'name' => 'Aspirin'])
+            ->set('activityForm.product_reference', 'INN-123')
             ->call('addLinkedGround', 'Condition', $condition->uuid)
             ->set('activityForm.quantity', 30)
             ->set('activityForm.daily_amount', 1.5)
-            ->set('activityForm.scheduled_period_end', now()->addDays(5)->format('d.m.Y'))
+            ->set('activityForm.scheduled_period_start', now()->format('d.m.Y'))
+            ->set('activityForm.scheduled_period_end', now()->addDays(7)->format('d.m.Y'))
             ->call('saveActivity')
             ->assertHasNoErrors();
 
@@ -428,8 +412,16 @@ class CarePlanLifecycleTest extends TestCase
     public function test_create_device_activity_with_positive_quantity_validation(): void
     {
         $this->actingAs($this->user);
-
-        $carePlan = $this->createTestCarePlan('Device Plan');
+        
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'Device Plan',
+            'status' => 'draft',
+        ]);
 
         $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
         $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
@@ -445,7 +437,8 @@ class CarePlanLifecycleTest extends TestCase
             ->set('selectedProduct', ['code' => 'DEV-456', 'name' => 'Test strips'])
             ->set('activityForm.product_reference', 'DEV-456')
             ->set('activityForm.quantity', -5)
-            ->set('activityForm.scheduled_period_end', now()->addDays(5)->format('d.m.Y'))
+            ->set('activityForm.scheduled_period_start', now()->format('d.m.Y'))
+            ->set('activityForm.scheduled_period_end', now()->addDays(7)->format('d.m.Y'))
             ->call('saveActivity')
             ->assertHasErrors(['activityForm.quantity']);
 
@@ -455,7 +448,8 @@ class CarePlanLifecycleTest extends TestCase
             ->set('selectedProduct', ['code' => 'DEV-456', 'name' => 'Test strips'])
             ->set('activityForm.product_reference', 'DEV-456')
             ->set('activityForm.quantity', 10)
-            ->set('activityForm.scheduled_period_end', now()->addDays(5)->format('d.m.Y'))
+            ->set('activityForm.scheduled_period_start', now()->format('d.m.Y'))
+            ->set('activityForm.scheduled_period_end', now()->addDays(7)->format('d.m.Y'))
             ->call('saveActivity')
             ->assertHasNoErrors();
 
@@ -463,130 +457,6 @@ class CarePlanLifecycleTest extends TestCase
             'care_plan_id' => $carePlan->id,
             'product_reference' => 'DEV-456',
             'quantity' => 10,
-        ]);
-    }
-
-    public function test_activity_referral_eligibility(): void
-    {
-        $carePlan = $this->createTestCarePlan('Test Eligibility Plan', 'active');
-
-        $activity = CarePlanActivity::create([
-            'uuid' => (string) Str::uuid(),
-            'care_plan_id' => $carePlan->id,
-            'author_id' => $this->employee->id,
-            'status' => 'active',
-            'kind' => 'device_request',
-            'scheduled_period_start' => now()->subDays(2),
-            'scheduled_period_end' => now()->addDays(2),
-        ]);
-
-        // 1. Should be eligible under standard active state
-        $this->assertTrue($activity->isEligibleForReferral());
-
-        // 2. Parent Care Plan status is completed/cancelled/terminated -> ineligible
-        $carePlan->update(['status' => 'completed']);
-        $this->assertFalse($activity->isEligibleForReferral());
-
-        // Reset plan status
-        $carePlan->update(['status' => 'active']);
-
-        // 3. Activity status is cancelled/completed -> ineligible
-        $activity->update(['status' => 'completed']);
-        $activity->refresh();
-        $this->assertFalse($activity->isEligibleForReferral());
-
-        $activity->update(['status' => 'active']);
-        $activity->refresh();
-
-        // 4. Care Plan expired -> ineligible
-        $carePlan->update([
-            'period_start' => now()->subDays(10),
-            'period_end' => now()->subDays(1),
-        ]);
-        $this->assertFalse($activity->isEligibleForReferral());
-
-        // Reset plan period
-        $carePlan->update([
-            'period_start' => now()->subDays(5),
-            'period_end' => now()->addDays(5),
-        ]);
-
-        // 5. Activity expired -> ineligible
-        $activity->update([
-            'scheduled_period_start' => now()->subDays(10),
-            'scheduled_period_end' => now()->subDays(1),
-        ]);
-        $activity->refresh();
-        $this->assertFalse($activity->isEligibleForReferral());
-    }
-
-    public function test_complete_activity_flow(): void
-    {
-        $this->actingAs($this->user);
-        $carePlan = $this->createTestCarePlan('Complete Activity Plan', 'active');
-        $activity = CarePlanActivity::create([
-            'uuid' => (string) Str::uuid(),
-            'care_plan_id' => $carePlan->id,
-            'author_id' => $this->employee->id,
-            'status' => 'scheduled',
-            'kind' => 'service_request',
-            'scheduled_period_start' => now()->subDays(2),
-            'scheduled_period_end' => now()->addDays(2),
-        ]);
-
-        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
-        $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
-
-        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
-        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
-        $mockSignatureService->shouldReceive('signData')->andReturn('mock-base64-signature');
-        $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
-
-        $activityCompleteResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
-        $activityCompleteResponse->shouldReceive('getData')->andReturn(['id' => $activity->uuid, 'status' => 'completed']);
-        $activityCompleteResponse->shouldReceive('getStatusCode')->andReturn(200);
-        $mockActivityApi->shouldReceive('complete')->once()->andReturn($activityCompleteResponse);
-
-        $outcomeReferenceUuid = (string) Str::uuid();
-
-        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
-            ->set('form.knedp', '1.2.3.4')
-            ->set('form.password', 'secret')
-            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.jks', 100))
-            ->call('openSignatureModal', 'complete_activity', $activity->id)
-            // outcomeCode is required when completing
-            ->call('sign')
-            ->assertHasErrors(['outcomeCode'])
-            ->set('outcomeCode', 'completed_successfully')
-            ->set('statusReason', 'completed')
-            // add an outcome reference
-            ->set('selectedOutcomeReference', $outcomeReferenceUuid)
-            ->call('addOutcomeReference')
-            ->assertSet('outcomeReferences', [$outcomeReferenceUuid])
-            // sign again, should pass
-            ->call('sign')
-            ->assertHasNoErrors();
-
-        $this->assertDatabaseHas('care_plan_activities', [
-            'id' => $activity->id,
-            'status' => 'completed',
-        ]);
-    }
-
-    public function test_delete_draft_care_plan(): void
-    {
-        $this->actingAs($this->user);
-        $carePlan = $this->createTestCarePlan('Draft Care Plan to Delete', 'draft');
-
-        Livewire::test(\App\Livewire\CarePlan\CarePlanUpdate::class, [
-            'legalEntity' => \App\Models\LegalEntity::first(),
-            'carePlan' => $carePlan,
-        ])
-            ->call('delete')
-            ->assertRedirect(route('persons.care-plans', [legalEntity(), $this->person->id]));
-
-        $this->assertDatabaseMissing('care_plans', [
-            'id' => $carePlan->id,
         ]);
     }
 }

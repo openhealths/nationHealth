@@ -90,7 +90,7 @@ class PatientEncounters extends BasePatientComponent
 
         $encountersModel = Encounter::wherePersonId($this->personId)->withRelationships()->get();
 
-        $this->encounters = Arr::toCamelCase($this->formatDatesForDisplay($encountersModel->toArray()));
+        $this->encounters = Arr::toCamelCase($this->formatDatesForDisplay($encountersModel->makeVisible('id')->toArray()));
         $this->populateDbIds();
         $this->incomingReferrals = $encountersModel->pluck('incomingReferral')
             ->filter()

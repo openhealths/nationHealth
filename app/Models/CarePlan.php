@@ -21,8 +21,7 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class CarePlan extends Model
 {
-    use HasFactory;
-    use HasCamelCasing;
+    use HasFactory, HasCamelCasing;
 
     protected $fillable = [
         'uuid',
@@ -116,7 +115,6 @@ class CarePlan extends Model
         // Simple translation check, fallback to english or original
         $statusStr = strtolower($this->status ?? 'new');
         $translated = __('care-plan.status.' . $statusStr);
-
         return $translated === 'care-plan.status.' . $statusStr ? ucfirst($statusStr) : $translated;
     }
 
@@ -130,7 +128,6 @@ class CarePlan extends Model
         if (is_array($this->supporting_info) && isset($this->supporting_info['episodes']) && !empty($this->supporting_info['episodes'])) {
             return $this->supporting_info['episodes'][0]['name'] ?? null;
         }
-
         return null;
     }
 
@@ -151,57 +148,22 @@ class CarePlan extends Model
 
     public function getCareProvisionConditionsAttribute(): ?string
     {
-        try {
-            $basics = dictionary()->basics();
-            $dict = $basics->byName('PROVIDING_CONDITION');
-            if ($dict) {
-                $description = $dict->asCodeDescription()->get($this->terms_of_service);
-                if ($description) {
-                    return $description;
-                }
-            }
-        } catch (\Throwable $e) {
-            // Ignore error and fall back
-        }
-
-        return match ($this->terms_of_service) {
-            'OUTPATIENT' => 'Амбулаторно',
-            'INPATIENT' => 'Стаціонарно',
-            'FIELD' => 'За місцем перебування пацієнта',
-            default => collect(config('ehealth.dictionaries.care_provision_condition') ?? [])->get($this->terms_of_service, $this->terms_of_service)
-        };
+        return collect(config('ehealth.dictionaries.care_provision_condition') ?? [])->get($this->terms_of_service, $this->terms_of_service);
     }
 
     public function getMedicalConditionAttribute(): ?string
     {
         if ($this->relationLoaded('encounter') && $this->encounter) {
-            $this->encounter->loadMissing('diagnoses.conditionModel.code.coding');
+            $this->encounter->loadMissing('diagnoses.condition');
             if ($this->encounter->diagnoses && $this->encounter->diagnoses->isNotEmpty()) {
                 $diagnosis = $this->encounter->diagnoses->first();
-                if ($diagnosis->conditionModel) {
-                    $condition = $diagnosis->conditionModel;
-
-                    return ($condition->code_string ?? '') . ' - ' . ($condition->code_display ?? '');
+                if ($diagnosis->condition) {
+                    $condition = $diagnosis->condition;
+                    return ($condition->code ?? '') . ' - ' . ($condition->code_display ?? '');
                 }
             }
         }
-
         return '—';
-    }
-
-    public function status(): \Illuminate\Database\Eloquent\Casts\Attribute
-    {
-        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
-            get: function ($value) {
-                if ($value === 'new') {
-                    if ($this->approvals()->where('status', 'active')->exists()) {
-                        return 'active';
-                    }
-                }
-
-                return $value;
-            }
-        );
     }
 
     public function getAuthorNameAttribute(): string
@@ -209,7 +171,6 @@ class CarePlan extends Model
         if ($this->relationLoaded('author')) {
             return $this->author?->party?->fullName ?? '—';
         }
-
         return '—';
     }
 }

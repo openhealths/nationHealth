@@ -111,13 +111,16 @@
                     </fieldset>
                 </div>
 
-                <!-- Additional Actions -->
-                <div class="pt-10 mt-10 border-t border-gray-100 dark:border-gray-700">
-                    <h3 class="text-[17px] font-bold text-gray-900 dark:text-gray-100 mb-6">
-                        {{ __('patients.additional_actions') }}
-                    </h3>
+                @if($isSigned)
+                    <!-- Separator -->
+                    <hr class="my-8 border-gray-200 dark:border-gray-700" />
 
+                    <!-- Additional Actions -->
                     <div class="space-y-6">
+                        <h3 class="text-[17px] font-bold text-gray-900 dark:text-gray-100 mb-6">
+                            {{ __('patients.additional_actions') }}
+                        </h3>
+
                         <fieldset class="fieldset-card p-5">
                             <legend class="legend">{{ __('patients.prescriptions') }}</legend>
                             <button type="button"
@@ -150,31 +153,144 @@
 
                         <fieldset class="fieldset-card p-5">
                             <legend class="legend">{{ __('patients.care_plans') }}</legend>
-                            <a href="{{ route('care-plan.create', [legalEntity(), 'personId' => $personId, 'encounterUuid' => $form->encounter['uuid'] ?? '']) }}"
+
+                            @php
+                                $linkedCarePlans = \App\Models\CarePlan::where('encounter_id', $encounterId)->get();
+                            @endphp
+
+                            @if($linkedCarePlans->isNotEmpty())
+                                <div class="mb-4 overflow-x-auto">
+                                    <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                                            <tr>
+                                                <th class="px-4 py-2">{{ __('care-plan.requisition') }}</th>
+                                                <th class="px-4 py-2">{{ __('care-plan.name_care_plan') }}</th>
+                                                <th class="px-4 py-2">{{ __('forms.status.label') }}</th>
+                                                <th class="px-4 py-2"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($linkedCarePlans as $plan)
+                                                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
+                                                    <td class="px-4 py-3">{{ $plan->requisition ?? '-' }}</td>
+                                                    <td class="px-4 py-3">{{ $plan->title }}</td>
+                                                    <td class="px-4 py-3">
+                                                        <span class="badge-{{ in_array($plan->status, ['ACTIVE', 'active']) ? 'green' : 'dark' }}">
+                                                            {{ is_array($plan->status) ? ($plan->status['text'] ?? '-') : $plan->status }}
+                                                        </span>
+                                                    </td>
+                                                    <td class="px-4 py-3 text-right">
+                                                        <div x-data="{
+                                                                 open: false,
+                                                                 toggle() {
+                                                                     if (this.open) { return this.close(); }
+                                                                     this.$refs.button.focus();
+                                                                     this.open = true;
+                                                                 },
+                                                                 close(focusAfter) {
+                                                                     if (!this.open) return;
+                                                                     this.open = false;
+                                                                     focusAfter && focusAfter.focus()
+                                                                 }
+                                                             }"
+                                                             @keydown.escape.prevent.stop="close($refs.button)"
+                                                             @focusin.window="!$refs.panel.contains($event.target) && close()"
+                                                             x-id="['dropdown-button']"
+                                                             class="relative inline-block text-left"
+                                                        >
+                                                            <button @click="toggle()"
+                                                                    x-ref="button"
+                                                                    :aria-expanded="open"
+                                                                    :aria-controls="$id('dropdown-button')"
+                                                                    type="button"
+                                                                    class="transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 p-2 rounded-lg"
+                                                            >
+                                                                @icon('edit-user-outline', 'w-5 h-5 text-gray-700 dark:text-gray-300')
+                                                            </button>
+
+                                                            <div x-show="open"
+                                                                 x-cloak
+                                                                 x-ref="panel"
+                                                                 x-transition.origin.top.right
+                                                                 @click.outside="close($refs.button)"
+                                                                 :id="$id('dropdown-button')"
+                                                                 class="absolute right-0 mt-2 w-48 rounded-md bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-lg z-50 py-1"
+                                                            >
+                                                                <a href="{{ route('care-plans.show', [legalEntity(), $plan->id]) }}"
+                                                                   wire:navigate
+                                                                   class="flex items-center gap-2 w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                                                                >
+                                                                    @icon('eye', 'w-4 h-4 text-gray-500')
+                                                                    {{ __('forms.view') }}
+                                                                </a>
+
+                                                                @php
+                                                                    $statusStr = is_array($plan->status) ? ($plan->status['coding'][0]['code'] ?? ($plan->status['text'] ?? '')) : $plan->status;
+                                                                    $isPlanActive = (strtolower((string) $statusStr) === 'active');
+                                                                @endphp
+
+                                                                @if($isPlanActive)
+                                                                    <a href="{{ route('care-plans.show', [legalEntity(), $plan->id, 'action' => 'cancel']) }}"
+                                                                       wire:navigate
+                                                                       class="flex items-center gap-2 w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                                                                    >
+                                                                        @icon('x-circle', 'w-4 h-4 text-red-500')
+                                                                        {{ __('forms.cancel') }}
+                                                                    </a>
+
+                                                                    <a href="{{ route('care-plans.show', [legalEntity(), $plan->id, 'action' => 'complete']) }}"
+                                                                       wire:navigate
+                                                                       class="flex items-center gap-2 w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                                                                    >
+                                                                        @icon('check-circle', 'w-4 h-4 text-gray-500')
+                                                                        {{ __('forms.complete') }}
+                                                                    </a>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @endif
+
+                            <a href="{{ route('care-plans.create-by-encounter', [legalEntity(), 'encounter' => $encounterId]) }}"
                                class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors"
+                               wire:navigate
                             >
                                 @icon('plus', 'w-4 h-4')
                                 <span>{{ __('patients.add_care_plan') }}</span>
                             </a>
                         </fieldset>
                     </div>
-                </div>
 
-                <!-- Actions -->
-                <div class="pt-8">
-                    <div class="flex flex-wrap gap-4">
-                        <button type="button" class="button-primary-outline-red">
-                            {{ __('patients.encounter_entered_in_error') }}
-                        </button>
-                        <button wire:click.prevent="save" type="submit" class="button-primary">
-                            {{ __('forms.save') }}
-                        </button>
-
-                        <button type="submit" @click="$wire.showSignatureModal = true" class="button-primary">
-                            {{ __('forms.save_and_send') }}
-                        </button>
+                    <!-- Actions when signed -->
+                    <div class="pt-8">
+                        <div class="flex flex-wrap gap-4">
+                            <button type="button" class="button-primary-outline-red">
+                                {{ __('patients.encounter_entered_in_error') }}
+                            </button>
+                        </div>
                     </div>
-                </div>
+                @else
+                    <!-- Actions when not signed (draft) -->
+                    <div class="pt-8">
+                        <div class="flex flex-wrap gap-4">
+                            <button type="button" class="button-primary-outline-red">
+                                {{ __('patients.encounter_entered_in_error') }}
+                            </button>
+                            <button wire:click.prevent="save" type="submit" class="button-primary">
+                                {{ __('forms.save') }}
+                            </button>
+
+                            <button type="submit" @click="$wire.showSignatureModal = true" class="button-primary">
+                                {{ __('forms.save_and_send') }}
+                            </button>
+                        </div>
+                    </div>
+                @endif
             </div>
 
             <!-- Sidebar Navigation (Right) -->

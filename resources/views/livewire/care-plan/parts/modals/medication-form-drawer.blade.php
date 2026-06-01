@@ -27,7 +27,11 @@
      tabindex="-1"
 >
     <h3 class="modal-header">
-        {{ __('care-plan.new_medication_prescription') }}
+        @if(isset($activityForm['id']) && $activityForm['id'])
+            {{ __('care-plan.edit_medication_prescription') }}
+        @else
+            {{ __('care-plan.new_medication_prescription') }}
+        @endif
     </h3>
 
     {{-- Content --}}
@@ -76,13 +80,13 @@
                                wire:model="activityForm.quantity"
                         >
                         <select class="input-select peer w-20" wire:model="activityForm.quantity_system">
-                            <option value="ml">{{ __('care-plan.ml') }}</option>
+                            <option value="MEDICATION_UNIT">{{ $activityForm['quantity_code'] ?? __('care-plan.ml') }}</option>
                         </select>
                     </div>
                 </div>
                 <div class="form-group group">
                     <label class="label">
-                        {{ __('care-plan.start_date') }}:
+                        {{ __('care-plan.start_date') }}: <span class="text-red-500">*</span>
                     </label>
                     <div class="relative">
                         <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
@@ -92,6 +96,7 @@
                                class="input peer ps-10"
                                placeholder="02.04.2025"
                                datepicker-autohide
+                               datepicker-format="dd.mm.yyyy"
                                datepicker-button="false"
                                wire:model.live="activityForm.scheduled_period_start"
                         />
@@ -124,16 +129,16 @@
                                id="med_quantity_per_time"
                                name="med_quantity_per_time"
                                class="input peer w-full"
-                               wire:model="activityForm.quantity_per_time"
+                               wire:model="activityForm.daily_amount"
                         >
-                        <select class="input-select peer w-20" wire:model="activityForm.quantity_per_time_unit">
-                            <option value="{{ $activityForm['quantity_code'] ?: 'ml' }}">{{ $activityForm['quantity_code'] ?: 'ml' }}</option>
+                        <select class="input-select peer w-20">
+                            <option selected value="ml">{{ __('care-plan.ml') }}</option>
                         </select>
                     </div>
                 </div>
                 <div class="form-group group">
                     <label class="label">
-                        {{ __('care-plan.end_date') }}*
+                        {{ __('care-plan.end_date') }}: <span class="text-red-500">*</span>
                     </label>
                     <div class="relative">
                         <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
@@ -143,6 +148,7 @@
                                class="input peer ps-10"
                                placeholder="02.08.2025"
                                datepicker-autohide
+                               datepicker-format="dd.mm.yyyy"
                                datepicker-button="false"
                                wire:model.live="activityForm.scheduled_period_end"
                         />
@@ -175,10 +181,10 @@
                                id="med_number_of_times"
                                name="med_number_of_times"
                                class="input peer w-full"
-                               wire:model="activityForm.frequency"
+                               value="1"
                         >
-                        <select class="input-select peer w-28" wire:model="activityForm.frequency_unit">
-                            <option value="per_day">{{ __('care-plan.per_day') }}</option>
+                        <select class="input-select peer w-28">
+                            <option selected value="per_day">{{ __('care-plan.per_day') }}</option>
                         </select>
                     </div>
                 </div>
@@ -190,13 +196,13 @@
                            id="med_duration"
                            name="med_duration"
                            class="input peer w-full"
-                           wire:model="activityForm.duration"
+                           value="10"
                     >
                 </div>
                 <div class="form-group group">
                     <label class="label">&nbsp;</label>
-                    <select class="input-select peer w-full" wire:model="activityForm.duration_unit">
-                        <option value="days">{{ __('care-plan.days') }}</option>
+                    <select class="input-select peer w-full">
+                        <option selected value="days">{{ __('care-plan.days') }}</option>
                     </select>
                 </div>
             </div>
@@ -211,7 +217,13 @@
             <div class="flex gap-4 items-end mb-6">
                 <div class="flex-1">
                     <label class="label">Оберіть клінічний запис пацієнта</label>
-                    <select x-model="selectedGround" class="input-select peer w-full">
+                    <select x-model="selectedGround" 
+                            @change="if(selectedGround) { 
+                                let parts = selectedGround.split('|');
+                                $wire.addLinkedGround(parts[0], parts[1]);
+                                selectedGround = '';
+                            }" 
+                            class="input-select peer w-full">
                         <option value="">-- Оберіть запис --</option>
                         @if(!empty($availableConditions))
                             <optgroup label="Діагнози (Стани)">
@@ -236,13 +248,6 @@
                         @endif
                     </select>
                 </div>
-                <button type="button" @click="if(selectedGround) { 
-                    let parts = selectedGround.split('|');
-                    $wire.addLinkedGround(parts[0], parts[1]);
-                    selectedGround = '';
-                }" class="button-primary whitespace-nowrap">
-                    Додати обґрунтування
-                </button>
             </div>
 
             <div class="mb-4">
@@ -256,7 +261,7 @@
                             <tr>
                                 <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.date') }}</th>
                                 <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.name') }}</th>
-                                <th scope="col" class="px-4 py-3 font-medium text-right">{{ __('care-plan.action') }}</th>
+                                <th scope="col" class="px-4 py-3 font-medium text-right">Дія</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -304,12 +309,8 @@
                     <select id="med_expected_result"
                             name="med_expected_result"
                             class="input-select peer w-full"
-                            wire:model="activityForm.goal"
                     >
-                        <option value="">{{ __('care-plan.select_result') }}</option>
-                        @foreach(($dictionaries['care_plan_activity_goals'] ?? []) as $code => $name)
-                            <option value="{{ $code }}">{{ $name }}</option>
-                        @endforeach
+                        <option selected value="">{{ __('care-plan.select_service') }}</option>
                     </select>
                 </div>
             </div>

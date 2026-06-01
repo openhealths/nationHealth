@@ -110,8 +110,8 @@
                     <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.name') }}</th>
                     <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.allowed_in_em_short') }}</th>
                     <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.code') }}</th>
-                    <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.status_title') }}</th>
-                    <th scope="col" class="px-4 py-3 font-medium text-right">{{ __('care-plan.action') }}</th>
+                    <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.status_title') ?? 'Статус' }}</th>
+                    <th scope="col" class="px-4 py-3 font-medium text-right">Дія</th>
                 </tr>
             </thead>
             <tbody>

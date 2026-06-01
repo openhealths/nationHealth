@@ -250,6 +250,7 @@
                                     >
                                         @if(!empty(data_get($encounter, 'id')))
                                             <a href="{{ route('encounter.edit', [legalEntity(), $personId, data_get($encounter, 'id')]) }}"
+                                               wire:navigate
                                                class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                                             >
                                                 @icon('eye', 'w-5 h-5 text-gray-500')

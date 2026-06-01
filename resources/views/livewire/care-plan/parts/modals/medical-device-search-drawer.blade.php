@@ -93,20 +93,20 @@
                     <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.type') }}</th>
                     <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.packaging') }}</th>
                     <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.code') }}</th>
-                    <th scope="col" class="px-4 py-3 font-medium text-right">{{ __('care-plan.action') }}</th>
+                    <th scope="col" class="px-4 py-3 font-medium text-right">Дія</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($searchResults as $device)
                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <td class="px-4 py-3">
-                            <span class="font-medium text-gray-900 dark:text-white">{{ $device['name'] ?? '' }}</span>
+                            <span class="font-medium text-gray-900 dark:text-white">{{ $device['name'] ?? $device['device_names'][0]['name'] ?? $device['description'] ?? '' }}</span>
                         </td>
                         <td class="px-4 py-3 text-gray-500">
                             {{ $device['type_name'] ?? $device['classification_type_name'] ?? '-' }}
                         </td>
                         <td class="px-4 py-3 text-gray-500">
-                            {{ $device['packaging'] ?? $device['package_description'] ?? '-' }}
+                            {{ is_string($device['packaging'] ?? null) ? $device['packaging'] : (is_string($device['package_description'] ?? null) ? $device['package_description'] : (is_array($device['packaging'] ?? null) ? json_encode($device['packaging']) : '-')) }}
                         </td>
                         <td class="px-4 py-3 font-mono text-xs">
                             {{ $device['classification_type_code'] ?? $device['code'] ?? '-' }}

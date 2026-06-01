@@ -150,7 +150,8 @@ class User extends Authenticatable implements MustVerifyEmail
     public function activeEmployee(): ?Employee
     {
         if (!config('permission.teams')) {
-            return $this->employees()->first();
+            $doctor = $this->employees()->whereIn('employee_type', ['DOCTOR', 'SPECIALIST'])->first();
+            return $doctor ?: $this->employees()->first();
         }
 
         $teamId = getPermissionsTeamId();
@@ -159,7 +160,12 @@ class User extends Authenticatable implements MustVerifyEmail
             return null;
         }
 
-        return $this->employees()
+        $doctor = $this->employees()
+            ->where('legal_entity_id', $teamId)
+            ->whereIn('employee_type', ['DOCTOR', 'SPECIALIST'])
+            ->first();
+
+        return $doctor ?: $this->employees()
             ->where('legal_entity_id', $teamId)
             ->first();
     }

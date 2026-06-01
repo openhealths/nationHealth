@@ -222,6 +222,12 @@ return [
     'activity_outcomes' => 'Результати виконання',
     'referral_outcome' => 'Пов\'язаний КД (Діагноз/Спостереження)',
 
+    'activity_kind' => [
+        'service_request' => 'Призначення послуги',
+        'medication_request' => 'Призначення лікарського засобу',
+        'device_request' => 'Призначення медичного виробу',
+    ],
+
     'status' => [
         'draft' => 'Чернетка',
         'new' => 'Новий',
@@ -231,5 +237,7 @@ return [
         'completed' => 'Завершено',
         'entered-in-error' => 'Внесено помилково',
         'unknown' => 'Невідомо',
+        'scheduled' => 'Заплановано',
+        'processed' => 'Оброблено',
     ],
 ];

@@ -51,7 +51,7 @@
                                 <a href="{{ route('care-plans.show', [legalEntity(), $plan->id]) }}" 
                                    target="_blank"
                                    class="text-blue-500 hover:underline text-sm">
-                                    {{ __('forms.show') }}
+                                    {{ __('forms.view') ?? 'Переглянути' }}
                                 </a>
                             </td>
                         </tr>
