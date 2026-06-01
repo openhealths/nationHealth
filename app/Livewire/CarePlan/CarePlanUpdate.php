@@ -197,7 +197,7 @@ class CarePlanUpdate extends CarePlanCreate
             $this->form->toArray(),
             $this->form->encounter ?: null,
             $encounterData,
-            Auth::user()?->activeEmployee()?->uuid
+            Auth::user()?->activeDoctorEmployee()?->uuid
         );
 
         try {

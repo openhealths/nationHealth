@@ -23,7 +23,8 @@ use Throwable;
 
 class EncounterEdit extends EncounterComponent
 {
-
+    #[Locked]
+    public int $encounterId;
 
     public function mount(LegalEntity $legalEntity, int $personId, int $encounterId): void
     {
@@ -32,7 +33,6 @@ class EncounterEdit extends EncounterComponent
 
         $encounter = Encounter::withRelationships()->whereId($encounterId)->firstOrFail()->toArray();
         $supportingInfoDetails = $this->getEncounterSupportingInfoDetailsMap($encounter);
-        $this->isSigned = !empty($encounter['ehealth_inserted_at']);
 
         $this->form->encounter = Fhir::encounter()->fromFhir($encounter, $supportingInfoDetails);
         $this->episodeType = 'existing';

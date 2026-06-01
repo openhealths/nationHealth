@@ -362,7 +362,7 @@ class CarePlanShow extends Component
             Session::flash('success', __('care-plan.activity_updated'));
         } else {
             $activityData['care_plan_id'] = $this->carePlan->id;
-            $activityData['author_id'] = Auth::user()?->activeEmployee()?->id;
+            $activityData['author_id'] = Auth::user()?->activeDoctorEmployee()?->id;
             $activityData['status'] = CarePlanStatus::DRAFT->value;
 
             $repository->create($activityData);
@@ -679,7 +679,7 @@ class CarePlanShow extends Component
                     'type' => [
                         'coding' => [['system' => 'eHealth/resources', 'code' => 'employee']]
                     ],
-                    'value' => $this->carePlan->author?->uuid ?? Auth::user()?->activeEmployee()?->uuid
+                    'value' => $this->carePlan->author?->uuid ?? Auth::user()?->activeDoctorEmployee()?->uuid
                 ]
             ],
             'description' => $this->carePlan->description ?: null,
@@ -797,7 +797,7 @@ class CarePlanShow extends Component
                 array_map(fn($m) => ['display' => $m['name']], $this->carePlan->supporting_info['medical_records'] ?? [])
             ),
             'encounter' => $this->carePlan->encounter?->uuid ? ['identifier' => ['value' => $this->carePlan->encounter->uuid]] : null,
-            'care_manager' => ['identifier' => ['value' => Auth::user()?->activeEmployee()?->uuid]],
+            'care_manager' => ['identifier' => ['value' => Auth::user()?->activeDoctorEmployee()?->uuid]],
             'description' => $this->carePlan->description ?: null,
             'note' => $this->carePlan->note ?: null,
             'inform_with' => $this->carePlan->inform_with ?: null,

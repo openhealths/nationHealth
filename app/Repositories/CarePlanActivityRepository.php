@@ -96,7 +96,7 @@ class CarePlanActivityRepository
             ];
         }
 
-        $authorUuid = $activity->author?->uuid ?? auth()->user()?->activeEmployee()?->uuid;
+        $authorUuid = $activity->author?->uuid ?? auth()->user()?->activeDoctorEmployee()?->uuid;
 
         $quantityRelation = $activity->quantityQuantity;
         $quantityValue = $quantityRelation ? $quantityRelation->value : $activity->quantity;
@@ -288,7 +288,7 @@ class CarePlanActivityRepository
                     $authorId = \App\Models\Employee\Employee::where('uuid', $authorUuid)->value('id');
                 }
                 if (!$authorId) {
-                    $authorId = auth()->user()?->activeEmployee()?->id;
+                    $authorId = auth()->user()?->activeDoctorEmployee()?->id;
                 }
                 if (!$authorId) {
                     $authorId = $carePlan->author_id;

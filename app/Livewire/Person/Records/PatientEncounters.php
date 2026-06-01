@@ -90,8 +90,9 @@ class PatientEncounters extends BasePatientComponent
 
         $encountersModel = Encounter::wherePersonId($this->personId)->withRelationships()->get();
 
-        $this->encounters = Arr::toCamelCase($this->formatDatesForDisplay($encountersModel->makeVisible('id')->toArray()));
-        $this->populateDbIds();
+        $this->encounters = Arr::toCamelCase($this->formatDatesForDisplay($encountersModel->toArray()));
+        $this->encounterIdMap = $encountersModel->pluck('id', 'uuid')->toArray();
+
         $this->incomingReferrals = $encountersModel->pluck('incomingReferral')
             ->filter()
             ->map(fn (Identifier $referral) => [
@@ -153,7 +154,6 @@ class PatientEncounters extends BasePatientComponent
         }
 
         $this->encounters = Arr::toCamelCase($this->formatDatesForDisplay($validatedData));
-        $this->populateDbIds();
     }
 
     public function search(): void
@@ -169,7 +169,6 @@ class PatientEncounters extends BasePatientComponent
         try {
             $response = EHealth::encounter()->getBySearchParams($this->uuid, $params);
             $this->encounters = Arr::toCamelCase($this->formatDatesForDisplay($response->validate()));
-            $this->populateDbIds();
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while searching encounters');
         }
@@ -184,24 +183,6 @@ class PatientEncounters extends BasePatientComponent
             'filterIncomingReferral',
             'filterOriginEpisode'
         ]);
-    }
-
-    private function populateDbIds(): void
-    {
-        $uuids = collect($this->encounters)->pluck('uuid')->filter()->toArray();
-        if (empty($uuids)) {
-            return;
-        }
-
-        $dbMap = Encounter::whereIn('uuid', $uuids)->pluck('id', 'uuid')->toArray();
-
-        foreach ($this->encounters as &$encounter) {
-            $uuid = $encounter['uuid'] ?? null;
-            if ($uuid && isset($dbMap[$uuid])) {
-                $encounter['id'] = $dbMap[$uuid];
-            }
-        }
-        unset($encounter);
     }
 
     public function render(): View

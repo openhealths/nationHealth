@@ -41,11 +41,6 @@ class EncounterComponent extends Component
 
     public bool $showSignatureModal = false;
 
-    public bool $isSigned = false;
-
-    #[Locked]
-    public ?int $encounterId = null;
-
     /**
      * ID of the patient for which create an encounter.
      *
