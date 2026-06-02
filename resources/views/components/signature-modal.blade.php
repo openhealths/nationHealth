@@ -23,7 +23,7 @@
                 <div class="p-6">
                     <form>
                         <div class="flex flex-col gap-6">
-                            @if(method_exists($this, 'getStatusReasonsProperty') && isset($this->actionType) && in_array($this->actionType, ['cancel', 'revoke', 'complete', 'cancel_activity', 'complete_activity']))
+                            @if(method_exists($this, 'getStatusReasonsProperty') && isset($this->actionType) && in_array($this->actionType, ['cancel', 'revoke', 'complete', 'cancel_activity', 'complete_activity', 'cancel_prescription', 'cancel_referral']))
                                 <div>
                                     <label for="statusReason" class="default-label">{{ __('care-plan.status_reason') }} *</label>
                                     <select class="input-modal" wire:model="statusReason" name="statusReason" id="statusReason">
