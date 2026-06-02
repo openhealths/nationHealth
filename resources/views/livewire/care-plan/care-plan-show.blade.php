@@ -22,14 +22,14 @@
     <div x-data="{
         showSignatureModal: $wire.entangle('showSignatureModal').live,
         activeTab: 'info',
-        showServiceDrawer: false,
-        showServiceSearchDrawer: false,
-        showMedicationDrawer: false,
-        showMedicationSearchDrawer: false,
-        showMedicationFormDrawer: false,
-        showMedicalDeviceDrawer: false,
-        showMedicalDeviceSearchDrawer: false,
-        showMedicalDeviceFormDrawer: false,
+        showServiceDrawer: $wire.entangle('showServiceDrawer').live,
+        showServiceSearchDrawer: $wire.entangle('showServiceSearchDrawer').live,
+        showMedicationDrawer: $wire.entangle('showMedicationDrawer').live,
+        showMedicationSearchDrawer: $wire.entangle('showMedicationSearchDrawer').live,
+        showMedicationFormDrawer: $wire.entangle('showMedicationFormDrawer').live,
+        showMedicalDeviceDrawer: $wire.entangle('showMedicalDeviceDrawer').live,
+        showMedicalDeviceSearchDrawer: $wire.entangle('showMedicalDeviceSearchDrawer').live,
+        showMedicalDeviceFormDrawer: $wire.entangle('showMedicalDeviceFormDrawer').live,
         showMedicalRecordsSearchDrawer: false
     }"
     @close-drawers.window="showServiceDrawer = false; showServiceSearchDrawer = false; showMedicationDrawer = false; showMedicationSearchDrawer = false; showMedicationFormDrawer = false; showMedicalDeviceDrawer = false; showMedicalDeviceSearchDrawer = false; showMedicalDeviceFormDrawer = false; showMedicalRecordsSearchDrawer = false;"

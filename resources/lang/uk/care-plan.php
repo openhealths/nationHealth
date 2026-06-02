@@ -246,13 +246,6 @@ return [
     'add_coauthor' => 'Додати співавтора',
     'from' => 'від',
     'diagnostic_reports' => 'Діагностичні звіти',
-    'mock_drotaverine_inn' => 'дротаверин (drotaverine), 20.0 мг/мл/',
-    'mock_injection_solution' => 'розчин для ін\'єкцій',
-    'mock_ampoule' => 'ампула',
-    'mock_yes' => 'так',
-    'mock_prescription_f1' => 'Ф-1',
-    'mock_oxygen_therapy' => 'Киснева терапія',
-    'mock_release_package' => '№10, №20, №50, №200',
     'home' => 'Головна',
     'patients' => 'Пацієнти',
 

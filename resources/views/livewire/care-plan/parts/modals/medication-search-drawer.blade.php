@@ -94,14 +94,14 @@
             </legend>
 
             <div class="space-y-1 text-sm text-gray-700 dark:text-gray-300 mb-4">
-                <p><span class="text-gray-500">{{ __('care-plan.inn_basic') }}:</span> {{ __('care-plan.mock_drotaverine_inn') }}</p>
-                <p><span class="text-gray-500">{{ __('care-plan.dosage_form') }}:</span> {{ __('care-plan.mock_injection_solution') }}</p>
-                <p><span class="text-gray-500">{{ __('care-plan.release_form') }}:</span> {{ __('care-plan.mock_ampoule') }}</p>
-                <p><span class="text-gray-500">{{ __('care-plan.package_quantity') }}:</span> {{ __('care-plan.mock_release_package') }}</p>
-                <p><span class="text-gray-500">{{ __('care-plan.otc_sign') }}:</span> {{ __('care-plan.mock_yes') }}</p>
+                <p><span class="text-gray-500">{{ __('care-plan.inn_basic') }}:</span> дротаверин (drotaverine), 20.0 мг/мл/</p>
+                <p><span class="text-gray-500">{{ __('care-plan.dosage_form') }}:</span> розчин для ін'єкцій</p>
+                <p><span class="text-gray-500">{{ __('care-plan.release_form') }}:</span> ампула</p>
+                <p><span class="text-gray-500">{{ __('care-plan.package_quantity') }}:</span> №10, №20, №50, №200</p>
+                <p><span class="text-gray-500">{{ __('care-plan.otc_sign') }}:</span> так</p>
                 <p><span class="text-gray-500">{{ __('care-plan.maintenance_dose') }}:</span></p>
                 <p><span class="text-gray-500">{{ __('care-plan.max_daily_dose') }}:</span></p>
-                <p><span class="text-gray-500">{{ __('care-plan.prescription_form_type') }}:</span> {{ __('care-plan.mock_prescription_f1') }}</p>
+                <p><span class="text-gray-500">{{ __('care-plan.prescription_form_type') }}:</span> Ф-1</p>
             </div>
 
             <button type="button" class="button-primary" @click="showMedicationFormDrawer = true">
@@ -115,14 +115,14 @@
             </legend>
 
             <div class="space-y-1 text-sm text-gray-700 dark:text-gray-300 mb-4">
-                <p><span class="text-gray-500">{{ __('care-plan.inn_basic') }}:</span> {{ __('care-plan.mock_drotaverine_inn') }}</p>
-                <p><span class="text-gray-500">{{ __('care-plan.dosage_form') }}:</span> {{ __('care-plan.mock_injection_solution') }}</p>
-                <p><span class="text-gray-500">{{ __('care-plan.release_form') }}:</span> {{ __('care-plan.mock_ampoule') }}</p>
-                <p><span class="text-gray-500">{{ __('care-plan.package_quantity') }}:</span> {{ __('care-plan.mock_release_package') }}</p>
-                <p><span class="text-gray-500">{{ __('care-plan.otc_sign') }}:</span> {{ __('care-plan.mock_yes') }}</p>
+                <p><span class="text-gray-500">{{ __('care-plan.inn_basic') }}:</span> дротаверин (drotaverine), 20.0 мг/мл/</p>
+                <p><span class="text-gray-500">{{ __('care-plan.dosage_form') }}:</span> розчин для ін'єкцій</p>
+                <p><span class="text-gray-500">{{ __('care-plan.release_form') }}:</span> ампула</p>
+                <p><span class="text-gray-500">{{ __('care-plan.package_quantity') }}:</span> №10, №20, №50, №200</p>
+                <p><span class="text-gray-500">{{ __('care-plan.otc_sign') }}:</span> так</p>
                 <p><span class="text-gray-500">{{ __('care-plan.maintenance_dose') }}:</span></p>
                 <p><span class="text-gray-500">{{ __('care-plan.max_daily_dose') }}:</span></p>
-                <p><span class="text-gray-500">{{ __('care-plan.prescription_form_type') }}:</span> {{ __('care-plan.mock_prescription_f1') }}</p>
+                <p><span class="text-gray-500">{{ __('care-plan.prescription_form_type') }}:</span> Ф-1</p>
             </div>
 
             <button type="button" class="button-primary" @click="showMedicationFormDrawer = true">

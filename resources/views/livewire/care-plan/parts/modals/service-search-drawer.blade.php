@@ -29,7 +29,7 @@
             <input type="text"
                    id="service-search-input"
                    class="input peer ps-10 w-full"
-                   placeholder="{{ __('care-plan.mock_oxygen_therapy') }}"
+                   placeholder="Киснева терапія"
                    wire:model.live.debounce.400ms="searchQuery"
                    wire:keydown.enter="searchServices"
             />

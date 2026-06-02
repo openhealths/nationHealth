@@ -15,7 +15,7 @@
             @include('livewire.care-plan.parts.patient_data')
             @include('livewire.care-plan.parts.care_plan_data')
             @include('livewire.care-plan.parts.condition_diagnosis')
-            @include('livewire.care-plan.parts.supporting_information')
+            @include('livewire.care-plan.parts.supporting_information', ['isReadOnly' => false])
             @include('livewire.care-plan.parts.additional_info')
 
             <div class="mt-8 flex items-center gap-4 pt-4">

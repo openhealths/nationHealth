@@ -54,7 +54,7 @@ class CarePlanUpdate extends CarePlanCreate
         $this->form->note = $carePlan->note ?? '';
         $this->form->informWith = $carePlan->inform_with ?? '';
         $this->form->episodes = $carePlan->supporting_info['episodes'] ?? [];
-        $this->form->medicalRecords = $carePlan->supporting_info['medical_records'] ?? [];
+        $this->form->medical_records = $carePlan->supporting_info['medical_records'] ?? [];
         $this->form->knedp = '';
         $this->form->keyContainerUpload = null;
         $this->form->password = '';
@@ -139,7 +139,7 @@ class CarePlanUpdate extends CarePlanCreate
             'addresses' => $encounterData['addresses'],
             'supporting_info' => [
                 'episodes' => $this->form->episodes,
-                'medical_records' => $this->form->medicalRecords,
+                'medical_records' => $this->form->medical_records,
             ],
             'description' => $this->form->description ?: null,
             'note' => $this->form->note ?: null,
@@ -255,7 +255,7 @@ class CarePlanUpdate extends CarePlanCreate
                 'addresses' => $encounterData['addresses'],
                 'supporting_info' => [
                     'episodes' => $this->form->episodes,
-                    'medical_records' => $this->form->medicalRecords,
+                    'medical_records' => $this->form->medical_records,
                 ],
             ]);
 

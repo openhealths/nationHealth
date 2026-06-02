@@ -25,7 +25,7 @@ class CarePlanForm extends Form
     public string $informWith = '';
     public string $termsOfService = '';
     public array $episodes = [];
-    public array $medicalRecords = [];
+    public array $medical_records = [];
     public string $knedp = '';
     public mixed $keyContainerUpload = null;
     public string $password = '';
@@ -48,7 +48,7 @@ class CarePlanForm extends Form
             'informWith'       => 'nullable|string',
             'termsOfService'   => 'required|string',
             'episodes'         => 'nullable|array',
-            'medicalRecords'   => 'nullable|array',
+            'medical_records'   => 'nullable|array',
         ];
     }
 
