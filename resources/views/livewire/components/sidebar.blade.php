@@ -278,7 +278,7 @@
                 @endif
 
                 <li>
-                    <a href="{{ route('care-plan.index', [legalEntity()]) }}"
+                    <a href="{{ route('care-plans.index', [legalEntity()]) }}"
                        class="menu-item-simple {{ (request()->routeIs('care-plan.*') || request()->routeIs('persons.care-plans')) ? 'menu-item-active' : '' }}"
                     >
                         @icon('hugeicons-contracts')

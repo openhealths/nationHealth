@@ -7,11 +7,14 @@ namespace App\Models;
 use App\Models\Employee\Employee;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\MedicalEvents\Sql\Quantity;
+use App\Models\MedicalEvents\Sql\Period;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class CarePlanActivity extends Model
 {
@@ -47,6 +50,8 @@ class CarePlanActivity extends Model
         'reason_code_id',
         'outcome_codeable_concept_id',
         'product_reference_id',
+        'quantity_id',
+        'daily_amount_id',
     ];
 
     protected $casts = [
@@ -54,9 +59,25 @@ class CarePlanActivity extends Model
         'quantity' => 'integer',
         'daily_amount' => 'decimal:4',
         'reason_reference' => 'array',
+        'goal' => 'array',
         'scheduled_period_start' => 'date',
         'scheduled_period_end' => 'date',
     ];
+
+    public function quantityQuantity(): BelongsTo
+    {
+        return $this->belongsTo(Quantity::class, 'quantity_id');
+    }
+
+    public function dailyAmountQuantity(): BelongsTo
+    {
+        return $this->belongsTo(Quantity::class, 'daily_amount_id');
+    }
+
+    public function scheduledPeriod(): MorphOne
+    {
+        return $this->morphOne(Period::class, 'periodable');
+    }
 
     public function carePlan(): BelongsTo
     {

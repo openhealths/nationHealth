@@ -23,7 +23,7 @@ class CarePlanUpdate extends CarePlanCreate
 
     public CarePlan $carePlan;
 
-    public function mount(?LegalEntity $legalEntity = null, ?int $id = null): void
+    public function mount(LegalEntity $legalEntity, $personId = null, $encounter = null): void
     {
         $carePlan = request()->route('carePlan');
         if (!$carePlan instanceof CarePlan) {
@@ -148,7 +148,27 @@ class CarePlanUpdate extends CarePlanCreate
 
         session()->flash('success', __('care-plan.draft_updated') ?? 'План лікування успішно збережено');
 
-        $this->redirectRoute('care-plan.edit', [legalEntity(), $this->carePlan->id], navigate: true);
+        $this->redirectRoute('care-plans.edit', [legalEntity(), $this->carePlan->id], navigate: true);
+    }
+
+    public function delete(CarePlanRepository $repository): void
+    {
+        if (isset($this->carePlan) && $this->carePlan->exists) {
+            if ($this->carePlan->status === 'draft' || $this->carePlan->status === 'new') {
+                $this->carePlan->delete();
+                session()->flash('success', 'Чернетку плану лікування успішно видалено.');
+            } else {
+                session()->flash('error', 'Можна видаляти лише чернетки планів лікування.');
+            }
+        }
+
+        $encounter = $this->carePlan->encounter;
+        if ($encounter) {
+            $this->redirectRoute('encounter.edit', [legalEntity(), $this->personId, $encounter->id], navigate: true);
+            return;
+        }
+
+        $this->redirectRoute('persons.care-plans', [legalEntity(), $this->personId], navigate: true);
     }
 
     /**
@@ -177,7 +197,7 @@ class CarePlanUpdate extends CarePlanCreate
             $this->form->toArray(),
             $this->form->encounter ?: null,
             $encounterData,
-            Auth::user()?->activeEmployee()?->uuid
+            Auth::user()?->activeDoctorEmployee()?->uuid
         );
 
         try {
@@ -207,6 +227,10 @@ class CarePlanUpdate extends CarePlanCreate
                     $finalResponse = $jobApi->getDetails($jobId)->getData();
                     $attempts++;
                 } while ($finalResponse['status'] === 'pending' && $attempts < 15);
+            }
+
+            if (($finalResponse['status'] ?? null) === 'failed') {
+                throw new \App\Exceptions\EHealth\EHealthValidationException($finalResponse);
             }
 
             // Extract the actual CarePlan data
@@ -261,7 +285,7 @@ class CarePlanUpdate extends CarePlanCreate
 
             session()->flash('success', __('care-plan.signed_and_sent'));
 
-            $this->redirectRoute('care-plan.show', [legalEntity(), $this->carePlan->id], navigate: true);
+            $this->redirectRoute('care-plans.show', [legalEntity(), $this->carePlan->id], navigate: true);
 
         } catch (EHealthConnectionException $exception) {
             Log::error('CarePlan: connection error: ' . $exception->getMessage());

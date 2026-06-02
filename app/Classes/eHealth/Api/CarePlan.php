@@ -46,18 +46,19 @@ class CarePlan extends Request
     }
 
     /**
-     * Get a specific Care Plan by ID.
+     * Get a specific Care Plan by Patient ID and Care Plan ID.
      *
+     * @param  string  $patientId
      * @param  string  $id
      * @param  array  $query
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
-    public function getDetails(string $id, array $query = []): PromiseInterface|EHealthResponse
+    public function getDetails(string $patientId, string $id, array $query = []): PromiseInterface|EHealthResponse
     {
         $this->setValidator($this->validateDetails(...));
 
-        return $this->get(self::URL . "/$id", $query);
+        return $this->get("/api/patients/{$patientId}/care_plans/{$id}", $query);
     }
 
     /**
@@ -114,9 +115,10 @@ class CarePlan extends Request
             Log::channel('e_health_errors')->error(
                 'CarePlan details validation failed: ' . implode(', ', $validator->errors()->all())
             );
+            throw new \Illuminate\Validation\ValidationException($validator);
         }
 
-        return $validator->validate();
+        return $data;
     }
 
     protected function validateMany(EHealthResponse $response): array
@@ -137,9 +139,10 @@ class CarePlan extends Request
             Log::channel('e_health_errors')->error(
                 'CarePlan validation failed: ' . implode(', ', $validator->errors()->all())
             );
+            throw new \Illuminate\Validation\ValidationException($validator);
         }
 
-        return $validator->validate();
+        return $transformedData;
     }
 
     protected function replaceEHealthPropNames(array $properties): array

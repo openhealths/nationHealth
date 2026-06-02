@@ -33,6 +33,19 @@ class EncounterDiagnose extends Model
         return $this->belongsTo(Identifier::class, 'condition_id');
     }
 
+    public function conditionModel(): \Illuminate\Database\Eloquent\Relations\HasOneThrough
+    {
+        return $this->hasOneThrough(
+            Condition::class,
+            Identifier::class,
+            'id',
+            'uuid',
+            'condition_id',
+            'value'
+        );
+    }
+
+
     public function role(): BelongsTo
     {
         return $this->belongsTo(CodeableConcept::class, 'role_id');

@@ -62,9 +62,10 @@ if (empty($breadcrumbs)) {
                     @endif
                 </div>
 
-                @if(trim($slot))
+                @if(isset($actions) || trim($slot))
                     <div class="button-group shrink-0 flex items-center gap-2">
                         {{ $slot }}
+                        {{ $actions ?? '' }}
                     </div>
                 @endif
             </div>

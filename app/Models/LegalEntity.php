@@ -102,6 +102,10 @@ class LegalEntity extends Model
         'is_active' => false,
     ];
 
+    protected $appends = [
+        'name',
+    ];
+
     public null|object $owner;
 
     public function employees(): HasMany
@@ -122,6 +126,11 @@ class LegalEntity extends Model
     public function setKvedsAttribute($value)
     {
         $this->attributes['kveds'] = json_encode($value);
+    }
+
+    public function getNameAttribute(): ?string
+    {
+        return $this->edr['name'] ?? $this->beneficiary ?? null;
     }
 
     public function divisions(): HasMany

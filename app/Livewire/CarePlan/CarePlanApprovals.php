@@ -21,6 +21,8 @@ class CarePlanApprovals extends Component
     use FormTrait;
     use InteractsWithApprovals;
 
+    protected $listeners = ['refreshApprovals' => 'fetchApprovals'];
+
     #[Locked]
     public int $carePlanId;
 
@@ -53,7 +55,7 @@ class CarePlanApprovals extends Component
         try {
             $carePlan = CarePlan::findOrFail($this->carePlanId);
             Repository::approval()->syncApprovals($carePlan, 'care_plan');
-            $this->approvals = $carePlan->approvals()->with('grantedTo')->latest()->get()->toArray();
+            $this->approvals = $carePlan->approvals()->with(['identifier', 'grantedTo'])->latest()->get()->toArray();
         } catch (\Exception $e) {
             Log::error('CarePlanApprovals: failed to fetch: ' . $e->getMessage());
             Session::flash('error', __('care-plan.approvals_fetch_error'));
@@ -105,7 +107,7 @@ class CarePlanApprovals extends Component
                 'code' => (int) $this->verificationCode,
             ]);
 
-            if ($response->getStatusCode() === 200) {
+            if ($response->successful()) {
                 Session::flash('success', __('care-plan.approval_verified'));
                 $this->closeAuthModal();
                 $this->reset('newApproval');

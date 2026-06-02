@@ -21,13 +21,43 @@ class ApprovalRepository
         }
 
         try {
-            $response = EHealth::approval()->getMany([
-                'granted_resource_type' => $resourceType,
-                'granted_resource_id' => $entity->uuid,
-            ]);
+            $patientUuid = null;
+            if (method_exists($entity, 'person') && $entity->person) {
+                $patientUuid = $entity->person->uuid;
+            } elseif (isset($entity->person_id)) {
+                $person = \App\Models\Person\Person::find($entity->person_id);
+                $patientUuid = $person?->uuid;
+            }
 
-            $data = $response->getData();
-            if (empty($data)) return;
+            if ($patientUuid) {
+                $response = EHealth::approval()->getPatientApprovals($patientUuid);
+                $data = $response->getData();
+                if (!empty($data) && is_array($data)) {
+                    $filteredData = [];
+                    foreach ($data as $approvalData) {
+                        $grantedResources = $approvalData['granted_resources'] ?? [];
+                        foreach ($grantedResources as $resource) {
+                            $typeCode = $resource['identifier']['type']['coding'][0]['code'] ?? null;
+                            $value = $resource['identifier']['value'] ?? null;
+                            if ($typeCode === $resourceType && $value === $entity->uuid) {
+                                $filteredData[] = $approvalData;
+                                break;
+                            }
+                        }
+                    }
+                    $data = $filteredData;
+                }
+            } else {
+                $response = EHealth::approval()->getMany([
+                    'granted_resource_type' => $resourceType,
+                    'granted_resource_id' => $entity->uuid,
+                ]);
+                $data = $response->getData();
+            }
+
+            if (empty($data)) {
+                return;
+            }
 
             foreach ($data as $approvalData) {
                 // Save raw response to Mongo
@@ -64,15 +94,15 @@ class ApprovalRepository
 
     private function resolveGrantedTo(?string $uuid, string $type): ?int
     {
-        if (!$uuid) return null;
-        
-        if ($type === 'employee') {
-            $emp = \App\Models\Employee::where('uuid', $uuid)->first();
-            return $emp?->id;
+        if (!$uuid) {
+            return null;
         }
 
-        // Implicitly 'legal_entity'
-        $le = \App\Models\LegalEntity::where('uuid', $uuid)->first();
-        return $le?->id;
+        $identifier = \App\Models\MedicalEvents\Sql\Identifier::where('value', $uuid)->first();
+        if (!$identifier) {
+            $identifier = \App\Repositories\MedicalEvents\Repository::identifier()->store($uuid);
+        }
+
+        return $identifier->id;
     }
 }

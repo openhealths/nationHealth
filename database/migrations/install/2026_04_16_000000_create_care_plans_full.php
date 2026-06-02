@@ -20,7 +20,7 @@ return new class extends Migration
                 $table->foreignId('person_id')->constrained('persons');
                 $table->foreignId('author_id')->constrained('employees');
                 $table->foreignId('legal_entity_id')->constrained('legal_entities');
-                $table->string('status'); 
+                $table->string('status');
                 $table->string('category')->nullable();
                 $table->string('clinical_protocol')->nullable();
                 $table->string('context')->nullable();
@@ -35,12 +35,12 @@ return new class extends Migration
                 $table->text('note')->nullable();
                 $table->string('inform_with')->nullable();
                 $table->string('requisition')->nullable()->index();
-                
+
                 // FHIR conversion fields
                 $table->foreignId('category_id')->nullable()->constrained('codeable_concepts');
                 $table->foreignId('encounter_identifier_id')->nullable()->constrained('identifiers');
                 $table->foreignId('care_manager_id')->nullable()->constrained('identifiers');
-                
+
                 $table->timestamps();
             });
         }
@@ -48,6 +48,7 @@ return new class extends Migration
         if (!Schema::hasTable('care_plan_activities')) {
             Schema::create('care_plan_activities', function (Blueprint $table) {
                 $table->id();
+                $table->uuid('uuid')->nullable()->index();
                 $table->foreignId('care_plan_id')->constrained('care_plans')->onDelete('cascade');
                 $table->foreignId('author_id')->constrained('employees');
                 $table->string('status');
@@ -60,6 +61,12 @@ return new class extends Migration
                 $table->decimal('daily_amount', 15, 2)->nullable();
                 $table->string('daily_amount_system')->nullable();
                 $table->string('daily_amount_code')->nullable();
+                $table->decimal('quantity_per_time', 15, 2)->nullable();
+                $table->string('quantity_per_time_unit')->nullable();
+                $table->integer('frequency')->nullable();
+                $table->string('frequency_unit')->nullable();
+                $table->integer('duration')->nullable();
+                $table->string('duration_unit')->nullable();
                 $table->string('reason_code')->nullable();
                 $table->string('reason_reference')->nullable();
                 $table->string('goal')->nullable();
@@ -70,14 +77,14 @@ return new class extends Migration
                 $table->text('status_reason')->nullable();
                 $table->string('outcome_reference')->nullable();
                 $table->string('outcome_codeable_concept')->nullable();
-                
+
                 // FHIR conversion fields
                 $table->foreignId('kind_id')->nullable()->constrained('codeable_concepts');
                 $table->foreignId('product_codeable_concept_id')->nullable()->constrained('codeable_concepts');
                 $table->foreignId('reason_code_id')->nullable()->constrained('codeable_concepts');
                 $table->foreignId('outcome_codeable_concept_id')->nullable()->constrained('codeable_concepts');
                 $table->foreignId('product_reference_id')->nullable()->constrained('identifiers');
-                
+
                 $table->timestamps();
             });
         }

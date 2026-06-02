@@ -28,6 +28,19 @@ class Approval extends Request
     }
 
     /**
+     * Get approvals for a specific patient.
+     *
+     * @param  string  $patientId
+     * @param  array  $query
+     * @return PromiseInterface|EHealthResponse
+     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
+     */
+    public function getPatientApprovals(string $patientId, array $query = []): PromiseInterface|EHealthResponse
+    {
+        return $this->get("/api/patients/{$patientId}/approvals", $query);
+    }
+
+    /**
      * Create a new Approval request for a patient entity.
      *
      * @param  string  $patientId
