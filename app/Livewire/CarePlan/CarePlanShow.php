@@ -1057,7 +1057,11 @@ class CarePlanShow extends Component
         // During cancellation or completion, eHealth expects the signed content's status to reflect the
         // current state (e.g. 'scheduled' or 'active'), which is synchronized in our local DB status field.
         if (isset($payload['detail'])) {
-            $payload['detail']['status'] = $activity->status;
+            $currentStatus = $activity->status;
+            if (strtolower((string)$currentStatus) === 'processed') {
+                $currentStatus = 'scheduled';
+            }
+            $payload['detail']['status'] = $currentStatus;
 
             if ($this->actionType === 'cancel_activity') {
                 $payload['detail']['status_reason'] = $statusReasonCodeableConcept;
