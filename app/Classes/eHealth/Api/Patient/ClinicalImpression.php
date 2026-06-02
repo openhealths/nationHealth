@@ -9,8 +9,8 @@ use App\Classes\eHealth\ValidationRuleBuilder;
 use App\Enums\Person\ClinicalImpressionStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
-use GuzzleHttp\Promise\PromiseInterface;
 use App\Exceptions\EHealth\EHealthConnectionException;
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -52,6 +52,35 @@ class ClinicalImpression extends PatientApiBase
         $mergedQuery = array_merge($this->options['query'], $query ?? []);
 
         return $this->get(self::URL . "/$patientId/summary/clinical_impressions", $mergedQuery);
+    }
+
+    /**
+     * Get a list of clinical impressions.
+     *
+     * @param  string  $patientId
+     * @param  array{
+     *     code?: string,
+     *     status?: string,
+     *     encounter_id?: string,
+     *     episode_id?: string,
+     *     effective_date_from?: string,
+     *     effective_date_to?: string,
+     *     page?: int,
+     *     page_size?: int
+     * }  $query
+     * @return PromiseInterface|EHealthResponse
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+     *
+     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/clinical-impression/get-clinical-impression-by-search-params
+     */
+    public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
+    {
+        $this->setValidator($this->validateClinicalImpressions(...));
+        $this->setDefaultPageSize();
+
+        $mergedQuery = array_merge($this->options['query'], $this->format($query, ['effective_date_from', 'effective_date_to']));
+        
+        return $this->get(self::URL . "/$patientId/clinical_impressions", $mergedQuery);
     }
 
     /**

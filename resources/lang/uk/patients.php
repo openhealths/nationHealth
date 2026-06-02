@@ -271,7 +271,7 @@ return [
     'add_care_plan' => 'Додати план лікування',
     'encounter_entered_in_error' => 'Взаємодія внесена помилково',
     'add_observations_reports_conditions' => 'Додати обстеження, звіт або стан',
-    'write_assignment_here' => 'Призначення...',
+    'write_assignments_here' => 'Призначення...',
     'medical_observation' => 'Медичне обстеження',
     'condition_or_diagnosis' => 'Стан або діагноз',
     'medical_diagnostic_report' => 'Діагностичний звіт',
@@ -424,6 +424,8 @@ return [
     'supporting_medical_information' => 'Підтверджуючі медичні дані',
     'medical_records_type' => 'тип медичних записів',
     'employee_who_created' => 'Співробітник, який створив',
+    'medical_record' => 'медичний запис',
+    'clinical_impression_search' => 'Пошук клінічних оцінок',
 
     // Auth methods
     'authentication_methods' => 'Методи автентифікації',

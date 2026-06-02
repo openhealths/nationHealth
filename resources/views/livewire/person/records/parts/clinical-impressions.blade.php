@@ -120,7 +120,7 @@
                     <div class="record-inner-id-value">{{ data_get($clinicalImpression, 'uuid', '-') }}</div>
                 </div>
                 <div class="min-w-0">
-                    <div class="record-inner-label">ID Епізоду</div>
+                    <div class="record-inner-label">{{ __('patients.episode_id') }}</div>
                     <div class="record-inner-id-value">
                         @php
                             $episodeValue = '';
