@@ -25,9 +25,11 @@
         showMedicationFormDrawer: @entangle('showMedicationFormDrawer'),
         showMedicalDeviceDrawer: @entangle('showMedicalDeviceDrawer'),
         showMedicalDeviceSearchDrawer: @entangle('showMedicalDeviceSearchDrawer'),
-        showMedicalDeviceFormDrawer: @entangle('showMedicalDeviceFormDrawer')
+        showMedicalDeviceFormDrawer: @entangle('showMedicalDeviceFormDrawer'),
+        showEPrescriptionDrawer: @entangle('showEPrescriptionDrawer'),
+        showReferralDrawer: @entangle('showReferralDrawer')
     }" 
-    @close-drawers.window="showServiceDrawer = false; showServiceSearchDrawer = false; showMedicationDrawer = false; showMedicationSearchDrawer = false; showMedicationFormDrawer = false; showMedicalDeviceDrawer = false; showMedicalDeviceSearchDrawer = false; showMedicalDeviceFormDrawer = false;"
+    @close-drawers.window="showServiceDrawer = false; showServiceSearchDrawer = false; showMedicationDrawer = false; showMedicationSearchDrawer = false; showMedicationFormDrawer = false; showMedicalDeviceDrawer = false; showMedicalDeviceSearchDrawer = false; showMedicalDeviceFormDrawer = false; showEPrescriptionDrawer = false; showReferralDrawer = false;"
     class="form shift-content" wire:key="care-plan-show-container">
 
         {{-- Plan Header --}}
@@ -436,27 +438,157 @@
                                                         Підписати призначення
                                                     </button>
                                                 </div>
-                                            @elseif(in_array(strtoupper($activityStatus), ['ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD']))
+                                            @elseif(in_array(strtoupper($activityStatus), ['ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD', 'PROCESSED']))
                                                 <div class="py-1">
-                                                    <button type="button" 
-                                                            @click="openDropdown = false" 
-                                                            wire:click="openSignatureModal('cancel_activity', {{ $activity->id }})" 
-                                                            class="text-red-600 dark:text-red-400 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 w-full"
-                                                    >
-                                                        Скасувати призначення
-                                                    </button>
-                                                    <button type="button" 
-                                                            @click="openDropdown = false" 
-                                                            wire:click="openSignatureModal('complete_activity', {{ $activity->id }})" 
+                                                    @if(str_contains(strtolower($kindValue), 'medication'))
+                                                        <button type="button"
+                                                                @click="openDropdown = false"
+                                                                wire:click="initEPrescriptionForm({{ $activity->id }})"
+                                                                class="text-gray-700 dark:text-gray-200 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 w-full"
+                                                        >
+                                                            Виписати Е-Рецепт
+                                                        </button>
+                                                    @endif
+                                                    @if(str_contains(strtolower($kindValue), 'service_request') || str_contains(strtolower($kindValue), 'device_request'))
+                                                        <button type="button"
+                                                                @click="openDropdown = false"
+                                                                wire:click="initReferralForm({{ $activity->id }})"
+                                                                class="text-gray-700 dark:text-gray-200 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 w-full"
+                                                        >
+                                                            Створити Направлення
+                                                        </button>
+                                                    @endif
+                                                    <button type="button"
+                                                            @click="openDropdown = false"
+                                                            wire:click="openSignatureModal('complete_activity', {{ $activity->id }})"
                                                             class="text-blue-600 dark:text-blue-400 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 w-full"
                                                     >
                                                         Завершити призначення
                                                     </button>
+                                                    <button type="button"
+                                                            @click="openDropdown = false"
+                                                            wire:click="openSignatureModal('cancel_activity', {{ $activity->id }})"
+                                                            class="text-red-600 dark:text-red-400 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 w-full"
+                                                    >
+                                                        Скасувати призначення
+                                                    </button>
                                                 </div>
                                             @endif
                                         </div>
+                                        </div>
                                     </td>
                                 </tr>
+                                @php
+                                    $linkedPrescriptions = collect($activePrescriptions)->where('based_on_id', $activity->id);
+                                @endphp
+                                @if($linkedPrescriptions->isNotEmpty())
+                                    <tr class="bg-gray-50/50 dark:bg-gray-700/30">
+                                        <td colspan="5" class="px-8 py-3">
+                                            <div class="pl-4 border-l-2 border-blue-500">
+                                                <h4 class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Виписані Е-Рецепти:</h4>
+                                                <div class="space-y-2">
+                                                    @foreach($linkedPrescriptions as $prescription)
+                                                        <div class="flex items-center justify-between text-sm bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+                                                            <div class="flex items-center gap-4">
+                                                                <span class="font-bold text-gray-900 dark:text-white">№ {{ $prescription['request_number'] ?? $prescription['uuid'] }}</span>
+                                                                <span class="text-gray-500">Кількість: {{ $prescription['medication_qty'] }}</span>
+                                                                <span class="text-gray-400 text-xs">Діє з {{ \Carbon\Carbon::parse($prescription['started_at'])->format('d.m.Y') }} по {{ \Carbon\Carbon::parse($prescription['ended_at'])->format('d.m.Y') }}</span>
+                                                                <span class="badge {{ strtolower($prescription['status']) === 'active' ? 'badge-green' : (strtolower($prescription['status']) === 'new' ? 'badge-yellow' : 'badge-dark') }}">
+                                                                    {{ $prescription['status'] }}
+                                                                </span>
+                                                            </div>
+                                                            <div class="flex items-center gap-3">
+                                                                @if(strtolower($prescription['status']) === 'new')
+                                                                    <button type="button" class="text-green-500 hover:text-green-700 transition-colors flex items-center gap-1" title="Підписати КЕП" wire:click="$set('ePrescriptionRequestIdToSign', '{{ $prescription['uuid'] }}'); openSignatureModal('sign_eprescription')">
+                                                                        @icon('key', 'w-4 h-4')
+                                                                        <span class="text-xs">Підписати</span>
+                                                                    </button>
+                                                                @endif
+                                                                @if(strtolower($prescription['status']) === 'active')
+                                                                    <button type="button" class="text-blue-500 hover:text-blue-700 transition-colors flex items-center gap-1" title="Друк пам'ятки" 
+                                                                            @click="
+                                                                                $wire.loadPrintoutForm('{{ $prescription['uuid'] }}').then(() => {
+                                                                                    let printWindow = window.open('', '_blank');
+                                                                                    printWindow.document.body.innerHTML = $wire.printableContent;
+                                                                                    printWindow.focus();
+                                                                                    printWindow.print();
+                                                                                });
+                                                                            ">
+                                                                        @icon('printer', 'w-4 h-4')
+                                                                        <span class="text-xs">Пам'ятка</span>
+                                                                    </button>
+                                                                    <button type="button" class="text-yellow-600 hover:text-yellow-800 transition-colors flex items-center gap-1" title="Повторно надіслати SMS" wire:click="resendPrescriptionSms('{{ $prescription['uuid'] }}')">
+                                                                        @icon('refresh', 'w-4 h-4')
+                                                                        <span class="text-xs">SMS</span>
+                                                                    </button>
+                                                                    <button type="button" class="text-red-500 hover:text-red-700 transition-colors flex items-center gap-1" title="Скасувати рецепт" wire:click="cancelPrescription('{{ $prescription['uuid'] }}')">
+                                                                        @icon('trash', 'w-4 h-4')
+                                                                        <span class="text-xs">Скасувати</span>
+                                                                    </button>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endif
+                                @php
+                                    $linkedReferrals = collect($activeReferrals)->where('based_on_id', $activity->id);
+                                @endphp
+                                @if($linkedReferrals->isNotEmpty())
+                                    <tr class="bg-gray-50/50 dark:bg-gray-700/30">
+                                        <td colspan="5" class="px-8 py-3">
+                                            <div class="pl-4 border-l-2 border-green-500">
+                                                <h4 class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Виписані Направлення:</h4>
+                                                <div class="space-y-2">
+                                                    @foreach($linkedReferrals as $referral)
+                                                        <div class="flex items-center justify-between text-sm bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+                                                            <div class="flex items-center gap-4">
+                                                                <span class="font-bold text-gray-900 dark:text-white">№ {{ $referral['request_number'] ?? $referral['uuid'] }}</span>
+                                                                <span class="text-gray-500">Кількість: {{ $referral['quantity'] }}</span>
+                                                                <span class="text-gray-400 text-xs">Діє з {{ \Carbon\Carbon::parse($referral['started_at'])->format('d.m.Y') }} по {{ \Carbon\Carbon::parse($referral['ended_at'])->format('d.m.Y') }}</span>
+                                                                <span class="badge {{ strtolower($referral['status']) === 'active' ? 'badge-green' : (strtolower($referral['status']) === 'draft' ? 'badge-yellow' : 'badge-dark') }}">
+                                                                    {{ $referral['status'] }}
+                                                                </span>
+                                                            </div>
+                                                            <div class="flex items-center gap-3">
+                                                                @if(strtolower($referral['status']) === 'draft')
+                                                                    @php
+                                                                        $signAction = isset($referral['service_id']) ? 'sign_servicerequest' : 'sign_devicerequest';
+                                                                    @endphp
+                                                                    <button type="button" class="text-green-500 hover:text-green-700 transition-colors flex items-center gap-1" title="Підписати КЕП" wire:click="$set('referralRequestIdToSign', '{{ $referral['uuid'] }}'); openSignatureModal('{{ $signAction }}')">
+                                                                        @icon('key', 'w-4 h-4')
+                                                                        <span class="text-xs">Підписати</span>
+                                                                    </button>
+                                                                @endif
+                                                                @if(strtolower($referral['status']) === 'active')
+                                                                    <button type="button" class="text-blue-500 hover:text-blue-700 transition-colors flex items-center gap-1 mr-2" title="Друк пам'ятки" 
+                                                                            @click="
+                                                                                $wire.loadReferralPrintoutForm('{{ $referral['uuid'] }}').then(() => {
+                                                                                    let printWindow = window.open('', '_blank');
+                                                                                    printWindow.document.body.innerHTML = $wire.printableContent;
+                                                                                    printWindow.focus();
+                                                                                    printWindow.print();
+                                                                                });
+                                                                            ">
+                                                                        @icon('printer', 'w-4 h-4')
+                                                                        <span class="text-xs">Пам'ятка</span>
+                                                                    </button>
+                                                                    <button type="button" class="text-red-500 hover:text-red-700 transition-colors flex items-center gap-1" title="Скасувати направлення" wire:click="cancelReferral('{{ $referral['uuid'] }}', '{{ isset($referral['service_id']) ? 'service_request' : 'device_request' }}')">
+                                                                        @icon('trash', 'w-4 h-4')
+                                                                        <span class="text-xs">Скасувати</span>
+                                                                    </button>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endif
                             @empty
                                 <tr>
                                     <td colspan="5" class="px-4 py-12 text-center text-gray-400 italic">
@@ -497,6 +629,8 @@
         @include('livewire.care-plan.parts.modals.medical-devices-drawer')
         @include('livewire.care-plan.parts.modals.medical-device-search-drawer')
         @include('livewire.care-plan.parts.modals.medical-device-form-drawer')
+        @include('livewire.care-plan.parts.modals.eprescription-form-drawer')
+        @include('livewire.care-plan.parts.modals.referral-form-drawer')
     </div>
 
     <livewire:components.x-message :key="time()" />
