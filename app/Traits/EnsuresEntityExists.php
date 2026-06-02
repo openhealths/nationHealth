@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Services\MedicalEvents;
+namespace App\Traits;
 
 use App\Classes\eHealth\EHealth;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Models\MedicalEvents\Sql\ClinicalImpression;
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
@@ -13,20 +15,11 @@ use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Repositories\MedicalEvents\Repository;
-use App\Traits\LogsExceptions;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
-class EnsureEntityExistsService
+trait EnsuresEntityExists
 {
     use LogsExceptions;
-
-    public function __construct(
-        private readonly string $patientUuid,
-        private readonly int $personId
-    ) {
-    }
 
     /**
      * Save condition/observation reason references locally if they don't exist in our database.
@@ -34,7 +27,7 @@ class EnsureEntityExistsService
      * @param  array  $procedure
      * @return void
      */
-    public function processReasonReferences(array $procedure): void
+    protected function processReasonReferences(array $procedure): void
     {
         if (!isset($procedure['reasonReferences'])) {
             return;
@@ -58,7 +51,7 @@ class EnsureEntityExistsService
      * @param  array  $procedure
      * @return void
      */
-    public function processComplicationDetails(array $procedure): void
+    protected function processComplicationDetails(array $procedure): void
     {
         if (!isset($procedure['complicationDetails'])) {
             return;
@@ -76,7 +69,7 @@ class EnsureEntityExistsService
      * @param  array  $clinicalImpression
      * @return void
      */
-    public function processSupportingInfo(array $clinicalImpression): void
+    protected function processSupportingInfo(array $clinicalImpression): void
     {
         if (!isset($clinicalImpression['supportingInfo'])) {
             return;
@@ -102,7 +95,7 @@ class EnsureEntityExistsService
      * @param  array  $clinicalImpression
      * @return void
      */
-    public function processFindings(array $clinicalImpression): void
+    protected function processFindings(array $clinicalImpression): void
     {
         if (!isset($clinicalImpression['findings'])) {
             return;
@@ -128,7 +121,7 @@ class EnsureEntityExistsService
      * @param  array  $clinicalImpression
      * @return void
      */
-    public function processPrevious(array $clinicalImpression): void
+    protected function processPrevious(array $clinicalImpression): void
     {
         if (!isset($clinicalImpression['previous'])) {
             return;
@@ -143,7 +136,7 @@ class EnsureEntityExistsService
      * @param  string  $uuid
      * @return void
      */
-    public function ensureEpisodeExists(string $uuid): void
+    protected function ensureEpisodeExists(string $uuid): void
     {
         if (Episode::whereUuid($uuid)->exists()) {
             return;
@@ -165,7 +158,7 @@ class EnsureEntityExistsService
      * @param  string  $uuid
      * @return void
      */
-    public function ensureProcedureExists(string $uuid): void
+    protected function ensureProcedureExists(string $uuid): void
     {
         if (Procedure::whereUuid($uuid)->exists()) {
             return;
@@ -187,7 +180,7 @@ class EnsureEntityExistsService
      * @param  string  $uuid
      * @return void
      */
-    public function ensureDiagnosticReportExists(string $uuid): void
+    protected function ensureDiagnosticReportExists(string $uuid): void
     {
         if (DiagnosticReport::whereUuid($uuid)->exists()) {
             return;
@@ -209,7 +202,7 @@ class EnsureEntityExistsService
      * @param  string  $uuid
      * @return void
      */
-    public function ensureConditionExists(string $uuid): void
+    protected function ensureConditionExists(string $uuid): void
     {
         if (Condition::whereUuid($uuid)->exists()) {
             return;
@@ -231,7 +224,7 @@ class EnsureEntityExistsService
      * @param  string  $uuid
      * @return void
      */
-    public function ensureObservationExists(string $uuid): void
+    protected function ensureObservationExists(string $uuid): void
     {
         if (Observation::whereUuid($uuid)->exists()) {
             return;
@@ -253,7 +246,7 @@ class EnsureEntityExistsService
      * @param  string  $uuid
      * @return void
      */
-    public function ensureClinicalImpressionExists(string $uuid): void
+    protected function ensureClinicalImpressionExists(string $uuid): void
     {
         if (ClinicalImpression::whereUuid($uuid)->exists()) {
             return;
@@ -275,7 +268,7 @@ class EnsureEntityExistsService
      * @param  string  $uuid
      * @return void
      */
-    public function ensureEncounterExists(string $uuid): void
+    protected function ensureEncounterExists(string $uuid): void
     {
         if (Encounter::whereUuid($uuid)->exists()) {
             return;

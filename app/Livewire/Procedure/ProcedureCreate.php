@@ -8,7 +8,7 @@ use App\Classes\eHealth\EHealth;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Core\Arr;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\EnsureEntityExistsService;
+use App\Traits\EnsuresEntityExists;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
@@ -19,6 +19,8 @@ use Throwable;
 
 class ProcedureCreate extends ProcedureComponent
 {
+    use EnsuresEntityExists;
+
     /**
      * Validate and save data.
      *
@@ -126,8 +128,7 @@ class ProcedureCreate extends ProcedureComponent
         DB::transaction(function () use ($formattedData) {
             Repository::procedure()->store([$formattedData], $this->personId);
 
-            app(EnsureEntityExistsService::class, [$this->patientUuid, $this->personId])
-                ->processReasonReferences($formattedData);
+            $this->processReasonReferences($formattedData);
         });
     }
 }

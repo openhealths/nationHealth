@@ -244,6 +244,7 @@
             serviceOptions: [],
             serviceSearches: [],
             serviceDropdowns: [],
+            serviceFilteredOptions: [],
 
             init() {
                 this.serviceOptions = Object.entries($wire.dictionaries['custom/services'] ?? {})
@@ -251,6 +252,7 @@
                         id: String(typeof service === 'object' ? (service.id ?? key) : key),
                         code: String(typeof service === 'object' ? (service.code ?? '') : ''),
                         name: String(typeof service === 'object' ? (service.name ?? '') : service),
+                        searchText: (String(typeof service === 'object' ? (service.name ?? '') : service) + ' ' + String(typeof service === 'object' ? (service.code ?? '') : '')).toLowerCase(),
                     }))
                     .filter(service => service.id);
 
@@ -263,23 +265,27 @@
                     return option ? this.serviceLabel(option) : '';
                 });
                 this.serviceDropdowns = this.services.map(() => false);
+                this.serviceFilteredOptions = this.services.map(() => []);
             },
 
             addService() {
                 this.services = [...(Array.isArray(this.services) ? this.services : []), {uuid: ''}];
                 this.serviceSearches = [...this.serviceSearches, ''];
                 this.serviceDropdowns = [...this.serviceDropdowns, false];
+                this.serviceFilteredOptions = [...this.serviceFilteredOptions, []];
             },
 
             removeService(index) {
                 this.services = this.services.filter((_, rowIndex) => rowIndex !== index);
                 this.serviceSearches = this.serviceSearches.filter((_, rowIndex) => rowIndex !== index);
                 this.serviceDropdowns = this.serviceDropdowns.filter((_, rowIndex) => rowIndex !== index);
+                this.serviceFilteredOptions = this.serviceFilteredOptions.filter((_, rowIndex) => rowIndex !== index);
 
                 if (!this.services.length) {
                     this.services = [{uuid: ''}];
                     this.serviceSearches = [''];
                     this.serviceDropdowns = [false];
+                    this.serviceFilteredOptions = [[]];
                 }
             },
 
@@ -287,18 +293,23 @@
                 return [service.code, service.name].filter(Boolean).join(' / ');
             },
 
-            filteredServiceOptions(index) {
-                const query = String(this.serviceSearches[index] ?? '').toLowerCase();
+            updateFilteredOptions(index) {
+                const query = String(this.serviceSearches[index] ?? '').toLowerCase().trim();
+                const MAX = 200;
+                const results = [];
 
-                return this.serviceOptions.filter((service) => {
-                    if (!query) {
-                        return true;
+                if (query) {
+                    for (const service of this.serviceOptions) {
+                        if (results.length >= MAX) break;
+                        if (service.searchText.includes(query)) {
+                            results.push(service);
+                        }
                     }
+                }
 
-                    return [service.code, service.name]
-                        .filter(Boolean)
-                        .some((value) => String(value).toLowerCase().includes(query));
-                });
+                const updated = [...this.serviceFilteredOptions];
+                updated[index] = results;
+                this.serviceFilteredOptions = updated;
             },
 
             selectService(index, service) {
@@ -311,6 +322,7 @@
                 this.services[index] = {uuid: ''};
                 this.serviceSearches[index] = '';
                 this.serviceDropdowns[index] = true;
+                this.updateFilteredOptions(index);
             },
 
             addCoAuthor() {
@@ -324,7 +336,7 @@
         }"
          class="space-y-6"
     >
-        <div class="space-y-3">
+        <div class="space-y-3" x-show="$wire.form.encounter.classCode !== 'PHC'">
             <template x-for="(service, index) in services" :key="index">
                 <div class="relative pr-10">
                     <div class="form-group group relative" @click.away="serviceDropdowns[index] = false">
@@ -332,7 +344,7 @@
                                class="input peer @error('form.encounter.actionReferences.0') input-error @enderror"
                                :id="'service_' + index"
                                x-model="serviceSearches[index]"
-                               @input="services[index] = {uuid: ''}; serviceDropdowns[index] = true;"
+                               @input.debounce.150ms="services[index] = {uuid: ''}; serviceDropdowns[index] = true; updateFilteredOptions(index);"
                                placeholder=" "
                                autocomplete="off"
                         >
@@ -342,13 +354,19 @@
                              x-cloak
                              class="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
                         >
-                            <template x-if="filteredServiceOptions(index).length === 0">
+                            <template x-if="!serviceSearches[index]">
+                                <div class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                                    {{ __('forms.type_to_search') }}
+                                </div>
+                            </template>
+
+                            <template x-if="serviceSearches[index] && (serviceFilteredOptions[index] || []).length === 0">
                                 <div class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                                     {{ __('forms.not_found') }}
                                 </div>
                             </template>
 
-                            <template x-for="serviceOption in filteredServiceOptions(index)" :key="serviceOption.id">
+                            <template x-for="serviceOption in (serviceFilteredOptions[index] || [])" :key="serviceOption.id">
                                 <button type="button"
                                         class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
                                         @click="selectService(index, serviceOption)"

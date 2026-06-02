@@ -15,7 +15,7 @@ use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\EncounterPackageBuilder;
-use App\Services\MedicalEvents\EnsureEntityExistsService;
+use App\Traits\EnsuresEntityExists;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +25,8 @@ use Throwable;
 
 class EncounterCreate extends EncounterComponent
 {
+    use EnsuresEntityExists;
+
     private EncounterPackageBuilder $packageBuilder;
 
     public function boot(): void
@@ -183,8 +185,6 @@ class EncounterCreate extends EncounterComponent
     protected function storeValidatedData(array $formattedData): int
     {
         return DB::transaction(function () use ($formattedData) {
-            $ensure = app(EnsureEntityExistsService::class, [$this->patientUuid, $this->personId]);
-
             $createdEncounterId = Repository::encounter()->store($formattedData['encounter'], $this->personId);
 
             if (isset($formattedData['episode'])) {
@@ -211,8 +211,8 @@ class EncounterCreate extends EncounterComponent
                 Repository::procedure()->store($formattedData['procedures'], $this->personId);
 
                 foreach ($formattedData['procedures'] as $procedure) {
-                    $ensure->processReasonReferences($procedure);
-                    $ensure->processComplicationDetails($procedure);
+                    $this->processReasonReferences($procedure);
+                    $this->processComplicationDetails($procedure);
                 }
             }
 
@@ -220,9 +220,9 @@ class EncounterCreate extends EncounterComponent
                 Repository::clinicalImpression()->store($formattedData['clinicalImpressions'], $this->personId);
 
                 foreach ($formattedData['clinicalImpressions'] as $clinicalImpression) {
-                    $ensure->processPrevious($clinicalImpression);
-                    $ensure->processSupportingInfo($clinicalImpression);
-                    $ensure->processFindings($clinicalImpression);
+                    $this->processPrevious($clinicalImpression);
+                    $this->processSupportingInfo($clinicalImpression);
+                    $this->processFindings($clinicalImpression);
                 }
             }
 
