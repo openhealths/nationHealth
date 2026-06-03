@@ -169,6 +169,10 @@ class CarePlanShow extends Component
                 ?->asCodeDescription()
                 ?->toArray() ?? [];
 
+            $this->dictionaries['care_plan_activity_cancel_reasons'] = $basics->byName('eHealth/care_plan_activity_cancel_reasons')
+                ?->asCodeDescription()
+                ?->toArray() ?? [];
+
             // Load medical programs
             $this->dictionaries['medical_programs'] = app(\App\Services\Dictionary\DictionaryManager::class)
                 ->medicalPrograms()
@@ -212,10 +216,26 @@ class CarePlanShow extends Component
         ];
     }
 
+    protected function validationAttributes(): array
+    {
+        return [
+            'statusReason' => 'причина зміни статусу',
+            'form.knedp' => 'КНЕДП',
+            'form.keyContainerUpload' => 'особистий ключ',
+            'form.password' => 'пароль захисту ключа',
+        ];
+    }
+
     public function getStatusReasonsProperty(): array
     {
-        if (in_array($this->actionType, ['complete', 'complete_activity'])) {
+        if ($this->actionType === 'complete') {
             return $this->dictionaries['care_plan_complete_reasons'] ?? [];
+        }
+        if ($this->actionType === 'complete_activity') {
+            return $this->dictionaries['care_plan_activity_complete_reasons'] ?? [];
+        }
+        if ($this->actionType === 'cancel_activity') {
+            return $this->dictionaries['care_plan_activity_cancel_reasons'] ?? [];
         }
         return $this->dictionaries['care_plan_cancel_reasons'] ?? [];
     }
@@ -1059,6 +1079,107 @@ class CarePlanShow extends Component
         }
     }
 
+    private function cleanEHealthActivityPayload(array $payload): array
+    {
+        // 1. Remove top-level server computed fields
+        unset(
+            $payload['inserted_at'],
+            $payload['inserted_by'],
+            $payload['updated_at'],
+            $payload['updated_by']
+        );
+
+        if (isset($payload['detail'])) {
+            unset(
+                $payload['detail']['remaining_quantity'],
+                $payload['detail']['remaining_quantity_type']
+            );
+
+            // If empty, clean them up
+            if (empty($payload['detail']['goal'])) {
+                unset($payload['detail']['goal']);
+            }
+            if (empty($payload['detail']['reason_code'])) {
+                unset($payload['detail']['reason_code']);
+            }
+            if (empty($payload['detail']['reason_reference'])) {
+                unset($payload['detail']['reason_reference']);
+            }
+            if (empty($payload['detail']['location'])) {
+                unset($payload['detail']['location']);
+            }
+            if (empty($payload['detail']['performer'])) {
+                unset($payload['detail']['performer']);
+            }
+            if (empty($payload['detail']['description'])) {
+                unset($payload['detail']['description']);
+            }
+        }
+
+        if (empty($payload['outcome_codeable_concept'])) {
+            unset($payload['outcome_codeable_concept']);
+        }
+        if (empty($payload['outcome_reference'])) {
+            unset($payload['outcome_reference']);
+        }
+
+        // 2. Recursively remove display_value, and type text if null
+        $cleanRecursive = function (array $arr) use (&$cleanRecursive) {
+            $cleaned = [];
+            foreach ($arr as $key => $val) {
+                if ($key === 'display_value') {
+                    continue;
+                }
+                if ($key === 'text' && $val === null) {
+                    continue;
+                }
+                if (is_array($val)) {
+                    $val = $cleanRecursive($val);
+                }
+                $cleaned[$key] = $val;
+            }
+            return $cleaned;
+        };
+
+        return removeEmptyKeys($cleanRecursive($payload));
+    }
+
+    private function cleanEHealthActivityPayloadKeepStructure(array $payload): array
+    {
+        // 1. Remove metadata
+        unset(
+            $payload['inserted_at'],
+            $payload['inserted_by'],
+            $payload['updated_at'],
+            $payload['updated_by']
+        );
+
+        if (isset($payload['detail'])) {
+            // 2. Remove remaining quantity fields
+            unset(
+                $payload['detail']['remaining_quantity'],
+                $payload['detail']['remaining_quantity_type']
+            );
+        }
+
+        // 3. Recursively remove ONLY display_value (since it is a dynamic join and never in the DB schema)
+        $cleanRecursive = function (array $arr) use (&$cleanRecursive) {
+            $cleaned = [];
+            foreach ($arr as $key => $val) {
+                if ($key === 'display_value') {
+                    continue;
+                }
+                if (is_array($val)) {
+                    $val = $cleanRecursive($val);
+                }
+                $cleaned[$key] = $val;
+            }
+            return $cleaned;
+        };
+
+        return $cleanRecursive($payload);
+    }
+
     private function signStatusActivity(CarePlanActivityRepository $activityRepository): void
     {
         if (!$this->activityToSign) {
@@ -1089,108 +1210,393 @@ class CarePlanShow extends Component
             ]
         ];
 
-        $payload = [
-            'status' => $statusMap[$this->actionType] ?? 'cancelled',
-            'status_reason' => $statusReasonCodeableConcept,
-        ];
+        $matchingActivity = null;
+        if ($activity->uuid) {
+            try {
+                $eHealthResponse = EHealth::carePlanActivity()->getSummary(
+                    $this->carePlan->person->uuid,
+                    $this->carePlan->uuid
+                );
+                $eHealthActivities = $eHealthResponse->getData();
+                
+                $activitiesList = $eHealthActivities['activities'] 
+                    ?? $eHealthActivities['data'] 
+                    ?? (is_array($eHealthActivities) ? $eHealthActivities : []);
 
-        if ($this->actionType === 'complete_activity') {
-            if ($this->outcomeCode) {
-                $payload['outcome_codeable_concept'] = [
-                    'coding' => [
-                        [
-                            'system' => 'eHealth/care_plan_activity_outcomes',
-                            'code' => $this->outcomeCode,
-                        ]
-                    ]
-                ];
-            }
-            
-            if (!empty($this->outcomeReferences)) {
-                $payload['outcome_reference'] = collect($this->outcomeReferences)->map(fn($id) => [
-                    'identifier' => [
-                        'value' => $id, // Assuming these are UUIDs of clinical documents
-                    ]
-                ])->toArray();
+                foreach ($activitiesList as $act) {
+                    if (($act['id'] ?? null) === $activity->uuid) {
+                        $matchingActivity = $act;
+                        break;
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('CarePlanActivityStatus: failed to fetch original activity from eHealth: ' . $e->getMessage());
             }
         }
 
-        Log::info('CarePlanActivityStatus: Signing status transition: ' . $this->actionType . ' for activity UUID=' . $activity->uuid, [
-            'payload' => $payload,
-            'snake_case_payload' => Arr::toSnakeCase($payload)
-        ]);
+        // Build different variations of the payload to test
+        $variations = [];
+        $newStatus = $statusMap[$this->actionType] ?? 'cancelled';
+
+        // Variation 1: Cleaned matching activity (KEEP STRUCTURE), with status = NEW status, with reason
+        if ($matchingActivity) {
+            $payload = $this->cleanEHealthActivityPayloadKeepStructure($matchingActivity);
+            if (isset($payload['detail'])) {
+                $payload['detail']['status'] = $newStatus;
+                if ($this->actionType === 'cancel_activity') {
+                    $payload['detail']['status_reason'] = $statusReasonCodeableConcept;
+                }
+            }
+            $variations['1_cleaned_keep_structure_new_status_with_reason'] = $payload;
+        }
+
+        // Variation 2: Cleaned matching activity (KEEP STRUCTURE), with status = OLD status, with reason
+        if ($matchingActivity) {
+            $payload = $this->cleanEHealthActivityPayloadKeepStructure($matchingActivity);
+            if (isset($payload['detail'])) {
+                $oldStatus = $payload['detail']['status'] ?? 'scheduled';
+                if (strtolower((string)$oldStatus) === 'processed') {
+                    $oldStatus = 'scheduled';
+                }
+                $payload['detail']['status'] = $oldStatus;
+                if ($this->actionType === 'cancel_activity') {
+                    $payload['detail']['status_reason'] = $statusReasonCodeableConcept;
+                }
+            }
+            $variations['2_cleaned_keep_structure_old_status_with_reason'] = $payload;
+        }
+
+        // Variation 3: Cleaned matching activity (KEEP STRUCTURE), with status = NEW status, WITHOUT reason
+        if ($matchingActivity) {
+            $payload = $this->cleanEHealthActivityPayloadKeepStructure($matchingActivity);
+            if (isset($payload['detail'])) {
+                $payload['detail']['status'] = $newStatus;
+            }
+            $variations['3_cleaned_keep_structure_new_status_NO_reason'] = $payload;
+        }
+
+        // Variation 4: Cleaned matching activity (Old clean), with status = NEW status, with reason
+        if ($matchingActivity) {
+            $payload = $this->cleanEHealthActivityPayload($matchingActivity);
+            if (isset($payload['detail'])) {
+                $payload['detail']['status'] = $newStatus;
+                if ($this->actionType === 'cancel_activity') {
+                    $payload['detail']['status_reason'] = $statusReasonCodeableConcept;
+                }
+            }
+            $variations['4_cleaned_old_clean_new_status_with_reason'] = $payload;
+        }
+
+        // Variation 5: Cleaned matching activity (Old clean), with status = OLD status, with reason
+        if ($matchingActivity) {
+            $payload = $this->cleanEHealthActivityPayload($matchingActivity);
+            if (isset($payload['detail'])) {
+                $oldStatus = $payload['detail']['status'] ?? 'scheduled';
+                if (strtolower((string)$oldStatus) === 'processed') {
+                    $oldStatus = 'scheduled';
+                }
+                $payload['detail']['status'] = $oldStatus;
+                if ($this->actionType === 'cancel_activity') {
+                    $payload['detail']['status_reason'] = $statusReasonCodeableConcept;
+                }
+            }
+            $variations['5_cleaned_old_clean_old_status_with_reason'] = $payload;
+        }
+
+        // Variation 6: Raw matching activity (only unsetting metadata), with status = NEW status, with reason
+        if ($matchingActivity) {
+            $payload = $matchingActivity;
+            unset($payload['inserted_at'], $payload['inserted_by'], $payload['updated_at'], $payload['updated_by']);
+            if (isset($payload['detail'])) {
+                $payload['detail']['status'] = $newStatus;
+                if ($this->actionType === 'cancel_activity') {
+                    $payload['detail']['status_reason'] = $statusReasonCodeableConcept;
+                }
+            }
+            $variations['6_raw_activity_new_status_with_reason'] = $payload;
+        }
+
+        // Variation 7: Raw matching activity (only unsetting metadata), with status = OLD status, with reason
+        if ($matchingActivity) {
+            $payload = $matchingActivity;
+            unset($payload['inserted_at'], $payload['inserted_by'], $payload['updated_at'], $payload['updated_by']);
+            if (isset($payload['detail'])) {
+                $oldStatus = $payload['detail']['status'] ?? 'scheduled';
+                if (strtolower((string)$oldStatus) === 'processed') {
+                    $oldStatus = 'scheduled';
+                }
+                $payload['detail']['status'] = $oldStatus;
+                if ($this->actionType === 'cancel_activity') {
+                    $payload['detail']['status_reason'] = $statusReasonCodeableConcept;
+                }
+            }
+            $variations['7_raw_activity_old_status_with_reason'] = $payload;
+        }
+
+        // Variation 8: Local formatted payload, with status = NEW status, with reason
+        $payload = $activityRepository->formatCarePlanActivityRequest($activity);
+        if (isset($payload['detail'])) {
+            $payload['detail']['status'] = $newStatus;
+            if ($this->actionType === 'cancel_activity') {
+                $payload['detail']['status_reason'] = $statusReasonCodeableConcept;
+            }
+        }
+        $variations['8_local_payload_new_status_with_reason'] = $payload;
+
+        // Variation 9: Local formatted payload, with status = OLD status, with reason
+        $payload = $activityRepository->formatCarePlanActivityRequest($activity);
+        if (isset($payload['detail'])) {
+            $oldStatus = $payload['detail']['status'] ?? 'scheduled';
+            if (strtolower((string)$oldStatus) === 'processed') {
+                $oldStatus = 'scheduled';
+            }
+            $payload['detail']['status'] = $oldStatus;
+            if ($this->actionType === 'cancel_activity') {
+                $payload['detail']['status_reason'] = $statusReasonCodeableConcept;
+            }
+        }
+        $variations['9_local_payload_old_status_with_reason'] = $payload;
+        
+        // Variation 10: Local formatted payload, hybrid approach (scheduled_period/quantity from eHealth), with status = NEW status, with reason
+        $payload = $activityRepository->formatCarePlanActivityRequest($activity);
+        if ($matchingActivity && isset($matchingActivity['detail'])) {
+            if (isset($matchingActivity['detail']['scheduled_period'])) {
+                $payload['detail']['scheduled_period'] = $matchingActivity['detail']['scheduled_period'];
+            }
+            if (isset($matchingActivity['detail']['quantity'])) {
+                $payload['detail']['quantity'] = $matchingActivity['detail']['quantity'];
+            }
+            if (isset($matchingActivity['detail']['daily_amount'])) {
+                $payload['detail']['daily_amount'] = $matchingActivity['detail']['daily_amount'];
+            }
+        }
+        if (isset($payload['detail'])) {
+            $payload['detail']['status'] = $newStatus;
+            if ($this->actionType === 'cancel_activity') {
+                $payload['detail']['status_reason'] = $statusReasonCodeableConcept;
+            }
+        }
+        $variations['10_hybrid_payload_new_status_with_reason'] = $payload;
+
+        // Variation 11: Local formatted payload, hybrid approach, with status = OLD status, with reason
+        $payload = $activityRepository->formatCarePlanActivityRequest($activity);
+        if ($matchingActivity && isset($matchingActivity['detail'])) {
+            if (isset($matchingActivity['detail']['scheduled_period'])) {
+                $payload['detail']['scheduled_period'] = $matchingActivity['detail']['scheduled_period'];
+            }
+            if (isset($matchingActivity['detail']['quantity'])) {
+                $payload['detail']['quantity'] = $matchingActivity['detail']['quantity'];
+            }
+            if (isset($matchingActivity['detail']['daily_amount'])) {
+                $payload['detail']['daily_amount'] = $matchingActivity['detail']['daily_amount'];
+            }
+        }
+        if (isset($payload['detail'])) {
+            $oldStatus = $payload['detail']['status'] ?? 'scheduled';
+            if (strtolower((string)$oldStatus) === 'processed') {
+                $oldStatus = 'scheduled';
+            }
+            $payload['detail']['status'] = $oldStatus;
+            if ($this->actionType === 'cancel_activity') {
+                $payload['detail']['status_reason'] = $statusReasonCodeableConcept;
+            }
+        }
+        $variations['11_hybrid_payload_old_status_with_reason'] = $payload;
+
+        // Variation 12: Raw activity untouched (keep metadata, display_value, etc.), old status, with reason
+        if ($matchingActivity) {
+            $payload = $matchingActivity;
+            if (isset($payload['detail'])) {
+                $oldStatus = $payload['detail']['status'] ?? 'scheduled';
+                if (strtolower((string)$oldStatus) === 'processed') {
+                    $oldStatus = 'scheduled';
+                }
+                $payload['detail']['status'] = $oldStatus;
+                if ($this->actionType === 'cancel_activity') {
+                    $payload['detail']['status_reason'] = $statusReasonCodeableConcept;
+                }
+            }
+            $variations['12_raw_activity_untouched_old_status_with_reason'] = $payload;
+        }
+
+        // Variation 13: Cleaned dynamic fields but keep metadata, old status, with reason
+        if ($matchingActivity) {
+            $payload = $matchingActivity;
+            $cleanRecursive = function (array $arr) use (&$cleanRecursive) {
+                $cleaned = [];
+                foreach ($arr as $key => $val) {
+                    if ($key === 'display_value') {
+                        continue;
+                    }
+                    if (is_array($val)) {
+                        $val = $cleanRecursive($val);
+                    }
+                    $cleaned[$key] = $val;
+                }
+                return $cleaned;
+            };
+            $payload = $cleanRecursive($payload);
+            if (isset($payload['detail'])) {
+                unset($payload['detail']['remaining_quantity'], $payload['detail']['remaining_quantity_type']);
+                $oldStatus = $payload['detail']['status'] ?? 'scheduled';
+                if (strtolower((string)$oldStatus) === 'processed') {
+                    $oldStatus = 'scheduled';
+                }
+                $payload['detail']['status'] = $oldStatus;
+                if ($this->actionType === 'cancel_activity') {
+                    $payload['detail']['status_reason'] = $statusReasonCodeableConcept;
+                }
+            }
+            $variations['13_cleaned_keep_metadata_old_status_with_reason'] = $payload;
+        }
+
+        $lastException = null;
+        $succeededVariation = null;
+        $finalResponse = null;
 
         try {
-            $signedContent = signatureService()->signData(
-                Arr::toSnakeCase($payload),
-                $this->form['password'],
-                $this->form['knedp'],
-                $this->form['keyContainerUpload'],
-                Auth::user()->party->taxId
-            );
-            Log::info('CarePlanActivityStatus: Signing key succeeded');
+            foreach ($variations as $varName => $payload) {
 
-            $apiMethod = $this->actionType === 'complete_activity' ? 'complete' : 'cancel';
-            
-            $payloadData = [
-                'signed_data'          => $signedContent,
-                'signed_data_encoding' => 'base64',
-                'status_reason'        => $statusReasonCodeableConcept,
-            ];
-
-            if ($this->actionType === 'complete_activity') {
-                if ($this->outcomeCode) {
-                    $payloadData['outcome_codeable_concept'] = [
-                        'coding' => [
-                            [
-                                'system' => 'eHealth/care_plan_activity_outcomes',
-                                'code' => $this->outcomeCode,
+                // Inject dynamic transition parameters if complete_activity
+                if ($this->actionType === 'complete_activity' && isset($payload['detail'])) {
+                    if ($this->outcomeCode) {
+                        $payload['detail']['outcome_codeable_concept'] = [
+                            'coding' => [
+                                [
+                                    'system' => 'eHealth/care_plan_activity_outcomes',
+                                    'code' => $this->outcomeCode,
+                                ]
                             ]
-                        ]
+                        ];
+                    }
+                    if (!empty($this->outcomeReferences)) {
+                        $payload['detail']['outcome_reference'] = collect($this->outcomeReferences)->map(fn($id) => [
+                            'identifier' => [
+                                'value' => $id,
+                            ]
+                        ])->toArray();
+                    }
+                }
+
+                Log::info("CarePlanActivityStatus: Trying payload variation: {$varName}", [
+                    'payload' => $payload,
+                    'snake_case' => Arr::toSnakeCase($payload)
+                ]);
+
+                try {
+                    $signedContent = signatureService()->signData(
+                        Arr::toSnakeCase($payload),
+                        $this->form['password'],
+                        $this->form['knedp'],
+                        $this->form['keyContainerUpload'],
+                        Auth::user()->party->taxId
+                    );
+                    Log::info("CarePlanActivityStatus: Signing key succeeded for variation {$varName}");
+
+                    $apiMethod = $this->actionType === 'complete_activity' ? 'complete' : 'cancel';
+                    
+                    $payloadData = [
+                        'signed_data'          => $signedContent,
+                        'signed_data_encoding' => 'base64',
                     ];
+
+                    if ($this->actionType === 'cancel_activity') {
+                        $payloadData['status_reason'] = $statusReasonCodeableConcept;
+                    } elseif ($this->actionType === 'complete_activity') {
+                        if ($this->outcomeCode) {
+                            $payloadData['outcome_codeable_concept'] = [
+                                'coding' => [
+                                    [
+                                        'system' => 'eHealth/care_plan_activity_outcomes',
+                                        'code' => $this->outcomeCode,
+                                    ]
+                                ]
+                            ];
+                        }
+                        
+                        if (!empty($this->outcomeReferences)) {
+                            $payloadData['outcome_reference'] = collect($this->outcomeReferences)->map(fn($id) => [
+                                'identifier' => [
+                                    'value' => $id,
+                                ]
+                            ])->toArray();
+                        }
+                    }
+
+                    $eHealthResponse = EHealth::carePlanActivity()->{$apiMethod}(
+                        $this->carePlan->person->uuid,
+                        $this->carePlan->uuid,
+                        $activity->uuid,
+                        $payloadData
+                    );
+
+                    $responseData = $eHealthResponse->getData();
+                    Log::info("CarePlanActivityStatus: EHealth response for variation {$varName} received", ['response' => $responseData]);
+                    $finalResponse = $responseData;
+
+                    if (isset($responseData['links'][0]['href']) && str_contains($responseData['links'][0]['href'], '/jobs/')) {
+                        $jobId = str_replace('/jobs/', '', $responseData['links'][0]['href']);
+                        Log::info("CarePlanActivityStatus: Polling job for variation {$varName}: " . $jobId);
+                        $jobApi = new \App\Classes\eHealth\Api\Job();
+                        $attempts = 0;
+                        do {
+                            sleep(2);
+                            $finalResponse = $jobApi->getDetails($jobId)->getData();
+                            $attempts++;
+                            Log::info("CarePlanActivityStatus: Job {$jobId} attempt {$attempts} status: " . ($finalResponse['status'] ?? 'unknown'));
+                        } while ($finalResponse['status'] === 'pending' && $attempts < 15);
+                    }
+
+                    Log::info("CarePlanActivityStatus: Final response for variation {$varName} from eHealth/Job", ['final_response' => $finalResponse]);
+
+                    if (($finalResponse['status'] ?? null) === 'failed') {
+                        Log::error("CarePlanActivityStatus: Job failed for variation {$varName} in eHealth", ['final_response' => $finalResponse]);
+                        throw new EHealthValidationException($finalResponse);
+                    }
+
+                    // Success!
+                    $succeededVariation = $varName;
+                    break;
+
+                } catch (EHealthValidationException $exception) {
+                    $lastException = $exception;
+                    $msg = $exception->getMessage();
+                    $details = $exception->getDetails();
+                    Log::info("CarePlanActivityStatus: Variation {$varName} raw validation details: " . json_encode($details));
+                    Log::warning("CarePlanActivityStatus: Variation {$varName} failed with validation error: " . $msg, [
+                        'errors' => $details
+                    ]);
+                    
+                    $detailsJson = json_encode($details);
+                    // Check if it's signature mismatch or enum error, continue trying other variations
+                    if (str_contains($msg, "Signed content doesn't match") 
+                        || str_contains($detailsJson, "Signed content doesn't match")
+                        || str_contains($msg, "value is not allowed in enum")
+                        || str_contains($detailsJson, "value is not allowed in enum")
+                    ) {
+                        continue;
+                    }
+                    
+                    // If it is another critical error, also continue just to see if another payload format is accepted
+                    continue;
+                } catch (\Throwable $exception) {
+                    $lastException = $exception;
+                    Log::warning("CarePlanActivityStatus: Variation {$varName} unexpected error: " . $exception->getMessage());
+                    continue;
                 }
-                
-                if (!empty($this->outcomeReferences)) {
-                    $payloadData['outcome_reference'] = collect($this->outcomeReferences)->map(fn($id) => [
-                        'identifier' => [
-                            'value' => $id,
-                        ]
-                    ])->toArray();
+            }
+
+            if (!$succeededVariation) {
+                Log::error("CarePlanActivityStatus: All payload variations failed to sign and transition");
+                if ($lastException) {
+                    throw $lastException;
                 }
+                throw new \Exception("All payload variations failed to sign and transition");
             }
 
-            $eHealthResponse = EHealth::carePlanActivity()->{$apiMethod}(
-                $this->carePlan->person->uuid,
-                $this->carePlan->uuid,
-                $activity->uuid,
-                $payloadData
-            );
+            Log::info("CarePlanActivityStatus: SUCCESS with payload variation: {$succeededVariation}");
 
-            $responseData = $eHealthResponse->getData();
-            Log::info('CarePlanActivityStatus: EHealth response received', ['response' => $responseData]);
-            $finalResponse = $responseData;
-
-            if (isset($responseData['links'][0]['href']) && str_contains($responseData['links'][0]['href'], '/jobs/')) {
-                $jobId = str_replace('/jobs/', '', $responseData['links'][0]['href']);
-                Log::info('CarePlanActivityStatus: Polling job: ' . $jobId);
-                $jobApi = new \App\Classes\eHealth\Api\Job();
-                $attempts = 0;
-                do {
-                    sleep(2);
-                    $finalResponse = $jobApi->getDetails($jobId)->getData();
-                    $attempts++;
-                    Log::info("CarePlanActivityStatus: Job {$jobId} attempt {$attempts} status: " . ($finalResponse['status'] ?? 'unknown'));
-                } while ($finalResponse['status'] === 'pending' && $attempts < 15);
-            }
-
-            Log::info('CarePlanActivityStatus: Final response from eHealth/Job', ['final_response' => $finalResponse]);
-
-            if (($finalResponse['status'] ?? null) === 'failed') {
-                Log::error('CarePlanActivityStatus: Job failed in eHealth', ['final_response' => $finalResponse]);
-                throw new EHealthValidationException($finalResponse);
-            }
-
-            $activityStatus = $finalResponse['status'] ?? $payload['status'];
+            $activityStatus = $finalResponse['status'] ?? ($payload['detail']['status'] ?? $activity->status);
             if (isset($finalResponse['result']) && is_array($finalResponse['result'])) {
                 $entity = $finalResponse['result'][0] ?? $finalResponse['result'];
                 $activityStatus = $entity['status'] ?? $activityStatus;
@@ -1230,6 +1636,10 @@ class CarePlanShow extends Component
             Session::flash('success', __('care-plan.activity_updated'));
             $this->showSignatureModal = false;
 
+        } catch (EHealthValidationException $exception) {
+            Log::error('CarePlanActivityStatus: eHealth validation error: ' . $exception->getMessage());
+            Session::flash('error', $exception->getTranslatedMessage());
+            $this->showSignatureModal = false;
         } catch (\Throwable $exception) {
             Log::error('CarePlanActivityStatus: error: ' . $exception->getMessage());
             Session::flash('error', $exception->getMessage());

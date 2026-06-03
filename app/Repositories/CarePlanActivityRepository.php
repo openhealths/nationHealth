@@ -116,17 +116,28 @@ class CarePlanActivityRepository
 
         $formattedStart = null;
         if ($startDate) {
-            $startCarbon = \Carbon\Carbon::parse($startDate);
-            $formattedStart = convertToEHealthISO8601(
-                $startCarbon->format('Y-m-d') . ' ' . 
-                ($startCarbon->isToday() ? now()->format('H:i:s') : '12:00:00')
-            );
+            if ($activity->uuid && $scheduledPeriod) {
+                // For existing activities synced to eHealth, use the exact stored timestamp
+                // to prevent cryptographic signature mismatch on cancel/complete operations.
+                $formattedStart = convertToEHealthISO8601($startDate);
+            } else {
+                $startCarbon = \Carbon\Carbon::parse($startDate);
+                $formattedStart = convertToEHealthISO8601(
+                    $startCarbon->format('Y-m-d') . ' ' . 
+                    ($startCarbon->isToday() ? now()->format('H:i:s') : '12:00:00')
+                );
+            }
         }
 
         $formattedEnd = null;
         if ($endDate) {
-            $endCarbon = \Carbon\Carbon::parse($endDate);
-            $formattedEnd = convertToEHealthISO8601($endCarbon->format('Y-m-d') . ' 23:59:59');
+            if ($activity->uuid && $scheduledPeriod) {
+                // Preserve exact end timestamp for existing activities (same reason as above).
+                $formattedEnd = convertToEHealthISO8601($endDate);
+            } else {
+                $endCarbon = \Carbon\Carbon::parse($endDate);
+                $formattedEnd = convertToEHealthISO8601($endCarbon->format('Y-m-d') . ' 23:59:59');
+            }
         }
 
         // For non-medication requests, eHealth does not allow daily_amount system/code to be set

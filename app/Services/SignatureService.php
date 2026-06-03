@@ -84,7 +84,11 @@ class SignatureService
                 'exception' => get_class($e),
                 'trace' => $e->getTraceAsString()
             ]);
-            throw new RuntimeException($e->getMessage());
+            $msg = $e->getMessage();
+            if (str_contains($msg, 'cURL error 28') || str_contains(strtolower($msg), 'timeout')) {
+                $msg = 'Перевищено час очікування з\'єднання із сервером підпису (Cipher). Будь ласка, спробуйте пізніше або перевірте мережеве підключення.';
+            }
+            throw new RuntimeException($msg);
         }
     }
 

@@ -401,33 +401,110 @@
                                             {{ $activityStatusDisplay }}
                                         </span>
                                     </td>
-                                    <td class="px-4 py-4 text-right">
-                                        <div class="flex items-center justify-end gap-3">
-                                            @if(in_array(strtoupper($activityStatus), ['NEW', 'DRAFT']))
-                                                <button type="button" class="text-blue-500 hover:text-blue-700 transition-colors" wire:click="editActivity({{ $activity->id }})">
-                                                    @icon('edit', 'w-5 h-5')
-                                                </button>
-                                                <button type="button" class="text-green-500 hover:text-green-700 transition-colors" title="Підписати призначення КЕПом" wire:click="openSignatureModal('sign_activity', {{ $activity->id }})">
-                                                    @icon('key', 'w-5 h-5')
-                                                </button>
-                                            @elseif(in_array(strtoupper($activityStatus), ['ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD']))
-                                                @if(str_contains(strtolower($kindValue), 'medication'))
-                                                    <button type="button" class="button-primary-outline py-1 px-3 text-xs flex items-center gap-1 mr-2" title="Виписати Електронний Рецепт" wire:click="initEPrescriptionForm({{ $activity->id }})">
-                                                        @icon('plus', 'w-4 h-4')
-                                                        <span>Виписати Е-Рецепт</span>
+                                    <td class="px-4 py-4 text-right overflow-visible relative">
+                                        @php
+                                            $ucStatus = strtoupper((string)$activityStatus);
+                                            $hasActions = in_array($ucStatus, ['NEW', 'DRAFT', 'ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD', 'PROCESSED']);
+                                        @endphp
+                                        @if($hasActions)
+                                            <div class="flex justify-end relative">
+                                                <div x-data="{
+                                                         open: false,
+                                                         toggle() {
+                                                             if (this.open) return this.close();
+                                                             this.$refs.button.focus();
+                                                             this.open = true;
+                                                         },
+                                                         close(focusAfter) {
+                                                             if (!this.open) return;
+                                                             this.open = false;
+                                                             focusAfter && focusAfter.focus();
+                                                         }
+                                                     }"
+                                                     @keydown.escape.prevent.stop="close($refs.button)"
+                                                     @focusin.window="!$refs.panel.contains($event.target) && close()"
+                                                     x-id="['dropdown-button']"
+                                                     class="relative"
+                                                >
+                                                    <button @click="toggle()"
+                                                            x-ref="button"
+                                                            :aria-expanded="open"
+                                                            :aria-controls="$id('dropdown-button')"
+                                                            type="button"
+                                                            class="hover:text-primary cursor-pointer outline-none p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                            title="Дії"
+                                                    >
+                                                        @icon('dots-vertical', 'w-5 h-5 text-gray-600 dark:text-gray-400')
                                                     </button>
-                                                @endif
-                                                @if(str_contains(strtolower($kindValue), 'service_request') || str_contains(strtolower($kindValue), 'device_request'))
-                                                    <button type="button" class="button-primary-outline py-1 px-3 text-xs flex items-center gap-1 mr-2" title="Створити електронне направлення" wire:click="initReferralForm({{ $activity->id }})">
-                                                        @icon('plus', 'w-4 h-4')
-                                                        <span>Створити Направлення</span>
-                                                    </button>
-                                                @endif
-                                                <button type="button" class="text-red-500 hover:text-red-700 transition-colors" wire:click="openSignatureModal('cancel_activity', {{ $activity->id }})">
-                                                    @icon('x-circle', 'w-5 h-5')
-                                                </button>
-                                            @endif
-                                        </div>
+
+                                                    <div
+                                                        x-show="open"
+                                                        x-cloak
+                                                        x-ref="panel"
+                                                        x-transition.origin.top.right
+                                                        @click.outside="close($refs.button)"
+                                                        :id="$id('dropdown-button')"
+                                                        class="absolute right-0 mt-2 w-56 rounded-md bg-white dark:bg-gray-800 shadow-lg z-50 border border-gray-100 dark:border-gray-700 py-1"
+                                                    >
+                                                        @if(in_array($ucStatus, ['NEW', 'DRAFT']))
+                                                            <button type="button"
+                                                                    wire:click="editActivity({{ $activity->id }})"
+                                                                    @click="close()"
+                                                                    class="flex items-center gap-2 w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                                            >
+                                                                @icon('edit', 'w-4 h-4 text-blue-500')
+                                                                <span>Редагувати</span>
+                                                            </button>
+                                                            <button type="button"
+                                                                    wire:click="openSignatureModal('sign_activity', {{ $activity->id }})"
+                                                                    @click="close()"
+                                                                    class="flex items-center gap-2 w-full px-4 py-2 text-left text-sm text-green-600 dark:text-green-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                                            >
+                                                                @icon('key', 'w-4 h-4 text-green-500')
+                                                                <span>Підписати КЕП</span>
+                                                            </button>
+                                                        @elseif(in_array($ucStatus, ['ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD', 'PROCESSED']))
+                                                            @if(str_contains(strtolower($kindValue), 'medication'))
+                                                                <button type="button"
+                                                                        wire:click="initEPrescriptionForm({{ $activity->id }})"
+                                                                        @click="close()"
+                                                                        class="flex items-center gap-2 w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                                                >
+                                                                    @icon('plus', 'w-4 h-4 text-blue-500')
+                                                                    <span>Виписати Е-Рецепт</span>
+                                                                </button>
+                                                            @endif
+                                                            @if(str_contains(strtolower($kindValue), 'service_request') || str_contains(strtolower($kindValue), 'device_request'))
+                                                                <button type="button"
+                                                                        wire:click="initReferralForm({{ $activity->id }})"
+                                                                        @click="close()"
+                                                                        class="flex items-center gap-2 w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                                                >
+                                                                    @icon('plus', 'w-4 h-4 text-blue-500')
+                                                                    <span>Створити Направлення</span>
+                                                                </button>
+                                                            @endif
+                                                            <button type="button"
+                                                                    wire:click="openSignatureModal('complete_activity', {{ $activity->id }})"
+                                                                    @click="close()"
+                                                                    class="flex items-center gap-2 w-full px-4 py-2 text-left text-sm text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                                            >
+                                                                @icon('check-circle', 'w-4 h-4 text-blue-500')
+                                                                <span>Завершити</span>
+                                                            </button>
+                                                            <button type="button"
+                                                                    wire:click="openSignatureModal('cancel_activity', {{ $activity->id }})"
+                                                                    @click="close()"
+                                                                    class="flex items-center gap-2 w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                                            >
+                                                                @icon('close-circle', 'w-4 h-4 text-red-500')
+                                                                <span>Скасувати</span>
+                                                            </button>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @endif
                                     </td>
                                 </tr>
                                 @php
