@@ -217,7 +217,6 @@ return [
             'codeSystem' => [
                 'class_forbidden' => "Для класу взаємодії 'Амбулаторна медична допомога' та 'Стаціонарна медична допомога' дозволена лише система eHealth/ICD10_AM/condition_codes"
             ],
-            'max_one_per_dictionary' => 'Дозволено лише один код з одного словника',
             'psychiatry_evidence_required' => 'Для коду діагнозу :code необхідно вказати стан як доказ',
             'psychiatry_evidence_code_forbidden' => 'Стан не може бути використаний як доказ для коду діагнозу :code',
             'employee_type_code_forbidden' => 'Цей код діагнозу недоступний для вашого типу співробітника',

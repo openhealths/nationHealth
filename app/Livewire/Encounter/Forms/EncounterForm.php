@@ -11,7 +11,6 @@ use App\Rules\OnlyOnePrimaryDiagnosis;
 use App\Rules\PastDateTime;
 use Carbon\Carbon;
 use Closure;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\RequiredIf;
@@ -738,19 +737,6 @@ class EncounterForm extends BaseForm
 
             if ($value !== 'eHealth/ICD10_AM/condition_codes') {
                 $fail(__('validation.custom.conditions.codeSystem.class_forbidden'));
-            }
-        };
-
-        $rules['conditions'][] = static function (string $attribute, mixed $value, Closure $fail): void {
-            if (empty($value)) {
-                return;
-            }
-
-            $hasDuplicate = collect($value)->groupBy('codeSystem')
-                ->contains(fn (Collection $group) => $group->count() > 1);
-
-            if ($hasDuplicate) {
-                $fail(__('validation.custom.conditions.max_one_per_dictionary'));
             }
         };
     }
