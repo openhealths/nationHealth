@@ -816,7 +816,7 @@ class CarePlanShow extends Component
             // Job Polling
             if (isset($responseData['links'][0]['href']) && str_contains($responseData['links'][0]['href'], '/jobs/')) {
                 $jobId = str_replace('/jobs/', '', $responseData['links'][0]['href']);
-                $jobApi = app(\App\Classes\eHealth\Api\Job::class);
+                $jobApi = EHealth::job();
                 $attempts = 0;
                 do {
                     sleep(2);
@@ -1002,7 +1002,7 @@ class CarePlanShow extends Component
             if (isset($responseData['links'][0]['href']) && str_contains($responseData['links'][0]['href'], '/jobs/')) {
                 $jobId = str_replace('/jobs/', '', $responseData['links'][0]['href']);
                 Log::info('CarePlanActivity: Polling job: ' . $jobId);
-                $jobApi = new \App\Classes\eHealth\Api\Job();
+                $jobApi = EHealth::job();
                 $attempts = 0;
                 do {
                     sleep(2);
@@ -1061,8 +1061,9 @@ class CarePlanShow extends Component
             try {
                 $planResponse = EHealth::carePlan()->getDetails($this->carePlan->person->uuid, $this->carePlan->uuid);
                 $repository->syncCarePlans(['data' => [$planResponse->getData()]], $this->carePlan->person_id);
+                $activityRepository->syncActivities($this->carePlan->person, $this->carePlan);
             } catch (\Exception $e) {
-                Log::warning('CarePlanShow: failed to sync plan status after activity: ' . $e->getMessage());
+                Log::warning('CarePlanShow: failed to sync plan status or activities after activity creation: ' . $e->getMessage());
             }
 
             $this->refreshCarePlan();
@@ -1223,7 +1224,7 @@ class CarePlanShow extends Component
                         ]
                     ];
                 }
-                
+
                 if (!empty($this->outcomeReferences)) {
                     $payloadData['outcome_reference'] = collect($this->outcomeReferences)->map(fn($id) => [
                         'identifier' => [
@@ -1845,7 +1846,7 @@ class CarePlanShow extends Component
             
             if (isset($responseData['links'][0]['href']) && str_contains($responseData['links'][0]['href'], '/jobs/')) {
                 $jobId = str_replace('/jobs/', '', $responseData['links'][0]['href']);
-                $jobApi = new \App\Classes\eHealth\Api\Job();
+                $jobApi = EHealth::job();
                 $attempts = 0;
                 do {
                     sleep(2);
@@ -2235,7 +2236,7 @@ class CarePlanShow extends Component
             
             if (isset($responseData['links'][0]['href']) && str_contains($responseData['links'][0]['href'], '/jobs/')) {
                 $jobId = str_replace('/jobs/', '', $responseData['links'][0]['href']);
-                $jobApi = new \App\Classes\eHealth\Api\Job();
+                $jobApi = EHealth::job();
                 $attempts = 0;
                 do {
                     sleep(2);
