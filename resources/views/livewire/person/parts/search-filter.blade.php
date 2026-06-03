@@ -49,7 +49,7 @@
                        type="text"
                        name="filterBirthDate"
                        id="filterBirthDate"
-                       class="datepicker-flatpickr with-leading-icon input peer @error('form.birthDate') input-error @enderror"
+                       class="datepicker-input with-leading-icon input peer @error('form.birthDate') input-error @enderror"
                        placeholder=" "
                        required
                        autocomplete="off"

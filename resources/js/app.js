@@ -232,119 +232,10 @@ function initUkTimepickers(root = document) {
     });
 }
 
-function initUkDatepickers(root = document) {
-    const inputs = root.querySelectorAll('input.datepicker-flatpickr:not([data-df-initialized])');
-
-    inputs.forEach((el) => {
-        if (el._flatpickr) return;
-
-        const maxDate = el.getAttribute('datepicker-max-date') || null;
-        const minDate = el.getAttribute('datepicker-min-date') || null;
-
-        flatpickr(el, {
-            allowInput: true,
-            dateFormat: "d.m.Y",
-            locale: Ukrainian,
-            maxDate: maxDate,
-            minDate: minDate,
-            onChange: (selectedDates, dateStr, instance) => {
-                el.value = dateStr;
-                el.dispatchEvent(new Event("input", { bubbles: true }));
-                el.dispatchEvent(new Event("change", { bubbles: true }));
-            },
-            onClose: (selectedDates, dateStr, instance) => {
-                el.dispatchEvent(new Event("input", { bubbles: true }));
-                el.dispatchEvent(new Event("change", { bubbles: true }));
-            }
-        });
-
-        el.setAttribute('data-df-initialized', 'true');
-
-        el.addEventListener('blur', () => {
-            el.dispatchEvent(new Event("input", { bubbles: true }));
-            el.dispatchEvent(new Event("change", { bubbles: true }));
-        });
-
-        el.addEventListener('input', (e) => {
-            if (e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward') {
-                return;
-            }
-
-            let val = e.target.value.replace(/\D/g, '');
-            if (val.length === 0) {
-                e.target.value = '';
-                return;
-            }
-
-            let d = '';
-            let m = '';
-            let y = '';
-
-            if (val.length >= 1) {
-                if (parseInt(val[0]) > 3) {
-                    val = '0' + val;
-                }
-            }
-
-            if (val.length >= 2) {
-                d = val.substring(0, 2);
-                if (parseInt(d) > 31) d = '31';
-                if (parseInt(d) === 0) d = '01';
-            } else {
-                d = val;
-            }
-
-            if (val.length >= 3) {
-                let mPart = val.substring(2);
-                if (parseInt(mPart[0]) > 1) {
-                    val = val.substring(0, 2) + '0' + mPart;
-                }
-            }
-
-            if (val.length >= 4) {
-                m = val.substring(2, 4);
-                if (parseInt(m) > 12) m = '12';
-                if (parseInt(m) === 0) m = '01';
-            } else if (val.length > 2) {
-                m = val.substring(2);
-            }
-
-            if (val.length >= 5) {
-                y = val.substring(4, 8);
-            }
-
-            let res = d;
-            if (val.length >= 2) {
-                res += '.';
-            }
-            if (m.length > 0) {
-                res += m;
-            }
-            if (val.length >= 4) {
-                res += '.';
-            }
-            if (y.length > 0) {
-                res += y;
-            }
-
-            e.target.value = res;
-
-            if (res.length === 10 && el._flatpickr) {
-                const parsed = el._flatpickr.parseDate(res, "d.m.Y");
-                if (parsed) {
-                    el._flatpickr.setDate(parsed, false);
-                }
-            }
-        });
-    });
-}
-
 document.addEventListener("DOMContentLoaded", () => {
     initUkTimepickers();
-    initUkDatepickers();
     const tpObserver = new MutationObserver(() => {
         initUkTimepickers();
-        initUkDatepickers();
     });
     tpObserver.observe(document.body, { childList: true, subtree: true });
 });
@@ -353,7 +244,6 @@ if (window.Livewire) {
     document.addEventListener("livewire:load", () => {
         Livewire.hook("message.processed", (message, component) => {
             initUkTimepickers(component?.el || document);
-            initUkDatepickers(component?.el || document);
             initFlowbite();
         });
     });
@@ -364,7 +254,6 @@ if (window.Livewire) {
 
     document.addEventListener("livewire:navigated", () => {
         initUkTimepickers();
-        initUkDatepickers();
         initFlowbite();
     });
 }
