@@ -150,6 +150,39 @@ class ImmunizationRepository extends BaseRepository
     }
 
     /**
+     * Get immunization data that is related to the person with pagination.
+     *
+     * @param  int  $personId
+     * @param  int  $page
+     * @param  int  $pageSize
+     * @return array
+     */
+    public function getByPersonIdPaginated(int $personId, int $page, int $pageSize): array
+    {
+        return $this->model
+            ->withAllRelations()
+            ->where('person_id', $personId)
+            ->orderByDesc('date')
+            ->offset(($page - 1) * $pageSize)
+            ->limit($pageSize)
+            ->get()
+            ->toArray();
+    }
+
+    /**
+     * Get count of immunization data that is related to the person.
+     *
+     * @param  int  $personId
+     * @return array|null
+     */
+    public function countByPersonId(int $personId): int 
+    {
+        return $this->model
+            ->where('person_id', $personId)
+            ->count();
+    }
+
+    /**
      * Formatting immunizations to show on the frontend.
      *
      * @param  array  $immunizations
