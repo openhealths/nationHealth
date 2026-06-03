@@ -160,7 +160,7 @@ class PatientClinicalImpressions extends BasePatientComponent
             $this->dispatchRemainingPages('clinicalImpression');
         } else {
             legalEntity()->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_CLINICAL_IMPRESSION);
-            Session::flash('success', __('patients.messages.clinical_impression_synced_successfully'));
+            Session::flash('success', __('patients.messages.clinical_impressions_synced_successfully'));
         }
 
         $this->clinicalImpressions = Arr::toCamelCase($validatedData);

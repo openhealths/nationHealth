@@ -15,7 +15,7 @@
             {{ __('patients.data_access') }}
         </button>
 
-        <button wire:click.prevent="syncImmunizations"
+        <button wire:click.prevent="sync"
                 type="button"
                 class="button-sync flex items-center gap-2 whitespace-nowrap px-5 py-2 text-sm shadow-sm"
         >
@@ -32,29 +32,121 @@
             </div>
 
             <div class="form-row-3 mb-6">
-                <div class="form-group group">
+                <div class="form-group group relative"
+                    x-data="{
+                        open: false,
+                        search: '',
+                        selected: $wire.entangle('filterVaccine'),
+
+                        get options() {
+                            return $wire.get('filterVaccineOptions') ?? [];
+                        },
+
+                        get filteredOptions() {
+                            if (!this.search.trim()) {
+                                return this.options;
+                            }
+
+                            const needle = this.search.toLowerCase();
+
+                            return this.options.filter((option) => {
+                                const label = (option.label ?? '').toLowerCase();
+                                const value = (option.value ?? '').toLowerCase();
+                                const description = (option.description ?? '').toLowerCase();
+
+                                return label.includes(needle)
+                                    || value.includes(needle)
+                                    || description.includes(needle);
+                            });
+                        },
+
+                        get selectedOption() {
+                            return this.options.find((option) => option.value === this.selected);
+                        },
+
+                        selectOption(option) {
+                            this.selected = option.value;
+                            this.search = option.label;
+                            this.open = false;
+                        },
+
+                        clearOption() {
+                            this.selected = '';
+                            this.search = '';
+                            this.open = false;
+                        },
+
+                        init() {
+                            this.search = this.selectedOption ? this.selectedOption.label : '';
+
+                            this.$watch('selected', () => {
+                                this.search = this.selectedOption ? this.selectedOption.label : '';
+                            });
+                        }
+                    }"
+                    @click.outside="open = false"
+                >
                     <div class="relative">
-                        <input wire:model="filterVaccine"
-                               type="text"
-                               name="filterVaccine"
-                               id="filterVaccine"
-                               class="input peer w-full"
+                        <input type="text"
+                               name="filterVaccineSearch"
+                               id="filterVaccineSearch"
+                               class="input peer w-full pr-10"
                                placeholder=" "
                                autocomplete="off"
+                               x-model="search"
+                               @focus="open = true"
+                               @input="
+                                   open = true;
+
+                                   if (selected) {
+                                       selected = '';
+                                   }
+                               "
                         />
 
-                        <label for="filterVaccine" class="label">
+                        <label for="filterVaccineSearch" class="label">
                             {{ __('patients.vaccine') }}
                         </label>
 
-                        @if($filterVaccine)
-                            <button type="button"
-                                    wire:click="$set('filterVaccine', '')"
-                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                            >
-                                @icon('close', 'w-4 h-4')
-                            </button>
-                        @endif
+                        <button type="button"
+                                x-show="selected || search"
+                                x-cloak
+                                @click="clearOption()"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                            @icon('close', 'w-4 h-4')
+                        </button>
+
+                        <div x-show="open"
+                             x-transition
+                             x-cloak
+                             class="absolute left-0 right-0 top-full mt-1 z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                        >
+                            <template x-if="filteredOptions.length > 0">
+                                <div>
+                                    <template x-for="option in filteredOptions" :key="option.value">
+                                        <button type="button"
+                                                class="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                @click="selectOption(option)"
+                                        >
+                                            <div class="font-medium text-gray-900 dark:text-gray-100"
+                                                 x-text="option.label || 'Без назви'"
+                                            ></div>
+
+                                            <div class="text-xs text-gray-500 break-all"
+                                                 x-text="option.description || option.value"
+                                            ></div>
+                                        </button>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <template x-if="filteredOptions.length === 0">
+                                <div class="px-3 py-2 text-sm text-gray-500">
+                                    {{ __('forms.nothing_found') }}
+                                </div>
+                            </template>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -118,117 +210,6 @@
 
             <div x-show="showAdditionalParams" x-transition x-cloak wire:key="immunization-search-filters" class="mb-8">
                 <div class="form-row-3 mb-6">
-                    <div class="form-group group relative"
-                        x-data="{
-                            open: false,
-                            search: '',
-                            selected: @entangle('filterEpisodeId'),
-
-                            get episodes() {
-                                return $wire.episodes ?? [];
-                            },
-
-                            get filteredEpisodes() {
-                                if (!this.search.trim()) {
-                                    return this.episodes;
-                                }
-
-                                const needle = this.search.toLowerCase();
-
-                                return this.episodes.filter((episode) => {
-                                    const name = (episode.name ?? '').toLowerCase();
-                                    const uuid = (episode.uuid ?? '').toLowerCase();
-
-                                    return name.includes(needle) || uuid.includes(needle);
-                                });
-                            },
-
-                            get selectedEpisodeLabel() {
-                                const episode = this.episodes.find((episode) => episode.uuid === this.selected);
-
-                                if (!episode) {
-                                    return '';
-                                }
-
-                                return episode.name || episode.uuid;
-                            },
-
-                            selectEpisode(episode) {
-                                this.selected = episode.uuid;
-                                this.search = episode.name || episode.uuid;
-                                this.open = false;
-                            },
-
-                            clearEpisode() {
-                                this.selected = '';
-                                this.search = '';
-                                this.open = false;
-                            },
-
-                            init() {
-                                this.search = this.selectedEpisodeLabel;
-                            }
-                        }"
-                        @click.outside="open = false"
-                    >
-                        <div class="relative">
-                            <input type="text"
-                                name="filterEpisodeId"
-                                id="filterEpisodeId"
-                                class="input peer w-full"
-                                placeholder=" "
-                                autocomplete="off"
-                                x-model="search"
-                                @focus="open = true"
-                                @input="open = true"
-                            />
-
-                            <label for="filterEpisodeId" class="label">
-                                {{ __('patients.episode_id') }}
-                            </label>
-
-                            <button type="button"
-                                    x-show="selected || search"
-                                    x-cloak
-                                    @click="clearEpisode()"
-                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                            >
-                                @icon('close', 'w-4 h-4')
-                            </button>
-
-                            <div x-show="open"
-                                x-transition
-                                x-cloak
-                                class="absolute left-0 right-0 top-full mt-1 z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
-                            >
-                                <template x-if="filteredEpisodes.length > 0">
-                                    <div>
-                                        <template x-for="episode in filteredEpisodes" :key="episode.uuid">
-                                            <button type="button"
-                                                    class="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 z-50"
-                                                    @click="selectEpisode(episode)"
-                                            >
-                                                <div class="font-medium text-gray-900 dark:text-gray-100"
-                                                    x-text="episode.name || 'Без назви'"
-                                                ></div>
-
-                                                <div class="text-xs text-gray-500 break-all"
-                                                    x-text="episode.uuid"
-                                                ></div>
-                                            </button>
-                                        </template>
-                                    </div>
-                                </template>
-
-                                <template x-if="filteredEpisodes.length === 0">
-                                    <div class="px-3 py-2 text-sm text-gray-500">
-                                        {{ __('patients.episodes_not_found') }}
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="form-group group">
                         <div class="datepicker-wrapper">
                             <input wire:model="filterDateFrom"
@@ -262,11 +243,289 @@
                             </label>
                         </div>
                     </div>
+
+                    <div class="form-group group relative"
+                        x-data="{
+                            open: false,
+                            search: '',
+                            selected: $wire.entangle('filterEpisodeId'),
+
+                            get options() {
+                                return $wire.get('filterEpisodeOptions') ?? [];
+                            },
+
+                            get filteredOptions() {
+                                if (!this.search.trim()) {
+                                    return this.options;
+                                }
+
+                                const needle = this.search.toLowerCase();
+
+                                return this.options.filter((option) => {
+                                    const label = (option.label ?? '').toLowerCase();
+                                    const value = (option.value ?? '').toLowerCase();
+                                    const description = (option.description ?? '').toLowerCase();
+
+                                    return label.includes(needle)
+                                        || value.includes(needle)
+                                        || description.includes(needle);
+                                });
+                            },
+
+                            get selectedOption() {
+                                return this.options.find((option) => option.value === this.selected);
+                            },
+
+                            selectOption(option) {
+                                this.selected = option.value;
+                                this.search = option.label;
+                                this.open = false;
+                            },
+
+                            clearOption() {
+                                this.selected = '';
+                                this.search = '';
+                                this.open = false;
+                            },
+
+                            init() {
+                                this.search = this.selectedOption ? this.selectedOption.label : '';
+
+                                this.$watch('selected', () => {
+                                    this.search = this.selectedOption ? this.selectedOption.label : '';
+                                });
+                            }
+                        }"
+                        @click.outside="open = false"
+                    >
+                        <div class="relative">
+                            <input type="text"
+                                   name="filterEpisodeIdSearch"
+                                   id="filterEpisodeIdSearch"
+                                   class="input peer w-full pr-10"
+                                   placeholder=" "
+                                   autocomplete="off"
+                                   x-model="search"
+                                   @focus="open = true"
+                                   @input="
+                                       open = true;
+
+                                       if (selected) {
+                                           selected = '';
+                                       }
+                                   "
+                            />
+
+                            <label for="filterEpisodeIdSearch" class="label">
+                                {{ __('patients.episode_id') }}
+                            </label>
+
+                            <button type="button"
+                                    x-show="selected || search"
+                                    x-cloak
+                                    @click="clearOption()"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                                @icon('close', 'w-4 h-4')
+                            </button>
+
+                            <div x-show="open"
+                                 x-transition
+                                 x-cloak
+                                 class="absolute left-0 right-0 top-full mt-1 z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                            >
+                                <template x-if="filteredOptions.length > 0">
+                                    <div>
+                                        <template x-for="option in filteredOptions" :key="option.value">
+                                            <button type="button"
+                                                    class="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                    @click="selectOption(option)"
+                                            >
+                                                <div class="font-medium text-gray-900 dark:text-gray-100"
+                                                     x-text="option.label || 'Без назви'"
+                                                ></div>
+
+                                                <div class="text-xs text-gray-500 break-all"
+                                                     x-text="option.description || option.value"
+                                                ></div>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </template>
+
+                                <template x-if="filteredOptions.length === 0">
+                                    <div class="px-3 py-2 text-sm text-gray-500">
+                                        {{ __('patients.episodes_not_found') }}
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group group relative"
+                        x-data="{
+                            open: false,
+                            search: '',
+                            selected: $wire.entangle('filterEncounterId'),
+
+                            get options() {
+                                return $wire.get('filterEncounterOptions') ?? [];
+                            },
+
+                            get filteredOptions() {
+                                if (!this.search.trim()) {
+                                    return this.options;
+                                }
+
+                                const needle = this.search.toLowerCase();
+
+                                return this.options.filter((option) => {
+                                    const label = (option.label ?? '').toLowerCase();
+                                    const value = (option.value ?? '').toLowerCase();
+                                    const description = (option.description ?? '').toLowerCase();
+
+                                    return label.includes(needle)
+                                        || value.includes(needle)
+                                        || description.includes(needle);
+                                });
+                            },
+
+                            get selectedOption() {
+                                return this.options.find((option) => option.value === this.selected);
+                            },
+
+                            selectOption(option) {
+                                this.selected = option.value;
+                                this.search = option.label;
+                                this.open = false;
+                            },
+
+                            clearOption() {
+                                this.selected = '';
+                                this.search = '';
+                                this.open = false;
+                            },
+
+                            init() {
+                                this.search = this.selectedOption ? this.selectedOption.label : '';
+
+                                this.$watch('selected', () => {
+                                    this.search = this.selectedOption ? this.selectedOption.label : '';
+                                });
+                            }
+                        }"
+                        @click.outside="open = false"
+                    >
+                        <div class="relative">
+                            <input type="text"
+                                   name="filterEncounterIdSearch"
+                                   id="filterEncounterIdSearch"
+                                   class="input peer w-full pr-10"
+                                   placeholder=" "
+                                   autocomplete="off"
+                                   x-model="search"
+                                   @focus="open = true"
+                                   @input="
+                                       open = true;
+
+                                       if (selected) {
+                                           selected = '';
+                                       }
+                                   "
+                            />
+
+                            <label for="filterEncounterIdSearch" class="label">
+                                {{ __('patients.encounter_id') }}
+                            </label>
+
+                            <button type="button"
+                                    x-show="selected || search"
+                                    x-cloak
+                                    @click="clearOption()"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                                @icon('close', 'w-4 h-4')
+                            </button>
+
+                            <div x-show="open"
+                                 x-transition
+                                 x-cloak
+                                 class="absolute left-0 right-0 top-full mt-1 z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                            >
+                                <template x-if="filteredOptions.length > 0">
+                                    <div>
+                                        <template x-for="option in filteredOptions" :key="option.value">
+                                            <button type="button"
+                                                    class="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                    @click="selectOption(option)"
+                                            >
+                                                <div class="font-medium text-gray-900 dark:text-gray-100"
+                                                     x-text="option.label || 'Без назви'"
+                                                ></div>
+
+                                                <div class="text-xs text-gray-500 break-all"
+                                                     x-text="option.description || option.value"
+                                                ></div>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </template>
+
+                                <template x-if="filteredOptions.length === 0">
+                                    <div class="px-3 py-2 text-sm text-gray-500">
+                                        {{ __('forms.nothing_found') }}
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
+            @php
+                $dictionaryDisplay = function (string $dictionaryName, $code, $fallback = null): string {
+                    if (!$code) {
+                        return $fallback ?: '—';
+                    }
+
+                    $value = data_get($this->dictionaries, $dictionaryName . '.' . $code);
+
+                    if (is_array($value)) {
+                        $value = data_get($value, 'name') ?: data_get($value, 'description');
+                    }
+
+                    return $value ?: ($fallback ?: $code);
+                };
+
+                $dictionaryCodeDisplay = function (string $dictionaryName, $code, $fallback = null) use ($dictionaryDisplay): string {
+                    if (!$code) {
+                        return $fallback ?: '—';
+                    }
+
+                    $value = $dictionaryDisplay($dictionaryName, $code, $fallback ?: $code);
+
+                    return collect([$code, $value !== $code ? $value : null])
+                        ->filter()
+                        ->implode(' | ') ?: ($fallback ?: '—');
+                };
+
+                $codeableConceptDisplay = function ($concept, string $dictionaryName) use ($dictionaryDisplay): string {
+                    $code = data_get($concept, 'coding.0.code');
+                    $text = data_get($concept, 'text');
+
+                    return $dictionaryDisplay($dictionaryName, $code, $text ?: $code);
+                };
+
+                $codeableConceptCodeDisplay = function ($concept, string $dictionaryName) use ($dictionaryCodeDisplay): string {
+                    $code = data_get($concept, 'coding.0.code') ?: data_get($concept, 'code');
+                    $text = data_get($concept, 'text');
+
+                    return $dictionaryCodeDisplay($dictionaryName, $code, $text ?: $code);
+                };
+            @endphp
+
             <div class="space-y-4">
-                @forelse($immunizations as $immunization)
+                @forelse($paginatedImmunizations as $immunization)
                     <div class="record-inner-card">
                         <div class="record-inner-header">
                             <div class="record-inner-checkbox-col">
@@ -279,7 +538,7 @@
                                 </div>
 
                                 <div class="record-inner-value text-[17px] font-semibold text-gray-900 dark:text-gray-100">
-                                    {{ data_get($immunization, 'vaccineCode.coding.0.code', data_get($immunization, 'vaccineCode.text', '—')) }}
+                                    {{ $codeableConceptCodeDisplay(data_get($immunization, 'vaccineCode'), 'eHealth/vaccine_codes') }}
                                 </div>
                             </div>
 
@@ -290,7 +549,7 @@
 
                                 <div>
                                     <span class="badge-green">
-                                        {{ data_get($immunization, 'status', '—') }}
+                                        {{ $dictionaryDisplay('eHealth/immunization_statuses', data_get($immunization, 'status')) }}
                                     </span>
                                 </div>
                             </div>
@@ -364,8 +623,11 @@
                                             </div>
 
                                             <div class="record-inner-value text-[14px] font-semibold">
-                                                {{ data_get($immunization, 'doseQuantity.value', '—') }}
-                                                {{ data_get($immunization, 'doseQuantity.unit', data_get($immunization, 'doseQuantity.code', '')) }}
+                                                @php
+                                                    $doseValue = data_get($immunization, 'doseQuantity.value');
+                                                    $doseUnit = $dictionaryDisplay('eHealth/immunization_dosage_units', data_get($immunization, 'doseQuantity.code'), data_get($immunization, 'doseQuantity.unit'));
+                                                @endphp
+                                                {{ collect([$doseValue, $doseUnit !== '—' ? $doseUnit : null])->filter()->implode(' ') ?: '—' }}
                                             </div>
                                         </div>
 
@@ -375,10 +637,11 @@
                                             </div>
 
                                             <div class="record-inner-value text-[14px] font-semibold break-words">
-                                                {{ data_get($immunization, 'manufacturer', '—') }}
-                                                @if(data_get($immunization, 'lotNumber'))
-                                                    ({{ data_get($immunization, 'lotNumber') }})
-                                                @endif
+                                                @php
+                                                    $manufacturer = data_get($immunization, 'manufacturer');
+                                                    $lotNumber = data_get($immunization, 'lotNumber');
+                                                @endphp
+                                                {{ collect([$manufacturer, $lotNumber ? '(' . $lotNumber . ')' : null])->filter()->implode(' ') ?: '—' }}
                                             </div>
                                         </div>
 
@@ -400,7 +663,7 @@
                                             </div>
 
                                             <div class="record-inner-value text-[14px] font-semibold break-words">
-                                                {{ data_get($immunization, 'route.text', data_get($immunization, 'route.coding.0.code', '—')) }}
+                                                {{ $codeableConceptDisplay(data_get($immunization, 'route'), 'eHealth/vaccination_routes') }}
                                             </div>
                                         </div>
 
@@ -410,7 +673,7 @@
                                             </div>
 
                                             <div class="record-inner-value text-[14px] font-semibold break-words">
-                                                {{ data_get($immunization, 'site.text', data_get($immunization, 'site.coding.0.code', '—')) }}
+                                                {{ $codeableConceptDisplay(data_get($immunization, 'site'), 'eHealth/immunization_body_sites') }}
                                             </div>
                                         </div>
 
@@ -432,7 +695,7 @@
                                             </div>
 
                                             <div class="record-inner-value text-[14px] font-semibold break-words">
-                                                {{ data_get($immunization, 'explanation.reasons.0.text', data_get($immunization, 'explanation.reasons.0.coding.0.code', '—')) }}
+                                                {{ $codeableConceptDisplay(data_get($immunization, 'explanation.reasons.0'), 'eHealth/reason_explanations') }}
                                             </div>
                                         </div>
 
@@ -476,7 +739,7 @@
                                     {{ __('patients.vaccination_protocol') }}:
                                 </div>
 
-                                @php($protocol = data_get($immunization, 'immunizationProtocols.0', []))
+                                @php($protocol = data_get($immunization, 'vaccinationProtocols.0', data_get($immunization, 'immunizationProtocols.0', [])))
 
                                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-3">
                                     <ul class="space-y-2.5">
@@ -487,7 +750,7 @@
                                                     {{ __('patients.target_diseases') }}:
                                                 </div>
                                                 <div class="text-gray-800 dark:text-gray-200 font-semibold break-words">
-                                                    {{ collect(data_get($protocol, 'targetDiseases', []))->map(fn($disease) => data_get($disease, 'text', data_get($disease, 'coding.0.code')))->filter()->join(', ') ?: '—' }}
+                                                    {{ collect(data_get($protocol, 'targetDiseases', []))->map(fn($disease) => $codeableConceptDisplay($disease, 'eHealth/vaccination_target_diseases'))->filter(fn($value) => $value !== '—')->join(', ') ?: '—' }}
                                                 </div>
                                             </div>
                                         </li>
@@ -499,7 +762,7 @@
                                                     {{ __('patients.protocol_author') }}:
                                                 </div>
                                                 <div class="text-gray-800 dark:text-gray-200 font-semibold uppercase tracking-wide text-[11px] break-words">
-                                                    {{ data_get($protocol, 'authority.text', data_get($protocol, 'authority.coding.0.code', '—')) }}
+                                                    {{ $codeableConceptDisplay(data_get($protocol, 'authority'), 'eHealth/vaccination_authorities') }}
                                                 </div>
                                             </div>
                                         </li>
@@ -589,6 +852,9 @@
                         {{ __('patients.immunizations_not_found') }}
                     </div>
                 @endforelse
+            </div>
+            <div class="mt-8">
+                {{ $paginatedImmunizations->links() }}
             </div>
         </div>
     </div>
