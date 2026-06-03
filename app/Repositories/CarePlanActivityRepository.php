@@ -117,23 +117,22 @@ class CarePlanActivityRepository
         $formattedStart = null;
         if ($startDate) {
             if ($activity->uuid && $scheduledPeriod) {
-                // For existing activities synced to eHealth, use the exact stored timestamp
-                // to prevent cryptographic signature mismatch on cancel/complete operations.
-                $formattedStart = convertToEHealthISO8601($startDate);
+                $formattedStart = \Carbon\Carbon::parse($startDate, 'UTC')->utc()->toIso8601ZuluString();
             } else {
                 $startCarbon = \Carbon\Carbon::parse($startDate);
-                $formattedStart = convertToEHealthISO8601(
-                    $startCarbon->format('Y-m-d') . ' ' . 
-                    ($startCarbon->isToday() ? now()->format('H:i:s') : '12:00:00')
-                );
+                if ($activity->uuid && $activity->created_at) {
+                    $time = $activity->created_at->format('H:i:s');
+                } else {
+                    $time = $startCarbon->isToday() ? now()->format('H:i:s') : '12:00:00';
+                }
+                $formattedStart = convertToEHealthISO8601($startCarbon->format('Y-m-d') . ' ' . $time);
             }
         }
 
         $formattedEnd = null;
         if ($endDate) {
             if ($activity->uuid && $scheduledPeriod) {
-                // Preserve exact end timestamp for existing activities (same reason as above).
-                $formattedEnd = convertToEHealthISO8601($endDate);
+                $formattedEnd = \Carbon\Carbon::parse($endDate, 'UTC')->utc()->toIso8601ZuluString();
             } else {
                 $endCarbon = \Carbon\Carbon::parse($endDate);
                 $formattedEnd = convertToEHealthISO8601($endCarbon->format('Y-m-d') . ' 23:59:59');

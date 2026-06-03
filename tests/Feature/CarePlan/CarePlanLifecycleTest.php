@@ -459,4 +459,95 @@ class CarePlanLifecycleTest extends TestCase
             'quantity' => 10,
         ]);
     }
+
+    public function test_cancel_and_complete_care_plan_activity(): void
+    {
+        $this->actingAs($this->user);
+        
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'Lifecycle Plan',
+            'status' => 'active',
+        ]);
+
+        $activity = CarePlanActivity::create([
+            'uuid' => (string) Str::uuid(),
+            'care_plan_id' => $carePlan->id,
+            'status' => 'scheduled',
+            'kind' => 'ServiceRequest',
+            'scheduled_period_start' => now(),
+            'scheduled_period_end' => now()->addDays(7),
+            'author_id' => $this->employee->id,
+        ]);
+
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
+        $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class);
+
+        $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
+        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $this->instance(\App\Classes\eHealth\Api\Job::class, $mockJobApi);
+
+        // Sign Mocking
+        $mockSignatureService->shouldReceive('signData')->andReturn('mock-base64-signature');
+        $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
+
+        // getSummary Mocking
+        $getSummaryResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $getSummaryResponse->shouldReceive('getData')->andReturn([
+            'activities' => [
+                [
+                    'id' => $activity->uuid,
+                    'detail' => [
+                        'kind' => 'ServiceRequest',
+                        'status' => 'scheduled',
+                        'scheduled_period' => [
+                            'start' => now()->toIso8601ZuluString(),
+                            'end' => now()->addDays(7)->toIso8601ZuluString(),
+                        ]
+                    ]
+                ]
+            ]
+        ]);
+        $mockActivityApi->shouldReceive('getSummary')
+            ->with($carePlan->person->uuid, $carePlan->uuid)
+            ->andReturn($getSummaryResponse);
+
+        // 1. Test Cancel Activity
+        $activityCancelResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $activityCancelResponse->shouldReceive('getData')->andReturn([
+            'links' => [['href' => '/jobs/cancel-123']]
+        ]);
+        $activityCancelResponse->shouldReceive('getStatusCode')->andReturn(202);
+        $mockActivityApi->shouldReceive('cancel')->once()->andReturn($activityCancelResponse);
+
+        $cancelJobResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $cancelJobResponse->shouldReceive('getData')->andReturn([
+            'status' => 'processed',
+            'id' => $activity->uuid,
+            'result' => [
+                'id' => $activity->uuid,
+                'status' => 'cancelled'
+            ]
+        ]);
+        $mockJobApi->shouldReceive('getDetails')->with('cancel-123')->andReturn($cancelJobResponse);
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->set('form.knedp', '1.2.3.4')
+            ->set('form.password', 'secret')
+            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.jks', 100))
+            ->call('openSignatureModal', 'cancel_activity', $activity->id)
+            ->set('statusReason', 'typo')
+            ->call('sign')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('care_plan_activities', [
+            'id' => $activity->id,
+            'status' => 'cancelled',
+        ]);
+    }
 }
