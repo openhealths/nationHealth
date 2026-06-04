@@ -89,16 +89,18 @@ class EncounterMapper implements FhirMapperContract
             );
         }
 
-        if (!empty($data['actionReferences'])) {
-            $result['actionReferences'] = collect($data['actionReferences'])
-                ->pluck('uuid')
-                ->filter()
-                ->unique()
-                ->map(fn (string $uuid) => FhirResource::make()
-                    ->coding('eHealth/resources', 'service')
-                    ->toIdentifier($uuid))
-                ->values()
-                ->toArray();
+        $mappedActionReferences = collect($data['actionReferences'] ?? [])
+            ->pluck('uuid')
+            ->filter()
+            ->unique()
+            ->map(fn (string $uuid) => FhirResource::make()
+                ->coding('eHealth/resources', 'service')
+                ->toIdentifier($uuid))
+            ->values()
+            ->toArray();
+
+        if (!empty($mappedActionReferences)) {
+            $result['actionReferences'] = $mappedActionReferences;
         }
 
         if (!empty($data['divisionId'])) {
@@ -123,16 +125,18 @@ class EncounterMapper implements FhirMapperContract
 
         // todo: hospitalization
 
-        if (!empty($data['participant'])) {
-            $result['participant'] = collect($data['participant'])
-                ->pluck('uuid')
-                ->filter()
-                ->unique()
-                ->map(fn (string $uuid) => FhirResource::make()
-                    ->coding('eHealth/resources', 'employee')
-                    ->toIdentifier($uuid))
-                ->values()
-                ->toArray();
+        $mappedParticipants = collect($data['participant'] ?? [])
+            ->pluck('uuid')
+            ->filter()
+            ->unique()
+            ->map(fn (string $uuid) => FhirResource::make()
+                ->coding('eHealth/resources', 'employee')
+                ->toIdentifier($uuid))
+            ->values()
+            ->toArray();
+
+        if (!empty($mappedParticipants)) {
+            $result['participant'] = $mappedParticipants;
         }
 
         return $result;
