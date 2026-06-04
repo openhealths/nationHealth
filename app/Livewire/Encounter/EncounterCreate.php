@@ -11,6 +11,7 @@ use App\Exceptions\Cipher\CipherConnectionException;
 use App\Exceptions\Cipher\CipherException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
+use App\Enums\Person\EpisodeStatus;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Repositories\MedicalEvents\Repository;
@@ -64,7 +65,7 @@ class EncounterCreate extends EncounterComponent
             return;
         }
 
-        $formattedData = $this->packageBuilder->build($validated, $this->episodeType);
+        $formattedData = $this->packageBuilder->build($validated, $this->episodeType, EpisodeStatus::DRAFT);
 
         try {
             $encounterId = $this->storeValidatedData($formattedData);

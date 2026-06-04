@@ -24,6 +24,7 @@
                 bind="selectedLegalEntityId"
                 bindValue='id'
                 bindParam='name'
+                :label="__('Медичний Заклад')"
                 class="!z-[100] mt-6"
             />
 

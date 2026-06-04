@@ -19,11 +19,10 @@ use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\Encounter\Forms\Api\EncounterRequestApi;
 use App\Models\Employee\Employee;
+use App\Models\Icd10;
 use App\Models\Person\Person;
 use App\Traits\FormTrait;
-use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use App\Livewire\Encounter\Forms\EncounterForm as Form;
@@ -334,10 +333,8 @@ class EncounterComponent extends Component
      */
     public function fetchIcd10Descriptions(array $codes): void
     {
-        $this->results = DB::table('icd_10')
-            ->whereIn('code', $codes)
-            ->select(['code', 'description'])
-            ->get()
+        $this->results = Icd10::whereIn('code', $codes)
+            ->get(['code', 'description'])
             ->toArray();
     }
 
@@ -349,20 +346,14 @@ class EncounterComponent extends Component
      */
     public function searchICD10(string $value): void
     {
-        $query = DB::table('icd_10')
-            ->select(['code', 'description'])
-            ->where(function (Builder $query) use ($value) {
-                $query->where('code', 'ILIKE', "%$value%")
-                    ->orWhere('description', 'ILIKE', "%$value%");
-            })
-            ->limit(50);
+        $query = Icd10::search($value)->limit(50);
 
         $allowedCodes = $this->allowedConditionCodesBySystem['eHealth/ICD10_AM/condition_codes'] ?? null;
         if ($allowedCodes !== null) {
             $query->whereIn('code', $allowedCodes);
         }
 
-        $this->results = $query->get()->toArray();
+        $this->results = $query->get(['code', 'description'])->toArray();
     }
 
     /**

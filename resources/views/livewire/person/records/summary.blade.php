@@ -94,7 +94,7 @@
                         <div x-show="activeSection === '{{ $item['id'] }}'" style="display: none;" class="px-5 pb-5">
 
                             @if($item['id'] === 'episodes')
-                                @include('livewire.person.records.parts.episodes')
+                                @include('livewire.person.records.parts.episodes', ['episodes' => $episodes])
                             @elseif($item['id'] === 'encounters')
                                 @include('livewire.person.records.parts.encounters')
                             @elseif($item['id'] === 'clinicalImpressions')
@@ -138,16 +138,16 @@
             </div>
 
             <!-- Right Sidebar Navigation -->
-            <div class="w-full lg:w-[320px] flex-shrink-0 space-y-1 mt-4 lg:mt-0 sticky top-6 self-start">
+            <div class="w-full lg:w-[320px] shrink-0 space-y-1 mt-4 lg:mt-0 sticky top-6 self-start">
                 @foreach($navItems as $item)
-                    <button @if($item['action']) wire:click.once="{{ $item['action'] }}" @endif
-                    @click="
+                    <button class="summary-sidebar-btn"
+                            @click="
                                 activeSection = '{{ $item['id'] }}';
                                 setTimeout(() => { document.getElementById('block-{{ $item['id'] }}').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
                             "
                             type="button"
                             :class="activeSection === '{{ $item['id'] }}' ? 'summary-sidebar-btn-active' : 'summary-sidebar-btn-inactive'"
-                            class="summary-sidebar-btn"
+                            @if($item['action']) wire:click.once="{{ $item['action'] }}" @endif
                     >
                         <span class="w-5 h-5 flex items-center justify-center shrink-0">
                             @icon($item['icon'], 'w-5 h-5')

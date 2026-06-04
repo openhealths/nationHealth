@@ -88,6 +88,7 @@ use App\Models\LegalEntity;
 use App\Models\License;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\Person\Person;
 use App\Models\Person\PersonRequest;
@@ -291,7 +292,7 @@ Route::middleware(['auth:web,ehealth', 'verified'])->group(function () {
                     Route::middleware('can:view,' . Person::class)->group(function () {
                         Route::get('/{personId}/patient-data', PatientData::class)->name('patient-data');
                         Route::get('/{personId}/summary', PatientSummary::class)->can('view', Person::class)->name('summary');
-                        Route::get('/{personId}/episodes', PatientEpisodes::class)->name('episodes');
+                        Route::get('/{personId}/episodes', PatientEpisodes::class)->can('view', Episode::class)->name('episodes');
                         Route::get('/{personId}/care-plans', \App\Livewire\Person\Records\PersonCarePlans::class)->name('care-plans');
                         Route::get('/{personId}/observations', PatientObservation::class)->name('observations');
                         Route::get('/{personId}/immunization', PatientImmunization::class)->name('immunization');

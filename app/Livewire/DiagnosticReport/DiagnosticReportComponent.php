@@ -7,11 +7,11 @@ namespace App\Livewire\DiagnosticReport;
 use App\Classes\Cipher\Traits\Cipher;
 use App\Livewire\DiagnosticReport\Forms\DiagnosticReportForm as Form;
 use App\Models\Employee\Employee;
+use App\Models\Icd10;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
 use App\Traits\FormTrait;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -184,12 +184,8 @@ class DiagnosticReportComponent extends Component
      */
     public function searchICD10(string $value): void
     {
-        $this->results = DB::table('icd_10')
-            ->select(['code', 'description'])
-            ->where('code', 'ILIKE', "%$value%")
-            ->orWhere('description', 'ILIKE', "%$value%")
-            ->limit(50)
-            ->get()
+        $this->results = Icd10::search($value)->limit(50)
+            ->get(['code', 'description'])
             ->toArray();
     }
 

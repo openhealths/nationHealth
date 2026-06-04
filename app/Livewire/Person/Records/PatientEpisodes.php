@@ -6,26 +6,31 @@ namespace App\Livewire\Person\Records;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
-use Illuminate\Database\Query\Builder;
-use Illuminate\Support\Facades\DB;
+use App\Enums\Person\EpisodeStatus;
+use App\Rules\InDictionary;
+use Illuminate\Validation\Rule;
 use App\Enums\JobStatus;
 use App\Jobs\EpisodeFullSync;
+use App\Models\Icd10;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\Episode;
 use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
 use Illuminate\Contracts\View\View;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Session;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
+use Livewire\Attributes\Computed;
+use Livewire\WithPagination;
 use Throwable;
 
 class PatientEpisodes extends BasePatientComponent
 {
     use BatchLegalEntityQueries;
     use HandlesSyncBatch;
-
-    public array $episodes = [];
+    use WithPagination;
 
     public string $syncStatus = '';
 
@@ -39,11 +44,26 @@ class PatientEpisodes extends BasePatientComponent
 
     protected array $dictionaryNames = ['eHealth/ICPC2/condition_codes'];
 
+    /**
+     * ICD-10 dictionary matches (code and description) for the search autocomplete.
+     *
+     * @var array
+     */
     public array $icd10Results = [];
 
     protected function initializeComponent(): void
     {
         $this->getDictionary();
+
+        $this->syncStatus = legalEntity()->getEntityStatus(LegalEntity::ENTITY_EPISODE) ?? '';
+    }
+
+    #[Computed]
+    public function paginatedEpisodes(): LengthAwarePaginator
+    {
+        return $this->isSearching
+            ? $this->searchEpisodesFromEHealth()
+            : $this->paginateLocalEpisodes();
     }
 
     protected function getSyncStatus(string $entityType): ?string
@@ -110,37 +130,97 @@ class PatientEpisodes extends BasePatientComponent
             Session::flash('success', __('patients.messages.episodes_synced_successfully'));
         }
 
-        $this->episodes = Arr::toCamelCase($this->formatDatesForDisplay($validatedData));
+        $this->isSearching = false;
+        $this->resetPage();
     }
 
     public function searchICD10(string $value): void
     {
-        $this->icd10Results = DB::table('icd_10')
-            ->select(['code', 'description'])
-            ->where(function (Builder $query) use ($value): void {
-                $query->where('code', 'ILIKE', "%$value%")
-                    ->orWhere('description', 'ILIKE', "%$value%");
-            })
-            ->limit(50)
-            ->get()
+        $this->icd10Results = Icd10::search($value)->limit(50)
+            ->get(['code', 'description'])
             ->toArray();
+    }
+
+    public function resetFilters(): void
+    {
+        $this->reset(['filterPeriodDateRange', 'filterCode', 'filterStatus', 'isSearching']);
+        $this->resetPage();
     }
 
     public function search(): void
     {
+        $this->validate($this->filterValidationRules());
+        $this->isSearching = true;
+        $this->resetPage();
+    }
+
+    /**
+     * Validation rules for the episode search filters.
+     *
+     * @return array
+     */
+    protected function filterValidationRules(): array
+    {
+        return [
+            'filterCode' => [
+                'nullable',
+                'string',
+                new InDictionary(['eHealth/ICPC2/condition_codes', 'eHealth/ICD10_AM/condition_codes'])
+            ],
+            'filterStatus' => ['nullable', Rule::in(array_keys(EpisodeStatus::searchableOptions()))],
+            'filterPeriodDateRange' => ['nullable', 'string', 'max:255']
+        ];
+    }
+
+    /**
+     * Paginate locally stored (synced) episodes straight from the database.
+     *
+     * @return LengthAwarePaginator
+     */
+    protected function paginateLocalEpisodes(): LengthAwarePaginator
+    {
+        $paginator = Episode::forPerson($this->personId)
+            ->withRelationships()
+            ->recentlyUpdatedFirst()
+            ->paginate(config('pagination.per_page'));
+
+        $paginator->setCollection(collect(Arr::toCamelCase($paginator->getCollection()->toArray())));
+
+        return $paginator;
+    }
+
+    /**
+     * Fetch a single page of episodes from the eHealth API for the active search filters.
+     *
+     * @return LengthAwarePaginator
+     */
+    protected function searchEpisodesFromEHealth(): LengthAwarePaginator
+    {
+        $perPage = config('pagination.per_page');
+        $page = $this->getPage();
+
         // todo: add period params after change in frontend
         $params = array_filter([
             'code' => $this->filterCode ?: null,
             'status' => $this->filterStatus ?: null,
-            'managing_organization_id' => legalEntity()->uuid
+            'managing_organization_id' => legalEntity()->uuid,
+            'page' => $page,
+            'page_size' => $perPage
         ]);
 
         try {
             $response = EHealth::episode()->getBySearchParams($this->uuid, $params);
-            $this->episodes = Arr::toCamelCase($this->formatDatesForDisplay($response->validate()));
+            $episodes = Arr::toCamelCase($this->formatDatesForDisplay($response->validate()));
+            $total = $response->getPaging()['total_entries'];
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while searching episodes');
+            $episodes = [];
+            $total = 0;
         }
+
+        return new LengthAwarePaginator(collect($episodes), $total, $perPage, $page, [
+            'path' => LengthAwarePaginator::resolveCurrentPath()
+        ]);
     }
 
     public function render(): View

@@ -252,6 +252,7 @@ return [
     // Observations record
     'observations' => 'Обстеження',
     'condition_search' => 'Пошук станів',
+    'observations_not_found' => 'Діагностичних звітів не знайдено',
 
     // Encounter
     'encounters' => 'Взаємодії',
@@ -271,7 +272,6 @@ return [
     'add_care_plan' => 'Додати план лікування',
     'encounter_entered_in_error' => 'Взаємодія внесена помилково',
     'add_observations_reports_conditions' => 'Додати обстеження, звіт або стан',
-    'write_assignments_here' => 'Призначення...',
     'medical_observation' => 'Медичне обстеження',
     'condition_or_diagnosis' => 'Стан або діагноз',
     'medical_diagnostic_report' => 'Діагностичний звіт',

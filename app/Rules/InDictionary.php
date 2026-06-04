@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Rules;
 
+use App\Models\Icd10;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Translation\PotentiallyTranslatedString;
 
 class InDictionary implements ValidationRule
@@ -53,10 +53,7 @@ class InDictionary implements ValidationRule
                         ->keys()
                         ->toArray();
                 } elseif ($name === 'eHealth/ICD10_AM/condition_codes') {
-                    self::$dictionaryCache[$name] = DB::table('icd_10')
-                        ->select(['code'])
-                        ->pluck('code')
-                        ->toArray();
+                    self::$dictionaryCache[$name] = Icd10::pluck('code')->toArray();
                 } elseif ($name === 'eHealth/assistive_products') {
                     self::$dictionaryCache[$name] = dictionary()->basics()
                         ->byName('eHealth/assistive_products')

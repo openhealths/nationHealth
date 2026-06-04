@@ -35,8 +35,17 @@
 
     - bindParam (string, required):
         The key in each option object that represents the label to display in the
-        dropdown and inside the input.
+        dropdown and inside the input. The list is also filtered on this key.
         Example: bindParam="name"
+
+    - label (string, not required):
+        The floating label rendered for the input.
+        Example: label="Episode"
+
+    - limit (int, not required):
+        Maximum number of options rendered in the dropdown at once (default 50).
+        Filtering still runs over the full options list; only the displayed slice is capped.
+        Example: limit="50"
 
     - isRequired (boolean, not required):
         This value responds for requirement combobox field if it shown
@@ -63,6 +72,8 @@
     'bind' => '',
     'bindValue' => '',
     'bindParam' => '',
+    'label' => '',
+    'limit' => 50,
     'isRequired' => false
 ])
 
@@ -76,11 +87,12 @@
          options: @js($options),
          entangled: $wire.entangle('{{ $bind }}'),
          value: '{{ $bindValue }}',
-         param: '{{ $bindParam }}'
+         param: '{{ $bindParam }}',
+         limit: {{ (int) $limit }}
      })"
 >
     <input :id="$id('input')"
-           :required="{{ $isRequired }}"
+           :required="{{ $isRequired ?: 'false' }}"
            :name="{{ $isRequired ? "'$bind'" : 'null' }}"
            type="text"
            placeholder=" "
@@ -88,10 +100,11 @@
            autocomplete="off"
            aria-describedby="{{ $hasSearchError ? 'hasSearchErrorHelp' : '' }}"
            class="input {{ $hasSearchError  ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
-           @focus="open=true"
-           @mousedown="open=(!open ? true : false)"
+           @focus="open = true"
+           @input="typing = true"
+           @mousedown="open = !open"
            @keydown.escape.window="open = false;"
-           @blur="setTimeout(() => open = false, 100)"
+           @blur="typing = false; setTimeout(() => open = false, 100)"
            x-init="if (search) $el.classList.add('not-empty')"
            x-effect="$el.classList.toggle('not-empty', !!search)"
     />
@@ -126,41 +139,52 @@
     @endif
 
     <label :for="$id('input')" class="label z-10">
-        {{ __('Медичний Заклад') }}
+        {{ $label }}
     </label>
 </div>
 
 @push('scripts')
     <script>
-        function combobox({ options, entangled, value, param }) {
+        function combobox({ options, entangled, value, param, limit }) {
             return {
                 options,
                 search: '',
                 value: entangled,
                 valueName: value,
                 param: param,
+                limit: limit,
                 open: false,
+                typing: false,
+
+                init() {
+                    this.$watch('value', (newValue) => {
+                        if (!newValue && !this.typing) {
+                            this.search = '';
+                        }
+                    });
+                },
 
                 get filtered() {
                     if (!this.search) {
-                        return this.options.map((opt, idx) => ({ label: opt[this.param], index: idx }));
+                        return this.options.slice(0, this.limit).map((option, index) => ({ label: option[this.param], index }));
                     }
 
-                    arr = this.options
-                        .map((opt, idx) => ({ label: opt[this.param], index: idx }))
-                        .filter(item => this.options[item.index].name.toLowerCase().includes(this.search.toLowerCase()));
+                    const matches = this.options
+                        .map((option, index) => ({ label: option[this.param], index }))
+                        .filter((item) => this.options[item.index][this.param].toLowerCase().includes(this.search.toLowerCase()));
 
-                    if (arr.length === 0) {
+                    if (matches.length === 0) {
                         this.value = '';
                     }
 
-                    return arr;
+                    return matches.slice(0, this.limit);
                 },
 
-                select(value, index) {
-                    this.search = value;
-                    this.value = this.options.find((option, idx) => idx === index && option[this.param] === value)[this.valueName];
+                select(label, index) {
+                    this.search = label;
+                    this.value = this.options.find((option, currentIndex) => currentIndex === index && option[this.param] === label)[this.valueName];
                     this.open = false;
+                    this.typing = false;
                 }
             }
         }

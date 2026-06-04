@@ -241,7 +241,7 @@
                 <input type="text"
                        @input.debounce.300ms="
                            let value = $event.target.value;
-                           let isEnglish = /^[a-zA-Z]+$/.test(value);
+                           let isEnglish = /^[a-zA-Z0-9.]+$/.test(value);
 
                            if ((isEnglish && value.length >= 1) || (!isEnglish && value.length >= 3)) {
                                $wire.searchICD10(value);

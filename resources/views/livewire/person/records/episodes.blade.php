@@ -1,5 +1,8 @@
-@use('App\Models\MedicalEvents\Sql\Encounter')
-@use('App\Enums\Person\EpisodeStatus')
+@php
+    use App\Models\MedicalEvents\Sql\Encounter;
+    use App\Enums\Person\EpisodeStatus;
+    use App\Models\MedicalEvents\Sql\Episode;
+@endphp
 
 <x-layouts.patient :personId="$personId" :patientFullName="$patientFullName">
     <x-slot name="headerActions">
@@ -18,13 +21,15 @@
             {{ __('patients.data_access') }}
         </button>
 
-        <button wire:click.prevent="sync"
-                type="button"
-                class="button-sync flex items-center gap-2 whitespace-nowrap px-5 py-2 text-sm shadow-sm"
-        >
-            @icon('refresh', 'w-4 h-4')
-            {{ __('patients.sync_ehealth_data') }}
-        </button>
+        @can('view', Episode::class)
+            <button wire:click.prevent="sync"
+                    type="button"
+                    class="button-sync flex items-center gap-2 whitespace-nowrap px-5 py-2 text-sm shadow-sm"
+            >
+                @icon('refresh', 'w-4 h-4')
+                {{ __('patients.sync_ehealth_data') }}
+            </button>
+        @endcan
     </x-slot>
 
     <div class="breadcrumb-form p-4 shift-content">
@@ -34,13 +39,15 @@
                 <p>{{ __('patients.search_episode') }}</p>
             </div>
 
-            <div class="form-row-3 mb-6" x-data="{
-                dictionary: '',
-                filterCode: $wire.entangle('filterCode'),
-                icd10Results: $wire.entangle('icd10Results'),
-                showIcd10Results: false
-            }">
-                <div class="form-group group" >
+            <div class="form-row-3 mb-6"
+                 x-data="{
+                     dictionary: '',
+                     filterCode: $wire.entangle('filterCode'),
+                     icd10Results: $wire.entangle('icd10Results'),
+                     showIcd10Results: false
+                 }"
+            >
+                <div class="form-group group">
                     <select x-model="dictionary"
                             @change="filterCode = ''"
                             class="input-select peer w-full mb-1 text-sm"
@@ -59,7 +66,7 @@
                                @input.debounce.300ms="
                                    filterCode = $event.target.value;
                                    let value = $event.target.value;
-                                   let isEnglish = /^[a-zA-Z]+$/.test(value);
+                                   let isEnglish = /^[a-zA-Z0-9.]+$/.test(value);
                                    if ((isEnglish && value.length >= 1) || (!isEnglish && value.length >= 3)) {
                                        $wire.searchICD10(value);
                                        showIcd10Results = true;
@@ -75,8 +82,8 @@
                              class="absolute left-0 top-full z-10 max-h-60 w-full overflow-auto rounded-lg border bg-white dark:bg-gray-800 p-1.5 shadow-lg"
                         >
                             <template x-for="result in icd10Results" :key="result.code">
-                                <div class="cursor-pointer rounded-md px-2 py-1.5 text-sm dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
-                                     @click="filterCode = result.code; showIcd10Results = false"
+                                <div @click="filterCode = result.code; showIcd10Results = false"
+                                     class="cursor-pointer rounded-md px-2 py-1.5 text-sm dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
                                      x-text="result.code + ' - ' + result.description"
                                 ></div>
                             </template>
@@ -99,7 +106,7 @@
                             class="input-select peer w-full"
                     >
                         <option value="" selected>{{ __('forms.select') }}</option>
-                        @foreach(EpisodeStatus::options() as $value => $label)
+                        @foreach(EpisodeStatus::searchableOptions() as $value => $label)
                             <option value="{{ $value }}">{{ $label }}</option>
                         @endforeach
                     </select>
@@ -111,13 +118,15 @@
 
             <div class="mb-9 flex flex-wrap items-center justify-between gap-4">
                 <div class="flex flex-wrap gap-2">
-                    <button type="button" wire:click="search"
+                    <button type="button"
+                            wire:click="search"
                             class="flex items-center gap-2 button-primary px-5 py-2.5 text-sm shadow-sm"
                     >
                         @icon('search', 'w-4 h-4')
                         <span>{{ __('patients.search') }}</span>
                     </button>
-                    <button type="button" wire:click="resetFilters"
+                    <button type="button"
+                            wire:click="resetFilters"
                             class="button-primary-outline-red px-5 py-2.5 text-sm"
                     >
                         {{ __('patients.reset_filters') }}
@@ -142,7 +151,7 @@
                     <div x-show="openGroupActions"
                          x-transition
                          x-cloak
-                         class="absolute right-0 top-full mt-2 z-10 w-[240px] bg-white rounded-lg shadow-lg border border-gray-200 dark:bg-gray-700 dark:border-gray-600 overflow-hidden"
+                         class="absolute right-0 top-full mt-2 z-10 w-60 bg-white rounded-lg shadow-lg border border-gray-200 dark:bg-gray-700 dark:border-gray-600 overflow-hidden"
                     >
                         <div class="py-1">
                             <button type="button"
@@ -180,7 +189,11 @@
             </div>
 
             <div class="space-y-4">
-                @include('livewire.person.records.parts.episodes')
+                @include('livewire.person.records.parts.episodes', ['episodes' => $this->paginatedEpisodes->items()])
+            </div>
+
+            <div class="mt-6">
+                {{ $this->paginatedEpisodes->links() }}
             </div>
         </div>
     </div>

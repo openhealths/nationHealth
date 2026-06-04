@@ -1,6 +1,6 @@
 @use('App\Enums\Person\EpisodeStatus')
 
-@foreach($this->episodes as $episode)
+@foreach($episodes as $episode)
     <div class="record-inner-card">
         <div class="record-inner-header">
             <div class="record-inner-checkbox-col">
@@ -9,7 +9,7 @@
 
             <div class="record-inner-column flex-1">
                 <div class="record-inner-label">{{ __('forms.name') }}</div>
-                <div class="record-inner-value text-[16px]">{{ data_get($episode, 'name', '-') }}</div>
+                <div class="record-inner-value text-[16px]">{{ data_get($episode, 'name') }}</div>
             </div>
 
             <div class="record-inner-column-bordered w-full md:w-36 shrink-0">
@@ -99,7 +99,7 @@
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <div class="record-inner-label">{{ __('patients.date_opened') }}</div>
-                        <div class="record-inner-value">{{ data_get($episode, 'period.start', '-') }}</div>
+                        <div class="record-inner-value">{{ data_get($episode, 'period.start') }}</div>
                     </div>
                     <div>
                         <div class="record-inner-label">{{ __('patients.date_closed') }}</div>
@@ -107,7 +107,13 @@
                     </div>
                     <div>
                         <div class="record-inner-label">{{ __('patients.date_updated') }}</div>
-                        <div class="record-inner-value">{{ data_get($episode, 'ehealthUpdatedAt', '-') }}</div>
+                        <div class="record-inner-value">{{ data_get($episode, 'ehealthUpdatedAt') ?? '-' }}</div>
+                    </div>
+                    <div>
+                        <div class="record-inner-label">{{ __('patients.doctor') }}</div>
+                        <div class="record-inner-value">
+                            {{ data_get($episode, 'careManager.displayValue') ?? '-' }}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -115,7 +121,7 @@
             <div class="record-inner-id-col">
                 <div class="min-w-0">
                     <div class="record-inner-label">{{ __('patients.filter_code') }}</div>
-                    <div class="record-inner-id-value">{{ data_get($episode, 'uuid', '-') }}</div>
+                    <div class="record-inner-id-value">{{ data_get($episode, 'uuid') }}</div>
                 </div>
             </div>
         </div>

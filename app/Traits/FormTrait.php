@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Traits;
 
+use App\Models\Icd10;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 
@@ -256,7 +256,7 @@ trait FormTrait
 
         $this->dictionaries['eHealth/ICD10_AM/condition_codes'] = array_merge(
             $this->dictionaries['eHealth/ICD10_AM/condition_codes'] ?? [],
-            DB::table('icd_10')->whereIn('code', $icd10Codes)->pluck('description', 'code')->toArray()
+            Icd10::whereIn('code', $icd10Codes)->pluck('description', 'code')->toArray()
         );
     }
 }
