@@ -23,11 +23,13 @@
 
                     <div class="record-inner-column flex-1">
                         <div class="record-inner-label">{{ __('patients.vaccine') }}</div>
-                        <div class="record-inner-value text-[16px]"
-                             x-text="`${ immunization.vaccineCode } - ${ vaccineCodesDictionary[immunization.vaccineCode] }`"></div>
+                        <div
+                            class="record-inner-value text-[16px]"
+                            x-text="`${ immunization.vaccineCode } - ${ vaccineCodesDictionary[immunization.vaccineCode] }`"
+                        ></div>
                     </div>
 
-                    <div class="record-inner-column-bordered min-w-[120px]">
+                    <div class="record-inner-column-bordered min-w-30">
                         <div class="record-inner-label">{{ __('forms.status.label') }}</div>
                         <div class="record-inner-value">
                             <template x-if="immunization.notGiven === false">
@@ -47,24 +49,24 @@
 
                     <div class="record-inner-action-col">
                         <div x-data="{
-                            openDropdown: false,
-                            toggle() {
-                                if (this.openDropdown) {
-                                    return this.close()
-                                }
+                                 openDropdown: false,
+                                 toggle() {
+                                     if (this.openDropdown) {
+                                         return this.close()
+                                     }
 
-                                this.$refs.button.focus()
+                                     this.$refs.button.focus()
 
-                                this.openDropdown = true
-                            },
-                            close(focusAfter) {
-                                if (!this.openDropdown) return
+                                     this.openDropdown = true
+                                 },
+                                 close(focusAfter) {
+                                     if (!this.openDropdown) return
 
-                                this.openDropdown = false
+                                     this.openDropdown = false
 
-                                focusAfter && focusAfter.focus()
-                            }
-                        }"
+                                     focusAfter && focusAfter.focus()
+                                 }
+                             }"
                              @keydown.escape.prevent.stop="close($refs.button)"
                              @focusin.window="! $refs.panel.contains($event.target) && close()"
                              x-id="['dropdown-button']"
@@ -100,12 +102,12 @@
                                      class="dropdown-panel relative"
                                 >
                                     <button @click.prevent="
-                                        openModal = true;
-                                        item = index;
-                                        modalImmunization = JSON.parse(JSON.stringify(immunizations[index]));
-                                        newImmunization = false;
-                                        close($refs.button);
-                                    "
+                                                openModal = true;
+                                                item = index;
+                                                modalImmunization = JSON.parse(JSON.stringify(immunizations[index]));
+                                                newImmunization = false;
+                                                close($refs.button);
+                                            "
                                     >
                                         {{ __('forms.edit') }}
                                     </button>
@@ -193,40 +195,52 @@
                                                 <div
                                                     class="grid grid-cols-2 gap-y-4 gap-x-4 border-b border-gray-100 dark:border-gray-700 last:border-b-0 pb-4 last:pb-0 mb-4 last:mb-0">
                                                     <div class="col-span-2">
-                                                        <div
-                                                            class="record-inner-label">{{ __('patients.target_diseases') }}</div>
+                                                        <div class="record-inner-label">
+                                                            {{ __('patients.target_diseases') }}
+                                                        </div>
                                                         <div class="record-inner-subvalue"
-                                                             x-text="vaccinationTargetDiseasesDictionary[protocol.targetDiseaseCodes?.[0]] || '-'"></div>
+                                                             x-text="vaccinationTargetDiseasesDictionary[protocol.targetDiseaseCodes?.[0]] || '-'"
+                                                        ></div>
                                                     </div>
                                                     <div>
-                                                        <div
-                                                            class="record-inner-label">{{ __('patients.dose_sequence') }}</div>
+                                                        <div class="record-inner-label">
+                                                            {{ __('patients.dose_sequence') }}
+                                                        </div>
                                                         <div class="record-inner-subvalue"
-                                                             x-text="protocol.doseSequence || '-'"></div>
+                                                             x-text="protocol.doseSequence || '-'"
+                                                        ></div>
                                                     </div>
                                                     <div>
-                                                        <div
-                                                            class="record-inner-label">{{ __('patients.series_of_doses_by_protocol') }}</div>
+                                                        <div class="record-inner-label">
+                                                            {{ __('patients.series_of_doses_by_protocol') }}
+                                                        </div>
                                                         <div class="record-inner-subvalue"
-                                                             x-text="protocol.seriesDoses || '-'"></div>
+                                                             x-text="protocol.seriesDoses || '-'"
+                                                        ></div>
                                                     </div>
                                                     <div>
-                                                        <div
-                                                            class="record-inner-label">{{ __('patients.protocol_author') }}</div>
+                                                        <div class="record-inner-label">
+                                                            {{ __('patients.protocol_author') }}
+                                                        </div>
                                                         <div class="record-inner-subvalue"
-                                                             x-text="$wire.dictionaries['eHealth/vaccination_authorities'][protocol.authorityCode] || '-'"></div>
+                                                             x-text="$wire.dictionaries['eHealth/vaccination_authorities'][protocol.authorityCode] || '-'"
+                                                        ></div>
                                                     </div>
                                                     <div>
-                                                        <div
-                                                            class="record-inner-label">{{ __('patients.immunization_series') }}</div>
+                                                        <div class="record-inner-label">
+                                                            {{ __('patients.immunization_series') }}
+                                                        </div>
                                                         <div class="record-inner-subvalue"
-                                                             x-text="protocol.series || '-'"></div>
+                                                             x-text="protocol.series || '-'"
+                                                        ></div>
                                                     </div>
                                                     <div class="col-span-2">
-                                                        <div
-                                                            class="record-inner-label">{{ __('patients.protocol_description') }}</div>
+                                                        <div class="record-inner-label">
+                                                            {{ __('patients.protocol_description') }}
+                                                        </div>
                                                         <div class="record-inner-subvalue"
-                                                             x-text="protocol.description || '-'"></div>
+                                                             x-text="protocol.description || '-'"
+                                                        ></div>
                                                     </div>
                                                 </div>
                                             </template>
@@ -250,10 +264,10 @@
     <div>
         {{-- Button to trigger the modal --}}
         <button @click.prevent="
-            openModal = true; {{-- Open the Modal --}}
-            newImmunization = true; {{-- We are adding a new immumization --}}
-            modalImmunization = new Immunization(); {{-- Replace the data of the previous immumization with a new one--}}
-        "
+                    openModal = true; {{-- Open the Modal --}}
+                    newImmunization = true; {{-- We are adding a new immumization --}}
+                    modalImmunization = new Immunization(); {{-- Replace the data of the previous immumization with a new one--}}
+                "
                 class="item-add my-5"
         >
             {{ __('forms.add') }}
@@ -302,50 +316,50 @@
                                 </button>
 
                                 <button @click.prevent="
-                                    const newImmunizationCode = modalImmunization.vaccineCode;
+                                            const newImmunizationCode = modalImmunization.vaccineCode;
 
-                                    // Check for duplicates, excluding the current item when editing
-                                    let hasDuplicate = false;
+                                            // Check for duplicates, excluding the current item when editing
+                                            let hasDuplicate = false;
 
-                                    if (newImmunization) {
-                                        // For new immunization, check all existing ones
-                                        hasDuplicate = immunizations.some(
-                                            immunization => immunization.vaccineCode === newImmunizationCode
-                                        );
-                                    } else {
-                                        // For editing, check all except the current item
-                                        hasDuplicate = immunizations.some(
-                                            (immunization, index) => index !== item && immunization.vaccineCode === newImmunizationCode
-                                        );
-                                    }
+                                            if (newImmunization) {
+                                                // For new immunization, check all existing ones
+                                                hasDuplicate = immunizations.some(
+                                                    immunization => immunization.vaccineCode === newImmunizationCode
+                                                );
+                                            } else {
+                                                // For editing, check all except the current item
+                                                hasDuplicate = immunizations.some(
+                                                    (immunization, index) => index !== item && immunization.vaccineCode === newImmunizationCode
+                                                );
+                                            }
 
-                                    if (hasDuplicate) {
-                                        showDuplicateCodeWarning = true;
-                                        return;
-                                    }
+                                            if (hasDuplicate) {
+                                                showDuplicateCodeWarning = true;
+                                                return;
+                                            }
 
-                                    if (modalImmunization.notGiven) {
-                                        modalImmunization.reasons = [];
-                                    } else {
-                                        modalImmunization.reasonNotGivenCode = '';
-                                    }
+                                            if (modalImmunization.notGiven) {
+                                                modalImmunization.reasons = [];
+                                            } else {
+                                                modalImmunization.reasonNotGivenCode = '';
+                                            }
 
-                                    newImmunization !== false
-                                        ? immunizations.push(modalImmunization)
-                                        : immunizations[item] = modalImmunization;
+                                            newImmunization !== false
+                                                ? immunizations.push(modalImmunization)
+                                                : immunizations[item] = modalImmunization;
 
-                                    showDuplicateCodeWarning = false;
-                                    openModal = false;
-                                "
+                                            showDuplicateCodeWarning = false;
+                                            openModal = false;
+                                        "
                                         class="button-primary"
                                         :disabled="!(
-                                                modalImmunization.date.trim() &&
-                                                modalImmunization.time.trim() &&
-                                                (modalImmunization.reasons?.[0]?.code?.trim?.() || modalImmunization.reasonNotGivenCode?.trim?.()) &&
-                                                (modalImmunization.vaccinationProtocols.length > 0 &&
-                                                 (!modalImmunization.primarySource ||
-                                                  modalImmunization.vaccinationProtocols.every(protocol => protocol.doseSequence && protocol.series && protocol.seriesDoses)))
-                                            )"
+                                            modalImmunization.date.trim() &&
+                                            modalImmunization.time.trim() &&
+                                            (modalImmunization.reasons?.[0]?.code?.trim?.() || modalImmunization.reasonNotGivenCode?.trim?.()) &&
+                                            (modalImmunization.vaccinationProtocols.length > 0 &&
+                                             (!modalImmunization.primarySource ||
+                                              modalImmunization.vaccinationProtocols.every(protocol => protocol.doseSequence && protocol.series && protocol.seriesDoses)))
+                                        )"
                                 >
                                     {{ __('forms.save') }}
                                 </button>
@@ -371,14 +385,13 @@
         constructor(obj = null) {
             const now = new Date();
             const [yyyy, mm, dd] = now.toISOString().split('T')[0].split('-');
-            const formattedDate = `${dd}.${mm}.${yyyy}`;
 
-            this.date = formattedDate;
-            this.time = now.toLocaleTimeString('uk-UA', {hour: '2-digit', minute: '2-digit', hour12: false});
+            this.date = `${dd}.${mm}.${yyyy}`;
+            this.time = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
             this.notGiven = false;
             this.vaccineCode = '';
             this.primarySource = true;
-            this.reasons = [{code: ''}];
+            this.reasons = [{ code: '' }];
             this.reasonNotGivenCode = '';
             this.reportOriginCode = '';
             this.reportOriginText = '';

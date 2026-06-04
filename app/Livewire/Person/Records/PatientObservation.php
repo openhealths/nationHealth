@@ -14,6 +14,7 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Repositories\MedicalEvents\Repository;
+use App\Rules\InDictionary;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
 use Carbon\CarbonImmutable;
@@ -159,7 +160,7 @@ class PatientObservation extends BasePatientComponent
         try {
             $response = EHealth::observation()->getBySearchParams(
                 $this->uuid,
-                ['managing_organization_id' => legalEntity()->uuid],
+                ['managing_organization_id' => legalEntity()->uuid]
             );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while synchronizing observation');
@@ -393,14 +394,20 @@ class PatientObservation extends BasePatientComponent
     protected function filterValidationRules(): array
     {
         return [
-            'filterCode' => ['nullable', 'string', 'max:255'],
+            'filterCode' => [
+                'nullable',
+                'string',
+                new InDictionary(
+                    ['eHealth/LOINC/observation_codes', 'eHealth/custom/observation_codes', 'eHealth/ICF/classifiers']
+                )
+            ],
             'filterEncounterId' => ['nullable', 'uuid'],
             'filterDiagnosticReportId' => ['nullable', 'uuid'],
             'filterEpisodeId' => ['nullable', 'uuid'],
             'filterIssuedFrom' => ['nullable', 'date_format:' . config('app.date_format')],
             'filterIssuedTo' => ['nullable', 'date_format:' . config('app.date_format')],
             'filterDeviceId' => ['nullable', 'uuid'],
-            'filterSpecimenId' => ['nullable', 'uuid'],
+            'filterSpecimenId' => ['nullable', 'uuid']
         ];
     }
 
