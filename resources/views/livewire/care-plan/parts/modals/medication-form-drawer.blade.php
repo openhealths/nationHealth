@@ -1,24 +1,38 @@
-@php
-    $availableConditions = $availableConditions ?? [];
-    $availableObservations = $availableObservations ?? [];
-    $availableReports = $availableReports ?? [];
-    $linkedGrounds = $linkedGrounds ?? [];
-    $selectedProduct = $selectedProduct ?? null;
-    $activityForm = $activityForm ?? [];
-    $dictionaries = $dictionaries ?? [];
-@endphp
+{{-- Medication Form Drawer Overlay (below header z-60) --}}
+<div x-show="showMedicationFormDrawer"
+     x-transition:enter="transition ease-out duration-300"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition ease-in duration-200"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     x-cloak
+     @click="showMedicationFormDrawer = false"
+     class="fixed top-0 right-0 h-screen pt-20 bg-gray-900/50"
+     style="z-index: 46; width: calc(80% - 30px);"
+></div>
 
-<x-dialog-drawer
-    x-model="showMedicationFormDrawer"
-    noTeleport="true"
-    topClass="top-[57px]"
-    zIndex="44"
-    customWidth="w-full sm:w-[calc(80%-30%)]"
-    overlayWidth="calc(80% - 15%)"
-    hasClose="true"
-    onCloseClick="showMedicationFormDrawer = false"
-    title="{{ __('care-plan.new_medication_prescription') }}"
+{{-- Medication Form Drawer (60px gap on the LEFT — third drawer) --}}
+<div id="medication-form-drawer-right"
+     x-show="showMedicationFormDrawer"
+     x-transition:enter="transition ease-out duration-300"
+     x-transition:enter-start="translate-x-full"
+     x-transition:enter-end="translate-x-0"
+     x-transition:leave="transition ease-in duration-200"
+     x-transition:leave-start="translate-x-0"
+     x-transition:leave-end="translate-x-full"
+     x-cloak
+     class="fixed top-0 right-0 h-screen pt-20 p-4 overflow-y-auto bg-white dark:bg-gray-800 shadow-2xl"
+     style="z-index: 47; width: calc(80% - 60px);"
+     tabindex="-1"
 >
+    <h3 class="modal-header">
+        @if(isset($activityForm['id']) && $activityForm['id'])
+            {{ __('care-plan.edit_medication_prescription') }}
+        @else
+            {{ __('care-plan.new_medication_prescription') }}
+        @endif
+    </h3>
 
     {{-- Content --}}
     <form wire:submit.prevent="saveActivity">
@@ -66,20 +80,20 @@
                                wire:model="activityForm.quantity"
                         >
                         <select class="input-select peer w-20" wire:model="activityForm.quantity_system">
-                            <option value="ml">{{ __('care-plan.ml') }}</option>
+                            <option value="MEDICATION_UNIT">{{ $activityForm['quantity_code'] ?? __('care-plan.ml') }}</option>
                         </select>
                     </div>
                 </div>
                 <div class="form-group group">
                     <label class="label">
-                        {{ __('care-plan.start_date') }}:
+                        {{ __('care-plan.start_date') }}: <span class="text-red-500">*</span>
                     </label>
                     <div class="relative">
                         <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
-                            @icon('calendar-week', 'w-4 h-4 text-gray-500')
+                            @icon('calendar-month', 'w-4 h-4 text-gray-500')
                         </div>
                         <input type="text"
-                               class="input peer ps-10"
+                               class="input peer ps-10 datepicker-input"
                                placeholder="02.04.2025"
                                datepicker-autohide
                                datepicker-format="dd.mm.yyyy"
@@ -115,7 +129,7 @@
                                id="med_quantity_per_time"
                                name="med_quantity_per_time"
                                class="input peer w-full"
-                               value="1"
+                               wire:model="activityForm.daily_amount"
                         >
                         <select class="input-select peer w-20">
                             <option selected value="ml">{{ __('care-plan.ml') }}</option>
@@ -124,14 +138,14 @@
                 </div>
                 <div class="form-group group">
                     <label class="label">
-                        {{ __('care-plan.end_date') }}:
+                        {{ __('care-plan.end_date') }}: <span class="text-red-500">*</span>
                     </label>
                     <div class="relative">
                         <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
-                            @icon('calendar-week', 'w-4 h-4 text-gray-500')
+                            @icon('calendar-month', 'w-4 h-4 text-gray-500')
                         </div>
                         <input type="text"
-                               class="input peer ps-10"
+                               class="input peer ps-10 datepicker-input"
                                placeholder="02.08.2025"
                                datepicker-autohide
                                datepicker-format="dd.mm.yyyy"
@@ -200,45 +214,54 @@
                 {{ __('care-plan.grounds_for_prescription') }}
             </legend>
 
-            <div class="mb-6 max-w-xl">
-                <select x-model="selectedGround" class="input-select peer w-full">
-                    <option value="">{{ __('care-plan.select_icd10_code') }}</option>
-                    @if(!empty($availableConditions))
-                        <optgroup label="{{ __('care-plan.diagnoses_conditions') }}">
-                            @foreach($availableConditions as $cond)
-                                <option value="Condition|{{ $cond['uuid'] }}">{{ $cond['name'] }} ({{ __('care-plan.from') }} {{ $cond['date'] }})</option>
-                            @endforeach
-                        </optgroup>
-                    @endif
-                    @if(!empty($availableReports))
-                        <optgroup label="{{ __('care-plan.diagnostic_reports') }}">
-                            @foreach($availableReports as $report)
-                                <option value="DiagnosticReport|{{ $report['uuid'] }}">{{ $report['name'] }} ({{ __('care-plan.from') }} {{ $report['date'] }})</option>
-                            @endforeach
-                        </optgroup>
-                    @endif
-                    @if(!empty($availableObservations))
-                        <optgroup label="{{ __('care-plan.observations') }}">
-                            @foreach($availableObservations as $obs)
-                                <option value="Observation|{{ $obs['uuid'] }}">{{ $obs['name'] }} ({{ __('care-plan.from') }} {{ $obs['date'] }})</option>
-                            @endforeach
-                        </optgroup>
-                    @endif
-                </select>
+            <div class="flex gap-4 items-end mb-6">
+                <div class="flex-1">
+                    <label class="label">Оберіть клінічний запис пацієнта</label>
+                    <select x-model="selectedGround" 
+                            @change="if(selectedGround) { 
+                                let parts = selectedGround.split('|');
+                                $wire.addLinkedGround(parts[0], parts[1]);
+                                selectedGround = '';
+                            }" 
+                            class="input-select peer w-full">
+                        <option value="">-- Оберіть запис --</option>
+                        @if(!empty($availableConditions))
+                            <optgroup label="Діагнози (Стани)">
+                                @foreach($availableConditions as $cond)
+                                    <option value="Condition|{{ $cond['uuid'] }}">{{ $cond['name'] }} (від {{ $cond['date'] }})</option>
+                                @endforeach
+                            </optgroup>
+                        @endif
+                        @if(!empty($availableReports))
+                            <optgroup label="Діагностичні звіти">
+                                @foreach($availableReports as $report)
+                                    <option value="DiagnosticReport|{{ $report['uuid'] }}">{{ $report['name'] }} (від {{ $report['date'] }})</option>
+                                @endforeach
+                            </optgroup>
+                        @endif
+                        @if(!empty($availableObservations))
+                            <optgroup label="Спостереження">
+                                @foreach($availableObservations as $obs)
+                                    <option value="Observation|{{ $obs['uuid'] }}">{{ $obs['name'] }} (від {{ $obs['date'] }})</option>
+                                @endforeach
+                            </optgroup>
+                        @endif
+                    </select>
+                </div>
             </div>
 
             <div class="mb-4">
-                <h4 class="text-base font-bold text-gray-900 dark:text-white mb-4">
+                <h4 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
                     {{ __('care-plan.justification_of_grounds') }}
                 </h4>
 
-                <div class="overflow-x-auto rounded-lg border border-gray-100 dark:border-gray-700">
+                <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left">
                         <thead class="thead-input">
                             <tr>
-                                <th scope="col" class="px-4 py-3 text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{{ __('care-plan.date') }}</th>
-                                <th scope="col" class="px-4 py-3 text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{{ __('care-plan.name') }}</th>
-                                <th scope="col" class="px-4 py-3 text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-right">{{ __('care-plan.action') }}</th>
+                                <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.date') }}</th>
+                                <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.name') }}</th>
+                                <th scope="col" class="px-4 py-3 font-medium text-right">Дія</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -248,10 +271,13 @@
                                         {{ $ground['date'] }}
                                     </td>
                                     <td class="px-4 py-3 text-gray-900 dark:text-white">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 mr-2">
+                                            {{ $ground['type'] === 'Condition' ? 'Діагноз' : ($ground['type'] === 'DiagnosticReport' ? 'Діагн. звіт' : 'Спостереження') }}
+                                        </span>
                                         {{ $ground['name'] }}
                                     </td>
                                     <td class="px-4 py-3 text-right">
-                                        <button type="button" wire:click="removeLinkedGround('{{ $ground['uuid'] }}')" class="text-black dark:text-white hover:opacity-70 transition-opacity inline-block cursor-pointer">
+                                        <button type="button" wire:click="removeLinkedGround('{{ $ground['uuid'] }}')" class="text-red-500 hover:text-red-700 transition-colors">
                                             @icon('delete', 'w-5 h-5')
                                         </button>
                                     </td>
@@ -259,21 +285,12 @@
                             @empty
                                 <tr>
                                     <td colspan="3" class="px-4 py-8 text-center text-gray-400 italic">
-                                        {{ __('care-plan.no_justification_added') }}
+                                        Немає доданих обґрунтувань
                                     </td>
                                 </tr>
                             @endforelse
                         </tbody>
                     </table>
-                </div>
-
-                <div class="mt-4">
-                    <button type="button" 
-                            @click="showMedicalRecordsSearchDrawer = true" 
-                            class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium text-sm flex items-center gap-1 transition-colors cursor-pointer"
-                    >
-                        + {{ __('care-plan.add_medical_record') }}
-                    </button>
                 </div>
             </div>
         </fieldset>
@@ -326,5 +343,4 @@
             </button>
         </div>
     </form>
-</x-dialog-drawer>
-
+</div>

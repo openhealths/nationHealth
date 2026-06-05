@@ -229,6 +229,7 @@ return [
     'data_access' => 'Доступ до даних',
     'sync_ehealth_data' => 'Синхронізувати дані з ЕСОЗ',
     'sync_success' => 'Дані успішно синхронізовані',
+    'show_more' => 'Побачити більше',
     'allergies' => 'Алергії',
     'risk_assessments' => 'Оцінки ризиків',
     'devices' => 'Пристрої',
@@ -252,6 +253,7 @@ return [
     // Observations record
     'observations' => 'Обстеження',
     'condition_search' => 'Пошук станів',
+    'observations_not_found' => 'Діагностичних звітів не знайдено',
 
     // Encounter
     'encounters' => 'Взаємодії',
@@ -271,7 +273,6 @@ return [
     'add_care_plan' => 'Додати план лікування',
     'encounter_entered_in_error' => 'Взаємодія внесена помилково',
     'add_observations_reports_conditions' => 'Додати обстеження, звіт або стан',
-    'write_assignments_here' => 'Призначення...',
     'medical_observation' => 'Медичне обстеження',
     'condition_or_diagnosis' => 'Стан або діагноз',
     'medical_diagnostic_report' => 'Діагностичний звіт',

@@ -89,123 +89,128 @@
              }
          }"
 >
-    <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
-        {{ __('patients.diagnoses') }}
-    </h2>
-
-    <table class="table-input w-inherit">
-        <thead class="thead-input">
-        <tr>
-            <th scope="col" class="th-input">{{ __('patients.code_and_name') }}</th>
-            <th scope="col" class="th-input">{{ __('forms.type') }}</th>
-            <th scope="col" class="th-input">{{ __('patients.clinical_status') }}</th>
-            <th scope="col" class="th-input">{{ __('patients.verification_status') }}</th>
-            <th scope="col" class="th-input">{{ __('forms.comment') }}</th>
-            <th scope="col" class="th-input">{{ __('forms.action') }}</th>
-        </tr>
-        </thead>
-        <tbody>
+    <div class="space-y-4">
         <template x-for="(condition, index) in conditions" :key="index">
-            <tr>
-                <td class="td-input"
-                    x-text="`${ condition.codeCode } - ${ condition.codeSystem === 'eHealth/ICD10_AM/condition_codes' ? icd10Descriptions[condition.codeCode] : conditionCodesDictionary[condition.codeCode] }`"
-                ></td>
-                <td class="td-input"
-                    x-text="diagnosisRolesDictionary[diagnoses[index]?.roleCode]"
-                ></td>
-                <td class="td-input"
-                    x-text="conditionClinicalStatusesRolesDictionary[condition.clinicalStatus]"
-                ></td>
-                <td class="td-input"
-                    x-text="conditionVerificationStatusesDictionary[condition.verificationStatus]"
-                ></td>
-                <td class="td-input" x-text="condition.asserterText"></td>
-                <td class="td-input">
-                    {{-- That all that is needed for the dropdown --}}
-                    <div x-data="{
-                             openDropdown: false,
-                             toggle() {
-                                 if (this.openDropdown) {
-                                     return this.close()
-                                 }
+            <div class="record-inner-card">
+                <div class="record-inner-header">
+                    <div class="record-inner-checkbox-col">
+                        <input type="checkbox" class="default-checkbox w-5 h-5" disabled>
+                    </div>
 
-                                 this.$refs.button.focus()
+                    <div class="record-inner-column flex-1">
+                        <div class="record-inner-label">{{ __('patients.code_and_name') }}</div>
+                        <div class="record-inner-value text-[16px]"
+                             x-text="`${ condition.codeCode } - ${ condition.codeSystem === 'eHealth/ICD10_AM/condition_codes' ? icd10Descriptions[condition.codeCode] : conditionCodesDictionary[condition.codeCode] }`"></div>
+                    </div>
 
-                                 this.openDropdown = true
-                             },
-                             close(focusAfter) {
-                                 if (!this.openDropdown) return
+                    <div class="record-inner-action-col">
+                        <div x-data="{
+                            openDropdown: false,
+                            toggle() {
+                                if (this.openDropdown) {
+                                    return this.close()
+                                }
 
-                                 this.openDropdown = false
+                                this.$refs.button.focus()
 
-                                 focusAfter && focusAfter.focus()
-                             }
-                         }"
-                         @keydown.escape.prevent.stop="close($refs.button)"
-                         @focusin.window="!$refs.panel.contains($event.target) && close()"
-                         x-id="['dropdown-button']"
-                         class="relative"
-                    >
-                        {{-- Dropdown Button --}}
-                        <button x-ref="button"
-                                @click="toggle()"
-                                :aria-expanded="openDropdown"
-                                :aria-controls="$id('dropdown-button')"
-                                type="button"
-                                class="cursor-pointer"
+                                this.openDropdown = true
+                            },
+                            close(focusAfter) {
+                                if (!this.openDropdown) return
+
+                                this.openDropdown = false
+
+                                focusAfter && focusAfter.focus()
+                            }
+                        }"
+                             @keydown.escape.prevent.stop="close($refs.button)"
+                             @focusin.window="!$refs.panel.contains($event.target) && close()"
+                             x-id="['dropdown-button']"
+                             class="relative"
                         >
-                            <svg class="w-6 h-6 text-gray-800 dark:text-gray-200" aria-hidden="true"
-                                 xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none"
-                                 viewBox="0 0 24 24"
+                            {{-- Dropdown Button --}}
+                            <button x-ref="button"
+                                    @click="toggle()"
+                                    :aria-expanded="openDropdown"
+                                    :aria-controls="$id('dropdown-button')"
+                                    type="button"
+                                    class="record-inner-action-btn cursor-pointer"
                             >
-                                <path stroke="currentColor" stroke-linecap="square" stroke-linejoin="round"
-                                      stroke-width="2"
-                                      d="M7 19H5a1 1 0 0 1-1-1v-1a3 3 0 0 1 3-3h1m4-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm7.441 1.559a1.907 1.907 0 0 1 0 2.698l-6.069 6.069L10 19l.674-3.372 6.07-6.07a1.907 1.907 0 0 1 2.697 0Z"
-                                />
-                            </svg>
-                        </button>
-
-                        {{-- Dropdown Panel --}}
-                        <div class="absolute" style="left: 50%"> {{-- Center a dropdown panel --}}
-                            <div x-ref="panel"
-                                 x-show="openDropdown"
-                                 x-transition.origin.top.left
-                                 @click.outside="close($refs.button)"
-                                 :id="$id('dropdown-button')"
-                                 x-cloak
-                                 class="dropdown-panel relative"
-                                 style="left: -50%" {{-- Center a dropdown panel --}}
-                            >
-
-                                <button @click.prevent="
-                                             item = index; {{-- Identify the item we are corrently editing --}}
-                                             modalCondition = new Condition(condition);
-                                             modalDiagnosis = new Diagnosis(diagnoses[index]);
-                                             newCondition = false; {{-- This condition is already created --}}
-                                             openConditionDrawer = true;
-                                         "
-                                        class="dropdown-button"
+                                <svg class="w-6 h-6 text-gray-800 dark:text-gray-200" aria-hidden="true"
+                                     xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none"
+                                     viewBox="0 0 24 24"
                                 >
-                                    {{ __('forms.edit') }}
-                                </button>
+                                    <path stroke="currentColor" stroke-linecap="square" stroke-linejoin="round"
+                                          stroke-width="2"
+                                          d="M7 19H5a1 1 0 0 1-1-1v-1a3 3 0 0 1 3-3h1m4-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm7.441 1.559a1.907 1.907 0 0 1 0 2.698l-6.069 6.069L10 19l.674-3.372 6.07-6.07a1.907 1.907 0 0 1 2.697 0Z"
+                                    />
+                                </svg>
+                            </button>
 
-                                <button @click.prevent="
-                                            conditions.splice(index, 1);
-                                            diagnoses.splice(index, 1);
-                                            close($refs.button);
-                                        "
-                                        class="dropdown-button dropdown-delete"
+                            {{-- Dropdown Panel --}}
+                            <div class="absolute right-0 z-50">
+                                <div x-ref="panel"
+                                     x-show="openDropdown"
+                                     x-transition.origin.top.left
+                                     @click.outside="close($refs.button)"
+                                     :id="$id('dropdown-button')"
+                                     x-cloak
+                                     class="dropdown-panel relative"
                                 >
-                                    {{ __('forms.delete') }}
-                                </button>
+                                    <button @click.prevent="
+                                        item = index;
+                                        modalCondition = new Condition(condition);
+                                        modalDiagnosis = new Diagnosis(diagnoses[index]);
+                                        newCondition = false;
+                                        openConditionDrawer = true;
+                                        close($refs.button);
+                                    "
+                                    >
+                                        {{ __('forms.edit') }}
+                                    </button>
+
+                                    <button class="dropdown-delete" @click.prevent="
+                                                conditions.splice(index, 1);
+                                                diagnoses.splice(index, 1);
+                                                close($refs.button);
+                                            "
+                                    >
+                                        {{ __('forms.delete') }}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </td>
-            </tr>
+                </div>
+
+                <div class="record-inner-body">
+                    <div class="record-inner-grid-container">
+                        <div class="grid grid-cols-2 xl:grid-cols-4 gap-y-4 gap-x-4 w-full">
+                            <div>
+                                <div class="record-inner-label">{{ __('forms.type') }}</div>
+                                <div class="record-inner-subvalue"
+                                     x-text="diagnosisRolesDictionary[diagnoses[index]?.roleCode] || '-'"></div>
+                            </div>
+                            <div>
+                                <div class="record-inner-label">{{ __('patients.clinical_status') }}</div>
+                                <div class="record-inner-subvalue"
+                                     x-text="conditionClinicalStatusesRolesDictionary[condition.clinicalStatus] || '-'"></div>
+                            </div>
+                            <div>
+                                <div class="record-inner-label">{{ __('patients.verification_status') }}</div>
+                                <div class="record-inner-subvalue"
+                                     x-text="conditionVerificationStatusesDictionary[condition.verificationStatus] || '-'"></div>
+                            </div>
+                            <div>
+                                <div class="record-inner-label">{{ __('forms.comment') }}</div>
+                                <div class="record-inner-subvalue" x-text="condition.asserterText || '-'"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </template>
-        </tbody>
-    </table>
+    </div>
 
     <div>
         {{-- Button to trigger the drawer --}}
@@ -255,7 +260,8 @@
                                     ICD-10 AM
                                 </option>
                             </select>
-                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400
+                            dark:text-gray-500 pointer-events-none')
                         </div>
 
                         <button type="button"
@@ -280,7 +286,8 @@
                                            id="conditionReasonCode"
                                            class="input w-full"
                                 />
-                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400
+                                dark:text-gray-500 pointer-events-none')
                             </div>
                         </div>
 
@@ -300,7 +307,7 @@
                                    @input.debounce.300ms="
                                        let value = $event.target.value;
                                        modalCondition.codeCode = value;
-                                       let isEnglish = /^[a-zA-Z]+$/.test(value);
+                                       let isEnglish = /^[a-zA-Z0-9.]+$/.test(value);
 
                                         if ((isEnglish && value.length >= 1) || (!isEnglish && value.length >= 3)) {
                                             $wire.searchICD10(value);
@@ -340,7 +347,7 @@
                                 {{ __('forms.nothing_found') }}
                             </p>
 
-                            <x-forms.loading />
+                            <x-forms.loading/>
                         </div>
 
                         <div x-show="!modalCondition.codeSystem">
@@ -353,7 +360,8 @@
                                        class="input w-full opacity-50 cursor-not-allowed"
                                        placeholder="{{ __('patients.choose_coding_system') }}"
                                 />
-                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400
+                                dark:text-gray-500 pointer-events-none')
                             </div>
                         </div>
                     </div>
@@ -376,7 +384,8 @@
                                     <option value="{{ $key }}">{{ $diagnosisRole }}</option>
                                 @endforeach
                             </select>
-                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400
+                            dark:text-gray-500 pointer-events-none')
                         </div>
                     </div>
 
@@ -398,7 +407,8 @@
                                     <option value="{{ $key }}">{{ $verificationStatus }}</option>
                                 @endforeach
                             </select>
-                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400
+                            dark:text-gray-500 pointer-events-none')
                         </div>
                     </div>
 
@@ -420,7 +430,8 @@
                                     <option value="{{ $key }}">{{ $clinicalStatus }}</option>
                                 @endforeach
                             </select>
-                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400
+                            dark:text-gray-500 pointer-events-none')
                         </div>
                     </div>
 
@@ -523,7 +534,8 @@
                                                 <option value="{{ $key }}">{{ $bodySiteName }}</option>
                                             @endforeach
                                         </select>
-                                        @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                                        @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2
+                                        text-gray-400 dark:text-gray-500 pointer-events-none')
                                     </div>
                                 </div>
                                 <div class="flex items-center h-10">
@@ -534,7 +546,7 @@
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"
                                              viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round"
-                                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                         </svg>
                                     </button>
                                 </div>
@@ -566,7 +578,8 @@
                                     <option value="{{ $key }}">{{ $conditionSeverity }}</option>
                                 @endforeach
                             </select>
-                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400
+                            dark:text-gray-500 pointer-events-none')
                         </div>
                     </div>
 
@@ -586,7 +599,8 @@
                                     <option value="{{ $i }}">{{ $i }}</option>
                                 @endfor
                             </select>
-                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400
+                            dark:text-gray-500 pointer-events-none')
                         </div>
                     </div>
                 </div>
@@ -660,7 +674,8 @@
                                         <option value="{{ $key }}">{{ $reportOrigin }}</option>
                                     @endforeach
                                 </select>
-                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400
+                                dark:text-gray-500 pointer-events-none')
                             </div>
                         </div>
                     </div>
@@ -806,7 +821,7 @@
                  class="absolute inset-0 flex items-center justify-center bg-white/70 dark:bg-gray-800/70 z-10"
                  x-cloak
             >
-                <x-forms.loading />
+                <x-forms.loading/>
             </div>
 
             <table class="table-input w-inherit">

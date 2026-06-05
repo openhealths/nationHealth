@@ -88,6 +88,7 @@ use App\Models\LegalEntity;
 use App\Models\License;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\Person\Person;
 use App\Models\Person\PersonRequest;
@@ -259,14 +260,19 @@ Route::middleware(['auth:web,ehealth', 'verified'])->group(function () {
                         });
                 });
 
-            Route::get('/care-plan', \App\Livewire\CarePlan\CarePlanIndex::class)
-                ->name('care-plan.index');
-            Route::get('/care-plan/{carePlan}', \App\Livewire\CarePlan\CarePlanShow::class)
+            Route::get('/care-plans', \App\Livewire\CarePlan\CarePlanIndex::class)
+                ->name('care-plans.index');
+            Route::get('/care-plans/create/{personId?}', \App\Livewire\CarePlan\CarePlanCreate::class)
+                ->name('care-plans.create');
+            Route::get('/encounters/{encounter}/care-plan/create', \App\Livewire\CarePlan\CarePlanCreate::class)
+                ->name('care-plans.create-by-encounter');
+            Route::get('/encounter/{encounter}/care-plan/create', \App\Livewire\CarePlan\CarePlanCreate::class);
+            Route::get('/care-plans/{carePlan}', \App\Livewire\CarePlan\CarePlanShow::class)
                 ->whereNumber('carePlan')
-                ->name('care-plan.show');
-            Route::get('/care-plan/{carePlan}/edit', \App\Livewire\CarePlan\CarePlanUpdate::class)
+                ->name('care-plans.show');
+            Route::get('/care-plans/{carePlan}/edit', \App\Livewire\CarePlan\CarePlanUpdate::class)
                 ->whereNumber('carePlan')
-                ->name('care-plan.edit');
+                ->name('care-plans.edit');
 
             Route::prefix('equipment')->name('equipment.')->group(static function () {
                 Route::get('/', EquipmentIndex::class)->name('index')->can('viewAny', Equipment::class);
@@ -291,7 +297,7 @@ Route::middleware(['auth:web,ehealth', 'verified'])->group(function () {
                     Route::middleware('can:view,' . Person::class)->group(function () {
                         Route::get('/{personId}/patient-data', PatientData::class)->name('patient-data');
                         Route::get('/{personId}/summary', PatientSummary::class)->can('view', Person::class)->name('summary');
-                        Route::get('/{personId}/episodes', PatientEpisodes::class)->name('episodes');
+                        Route::get('/{personId}/episodes', PatientEpisodes::class)->can('view', Episode::class)->name('episodes');
                         Route::get('/{personId}/care-plans', \App\Livewire\Person\Records\PersonCarePlans::class)->name('care-plans');
                         Route::get('/{personId}/observations', PatientObservation::class)->name('observations');
                         Route::get('/{personId}/immunization', PatientImmunization::class)->name('immunization');

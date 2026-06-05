@@ -76,6 +76,7 @@
                               bind="legalEntityUUID"
                               bindValue='uuid'
                               bindParam='name'
+                              :label="__('Медичний Заклад')"
                               class="!z-[100] mt-6"
             />
 

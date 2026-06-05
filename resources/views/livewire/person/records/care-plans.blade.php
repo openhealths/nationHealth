@@ -1,8 +1,8 @@
 @use('App\Enums\CarePlanStatus')
 <x-layouts.patient :personId="$personId" :patientFullName="$patientFullName">
     <x-slot name="headerActions">
-        @can('create', \App\Models\MedicalEvents\Sql\CarePlan::class)
-            <a href="{{ route('care-plan.create', [legalEntity(), $personId]) }}"
+        @can('create', \App\Models\CarePlan::class)
+            <a href="{{ route('care-plans.create', [legalEntity(), $personId]) }}"
                class="flex items-center gap-2 button-primary px-5 py-2 text-sm shadow-sm"
             >
                 @icon('plus', 'w-4 h-4')
@@ -223,20 +223,19 @@
             <div class="space-y-4">
                 @foreach($carePlans as $plan)
                     <div class="record-inner-card" wire:key="care-plan-{{ $plan->id }}">
-                        <div class="record-inner-header !grid !grid-cols-[56px_1fr_240px_64px] !p-0">
-                            <div
-                                class="record-inner-checkbox-col !w-full border-r border-gray-200 dark:border-gray-700 flex items-center justify-center">
+                        <div class="record-inner-header">
+                            <div class="record-inner-checkbox-col">
                                 <input type="checkbox" class="default-checkbox w-5 h-5">
                             </div>
 
-                            <div class="record-inner-column !pl-4">
+                            <div class="record-inner-column flex-1">
                                 <div class="record-inner-label">Назва</div>
                                 <div
                                     class="record-inner-value text-[17px] font-semibold text-gray-900 dark:text-gray-100">{{ $plan->title }}</div>
                             </div>
 
                             <div
-                                class="record-inner-column-bordered !w-full border-l border-gray-200 dark:border-gray-700">
+                                class="record-inner-column-bordered w-full md:w-36 shrink-0">
                                 <div class="record-inner-label">Статус:</div>
                                 <div>
                                 <span class="badge-green">
@@ -245,8 +244,7 @@
                                 </div>
                             </div>
 
-                            <div
-                                class="record-inner-action-col border-l border-gray-200 dark:border-gray-700 !w-full flex items-center justify-center shrink-0 h-full relative">
+                            <div class="record-inner-action-col">
                                 <div x-data="{
                                 open: false,
                                 toggle() {
@@ -284,13 +282,13 @@
                                          class="absolute right-0 mt-2 w-56 rounded-md bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-lg z-50 py-1"
                                     >
                                         @if($plan->status === CarePlanStatus::DRAFT->value)
-                                            <a href="{{ route('care-plan.edit', [legalEntity(), $plan->id]) }}" class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                                            <a href="{{ route('care-plans.edit', [legalEntity(), $plan->id]) }}" class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
                                                 @icon('edit', 'w-5 h-5 text-gray-500')
                                                 {{ __('forms.edit') ?? 'Редагувати' }}
                                             </a>
                                         @endif
 
-                                        <a href="{{ route('care-plan.show', [legalEntity(), $plan->id]) }}" class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                                        <a href="{{ route('care-plans.show', [legalEntity(), $plan->id]) }}" class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
                                             @icon('eye', 'w-5 h-5 text-gray-500')
                                             {{ __('patients.view_details') ?? 'Переглянути' }}
                                         </a>
@@ -299,11 +297,8 @@
                             </div>
                         </div>
 
-                        <div class="record-inner-body !grid md:!grid-cols-[56px_1fr_240px_64px] !divide-x-0 !p-0">
-                            <div
-                                class="record-inner-checkbox-col !w-full border-r border-gray-200 dark:border-gray-700"></div>
-
-                            <div class="p-3.5 pl-4 overflow-hidden">
+                        <div class="record-inner-body">
+                            <div class="record-inner-grid-container">
                                 <!-- First Row of Details -->
                                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-3 mb-4">
                                     <div class="min-w-0">
@@ -361,19 +356,16 @@
                                 </div>
                             </div>
 
-                            <div
-                                class="p-3.5 px-4 overflow-hidden flex flex-col justify-center col-span-2 border-l border-gray-200 dark:border-gray-700">
-                                <div class="space-y-4">
-                                    <div class="min-w-0">
-                                        <div class="record-inner-label text-[10px] uppercase">ID ECO3</div>
-                                        <div
-                                            class="record-inner-id-value text-[13px] break-all whitespace-normal leading-normal">{{ $plan->ehealth_id }}</div>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <div class="record-inner-label text-[10px] uppercase">ID Епізоду</div>
-                                        <div
-                                            class="record-inner-id-value text-[13px] break-all whitespace-normal leading-normal">{{ $plan->episode_id }}</div>
-                                    </div>
+                            <div class="record-inner-id-col">
+                                <div class="min-w-0">
+                                    <div class="record-inner-label text-[10px] uppercase">ID ECO3</div>
+                                    <div
+                                        class="record-inner-id-value">{{ $plan->ehealth_id }}</div>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="record-inner-label text-[10px] uppercase">ID Епізоду</div>
+                                    <div
+                                        class="record-inner-id-value">{{ $plan->episode_id }}</div>
                                 </div>
                             </div>
                         </div>

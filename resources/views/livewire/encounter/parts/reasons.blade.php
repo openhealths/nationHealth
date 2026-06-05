@@ -10,44 +10,41 @@
          dictionary: $wire.dictionaries['eHealth/ICPC2/reasons']
      }"
 >
-    <div class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
-        {{ __('patients.reasons_for_visit') }}
-    </div>
 
-        <table class="table-input w-inherit">
-            <thead class="thead-input">
-            <tr>
-                <th scope="col" class="th-input">{{ __('patients.code_and_name') }}</th>
-                <th scope="col" class="th-input">{{ __('forms.comment') }}</th>
-                <th scope="col" class="th-input">{{ __('forms.action') }}</th>
-            </tr>
-            </thead>
-            <tbody>
-            <template x-for="(reason, index) in reasons" :key="index">
-                <tr>
-                    <td class="td-input" x-text="`${ reason.code } - ${ dictionary[reason.code] }`"></td>
-                    <td class="td-input" x-text="reason.text"></td>
-                    <td class="td-input">
-                        {{-- That all that is needed for the dropdown --}}
+    <div class="space-y-4">
+        <template x-for="(reason, index) in reasons" :key="index">
+            <div class="record-inner-card">
+                <div class="record-inner-header">
+                    <div class="record-inner-checkbox-col">
+                        <input type="checkbox" class="default-checkbox w-5 h-5" disabled>
+                    </div>
+
+                    <div class="record-inner-column flex-1">
+                        <div class="record-inner-label">{{ __('patients.code_and_name') }}</div>
+                        <div class="record-inner-value text-[16px]"
+                             x-text="`${ reason.code } - ${ dictionary[reason.code] }`"></div>
+                    </div>
+
+                    <div class="record-inner-action-col">
                         <div x-data="{
-                                 openDropdown: false,
-                                 toggle() {
-                                     if (this.openDropdown) {
-                                         return this.close()
-                                     }
+                            openDropdown: false,
+                            toggle() {
+                                if (this.openDropdown) {
+                                    return this.close()
+                                }
 
-                                     this.$refs.button.focus()
+                                this.$refs.button.focus()
 
-                                     this.openDropdown = true
-                                 },
-                                 close(focusAfter) {
-                                     if (!this.openDropdown) return
+                                this.openDropdown = true
+                            },
+                            close(focusAfter) {
+                                if (!this.openDropdown) return
 
-                                     this.openDropdown = false
+                                this.openDropdown = false
 
-                                     focusAfter && focusAfter.focus()
-                                 }
-                             }"
+                                focusAfter && focusAfter.focus()
+                            }
+                        }"
                              @keydown.escape.prevent.stop="close($refs.button)"
                              @focusin.window="! $refs.panel.contains($event.target) && close()"
                              x-id="['dropdown-button']"
@@ -59,7 +56,7 @@
                                     :aria-expanded="openDropdown"
                                     :aria-controls="$id('dropdown-button')"
                                     type="button"
-                                    class="cursor-pointer"
+                                    class="record-inner-action-btn cursor-pointer"
                             >
                                 <svg class="w-6 h-6 text-gray-800 dark:text-gray-200" aria-hidden="true"
                                      xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none"
@@ -73,7 +70,7 @@
                             </button>
 
                             {{-- Dropdown Panel --}}
-                            <div class="absolute" style="left: 50%"> {{-- Center a dropdown panel --}}
+                            <div class="absolute right-0 z-50">
                                 <div x-ref="panel"
                                      x-show="openDropdown"
                                      x-transition.origin.top.left
@@ -81,95 +78,102 @@
                                      :id="$id('dropdown-button')"
                                      x-cloak
                                      class="dropdown-panel relative"
-                                     style="left: -50%" {{-- Center a dropdown panel --}}
                                 >
-
                                     <button @click.prevent="
-                                                openModal = true; {{-- Open the modal --}}
-                                                item = index; {{-- Identify the item we are corrently editing --}}
-                                                {{-- Replace the previous reason with the current, don't assign object directly (modalReason = reason) to avoid reactiveness --}}
-                                                modalReason = new Reason(reason);
-                                                newReason = false; {{-- This reason is already created --}}
-                                            "
-                                            class="dropdown-button"
+                                        openModal = true;
+                                        item = index;
+                                        modalReason = new Reason(reason);
+                                        newReason = false;
+                                        close($refs.button);
+                                    "
                                     >
                                         {{ __('forms.edit') }}
                                     </button>
 
-                                    <button @click.prevent="reasons.splice(index, 1); close($refs.button)"
-                                            class="dropdown-button dropdown-delete"
-                                    >
+                                    <button class="dropdown-delete"
+                                            @click.prevent="reasons.splice(index, 1); close($refs.button)">
                                         {{ __('forms.delete') }}
                                     </button>
                                 </div>
                             </div>
                         </div>
-                    </td>
-                </tr>
-            </template>
-            </tbody>
-        </table>
+                    </div>
+                </div>
 
-        <div>
-            {{-- Button to trigger the modal --}}
-            <button @click.prevent="
-                        openModal = true; {{-- Open the Modal --}}
-                        newReason = true; {{-- We are adding a new reason --}}
-                        modalReason = new Reason(); {{-- Replace the data of the previous reason with a new one--}}
-                    "
-                    class="item-add my-5"
+                <div class="record-inner-body" x-show="reason.text">
+                    <div class="record-inner-grid-container">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <div class="record-inner-label">{{ __('forms.comment') }}</div>
+                                <div class="record-inner-subvalue" x-text="reason.text"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <div>
+        {{-- Button to trigger the modal --}}
+        <button @click.prevent="
+            openModal = true;
+            newReason = true;
+            modalReason = new Reason();
+        "
+                class="item-add my-5"
+        >
+            {{ __('forms.add') }}
+        </button>
+
+        {{-- Modal --}}
+        <template x-teleport="body"> {{-- This moves the modal at the end of the body tag --}}
+            <div x-show="openModal"
+                 style="display: none"
+                 @keydown.escape.prevent.stop="openModal = false"
+                 role="dialog"
+                 aria-modal="true"
+                 x-id="['modal-title']"
+                 :aria-labelledby="$id('modal-title')" {{-- This associates the modal with unique ID --}}
+                 class="modal"
             >
-                {{ __('forms.add') }}
-            </button>
 
-            {{-- Modal --}}
-            <template x-teleport="body"> {{-- This moves the modal at the end of the body tag --}}
+                {{-- Overlay --}}
+                <div x-show="openModal" x-transition.opacity class="fixed inset-0 bg-black/25"></div>
+
+                {{-- Panel --}}
                 <div x-show="openModal"
-                     style="display: none"
-                     @keydown.escape.prevent.stop="openModal = false"
-                     role="dialog"
-                     aria-modal="true"
-                     x-id="['modal-title']"
-                     :aria-labelledby="$id('modal-title')" {{-- This associates the modal with unique ID --}}
-                     class="modal"
+                     x-transition
+                     @click="openModal = false"
+                     class="relative flex min-h-screen items-center justify-center p-4"
                 >
-
-                    {{-- Overlay --}}
-                    <div x-show="openModal" x-transition.opacity class="fixed inset-0 bg-black/25"></div>
-
-                    {{-- Panel --}}
-                    <div x-show="openModal"
-                         x-transition
-                         @click="openModal = false"
-                         class="relative flex min-h-screen items-center justify-center p-4"
+                    <div @click.stop
+                         x-trap.noscroll.inert="openModal"
+                         class="modal-content h-fit w-full lg:max-w-4xl"
                     >
-                        <div @click.stop
-                             x-trap.noscroll.inert="openModal"
-                             class="modal-content h-fit w-full lg:max-w-4xl"
-                        >
-                            {{-- Title --}}
-                            <h3 class="modal-header" :id="$id('modal-title')">{{ __('patients.reason_for_visit') }}</h3>
+                        {{-- Title --}}
+                        <h3 class="modal-header" :id="$id('modal-title')">{{ __('patients.reason_for_visit') }}</h3>
 
-                            {{-- Content --}}
-                            <form>
-                                <div class="form-row-modal">
-                                    <div>
-                                        <label for="reasonCode" class="label-modal">
-                                            {{ __('patients.icpc-2_status_code') }}
-                                        </label>
-                                        <x-select2 modelPath="modalReason.code"
-                                                   dictionaryName="eHealth/ICPC2/reasons"
-                                                   id="reasonCode"
-                                        />
+                        {{-- Content --}}
+                        <form>
+                            <div class="form-row-modal">
+                                <div>
+                                    <label for="reasonCode" class="label-modal">
+                                        {{ __('patients.icpc-2_status_code') }}
+                                    </label>
+                                    <x-select2 modelPath="modalReason.code"
+                                               dictionaryName="eHealth/ICPC2/reasons"
+                                               id="reasonCode"
+                                    />
 
-                                        <p class="text-error text-xs"
-                                           x-show="!Object.keys(dictionary).includes(modalReason.code)"
-                                        >
-                                            {{ __('forms.field_empty') }}
-                                        </p>
-                                    </div>
+                                    <p class="text-error text-xs"
+                                       x-show="!Object.keys(dictionary).includes(modalReason.code)"
+                                    >
+                                        {{ __('forms.field_empty') }}
+                                    </p>
+                                </div>
 
-                                    <div>
+                                <div>
                                         <textarea x-model="modalReason.text"
                                                   id="reasonComment"
                                                   name="reasonComment"
@@ -177,54 +181,54 @@
                                                   rows="4"
                                                   placeholder="{{ __('forms.write_comment_here') }}"
                                         ></textarea>
-                                    </div>
                                 </div>
+                            </div>
 
-                                <div class="mt-6 flex justify-between space-x-2">
-                                    <button type="button"
-                                            @click="openModal = false"
-                                            class="button-minor"
-                                    >
-                                        {{ __('forms.cancel') }}
-                                    </button>
+                            <div class="mt-6 flex justify-between space-x-2">
+                                <button type="button"
+                                        @click="openModal = false"
+                                        class="button-minor"
+                                >
+                                    {{ __('forms.cancel') }}
+                                </button>
 
-                                    <button @click.prevent="
-                                                const newReasonCode = modalReason.code;
-                                                const matchingReasonCodesCount = reasons.filter((reason, index) => {
-                                                    // If editing — ignore the current index
-                                                    if (newReason === false && index === item) return false;
-                                                    return reason.code === newReasonCode;
-                                                }).length;
+                                <button @click.prevent="
+                                    const newReasonCode = modalReason.code;
+                                    const matchingReasonCodesCount = reasons.filter((reason, index) => {
+                                        // If editing — ignore the current index
+                                        if (newReason === false && index === item) return false;
+                                        return reason.code === newReasonCode;
+                                    }).length;
 
-                                                if (matchingReasonCodesCount >= 1) {
-                                                    showDuplicateCodeWarning = true;
-                                                    return;
-                                                }
+                                    if (matchingReasonCodesCount >= 1) {
+                                        showDuplicateCodeWarning = true;
+                                        return;
+                                    }
 
-                                                newReason !== false
-                                                    ? reasons.push(modalReason)
-                                                    : reasons[item] = modalReason;
+                                    newReason !== false
+                                        ? reasons.push(modalReason)
+                                        : reasons[item] = modalReason;
 
-                                                showDuplicateCodeWarning = false;
-                                                openModal = false;
-                                            "
-                                            class="button-primary"
-                                            :disabled="!modalReason.code.trim()"
-                                    >
-                                        {{ __('forms.save') }}
-                                    </button>
-                                </div>
-                                <template x-if="showDuplicateCodeWarning">
-                                    <p class="text-error text-right">
-                                        {!! __('patients.duplicate_code_warning') !!}
-                                    </p>
-                                </template>
-                            </form>
-                        </div>
+                                    showDuplicateCodeWarning = false;
+                                    openModal = false;
+                                "
+                                        class="button-primary"
+                                        :disabled="!modalReason.code.trim()"
+                                >
+                                    {{ __('forms.save') }}
+                                </button>
+                            </div>
+                            <template x-if="showDuplicateCodeWarning">
+                                <p class="text-error text-right">
+                                    {!! __('patients.duplicate_code_warning') !!}
+                                </p>
+                            </template>
+                        </form>
                     </div>
                 </div>
-            </template>
-        </div>
+            </div>
+        </template>
+    </div>
 </div>
 
 <script>

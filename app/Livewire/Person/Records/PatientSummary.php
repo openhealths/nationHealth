@@ -18,6 +18,7 @@ use App\Jobs\ImmunizationSync;
 use App\Jobs\ObservationSync;
 use App\Jobs\ConditionSync;
 use App\Jobs\DiagnosticReportSync;
+use App\Models\Icd10;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\ClinicalImpression;
 use App\Models\MedicalEvents\Sql\Condition;
@@ -30,7 +31,6 @@ use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use InvalidArgumentException;
 use Throwable;
@@ -562,8 +562,7 @@ class PatientSummary extends BasePatientComponent
             return;
         }
 
-        $this->dictionaries['eHealth/ICD10_AM/condition_codes'] = DB::table('icd_10')
-            ->whereIn('code', $icd10Codes)
+        $this->dictionaries['eHealth/ICD10_AM/condition_codes'] = Icd10::whereIn('code', $icd10Codes)
             ->pluck('description', 'code')
             ->toArray();
     }

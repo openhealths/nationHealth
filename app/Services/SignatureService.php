@@ -32,17 +32,21 @@ class SignatureService
         ?UploadedFile $keyFile,
         string $taxId
     ): string|array {
-
         try {
             $base64FileContent = $this->getBase64KepFileContent($keyFile);
 
             $signedContent = $this->cipherApi->sendSession(
-                json_encode($dataToSign, JSON_THROW_ON_ERROR),
+                json_encode($dataToSign, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION),
                 $password,
                 $base64FileContent,
                 $knedp,
                 $taxId
             );
+
+            if (is_array($signedContent)) {
+                $errorMessage = collect($signedContent)->flatten()->first() ?? __('forms.invalid_kep_password');
+                throw new RuntimeException((string) $errorMessage);
+            }
 
             if (empty($signedContent) || !is_string($signedContent)) {
                 throw new RuntimeException(__('employees.errors.signature_failed_unexpected'));
@@ -54,10 +58,12 @@ class SignatureService
             $errors = $e->getErrors();
             $errorMessage = collect($errors)->flatten()->first() ?? __('forms.invalid_kep_password');
 
-            throw new RuntimeException($errorMessage);
+            throw new RuntimeException((string) $errorMessage);
         } catch (\Exception $e) {
-            Log::error('An unexpected error occurred in SignatureService: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-            throw new RuntimeException(__('employees.errors.signature_failed_unexpected'));
+            Log::error('An unexpected error occurred in SignatureService: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw new RuntimeException($e->getMessage());
         }
     }
 

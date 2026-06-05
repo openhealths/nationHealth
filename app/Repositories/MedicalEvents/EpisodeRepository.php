@@ -54,42 +54,10 @@ class EpisodeRepository extends BaseRepository
     }
 
     /**
-     * Get episode data that is related to the encounter.
-     *
-     * @param  int  $encounterId
-     * @return array|null
-     */
-    public function get(int $encounterId): ?array
-    {
-        return $this->model::with([
-            'type',
-            'managingOrganization',
-            'careManager'
-        ])
-            ->where('encounter_id', $encounterId)
-            ->first()
-            ?->toArray();
-    }
-
-    /**
-     * Get episodes data that is related to the person.
-     *
-     * @param  string  $personId
-     * @return array|null
-     */
-    public function getByPersonId(int $personId): array
-    {
-        return $this->model
-            ->where('person_id', $personId)
-            ->get()
-            ->toArray();
-    }
-
-    /**
      * Get the episode for the clinical impression based on the provided UUID to display the selected supporting info.
      *
-     * @param  string  $uuid
-     * @return array|null
+     * @param  array  $uuids
+     * @return array
      */
     public function getDetailsMapByUuids(array $uuids): array
     {
@@ -103,18 +71,10 @@ class EpisodeRepository extends BaseRepository
                 $episode['uuid'] => [
                     'ehealthInsertedAt' => convertToAppDateFormat($episode['createdAt'] ?? null),
                     'codeCode' => $episode['name'] ?? null,
-                    'type' => 'episode_of_care',
+                    'type' => 'episode_of_care'
                 ],
             ])
             ->toArray();
-    }
-
-    public function getForClinicalImpression(string $uuid): ?array
-    {
-        return Episode::whereUuid($uuid)
-            ->select(['name', 'created_at'])
-            ->first()
-            ?->toArray();
     }
 
     /**

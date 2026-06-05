@@ -21,12 +21,14 @@
                  x-trap.noscroll.inert="showSignatureModal"
             >
                 {{-- Title --}}
-                <h3 class="modal-header">{{ __('forms.sign_with_KEP') }}</h3>
+                <h3 class="modal-header">@yield('title', __('forms.sign_with_KEP'))</h3>
 
                 {{-- Content --}}
                 <div class="p-6">
                     <form>
                         <div class="flex flex-col gap-6">
+                            @yield('custom-fields')
+
                             {{-- KEP Provider --}}
                             <div>
                                 <label for="knedp" class="default-label">{{ __('forms.knedp') }} *</label>

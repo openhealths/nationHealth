@@ -223,6 +223,31 @@ class CarePlanRepository
                 // Fallback to current user if author not found (to satisfy NOT NULL constraint)
                 $authorId = $author?->id ?? Auth::user()?->getCarePlanWriterEmployee()?->id;
 
+                $addresses = [];
+                if (isset($rawFhir['addresses']) && is_array($rawFhir['addresses'])) {
+                    foreach ($rawFhir['addresses'] as $addr) {
+                        if (isset($addr['coding']) && is_array($addr['coding'])) {
+                            $addresses[] = $addr;
+                        } elseif (isset($addr['reference']) && str_starts_with($addr['reference'], 'Condition/')) {
+                            $conditionUuid = str_replace('Condition/', '', $addr['reference']);
+                            $actualCondition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
+                            if ($actualCondition) {
+                                $coding = $actualCondition->code?->coding?->first();
+                                if ($coding) {
+                                    $addresses[] = [
+                                        'coding' => [
+                                            [
+                                                'system' => $coding->system,
+                                                'code' => $coding->code
+                                            ]
+                                        ]
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Try to find existing record by UUID OR by (person + encounter) if UUID is missing locally
                 $carePlan = CarePlan::where('uuid', $rawFhir['id'] ?? $rawFhir['uuid'] ?? null)->first();
                 if (!$carePlan && $encounterIdentifier) {
@@ -238,9 +263,9 @@ class CarePlanRepository
                         'author_id' => $authorId,
                         'legal_entity_id' => $person->legal_entity_id ?? legalEntity()->id,
                         'status' => $rawFhir['status'] ?? CarePlanStatus::ACTIVE->value,
-                        'title' => $rawFhir['title'] ?? 'План лікування',
-                        'description' => $rawFhir['description'] ?? null,
-                        'note' => $rawFhir['note'] ?? null,
+                        'title' => !empty($rawFhir['title']) ? $rawFhir['title'] : ($carePlan->title ?? 'План лікування'),
+                        'description' => !empty($rawFhir['description']) ? $rawFhir['description'] : ($carePlan->description ?? null),
+                        'note' => !empty($rawFhir['note']) ? $rawFhir['note'] : ($carePlan->note ?? null),
                         'category_id' => $category?->id,
                         'encounter_identifier_id' => $encounterIdentifier?->id,
                         'care_manager_id' => $careManager?->id,
@@ -251,17 +276,18 @@ class CarePlanRepository
                             ? \Carbon\Carbon::parse($rawFhir['period']['end']) 
                             : null,
                         'terms_of_service' => $rawFhir['terms_of_service']['coding'][0]['code'] ?? null,
+                        'addresses' => !empty($addresses) ? $addresses : ($carePlan->addresses ?? null),
                     ]);
                 } else {
                     $carePlan = CarePlan::create([
                         'uuid' => $rawFhir['id'] ?? $rawFhir['uuid'] ?? null,
                         'person_id' => $person->id,
                         'author_id' => $authorId,
-                        'legal_entity_id' => $person->legal_entity_id ?? legalEntity()->id,
+                        'legal_entity_id' => $person->legal_entity_id ?? (legalEntity()?->id ?? null),
                         'status' => $rawFhir['status'] ?? CarePlanStatus::ACTIVE->value,
-                        'title' => $rawFhir['title'] ?? 'План лікування',
-                        'description' => $rawFhir['description'] ?? null,
-                        'note' => $rawFhir['note'] ?? null,
+                        'title' => !empty($rawFhir['title']) ? $rawFhir['title'] : 'План лікування',
+                        'description' => !empty($rawFhir['description']) ? $rawFhir['description'] : null,
+                        'note' => !empty($rawFhir['note']) ? $rawFhir['note'] : null,
                         'category_id' => $category?->id,
                         'encounter_identifier_id' => $encounterIdentifier?->id,
                         'care_manager_id' => $careManager?->id,
@@ -272,6 +298,7 @@ class CarePlanRepository
                             ? \Carbon\Carbon::parse($rawFhir['period']['end']) 
                             : null,
                         'terms_of_service' => $rawFhir['terms_of_service']['coding'][0]['code'] ?? null,
+                        'addresses' => !empty($addresses) ? $addresses : null,
                     ]);
                 }
 

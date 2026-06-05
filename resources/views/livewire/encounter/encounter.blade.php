@@ -61,7 +61,7 @@
                                     class="w-full flex items-center justify-between p-5 focus:outline-none"
                             >
                                 <div
-                                    class="flex items-center gap-4 text-gray-900 dark:text-gray-100 font-medium text-[15px]">
+                                    class="flex items-center gap-4 text-gray-900 dark:text-gray-100 font-semibold text-[17px]">
                                     <span
                                         class="w-6 h-6 flex items-center justify-center shrink-0 text-gray-900 dark:text-gray-100">
                                         @icon($item['icon'], 'w-6 h-6')
@@ -150,7 +150,7 @@
 
                         <fieldset class="fieldset-card p-5">
                             <legend class="legend">{{ __('patients.care_plans') }}</legend>
-                            <a href="{{ route('care-plan.create', [legalEntity(), 'personId' => $personId, 'encounterUuid' => $form->encounter['uuid'] ?? '']) }}"
+                            <a href="{{ route('care-plans.create-by-encounter', [legalEntity(), 'encounter' => $encounterId]) }}"
                                class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors"
                             >
                                 @icon('plus', 'w-4 h-4')
@@ -200,7 +200,7 @@
         </div>
     </div>
 
-    <x-signature-modal method="sign" />
-    <livewire:components.x-message :key="time()" />
-    <x-forms.loading />
+    <x-signature-modal method="sign"/>
+    <livewire:components.x-message :key="time()"/>
+    <x-forms.loading/>
 </x-layouts.patient>

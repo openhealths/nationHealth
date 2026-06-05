@@ -20,17 +20,19 @@
     >
         <x-slot name="title">{{ $title ?? $patientFullName }}</x-slot>
 
-        @if(isset($headerActions))
-            {{ $headerActions }}
-        @else
-            @can('create', Encounter::class)
-                <a href="{{ route('encounter.create', [legalEntity(), 'personId' => $personId]) }}"
-                   class="flex items-center gap-2 button-primary px-5 py-2 text-sm shadow-sm"
-                >
-                    @icon('plus', 'w-4 h-4')
-                    {{ __('patients.starts_interacting') }}
-                </a>
-            @endcan
+        @if($personId)
+            @if(isset($headerActions))
+                {{ $headerActions }}
+            @else
+                @can('create', Encounter::class)
+                    <a href="{{ route('encounter.create', [legalEntity(), 'personId' => $personId]) }}"
+                       class="flex items-center gap-2 button-primary px-5 py-2 text-sm shadow-sm"
+                    >
+                        @icon('plus', 'w-4 h-4')
+                        {{ __('patients.starts_interacting') }}
+                    </a>
+                @endcan
+            @endif
         @endif
 
         <x-slot name="description">

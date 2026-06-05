@@ -1,18 +1,35 @@
-@php
-    $dictionaries = $dictionaries ?? [];
-@endphp
+{{-- Medical Devices Drawer (single teleport root — Alpine moves only firstElementChild) --}}
+<template x-teleport="body">
+    <div x-show="showMedicalDeviceDrawer"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         x-cloak
+         class="fixed inset-0"
+         style="z-index: 39;"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="medical-devices-drawer-label"
+     >
+        <div class="absolute inset-0 bg-gray-900/50"
+             aria-hidden="true"
+             @click="showMedicalDeviceDrawer = false"
+        ></div>
 
-<x-dialog-drawer
-    x-model="showMedicalDeviceDrawer"
-    noTeleport="true"
-    topClass="top-[57px]"
-    zIndex="40"
-    customWidth="w-full sm:w-4/5"
-    hasClose="true"
-    onCloseClick="showMedicalDeviceDrawer = false"
->
-
-    <h3 class="modal-header" id="medical-devices-drawer-label">
+        <div id="medical-devices-drawer-right"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="translate-x-full"
+             x-transition:enter-end="translate-x-0"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="translate-x-0"
+             x-transition:leave-end="translate-x-full"
+             class="absolute top-0 right-0 z-10 h-screen pt-20 p-4 overflow-y-auto bg-white w-4/5 dark:bg-gray-800 shadow-2xl"
+             tabindex="-1"
+        >
+        <h3 class="modal-header" id="medical-devices-drawer-label">
             {{ __('care-plan.new_medical_device_prescription') }}
         </h3>
 
@@ -60,5 +77,7 @@
                 </button>
             </div>
         </form>
-</x-dialog-drawer>
-
+        </div>
+    </div>
+    </div>
+</template>

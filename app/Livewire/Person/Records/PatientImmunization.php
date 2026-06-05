@@ -11,6 +11,7 @@ use App\Core\Arr;
 use App\Enums\JobStatus;
 use App\Jobs\ImmunizationSync;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\Episode;
 use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
@@ -179,7 +180,7 @@ class PatientImmunization extends BasePatientComponent
         }
     }
 
-    private function loadFilters(): void 
+    private function loadFilters(): void
     {
         $this->getVaccineCodesFromDictionary();
 
@@ -233,7 +234,7 @@ class PatientImmunization extends BasePatientComponent
     {
         try {
             $this->dataFromDb = false;
-            
+
             $response = EHealth::immunization()->getBySearchParams($this->uuid, $params);
 
             $validatedData = $response->validate();
@@ -250,7 +251,7 @@ class PatientImmunization extends BasePatientComponent
         }
     }
 
-    private function getEncounters(): void 
+    private function getEncounters(): void
     {
         try {
             $response = EHealth::encounter()->getBySearchParams(
@@ -270,7 +271,7 @@ class PatientImmunization extends BasePatientComponent
         }
     }
 
-    private function getEncountersFromDb(): void 
+    private function getEncountersFromDb(): void
     {
         $encounters = Arr::toCamelCase(
             Repository::encounter()->getByPersonId($this->personId)
@@ -279,7 +280,7 @@ class PatientImmunization extends BasePatientComponent
         $this->filterEncounterOptions = $this->mapEncounterOptions($encounters);
     }
 
-    private function getEpisodes(): void 
+    private function getEpisodes(): void
     {
         try {
             $response = EHealth::episode()->getBySearchParams(
@@ -301,9 +302,7 @@ class PatientImmunization extends BasePatientComponent
 
     private function getEpisodesFromDb(): void
     {
-        $episodes = Arr::toCamelCase(
-            Repository::episode()->getByPersonId($this->personId)
-        );
+        $episodes = Episode::forPerson($this->personId)->get()->toArray();
 
         $this->filterEpisodeOptions = $this->mapEpisodeOptions($episodes);
     }
@@ -381,7 +380,7 @@ class PatientImmunization extends BasePatientComponent
         );
     }
 
-    private function filterValidationRules(): array
+    protected function filterValidationRules(): array
     {
         return [
             'filterVaccine' => ['nullable', 'string', 'max:255'],

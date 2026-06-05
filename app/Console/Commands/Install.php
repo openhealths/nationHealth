@@ -61,6 +61,7 @@ class Install extends MigrationsCommand
         // Completely wipe the database before installation
         if ($this->options['wipe']) {
             $this->call('db:wipe');
+            DB::purge();
 
             $this->call('migrate:install');
         }

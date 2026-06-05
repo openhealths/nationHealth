@@ -7,9 +7,9 @@ namespace App\Livewire\Dictionary;
 use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
+use App\Models\Icd10;
 use App\Models\LegalEntity;
 use App\Traits\FormTrait;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -65,9 +65,7 @@ class ConditionDiagnose extends Component
             $codes = collect($details['diagnoses_group_codes'])->pluck('code')->toArray();
 
             // Get descriptions only for these specific codes
-            $descriptions = DB::table('icd_10')
-                ->whereIn('code', $codes)
-                ->pluck('description', 'code');
+            $descriptions = Icd10::whereIn('code', $codes)->pluck('description', 'code');
 
             // Add descriptions to each code
             foreach ($details['diagnoses_group_codes'] as &$codeItem) {

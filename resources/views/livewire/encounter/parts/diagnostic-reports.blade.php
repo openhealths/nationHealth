@@ -10,114 +10,125 @@
          servicesDictionary: $wire.dictionaries['custom/services']
      }"
 >
-    <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
-        {{ __('patients.diagnostic_reports') }}
-    </h2>
 
     {{-- Show saved data in table --}}
-    <table class="table-input w-inherit">
-        <thead class="thead-input">
-        <tr>
-            <th scope="col" class="th-input">{{ __('patients.code_and_name') }}</th>
-            <th scope="col" class="th-input">{{ __('forms.comment') }}</th>
-            <th scope="col" class="th-input">{{ __('forms.date') }}</th>
-            <th scope="col" class="th-input">{{ __('forms.action') }}</th>
-        </tr>
-        </thead>
-        <tbody>
-        <template x-for="(diagnosticReport, index) in diagnosticReports">
-            <tr>
-                <td class="td-input"
-                    x-text="Object.values(servicesDictionary).find(service => service.id === diagnosticReport.codeValue).name"
-                ></td>
-                <td class="td-input" x-text="diagnosticReport.conclusion"></td>
-                <td class="td-input" x-text="diagnosticReport.issuedDate"></td>
-                <td class="td-input">
-                    {{-- That all that is needed for the dropdown --}}
-                    <div x-data="{
-                             openDropdown: false,
-                             toggle() {
-                                 if (this.openDropdown) {
-                                     return this.close()
-                                 }
+    <div class="space-y-4">
+        <template x-for="(diagnosticReport, index) in diagnosticReports" :key="index">
+            <div class="record-inner-card">
+                <div class="record-inner-header">
+                    <div class="record-inner-checkbox-col">
+                        <input type="checkbox" class="default-checkbox w-5 h-5" disabled>
+                    </div>
 
-                                 this.$refs.button.focus()
+                    <div class="record-inner-column flex-1">
+                        <div class="record-inner-label">{{ __('patients.diagnostic_report') }}</div>
+                        <div class="record-inner-value text-[16px]"
+                             x-text="Object.values(servicesDictionary).find(service => service.id === diagnosticReport.codeValue)?.name || ''"></div>
+                    </div>
 
-                                 this.openDropdown = true
-                             },
-                             close(focusAfter) {
-                                 if (!this.openDropdown) return
+                    <div class="record-inner-action-col">
+                        <div x-data="{
+                            openDropdown: false,
+                            toggle() {
+                                if (this.openDropdown) {
+                                    return this.close()
+                                }
 
-                                 this.openDropdown = false
+                                this.$refs.button.focus()
 
-                                 focusAfter && focusAfter.focus()
-                             }
-                         }"
-                         @keydown.escape.prevent.stop="close($refs.button)"
-                         @focusin.window="!$refs.panel.contains($event.target) && close()"
-                         x-id="['dropdown-button']"
-                         class="relative"
-                    >
-                        {{-- Dropdown Button --}}
-                        <button x-ref="button"
-                                @click="toggle()"
-                                :aria-expanded="openDropdown"
-                                :aria-controls="$id('dropdown-button')"
-                                type="button"
-                                class="cursor-pointer"
+                                this.openDropdown = true
+                            },
+                            close(focusAfter) {
+                                if (!this.openDropdown) return
+
+                                this.openDropdown = false
+
+                                focusAfter && focusAfter.focus()
+                            }
+                        }"
+                             @keydown.escape.prevent.stop="close($refs.button)"
+                             @focusin.window="!$refs.panel.contains($event.target) && close()"
+                             x-id="['dropdown-button']"
+                             class="relative"
                         >
-                            <svg class="w-6 h-6 text-gray-800 dark:text-gray-200" aria-hidden="true"
-                                 xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none"
-                                 viewBox="0 0 24 24"
+                            {{-- Dropdown Button --}}
+                            <button x-ref="button"
+                                    @click="toggle()"
+                                    :aria-expanded="openDropdown"
+                                    :aria-controls="$id('dropdown-button')"
+                                    type="button"
+                                    class="record-inner-action-btn cursor-pointer"
                             >
-                                <path stroke="currentColor" stroke-linecap="square" stroke-linejoin="round"
-                                      stroke-width="2"
-                                      d="M7 19H5a1 1 0 0 1-1-1v-1a3 3 0 0 1 3-3h1m4-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm7.441 1.559a1.907 1.907 0 0 1 0 2.698l-6.069 6.069L10 19l.674-3.372 6.07-6.07a1.907 1.907 0 0 1 2.697 0Z"
-                                />
-                            </svg>
-                        </button>
-
-                        {{-- Dropdown Panel --}}
-                        <div class="absolute" style="left: 50%"> {{-- Center a dropdown panel --}}
-                            <div x-ref="panel"
-                                 x-show="openDropdown"
-                                 x-transition.origin.top.left
-                                 @click.outside="close($refs.button)"
-                                 :id="$id('dropdown-button')"
-                                 x-cloak
-                                 class="dropdown-panel relative"
-                                 style="left: -50%" {{-- Center a dropdown panel --}}
-                            >
-
-                                <button @click.prevent="
-                                            item = index; {{-- Identify the item we are corrently editing --}}
-                                            {{-- Replace the previous diagnosticReport with the current, don't assign object directly (modalDiagnosticReport = diagnosticReport) to avoid reactiveness --}}
-                                            modalDiagnosticReport = JSON.parse(JSON.stringify(diagnosticReports[index]));
-                                            newDiagnosticReport = false; {{-- This diagnosticReport is already created --}}
-                                            openDiagnosticReportDrawer = true;
-                                        "
+                                <svg class="w-6 h-6 text-gray-800 dark:text-gray-200" aria-hidden="true"
+                                     xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none"
+                                     viewBox="0 0 24 24"
                                 >
-                                    {{ __('forms.edit') }}
-                                </button>
+                                    <path stroke="currentColor" stroke-linecap="square" stroke-linejoin="round"
+                                          stroke-width="2"
+                                          d="M7 19H5a1 1 0 0 1-1-1v-1a3 3 0 0 1 3-3h1m4-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm7.441 1.559a1.907 1.907 0 0 1 0 2.698l-6.069 6.069L10 19l.674-3.372 6.07-6.07a1.907 1.907 0 0 1 2.697 0Z"
+                                    />
+                                </svg>
+                            </button>
 
-                                <button @click.prevent="diagnosticReports.splice(index, 1); close($refs.button)"
-                                        class="dropdown-button dropdown-delete"
+                            {{-- Dropdown Panel --}}
+                            <div class="absolute right-0 z-50">
+                                <div x-ref="panel"
+                                     x-show="openDropdown"
+                                     x-transition.origin.top.left
+                                     @click.outside="close($refs.button)"
+                                     :id="$id('dropdown-button')"
+                                     x-cloak
+                                     class="dropdown-panel relative"
                                 >
-                                    {{ __('forms.delete') }}
-                                </button>
+                                    <button @click.prevent="
+                                        item = index;
+                                        modalDiagnosticReport = JSON.parse(JSON.stringify(diagnosticReports[index]));
+                                        newDiagnosticReport = false;
+                                        openDiagnosticReportDrawer = true;
+                                        close($refs.button);
+                                    "
+                                    >
+                                        {{ __('forms.edit') }}
+                                    </button>
+
+                                    <button class="dropdown-delete"
+                                            @click.prevent="diagnosticReports.splice(index, 1); close($refs.button)">
+                                        {{ __('forms.delete') }}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </td>
-            </tr>
+                </div>
+
+                <div class="record-inner-body">
+                    <div class="record-inner-grid-container">
+                        <div class="grid grid-cols-2 xl:grid-cols-3 gap-y-4 gap-x-4 w-full">
+                            <div>
+                                <div class="record-inner-label">{{ __('forms.category') }}</div>
+                                <div class="record-inner-subvalue"
+                                     x-text="diagnosticReportCategoriesDictionary[diagnosticReport.categoryCode] || '-'"></div>
+                            </div>
+                            <div>
+                                <div class="record-inner-label">{{ __('forms.date') }}</div>
+                                <div class="record-inner-subvalue"
+                                     x-text="`${diagnosticReport.issuedDate} ${diagnosticReport.issuedTime}`"></div>
+                            </div>
+                            <div>
+                                <div class="record-inner-label">{{ __('forms.comment') }}</div>
+                                <div class="record-inner-subvalue" x-text="diagnosticReport.conclusion || '-'"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </template>
-        </tbody>
-    </table>
+    </div>
 
     {{-- Button to trigger the drawer --}}
     <button @click.prevent="
-                newDiagnosticReport = true; {{-- We are adding a new diagnostic report --}}
-                modalDiagnosticReport = new DiagnosticReport(); {{-- Replace the data of the previous diagnostic report with a new one--}}
+                newDiagnosticReport = true;
+                modalDiagnosticReport = new DiagnosticReport();
                 openDiagnosticReportDrawer = true;
             "
             class="item-add my-5"
@@ -173,7 +184,7 @@
                 const [yyyy, mm, dd] = date.toISOString().split('T')[0].split('-');
                 return `${dd}.${mm}.${yyyy}`;
             };
-            const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
+            const timeOptions = {hour: '2-digit', minute: '2-digit', hour12: false};
 
             this.categoryCode = '';
             this.codeValue = '';

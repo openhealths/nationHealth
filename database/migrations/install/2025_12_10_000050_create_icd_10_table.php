@@ -63,9 +63,6 @@ return new class extends Migration
             ];
         }
 
-        // Clear an old table before inserting new data
-        DB::table('icd_10')->truncate();
-
         // Insert data by chunks
         $chunks = array_chunk($data, self::CHUNK_SIZE);
 

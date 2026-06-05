@@ -1,7 +1,6 @@
 <fieldset class="fieldset bg-white dark:bg-gray-800 !rounded-xl !shadow-none !border-gray-100 dark:!border-gray-700 !max-w-full !p-6 !mb-6" x-data="{
     localEpisodes: $wire.entangle('form.episodes'),
     localMedicalRecords: $wire.entangle('form.medical_records'),
-    isReadOnly: {{ ($isReadOnly ?? false) ? 'true' : 'false' }},
 
     openModal: false,
     openMedicalModal: false,
@@ -12,7 +11,6 @@
     modalForm: { date: '', name: '' },
 
     initAdd(target) {
-        if (this.isReadOnly) return;
         this.modalTarget = target;
         this.isNew = true;
         this.modalForm = {
@@ -23,7 +21,6 @@
     },
 
     initEdit(target, index) {
-        if (this.isReadOnly) return;
         this.modalTarget = target;
         this.isNew = false;
         this.itemIndex = index;
@@ -33,7 +30,6 @@
     },
 
     save() {
-        if (this.isReadOnly) return;
         let list = this.modalTarget === 'episode' ? this.localEpisodes : this.localMedicalRecords;
         if (this.isNew) {
             list.push({...this.modalForm});
@@ -44,7 +40,6 @@
     },
 
     saveMedical() {
-        if (this.isReadOnly) return;
         if (this.searchType === 'current') {
             this.localMedicalRecords.push({
                 date: new Date().toLocaleDateString('uk-UA'),
@@ -60,7 +55,6 @@
     },
 
     removeEntry(type, index) {
-        if (this.isReadOnly) return;
         if (type === 'episode') this.localEpisodes.splice(index, 1);
         else this.localMedicalRecords.splice(index, 1);
     }
@@ -78,34 +72,28 @@
                         <tr>
                             <th class="index-table-th w-32">{{ __('care-plan.date') }}</th>
                             <th class="index-table-th">{{ __('care-plan.name_episode') }}</th>
-                            @if(!($isReadOnly ?? false))
                             <th class="index-table-th w-24 text-right">{{ __('forms.action') }}</th>
-                            @endif
                         </tr>
                         </thead>
                         <tbody>
                         <template x-for="(item, index) in localEpisodes" :key="'ep-'+index">
-                            <tr :class="isReadOnly ? 'index-table-tr' : 'index-table-tr group cursor-pointer'" @click="if(!isReadOnly) initEdit('episode', index)">
+                            <tr class="index-table-tr group cursor-pointer" @click="initEdit('episode', index)">
                                 <td class="index-table-td" x-text="item.date"></td>
                                 <td class="index-table-td-primary" x-text="item.name"></td>
-                                @if(!($isReadOnly ?? false))
                                 <td class="index-table-td text-right">
                                     <button type="button" @click.stop="removeEntry('episode', index)" class="svg-hover-action">
                                         @icon('delete', 'w-5 h-5 text-red-600')
                                     </button>
                                 </td>
-                                @endif
                             </tr>
                         </template>
                         </tbody>
                     </table>
                 </div>
             </template>
-            @if(!($isReadOnly ?? false))
             <button type="button" @click="initAdd('episode')" class="item-add flex items-center ml-1">
                 {{ __('care-plan.add_episode') }}
             </button>
-            @endif
         </div>
 
         <div class="space-y-4">
@@ -116,34 +104,28 @@
                         <tr>
                             <th class="index-table-th w-32">{{ __('care-plan.date') }}</th>
                             <th class="index-table-th">{{ __('care-plan.medical_record') }}</th>
-                            @if(!($isReadOnly ?? false))
                             <th class="index-table-th w-24 text-right">{{ __('forms.action') }}</th>
-                            @endif
                         </tr>
                         </thead>
                         <tbody>
                         <template x-for="(item, index) in localMedicalRecords" :key="'mr-'+index">
-                            <tr :class="isReadOnly ? 'index-table-tr' : 'index-table-tr group cursor-pointer'" @click="if(!isReadOnly) initEdit('medical', index)">
+                            <tr class="index-table-tr group cursor-pointer" @click="initEdit('medical', index)">
                                 <td class="index-table-td" x-text="item.date"></td>
                                 <td class="index-table-td-primary" x-text="item.name"></td>
-                                @if(!($isReadOnly ?? false))
                                 <td class="index-table-td text-right">
                                     <button type="button" @click.stop="removeEntry('medical', index)" class="svg-hover-action">
                                         @icon('delete', 'w-5 h-5 text-red-600')
                                     </button>
                                 </td>
-                                @endif
                             </tr>
                         </template>
                         </tbody>
                     </table>
                 </div>
             </template>
-            @if(!($isReadOnly ?? false))
             <button type="button" @click="openMedicalModal = true" class="item-add flex items-center ml-1">
                 {{ __('care-plan.add_medical_record') }}
             </button>
-            @endif
         </div>
     </div>
 
@@ -211,7 +193,7 @@
                         <form @submit.prevent="saveMedical()">
                         <fieldset class="fieldset">
                             <legend class="legend">
-                                {{ __('care-plan.search_medical_records') }}
+                                {{ __('care-plan.search_medical_records') ?? 'Пошук медичних записів' }}
                             </legend>
 
                             <div class="flex mt-2">
@@ -245,8 +227,8 @@
                                    open: false,
                                    selectedType: $wire.entangle('medical_record_type'),
                                    types: {
-                                   'CONDITION': '{{ __('care-plan.conditions/diagnoses') }}',
-                                   'OBSERVATION': '{{ __('care-plan.observations') }}'
+                                   'CONDITION': 'Стани/діагнози',
+                                   'OBSERVATION': 'Спостереження'
                                    }
                                    }">
 

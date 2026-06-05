@@ -202,12 +202,60 @@ class DiagnosticReport extends Model
 
     public function specimens(): BelongsToMany
     {
-        return $this->belongsToMany(Identifier::class, 'diagnostic_report_specimens', 'diagnostic_report_id', 'identifier_id')->withTimestamps();
+        return $this->belongsToMany(
+            Identifier::class,
+            'diagnostic_report_specimens',
+            'diagnostic_report_id',
+            'identifier_id'
+        )->withTimestamps();
     }
 
     public function usedReferences(): BelongsToMany
     {
-        return $this->belongsToMany(Identifier::class, 'diagnostic_report_used_references', 'diagnostic_report_id', 'identifier_id')->withTimestamps();
+        return $this->belongsToMany(
+            Identifier::class,
+            'diagnostic_report_used_references',
+            'diagnostic_report_id',
+            'identifier_id'
+        )->withTimestamps();
+    }
+
+    /**
+     * Filter diagnostic reports belonging to the given person.
+     *
+     * @param  Builder  $query
+     * @param  int  $personId
+     * @return Builder
+     */
+    #[Scope]
+    protected function forPerson(Builder $query, int $personId): Builder
+    {
+        return $query->wherePersonId($personId);
+    }
+
+    /**
+     * Order by most recently updated in eHealth first, keeping records without a timestamp last.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    #[Scope]
+    protected function recentlyUpdatedFirst(Builder $query): Builder
+    {
+        return $query->orderByRaw('CASE WHEN ehealth_updated_at IS NULL THEN 1 ELSE 0 END')
+            ->orderByDesc('ehealth_updated_at');
+    }
+
+    /**
+     * Filter diagnostic reports with a final status.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    #[Scope]
+    protected function final(Builder $query): Builder
+    {
+        return $query->whereStatus(DiagnosticReportStatus::FINAL);
     }
 
     /**

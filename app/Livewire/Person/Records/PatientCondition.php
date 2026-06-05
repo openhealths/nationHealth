@@ -9,13 +9,14 @@ use App\Traits\BatchLegalEntityQueries;
 use App\Jobs\ConditionSync;
 use App\Classes\eHealth\EHealth;
 use App\Traits\HandlesSyncBatch;
+use App\Models\Icd10;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\Episode;
 use App\Enums\JobStatus;
 use App\Core\Arr;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Facades\DB;
 use Livewire\WithPagination;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
@@ -259,18 +260,12 @@ class PatientCondition extends BasePatientComponent
 
     private function searchIcd10AmCodesInDb(string $search): array
     {
-        return DB::table('icd_10')
-            ->select(['code', 'description'])
-            ->where('is_active', true)
-            ->where(function ($query) use ($search) {
-                $query->where('code', 'ILIKE', '%' . $search . '%')
-                    ->orWhere('description', 'ILIKE', '%' . $search . '%');
-            })
+        return Icd10::active()->search($search)
             ->orderByRaw('CASE WHEN code ILIKE ? THEN 0 ELSE 1 END', [$search . '%'])
             ->orderBy('code')
             ->limit(10)
-            ->get()
-            ->map(static fn ($item) => [
+            ->get(['code', 'description'])
+            ->map(static fn (Icd10 $item) => [
                 'value' => (string) $item->code,
                 'label' => $item->code . ' | ' . $item->description,
                 'description' => 'eHealth/ICD10_AM/condition_codes',
@@ -337,7 +332,7 @@ class PatientCondition extends BasePatientComponent
 
     private function loadEpisodesFromDb(): void
     {
-        $filterEpisodeOptions = Repository::episode()->getByPersonId($this->personId);
+        $filterEpisodeOptions = Episode::forPerson($this->personId)->get()->toArray();
 
         $this->filterEpisodeOptions = collect($filterEpisodeOptions)
             ->map(function (array $episode) {
@@ -523,7 +518,7 @@ class PatientCondition extends BasePatientComponent
         );
     }
 
-    private function filterValidationRules(): array
+    protected function filterValidationRules(): array
     {
         return [
             'filterCode' => ['nullable', 'string', 'max:255'],

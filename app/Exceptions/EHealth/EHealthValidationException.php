@@ -16,6 +16,19 @@ class EHealthValidationException extends EHealthException
     }
 
     /**
+     * Report the exception.
+     *
+     * @return void
+     */
+    public function report(): void
+    {
+        Log::error('eHealth API Validation Error Detail', [
+            'message' => $this->getMessage(),
+            'details' => $this->details,
+        ]);
+    }
+
+    /**
      * Log the exception and flash a user-facing error message.
      *
      * @param  string  $logMessage
@@ -54,11 +67,18 @@ class EHealthValidationException extends EHealthException
     public function getFormattedMessage(): string
     {
         $type = $this->details['error']['type'] ?? null;
-        $message = 'Помилка від ЕСОЗ: ' . $this->getMessage();
+        $errorMessage = $this->details['error']['message'] ?? null;
 
-        if ($type === 'request_malformed') {
-            return $message . ' ' . $this->details['error']['message'];
+        if ($errorMessage) {
+            $translated = match ($errorMessage) {
+                'Care plan has unfinished activities' => 'План лікування має незавершені призначення (активності). Спочатку скасуйте або завершіть усі призначення в цьому плані.',
+                default => $errorMessage,
+            };
+        } else {
+            $translated = $this->getMessage();
         }
+
+        $message = 'Помилка від ЕСОЗ: ' . $translated;
 
         if (isset($this->details['error']['invalid']) && is_array($this->details['error']['invalid'])) {
             $invalids = $this->details['error']['invalid'];
@@ -141,7 +161,12 @@ class EHealthValidationException extends EHealthException
             } elseif (str_contains($message, 'speciality') && str_contains($message, 'not allowed for doctor')) {
                 $translatedMessage = __('errors.ehealth.messages.speciality not allowed for doctor');
             } elseif (str_contains($message, 'type mismatch')) {
-                $translatedMessage = __('errors.ehealth.messages.type mismatch. Expected integer but got string');
+                $messages = trans('errors.ehealth.messages');
+                $translatedMessage = is_array($messages) && isset($messages[$message])
+                    ? $messages[$message]
+                    : $message;
+            } elseif (str_contains($message, 'Another activity with status') && str_contains($message, 'already exists')) {
+                $translatedMessage = __('errors.ehealth.messages.another_activity_exists');
             }
 
             if (empty($translatedMessage) && !empty($ruleName)) {

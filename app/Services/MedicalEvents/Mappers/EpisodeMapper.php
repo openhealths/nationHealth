@@ -14,18 +14,18 @@ class EpisodeMapper implements FhirMapperContract
      * Build a FHIR episode structure ready for the repository or eHealth API.
      *
      * @param  array  $data  Flat episode form data
-     * @param  mixed  ...$context  [0] array $uuids, [1] string $periodDate, [2] string $periodStart
+     * @param  mixed  ...$context  [0] array $uuids, [1] string $periodDate, [2] string $periodStart, [3] EpisodeStatus $status
      * @return array
      */
     public function toFhir(array $data, mixed ...$context): array
     {
-        [$uuids, $periodDate, $periodStart] = $context;
+        [$uuids, $periodDate, $periodStart, $status] = $context;
 
         return [
             'id' => $uuids['episode'],
             'type' => FhirResource::make()->coding('eHealth/episode_types', $data['typeCode'])->toCoding(),
             'name' => $data['name'],
-            'status' => EpisodeStatus::ACTIVE->value,
+            'status' => $status->value,
             'managingOrganization' => FhirResource::make()->coding('eHealth/resources', 'legal_entity')->toIdentifier(legalEntity()->uuid),
             'period' => [
                 'start' => convertToEHealthISO8601($periodDate . ' ' . $periodStart)

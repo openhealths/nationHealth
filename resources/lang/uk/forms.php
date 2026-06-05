@@ -331,7 +331,7 @@ return [
     'expiry_date' => 'Дата закінчення дії',
     'knedp' => 'КНЕДП',
     'key_container' => 'Файл ключа (контейнер)',
-    'key_container_upload' => 'Шлях до контейнера',
+    'key_container_upload' => 'Оберіть файл ключа',
     'password' => 'Пароль',
     'password_confirmation' => 'Підтвердження пароля',
     'register' => 'Реєстрація',

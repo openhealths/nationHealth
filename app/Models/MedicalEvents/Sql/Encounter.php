@@ -157,6 +157,32 @@ class Encounter extends Model
     }
 
     /**
+     * Filter encounters belonging to the given person.
+     *
+     * @param  Builder  $query
+     * @param  int  $personId
+     * @return Builder
+     */
+    #[Scope]
+    protected function forPerson(Builder $query, int $personId): Builder
+    {
+        return $query->wherePersonId($personId);
+    }
+
+    /**
+     * Order by most recently updated in eHealth first, keeping records without a timestamp last.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    #[Scope]
+    protected function recentlyUpdatedFirst(Builder $query): Builder
+    {
+        return $query->orderByRaw('CASE WHEN ehealth_updated_at IS NULL THEN 1 ELSE 0 END')
+            ->orderByDesc('ehealth_updated_at');
+    }
+
+    /**
      * Scope to load only sync-related relationships.
      */
     #[Scope]

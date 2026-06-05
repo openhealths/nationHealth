@@ -27,7 +27,7 @@
 
     <div class="breadcrumb-form p-4 shift-content">
         <div class="w-full mt-6"
-            x-data="{
+             x-data="{
                 showAdditionalParams: $wire.entangle('showAdditionalParams'),
                 modalDiagnosticReport: {
                     categoryCode: $wire.entangle('filterCategory'),
@@ -60,7 +60,7 @@
                     </label>
                 </div>
 
-               @php
+                @php
                     $servicesForSearch = collect($this->dictionaries['custom/services'] ?? [])
                         ->map(fn ($service) => [
                             'id' => data_get($service, 'id'),
@@ -74,7 +74,7 @@
                 @endphp
 
                 <div class="form-group group relative"
-                    x-data="{
+                     x-data="{
                         open: false,
                         search: '',
                         selected: $wire.entangle('filterCode'),
@@ -144,18 +144,18 @@
                             });
                         }
                     }"
-                    @click.outside="open = false"
+                     @click.outside="open = false"
                 >
                     <div class="relative">
                         <input type="text"
-                            name="filterCodeSearch"
-                            id="filterCodeSearch"
-                            class="input peer w-full pr-10"
-                            placeholder=" "
-                            autocomplete="off"
-                            x-model="search"
-                            @focus="open = true"
-                            @input="
+                               name="filterCodeSearch"
+                               id="filterCodeSearch"
+                               class="input peer w-full pr-10"
+                               placeholder=" "
+                               autocomplete="off"
+                               x-model="search"
+                               @focus="open = true"
+                               @input="
                                 open = true;
 
                                 if (selected) {
@@ -178,9 +178,9 @@
                         </button>
 
                         <div x-show="open"
-                            x-transition
-                            x-cloak
-                            class="absolute left-0 right-0 top-full mt-1 z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                             x-transition
+                             x-cloak
+                             class="absolute left-0 right-0 top-full mt-1 z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
                         >
                             <template x-if="filteredServices.length > 0">
                                 <div>
@@ -190,11 +190,11 @@
                                                 @click="selectService(service)"
                                         >
                                             <div class="font-medium text-gray-900 dark:text-gray-100"
-                                                x-text="makeServiceLabel(service)"
+                                                 x-text="makeServiceLabel(service)"
                                             ></div>
 
                                             <div class="text-xs text-gray-500 break-all"
-                                                x-text="service.id"
+                                                 x-text="service.id"
                                             ></div>
                                         </button>
                                     </template>
@@ -266,12 +266,12 @@
                     <div class="form-group group">
                         <div class="datepicker-wrapper">
                             <input wire:model="filterIssuedFrom"
-                                type="text"
-                                name="filterIssuedFrom"
-                                id="filterIssuedFrom"
-                                class="datepicker-input with-leading-icon input peer w-full"
-                                placeholder=" "
-                                autocomplete="off"
+                                   type="text"
+                                   name="filterIssuedFrom"
+                                   id="filterIssuedFrom"
+                                   class="datepicker-input with-leading-icon input peer w-full"
+                                   placeholder=" "
+                                   autocomplete="off"
                             />
                             <label for="filterIssuedFrom" class="wrapped-label">
                                 {{ __('patients.date_from') }}
@@ -282,12 +282,12 @@
                     <div class="form-group group">
                         <div class="datepicker-wrapper">
                             <input wire:model="filterIssuedTo"
-                                type="text"
-                                name="filterIssuedTo"
-                                id="filterIssuedTo"
-                                class="datepicker-input with-leading-icon input peer w-full"
-                                placeholder=" "
-                                autocomplete="off"
+                                   type="text"
+                                   name="filterIssuedTo"
+                                   id="filterIssuedTo"
+                                   class="datepicker-input with-leading-icon input peer w-full"
+                                   placeholder=" "
+                                   autocomplete="off"
                             />
                             <label for="filterIssuedTo" class="wrapped-label">
                                 {{ __('patients.date_to') }}
@@ -296,7 +296,7 @@
                     </div>
 
                     <div class="form-group group relative"
-                        x-data="{
+                         x-data="{
                             open: false,
                             search: '',
                             selected: $wire.entangle('filterSpecimenId'),
@@ -347,18 +347,18 @@
                                 });
                             }
                         }"
-                        @click.outside="open = false"
+                         @click.outside="open = false"
                     >
                         <div class="relative">
                             <input type="text"
-                                name="filterSpecimenId"
-                                id="filterSpecimenId"
-                                class="input peer w-full"
-                                placeholder=" "
-                                autocomplete="off"
-                                x-model="search"
-                                @focus="open = true"
-                                @input="open = true"
+                                   name="filterSpecimenId"
+                                   id="filterSpecimenId"
+                                   class="input peer w-full"
+                                   placeholder=" "
+                                   autocomplete="off"
+                                   x-model="search"
+                                   @focus="open = true"
+                                   @input="open = true"
                             />
 
                             <label for="filterSpecimenId" class="label">
@@ -375,9 +375,9 @@
                             </button>
 
                             <div x-show="open"
-                                x-transition
-                                x-cloak
-                                class="absolute left-0 right-0 top-full mt-1 z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                                 x-transition
+                                 x-cloak
+                                 class="absolute left-0 right-0 top-full mt-1 z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
                             >
                                 <template x-if="filteredOptions.length > 0">
                                     <div>
@@ -387,11 +387,11 @@
                                                     @click="selectOption(option)"
                                             >
                                                 <div class="font-medium text-gray-900 dark:text-gray-100"
-                                                    x-text="option.label || 'Без назви'"
+                                                     x-text="option.label || 'Без назви'"
                                                 ></div>
 
                                                 <div class="text-xs text-gray-500 break-all"
-                                                    x-text="option.description || option.value"
+                                                     x-text="option.description || option.value"
                                                 ></div>
                                             </button>
                                         </template>
@@ -414,7 +414,7 @@
                 --}}
                 <div class="form-row-3 mb-9">
                     <div class="form-group group relative"
-                        x-data="{
+                         x-data="{
                             open: false,
                             search: '',
                             selected: $wire.entangle('filterContextEpisodeId'),
@@ -465,18 +465,18 @@
                                 });
                             }
                         }"
-                        @click.outside="open = false"
+                         @click.outside="open = false"
                     >
                         <div class="relative">
                             <input type="text"
-                                name="episodesId"
-                                id="episodesId"
-                                class="input peer w-full"
-                                placeholder=" "
-                                autocomplete="off"
-                                x-model="search"
-                                @focus="open = true"
-                                @input="open = true"
+                                   name="episodesId"
+                                   id="episodesId"
+                                   class="input peer w-full"
+                                   placeholder=" "
+                                   autocomplete="off"
+                                   x-model="search"
+                                   @focus="open = true"
+                                   @input="open = true"
                             />
 
                             <label for="episodesId" class="label">
@@ -493,9 +493,9 @@
                             </button>
 
                             <div x-show="open"
-                                x-transition
-                                x-cloak
-                                class="absolute left-0 right-0 top-full mt-1 z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                                 x-transition
+                                 x-cloak
+                                 class="absolute left-0 right-0 top-full mt-1 z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
                             >
                                 <template x-if="filteredOptions.length > 0">
                                     <div>
@@ -505,11 +505,11 @@
                                                     @click="selectOption(option)"
                                             >
                                                 <div class="font-medium text-gray-900 dark:text-gray-100"
-                                                    x-text="option.label || 'Без назви'"
+                                                     x-text="option.label || 'Без назви'"
                                                 ></div>
 
                                                 <div class="text-xs text-gray-500 break-all"
-                                                    x-text="option.description || option.value"
+                                                     x-text="option.description || option.value"
                                                 ></div>
                                             </button>
                                         </template>
@@ -526,7 +526,7 @@
                     </div>
 
                     <div class="form-group group relative"
-                        x-data="{
+                         x-data="{
                             open: false,
                             search: '',
                             selected: $wire.entangle('filterOriginEpisodeId'),
@@ -577,18 +577,18 @@
                                 });
                             }
                         }"
-                        @click.outside="open = false"
+                         @click.outside="open = false"
                     >
                         <div class="relative">
                             <input type="text"
-                                name="originEpisodesId"
-                                id="originEpisodesId"
-                                class="input peer w-full"
-                                placeholder=" "
-                                autocomplete="off"
-                                x-model="search"
-                                @focus="open = true"
-                                @input="open = true"
+                                   name="originEpisodesId"
+                                   id="originEpisodesId"
+                                   class="input peer w-full"
+                                   placeholder=" "
+                                   autocomplete="off"
+                                   x-model="search"
+                                   @focus="open = true"
+                                   @input="open = true"
                             />
 
                             <label for="originEpisodesId" class="label">
@@ -605,9 +605,9 @@
                             </button>
 
                             <div x-show="open"
-                                x-transition
-                                x-cloak
-                                class="absolute left-0 right-0 top-full mt-1 z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                                 x-transition
+                                 x-cloak
+                                 class="absolute left-0 right-0 top-full mt-1 z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
                             >
                                 <template x-if="filteredOptions.length > 0">
                                     <div>
@@ -617,11 +617,11 @@
                                                     @click="selectOption(option)"
                                             >
                                                 <div class="font-medium text-gray-900 dark:text-gray-100"
-                                                    x-text="option.label || 'Без назви'"
+                                                     x-text="option.label || 'Без назви'"
                                                 ></div>
 
                                                 <div class="text-xs text-gray-500 break-all"
-                                                    x-text="option.description || option.value"
+                                                     x-text="option.description || option.value"
                                                 ></div>
                                             </button>
                                         </template>
@@ -681,16 +681,17 @@
                                 <input type="checkbox" class="default-checkbox w-5 h-5">
                             </div>
 
-                            <div class="record-inner-column !pl-4 flex-1">
+                            <div class="record-inner-column flex-1">
                                 <div class="record-inner-label">{{ __('patients.code_and_name') }}</div>
-                                <div class="record-inner-value text-[17px] font-semibold text-gray-900 dark:text-gray-100">
+                                <div
+                                    class="record-inner-value text-[16px]">
                                     {{ data_get($diagnosticReport, 'code.identifier.value') && data_get($diagnosticReport, 'code.displayValue')
                                     ? data_get($diagnosticReport, 'code.identifier.value') . ' | ' . data_get($diagnosticReport, 'code.displayValue')
                                     : '-' }}
                                 </div>
                             </div>
 
-                            <div class="record-inner-column-bordered w-full md:w-[180px] shrink-0">
+                            <div class="record-inner-column-bordered w-full md:w-36 shrink-0">
                                 <div class="record-inner-label">{{ __('forms.status.label') }}</div>
                                 <div>
                                     <span class="badge-green">
@@ -699,7 +700,7 @@
                                 </div>
                             </div>
 
-                            <div class="record-inner-action-col border-l border-gray-200 dark:border-gray-700 w-16 flex items-center justify-center shrink-0 h-full relative">
+                            <div class="record-inner-action-col">
                                 <div x-data="{
                                     open: false,
                                     toggle() {
@@ -713,28 +714,28 @@
                                         focusAfter && focusAfter.focus()
                                     }
                                 }"
-                                    @keydown.escape.prevent.stop="close($refs.button)"
-                                    @focusin.window="!$refs.panel.contains($event.target) && close()"
-                                    x-id="['dropdown-button']"
-                                    class="relative"
+                                     @keydown.escape.prevent.stop="close($refs.button)"
+                                     @focusin.window="!$refs.panel.contains($event.target) && close()"
+                                     x-id="['dropdown-button']"
+                                     class="relative"
                                 >
                                     <button @click="toggle()"
                                             x-ref="button"
                                             :aria-expanded="open"
                                             :aria-controls="$id('dropdown-button')"
                                             type="button"
-                                            class="record-inner-action-btn transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 p-2 rounded-lg"
+                                            class="record-inner-action-btn"
                                     >
-                                        @icon('edit-user-outline', 'w-6 h-6 text-gray-700 dark:text-gray-300')
+                                        @icon('edit-user-outline', 'w-5 h-5')
                                     </button>
 
                                     <div x-show="open"
-                                        x-cloak
-                                        x-ref="panel"
-                                        x-transition.origin.top.right
-                                        @click.outside="close($refs.button)"
-                                        :id="$id('dropdown-button')"
-                                        class="absolute right-0 mt-2 w-56 rounded-md bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-lg z-50 py-1"
+                                         x-cloak
+                                         x-ref="panel"
+                                         x-transition.origin.top.right
+                                         @click.outside="close($refs.button)"
+                                         :id="$id('dropdown-button')"
+                                         class="absolute right-0 mt-2 w-56 rounded-md bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-lg z-50 py-1"
                                     >
                                         <button @click="close($refs.button)"
                                                 class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
@@ -754,12 +755,13 @@
                             </div>
                         </div>
 
-                        <div class="record-inner-body grid grid-cols-1 xl:grid-cols-[2.2fr_1.5fr] divide-y xl:divide-y-0 xl:divide-x divide-gray-200 dark:divide-gray-700 !p-0">
-                            <div class="p-3.5 pl-4 overflow-hidden">
+                        <div class="record-inner-body">
+                            <div class="record-inner-grid-container">
                                 <div class="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
                                     <div class="space-y-2.5 min-w-0">
                                         <div class="min-w-0">
-                                            <div class="record-inner-label text-[10px] uppercase">{{ __('forms.category') }}</div>
+                                            <div
+                                                class="record-inner-label text-[10px] uppercase">{{ __('forms.category') }}</div>
                                             <div class="record-inner-value text-[14px] font-semibold break-words">
                                                 {{ data_get(
                                                     $this->dictionaries,
@@ -769,7 +771,8 @@
                                             </div>
                                         </div>
                                         <div class="min-w-0">
-                                            <div class="record-inner-label text-[10px] uppercase">{{ __('patients.referrals') }}</div>
+                                            <div
+                                                class="record-inner-label text-[10px] uppercase">{{ __('patients.referrals') }}</div>
                                             <div class="record-inner-value text-[14px] font-semibold break-words">
                                                 {{ data_get($diagnosticReport, 'paperReferral.requisition', '—') }}
                                             </div>
@@ -778,13 +781,16 @@
 
                                     <div class="space-y-2.5 min-w-0">
                                         <div class="min-w-0">
-                                            <div class="record-inner-label text-[10px] uppercase">{{ __('patients.performer') }}</div>
-                                            <div class="record-inner-value text-[14px] font-semibold break-words uppercase">
+                                            <div
+                                                class="record-inner-label text-[10px] uppercase">{{ __('patients.performer') }}</div>
+                                            <div
+                                                class="record-inner-value text-[14px] font-semibold break-words uppercase">
                                                 {{ data_get($diagnosticReport, 'performer.reference.displayValue' ,'-') }}
                                             </div>
                                         </div>
                                         <div class="min-w-0">
-                                            <div class="record-inner-label text-[10px] uppercase">{{ __('patients.conclusion') }}</div>
+                                            <div
+                                                class="record-inner-label text-[10px] uppercase">{{ __('patients.conclusion') }}</div>
                                             <div class="record-inner-value text-[14px] font-semibold break-words">
                                                 {{ data_get($diagnosticReport, 'conclusion') ?? '-' }}
                                             </div>
@@ -793,13 +799,15 @@
 
                                     <div class="space-y-2.5 min-w-0">
                                         <div class="min-w-0">
-                                            <div class="record-inner-label text-[10px] uppercase">{{ __('patients.created') }}</div>
+                                            <div
+                                                class="record-inner-label text-[10px] uppercase">{{ __('patients.created') }}</div>
                                             <div class="record-inner-value text-[14px] font-semibold break-words">
                                                 {{ optional(\Carbon\Carbon::make(data_get($diagnosticReport, 'ehealthInsertedAt')))->format('d.m.Y H:i') ?? '-' }}
                                             </div>
                                         </div>
                                         <div class="min-w-0">
-                                            <div class="record-inner-label text-[10px] uppercase">{{ __('patients.doctor') }}</div>
+                                            <div
+                                                class="record-inner-label text-[10px] uppercase">{{ __('patients.doctor') }}</div>
                                             <div class="record-inner-value text-[14px] font-semibold break-words">
                                                 {{ data_get($diagnosticReport, 'recordedBy.displayValue') ?? '-' }}
                                             </div>
@@ -808,30 +816,29 @@
                                 </div>
                             </div>
 
-                            <div class="p-3.5 px-4 overflow-hidden flex flex-col justify-center">
-                                <div class="space-y-4">
-                                    <div class="min-w-0">
-                                        <div class="record-inner-label text-[10px] uppercase">
-                                            {{ __('patients.ehealth_id') }}
-                                        </div>
-                                        <div class="record-inner-id-value text-[13px] break-all whitespace-normal leading-normal">
-                                            {{ data_get($diagnosticReport, 'uuid') ?? '-'}}
-                                        </div>
+                            <div class="record-inner-id-col">
+                                <div class="min-w-0">
+                                    <div class="record-inner-label text-[10px] uppercase">
+                                        {{ __('patients.ehealth_id') }}
                                     </div>
-                                    <div class="min-w-0">
-                                        <div class="record-inner-label text-[10px] uppercase">
-                                            {{ __('patients.medical_record_id') }}
-                                        </div>
-                                        <div class="record-inner-id-value text-[13px] break-all whitespace-normal leading-normal">
-                                            {{ data_get($diagnosticReport, 'encounter.identifier.value') ?? '-' }}
-                                        </div>
+                                    <div class="record-inner-id-value">
+                                        {{ data_get($diagnosticReport, 'uuid') ?? '-'}}
+                                    </div>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="record-inner-label text-[10px] uppercase">
+                                        {{ __('patients.medical_record_id') }}
+                                    </div>
+                                    <div class="record-inner-id-value">
+                                        {{ data_get($diagnosticReport, 'encounter.identifier.value') ?? '-' }}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    @empty
-                    <div class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-sm text-gray-500 dark:text-gray-400">
+                @empty
+                    <div
+                        class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-sm text-gray-500 dark:text-gray-400">
                         {{ __('patients.diagnostic_report_not_found') }}
                     </div>
                 @endforelse
@@ -842,5 +849,5 @@
         </div>
     </div>
 
-    <x-forms.loading />
+    <x-forms.loading/>
 </x-layouts.patient>

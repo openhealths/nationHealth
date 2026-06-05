@@ -40,26 +40,206 @@ class CarePlanActivityRepository
         return $activity->update($data);
     }
 
+    private function normalizeUnitCode(?string $system, ?string $code): ?string
+    {
+        if (empty($code)) {
+            return null;
+        }
+        if (empty($system)) {
+            return $code;
+        }
+
+        try {
+            $res = dictionary()->basics()->getMultipleFormatted([$system])->toArray();
+            $dict = $res[$system] ?? null;
+            if ($dict && is_array($dict)) {
+                foreach (array_keys($dict) as $key) {
+                    if (strcasecmp((string)$key, $code) === 0) {
+                        return (string)$key;
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // fallback
+        }
+
+        return $code;
+    }
+
     public function formatCarePlanActivityRequest(CarePlanActivity $activity): array
     {
+        $productReference = null;
+        if (!empty($activity->product_reference)) {
+            $kindLower = strtolower($activity->kind);
+            if (str_contains($kindLower, 'service')) {
+                $code = 'service';
+            } elseif (str_contains($kindLower, 'medication')) {
+                $code = 'medication';
+            } elseif (str_contains($kindLower, 'device')) {
+                $code = 'device_definition';
+            } else {
+                $code = 'service'; // fallback
+            }
+
+            $productReference = [
+                'identifier' => [
+                    'type' => [
+                        'coding' => [
+                            [
+                                'system' => 'eHealth/resources',
+                                'code' => $code
+                            ]
+                        ]
+                    ],
+                    'value' => $activity->product_reference
+                ]
+            ];
+        }
+
+        $authorUuid = $activity->author?->uuid ?? auth()->user()?->activeDoctorEmployee()?->uuid;
+
+        $quantityRelation = $activity->quantityQuantity;
+        $quantityValue = $quantityRelation ? $quantityRelation->value : $activity->quantity;
+        $quantitySystem = $quantityRelation ? $quantityRelation->system : $activity->quantity_system;
+        $quantityCode = $quantityRelation ? $quantityRelation->code : $activity->quantity_code;
+        $quantityNormalizedCode = $this->normalizeUnitCode($quantitySystem, $quantityCode);
+        $quantityUnit = $quantityRelation ? $quantityRelation->unit : null;
+
+        $dailyAmountRelation = $activity->dailyAmountQuantity;
+        $dailyAmountValue = $dailyAmountRelation ? $dailyAmountRelation->value : $activity->daily_amount;
+        $dailyAmountSystem = $dailyAmountRelation ? $dailyAmountRelation->system : ($activity->daily_amount_system ?? $quantitySystem);
+        $dailyAmountCode = $dailyAmountRelation ? $dailyAmountRelation->code : ($activity->daily_amount_code ?? $quantityCode);
+        $dailyAmountNormalizedCode = $this->normalizeUnitCode($dailyAmountSystem, $dailyAmountCode);
+        $dailyAmountUnit = $dailyAmountRelation ? $dailyAmountRelation->unit : null;
+
+        $scheduledPeriod = $activity->scheduledPeriod;
+        $startDate = $scheduledPeriod ? $scheduledPeriod->getRawOriginal('start') : $activity->scheduled_period_start;
+        $endDate = $scheduledPeriod ? $scheduledPeriod->getRawOriginal('end') : $activity->scheduled_period_end;
+
+        $formattedStart = null;
+        if ($startDate) {
+            if ($activity->uuid && $scheduledPeriod) {
+                $formattedStart = \Carbon\Carbon::parse($startDate, 'UTC')->utc()->toIso8601ZuluString();
+            } else {
+                $startCarbon = \Carbon\Carbon::parse($startDate);
+                if ($activity->uuid && $activity->created_at) {
+                    $time = $activity->created_at->format('H:i:s');
+                } else {
+                    $time = $startCarbon->isToday() ? now()->format('H:i:s') : '12:00:00';
+                }
+                $formattedStart = convertToEHealthISO8601($startCarbon->format('Y-m-d') . ' ' . $time);
+            }
+        }
+
+        $formattedEnd = null;
+        if ($endDate) {
+            if ($activity->uuid && $scheduledPeriod) {
+                $formattedEnd = \Carbon\Carbon::parse($endDate, 'UTC')->utc()->toIso8601ZuluString();
+            } else {
+                $endCarbon = \Carbon\Carbon::parse($endDate);
+                $formattedEnd = convertToEHealthISO8601($endCarbon->format('Y-m-d') . ' 23:59:59');
+            }
+        }
+
+        // For non-medication requests, eHealth does not allow daily_amount system/code to be set
+        $isMedication = str_contains(strtolower($activity->kind), 'medication');
+
         return removeEmptyKeys([
+            'id' => $activity->uuid,
+            'author' => [
+                'identifier' => [
+                    'type' => [
+                        'coding' => [
+                            [
+                                'system' => 'eHealth/resources',
+                                'code' => 'employee'
+                            ]
+                        ]
+                    ],
+                    'value' => $authorUuid
+                ]
+            ],
+            'care_plan' => [
+                'identifier' => [
+                    'type' => [
+                        'coding' => [
+                            [
+                                'system' => 'eHealth/resources',
+                                'code' => 'care_plan'
+                            ]
+                        ]
+                    ],
+                    'value' => $activity->carePlan?->uuid
+                ]
+            ],
             'detail' => removeEmptyKeys([
                 'kind' => $activity->kind,
                 'status' => 'scheduled',
-                'intent' => 'order',
+                'do_not_perform' => (bool)$activity->do_not_perform,
                 'description' => $activity->description ?: null,
-                'product_reference' => $activity->product_reference ? ['identifier' => ['value' => $activity->product_reference]] : null,
-                'scheduled_period' => array_filter([
-                    'start' => $activity->scheduled_period_start ? convertToYmd($activity->scheduled_period_start->format('d.m.Y')) : null,
-                    'end' => $activity->scheduled_period_end ? convertToYmd($activity->scheduled_period_end->format('d.m.Y')) : null,
+                'product_reference' => $productReference,
+                'scheduled_period' => removeEmptyKeys([
+                    'start' => $formattedStart,
+                    'end' => $formattedEnd,
                 ]),
-                'quantity' => $activity->quantity ? ['value' => (float)$activity->quantity, 'system' => $activity->quantity_system ?? null, 'code' => $activity->quantity_code ?? null] : null,
-                'daily_amount' => $activity->daily_amount ? ['value' => (float)$activity->daily_amount, 'system' => $activity->daily_amount_system ?? null, 'code' => $activity->daily_amount_code ?? null] : null,
+                'quantity' => $quantityValue ? removeEmptyKeys([
+                    'value' => (float)$quantityValue,
+                    'system' => $quantitySystem,
+                    'code' => $quantityNormalizedCode,
+                    'unit' => $quantityUnit ?: null,
+                ]) : null,
+                'daily_amount' => $dailyAmountValue ? removeEmptyKeys([
+                    'value' => (float)$dailyAmountValue,
+                    'system' => $isMedication ? $dailyAmountSystem : null,
+                    'code' => $isMedication ? $dailyAmountNormalizedCode : null,
+                    'unit' => $isMedication ? ($dailyAmountUnit ?: null) : null,
+                ]) : null,
                 'reason_code' => $activity->reason_code ? [['coding' => [['code' => $activity->reason_code]]]] : null,
-                'reason_reference' => !empty($activity->reason_reference) ? array_map(fn($r) => ['identifier' => ['value' => $r]], $activity->reason_reference) : null,
-                'goal' => !empty($activity->goal) ? array_map(fn($g) => ['identifier' => ['value' => $g]], $activity->goal) : null,
+                'reason_reference' => !empty($activity->reason_reference) ? array_map(function($r) {
+                    $parts = explode('/', $r);
+                    if (count($parts) === 2) {
+                        $type = strtolower($parts[0]);
+                        $uuid = $parts[1];
+                    } else {
+                        $type = 'condition';
+                        $uuid = $r;
+                    }
+                    return [
+                        'identifier' => [
+                            'type' => [
+                                'coding' => [
+                                    [
+                                        'system' => 'eHealth/resources',
+                                        'code' => $type
+                                    ]
+                                ]
+                            ],
+                            'value' => $uuid
+                        ]
+                    ];
+                }, $activity->reason_reference) : null,
+                'goal' => !empty($activity->goal) ? array_map(fn($g) => [
+                    'coding' => [
+                        [
+                            'system' => 'eHealth/care_plan_activity_goals',
+                            'code' => $g
+                        ]
+                    ]
+                ], $activity->goal) : null,
+                'program' => $activity->program ? [
+                    'identifier' => [
+                        'type' => [
+                            'coding' => [
+                                [
+                                    'system' => 'eHealth/resources',
+                                    'code' => 'medical_program'
+                                ]
+                            ]
+                        ],
+                        'value' => $activity->program
+                    ]
+                ] : null,
             ]),
-            'program' => $activity->program ? ['identifier' => ['value' => $activity->program]] : null,
         ]);
     }
 
@@ -73,21 +253,40 @@ class CarePlanActivityRepository
         $response = EHealth::carePlanActivity()->getSummary($person->uuid, $carePlan->uuid, $query);
         $data = $response->getData();
 
-        if (!isset($data['data']) || !is_array($data['data'])) {
+        \Illuminate\Support\Facades\Log::info('CarePlanActivityRepository: syncActivities raw response data', [
+            'person_uuid' => $person->uuid,
+            'care_plan_uuid' => $carePlan->uuid,
+            'response' => $data
+        ]);
+
+        $activities = isset($data['data']) ? $data['data'] : $data;
+
+        if (!is_array($activities)) {
+            \Illuminate\Support\Facades\Log::warning('CarePlanActivityRepository: sync skipped because data is not an array', ['data' => $data]);
             return;
         }
 
-        $validator = Validator::make($data['data'], [
+        foreach ($activities as $index => $rawFhir) {
+            if (is_array($rawFhir) && !isset($rawFhir['status']) && isset($rawFhir['detail']['status'])) {
+                $activities[$index]['status'] = $rawFhir['detail']['status'];
+            }
+        }
+
+        $validator = Validator::make($activities, [
             '*' => 'array',
             '*.id' => 'required|uuid',
             '*.status' => 'required|string',
         ]);
 
         if ($validator->fails()) {
+            \Illuminate\Support\Facades\Log::error('CarePlanActivityRepository: sync validation failed', [
+                'errors' => $validator->errors()->toArray(),
+                'data' => $activities
+            ]);
             throw new ValidationException($validator);
         }
 
-        foreach ($data['data'] as $rawFhir) {
+        foreach ($activities as $rawFhir) {
             /*
             \App\Models\MedicalEvents\Mongo\CarePlanActivity::updateOrCreate(
                 ['uuid' => $rawFhir['id']],
@@ -98,25 +297,157 @@ class CarePlanActivityRepository
             DB::transaction(function () use ($carePlan, $rawFhir) {
                 $detail = $rawFhir['detail'] ?? [];
 
-                $kind = isset($detail['kind'])
-                    ? MedicalEventsRepository::codeableConcept()->store($detail['kind'])
+                $kind = null;
+                if (isset($detail['kind'])) {
+                    if (is_array($detail['kind'])) {
+                        $kind = MedicalEventsRepository::codeableConcept()->store($detail['kind']);
+                    } else {
+                        $kind = MedicalEventsRepository::codeableConcept()->store([
+                            'coding' => [
+                                [
+                                    'system' => 'http://hl7.org/fhir/care-plan-activity-kind',
+                                    'code' => $detail['kind']
+                                ]
+                            ],
+                            'text' => $detail['kind']
+                        ]);
+                    }
+                }
+
+                $rawProductCodeableConcept = $detail['product_codeable_concept'] ?? ($detail['productCodeableConcept'] ?? null);
+                $rawReasonCode = $detail['reason_code'] ?? ($detail['reasonCode'] ?? null);
+                $rawOutcomeCodeableConcept = $detail['outcome_codeable_concept'] ?? ($detail['outcomeCodeableConcept'] ?? null);
+                $rawProductReference = $detail['product_reference'] ?? ($detail['productReference'] ?? null);
+                $rawReasonReference = $detail['reason_reference'] ?? ($detail['reasonReference'] ?? null);
+                $rawGoal = $detail['goal'] ?? null;
+                $rawOutcomeReference = $detail['outcome_reference'] ?? ($detail['outcomeReference'] ?? null);
+
+                $productConcept = !empty($rawProductCodeableConcept)
+                    ? MedicalEventsRepository::codeableConcept()->store($rawProductCodeableConcept)
                     : null;
 
-                $productConcept = isset($detail['productCodeableConcept'])
-                    ? MedicalEventsRepository::codeableConcept()->store($detail['productCodeableConcept'])
+                $reasonConcept = !empty($rawReasonCode)
+                    ? MedicalEventsRepository::codeableConcept()->store($rawReasonCode[0])
                     : null;
 
-                $reasonConcept = !empty($detail['reasonCode'])
-                    ? MedicalEventsRepository::codeableConcept()->store($detail['reasonCode'][0])
+                $outcomeConcept = !empty($rawOutcomeCodeableConcept)
+                    ? MedicalEventsRepository::codeableConcept()->store($rawOutcomeCodeableConcept)
                     : null;
 
-                $outcomeConcept = isset($detail['outcomeCodeableConcept'])
-                    ? MedicalEventsRepository::codeableConcept()->store($detail['outcomeCodeableConcept'])
+                $productReference = !empty($rawProductReference)
+                    ? MedicalEventsRepository::identifier()->store($rawProductReference['identifier']['value'])
                     : null;
 
-                $productReference = isset($detail['productReference'])
-                    ? MedicalEventsRepository::identifier()->store($detail['productReference']['identifier']['value'])
-                    : null;
+                $kindString = null;
+                if (isset($detail['kind'])) {
+                    if (is_array($detail['kind'])) {
+                        $kindString = $detail['kind']['coding'][0]['code'] ?? ($detail['kind']['text'] ?? null);
+                    } else {
+                        $kindString = (string)$detail['kind'];
+                    }
+                }
+
+                $authorUuid = $rawFhir['author']['identifier']['value'] ?? null;
+                $authorId = null;
+                if ($authorUuid) {
+                    $authorId = \App\Models\Employee\Employee::where('uuid', $authorUuid)->value('id');
+                }
+                if (!$authorId) {
+                    $authorId = auth()->user()?->activeDoctorEmployee()?->id;
+                }
+                if (!$authorId) {
+                    $authorId = $carePlan->author_id;
+                }
+
+                $productReferenceValue = $rawProductReference['identifier']['value'] ?? null;
+
+                $reasonReferenceArray = [];
+                if (!empty($rawReasonReference)) {
+                    foreach ($rawReasonReference as $ref) {
+                        $val = $ref['identifier']['value'] ?? null;
+                        if ($val) {
+                            if (str_contains($val, '/')) {
+                                $reasonReferenceArray[] = $val;
+                            } else {
+                                $type = 'Condition';
+                                if (isset($ref['identifier']['type']['coding'][0]['code'])) {
+                                    $code = $ref['identifier']['type']['coding'][0]['code'];
+                                    if (strcasecmp($code, 'condition') === 0) {
+                                        $type = 'Condition';
+                                    } elseif (strcasecmp($code, 'observation') === 0) {
+                                        $type = 'Observation';
+                                    } elseif (strcasecmp($code, 'diagnostic_report') === 0) {
+                                        $type = 'DiagnosticReport';
+                                    }
+                                }
+                                $reasonReferenceArray[] = $type . '/' . $val;
+                            }
+                        }
+                    }
+                }
+
+                $goalArray = [];
+                if (!empty($rawGoal)) {
+                    foreach ($rawGoal as $g) {
+                        $val = null;
+                        if (isset($g['coding'][0]['code'])) {
+                            $val = $g['coding'][0]['code'];
+                        } elseif (isset($g['identifier']['value'])) {
+                            $val = $g['identifier']['value'];
+                        }
+                        if ($val) {
+                            $goalArray[] = $val;
+                        }
+                    }
+                }
+
+                $activity = CarePlanActivity::where('uuid', $rawFhir['id'])->first();
+
+                $quantityId = null;
+                $rawQuantity = $detail['quantity'] ?? null;
+                if ($rawQuantity) {
+                    $qtyData = [
+                        'value' => isset($rawQuantity['value']) ? (float)$rawQuantity['value'] : null,
+                        'comparator' => $rawQuantity['comparator'] ?? null,
+                        'unit' => $rawQuantity['unit'] ?? null,
+                        'system' => $rawQuantity['system'] ?? null,
+                        'code' => $rawQuantity['code'] ?? null,
+                    ];
+                    if ($activity && $activity->quantityQuantity) {
+                        $activity->quantityQuantity->update($qtyData);
+                        $quantityId = $activity->quantityQuantity->id;
+                    } else {
+                        $quantityObj = \App\Models\MedicalEvents\Sql\Quantity::create($qtyData);
+                        $quantityId = $quantityObj->id;
+                    }
+                } else {
+                    if ($activity && $activity->quantityQuantity) {
+                        $activity->quantityQuantity->delete();
+                    }
+                }
+
+                $dailyAmountId = null;
+                $rawDailyAmount = $detail['dailyAmount'] ?? ($detail['daily_amount'] ?? null);
+                if ($rawDailyAmount) {
+                    $dailyAmountData = [
+                        'value' => isset($rawDailyAmount['value']) ? (float)$rawDailyAmount['value'] : null,
+                        'comparator' => $rawDailyAmount['comparator'] ?? null,
+                        'unit' => $rawDailyAmount['unit'] ?? null,
+                        'system' => $rawDailyAmount['system'] ?? null,
+                        'code' => $rawDailyAmount['code'] ?? null,
+                    ];
+                    if ($activity && $activity->dailyAmountQuantity) {
+                        $activity->dailyAmountQuantity->update($dailyAmountData);
+                        $dailyAmountId = $activity->dailyAmountQuantity->id;
+                    } else {
+                        $dailyAmountObj = \App\Models\MedicalEvents\Sql\Quantity::create($dailyAmountData);
+                        $dailyAmountId = $dailyAmountObj->id;
+                    }
+                } else {
+                    if ($activity && $activity->dailyAmountQuantity) {
+                        $activity->dailyAmountQuantity->delete();
+                    }
+                }
 
                 $activity = CarePlanActivity::updateOrCreate(
                     ['uuid' => $rawFhir['id']],
@@ -128,34 +459,54 @@ class CarePlanActivityRepository
                         'reason_code_id' => $reasonConcept?->id,
                         'outcome_codeable_concept_id' => $outcomeConcept?->id,
                         'product_reference_id' => $productReference?->id,
-                        'quantity' => $detail['quantity']['value'] ?? null,
-                        'quantity_system' => $detail['quantity']['system'] ?? null,
-                        'quantity_code' => $detail['quantity']['code'] ?? null,
+                        'quantity_id' => $quantityId,
+                        'daily_amount_id' => $dailyAmountId,
+                        'quantity' => $rawQuantity['value'] ?? null,
+                        'quantity_system' => $rawQuantity['system'] ?? null,
+                        'quantity_code' => $rawQuantity['code'] ?? null,
+                        'daily_amount' => $rawDailyAmount['value'] ?? null,
+                        'daily_amount_system' => $rawDailyAmount['system'] ?? null,
+                        'daily_amount_code' => $rawDailyAmount['code'] ?? null,
                         'description' => $detail['description'] ?? null,
-                        'scheduled_period_start' => isset($detail['scheduled_period']['start']) ? \Carbon\Carbon::parse($detail['scheduled_period']['start']) : null,
-                        'scheduled_period_end' => isset($detail['scheduled_period']['end']) ? \Carbon\Carbon::parse($detail['scheduled_period']['end']) : null,
+                        'scheduled_period_start' => isset($detail['scheduledPeriod']['start']) ? \Carbon\Carbon::parse($detail['scheduledPeriod']['start']) : (isset($detail['scheduled_period']['start']) ? \Carbon\Carbon::parse($detail['scheduled_period']['start']) : null),
+                        'scheduled_period_end' => isset($detail['scheduledPeriod']['end']) ? \Carbon\Carbon::parse($detail['scheduledPeriod']['end']) : (isset($detail['scheduled_period']['end']) ? \Carbon\Carbon::parse($detail['scheduled_period']['end']) : null),
+                        'kind' => $kindString,
+                        'author_id' => $authorId,
+                        'product_reference' => $productReferenceValue,
+                        'reason_reference' => $reasonReferenceArray,
+                        'goal' => $goalArray,
                     ]
                 );
 
-                if (isset($detail['reasonReference'])) {
+                $rawScheduledPeriod = $detail['scheduledPeriod'] ?? ($detail['scheduled_period'] ?? null);
+                $scheduledPeriodData = null;
+                if ($rawScheduledPeriod) {
+                    $scheduledPeriodData = [
+                        'start' => $rawScheduledPeriod['start'] ?? null,
+                        'end' => $rawScheduledPeriod['end'] ?? null,
+                    ];
+                }
+                MedicalEventsRepository::period()->sync($activity, $scheduledPeriodData, 'scheduledPeriod');
+
+                if (!empty($rawReasonReference)) {
                     $ids = [];
-                    foreach ($detail['reasonReference'] as $ref) {
+                    foreach ($rawReasonReference as $ref) {
                         $ids[] = MedicalEventsRepository::identifier()->store($ref['identifier']['value'])->id;
                     }
                     $activity->reasonReferences()->sync($ids);
                 }
 
-                if (isset($detail['goal'])) {
+                if (!empty($rawGoal)) {
                     $ids = [];
-                    foreach ($detail['goal'] as $ref) {
+                    foreach ($rawGoal as $ref) {
                         $ids[] = MedicalEventsRepository::identifier()->store($ref['identifier']['value'])->id;
                     }
                     $activity->goalReferences()->sync($ids);
                 }
 
-                if (isset($detail['outcomeReference'])) {
+                if (!empty($rawOutcomeReference)) {
                     $ids = [];
-                    foreach ($detail['outcomeReference'] as $ref) {
+                    foreach ($rawOutcomeReference as $ref) {
                         $ids[] = MedicalEventsRepository::identifier()->store($ref['identifier']['value'])->id;
                     }
                     $activity->outcomeReferences()->sync($ids);

@@ -52,9 +52,9 @@
                                     
                                     <div class="w-20 h-20 flex items-center justify-center rounded-full {{ $isOtp ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600' }} mb-6 group-hover:scale-110 transition-transform">
                                         @if($isOtp)
-                                            @icon('message-square', 'w-10 h-10')
+                                            @icon('phone', 'w-10 h-10')
                                         @else
-                                            @icon('user-check', 'w-10 h-10')
+                                            @icon('file-text', 'w-10 h-10')
                                         @endif
                                     </div>
                                     

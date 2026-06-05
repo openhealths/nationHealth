@@ -150,7 +150,8 @@
                         >
                             <template x-if="filteredOptions.length > 0">
                                 <div>
-                                    <template x-for="option in filteredOptions" :key="option.description + ':' + option.value">
+                                    <template x-for="option in filteredOptions"
+                                              :key="option.description + ':' + option.value">
                                         <button type="button"
                                                 class="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
                                                 @click="selectOption(option)"
@@ -523,48 +524,48 @@
                                 <input type="checkbox" class="default-checkbox w-5 h-5">
                             </div>
 
-                            <div class="record-inner-column !pl-4 flex-1">
+                            <div class="record-inner-column flex-1">
                                 <div class="record-inner-label">{{ __('patients.code_and_name') }}</div>
-                                <div class="record-inner-value text-[17px] font-semibold text-gray-900 dark:text-gray-100">
+                                <div class="record-inner-value text-[16px]">
                                     {{
                                         data_get($condition, 'code.coding.0.code') ?? '-'
                                     }} - {{
-                                        data_get( $this->dictionaries, 'eHealth/ICPC2/condition_codes.' . data_get($condition, 'code.coding.0.code') ?? '-')
-                                    }}
+                                            data_get( $this->dictionaries, 'eHealth/ICPC2/condition_codes.' . data_get($condition, 'code.coding.0.code') ?? '-')
+                                        }}
                                 </div>
                             </div>
 
-                            <div class="record-inner-column-bordered w-full md:w-[180px] shrink-0">
+                            <div class="record-inner-column-bordered w-full md:w-36 shrink-0">
                                 <div class="record-inner-label">{{ __('patients.status_clinical') }}</div>
                                 <div>
-                                    <span class="badge-green">
-                                        {{ data_get(
-                                            $this->dictionaries,
-                                            'eHealth/condition_clinical_statuses.' . data_get($condition, 'clinicalStatus'),
-                                            data_get($condition, 'clinicalStatus', '-')
-                                        )}}
-                                    </span>
+                                        <span class="badge-green">
+                                            {{ data_get(
+                                                $this->dictionaries,
+                                                'eHealth/condition_clinical_statuses.' . data_get($condition, 'clinicalStatus'),
+                                                data_get($condition, 'clinicalStatus', '-')
+                                            )}}
+                                        </span>
                                 </div>
                             </div>
 
-                            <div class="record-inner-action-col border-l border-gray-200 dark:border-gray-700 w-16 flex items-center justify-center shrink-0 h-full relative">
+                            <div class="record-inner-action-col">
                                 <div x-data="{
-                                    open: false,
-                                    toggle() {
-                                        if (this.open) { return this.close(); }
-                                        this.$refs.button.focus();
-                                        this.open = true;
-                                    },
-                                    close(focusAfter) {
-                                        if (!this.open) return;
-                                        this.open = false;
-                                        focusAfter && focusAfter.focus()
-                                    }
-                                }"
-                                    @keydown.escape.prevent.stop="close($refs.button)"
-                                    @focusin.window="!$refs.panel.contains($event.target) && close()"
-                                    x-id="['dropdown-button']"
-                                    class="relative"
+                                        open: false,
+                                        toggle() {
+                                            if (this.open) { return this.close(); }
+                                            this.$refs.button.focus();
+                                            this.open = true;
+                                        },
+                                        close(focusAfter) {
+                                            if (!this.open) return;
+                                            this.open = false;
+                                            focusAfter && focusAfter.focus()
+                                        }
+                                    }"
+                                     @keydown.escape.prevent.stop="close($refs.button)"
+                                     @focusin.window="!$refs.panel.contains($event.target) && close()"
+                                     x-id="['dropdown-button']"
+                                     class="relative"
                                 >
                                     <button @click="toggle()"
                                             x-ref="button"
@@ -577,12 +578,12 @@
                                     </button>
 
                                     <div x-show="open"
-                                        x-cloak
-                                        x-ref="panel"
-                                        x-transition.origin.top.right
-                                        @click.outside="close($refs.button)"
-                                        :id="$id('dropdown-button')"
-                                        class="absolute right-0 mt-2 w-56 rounded-md bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-lg z-50 py-1"
+                                         x-cloak
+                                         x-ref="panel"
+                                         x-transition.origin.top.right
+                                         @click.outside="close($refs.button)"
+                                         :id="$id('dropdown-button')"
+                                         class="absolute right-0 mt-2 w-56 rounded-md bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-lg z-50 py-1"
                                     >
                                         <button @click="close($refs.button)"
                                                 class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
@@ -602,166 +603,149 @@
                             </div>
                         </div>
 
-                        <div class="record-inner-body grid grid-cols-1 xl:grid-cols-[2.2fr_1.5fr_minmax(280px,1fr)] divide-y xl:divide-y-0 xl:divide-x divide-gray-200 dark:divide-gray-700 !p-0">
-                            <div class="p-3.5 pl-4 overflow-hidden">
-                                <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-3">
-                                    <div class="space-y-2.5 min-w-0">
-                                        <div class="min-w-0">
-                                            <div class="record-inner-label text-[10px] uppercase">{{ __('forms.type') }}</div>
-                                            <div class="record-inner-value text-[14px] font-semibold">
-                                                {{ data_get($this->dictionaries, 'eHealth/report_origins.' . data_get($condition, 'reportOrigin.coding.0.code')) ?? '-' }}
-                                            </div>
-                                        </div>
-                                        <div class="min-w-0">
-                                            <div class="record-inner-label text-[10px] uppercase">{{ __('patients.doctor') }}</div>
-                                            <div class="record-inner-value text-[14px] font-semibold break-words">
-                                                {{ data_get($condition, 'asserter.displayValue') ?? '-'}}
-                                            </div>
-                                        </div>
+                        <div class="record-inner-body">
+                        <div class="record-inner-grid-container">
+                            <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                                <div class="min-w-0">
+                                    <div class="record-inner-label">{{ __('forms.type') }}</div>
+                                    <div class="record-inner-value text-[14px]">
+                                        {{ data_get($this->dictionaries, 'eHealth/report_origins.' . data_get($condition, 'reportOrigin.coding.0.code')) ?? '-' }}
                                     </div>
-
-                                    <div class="space-y-2.5 min-w-0">
-                                        <div class="min-w-0">
-                                            <div class="record-inner-label text-[10px] uppercase">{{ __('patients.verification_status') }}</div>
-                                            <div class="record-inner-value text-[14px] font-semibold uppercase">
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="record-inner-label">{{ __('patients.doctor') }}</div>
+                                    <div class="record-inner-value text-[14px] break-words">
+                                        {{ data_get($condition, 'asserter.displayValue') ?? '-'}}
+                                    </div>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="record-inner-label">{{ __('patients.verification_status') }}</div>
+                                    <div class="record-inner-value text-[14px] uppercase">
+                                        {{ data_get(
+                                            $this->dictionaries,
+                                            'eHealth/condition_verification_statuses.' . data_get($condition, 'verificationStatus'),
+                                            data_get($condition, 'verificationStatus', '-')
+                                        ) }}
+                                    </div>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="record-inner-label">{{ __('patients.condition') }}</div>
+                                    <div class="record-inner-value text-[14px] break-words">
+                                        {{ data_get(
+                                            $this->dictionaries,
+                                            data_get($condition, 'severity.coding.0.system') . '.' . data_get($condition, 'severity.coding.0.code'),
+                                            data_get($condition, 'severity.coding.0.code', '-')
+                                        ) }}
+                                    </div>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="record-inner-label">{{ __('patients.body_part') }}</div>
+                                    <div class="record-inner-value text-[14px] break-words">
+                                        @forelse(data_get($condition, 'bodySites', []) as $bodySite)
+                                            <div>
                                                 {{ data_get(
                                                     $this->dictionaries,
-                                                    'eHealth/condition_verification_statuses.' . data_get($condition, 'verificationStatus'),
-                                                    data_get($condition, 'verificationStatus', '-')
+                                                    data_get($bodySite, 'coding.0.system') . '.' . data_get($bodySite, 'coding.0.code'),
+                                                    data_get($bodySite, 'coding.0.code', '-')
                                                 ) }}
                                             </div>
-                                        </div>
-                                        <div class="min-w-0">
-                                            <div class="record-inner-label text-[10px] uppercase">{{ __('patients.condition') }}</div>
-                                            <div class="record-inner-value text-[14px] font-semibold break-words">
-                                                {{ data_get(
-                                                    $this->dictionaries,
-                                                    data_get($condition, 'severity.coding.0.system') . '.' . data_get($condition, 'severity.coding.0.code'),
-                                                    data_get($condition, 'severity.coding.0.code', '-')
-                                                ) }}
-                                            </div>
-                                        </div>
+                                        @empty
+                                            -
+                                        @endforelse
                                     </div>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="record-inner-label">{{ __('patients.start_date') }}</div>
+                                    <div class="record-inner-value text-[14px]">
+                                        {{ optional(\Carbon\Carbon::make(data_get($condition, 'onsetDate')))->format(config('app.date_format')) ?? '-' }}
+                                    </div>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="record-inner-label">{{ __('patients.created') }}</div>
+                                    <div class="record-inner-value text-[14px]">
+                                        {{ optional(\Carbon\Carbon::make(data_get($condition, 'assertedDate')))->format(config('app.date_format')) ?? '-' }}
+                                    </div>
+                                </div>
+                            </div>
 
-                                    <div class="space-y-2.5 min-w-0">
-                                        <div class="min-w-0">
-                                            <div class="record-inner-label text-[10px] uppercase">{{ __('patients.body_part') }}</div>
-                                            <div class="record-inner-value text-[14px] font-semibold break-words">
-                                            @forelse(data_get($condition, 'bodySites', []) as $bodySite)
-                                                <div>
-                                                    {{ data_get(
-                                                        $this->dictionaries,
-                                                        data_get($bodySite, 'coding.0.system') . '.' . data_get($bodySite, 'coding.0.code'),
-                                                        data_get($bodySite, 'coding.0.code', '-')
-                                                    ) }}
-                                                </div>
+                            <!-- Evidence Section -->
+                            <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700/50">
+                                <div
+                                    class="record-inner-label uppercase font-semibold text-gray-700 dark:text-gray-300 mb-2">{{ __('patients.evidence') }}</div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="min-w-0">
+                                        <div
+                                            class="text-[11px] text-gray-400 uppercase mb-1">{{ __('patients.conditions') }}</div>
+                                        <div class="text-sm font-medium text-gray-800 dark:text-gray-200">
+                                            @forelse(data_get($condition, 'evidences', []) as $evidence)
+                                                @forelse(data_get($evidence, 'codes', []) as $code)
+                                                    <p>
+                                                        {{ data_get($code, 'coding.0.code', '—') }}
+                                                        -
+                                                        {{ data_get(
+                                                            $this->dictionaries,
+                                                            data_get($code, 'coding.0.system') . '.' . data_get($code, 'coding.0.code')
+                                                        ) ?? '-' }}
+                                                    </p>
+                                                @empty
+                                                    <p>—</p>
+                                                @endforelse
                                             @empty
-                                                -
+                                                <p>—</p>
                                             @endforelse
-                                            </div>
-                                        </div>
-                                        <div class="min-w-0">
-                                            <div class="record-inner-label text-[10px] uppercase">{{ __('patients.start_date') }}</div>
-                                            <div class="record-inner-value text-[14px] font-semibold">
-                                                {{ optional(\Carbon\Carbon::make(data_get($condition, 'onsetDate')))->format(config('app.date_format')) ?? '-' }}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="space-y-2.5 min-w-0">
-                                        <div class="min-w-0">
-                                            <div class="record-inner-label text-[10px] uppercase">{{ __('patients.created') }}</div>
-                                            <div class="record-inner-value text-[14px] font-semibold">
-                                                {{ optional(\Carbon\Carbon::make(data_get($condition, 'assertedDate')))->format(config('app.date_format')) ?? '-' }}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="p-4 bg-gray-50/5 dark:bg-gray-800/20">
-                                <div class="record-inner-label font-bold text-gray-900 dark:text-gray-100 mb-2.5 text-[12px]">{{ __('patients.evidence') }}:</div>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-                                    <ul class="space-y-2">
-                                        <li class="flex items-start gap-1.5 text-[13px] leading-tight">
-                                            <span class="w-1 h-1 rounded-full bg-gray-400 mt-1.5 shrink-0"></span>
-                                            <div class="min-w-0">
-                                                <div class="text-gray-500 dark:text-gray-400 text-[10px] mb-0.5 uppercase">{{ __('patients.conditions') }}:</div>
-                                                <div class="text-gray-800 dark:text-gray-200 font-semibold break-words whitespace-normal">
-                                                    @forelse(data_get($condition, 'evidences', []) as $evidence)
-                                                        @forelse(data_get($evidence, 'codes', []) as $code)
-                                                            <p>
-                                                                {{ data_get($code, 'coding.0.code', '—') }}
-                                                                -
-                                                                {{ data_get(
-                                                                    $this->dictionaries,
-                                                                    data_get($code, 'coding.0.system') . '.' . data_get($code, 'coding.0.code')
-                                                                ) ?? '-' }}
-                                                            </p>
-                                                        @empty
-                                                            <p>—</p>
-                                                        @endforelse
-                                                    @empty
-                                                        <p>—</p>
-                                                    @endforelse
-                                                </div>
-                                            </div>
-                                        </li>
-                                    </ul>
-                                    <ul class="space-y-2">
-                                        <li class="flex items-start gap-1.5 text-[13px] leading-tight">
-                                            <span class="w-1 h-1 rounded-full bg-gray-400 mt-1.5 shrink-0"></span>
-                                            <div class="min-w-0">
-                                                <div class="text-gray-500 dark:text-gray-400 text-[10px] mb-0.5 uppercase">{{ __('patients.evidence_observations') }}:</div>
-                                                <div class="text-gray-800 dark:text-gray-200 font-semibold break-all leading-relaxed">
-                                                    @forelse(data_get($condition, 'evidences', []) as $evidence)
-                                                        @forelse(data_get($evidence, 'details', []) as $detail)
-                                                            <p>
-                                                                {{ data_get($detail, 'displayValue')
-                                                                    ?: data_get($detail, 'identifier.value', '-') }}
-                                                            </p>
-                                                        @empty
-                                                            <p>—</p>
-                                                        @endforelse
-                                                    @empty
-                                                        <p>—</p>
-                                                    @endforelse
-                                                </div>
-                                            </div>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
-
-                            <div class="p-3.5 px-4 overflow-hidden flex flex-col justify-center">
-                                <div class="space-y-4">
-                                    <div class="min-w-0">
-                                        <div class="record-inner-label text-[10px] uppercase">ID ECO3</div>
-                                        <div class="record-inner-id-value text-[13px] break-all whitespace-normal leading-normal">
-                                            {{ data_get($condition, 'uuid') ?? '-' }}
                                         </div>
                                     </div>
                                     <div class="min-w-0">
-                                        <div class="record-inner-label text-[10px] uppercase">{{ __('patients.medical_record_id') }}</div>
-                                        <div class="record-inner-id-value text-[13px] break-all whitespace-normal leading-normal">
-                                            {{ data_get($condition, 'context.identifier.value') ?? '-' }}
+                                        <div
+                                            class="text-[11px] text-gray-400 uppercase mb-1">{{ __('patients.evidence_observations') }}</div>
+                                        <div
+                                            class="text-sm font-medium text-gray-800 dark:text-gray-200 break-words leading-relaxed">
+                                            @forelse(data_get($condition, 'evidences', []) as $evidence)
+                                                @forelse(data_get($evidence, 'details', []) as $detail)
+                                                    <p>
+                                                        {{ data_get($detail, 'displayValue')
+                                                            ?: data_get($detail, 'identifier.value', '-') }}
+                                                    </p>
+                                                @empty
+                                                    <p>—</p>
+                                                @endforelse
+                                            @empty
+                                                <p>—</p>
+                                            @endforelse
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
+
+                        <div class="record-inner-id-col">
+                            <div class="min-w-0">
+                                <div class="record-inner-label">ID ECO3</div>
+                                <div class="record-inner-id-value">
+                                    {{ data_get($condition, 'uuid') ?? '-' }}
+                                </div>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="record-inner-label">{{ __('patients.medical_record_id') }}</div>
+                                <div class="record-inner-id-value">
+                                    {{ data_get($condition, 'context.identifier.value') ?? '-' }}
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                     @empty
-                    <div class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-sm text-gray-500 dark:text-gray-400">
-                        {{ __('diagnosticReport.condotions_not_found') }}
-                    </div>
-                @endforelse
             </div>
-            <div class="mt-8">
-                {{ $paginatedConditions->links() }}
-            </div>
+            @empty
+                <div
+                    class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-sm text-gray-500 dark:text-gray-400">
+                    {{ __('diagnosticReport.condotions_not_found') }}
+                </div>
+            @endforelse
+        </div>
+        <div class="mt-8">
+            {{ $paginatedConditions->links() }}
         </div>
     </div>
+    </div>
 
-    <x-forms.loading />
+    <x-forms.loading/>
 </x-layouts.patient>

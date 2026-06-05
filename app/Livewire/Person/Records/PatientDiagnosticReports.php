@@ -11,6 +11,7 @@ use App\Traits\BatchLegalEntityQueries;
 use App\Jobs\DiagnosticReportSync;
 use App\Traits\HandlesSyncBatch;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\Episode;
 use App\Enums\JobStatus;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Session;
@@ -259,7 +260,7 @@ class PatientDiagnosticReports extends BasePatientComponent
 
     private function loadEpisodesFromDb(): void
     {
-        $filterEpisodeOptions = Repository::episode()->getByPersonId($this->personId);
+        $filterEpisodeOptions = Episode::forPerson($this->personId)->get()->toArray();
 
         $this->totalEntries = count($filterEpisodeOptions);
 
@@ -369,7 +370,7 @@ class PatientDiagnosticReports extends BasePatientComponent
         );
     }
 
-    private function filterValidationRules(): array
+    protected function filterValidationRules(): array
     {
         return [
             'filterCategory' => ['nullable', 'string', 'max:255'],

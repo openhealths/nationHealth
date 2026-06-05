@@ -16,73 +16,45 @@
          observationInterpretationsDictionary: $wire.dictionaries['eHealth/observation_interpretations']
      }"
 >
-    <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
-        {{ __('patients.observation') }}
-    </h2>
 
-        <table class="table-input w-inherit">
-            <thead class="thead-input">
-            <tr>
-                <th scope="col" class="th-input">{{ __('forms.category') }}</th>
-                <th scope="col" class="th-input">{{ __('forms.code') }}</th>
-                <th scope="col" class="th-input">{{ __('patients.value') }}</th>
-                <th scope="col" class="th-input">{{ __('forms.date') }}</th>
-                <th scope="col" class="th-input">{{ __('forms.action') }}</th>
-            </tr>
-            </thead>
-            <tbody>
-            <template x-for="(observation, index) in observations">
-                <tr>
-                    <td class="td-input"
-                        x-text="
-                            observationCategoriesDictionary[observation.categoryCode] ||
-                            icfObservationCategoriesDictionary[observation.categoryCode]
-                        "
-                    ></td>
-                    <td class="td-input"
-                        x-text="
-                            observationCodesDictionary[observation.codeCode] ||
-                            icfObservationCodesDictionary[observation.codeCode] ||
-                            customObservationCodesDictionary[observation.codeCode]
-                        "
-                    ></td>
-                    <td class="td-input"
-                        x-text="
-                            observation.valueBoolean !== undefined
-                                ? (observation.valueBoolean ? '{{ __('forms.yes') }}' : '{{ __('forms.no') }}')
-                            : observation.valueString !== undefined
-                                ? observation.valueString
-                            : (observation.valueDate !== undefined && observation.valueTime !== undefined)
-                                ? observation.valueDate + ' ' + observation.valueTime
-                            : observation.valueQuantityValue !== ''
-                                ? observation.valueQuantityValue
-                            : observation.dictionaryName !== ''
-                                ? $wire.dictionaries[observation.dictionaryName]?.[observation.valueCodeableConcept]
-                            : '-'
-                        "
-                    ></td>
-                    <td class="td-input" x-text="observation.issuedDate"></td>
-                    <td class="td-input">
-                        {{-- That all that is needed for the dropdown --}}
+    <div class="space-y-4">
+        <template x-for="(observation, index) in observations" :key="index">
+            <div class="record-inner-card">
+                <div class="record-inner-header">
+                    <div class="record-inner-checkbox-col">
+                        <input type="checkbox" class="default-checkbox w-5 h-5" disabled>
+                    </div>
+
+                    <div class="record-inner-column flex-1">
+                        <div class="record-inner-label">{{ __('forms.code') }}</div>
+                        <div class="record-inner-value text-[16px]" x-text="
+                                observationCodesDictionary[observation.codeCode] ||
+                                icfObservationCodesDictionary[observation.codeCode] ||
+                                customObservationCodesDictionary[observation.codeCode] ||
+                                observation.codeCode
+                            "></div>
+                    </div>
+
+                    <div class="record-inner-action-col">
                         <div x-data="{
-                                 openDropdown: false,
-                                 toggle() {
-                                     if (this.openDropdown) {
-                                         return this.close();
-                                     }
+                            openDropdown: false,
+                            toggle() {
+                                if (this.openDropdown) {
+                                    return this.close();
+                                }
 
-                                     this.$refs.button.focus();
+                                this.$refs.button.focus();
 
-                                     this.openDropdown = true;
-                                 },
-                                 close(focusAfter) {
-                                     if (!this.openDropdown) return;
+                                this.openDropdown = true;
+                            },
+                            close(focusAfter) {
+                                if (!this.openDropdown) return;
 
-                                     this.openDropdown = false;
+                                this.openDropdown = false;
 
-                                     focusAfter && focusAfter.focus();
-                                 }
-                             }"
+                                focusAfter && focusAfter.focus();
+                            }
+                        }"
                              @keydown.escape.prevent.stop="close($refs.button)"
                              @focusin.window="!$refs.panel.contains($event.target) && close()"
                              x-id="['dropdown-button']"
@@ -94,7 +66,7 @@
                                     :aria-expanded="openDropdown"
                                     :aria-controls="$id('dropdown-button')"
                                     type="button"
-                                    class="cursor-pointer"
+                                    class="record-inner-action-btn cursor-pointer"
                             >
                                 <svg class="w-6 h-6 text-gray-800 dark:text-gray-200" aria-hidden="true"
                                      xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none"
@@ -108,7 +80,7 @@
                             </button>
 
                             {{-- Dropdown Panel --}}
-                            <div class="absolute" style="left: 50%"> {{-- Center a dropdown panel --}}
+                            <div class="absolute right-0 z-50">
                                 <div x-ref="panel"
                                      x-show="openDropdown"
                                      x-transition.origin.top.left
@@ -116,148 +88,179 @@
                                      :id="$id('dropdown-button')"
                                      x-cloak
                                      class="dropdown-panel relative"
-                                     style="left: -50%" {{-- Center a dropdown panel --}}
                                 >
-
                                     <button @click.prevent="
-                                                openModal = true; {{-- Open the modal --}}
-                                                item = index; {{-- Identify the item we are corrently editing --}}
-                                                {{-- Replace the previous observation with the current, don't assign object directly (modalObservation = observation) to avoid reactiveness --}}
-                                                modalObservation = JSON.parse(JSON.stringify(observations[index]));
-                                                newObservation = false; {{-- This observation is already created --}}
-                                            "
-                                            class="dropdown-button"
+                                        openModal = true;
+                                        item = index;
+                                        modalObservation = JSON.parse(JSON.stringify(observations[index]));
+                                        newObservation = false;
+                                        close($refs.button);
+                                    "
                                     >
                                         {{ __('forms.edit') }}
                                     </button>
 
-                                    <button @click.prevent="observations.splice(index, 1); close($refs.button)"
-                                            class="dropdown-button dropdown-delete"
-                                    >
+                                    <button class="dropdown-delete"
+                                            @click.prevent="observations.splice(index, 1); close($refs.button)">
                                         {{ __('forms.delete') }}
                                     </button>
                                 </div>
                             </div>
                         </div>
-                    </td>
-                </tr>
-            </template>
-            </tbody>
-        </table>
+                    </div>
+                </div>
 
-        <div>
-            {{-- Button to trigger the modal --}}
-            <button @click.prevent="
-                        openModal = true; {{-- Open the Modal --}}
-                        newObservation = true; {{-- We are adding a new observation --}}
-                        modalObservation = new Observation(); {{-- Replace the data of the previous observation with a new one--}}
-                    "
-                    class="item-add my-5"
+                <div class="record-inner-body">
+                    <div class="record-inner-grid-container">
+                        <div class="grid grid-cols-2 xl:grid-cols-3 gap-y-4 gap-x-4 w-full">
+                            <div>
+                                <div class="record-inner-label">{{ __('forms.category') }}</div>
+                                <div class="record-inner-subvalue" x-text="
+                                        observationCategoriesDictionary[observation.categoryCode] ||
+                                        icfObservationCategoriesDictionary[observation.categoryCode] ||
+                                        '-'
+                                    "></div>
+                            </div>
+                            <div>
+                                <div class="record-inner-label">{{ __('patients.value') }}</div>
+                                <div class="record-inner-subvalue" x-text="
+                                        observation.valueBoolean !== undefined
+                                            ? (observation.valueBoolean ? '{{ __('forms.yes') }}' : '{{ __('forms.no') }}')
+                                        : observation.valueString !== undefined
+                                            ? observation.valueString
+                                        : (observation.valueDate !== undefined && observation.valueTime !== undefined)
+                                            ? observation.valueDate + ' ' + observation.valueTime
+                                        : observation.valueQuantityValue !== ''
+                                            ? observation.valueQuantityValue
+                                        : observation.dictionaryName !== ''
+                                            ? $wire.dictionaries[observation.dictionaryName]?.[observation.valueCodeableConcept]
+                                        : '-'
+                                    "></div>
+                            </div>
+                            <div>
+                                <div class="record-inner-label">{{ __('forms.date') }}</div>
+                                <div class="record-inner-subvalue" x-text="observation.issuedDate || '-'"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <div>
+        {{-- Button to trigger the modal --}}
+        <button @click.prevent="
+            openModal = true;
+            newObservation = true;
+            modalObservation = new Observation();
+        "
+                class="item-add my-5"
+        >
+            {{ __('forms.add') }}
+        </button>
+
+        {{-- Modal --}}
+        <template x-teleport="body"> {{-- This moves the modal at the end of the body tag --}}
+            <div x-show="openModal"
+                 style="display: none"
+                 @keydown.escape.prevent.stop="openModal = false"
+                 role="dialog"
+                 aria-modal="true"
+                 x-id="['modal-title']"
+                 :aria-labelledby="$id('modal-title')" {{-- This associates the modal with unique ID --}}
+                 class="modal"
             >
-                {{ __('forms.add') }}
-            </button>
 
-            {{-- Modal --}}
-            <template x-teleport="body"> {{-- This moves the modal at the end of the body tag --}}
+                {{-- Overlay --}}
+                <div x-show="openModal" x-transition.opacity class="fixed inset-0 bg-black/25"></div>
+
+                {{-- Panel --}}
                 <div x-show="openModal"
-                     style="display: none"
-                     @keydown.escape.prevent.stop="openModal = false"
-                     role="dialog"
-                     aria-modal="true"
-                     x-id="['modal-title']"
-                     :aria-labelledby="$id('modal-title')" {{-- This associates the modal with unique ID --}}
-                     class="modal"
+                     x-transition
+                     @click="openModal = false"
+                     class="relative flex min-h-screen items-center justify-center p-4"
                 >
-
-                    {{-- Overlay --}}
-                    <div x-show="openModal" x-transition.opacity class="fixed inset-0 bg-black/25"></div>
-
-                    {{-- Panel --}}
-                    <div x-show="openModal"
-                         x-transition
-                         @click="openModal = false"
-                         class="relative flex min-h-screen items-center justify-center p-4"
+                    <div @click.stop
+                         x-trap.noscroll.inert="openModal"
+                         class="modal-content h-fit w-full lg:max-w-7xl"
                     >
-                        <div @click.stop
-                             x-trap.noscroll.inert="openModal"
-                             class="modal-content h-fit w-full lg:max-w-7xl"
-                        >
-                            {{-- Title --}}
-                            <h3 class="modal-header" :id="$id('modal-title')">{{ __('patients.observation') }}</h3>
+                        {{-- Title --}}
+                        <h3 class="modal-header" :id="$id('modal-title')">{{ __('patients.observation') }}</h3>
 
-                            {{-- Content --}}
-                            <form>
-                                @include('livewire.encounter.observation-parts.coding-system')
-                                @include('livewire.encounter.observation-parts.main-information')
-                                @include('livewire.encounter.observation-parts.additional-information')
+                        {{-- Content --}}
+                        <form>
+                            @include('livewire.encounter.observation-parts.coding-system')
+                            @include('livewire.encounter.observation-parts.main-information')
+                            @include('livewire.encounter.observation-parts.additional-information')
 
-                                <div class="mt-6 flex justify-between space-x-2">
-                                    <button type="button"
-                                            @click="openModal = false"
-                                            class="button-minor"
-                                    >
-                                        {{ __('forms.cancel') }}
-                                    </button>
+                            <div class="mt-6 flex justify-between space-x-2">
+                                <button type="button"
+                                        @click="openModal = false"
+                                        class="button-minor"
+                                >
+                                    {{ __('forms.cancel') }}
+                                </button>
 
-                                    <button @click.prevent="
-                                                const selectedValueType = valueMap[modalObservation.codeCode]?.[1];
+                                <button @click.prevent="
+                                    const selectedValueType = valueMap[modalObservation.codeCode]?.[1];
 
-                                                const fieldsToDelete = [
-                                                    'valueQuantity',
-                                                    'valueCodeableConcept',
-                                                    'valueString',
-                                                    'valueBoolean',
-                                                    'valueDateTime'
-                                                ];
+                                    const fieldsToDelete = [
+                                        'valueQuantity',
+                                        'valueCodeableConcept',
+                                        'valueString',
+                                        'valueBoolean',
+                                        'valueDateTime'
+                                    ];
 
-                                                fieldsToDelete.forEach(field => {
-                                                    if (field !== selectedValueType) {
-                                                        if (field === 'valueQuantity') {
-                                                            modalObservation.valueQuantityValue = '';
-                                                            modalObservation.valueQuantityComparator = '';
-                                                            modalObservation.valueQuantityUnit = '';
-                                                            modalObservation.valueQuantitySystem = '';
-                                                            modalObservation.valueQuantityCode = '';
-                                                        } else if (field === 'valueDateTime') {
-                                                            delete modalObservation.valueDate;
-                                                            delete modalObservation.valueTime;
-                                                        } else {
-                                                            delete modalObservation[field];
-                                                        }
-                                                    }
-                                                });
+                                    fieldsToDelete.forEach(field => {
+                                        if (field !== selectedValueType) {
+                                            if (field === 'valueQuantity') {
+                                                modalObservation.valueQuantityValue = '';
+                                                modalObservation.valueQuantityComparator = '';
+                                                modalObservation.valueQuantityUnit = '';
+                                                modalObservation.valueQuantitySystem = '';
+                                                modalObservation.valueQuantityCode = '';
+                                            } else if (field === 'valueDateTime') {
+                                                delete modalObservation.valueDate;
+                                                delete modalObservation.valueTime;
+                                            } else {
+                                                delete modalObservation[field];
+                                            }
+                                        }
+                                    });
 
-                                                modalObservation.dictionaryName = $wire.observationValueMap[modalObservation.codeCode]?.[0];
+                                    modalObservation.dictionaryName = $wire.observationValueMap[modalObservation.codeCode]?.[0];
 
-                                                newObservation !== false
-                                                    ? observations.push(modalObservation)
-                                                    : observations[item] = modalObservation;
+                                    newObservation !== false
+                                        ? observations.push(modalObservation)
+                                        : observations[item] = modalObservation;
 
-                                                showDuplicateCodeWarning = false;
-                                                openModal = false;
-                                            "
-                                            class="button-primary"
-                                            :disabled="!(
+                                    showDuplicateCodeWarning = false;
+                                    openModal = false;
+                                "
+                                        class="button-primary"
+                                        :disabled="!(
                                                 modalObservation.issuedDate.trim() &&
                                                 modalObservation.issuedTime.trim() &&
                                                 modalObservation.categoryCode.trim() &&
                                                 modalObservation.codeCode.trim()
                                             )"
-                                    >
-                                        {{ __('forms.save') }}
-                                    </button>
-                                </div>
-                                <template x-if="showDuplicateCodeWarning">
-                                    <p class="text-error text-right">
-                                        {!! __('patients.duplicate_code_warning') !!}
-                                    </p>
-                                </template>
-                            </form>
-                        </div>
+                                >
+                                    {{ __('forms.save') }}
+                                </button>
+                            </div>
+                            <template x-if="showDuplicateCodeWarning">
+                                <p class="text-error text-right">
+                                    {!! __('patients.duplicate_code_warning') !!}
+                                </p>
+                            </template>
+                        </form>
                     </div>
                 </div>
-            </template>
-        </div>
+            </div>
+        </template>
+    </div>
 </div>
 
 <script>
@@ -300,7 +303,7 @@
             const now = new Date();
             const [yyyy, mm, dd] = now.toISOString().split('T')[0].split('-');
             const formattedDate = `${dd}.${mm}.${yyyy}`;
-            const formattedTime = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
+            const formattedTime = now.toLocaleTimeString('uk-UA', {hour: '2-digit', minute: '2-digit', hour12: false});
 
             this.issuedDate = formattedDate;
             this.issuedTime = formattedTime;

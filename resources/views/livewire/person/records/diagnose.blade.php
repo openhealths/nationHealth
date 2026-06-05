@@ -59,7 +59,9 @@
                         <label for="filterEcozId" class="label">
                             {{ __('patients.filter_code') }}
                         </label>
-                        <button type="button" wire:click="$set('filterEcozId', '')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" x-show="$wire.filterEcozId">
+                        <button type="button" wire:click="$set('filterEcozId', '')"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                x-show="$wire.filterEcozId">
                             @icon('close', 'w-4 h-4')
                         </button>
                     </div>
@@ -78,7 +80,9 @@
                         <label for="filterMedicalRecordId" class="label">
                             {{ __('patients.medical_record_id') }}
                         </label>
-                        <button type="button" wire:click="$set('filterMedicalRecordId', '')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" x-show="$wire.filterMedicalRecordId">
+                        <button type="button" wire:click="$set('filterMedicalRecordId', '')"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                x-show="$wire.filterMedicalRecordId">
                             @icon('close', 'w-4 h-4')
                         </button>
                     </div>
@@ -266,12 +270,12 @@
                             <input type="checkbox" class="default-checkbox w-5 h-5">
                         </div>
 
-                        <div class="record-inner-column !pl-4 flex-1">
+                        <div class="record-inner-column flex-1">
                             <div class="record-inner-label">{{ __('patients.code_and_name') }}</div>
-                            <div class="record-inner-value text-[17px] font-semibold text-gray-900 dark:text-gray-100">2A00.00 Гліобластома головного мозку</div>
+                            <div class="record-inner-value text-[16px]">2A00.00 Гліобластома головного мозку</div>
                         </div>
 
-                        <div class="record-inner-column-bordered w-full md:w-[180px] shrink-0">
+                        <div class="record-inner-column-bordered w-full md:w-36 shrink-0">
                             <div class="record-inner-label">{{ __('patients.status_clinical') }}</div>
                             <div>
                                 <span class="badge-green">
@@ -280,7 +284,7 @@
                             </div>
                         </div>
 
-                        <div class="record-inner-action-col border-l border-gray-200 dark:border-gray-700 w-16 flex items-center justify-center shrink-0 h-full relative">
+                        <div class="record-inner-action-col">
                             <div x-data="{
                                 open: false,
                                 toggle() {
@@ -335,88 +339,74 @@
                         </div>
                     </div>
 
-                    <div class="record-inner-body grid grid-cols-1 xl:grid-cols-[2.2fr_1.5fr_minmax(280px,1fr)] divide-y xl:divide-y-0 xl:divide-x divide-gray-200 dark:divide-gray-700 !p-0">
-                        <div class="p-3.5 pl-4 overflow-hidden">
-                            <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-3">
-                                <div class="space-y-2.5 min-w-0">
-                                    <div class="min-w-0">
-                                        <div class="record-inner-label text-[10px] uppercase">{{ __('forms.type') }}</div>
-                                        <div class="record-inner-value text-[14px] font-semibold">{{ __('patients.basic') }}</div>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <div class="record-inner-label text-[10px] uppercase">{{ __('patients.doctor') }}</div>
-                                        <div class="record-inner-value text-[14px] font-semibold break-words">Шевченко Т.Г.</div>
-                                    </div>
+                    <div class="record-inner-body">
+                        <div class="record-inner-grid-container">
+                            <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                                <div class="min-w-0">
+                                    <div class="record-inner-label">{{ __('forms.type') }}</div>
+                                    <div class="record-inner-value text-[14px]">{{ __('patients.basic') }}</div>
                                 </div>
-
-                                <div class="space-y-2.5 min-w-0">
-                                    <div class="min-w-0">
-                                        <div class="record-inner-label text-[10px] uppercase">{{ __('patients.verification_status') }}</div>
-                                        <div class="record-inner-value text-[14px] font-semibold uppercase">{{ __('patients.final') }}</div>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <div class="record-inner-label text-[10px] uppercase">{{ __('patients.condition') }}</div>
-                                        <div class="record-inner-value text-[14px] font-semibold break-words">{{ __('patients.moderate_severity') }}</div>
-                                    </div>
+                                <div class="min-w-0">
+                                    <div class="record-inner-label">{{ __('patients.doctor') }}</div>
+                                    <div class="record-inner-value text-[14px] break-words">Шевченко Т.Г.</div>
                                 </div>
-
-                                <div class="space-y-2.5 min-w-0">
-                                    <div class="min-w-0">
-                                        <div class="record-inner-label text-[10px] uppercase">{{ __('patients.body_part') }}</div>
-                                        <div class="record-inner-value text-[14px] font-semibold break-words">{{ __('patients.head') }}</div>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <div class="record-inner-label text-[10px] uppercase">{{ __('patients.start_date') }}</div>
-                                        <div class="record-inner-value text-[14px] font-semibold">02.02.2025</div>
-                                    </div>
+                                <div class="min-w-0">
+                                    <div class="record-inner-label">{{ __('patients.verification_status') }}</div>
+                                    <div
+                                        class="record-inner-value text-[14px] uppercase">{{ __('patients.final') }}</div>
                                 </div>
+                                <div class="min-w-0">
+                                    <div class="record-inner-label">{{ __('patients.condition') }}</div>
+                                    <div
+                                        class="record-inner-value text-[14px] break-words">{{ __('patients.moderate_severity') }}</div>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="record-inner-label">{{ __('patients.body_part') }}</div>
+                                    <div
+                                        class="record-inner-value text-[14px] break-words">{{ __('patients.head') }}</div>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="record-inner-label">{{ __('patients.start_date') }}</div>
+                                    <div class="record-inner-value text-[14px]">02.02.2025</div>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="record-inner-label">{{ __('patients.created') }}</div>
+                                    <div class="record-inner-value text-[14px]">04.02.2026</div>
+                                </div>
+                            </div>
 
-                                <div class="space-y-2.5 min-w-0">
+                            <!-- Evidence Section -->
+                            <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700/50">
+                                <div
+                                    class="record-inner-label uppercase font-semibold text-gray-700 dark:text-gray-300 mb-2">{{ __('patients.evidence') }}</div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div class="min-w-0">
-                                        <div class="record-inner-label text-[10px] uppercase">{{ __('patients.created') }}</div>
-                                        <div class="record-inner-value text-[14px] font-semibold">04.02.2026</div>
+                                        <div
+                                            class="text-[11px] text-gray-400 uppercase mb-1">{{ __('patients.conditions') }}</div>
+                                        <div class="text-sm font-medium text-gray-800 dark:text-gray-200">- А01 - Кома
+                                        </div>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <div
+                                            class="text-[11px] text-gray-400 uppercase mb-1">{{ __('patients.evidence_observations') }}</div>
+                                        <div
+                                            class="text-sm font-medium text-gray-800 dark:text-gray-200 break-words leading-relaxed whitespace-pre-line">
+                                            - 1231-adsadas-aqeqe-casdda
+                                            - 1231-adsadas-aqeqe-casdda
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="p-4 bg-gray-50/5 dark:bg-gray-800/20">
-                            <div class="record-inner-label font-bold text-gray-900 dark:text-gray-100 mb-2.5 text-[12px]">{{ __('patients.evidence') }}:</div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-                                <ul class="space-y-2">
-                                    <li class="flex items-start gap-1.5 text-[13px] leading-tight">
-                                        <span class="w-1 h-1 rounded-full bg-gray-400 mt-1.5 shrink-0"></span>
-                                        <div class="min-w-0">
-                                            <div class="text-gray-500 dark:text-gray-400 text-[10px] mb-0.5 uppercase">{{ __('patients.conditions') }}:</div>
-                                            <div class="text-gray-800 dark:text-gray-200 font-semibold break-words whitespace-normal">- А01 - Кома</div>
-                                        </div>
-                                    </li>
-                                </ul>
-                                <ul class="space-y-2">
-                                    <li class="flex items-start gap-1.5 text-[13px] leading-tight">
-                                        <span class="w-1 h-1 rounded-full bg-gray-400 mt-1.5 shrink-0"></span>
-                                        <div class="min-w-0">
-                                            <div class="text-gray-500 dark:text-gray-400 text-[10px] mb-0.5 uppercase">{{ __('patients.evidence_observations') }}:</div>
-                                            <div class="text-gray-800 dark:text-gray-200 font-semibold break-all leading-relaxed">
-                                                - 1231-adsadas-aqeqe-casdda<br>
-                                                - 1231-adsadas-aqeqe-casdda
-                                            </div>
-                                        </div>
-                                    </li>
-                                </ul>
+                        <div class="record-inner-id-col">
+                            <div class="min-w-0">
+                                <div class="record-inner-label">ID ECO3</div>
+                                <div class="record-inner-id-value">1231-adsadas-aqeqe-casdda</div>
                             </div>
-                        </div>
-
-                        <div class="p-3.5 px-4 overflow-hidden flex flex-col justify-center">
-                            <div class="space-y-4">
-                                <div class="min-w-0">
-                                    <div class="record-inner-label text-[10px] uppercase">ID ECO3</div>
-                                    <div class="record-inner-id-value text-[13px] break-all whitespace-normal leading-normal">1231-adsadas-aqeqe-casdda</div>
-                                </div>
-                                <div class="min-w-0">
-                                    <div class="record-inner-label text-[10px] uppercase">{{ __('patients.medical_record_id') }}</div>
-                                    <div class="record-inner-id-value text-[13px] break-all whitespace-normal leading-normal">1231-adsadas-aqeqe-casdda</div>
-                                </div>
+                            <div class="min-w-0">
+                                <div class="record-inner-label">{{ __('patients.medical_record_id') }}</div>
+                                <div class="record-inner-id-value">1231-adsadas-aqeqe-casdda</div>
                             </div>
                         </div>
                     </div>
@@ -425,5 +415,5 @@
         </div>
     </div>
 
-    <x-forms.loading />
+    <x-forms.loading/>
 </x-layouts.patient>

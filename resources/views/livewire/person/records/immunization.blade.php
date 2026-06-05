@@ -210,6 +210,7 @@
 
             <div x-show="showAdditionalParams" x-transition x-cloak wire:key="immunization-search-filters" class="mb-8">
                 <div class="form-row-3 mb-6">
+
                     <div class="form-group group">
                         <div class="datepicker-wrapper">
                             <input wire:model="filterDateFrom"
@@ -554,7 +555,8 @@
                                 </div>
                             </div>
 
-                            <div class="record-inner-action-col border-l border-gray-200 dark:border-gray-700 w-16 flex items-center justify-center shrink-0 h-full relative">
+                            <div
+                                class="record-inner-action-col border-l border-gray-200 dark:border-gray-700 w-16 flex items-center justify-center shrink-0 h-full relative">
                                 <div x-data="{
                                     open: false,
                                     toggle() {
@@ -613,8 +615,8 @@
                             </div>
                         </div>
 
-                        <div class="record-inner-body grid grid-cols-1 xl:grid-cols-[1.5fr_minmax(340px,1fr)_160px] divide-y xl:divide-y-0 xl:divide-x divide-gray-200 dark:divide-gray-700 !p-0">
-                            <div class="p-3.5 pl-4 overflow-hidden">
+                        <div class="record-inner-body">
+                            <div class="record-inner-grid-container">
                                 <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-3">
                                     <div class="space-y-2.5 min-w-0">
                                         <div class="min-w-0">
@@ -732,9 +734,8 @@
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div class="p-3.5 bg-gray-50/5 dark:bg-gray-800/20">
+                            <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700/50">
                                 <div class="record-inner-label font-bold text-gray-900 dark:text-gray-100 mb-2">
                                     {{ __('patients.vaccination_protocol') }}:
                                 </div>
@@ -821,34 +822,34 @@
                                     </ul>
                                 </div>
                             </div>
+                        </div>
 
-                            <div class="p-3.5 px-4 overflow-hidden">
-                                <div class="space-y-3.5">
-                                    <div class="min-w-0">
-                                        <div class="record-inner-label text-[10px]">
-                                            ID ЕСОЗ
-                                        </div>
-
-                                        <div class="record-inner-id-value text-[13px] break-all whitespace-normal">
-                                            {{ data_get($immunization, 'uuid', '—') }}
-                                        </div>
+                            <div class="record-inner-id-col">
+                                <div class="min-w-0">
+                                    <div class="record-inner-label">
+                                        ID ЕСОЗ
                                     </div>
 
-                                    <div class="min-w-0">
-                                        <div class="record-inner-label text-[10px]">
-                                            {{ __('patients.medical_record_id') }}
-                                        </div>
+                                    <div class="record-inner-id-value">
+                                        {{ data_get($immunization, 'uuid', '—') }}
+                                    </div>
+                                </div>
 
-                                        <div class="record-inner-id-value text-[13px] break-all whitespace-normal">
-                                            {{ data_get($immunization, 'context.identifier.value', '—') }}
-                                        </div>
+                                <div class="min-w-0">
+                                    <div class="record-inner-label">
+                                        {{ __('patients.medical_record_id') }}
+                                    </div>
+
+                                    <div class="record-inner-id-value">
+                                        {{ data_get($immunization, 'context.identifier.value', '—') }}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 @empty
-                    <div class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-sm text-gray-500 dark:text-gray-400">
+                    <div
+                        class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-sm text-gray-500 dark:text-gray-400">
                         {{ __('patients.immunizations_not_found') }}
                     </div>
                 @endforelse
@@ -859,5 +860,5 @@
         </div>
     </div>
 
-    <x-forms.loading />
+    <x-forms.loading/>
 </x-layouts.patient>

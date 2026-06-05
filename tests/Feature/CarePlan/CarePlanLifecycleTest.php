@@ -23,18 +23,23 @@ use Illuminate\Support\Facades\Log;
 
 class CarePlanLifecycleTest extends TestCase
 {
+    use RefreshDatabase;
+
+    protected function migrateDatabases()
+    {
+        $this->artisan('migrate:fresh', [
+            '--path' => [
+                database_path('migrations'),
+                database_path('migrations/install'),
+                database_path('migrations/update/0_1'),
+            ],
+            '--realpath' => true,
+        ]);
+    }
+
     protected function setUp(): void
     {
-        // Ensure we are using the pgsql connection for tests
-        putenv('DB_CONNECTION=pgsql');
-        putenv('DB_HOST=127.0.0.1');
-        putenv('DB_DATABASE=mis_dev');
-        putenv('DB_USERNAME=sail');
-        putenv('DB_PASSWORD=password');
-
         parent::setUp();
-        
-        \Illuminate\Support\Facades\DB::beginTransaction();
 
         // Setup initial data
         $this->person = Person::create([
@@ -138,12 +143,6 @@ class CarePlanLifecycleTest extends TestCase
         if (config('permission.teams')) {
             setPermissionsTeamId($legalEntity->id);
         }
-    }
-
-    protected function tearDown(): void
-    {
-        \Illuminate\Support\Facades\DB::rollBack();
-        parent::tearDown();
     }
 
     public function test_full_care_plan_lifecycle_flow(): void
@@ -263,6 +262,8 @@ class CarePlanLifecycleTest extends TestCase
             ->call('initActivityForm', 'service_request')
             ->set('activityForm.kind', 'ServiceRequest')
             ->set('activityForm.quantity', 1)
+            ->set('activityForm.scheduled_period_start', now()->format('d.m.Y'))
+            ->set('activityForm.scheduled_period_end', now()->addDays(7)->format('d.m.Y'))
             ->call('saveActivity')
             ->assertHasNoErrors();
 
@@ -317,4 +318,256 @@ class CarePlanLifecycleTest extends TestCase
             'status' => 'active',
         ]);
     }
+
+    public function test_create_service_activity_with_linked_grounds(): void
+    {
+        $this->actingAs($this->user);
+        
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'Service Plan',
+            'status' => 'draft',
+        ]);
+
+        $condition = \App\Models\MedicalEvents\Sql\Condition::first();
+
+        // Bind mock APIs to satisfy dependencies
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
+
+        $activityCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $activityCreateResponse->shouldReceive('getData')->andReturn(['id' => (string) Str::uuid(), 'status' => 'scheduled']);
+        $activityCreateResponse->shouldReceive('getStatusCode')->andReturn(201);
+        $mockActivityApi->shouldReceive('create')->andReturn($activityCreateResponse);
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->call('initActivityForm', 'service_request')
+            ->set('selectedProduct', ['code' => 'A01001', 'name' => 'General medical consultation'])
+            ->set('activityForm.product_reference', 'A01001')
+            ->call('addLinkedGround', 'Condition', $condition->uuid)
+            ->assertSet('linkedGrounds.0.uuid', $condition->uuid)
+            ->set('activityForm.quantity', 2)
+            ->set('activityForm.scheduled_period_start', now()->format('d.m.Y'))
+            ->set('activityForm.scheduled_period_end', now()->addDays(7)->format('d.m.Y'))
+            ->call('saveActivity')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('care_plan_activities', [
+            'care_plan_id' => $carePlan->id,
+            'product_reference' => 'A01001',
+            'quantity' => 2,
+        ]);
+    }
+
+    public function test_create_medication_activity_with_program_and_linked_grounds(): void
+    {
+        $this->actingAs($this->user);
+        
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'Medication Plan',
+            'status' => 'draft',
+        ]);
+
+        $condition = \App\Models\MedicalEvents\Sql\Condition::first();
+
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
+
+        $activityCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $activityCreateResponse->shouldReceive('getData')->andReturn(['id' => (string) Str::uuid(), 'status' => 'scheduled']);
+        $activityCreateResponse->shouldReceive('getStatusCode')->andReturn(201);
+        $mockActivityApi->shouldReceive('create')->andReturn($activityCreateResponse);
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->call('initActivityForm', 'medication_request')
+            ->set('selectedProgram', 'program-id')
+            ->set('activityForm.program', 'program-id')
+            ->set('selectedProduct', ['code' => 'INN-123', 'name' => 'Aspirin'])
+            ->set('activityForm.product_reference', 'INN-123')
+            ->call('addLinkedGround', 'Condition', $condition->uuid)
+            ->set('activityForm.quantity', 30)
+            ->set('activityForm.daily_amount', 1.5)
+            ->set('activityForm.scheduled_period_start', now()->format('d.m.Y'))
+            ->set('activityForm.scheduled_period_end', now()->addDays(7)->format('d.m.Y'))
+            ->call('saveActivity')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('care_plan_activities', [
+            'care_plan_id' => $carePlan->id,
+            'product_reference' => 'INN-123',
+            'program' => 'program-id',
+            'quantity' => 30,
+        ]);
+    }
+
+    public function test_create_device_activity_with_positive_quantity_validation(): void
+    {
+        $this->actingAs($this->user);
+        
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'Device Plan',
+            'status' => 'draft',
+        ]);
+
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
+
+        $activityCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $activityCreateResponse->shouldReceive('getData')->andReturn(['id' => (string) Str::uuid(), 'status' => 'scheduled']);
+        $activityCreateResponse->shouldReceive('getStatusCode')->andReturn(201);
+        $mockActivityApi->shouldReceive('create')->andReturn($activityCreateResponse);
+
+        // Validation error for negative or zero quantity
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->call('initActivityForm', 'device_request')
+            ->set('selectedProduct', ['code' => 'DEV-456', 'name' => 'Test strips'])
+            ->set('activityForm.product_reference', 'DEV-456')
+            ->set('activityForm.quantity', -5)
+            ->set('activityForm.scheduled_period_start', now()->format('d.m.Y'))
+            ->set('activityForm.scheduled_period_end', now()->addDays(7)->format('d.m.Y'))
+            ->call('saveActivity')
+            ->assertHasErrors(['activityForm.quantity']);
+
+        // Success when positive integer
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->call('initActivityForm', 'device_request')
+            ->set('selectedProduct', ['code' => 'DEV-456', 'name' => 'Test strips'])
+            ->set('activityForm.product_reference', 'DEV-456')
+            ->set('activityForm.quantity', 10)
+            ->set('activityForm.scheduled_period_start', now()->format('d.m.Y'))
+            ->set('activityForm.scheduled_period_end', now()->addDays(7)->format('d.m.Y'))
+            ->call('saveActivity')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('care_plan_activities', [
+            'care_plan_id' => $carePlan->id,
+            'product_reference' => 'DEV-456',
+            'quantity' => 10,
+        ]);
+    }
+
+    public function test_cancel_and_complete_care_plan_activity(): void
+    {
+        $this->actingAs($this->user);
+        
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'Lifecycle Plan',
+            'status' => 'active',
+        ]);
+
+        $activity = CarePlanActivity::create([
+            'uuid' => (string) Str::uuid(),
+            'care_plan_id' => $carePlan->id,
+            'status' => 'scheduled',
+            'kind' => 'ServiceRequest',
+            'scheduled_period_start' => now(),
+            'scheduled_period_end' => now()->addDays(7),
+            'author_id' => $this->employee->id,
+        ]);
+
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
+        $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class);
+
+        $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
+        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $this->instance(\App\Classes\eHealth\Api\Job::class, $mockJobApi);
+
+        // Sign Mocking
+        $mockSignatureService->shouldReceive('signData')->andReturn('mock-base64-signature');
+        $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
+
+        // 1. Test Cancel Activity
+        $activityDetailsResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $activityDetailsResponse->shouldReceive('getData')->andReturn([
+            'data' => [
+                'id' => $activity->uuid,
+                'author' => [
+                    [
+                        'identifier' => [
+                            'type' => [
+                                'coding' => [
+                                    [
+                                        'system' => 'eHealth/resources',
+                                        'code' => 'employee'
+                                    ]
+                                ]
+                            ],
+                            'value' => $this->employee->uuid
+                        ]
+                    ]
+                ],
+                'care_plan' => [
+                    'identifier' => [
+                        'type' => [
+                            'coding' => [
+                                [
+                                    'system' => 'eHealth/resources',
+                                    'code' => 'care_plan'
+                                ]
+                            ]
+                        ],
+                        'value' => $carePlan->uuid
+                    ]
+                ],
+                'detail' => [
+                    'kind' => 'ServiceRequest',
+                    'status' => 'scheduled',
+                ]
+            ]
+        ]);
+        $mockActivityApi->shouldReceive('getDetails')->andReturn($activityDetailsResponse);
+
+        $activityCancelResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $activityCancelResponse->shouldReceive('getData')->andReturn([
+            'links' => [['href' => '/jobs/cancel-123']]
+        ]);
+        $activityCancelResponse->shouldReceive('getStatusCode')->andReturn(202);
+        $mockActivityApi->shouldReceive('cancel')->once()->andReturn($activityCancelResponse);
+
+        $cancelJobResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $cancelJobResponse->shouldReceive('getData')->andReturn([
+            'status' => 'processed',
+            'id' => $activity->uuid,
+            'result' => [
+                'id' => $activity->uuid,
+                'status' => 'cancelled'
+            ]
+        ]);
+        $mockJobApi->shouldReceive('getDetails')->with('cancel-123')->andReturn($cancelJobResponse);
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->set('form.knedp', '1.2.3.4')
+            ->set('form.password', 'secret')
+            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.jks', 100))
+            ->call('openSignatureModal', 'cancel_activity', $activity->id)
+            ->set('statusReason', 'typo')
+            ->call('sign')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('care_plan_activities', [
+            'id' => $activity->id,
+            'status' => 'cancelled',
+        ]);
+    }
 }
+

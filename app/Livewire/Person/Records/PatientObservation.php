@@ -9,6 +9,10 @@ use App\Classes\eHealth\EHealth;
 use App\Enums\JobStatus;
 use App\Jobs\ObservationSync;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\DiagnosticReport;
+use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Episode;
+use App\Models\MedicalEvents\Sql\Observation;
 use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
@@ -16,6 +20,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
@@ -27,20 +32,26 @@ class PatientObservation extends BasePatientComponent
     use HandlesSyncBatch;
     use WithPagination;
 
-    public array $observations = [];
+    /**
+     * Filter dropdown options the user can pick from to narrow the observations search.
+     *
+     * @var array
+     */
+    public array $episodes = [];
 
-    public array $filterCodeOptions = [];
+    public array $encounters = [];
 
-    public array $filterEncounterOptions = [];
+    public array $diagnosticReports = [];
 
-    public array $filterDiagnosticReportOptions = [];
+    public array $devices = [];
 
-    public array $filterEpisodeOptions = [];
+    public array $specimens = [];
 
-    public array $filterDeviceOptions = [];
-
-    public array $filterSpecimenOptions = [];
-
+    /**
+     * Bound search filter values applied when querying observations.
+     *
+     * @var string
+     */
     public string $filterCode = '';
 
     public string $filterEncounterId = '';
@@ -61,10 +72,6 @@ class PatientObservation extends BasePatientComponent
 
     public string $syncStatus = '';
 
-    public int $totalEntries = 0;
-
-    public int $pageSize = 10;
-
     protected array $dictionaryNames = [
         'eHealth/observation_categories',
         'eHealth/ICF/observation_categories',
@@ -81,7 +88,7 @@ class PatientObservation extends BasePatientComponent
         'eHealth/hair_length',
         'GENDER',
         'eHealth/rankin_scale',
-        'eHealth/vaccination_covid_groups',
+        'eHealth/vaccination_covid_groups'
     ];
 
     protected function getSyncStatus(string $entityType): ?string
@@ -113,24 +120,28 @@ class PatientObservation extends BasePatientComponent
     {
         $this->getDictionary();
 
-        $this->dictionaries['eHealth/ICF/classifiers'] = dictionary()
-            ->basics()
+        $this->dictionaries['eHealth/ICF/classifiers'] = dictionary()->basics()
             ->byName('eHealth/ICF/classifiers')
             ->flattenedChildValues()
             ->toArray();
 
-        $this->loadObservationsFromDb();
+        $this->loadFilterOptions();
+    }
 
-        $this->loadFilters();
+    #[Computed]
+    public function paginatedObservations(): LengthAwarePaginator
+    {
+        return $this->isSearching
+            ? $this->searchObservationsFromEHealth()
+            : $this->paginateLocalObservations();
     }
 
     public function search(): void
     {
         $this->validate($this->filterValidationRules());
 
+        $this->isSearching = true;
         $this->resetPage();
-
-        $this->loadObservations($this->buildSearchParams());
     }
 
     public function sync(): void
@@ -148,7 +159,7 @@ class PatientObservation extends BasePatientComponent
         try {
             $response = EHealth::observation()->getBySearchParams(
                 $this->uuid,
-                $this->buildSearchParams(),
+                ['managing_organization_id' => legalEntity()->uuid],
             );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while synchronizing observation');
@@ -172,12 +183,8 @@ class PatientObservation extends BasePatientComponent
             Session::flash('success', __('patients.messages.observation_synced_successfully'));
         }
 
-        $this->loadObservationsFromDb();
-    }
-
-    public function updatedPage(): void
-    {
-        $this->loadObservations($this->buildSearchParams());
+        $this->isSearching = false;
+        $this->resetPage();
     }
 
     public function resetFilters(): void
@@ -191,251 +198,91 @@ class PatientObservation extends BasePatientComponent
             'filterIssuedTo',
             'filterDeviceId',
             'filterSpecimenId',
+            'isSearching'
         ]);
 
         $this->resetPage();
-
-        $this->loadObservations($this->buildSearchParams());
     }
 
-    private function loadFilters(): void
+    protected function loadFilterOptions(): void
     {
-        $this->loadObservationCodesFromDb();
+        $this->episodes = Episode::forPerson($this->personId)->recentlyUpdatedFirst()->get()->toArray();
+        $this->encounters = Encounter::forPerson($this->personId)->recentlyUpdatedFirst()->get()->toArray();
+        $reports = DiagnosticReport::forPerson($this->personId)
+            ->final()
+            ->with(['effectivePeriod', 'code.type.coding'])
+            ->recentlyUpdatedFirst()
+            ->get();
 
-        $this->loadEpisodesFromDb();
+        // Load the services dictionary only if some report misses a name.
+        $serviceNames = $reports->contains(static fn (DiagnosticReport $report): bool => !$report->code->displayValue)
+            ? dictionary()->services()->flattened()->pluck('name', 'id')
+            : collect();
 
-        $this->loadEncountersFromDb();
-
-        $this->loadDiagnosticReportsFromDb();
-    }
-
-    private function loadObservationCodesFromDb(): void
-    {
-        $observations = Arr::toCamelCase(Repository::observation()->getByPersonId($this->personId));
-
-        $this->filterCodeOptions = collect($observations)
-            ->map(function (array $observation) {
-                $code = data_get($observation, 'code.coding.0.code');
-                $system = data_get($observation, 'code.coding.0.system', 'eHealth/LOINC/observation_codes');
-
-                if (!$code) {
-                    return null;
-                }
-
-                $label = data_get(
-                    $this->dictionaries,
-                    $system . '.' . $code,
-                    data_get($observation, 'code.text', $code)
-                );
-
-                return [
-                    'value' => $code,
-                    'label' => $code . ' | ' . $label,
-                    'description' => $system,
-                ];
-            })
-            ->filter()
-            ->unique('value')
-            ->sortBy('label')
-            ->values()
+        // Name from the record or from the dictionary.
+        $this->diagnosticReports = $reports
+            ->map(static fn (DiagnosticReport $report): array => [
+                'uuid' => $report->uuid,
+                'displayValue' => $report->code->displayValue ?? $serviceNames->get($report->code->value)
+            ])
             ->toArray();
+        // todo: devices, specimens
     }
 
-    private function loadEpisodesFromDb(): void
+    /**
+     * Paginate locally stored (synced) observations straight from the database.
+     *
+     * @return LengthAwarePaginator
+     */
+    protected function paginateLocalObservations(): LengthAwarePaginator
     {
-        $filterEpisodeOptions = Repository::episode()->getByPersonId($this->personId);
+        $paginator = Observation::forPerson($this->personId)
+            ->withAllRelations()
+            ->recentlyUpdatedFirst()
+            ->paginate(config('pagination.per_page'));
 
-        $this->filterEpisodeOptions = collect($filterEpisodeOptions)
-            ->map(function (array $episode) {
-                $episodeId = data_get($episode, 'uuid');
+        $paginator->setCollection(collect(Arr::toCamelCase($paginator->getCollection()->toArray())));
 
-                if (!$episodeId) {
-                    return null;
-                }
-
-                return [
-                    'value' => $episodeId,
-                    'label' => data_get($episode, 'name') ?: $episodeId,
-                    'description' => $episodeId,
-                ];
-            })
-            ->filter()
-            ->unique('value')
-            ->values()
-            ->toArray();
+        return $paginator;
     }
 
-    private function loadEncountersFromDb(): void
+    /**
+     * Fetch a single page of observations from the eHealth API for the active search filters.
+     *
+     * @return LengthAwarePaginator
+     */
+    protected function searchObservationsFromEHealth(): LengthAwarePaginator
     {
-        $encounters = Repository::encounter()->getByPersonId($this->personId);
+        $perPage = config('pagination.per_page');
+        $page = $this->getPage();
 
-        $this->filterEncounterOptions = collect(Arr::toCamelCase($encounters))
-            ->map(function (array $encounter) {
-                $encounterId = data_get($encounter, 'uuid');
+        $params = array_filter([
+            'code' => $this->filterCode ?: null,
+            'encounter_id' => $this->filterEncounterId ?: null,
+            'diagnostic_report_id' => $this->filterDiagnosticReportId ?: null,
+            'episode_id' => $this->filterEpisodeId ?: null,
+            'issued_from' => $this->filterIssuedFrom ?: null,
+            'issued_to' => $this->filterIssuedTo ?: null,
+            'device_id' => $this->filterDeviceId ?: null,
+            'managing_organization_id' => legalEntity()->uuid,
+            'specimen_id' => $this->filterSpecimenId ?: null,
+            'page' => $this->getPage(),
+            'page_size' => config('pagination.per_page')
+        ]);
 
-                if (!$encounterId) {
-                    return null;
-                }
-
-                $typeCode = data_get($encounter, 'type.coding.0.code');
-                $typeSystem = data_get($encounter, 'type.coding.0.system');
-
-                $typeLabel = $typeCode
-                    ? data_get(
-                        $this->dictionaries,
-                        $typeSystem . '.' . $typeCode,
-                        data_get($encounter, 'type.text', $typeCode)
-                    )
-                    : null;
-
-                $classCode = data_get($encounter, 'class.code', data_get($encounter, 'class.coding.0.code'));
-                $classSystem = data_get($encounter, 'class.system', data_get($encounter, 'class.coding.0.system'));
-
-                $classLabel = $classCode
-                    ? data_get(
-                        $this->dictionaries,
-                        $classSystem . '.' . $classCode,
-                        data_get($encounter, 'class.text', $classCode)
-                    )
-                    : null;
-
-                $episodeLabel = data_get(
-                    $encounter,
-                    'episode.displayValue',
-                    data_get($encounter, 'episode.identifier.value')
-                );
-
-                $periodStart = collect([
-                    data_get($encounter, 'period.startDate'),
-                    data_get($encounter, 'period.startTime'),
-                ])->filter()->implode(' ');
-
-                $performer = data_get($encounter, 'performer.displayValue');
-
-                $label = collect([
-                    $typeLabel,
-                    $classLabel,
-                    $episodeLabel,
-                    $periodStart,
-                    $performer,
-                ])->filter()->implode(' | ');
-
-                return [
-                    'value' => $encounterId,
-                    'label' => $label ?: $encounterId,
-                    'description' => $encounterId,
-                ];
-            })
-            ->filter()
-            ->unique('value')
-            ->sortBy('label')
-            ->values()
-            ->toArray();
-    }
-
-    private function loadDiagnosticReportsFromDb(): void
-    {
-        $diagnosticReports = Repository::diagnosticReport()->getByPersonId($this->personId);
-
-        $this->filterDiagnosticReportOptions = collect(Arr::toCamelCase($diagnosticReports))
-            ->map(function (array $diagnosticReport) {
-                $diagnosticReportId = data_get($diagnosticReport, 'uuid');
-
-                if (!$diagnosticReportId) {
-                    return null;
-                }
-
-                $code = data_get(
-                    $diagnosticReport,
-                    'code.identifier.value',
-                    data_get($diagnosticReport, 'code.coding.0.code')
-                );
-
-                $codeSystem = data_get($diagnosticReport, 'code.coding.0.system');
-
-                $codeLabel = $code
-                    ? data_get(
-                        $this->dictionaries,
-                        $codeSystem . '.' . $code,
-                        data_get(
-                            $diagnosticReport,
-                            'code.displayValue',
-                            data_get($diagnosticReport, 'code.text', $code)
-                        )
-                    )
-                    : null;
-
-                $categoryCode = data_get($diagnosticReport, 'category.0.coding.0.code');
-                $categorySystem = data_get(
-                    $diagnosticReport,
-                    'category.0.coding.0.system',
-                    'eHealth/diagnostic_report_categories'
-                );
-
-                $categoryLabel = $categoryCode
-                    ? data_get(
-                        $this->dictionaries,
-                        $categorySystem . '.' . $categoryCode,
-                        data_get($diagnosticReport, 'category.0.text', $categoryCode)
-                    )
-                    : null;
-
-                $issued = collect([
-                    data_get($diagnosticReport, 'issuedDate'),
-                    data_get($diagnosticReport, 'issuedTime'),
-                ])->filter()->implode(' ');
-
-                $performer = data_get($diagnosticReport, 'performer.displayValue');
-
-                $label = collect([
-                    $codeLabel,
-                    $categoryLabel,
-                    $issued,
-                    $performer,
-                ])->filter()->implode(' | ');
-
-                return [
-                    'value' => $diagnosticReportId,
-                    'label' => $label ?: $diagnosticReportId,
-                    'description' => $diagnosticReportId,
-                ];
-            })
-            ->filter()
-            ->unique('value')
-            ->sortBy('label')
-            ->values()
-            ->toArray();
-    }
-
-    private function loadObservations(array $params = []): void
-    {
         try {
-            $response = EHealth::observation()->getBySearchParams(
-                $this->uuid,
-                $params
-            );
-
-            $validatedData = $response->validate();
-
-            $paging = $response->getPaging();
-            $this->totalEntries = $paging['total_entries'] ?? 0;
-            $this->pageSize = $paging['page_size'] ?? 10;
-
-            $this->observations = Arr::toCamelCase($validatedData);
+            $response = EHealth::observation()->getBySearchParams($this->uuid, $params);
+            $observations = Arr::toCamelCase($this->formatDatesForDisplay($response->validate()));
+            $total = $response->getPaging()['total_entries'];
         } catch (EHealthException|EHealthConnectionException $exception) {
-            $this->observations = [];
-
             $exception->handle('Error while loading observations');
+            $observations = [];
+            $total = 0;
         }
-    }
 
-    private function loadObservationsFromDb(): void
-    {
-        $observations = Repository::observation()->getByPersonId($this->personId);
-
-        $this->totalEntries = count($observations);
-
-        $this->observations = Arr::toCamelCase($observations);
+        return new LengthAwarePaginator(collect($observations), $total, $perPage, $page, [
+            'path' => LengthAwarePaginator::resolveCurrentPath()
+        ]);
     }
 
     public function displayObservationValue(array $observation): string
@@ -486,7 +333,7 @@ class PatientObservation extends BasePatientComponent
             $value = data_get($item, $path);
 
             if ($value !== null && $value !== '') {
-                return (string) $value;
+                return (string)$value;
             }
         }
 
@@ -495,7 +342,7 @@ class PatientObservation extends BasePatientComponent
             $value = data_get($item, $path, $missing);
 
             if ($value !== $missing && $value !== null && $value !== '') {
-                return (bool) $value ? 'Так' : 'Ні';
+                return (bool)$value ? 'Так' : 'Ні';
             }
         }
 
@@ -503,7 +350,7 @@ class PatientObservation extends BasePatientComponent
             $value = data_get($item, $path);
 
             if ($value !== null && $value !== '') {
-                return $this->formatObservationValueDate((string) $value);
+                return $this->formatObservationValueDate((string)$value);
             }
         }
 
@@ -543,35 +390,7 @@ class PatientObservation extends BasePatientComponent
         }
     }
 
-    private function buildSearchParams(): array
-    {
-        return array_filter([
-            'code' => $this->filterCode ?: null,
-            'encounter_id' => $this->filterEncounterId ?: null,
-            'diagnostic_report_id' => $this->filterDiagnosticReportId ?: null,
-            'episode_id' => $this->filterEpisodeId ?: null,
-            'issued_from' => $this->filterIssuedFrom ?: null,
-            'issued_to' => $this->filterIssuedTo ?: null,
-            'device_id' => $this->filterDeviceId ?: null,
-            'managing_organization_id' => legalEntity()?->uuid,
-            'specimen_id' => $this->filterSpecimenId ?: null,
-            'page' => $this->getPage(),
-            'page_size' => $this->pageSize,
-        ], static fn ($value) => $value !== null && $value !== '');
-    }
-
-    private function buildPaginator(): LengthAwarePaginator
-    {
-        return new LengthAwarePaginator(
-            $this->observations,
-            $this->totalEntries,
-            $this->pageSize,
-            $this->getPage(),
-            ['path' => request()->url()]
-        );
-    }
-
-    private function filterValidationRules(): array
+    protected function filterValidationRules(): array
     {
         return [
             'filterCode' => ['nullable', 'string', 'max:255'],
@@ -587,8 +406,6 @@ class PatientObservation extends BasePatientComponent
 
     public function render(): View
     {
-        return view('livewire.person.records.observations', [
-            'paginatedObservations' => $this->buildPaginator(),
-        ]);
+        return view('livewire.person.records.observations');
     }
 }

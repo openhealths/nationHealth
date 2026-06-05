@@ -69,4 +69,17 @@ class CarePlanActivity extends Request
     {
         return $this->get("/api/patients/$personId/care_plans/$carePlanId/activities", $query);
     }
+
+    /**
+     * Fetch details of a single Care Plan Activity.
+     *
+     * @param  string  $personId
+     * @param  string  $carePlanId
+     * @param  string  $activityId
+     * @return PromiseInterface|EHealthResponse
+     */
+    public function getDetails(string $personId, string $carePlanId, string $activityId): PromiseInterface|EHealthResponse
+    {
+        return $this->get("/api/patients/$personId/care_plans/$carePlanId/activities/$activityId");
+    }
 }

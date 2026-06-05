@@ -92,10 +92,15 @@
                     const rawData = this.$wire.dictionaries?.[dictionaryKey] ?? {};
 
                     if (dictionaryKey === 'eHealth/LOINC/observation_codes') {
-                        const allowedCodes = new Set(this.$wire.observationLoincCodeMap?.laboratory ?? []);
-                        this.options = Object.entries(rawData)
-                            .filter(([value]) => allowedCodes.has(value))
-                            .map(([value, label]) => this.makeOption(value, label));
+                        const allowedCodes = this.$wire.observationLoincCodeMap?.laboratory;
+                        if (allowedCodes !== undefined) {
+                            const allowedSet = new Set(allowedCodes);
+                            this.options = Object.entries(rawData)
+                                .filter(([value]) => allowedSet.has(value))
+                                .map(([value, label]) => this.makeOption(value, label));
+                        } else {
+                            this.options = Object.entries(rawData).map(([value, label]) => this.makeOption(value, label));
+                        }
                     } else if (dictionaryKey === 'eHealth/ICPC2/condition_codes') {
                         const allowedCodes = this.$wire.allowedConditionCodesBySystem?.['eHealth/ICPC2/condition_codes'];
                         if (allowedCodes !== undefined) {

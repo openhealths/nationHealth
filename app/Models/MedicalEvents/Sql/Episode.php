@@ -103,6 +103,19 @@ class Episode extends Model
         return $this->hasMany(EpisodeStatusHistory::class);
     }
 
+    /**
+     * Filter episodes belonging to the given person.
+     *
+     * @param  Builder  $query
+     * @param  int  $personId
+     * @return Builder
+     */
+    #[Scope]
+    protected function forPerson(Builder $query, int $personId): Builder
+    {
+        return $query->wherePersonId($personId);
+    }
+
     #[Scope]
     protected function withRelationships(Builder $query): Builder
     {
@@ -121,5 +134,18 @@ class Episode extends Model
             'diagnosesHistory.diagnoses.role.coding',
             'statusHistory.statusReason.coding',
         ]);
+    }
+
+    /**
+     * Order by most recently updated in eHealth first, keeping records without a timestamp last.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    #[Scope]
+    protected function recentlyUpdatedFirst(Builder $query): Builder
+    {
+        return $query->orderByRaw('CASE WHEN ehealth_updated_at IS NULL THEN 1 ELSE 0 END')
+            ->orderByDesc('ehealth_updated_at');
     }
 }

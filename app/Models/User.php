@@ -164,6 +164,29 @@ class User extends Authenticatable implements MustVerifyEmail
             ->first();
     }
 
+    public function activeDoctorEmployee(): ?Employee
+    {
+        if (!config('permission.teams')) {
+            $doctor = $this->employees()->whereIn('employee_type', ['DOCTOR', 'SPECIALIST'])->first();
+            return $doctor ?: $this->employees()->first();
+        }
+
+        $teamId = getPermissionsTeamId();
+
+        if (!$teamId) {
+            return null;
+        }
+
+        $doctor = $this->employees()
+            ->where('legal_entity_id', $teamId)
+            ->whereIn('employee_type', ['DOCTOR', 'SPECIALIST'])
+            ->first();
+
+        return $doctor ?: $this->employees()
+            ->where('legal_entity_id', $teamId)
+            ->first();
+    }
+
     public function employeeRequests(): HasMany
     {
         return $this->hasMany(EmployeeRequest::class);

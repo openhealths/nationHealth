@@ -13,6 +13,7 @@ use App\Jobs\ClinicalImpressionSync;
 use App\Classes\eHealth\EHealth;
 use App\Traits\HandlesSyncBatch;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\Episode;
 use App\Enums\JobStatus;
 use App\Core\Arr;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -64,7 +65,7 @@ class PatientClinicalImpressions extends BasePatientComponent
         'eHealth/resources',
     ];
 
-    protected function getSyncStatus(string $entityType): ?string 
+    protected function getSyncStatus(string $entityType): ?string
     {
         return $this->syncStatus ?: null;
     }
@@ -79,12 +80,12 @@ class PatientClinicalImpressions extends BasePatientComponent
         return ClinicalImpressionSync::class;
     }
 
-    protected function getEntityConstant(string $entityType): string 
+    protected function getEntityConstant(string $entityType): string
     {
         return LegalEntity::ENTITY_CLINICAL_IMPRESSION;
     }
 
-    protected function onSyncStatusChanged(string $entityType, JobStatus $status): void 
+    protected function onSyncStatusChanged(string $entityType, JobStatus $status): void
     {
         $this->syncStatus = $status->value;
     }
@@ -145,7 +146,7 @@ class PatientClinicalImpressions extends BasePatientComponent
 
             return;
         }
-        
+
         try {
             $validatedData = $response->validate();
             Repository::clinicalImpression()->sync($this->personId, $validatedData);
@@ -156,7 +157,7 @@ class PatientClinicalImpressions extends BasePatientComponent
             return;
         }
 
-        if($response->isNotLast()) {
+        if ($response->isNotLast()) {
             $this->dispatchRemainingPages('clinicalImpression');
         } else {
             legalEntity()->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_CLINICAL_IMPRESSION);
@@ -172,7 +173,7 @@ class PatientClinicalImpressions extends BasePatientComponent
         $this->getClinicalImpressions($this->buildSearchParams());
     }
 
-    public function updatedPage(): void 
+    public function updatedPage(): void
     {
         if ($this->dataFromDb) {
             $this->getClinicalImpressionsFromDb();
@@ -215,7 +216,7 @@ class PatientClinicalImpressions extends BasePatientComponent
         $this->clinicalImpressions = Arr::toCamelCase($clinicalImpressions);
     }
 
-    public function getEncounters(): void 
+    public function getEncounters(): void
     {
         try {
             $response = EHealth::encounter()->getBySearchParams(
@@ -235,7 +236,7 @@ class PatientClinicalImpressions extends BasePatientComponent
         }
     }
 
-    public function getEncountersFromDb(): void 
+    public function getEncountersFromDb(): void
     {
         $encounters = Arr::toCamelCase(
             Repository::encounter()->getByPersonId($this->personId)
@@ -244,7 +245,7 @@ class PatientClinicalImpressions extends BasePatientComponent
         $this->filterEncounterOptions = $this->mapEncounterOptions($encounters);
     }
 
-    public function getEpisodes(): void 
+    public function getEpisodes(): void
     {
         try {
             $response = EHealth::episode()->getBySearchParams(
@@ -266,14 +267,12 @@ class PatientClinicalImpressions extends BasePatientComponent
 
     public function getEpisodesFromDb(): void
     {
-        $episodes = Arr::toCamelCase(
-            Repository::episode()->getByPersonId($this->personId)
-        );
+        $episodes = Arr::toCamelCase(Episode::forPerson($this->personId)->get()->toArray());
 
         $this->filterEpisodeOptions = $this->mapEpisodeOptions($episodes);
     }
 
-    public function getCodesFromDb(): void 
+    public function getCodesFromDb(): void
     {
         $this->filterCodeOptions = collect(data_get($this->dictionaries, 'eHealth/clinical_impression_patient_categories', []))
             ->map(function ($label, string $code): array {
@@ -304,7 +303,7 @@ class PatientClinicalImpressions extends BasePatientComponent
         return $value ? $value : null;
     }
 
-    private function loadFilters(): void 
+    private function loadFilters(): void
     {
         $this->getCodesFromDb();
 
@@ -362,7 +361,7 @@ class PatientClinicalImpressions extends BasePatientComponent
             ->toArray();
     }
 
-    private function buildPaginator(): LengthAwarePaginator 
+    private function buildPaginator(): LengthAwarePaginator
     {
         return new LengthAwarePaginator(
             $this->clinicalImpressions,
@@ -373,7 +372,7 @@ class PatientClinicalImpressions extends BasePatientComponent
         );
     }
 
-    private function filterValidationRules(): array 
+    protected function filterValidationRules(): array
     {
         return [
             'filterCode' => ['nullable', 'string', 'max:255'],
@@ -385,7 +384,7 @@ class PatientClinicalImpressions extends BasePatientComponent
         ];
     }
 
-    private function buildSearchParams(): array 
+    private function buildSearchParams(): array
     {
         return array_filter([
             'encounter_id' => $this->filterEncounterId ?: null,
@@ -402,7 +401,7 @@ class PatientClinicalImpressions extends BasePatientComponent
     public function render()
     {
         return view('livewire.person.records.clinical-impressions', [
-            'paginatedClinicalImpressions' => $this->buildPaginator(), 
+            'paginatedClinicalImpressions' => $this->buildPaginator(),
         ]);
     }
 }

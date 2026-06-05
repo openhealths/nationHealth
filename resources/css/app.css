@@ -752,7 +752,7 @@ input:-webkit-autofill {
     }
 
     .record-inner-id-value {
-        @apply text-[13px] font-medium text-gray-800 dark:text-gray-300 truncate
+        @apply text-[13px] font-normal text-gray-800 dark:text-gray-300 break-all whitespace-normal leading-normal
     }
 }
 /* SIDEBAR NAVIGATION STYLES */

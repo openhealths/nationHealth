@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Person\Records;
 
 use App\Classes\eHealth\EHealth;
+
 use App\Repositories\CarePlanRepository;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Session;
@@ -47,11 +48,30 @@ class PersonCarePlans extends BasePatientComponent
      */
     public function loadCarePlans(): void
     {
-        $this->carePlans = app(CarePlanRepository::class)->getByPersonId($this->personId);
+        $this->carePlans = app(CarePlanRepository::class)->getByPersonId($this->personId, [
+            'name' => $this->filterName,
+            'status' => $this->filterStatus,
+            'encounter_id' => $this->filterEncounterId,
+        ]);
     }
 
     public function sync(): void
     {
+        // Sync patient's declarations first to support auto-activation logic
+        try {
+            $decResponse = EHealth::declaration()->getMany(
+                ['person_id' => $this->uuid],
+                groupByEntities: true
+            );
+            $decValidated = $decResponse->validate();
+            app(\App\Repositories\DeclarationRepository::class)->storeMany($decValidated, legalEntity());
+        } catch (\Throwable $exception) {
+            \Illuminate\Support\Facades\Log::warning('PersonCarePlans: failed to sync declarations for patient during care plan sync', [
+                'patient_uuid' => $this->uuid,
+                'error' => $exception->getMessage()
+            ]);
+        }
+
         try {
             $response = EHealth::carePlan()->getBySearchParams(
                 $this->uuid,

@@ -139,6 +139,29 @@ class Condition extends Model
         );
     }
 
+    public function getCodeDisplayAttribute(): ?string
+    {
+        $coding = $this->code?->coding?->first();
+        if ($coding) {
+            $code = $coding->code;
+            try {
+                $dict = dictionary()->basics()->byName($coding->system);
+                if ($dict) {
+                    return $dict->asCodeDescription()->get($code) ?? $code;
+                }
+            } catch (\Throwable $e) {
+                // ignore
+            }
+            return $code;
+        }
+        return null;
+    }
+
+    public function getCodeStringAttribute(): ?string
+    {
+        return $this->code?->coding?->first()?->code;
+    }
+
     /**
      * Scope to eager load all condition relationships.
      */
