@@ -223,6 +223,31 @@ class CarePlanRepository
                 // Fallback to current user if author not found (to satisfy NOT NULL constraint)
                 $authorId = $author?->id ?? Auth::user()?->getCarePlanWriterEmployee()?->id;
 
+                $addresses = [];
+                if (isset($rawFhir['addresses']) && is_array($rawFhir['addresses'])) {
+                    foreach ($rawFhir['addresses'] as $addr) {
+                        if (isset($addr['coding']) && is_array($addr['coding'])) {
+                            $addresses[] = $addr;
+                        } elseif (isset($addr['reference']) && str_starts_with($addr['reference'], 'Condition/')) {
+                            $conditionUuid = str_replace('Condition/', '', $addr['reference']);
+                            $actualCondition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
+                            if ($actualCondition) {
+                                $coding = $actualCondition->code?->coding?->first();
+                                if ($coding) {
+                                    $addresses[] = [
+                                        'coding' => [
+                                            [
+                                                'system' => $coding->system,
+                                                'code' => $coding->code
+                                            ]
+                                        ]
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Try to find existing record by UUID OR by (person + encounter) if UUID is missing locally
                 $carePlan = CarePlan::where('uuid', $rawFhir['id'] ?? $rawFhir['uuid'] ?? null)->first();
                 if (!$carePlan && $encounterIdentifier) {
@@ -251,6 +276,7 @@ class CarePlanRepository
                             ? \Carbon\Carbon::parse($rawFhir['period']['end']) 
                             : null,
                         'terms_of_service' => $rawFhir['terms_of_service']['coding'][0]['code'] ?? null,
+                        'addresses' => !empty($addresses) ? $addresses : ($carePlan->addresses ?? null),
                     ]);
                 } else {
                     $carePlan = CarePlan::create([
@@ -272,6 +298,7 @@ class CarePlanRepository
                             ? \Carbon\Carbon::parse($rawFhir['period']['end']) 
                             : null,
                         'terms_of_service' => $rawFhir['terms_of_service']['coding'][0]['code'] ?? null,
+                        'addresses' => !empty($addresses) ? $addresses : null,
                     ]);
                 }
 

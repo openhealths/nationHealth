@@ -253,21 +253,40 @@ class CarePlanActivityRepository
         $response = EHealth::carePlanActivity()->getSummary($person->uuid, $carePlan->uuid, $query);
         $data = $response->getData();
 
-        if (!isset($data['data']) || !is_array($data['data'])) {
+        \Illuminate\Support\Facades\Log::info('CarePlanActivityRepository: syncActivities raw response data', [
+            'person_uuid' => $person->uuid,
+            'care_plan_uuid' => $carePlan->uuid,
+            'response' => $data
+        ]);
+
+        $activities = isset($data['data']) ? $data['data'] : $data;
+
+        if (!is_array($activities)) {
+            \Illuminate\Support\Facades\Log::warning('CarePlanActivityRepository: sync skipped because data is not an array', ['data' => $data]);
             return;
         }
 
-        $validator = Validator::make($data['data'], [
+        foreach ($activities as $index => $rawFhir) {
+            if (is_array($rawFhir) && !isset($rawFhir['status']) && isset($rawFhir['detail']['status'])) {
+                $activities[$index]['status'] = $rawFhir['detail']['status'];
+            }
+        }
+
+        $validator = Validator::make($activities, [
             '*' => 'array',
             '*.id' => 'required|uuid',
             '*.status' => 'required|string',
         ]);
 
         if ($validator->fails()) {
+            \Illuminate\Support\Facades\Log::error('CarePlanActivityRepository: sync validation failed', [
+                'errors' => $validator->errors()->toArray(),
+                'data' => $activities
+            ]);
             throw new ValidationException($validator);
         }
 
-        foreach ($data['data'] as $rawFhir) {
+        foreach ($activities as $rawFhir) {
             /*
             \App\Models\MedicalEvents\Mongo\CarePlanActivity::updateOrCreate(
                 ['uuid' => $rawFhir['id']],
@@ -278,24 +297,45 @@ class CarePlanActivityRepository
             DB::transaction(function () use ($carePlan, $rawFhir) {
                 $detail = $rawFhir['detail'] ?? [];
 
-                $kind = isset($detail['kind'])
-                    ? MedicalEventsRepository::codeableConcept()->store($detail['kind'])
+                $kind = null;
+                if (isset($detail['kind'])) {
+                    if (is_array($detail['kind'])) {
+                        $kind = MedicalEventsRepository::codeableConcept()->store($detail['kind']);
+                    } else {
+                        $kind = MedicalEventsRepository::codeableConcept()->store([
+                            'coding' => [
+                                [
+                                    'system' => 'http://hl7.org/fhir/care-plan-activity-kind',
+                                    'code' => $detail['kind']
+                                ]
+                            ],
+                            'text' => $detail['kind']
+                        ]);
+                    }
+                }
+
+                $rawProductCodeableConcept = $detail['product_codeable_concept'] ?? ($detail['productCodeableConcept'] ?? null);
+                $rawReasonCode = $detail['reason_code'] ?? ($detail['reasonCode'] ?? null);
+                $rawOutcomeCodeableConcept = $detail['outcome_codeable_concept'] ?? ($detail['outcomeCodeableConcept'] ?? null);
+                $rawProductReference = $detail['product_reference'] ?? ($detail['productReference'] ?? null);
+                $rawReasonReference = $detail['reason_reference'] ?? ($detail['reasonReference'] ?? null);
+                $rawGoal = $detail['goal'] ?? null;
+                $rawOutcomeReference = $detail['outcome_reference'] ?? ($detail['outcomeReference'] ?? null);
+
+                $productConcept = !empty($rawProductCodeableConcept)
+                    ? MedicalEventsRepository::codeableConcept()->store($rawProductCodeableConcept)
                     : null;
 
-                $productConcept = isset($detail['productCodeableConcept'])
-                    ? MedicalEventsRepository::codeableConcept()->store($detail['productCodeableConcept'])
+                $reasonConcept = !empty($rawReasonCode)
+                    ? MedicalEventsRepository::codeableConcept()->store($rawReasonCode[0])
                     : null;
 
-                $reasonConcept = !empty($detail['reasonCode'])
-                    ? MedicalEventsRepository::codeableConcept()->store($detail['reasonCode'][0])
+                $outcomeConcept = !empty($rawOutcomeCodeableConcept)
+                    ? MedicalEventsRepository::codeableConcept()->store($rawOutcomeCodeableConcept)
                     : null;
 
-                $outcomeConcept = isset($detail['outcomeCodeableConcept'])
-                    ? MedicalEventsRepository::codeableConcept()->store($detail['outcomeCodeableConcept'])
-                    : null;
-
-                $productReference = isset($detail['productReference'])
-                    ? MedicalEventsRepository::identifier()->store($detail['productReference']['identifier']['value'])
+                $productReference = !empty($rawProductReference)
+                    ? MedicalEventsRepository::identifier()->store($rawProductReference['identifier']['value'])
                     : null;
 
                 $kindString = null;
@@ -319,11 +359,11 @@ class CarePlanActivityRepository
                     $authorId = $carePlan->author_id;
                 }
 
-                $productReferenceValue = $detail['productReference']['identifier']['value'] ?? null;
+                $productReferenceValue = $rawProductReference['identifier']['value'] ?? null;
 
                 $reasonReferenceArray = [];
-                if (isset($detail['reasonReference'])) {
-                    foreach ($detail['reasonReference'] as $ref) {
+                if (!empty($rawReasonReference)) {
+                    foreach ($rawReasonReference as $ref) {
                         $val = $ref['identifier']['value'] ?? null;
                         if ($val) {
                             if (str_contains($val, '/')) {
@@ -347,8 +387,8 @@ class CarePlanActivityRepository
                 }
 
                 $goalArray = [];
-                if (isset($detail['goal'])) {
-                    foreach ($detail['goal'] as $g) {
+                if (!empty($rawGoal)) {
+                    foreach ($rawGoal as $g) {
                         $val = null;
                         if (isset($g['coding'][0]['code'])) {
                             $val = $g['coding'][0]['code'];
@@ -448,25 +488,25 @@ class CarePlanActivityRepository
                 }
                 MedicalEventsRepository::period()->sync($activity, $scheduledPeriodData, 'scheduledPeriod');
 
-                if (isset($detail['reasonReference'])) {
+                if (!empty($rawReasonReference)) {
                     $ids = [];
-                    foreach ($detail['reasonReference'] as $ref) {
+                    foreach ($rawReasonReference as $ref) {
                         $ids[] = MedicalEventsRepository::identifier()->store($ref['identifier']['value'])->id;
                     }
                     $activity->reasonReferences()->sync($ids);
                 }
 
-                if (isset($detail['goal'])) {
+                if (!empty($rawGoal)) {
                     $ids = [];
-                    foreach ($detail['goal'] as $ref) {
+                    foreach ($rawGoal as $ref) {
                         $ids[] = MedicalEventsRepository::identifier()->store($ref['identifier']['value'])->id;
                     }
                     $activity->goalReferences()->sync($ids);
                 }
 
-                if (isset($detail['outcomeReference'])) {
+                if (!empty($rawOutcomeReference)) {
                     $ids = [];
-                    foreach ($detail['outcomeReference'] as $ref) {
+                    foreach ($rawOutcomeReference as $ref) {
                         $ids[] = MedicalEventsRepository::identifier()->store($ref['identifier']['value'])->id;
                     }
                     $activity->outcomeReferences()->sync($ids);

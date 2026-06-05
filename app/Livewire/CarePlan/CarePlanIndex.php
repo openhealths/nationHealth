@@ -8,6 +8,11 @@ use App\Classes\eHealth\EHealth;
 use App\Repositories\CarePlanRepository;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
+use App\Models\Declaration;
+use App\Models\Person\Person;
+use App\Models\CarePlan;
+use App\Enums\User\Role;
+use App\Repositories\DeclarationRepository;
 
 class CarePlanIndex extends Component
 {
@@ -55,19 +60,67 @@ class CarePlanIndex extends Component
             }
 
             $employee = auth()->user()->activeEmployee();
-            
-            $query = [
-                'managing_organization_id' => $legalEntity->uuid,
-            ];
-
-            if ($employee) {
-                $query['care_manager'] = $employee->uuid;
+            if (!$employee) {
+                return;
             }
 
-            $response = EHealth::carePlan()->getMany($query);
-            $validatedData = $response->validate();
+            // Find all patient IDs from active declarations for this doctor/legal entity
+            $query = Declaration::query()
+                ->active()
+                ->filterByLegalEntityId($legalEntity->id);
 
-            app(CarePlanRepository::class)->syncCarePlans($validatedData);
+            // Filter by employees of the logged-in user if they are not OWNER
+            if (!auth()->user()->hasAllowedRole(Role::OWNER)) {
+                $employeeIds = auth()->user()->party->employees()
+                    ->where('legal_entity_id', $legalEntity->id)
+                    ->pluck('id')
+                    ->all();
+                $query->forEmployees($employeeIds);
+            }
+
+            $personIds = $query->pluck('person_id')->unique()->all();
+
+            // Also include patients of existing care plans in the database
+            $existingCarePlanPersonIds = CarePlan::where('legal_entity_id', $legalEntity->id)
+                ->pluck('person_id')
+                ->unique()
+                ->all();
+
+            $allPersonIds = array_unique(array_merge($personIds, $existingCarePlanPersonIds));
+
+            $persons = Person::whereIn('id', $allPersonIds)->get();
+
+            $allValidatedData = [];
+            foreach ($persons as $person) {
+                try {
+                    // Sync patient's declarations first to support auto-activation logic (like in PersonCarePlans)
+                    try {
+                        $decResponse = EHealth::declaration()->getMany(
+                            ['person_id' => $person->uuid],
+                            groupByEntities: true
+                        );
+                        $decValidated = $decResponse->validate();
+                        app(DeclarationRepository::class)->storeMany($decValidated, $legalEntity);
+                    } catch (\Throwable $exception) {
+                        Log::warning('CarePlanIndex: failed to sync declarations for patient during care plan sync', [
+                            'patient_uuid' => $person->uuid,
+                            'error' => $exception->getMessage()
+                        ]);
+                    }
+
+                    $response = EHealth::carePlan()->getBySearchParams($person->uuid, []);
+                    $validated = $response->validate();
+                    if (!empty($validated)) {
+                        $allValidatedData = array_merge($allValidatedData, $validated);
+                    }
+                } catch (\Throwable $ex) {
+                    Log::warning("Failed to sync care plans for patient {$person->uuid}: " . $ex->getMessage());
+                }
+            }
+
+            if (!empty($allValidatedData)) {
+                app(CarePlanRepository::class)->syncCarePlans($allValidatedData);
+            }
 
             $this->mount(app(CarePlanRepository::class));
             session()->flash('success', 'Синхронізація планів закладу успішна');

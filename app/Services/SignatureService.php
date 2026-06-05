@@ -36,7 +36,7 @@ class SignatureService
             $base64FileContent = $this->getBase64KepFileContent($keyFile);
 
             $signedContent = $this->cipherApi->sendSession(
-                json_encode($dataToSign, JSON_THROW_ON_ERROR),
+                json_encode($dataToSign, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION),
                 $password,
                 $base64FileContent,
                 $knedp,

@@ -93,7 +93,7 @@ class CarePlanShow extends Component
     public function mount(CarePlan $carePlan): void
     {
         $this->carePlan = $carePlan;
-        $this->carePlan->load(['person', 'author.party', 'categoryConcept', 'activities.kindConcept.coding']);
+        $this->carePlan->load(['person', 'author.party', 'categoryConcept.coding', 'activities.kindConcept.coding']);
         
         // Fetch patient conditions for outcomeReference selection
         $this->availableConditions = \App\Models\MedicalEvents\Sql\Condition::where('person_id', $this->carePlan->person_id)
@@ -597,7 +597,7 @@ class CarePlanShow extends Component
             return;
         }
 
-        $this->carePlan->loadMissing(['encounter', 'effectivePeriod', 'author']);
+        $this->carePlan->loadMissing(['encounter', 'encounterIdentifier', 'effectivePeriod', 'author', 'categoryConcept.coding']);
 
         // Action-specific payload
         $statusMap = [
@@ -619,15 +619,24 @@ class CarePlanShow extends Component
             ]
         ];
 
-        $categoryCode = $this->carePlan->categoryConcept?->coding?->first()?->code
+        $categoryCoding = $this->carePlan->categoryConcept?->coding?->first();
+        $categorySystem = $categoryCoding?->system ?? 'eHealth/care_plan_categories';
+        $categoryCode = $categoryCoding?->code
             ?? (is_array($this->carePlan->category) 
                 ? ($this->carePlan->category['coding'][0]['code'] ?? null) 
                 : $this->carePlan->category);
 
+        $encounter = $this->carePlan->encounter;
+        if (!$encounter && $this->carePlan->encounterIdentifier?->value) {
+            $encounter = \App\Models\MedicalEvents\Sql\Encounter::where('uuid', $this->carePlan->encounterIdentifier->value)
+                ->with(['diagnoses.condition'])
+                ->first();
+        }
+
         $addresses = [];
-        if ($this->carePlan->encounter) {
-            $this->carePlan->encounter->loadMissing(['diagnoses.condition']);
-            foreach ($this->carePlan->encounter->diagnoses as $d) {
+        if ($encounter) {
+            $encounter->loadMissing(['diagnoses.condition']);
+            foreach ($encounter->diagnoses as $d) {
                 $conditionUuid = $d->condition?->value;
                 if ($conditionUuid) {
                     $actualCondition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
@@ -646,6 +655,10 @@ class CarePlanShow extends Component
                     }
                 }
             }
+        }
+
+        if (empty($addresses) && !empty($this->carePlan->addresses)) {
+            $addresses = $this->carePlan->addresses;
         }
 
         $periodStart = null;
@@ -676,7 +689,7 @@ class CarePlanShow extends Component
             'category' => [
                 'coding' => [
                     [
-                        'system' => 'eHealth/care_plan_categories',
+                        'system' => $categorySystem,
                         'code' => $categoryCode,
                     ]
                 ]
@@ -685,12 +698,12 @@ class CarePlanShow extends Component
             'title' => $this->carePlan->title,
             'period' => $period,
             'addresses' => !empty($addresses) ? $addresses : null,
-            'encounter' => $this->carePlan->encounter?->uuid ? [
+            'encounter' => ($encounter?->uuid ?? $this->carePlan->encounterIdentifier?->value) ? [
                 'identifier' => [
                     'type' => [
                         'coding' => [['system' => 'eHealth/resources', 'code' => 'encounter']]
                     ],
-                    'value' => $this->carePlan->encounter->uuid
+                    'value' => $encounter?->uuid ?? $this->carePlan->encounterIdentifier->value
                 ]
             ] : null,
             'author' => [
@@ -781,7 +794,9 @@ class CarePlanShow extends Component
             if (method_exists($exception, 'report')) {
                 $exception->report();
             }
-            Log::error('CarePlanShow: eHealth error: ' . $exception->getMessage());
+            Log::error('CarePlanShow: eHealth error: ' . $exception->getMessage(), [
+                'details' => method_exists($exception, 'getDetails') ? $exception->getDetails() : null
+            ]);
             $msg = $exception instanceof EHealthValidationException
                 ? $exception->getFormattedMessage()
                 : __('care-plan.ehealth_error_prefix') . $exception->getMessage();
@@ -858,7 +873,9 @@ class CarePlanShow extends Component
             if (method_exists($exception, 'report')) {
                 $exception->report();
             }
-            Log::error('CarePlanShow: eHealth error: ' . $exception->getMessage());
+            Log::error('CarePlanShow: eHealth error: ' . $exception->getMessage(), [
+                'details' => method_exists($exception, 'getDetails') ? $exception->getDetails() : null
+            ]);
             $msg = $exception instanceof EHealthValidationException
                 ? $exception->getFormattedMessage()
                 : __('care-plan.ehealth_error_prefix') . $exception->getMessage();
@@ -1073,9 +1090,8 @@ class CarePlanShow extends Component
             $payload = $this->cleanActivityPayload($activityRepository->formatCarePlanActivityRequest($activity));
         }
 
-        // Keep the status inside the detail equal to the current status of the activity in eHealth.
-        // During cancellation or completion, eHealth expects the signed content's status to reflect the
-        // current state (e.g. 'scheduled' or 'active'), which is synchronized in our local DB status field.
+        // Keep the status inside detail equal to the current status of the activity on eHealth
+        // because the signed content must match the activity as it currently exists in their database.
         if (isset($payload['detail'])) {
             $currentStatus = $activity->status;
             if (strtolower((string)$currentStatus) === 'processed') {
@@ -1111,10 +1127,11 @@ class CarePlanShow extends Component
             }
         }
 
-        Log::info('CarePlanActivityStatus: Signing status transition: ' . $this->actionType . ' for activity UUID=' . $activity->uuid, [
-            'payload' => $payload,
-            'snake_case_payload' => Arr::toSnakeCase($payload)
-        ]);
+        // Log the full JSON string to prevent Monolog from truncating the output in laravel.log
+        Log::info('CarePlanActivityStatus: Full JSON payload to sign: ' . json_encode(Arr::toSnakeCase($payload), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+
+        // Dump and die to inspect the payload in the browser network tab/modal as requested
+        // dd(Arr::toSnakeCase($payload));
 
         try {
             $signedContent = signatureService()->signData(
@@ -1228,7 +1245,9 @@ class CarePlanShow extends Component
             $this->showSignatureModal = false;
 
         } catch (EHealthValidationException $exception) {
-            Log::error('CarePlanActivityStatus: eHealth validation error: ' . $exception->getMessage());
+            Log::error('CarePlanActivityStatus: eHealth validation error: ' . $exception->getMessage(), [
+                'details' => $exception->getDetails()
+            ]);
             Session::flash('error', $exception->getTranslatedMessage());
             $this->showSignatureModal = false;
         } catch (\Throwable $exception) {
@@ -1394,7 +1413,6 @@ class CarePlanShow extends Component
     private function cleanActivityPayload(array $payload): array
     {
         $excludeKeys = [
-            'display_value',
             'remaining_quantity',
             'remaining_quantity_type',
             'inserted_at',
@@ -1405,10 +1423,10 @@ class CarePlanShow extends Component
             'database_id',
         ];
 
+        $cleaned = [];
         foreach ($payload as $key => $value) {
             $snakeKey = \Illuminate\Support\Str::snake($key);
             if (in_array($snakeKey, $excludeKeys, true)) {
-                unset($payload[$key]);
                 continue;
             }
 
@@ -1416,25 +1434,17 @@ class CarePlanShow extends Component
                 // eHealth getDetails returns author as a list [ {identifier...} ], but creation / expected schema is a single object
                 if (isset($value[0])) {
                     $value = $value[0];
-                } elseif (empty($value)) {
-                    unset($payload[$key]);
-                    continue;
                 }
             }
 
             if (is_array($value)) {
-                $payload[$key] = $this->cleanActivityPayload($value);
-                if (empty($payload[$key])) {
-                    unset($payload[$key]);
-                }
-            } elseif ($value === null || $value === '') {
-                unset($payload[$key]);
+                $cleaned[$key] = $this->cleanActivityPayload($value);
             } else {
-                $payload[$key] = $value;
+                $cleaned[$key] = $value;
             }
         }
 
-        return $payload;
+        return $cleaned;
     }
 
     public function render()
