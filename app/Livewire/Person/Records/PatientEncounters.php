@@ -227,7 +227,14 @@ class PatientEncounters extends BasePatientComponent
             ->recentlyUpdatedFirst()
             ->paginate(config('pagination.per_page'));
 
-        $paginator->setCollection(collect(Arr::toCamelCase($paginator->getCollection()->toArray())));
+        $paginator->setCollection(
+            $paginator->getCollection()->map(function (Encounter $encounter) {
+                $data = Arr::toCamelCase($encounter->toArray());
+                $data['id'] = $encounter->id;
+
+                return $data;
+            })
+        );
 
         return $paginator;
     }
