@@ -150,7 +150,7 @@
 
                         <fieldset class="fieldset-card p-5">
                             <legend class="legend">{{ __('patients.care_plans') }}</legend>
-                            <a href="{{ route('care-plan.create', [legalEntity(), 'personId' => $personId, 'encounterUuid' => $form->encounter['uuid'] ?? '']) }}"
+                            <a href="{{ route('care-plans.create-by-encounter', [legalEntity(), 'encounter' => $encounterId]) }}"
                                class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors"
                             >
                                 @icon('plus', 'w-4 h-4')
