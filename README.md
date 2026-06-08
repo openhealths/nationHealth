@@ -188,5 +188,4 @@ After successful authentication, the user is automatically redirected to the app
 
 > **Note:** For eHealth login to work properly, the `EHEALTH_REDIRECT_URI` in your `.env` must point to a real, accessible URL of your application. For local development, you may set `EHEALTH_CALLBACK_PROD=true` and configure `EHEALTH_URL_DEV` to `http://localhost:8000`.
 ## Code Style
-- view file names: kebab-case
-- lang key: snake_case
+See [docs/CODE_STYLE.md](docs/CODE_STYLE.md) for the project code style conventions.
