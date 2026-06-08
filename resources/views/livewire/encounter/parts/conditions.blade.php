@@ -100,29 +100,30 @@
                     <div class="record-inner-column flex-1">
                         <div class="record-inner-label">{{ __('patients.code_and_name') }}</div>
                         <div class="record-inner-value text-[16px]"
-                             x-text="`${ condition.codeCode } - ${ condition.codeSystem === 'eHealth/ICD10_AM/condition_codes' ? icd10Descriptions[condition.codeCode] : conditionCodesDictionary[condition.codeCode] }`"></div>
+                             x-text="`${ condition.codeCode } - ${ condition.codeSystem === 'eHealth/ICD10_AM/condition_codes' ? icd10Descriptions[condition.codeCode] : conditionCodesDictionary[condition.codeCode] }`"
+                        ></div>
                     </div>
 
                     <div class="record-inner-action-col">
                         <div x-data="{
-                            openDropdown: false,
-                            toggle() {
-                                if (this.openDropdown) {
-                                    return this.close()
-                                }
+                                 openDropdown: false,
+                                 toggle() {
+                                     if (this.openDropdown) {
+                                         return this.close()
+                                     }
 
-                                this.$refs.button.focus()
+                                     this.$refs.button.focus()
 
-                                this.openDropdown = true
-                            },
-                            close(focusAfter) {
-                                if (!this.openDropdown) return
+                                     this.openDropdown = true
+                                 },
+                                 close(focusAfter) {
+                                     if (!this.openDropdown) return
 
-                                this.openDropdown = false
+                                     this.openDropdown = false
 
-                                focusAfter && focusAfter.focus()
-                            }
-                        }"
+                                     focusAfter && focusAfter.focus()
+                                 }
+                             }"
                              @keydown.escape.prevent.stop="close($refs.button)"
                              @focusin.window="!$refs.panel.contains($event.target) && close()"
                              x-id="['dropdown-button']"
@@ -169,7 +170,8 @@
                                         {{ __('forms.edit') }}
                                     </button>
 
-                                    <button class="dropdown-delete" @click.prevent="
+                                    <button class="dropdown-delete"
+                                            @click.prevent="
                                                 conditions.splice(index, 1);
                                                 diagnoses.splice(index, 1);
                                                 close($refs.button);
@@ -189,17 +191,20 @@
                             <div>
                                 <div class="record-inner-label">{{ __('forms.type') }}</div>
                                 <div class="record-inner-subvalue"
-                                     x-text="diagnosisRolesDictionary[diagnoses[index]?.roleCode] || '-'"></div>
+                                     x-text="diagnosisRolesDictionary[diagnoses[index]?.roleCode] || '-'"
+                                ></div>
                             </div>
                             <div>
                                 <div class="record-inner-label">{{ __('patients.clinical_status') }}</div>
                                 <div class="record-inner-subvalue"
-                                     x-text="conditionClinicalStatusesRolesDictionary[condition.clinicalStatus] || '-'"></div>
+                                     x-text="conditionClinicalStatusesRolesDictionary[condition.clinicalStatus] || '-'"
+                                ></div>
                             </div>
                             <div>
                                 <div class="record-inner-label">{{ __('patients.verification_status') }}</div>
                                 <div class="record-inner-subvalue"
-                                     x-text="conditionVerificationStatusesDictionary[condition.verificationStatus] || '-'"></div>
+                                     x-text="conditionVerificationStatusesDictionary[condition.verificationStatus] || '-'"
+                                ></div>
                             </div>
                             <div>
                                 <div class="record-inner-label">{{ __('forms.comment') }}</div>
@@ -228,7 +233,8 @@
         <x-dialog-drawer x-model="openConditionDrawer" maxWidth="4/5" wire:ignore>
             <x-slot name="title">
                 <span
-                    x-text="newCondition ? '{{ __('patients.new_diagnose_state') }}' : '{{ __('patients.edit_diagnose_state') }}'"></span>
+                    x-text="newCondition ? '{{ __('patients.new_diagnose_state') }}' : '{{ __('patients.edit_diagnose_state') }}'"
+                ></span>
             </x-slot>
 
             {{-- Content --}}
@@ -347,7 +353,7 @@
                                 {{ __('forms.nothing_found') }}
                             </p>
 
-                            <x-forms.loading/>
+                            <x-forms.loading />
                         </div>
 
                         <div x-show="!modalCondition.codeSystem">
@@ -360,8 +366,7 @@
                                        class="input w-full opacity-50 cursor-not-allowed"
                                        placeholder="{{ __('patients.choose_coding_system') }}"
                                 />
-                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400
-                                dark:text-gray-500 pointer-events-none')
+                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
                             </div>
                         </div>
                     </div>
@@ -384,8 +389,7 @@
                                     <option value="{{ $key }}">{{ $diagnosisRole }}</option>
                                 @endforeach
                             </select>
-                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400
-                            dark:text-gray-500 pointer-events-none')
+                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
                         </div>
                     </div>
 
@@ -430,8 +434,7 @@
                                     <option value="{{ $key }}">{{ $clinicalStatus }}</option>
                                 @endforeach
                             </select>
-                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400
-                            dark:text-gray-500 pointer-events-none')
+                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
                         </div>
                     </div>
 
@@ -439,21 +442,23 @@
 
                     <div>
                         <label for="onsetDate"
-                               class="text-xs text-gray-500 dark:text-gray-400 font-medium block mb-1">
+                               class="text-xs text-gray-500 dark:text-gray-400 font-medium block mb-1"
+                        >
                             {{ __('patients.start_date') }}<span class="text-red-600"> *</span>
                         </label>
                         <div class="relative">
                             <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none pl-1">
                                 @icon('calendar-week', 'w-4 h-4 text-gray-400')
                             </div>
-                            <input x-model="modalCondition.onsetDate"
-                                   datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                                   type="text"
-                                   name="onsetDate"
-                                   id="onsetDate"
-                                   class="datepicker-input input pl-7 w-full"
-                                   autocomplete="off"
-                                   required
+                            <input
+                                x-model="modalCondition.onsetDate"
+                                datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                                type="text"
+                                name="onsetDate"
+                                id="onsetDate"
+                                class="datepicker-input input pl-7 w-full"
+                                autocomplete="off"
+                                required
                             >
                         </div>
                     </div>
@@ -464,14 +469,15 @@
                             <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none pl-1">
                                 @icon('mingcute-time-fill', 'w-4 h-4 text-gray-400')
                             </div>
-                            <input x-model="modalCondition.onsetTime"
-                                   @input="$event.target.blur()"
-                                   type="time"
-                                   name="onsetTime"
-                                   id="onsetTime"
-                                   class="input pl-7 w-full cursor-pointer"
-                                   autocomplete="off"
-                                   required
+                            <input
+                                x-model="modalCondition.onsetTime"
+                                @input="$event.target.blur()"
+                                type="time"
+                                name="onsetTime"
+                                id="onsetTime"
+                                class="input pl-7 w-full cursor-pointer"
+                                autocomplete="off"
+                                required
                             >
                         </div>
                     </div>
@@ -486,14 +492,15 @@
                             <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none pl-1">
                                 @icon('calendar-week', 'w-4 h-4 text-gray-400')
                             </div>
-                            <input x-model="modalCondition.assertedDate"
-                                   datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                                   type="text"
-                                   name="assertedDate"
-                                   id="assertedDate"
-                                   class="datepicker-input input pl-7 w-full"
-                                   autocomplete="off"
-                                   required
+                            <input
+                                x-model="modalCondition.assertedDate"
+                                datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                                type="text"
+                                name="assertedDate"
+                                id="assertedDate"
+                                class="datepicker-input input pl-7 w-full"
+                                autocomplete="off"
+                                required
                             >
                         </div>
                     </div>
@@ -504,14 +511,15 @@
                             <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none pl-1">
                                 @icon('mingcute-time-fill', 'w-4 h-4 text-gray-400')
                             </div>
-                            <input x-model="modalCondition.assertedTime"
-                                   @input="$event.target.blur()"
-                                   type="time"
-                                   name="assertedTime"
-                                   id="assertedTime"
-                                   class="input pl-7 w-full cursor-pointer"
-                                   autocomplete="off"
-                                   required
+                            <input
+                                x-model="modalCondition.assertedTime"
+                                @input="$event.target.blur()"
+                                type="time"
+                                name="assertedTime"
+                                id="assertedTime"
+                                class="input pl-7 w-full cursor-pointer"
+                                autocomplete="off"
+                                required
                             >
                         </div>
                     </div>
@@ -529,7 +537,7 @@
                                         <select x-model="bodySite.code"
                                                 class="input-select w-full appearance-none bg-none"
                                         >
-                                            <option value="">{{ __('forms.select') }}</option>
+                                            <option value="" selected>{{ __('forms.select') }}</option>
                                             @foreach($this->dictionaries['eHealth/body_sites'] as $key => $bodySiteName)
                                                 <option value="{{ $key }}">{{ $bodySiteName }}</option>
                                             @endforeach
@@ -546,7 +554,7 @@
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"
                                              viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round"
-                                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                         </svg>
                                     </button>
                                 </div>
@@ -573,7 +581,7 @@
                                     type="text"
                                     required
                             >
-                                <option selected>{{ __('forms.select') }}</option>
+                                <option value="" selected>{{ __('forms.select') }}</option>
                                 @foreach($this->dictionaries['eHealth/condition_severities'] as $key => $conditionSeverity)
                                     <option value="{{ $key }}">{{ $conditionSeverity }}</option>
                                 @endforeach
@@ -674,8 +682,7 @@
                                         <option value="{{ $key }}">{{ $reportOrigin }}</option>
                                     @endforeach
                                 </select>
-                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400
-                                dark:text-gray-500 pointer-events-none')
+                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
                             </div>
                         </div>
                     </div>
@@ -821,7 +828,7 @@
                  class="absolute inset-0 flex items-center justify-center bg-white/70 dark:bg-gray-800/70 z-10"
                  x-cloak
             >
-                <x-forms.loading/>
+                <x-forms.loading />
             </div>
 
             <table class="table-input w-inherit">

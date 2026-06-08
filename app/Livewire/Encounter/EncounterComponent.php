@@ -229,7 +229,6 @@ class EncounterComponent extends Component
         'eHealth/reason_explanations',
         'eHealth/reason_not_given_explanations',
         'eHealth/immunization_report_origins',
-        'eHealth/immunization_statuses',
         'eHealth/vaccine_codes',
         'eHealth/immunization_dosage_units',
         'eHealth/vaccination_routes',

@@ -109,8 +109,11 @@
            x-effect="$el.classList.toggle('not-empty', !!search)"
     />
 
+    {{-- wire:ignore keeps Livewire from morphing the Alpine x-for items; otherwise a parent re-render
+         (e.g. resetFilters) re-evaluates "option" after its loop scope is gone → "option is not defined". --}}
     <ul x-show="open"
         x-cloak
+        wire:ignore
         :id="$id('listbox')"
         class="py-2 text-sm text-gray-700 dark:text-gray-400 absolute z-17 mt-1 w-full bg-white border border-gray-400 rounded shadow max-h-60 overflow-auto"
     >

@@ -238,18 +238,18 @@
                             <div class="record-inner-action-col">
                                 <div class="flex justify-center relative">
                                     <div x-data="{
-                                            open: false,
-                                            toggle() {
-                                                if (this.open) { return this.close(); }
-                                                this.$refs.button.focus();
-                                                this.open = true;
-                                            },
-                                            close(focusAfter) {
-                                                if (!this.open) return;
-                                                this.open = false;
-                                                focusAfter && focusAfter.focus()
-                                            }
-                                        }"
+                                             open: false,
+                                             toggle() {
+                                                 if (this.open) { return this.close(); }
+                                                 this.$refs.button.focus();
+                                                 this.open = true;
+                                             },
+                                             close(focusAfter) {
+                                                 if (!this.open) return;
+                                                 this.open = false;
+                                                 focusAfter && focusAfter.focus()
+                                             }
+                                         }"
                                          @keydown.escape.prevent.stop="close($refs.button)"
                                          @focusin.window="!$refs.panel.contains($event.target) && close()"
                                          x-id="['dropdown-button']"
