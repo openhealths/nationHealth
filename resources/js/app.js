@@ -206,7 +206,6 @@ document.addEventListener('DOMContentLoaded', () => {
     observer.observe(document.body, { childList: true, subtree: true });
 });
 
-// Enter → move focus to next form field (skip textarea, disabled, hidden, readonly)
 const FOCUSABLE = 'input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]), select';
 
 document.addEventListener('keydown', (e) => {
@@ -217,7 +216,6 @@ document.addEventListener('keydown', (e) => {
     if (el.tagName === 'TEXTAREA') return;
     if (el.disabled || el.readOnly) return;
 
-    // Don't interfere if datepicker or select2 popup is open
     if (document.querySelector('.datepicker.active, .select2-container--open')) return;
 
     const form = el.closest('form, fieldset, section, [wire\\:id]');
@@ -236,10 +234,8 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
         fields[idx + 1].focus();
     }
-    // Last field — let default behavior (submit) happen
 });
 
-// Global Loading Spinner / Preloader controller
 let activeRequests = 0;
 let isNavigating = false;
 
@@ -260,7 +256,6 @@ function updatePreloader() {
     }
 }
 
-// 1. Livewire SPA Navigation Events
 document.addEventListener('livewire:navigate', () => {
     console.log('[Preloader] livewire:navigate event');
     isNavigating = true;
@@ -280,14 +275,12 @@ document.addEventListener('livewire:navigated', () => {
     updatePreloader();
 });
 
-// 2. Normal Browser Page Unload Events (for standard form submits / link clicks)
 window.addEventListener('beforeunload', () => {
     console.log('[Preloader] beforeunload event');
     isNavigating = true;
     updatePreloader();
 });
 
-// Restore from back/forward cache (bfcache)
 window.addEventListener('pageshow', (event) => {
     console.log('[Preloader] pageshow event:', event.persisted);
     if (event.persisted) {
@@ -297,7 +290,6 @@ window.addEventListener('pageshow', (event) => {
     }
 });
 
-// 3. Normal Link Clicks (Immediate visual feedback before unload)
 document.addEventListener('click', (event) => {
     const link = event.target.closest('a');
     if (!link) return;
@@ -305,7 +297,6 @@ document.addEventListener('click', (event) => {
     const href = link.getAttribute('href');
     if (!href) return;
 
-    // Ignore anchors, JS links, email, phone, downloads, new tabs, and Livewire navigation links
     if (
         href.startsWith('#') ||
         href.startsWith('javascript:') ||
@@ -318,7 +309,6 @@ document.addEventListener('click', (event) => {
         return;
     }
 
-    // Ignore modified clicks (Ctrl, Cmd, Shift, Alt, Middle Click)
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
         return;
     }
