@@ -221,7 +221,7 @@
             </div>
 
             <div class="space-y-4">
-                @foreach($carePlans as $plan)
+                @forelse($carePlans as $plan)
                     <div class="record-inner-card" wire:key="care-plan-{{ $plan->id }}">
                         <div class="record-inner-header">
                             <div class="record-inner-checkbox-col">
@@ -370,7 +370,9 @@
                             </div>
                         </div>
                     </div>
-                @endforeach
+                @empty
+                    <x-nothing-found :description="null" />
+                @endforelse
             </div>
         </div>
     </div>

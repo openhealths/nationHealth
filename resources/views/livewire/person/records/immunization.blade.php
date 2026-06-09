@@ -470,10 +470,7 @@
                         </div>
                     </div>
                 @empty
-                    <div
-                        class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-sm text-gray-500 dark:text-gray-400">
-                        {{ __('patients.immunizations_not_found') }}
-                    </div>
+                    <x-nothing-found :description="null" />
                 @endforelse
             </div>
             <div class="mt-8">
