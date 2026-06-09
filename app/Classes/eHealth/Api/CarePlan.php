@@ -7,9 +7,8 @@ namespace App\Classes\eHealth\Api;
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
 use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use App\Core\Arr;
@@ -23,8 +22,9 @@ class CarePlan extends Request
      *
      * @param  string  $patientId
      * @param  array  $payload
+     *
      * @return PromiseInterface|EHealthResponse
-     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|ConnectionException
      */
     public function create(string $patientId, array $payload): PromiseInterface|EHealthResponse
     {
@@ -35,8 +35,9 @@ class CarePlan extends Request
      * Get Care Plans by search parameters.
      *
      * @param  array  $query
+     *
      * @return PromiseInterface|EHealthResponse
-     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|ConnectionException
      */
     public function getMany(array $query = []): PromiseInterface|EHealthResponse
     {
@@ -51,8 +52,9 @@ class CarePlan extends Request
      * @param  string  $patientId
      * @param  string  $id
      * @param  array  $query
+     *
      * @return PromiseInterface|EHealthResponse
-     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|ConnectionException
      */
     public function getDetails(string $patientId, string $id, array $query = []): PromiseInterface|EHealthResponse
     {
@@ -64,10 +66,12 @@ class CarePlan extends Request
     /**
      * Cancel a Care Plan.
      *
-     * @param  string  $id
-     * @param  array  $payload  requires status_reason
+     * @param string $personId
+     * @param string $id
+     * @param array  $payload requires status_reason
+     *
      * @return PromiseInterface|EHealthResponse
-     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws ConnectionException
      */
     public function cancel(string $personId, string $id, array $payload): PromiseInterface|EHealthResponse
     {
@@ -77,10 +81,12 @@ class CarePlan extends Request
     /**
      * Complete a Care Plan.
      *
-     * @param  string  $id
-     * @param  array  $payload  requires status_reason
+     * @param string $personId
+     * @param string $id
+     * @param array  $payload requires status_reason
+     *
      * @return PromiseInterface|EHealthResponse
-     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws ConnectionException
      */
     public function complete(string $personId, string $id, array $payload): PromiseInterface|EHealthResponse
     {
@@ -90,9 +96,11 @@ class CarePlan extends Request
     /**
      * Get Care Plans by search parameters.
      *
-     * @param  string  $patientId
-     * @param  array  $query
+     * @param string $patientId
+     * @param array  $query
+     *
      * @return PromiseInterface|EHealthResponse
+     * @throws ConnectionException
      */
     public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
