@@ -112,6 +112,7 @@
                 </div>
 
                 <!-- Additional Actions -->
+                @if(isset($encounterId))
                 <div class="pt-10 mt-10 border-t border-gray-100 dark:border-gray-700">
                     <h3 class="text-[17px] font-bold text-gray-900 dark:text-gray-100 mb-6">
                         {{ __('patients.additional_actions') }}
@@ -159,6 +160,7 @@
                         </fieldset>
                     </div>
                 </div>
+                @endif
 
                 <!-- Actions -->
                 <div class="pt-8">
