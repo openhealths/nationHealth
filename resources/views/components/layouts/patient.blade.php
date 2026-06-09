@@ -1,6 +1,6 @@
 @props([
-    'personId', 
-    'patientFullName', 
+    'personId',
+    'patientFullName',
     'hideNavigation' => false,
     'title' => null,
     'breadcrumbs' => []
@@ -13,8 +13,8 @@
 @endphp
 
 <section>
-    <x-header-navigation 
-        x-data="{ showFilter: true }" 
+    <x-header-navigation
+        x-data="{ showFilter: true }"
         class="breadcrumb-form"
         :breadcrumbs="$breadcrumbs"
     >
@@ -76,16 +76,16 @@
                             {{ __('patients.observation') }}
                         </a>
 
-                        <a href="{{ route('persons.immunization', [legalEntity(), 'personId' => $personId]) }}"
+                        <a href="{{ route('persons.immunizations', [legalEntity(), 'personId' => $personId]) }}"
                            class="summary-tab {{ request()->routeIs('persons.immunization') ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                         >
                             {{ __('patients.immunizations') }}
                         </a>
 
-                        <a href="{{ route('persons.condition', [legalEntity(), 'personId' => $personId]) }}"
+                        <a href="{{ route('persons.conditions', [legalEntity(), 'personId' => $personId]) }}"
                            class="summary-tab {{ request()->routeIs('persons.condition') ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                         >
-                            {{ __('patients.condition') }}
+                            {{ __('patients.conditions') }}
                         </a>
 
                         <a href="{{ route('persons.diagnoses', [legalEntity(), 'personId' => $personId]) }}"

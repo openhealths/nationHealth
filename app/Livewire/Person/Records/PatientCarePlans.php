@@ -13,7 +13,7 @@ use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
-class PersonCarePlans extends BasePatientComponent
+class PatientCarePlans extends BasePatientComponent
 {
     public $carePlans = [];
 

@@ -118,24 +118,24 @@ class Condition extends Model
     public function evidences(): Attribute
     {
         return Attribute::make(
-            get: fn () => [
-                [
-                    'codes' => $this->evidencesRelation()
-                        ->with(['codes.coding'])
-                        ->get()
-                        ->filter(fn (ConditionEvidence $evidence) => $evidence->codes !== null)
-                        ->values()
-                        ->map(fn (ConditionEvidence $evidence) => $evidence->codes->toArray())
-                        ->toArray(),
-                    'details' => $this->evidencesRelation()
-                        ->with(['details.type.coding'])
-                        ->get()
-                        ->filter(fn (ConditionEvidence $evidence) => $evidence->details !== null)
-                        ->values()
-                        ->map(fn (ConditionEvidence $evidence) => $evidence->details->toArray())
-                        ->toArray()
-                ]
-            ]
+            get: function (): array {
+                $evidences = $this->evidencesRelation;
+
+                return [
+                    [
+                        'codes' => $evidences
+                            ->filter(static fn (ConditionEvidence $evidence): bool => $evidence->codes !== null)
+                            ->values()
+                            ->map(static fn (ConditionEvidence $evidence): array => $evidence->codes->toArray())
+                            ->toArray(),
+                        'details' => $evidences
+                            ->filter(static fn (ConditionEvidence $evidence): bool => $evidence->details !== null)
+                            ->values()
+                            ->map(static fn (ConditionEvidence $evidence): array => $evidence->details->toArray())
+                            ->toArray()
+                    ]
+                ];
+            }
         );
     }
 
@@ -152,14 +152,42 @@ class Condition extends Model
             } catch (\Throwable $e) {
                 // ignore
             }
+
             return $code;
         }
+
         return null;
     }
 
     public function getCodeStringAttribute(): ?string
     {
         return $this->code?->coding?->first()?->code;
+    }
+
+    /**
+     * Scope the query to conditions belonging to the given person.
+     *
+     * @param  Builder  $query
+     * @param  int  $personId
+     * @return Builder
+     */
+    #[Scope]
+    protected function forPerson(Builder $query, int $personId): Builder
+    {
+        return $query->wherePersonId($personId);
+    }
+
+    /**
+     * Order by most recently updated in eHealth first, keeping records without a timestamp last.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    #[Scope]
+    protected function recentlyUpdatedFirst(Builder $query): Builder
+    {
+        return $query->orderByRaw('CASE WHEN ehealth_updated_at IS NULL THEN 1 ELSE 0 END')
+            ->orderByDesc('ehealth_updated_at');
     }
 
     /**
@@ -176,6 +204,8 @@ class Condition extends Model
             'severity.coding',
             'bodySites.coding',
             'stageSummary.coding',
+            'evidencesRelation.codes.coding',
+            'evidencesRelation.details.type.coding',
         ]);
     }
 }

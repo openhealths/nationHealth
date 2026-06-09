@@ -45,6 +45,7 @@ return [
     'was_performed' => 'Чи була проведена',
     'date_time_entered' => 'Дата та час внесення',
     'episode' => 'Епізод',
+    'ehealth_id' => 'ID ЕСОЗ',
 
     // Summary sections fields
     'status_clinical' => 'Статус клінічний',
@@ -241,7 +242,7 @@ return [
     'devices' => 'Пристрої',
     'medicines' => 'Відомості про ліки',
 
-    // Episodes record
+    // Episodes
     'episodes' => 'Епізоди',
     'search_episode' => 'Пошук епізоду',
     'filter_code' => 'ЕСОЗ ID',
@@ -250,6 +251,7 @@ return [
     'group_actions' => 'Групові дії',
     'revoke_access' => 'Відкликати доступ до записів',
     'filter_created_at_range' => 'Створено від - до',
+    'episodes_not_found' => 'Епізоди не знайдено',
 
     // Diagnoses record
     'diagnoses_search' => 'Пошук діагнозів',
@@ -259,7 +261,7 @@ return [
     // Observations record
     'observations' => 'Обстеження',
     'condition_search' => 'Пошук станів',
-    'observations_not_found' => 'Діагностичних звітів не знайдено',
+    'observations_not_found' => 'Обстежень не знайдено',
 
     // Encounter
     'encounters' => 'Взаємодії',
@@ -331,6 +333,7 @@ return [
     'add_icpc2_code' => ' Додати код за ICPC-2',
     'add_diagnose' => 'Додати діагноз',
     'doctor_who_created_episode' => 'ПІБ лікаря, що створив епізод',
+    'conditions_not_found' => 'Стани не знайдено',
 
     // Additional data
     'additional_data' => 'Додаткові дані',
@@ -371,7 +374,6 @@ return [
     'episode_id' => 'ID епізоду',
     'date_from' => 'Дата проведення від',
     'date_to' => 'Дата проведення до',
-    'episodes_not_found' => 'Епізоди не знайдено',
     'immunizations_not_found' => 'Вакцинації не знайдено',
     'immunization_search' => 'Пошук вакцинації',
 
@@ -391,7 +393,6 @@ return [
     'context_episode_id' => 'ID контекстного епізоду',
     'origin_episode_id' => 'ID первинного епізоду',
     'encounter_id' => 'ID взаємодії',
-    'ehealth_id' => 'ID ЕСОЗ',
 
     // Observations
     'value' => 'Значення',

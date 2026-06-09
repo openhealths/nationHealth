@@ -78,6 +78,21 @@ class EpisodeRepository extends BaseRepository
     }
 
     /**
+     * Get episode data that is related to the person.
+     *
+     * @param  int  $personId
+     * @return array
+     */
+    public function getByPersonId(int $personId): array
+    {
+        return $this->model
+            ->forPerson($personId)
+            ->recentlyUpdatedFirst()
+            ->get()
+            ->toArray();
+    }
+
+    /**
      * Sync episodes from eHealth API to database.
      *
      * @param  int  $personId

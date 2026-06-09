@@ -10,8 +10,6 @@ use App\Enums\JobStatus;
 use App\Jobs\ObservationSync;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
-use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Repositories\MedicalEvents\Repository;
 use App\Rules\InDictionary;
@@ -27,7 +25,7 @@ use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
-class PatientObservation extends BasePatientComponent
+class PatientObservations extends BasePatientComponent
 {
     use BatchLegalEntityQueries;
     use HandlesSyncBatch;
@@ -184,6 +182,8 @@ class PatientObservation extends BasePatientComponent
             Session::flash('success', __('patients.messages.observation_synced_successfully'));
         }
 
+        $this->loadFilterOptions();
+
         $this->isSearching = false;
         $this->resetPage();
     }
@@ -207,8 +207,8 @@ class PatientObservation extends BasePatientComponent
 
     protected function loadFilterOptions(): void
     {
-        $this->episodes = Episode::forPerson($this->personId)->recentlyUpdatedFirst()->get()->toArray();
-        $this->encounters = Encounter::forPerson($this->personId)->recentlyUpdatedFirst()->get()->toArray();
+        $this->episodes = Repository::episode()->getByPersonId($this->personId);
+        $this->encounters = Repository::encounter()->getByPersonId($this->personId);
         $reports = DiagnosticReport::forPerson($this->personId)
             ->final()
             ->with(['effectivePeriod', 'code.type.coding'])
