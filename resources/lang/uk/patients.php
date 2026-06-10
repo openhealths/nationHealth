@@ -172,6 +172,8 @@ return [
     'informed' => "інформація з пам'ятки повідомлена пацієнту",
     'reject' => 'Відхилити заявку',
     'print_leaflet_for_patient' => "Роздрукувати пам'ятку для ознайомлення пацієнтом",
+    'get_certificate' => 'Довідка',
+    'register_death' => 'Зареєструвати смерть',
 
     'status' => [
         // PERSON_VERIFICATION_STATUSES
@@ -501,6 +503,7 @@ return [
         'person_auth_methods_sync_error' => 'Помилка синхронізації методів автентифікації пацієнта.',
         'cannot_set_offline_auth_method_if_person_has_otp' => 'Не можна встановити метод автентифікації через документи, якщо пацієнт уже має метод через SMS.',
         'otp_requires_self_auth_age' => 'Метод автентифікації через SMS доступний лише пацієнтам старшим за :age років.',
+        'error_creating_approval' => 'Помилка під час створення затвердження для отримання даних пацієнта.',
         'authMethod' => [
             'only_third_person_for_person_with_confidants' => 'Для пацієнта з довіреними особами можна створити лише метод автентифікації через іншу особу.',
             'only_third_person_can_be_updated' => 'Оновити можна лише метод автентифікації через іншу особу.',

@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         if (!Schema::hasTable('ehealth_request_processing')) {
-            Schema::create('ehealth_request_processing', function (Blueprint $table) {
+            Schema::create('ehealth_request_processings', function (Blueprint $table) {
                 $table->id();
 
                 $table->foreignId('ehealth_link_id')->nullable()

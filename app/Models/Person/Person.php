@@ -10,8 +10,10 @@ use App\Models\Employee\Employee;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\Relations\ConfidantPerson;
+use App\Models\MedicalEvents\Sql\Approval;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Person extends BasePerson
 {
@@ -83,5 +85,10 @@ class Person extends BasePerson
     public function confidantPersonRelationshipRequests(): HasMany
     {
         return $this->hasMany(ConfidantPersonRelationshipRequest::class, 'person_id');
+    }
+
+    public function approvals(): MorphMany
+    {
+        return $this->morphMany(Approval::class, 'approvable');
     }
 }

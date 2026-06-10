@@ -12,21 +12,21 @@ return new class extends Migration {
     {
         Schema::create('approvals', function (Blueprint $table) {
             $table->id();
-            $table->uuid('uuid')->unique();
-            
+            $table->uuid('uuid')->unique()->nullable();
+
             // Polymorphic relation
             $table->morphs('approvable');
-            
+
             $table->foreignId('created_by_id')->nullable()->constrained('identifiers');
 
             $table->foreignId('granted_to_id')->nullable()->constrained('identifiers');
             $table->string('granted_to_type')->default('legal_entity');
-            
+
             $table->foreignId('granted_by_id')->nullable()->constrained('employees');
-            
+
             $table->uuid('authorize_with')->nullable();
             $table->foreignId('authentication_method_id')->nullable()->constrained('authentication_methods');
-            
+
             $table->foreignId('reason_id')->nullable()->constrained('identifiers');
 
             $table->string('status')->index();

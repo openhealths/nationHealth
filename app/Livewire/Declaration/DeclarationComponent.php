@@ -173,8 +173,11 @@ abstract class DeclarationComponent extends Component
             ->whereIn('type', [AuthenticationMethod::OTP->value, AuthenticationMethod::THIRD_PERSON->value])
             ->isEmpty();
 
-        $this->isNeedToResign = Repository::declarationRequest()->checkIfNeedToResign($this->patientUuid);
+        // Use 'documents_exists' dynamic attribute (added by withExists) to determine if we need to update person data (for one haven't OTP authentication method)
+        $this->isNeedToPersonUpdate = !$patient->documents_exists &&
+            collect($this->authMethods)->whereIn('type', [AuthenticationMethod::OTP->value, AuthenticationMethod::THIRD_PERSON->value])->isEmpty();
 
+        $this->isNeedToResign = Repository::declarationRequest()->checkIfNeedToResign($this->patientUuid);
         $this->isSyncing = $patient->isSyncing;
     }
 
@@ -226,12 +229,6 @@ abstract class DeclarationComponent extends Component
             return;
         }
 
-        if ($this->isNeedToPersonUpdate) {
-            $this->showUpdatePersonDataModal = true;
-
-            return;
-        }
-
         $this->setDivisionId();
 
         try {
@@ -239,6 +236,12 @@ abstract class DeclarationComponent extends Component
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
+
+            return;
+        }
+
+        if ($this->isNeedToPersonUpdate) {
+            $this->showUpdatePersonDataModal = true;
 
             return;
         }

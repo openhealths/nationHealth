@@ -41,6 +41,19 @@ class Approval extends Request
     }
 
     /**
+     * Get approvals for a specific patient.
+     *
+     * @param  string  $patientId
+     * @param  array  $query  query params: status (e.g. active), limit, etc.
+     * @return PromiseInterface|EHealthResponse
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+     */
+    public function getApprovalDetails(string $patientId, string $approvalUuid, array $query = []): PromiseInterface|EHealthResponse
+    {
+        return $this->get("/api/patients/{$patientId}/approvals/{$approvalUuid}", $query);
+    }
+
+    /**
      * Create a new Approval request for a patient entity.
      *
      * @param  string  $patientId
@@ -112,5 +125,61 @@ class Approval extends Request
         // Typically a PATCH Request to /api/approvals/{id} with status = null depending on API specifics
         // However wait to check official api schema for this endpoint if differing from /actions/cancel
         return (new \App\Classes\eHealth\Request('PATCH', self::URL . "/$id/actions/cancel", $payload))->sendRequest();
+    }
+
+    /**
+     * Build the request payload for an approval request for a person data.
+     *
+     * @param  array  $payloadData  Expected keys: employee_id (string), person_id (string), authorize_with (string|null)
+     * 
+     * @return array
+     */
+    public function getPayloadForPersonDataApproval(array $payloadData): array
+    {
+         $payload = [
+            'granted_to' => [
+                'identifier' => [
+                    'type' => [
+                        'coding' => [
+                            [
+                                'system' => 'eHealth/resources',
+                                'code' => 'employee'
+                            ]
+                        ]
+                    ],
+                    'value' => $payloadData['employee_id'],
+                ]
+            ],
+            'created_by' => [
+                'identifier' => [
+                    'type' => [
+                        'coding' => [
+                            [
+                                'system' => 'eHealth/resources',
+                                'code' => 'employee'
+                            ]
+                        ]
+                    ],
+                    'value' => $payloadData['employee_id'],
+                ]
+            ],
+            'person' => [
+                'identifier' => [
+                    'type' => [
+                        'coding' => [
+                            [
+                                'system' => 'eHealth/resources',
+                                'code' => 'person'
+                            ]
+                        ]
+                    ],
+                    'value' => $payloadData['person_id'],
+                ]
+            ],
+            'access_level' => 'read',
+            'authorize_with' => $payloadData['authorize_with'] ?: null,
+        ];
+
+        return $payload;
     }
 }

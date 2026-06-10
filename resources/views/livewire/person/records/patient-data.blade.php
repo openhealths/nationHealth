@@ -1,3 +1,4 @@
+@use('App\Models\Person')
 @use('App\Enums\Person\AuthenticationMethod')
 @use('App\Enums\Person\VerificationStatus as Status')
 
@@ -150,11 +151,13 @@
                 <div x-show="open" wire:ignore.self>
                     <div class="px-6 pb-6 border-t border-gray-100 dark:border-gray-700 pt-6">
                         <div class="flex items-center justify-end mb-6">
-                            <button type="button"
-                                    class="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 font-medium text-sm cursor-pointer"
-                                    style="margin: 0 !important;">
+                            <button
+                                type="button"
+                                class="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 font-medium text-sm cursor-pointer" style="margin: 0 !important;"
+                                wire:click.once="syncPersonDataFromEHealth()"
+                            >
                                 @icon('refresh', 'w-4 h-4')
-                                <span>{{ __('patients.sync_personal_data') }}</span>
+                                <span>{{ $isSyncing ? __('forms.sync_retry') : __('patients.sync_personal_data') }}</span>
                             </button>
                         </div>
 
@@ -327,11 +330,13 @@
                 <div x-show="open" wire:ignore.self>
                     <div class="px-6 pb-6 border-t border-gray-100 dark:border-gray-700 pt-6">
                         <div class="flex items-center justify-end mb-6">
-                            <button type="button"
-                                    class="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 font-medium text-sm cursor-pointer"
-                                    style="margin: 0 !important;">
+                            <button
+                                type="button"
+                                class="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 font-medium text-sm cursor-pointer" style="margin: 0 !important;"
+                                wire:click.once="syncPersonDataFromEHealth()"
+                            >
                                 @icon('refresh', 'w-4 h-4')
-                                <span>{{ __('patients.sync_personal_data') }}</span>
+                                <span>{{ $isSyncing ? __('forms.sync_retry') : __('patients.sync_personal_data') }}</span>
                             </button>
                         </div>
 
@@ -395,11 +400,13 @@
                 <div x-show="open" wire:ignore.self>
                     <div class="px-6 pb-6 border-t border-gray-100 dark:border-gray-700 pt-6">
                         <div class="flex items-center justify-end mb-6">
-                            <button type="button"
-                                    class="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 font-medium text-sm cursor-pointer"
-                                    style="margin: 0 !important;">
+                            <button
+                                type="button"
+                                class="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 font-medium text-sm cursor-pointer" style="margin: 0 !important;"
+                                wire:click.once="syncPersonDataFromEHealth()"
+                            >
                                 @icon('refresh', 'w-4 h-4')
-                                <span>{{ __('patients.sync_personal_data') }}</span>
+                                <span>{{ $isSyncing ? __('forms.sync_retry') : __('patients.sync_personal_data') }}</span>
                             </button>
                         </div>
 
@@ -933,6 +940,10 @@
 
     @if($showAuthMethodModal)
         @include('livewire.person.parts.modals.choose-auth-method')
+    @endif
+
+    @if($showConfirmationUpdateModal)
+        @include('livewire.person.parts.modals.person-update-authentication')
     @endif
 
     </div>
