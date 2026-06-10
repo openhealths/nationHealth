@@ -149,6 +149,14 @@ return [
     'activities' => 'Призначення',
     'no_activities' => 'Призначень поки немає',
     'kind' => 'Вид',
+    'search_care_plan' => 'Пошук плану лікування',
+    'filter_start_date_range' => 'Дата початку від - до',
+    'filter_end_date_range' => 'Дата завершення від - до',
+    'is_part_of_care_plan' => 'Є частиною плана лікування',
+    'includes_care_plan' => 'Включає в себе план лікування',
+    'doctor' => 'Лікар',
+    'care_provision_conditions_label' => 'Умови надання медичної допомоги',
+    'episode_id' => 'ID Епізоду',
 
     // Show view
     'no_end_date' => 'Безтерміново',
@@ -227,6 +235,10 @@ return [
         'medication_request' => 'Призначення лікарського засобу',
         'device_request' => 'Призначення медичного виробу',
     ],
+
+    'search_error' => 'Помилка пошуку планів лікування в ЕСОЗ',
+    'sync_success' => 'Синхронізація планів закладу успішна',
+    'sync_error' => 'Помилка синхронізації',
 
     'status' => [
         'draft' => 'Чернетка',

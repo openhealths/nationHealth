@@ -19,6 +19,15 @@ class CarePlanIndex extends Component
     public $carePlans = [];
     public string $searchRequisition = '';
 
+    public string $filterName = '';
+    public string $filterEncounterId = '';
+    public string $filterStatus = '';
+    public string $filterStartDateRange = '';
+    public string $filterEndDateRange = '';
+    public string $filterIsPartOf = '';
+    public string $filterIncludes = '';
+    public bool $showAdditionalParams = false;
+
     public function mount(CarePlanRepository $repository): void
     {
         $legalEntity = legalEntity();
@@ -26,6 +35,25 @@ class CarePlanIndex extends Component
         if ($legalEntity) {
             $this->carePlans = $repository->getByLegalEntity($legalEntity->id);
         }
+    }
+
+    public function search(): void
+    {
+        $this->searchByRequisition();
+    }
+
+    public function resetFilters(): void
+    {
+        $this->reset([
+            'searchRequisition',
+            'filterName',
+            'filterEncounterId',
+            'filterStatus',
+            'filterStartDateRange',
+            'filterEndDateRange',
+            'filterIsPartOf',
+            'filterIncludes',
+        ]);
     }
 
     /**
@@ -40,14 +68,14 @@ class CarePlanIndex extends Component
         try {
             $response = EHealth::carePlan()->getMany(['requisition' => $this->searchRequisition]);
             $data = $response->validate();
-            
+
             // Sync with local DB if found
             app(CarePlanRepository::class)->syncCarePlans($data);
-            
+
             $this->mount(app(CarePlanRepository::class));
         } catch (\Throwable $e) {
             Log::error('CarePlan search error: ' . $e->getMessage());
-            session()->flash('error', 'Помилка пошуку планів лікування в ЕСОЗ: ' . $e->getMessage());
+            session()->flash('error', __('care-plan.search_error') . ': ' . $e->getMessage());
         }
     }
 
@@ -123,10 +151,10 @@ class CarePlanIndex extends Component
             }
 
             $this->mount(app(CarePlanRepository::class));
-            session()->flash('success', 'Синхронізація планів закладу успішна');
+            session()->flash('success', __('care-plan.sync_success'));
         } catch (\Throwable $e) {
             Log::error('CarePlan index sync error: ' . $e->getMessage());
-            session()->flash('error', 'Помилка синхронізації: ' . $e->getMessage());
+            session()->flash('error', __('care-plan.sync_error') . ': ' . $e->getMessage());
         }
     }
 

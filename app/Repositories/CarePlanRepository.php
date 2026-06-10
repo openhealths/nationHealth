@@ -20,7 +20,7 @@ class CarePlanRepository
     public function getByLegalEntity(int $legalEntityId): Collection
     {
         return CarePlan::where('legal_entity_id', $legalEntityId)
-            ->with(['person', 'author.party', 'encounter.diagnoses.condition'])
+            ->with(['person', 'author.party', 'encounter.diagnoses.condition', 'encounterIdentifier'])
             ->latest()
             ->get();
     }
@@ -28,7 +28,7 @@ class CarePlanRepository
     public function getByPersonId(int $personId): Collection
     {
         return CarePlan::where('person_id', $personId)
-            ->with(['person', 'author.party', 'encounter.diagnoses.condition'])
+            ->with(['person', 'author.party', 'encounter.diagnoses.condition', 'encounterIdentifier'])
             ->latest()
             ->get();
     }
