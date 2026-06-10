@@ -19,7 +19,7 @@ class Approval extends Model
         'granted_to_type',
         'granted_by_id',
         'status',
-        'reason',
+        'reason_id',
     ];
 
     protected $appends = ['granted_to_details'];
@@ -52,7 +52,7 @@ class Approval extends Model
 
     public function grantedResourceTypes(): HasMany
     {
-        return $this->hasMany(ApprovalGrantedResource::class);
+        return $this->hasMany(ApprovalGrantedResourceType::class);
     }
 
     public function getGrantedToDetailsAttribute(): array

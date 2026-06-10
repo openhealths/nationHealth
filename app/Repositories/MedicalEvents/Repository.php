@@ -70,4 +70,9 @@ final class Repository
     {
         return app(PeriodRepository::class);
     }
+
+    public static function approval(): ApprovalRepository
+    {
+        return app(ApprovalRepository::class);
+    }
 }

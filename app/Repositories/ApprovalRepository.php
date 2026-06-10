@@ -11,6 +11,11 @@ use Illuminate\Support\Facades\Log;
 
 class ApprovalRepository
 {
+    public function create(array $data): Approval
+    {
+        return Approval::create($data);
+    }
+
     /**
      * Sync approvals for a specific polymorphic entity.
      */

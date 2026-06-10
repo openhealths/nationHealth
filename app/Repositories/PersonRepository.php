@@ -117,4 +117,25 @@ class PersonRepository
 
         $query->update(['verification_status' => $verificationStatus]);
     }
+
+    /**
+     * Update synchronization person data status by provided ID or UUID.
+     *
+     * @param  int|string  $personId
+     * @param  bool  $synchronizationStatus
+     *
+     * @return void
+     */
+    public function updateSynchronizationStatusById(int|string $personId, bool $synchronizationStatus): void
+    {
+        $query = Person::query();
+
+        if (is_numeric($personId)) {
+            $query->where('id', $personId);
+        } else {
+            $query->where('uuid', $personId);
+        }
+
+        $query->update(['is_syncing' => $synchronizationStatus]);
+    }
 }

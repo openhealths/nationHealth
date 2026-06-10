@@ -7,7 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class ApprovalGrantedResourceTypes extends Model
+class ApprovalGrantedResourceType extends Model
 {
     protected $table = 'approval_granted_resource_types';
 
