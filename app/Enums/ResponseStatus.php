@@ -33,4 +33,14 @@ enum ResponseStatus: string
             ->values()
             ->all();
     }
+
+    public function code(): int
+    {
+        return match($this) {
+            self::SYNC => 201,
+            self::ASYNC => 202,
+            self::SUCCESS => 200,
+            self::NOT_FOUND => 404,
+        };
+    }
 }

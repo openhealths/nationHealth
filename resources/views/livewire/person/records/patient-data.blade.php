@@ -1,3 +1,4 @@
+@use('App\Models\Person')
 @use('App\Enums\Person\AuthenticationMethod')
 @use('App\Enums\Person\VerificationStatus as Status')
 
@@ -392,15 +393,28 @@
                 </div>
             </div>
 
-            <div class="mt-8">
-                <a
-                    href="{{ route('persons.update', [legalEntity(), $personId]) }}"
-                    class="inline-flex items-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+        <div class="flex items-center space-x-4 justify-between mt-8">
+            <a
+                href="{{ route('persons.update', [legalEntity(), $personId]) }}"
+                class="inline-flex items-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            >
+                {{ __('patients.edit_data') }}
+            </a>
+
+            @can('syncPersonData', Person::class)
+            <div>
+                <button wire:click.once="syncPersonDataFromEHealth()"
+                        type="button"
+                        class="flex items-center gap-2 button-primary"
                 >
-                    {{ __('patients.edit_data') }}
-                </a>
+                    {{ $isSyncing ? __('forms.sync_retry') : __('patients.sync_ehealth_data') }}
+                    @icon('refresh', 'w-4 h-4')
+                </button>
+                @include('livewire.person.parts.modals.person-update-authentication')
             </div>
+            @endcan
         </div>
+    </div>
 
         @if($showAuthMethodModal)
             @include('livewire.person.parts.modals.choose-auth-method')

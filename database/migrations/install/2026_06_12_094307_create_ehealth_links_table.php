@@ -23,7 +23,13 @@ return new class extends Migration
 
             $table->text('href')->nullable();
 
+            $table->json('error')->nullable()->comment('Error details if the link creation or processing failed');
+            $table->string('error_code')->nullable()->comment('Error code if the link creation or processing failed');
+            $table->enum('status', JobStatus::values())->default(JobStatus::PENDING)->nullable()->comment('Status of the link processing, e.g., pending, processed, failed');
+
             $table->timestamps();
+
+            $table->unique(['linkable_type', 'linkable_id', 'ehealth_job_id'], 'ehealth_links_linkable_job_unique');
         });
     }
 

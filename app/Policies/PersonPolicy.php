@@ -32,4 +32,16 @@ class PersonPolicy
 
         return Response::allow();
     }
+
+    /**
+     * Determine whether the user can sync the person data.
+     */
+    public function syncPersonData(User $user): Response
+    {
+        if ($user->can('personal_data:read') && $user->can('approval:create')) {
+            return Response::allow();
+        }
+
+        return Response::denyWithStatus(404);
+    }
 }

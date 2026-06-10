@@ -52,10 +52,6 @@
             @endcan
         </div>
 
-        @if ($isNeedToPersonUpdate)
-            @include('livewire.declaration.modals.person-missed-data-message')
-        @endif
-
         @if($showInformationMessageModal && !$isNeedToResign)
             @include('livewire.declaration.modals.information-message')
         @endif
@@ -66,6 +62,10 @@
 
         @if($showAuthModal && !$isNeedToResign)
             @include('livewire.declaration.modals.authentication')
+        @endif
+
+        @if ($isNeedToPersonUpdate)
+            @include('livewire.declaration.modals.person-missed-data-message')
         @endif
 
         @if($showUploadingDocumentsModal)

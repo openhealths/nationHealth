@@ -12,7 +12,7 @@ return new class extends Migration {
     {
         Schema::create('approvals', function (Blueprint $table) {
             $table->id();
-            $table->uuid('uuid')->unique();
+            $table->uuid('uuid')->unique()->nullable();
             
             // Polymorphic relation
             $table->morphs('approvable');

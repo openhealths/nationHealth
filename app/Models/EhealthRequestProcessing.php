@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class EhealthRequestProcessing extends Model
 {
     protected $fillable = [
+        'ehealth_link_id',
         'response_data'
     ];
 

@@ -197,6 +197,8 @@ return [
     'informed' => "інформація з пам'ятки повідомлена пацієнту",
     'reject' => 'Відхилити заявку',
     'print_leaflet_for_patient' => "Роздрукувати пам'ятку для ознайомлення пацієнтом",
+    'get_certificate' => 'Довідка',
+    'register_death' => 'Зареєструвати смерть',
 
     'status' => [
         // PERSON_VERIFICATION_STATUSES
