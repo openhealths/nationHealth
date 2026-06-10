@@ -27,7 +27,7 @@
     </x-header-navigation>
 
     <div class="form shift-content">
-        {{-- Search and Filters Section matching Figma --}}
+        {{-- Search and Filters Section --}}
         <div class="w-full mb-6" x-data="{ showAdditionalParams: $wire.entangle('showAdditionalParams') }">
             <div class="mb-4 flex items-center gap-1 font-semibold text-gray-900 dark:text-gray-100">
                 @icon('search-outline', 'w-4.5 h-4.5')
@@ -178,26 +178,23 @@
             </div>
         </div>
 
-        {{-- Plans List using Cards --}}
         <div class="space-y-4">
             @forelse($carePlans as $plan)
                 @php
                     /** @var \App\Models\CarePlan $plan */
                     $status = strtolower($plan->status ?? '');
-                    
+
                     $statusClass = 'badge-dark';
                     if (in_array($status, ['active', 'new'])) {
                         $statusClass = 'badge-green';
                     } elseif (in_array($status, ['draft', 'completed', 'revoked'])) {
                         $statusClass = 'badge-red';
                     }
-                    
-                    // Format dates
+
                     $created = $plan->created_at?->format(config('app.date_format', 'd.m.Y')) ?? '-';
                     $start = $plan->period_start?->format(config('app.date_format', 'd.m.Y')) ?? '-';
                     $end = $plan->period_end?->format(config('app.date_format', 'd.m.Y')) ?? '-';
-                    
-                    // Medical record number / Encounter identifier value
+
                     $medRecordNo = $plan->encounterIdentifier?->value ?? $plan->encounter?->uuid ?? $plan->requisition ?? $plan->encounter_id ?? '-';
                 @endphp
                 <div class="record-inner-card" wire:key="care-plan-{{ $plan->id }}">
