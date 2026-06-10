@@ -127,6 +127,12 @@ return [
         'COURT_DECISION' => 'Рішення суду',
         'DOCUMENT' => 'Документ'
     ],
+    
+    // patient update
+    'missed_patient_data' => 'Декларація не може бути створена, так як в ЕСОЗ відсутні дані, необхідні для роботи з декларацією.',
+    'patient_data_need_to_update' => 'МІС має оновити дані пацієнта відповідно до даних в ЕСОЗ для продовження роботи з декларацією.',
+    'patient_data_update' => 'Запросити відсутні дані пацієнта',
+    'patient_data_incomplete' => 'Дані пацієнта неповні',
 
     // patient search
     'patient_search' => 'Пошук пацієнта',

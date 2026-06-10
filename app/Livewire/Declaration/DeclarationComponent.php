@@ -55,6 +55,7 @@ abstract class DeclarationComponent extends Component
     public bool $showSignModal = false;
     public bool $showSignatureModal = false;
     public bool $showUploadingDocumentsModal = false;
+    public bool $showUpdatePersonDataModal = false;
 
     /**
      * Status of declaration request, that we use to determine which actions user can do with declaration request and which buttons show.
@@ -62,6 +63,8 @@ abstract class DeclarationComponent extends Component
      * @var Status
      */
     public Status $status = Status::DRAFT;
+
+    public bool $isNeedToPersonUpdate = false;
 
     /**
      * Check is patient sign form.
@@ -145,8 +148,13 @@ abstract class DeclarationComponent extends Component
     protected function baseMount(int $personId): void
     {
         $patient = Person::select(['uuid', 'first_name', 'last_name', 'second_name'])
+            ->withExists('documents')
             ->whereId($personId)
             ->firstOrFail();
+
+        // Use 'documents_exists' dynamic attribute (added by withExists) to determine if we need to update person data
+        $this->isNeedToPersonUpdate = !(bool) $patient->documents_exists;
+
         $this->patientFullName = $patient->fullName;
         $this->personId = $personId;
         $this->patientUuid = $patient->uuid;
@@ -198,6 +206,12 @@ abstract class DeclarationComponent extends Component
     public function create(): void
     {
         if (!$this->ensureAbility('create', __('declarations.policy.create'))) {
+            return;
+        }
+
+        if ($this->isNeedToPersonUpdate) {
+            $this->showUpdatePersonDataModal = true;
+
             return;
         }
 

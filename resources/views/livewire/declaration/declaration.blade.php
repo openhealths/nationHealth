@@ -40,6 +40,7 @@
                     }}"
                     type="submit"
                     class="button-primary"
+                    :disabled="$isNeedToUpdatePerson"
                 >
                     {{ $status === Status::NEW
                         ? __('declarations.approve_declaration_request')
@@ -51,6 +52,10 @@
                 </button>
             @endcan
         </div>
+
+        @if ($isNeedToPersonUpdate)
+            @include('livewire.declaration.modals.person-missed-data-message')
+        @endif
 
         @if($showInformationMessageModal && !$isNeedToResign)
             @include('livewire.declaration.modals.information-message')
