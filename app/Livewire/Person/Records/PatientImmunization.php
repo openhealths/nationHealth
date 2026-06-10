@@ -57,7 +57,7 @@ class PatientImmunization extends BasePatientComponent
 
     public string $filterDateTo = '';
 
-    public bool $showAdditionalParams = true;
+    public bool $showAdditionalParams = false;
 
     public string $syncStatus = '';
 

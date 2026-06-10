@@ -146,24 +146,7 @@
         </template>
 
         <template x-if="$wire.confidantPerson.length === 0">
-            <fieldset class="fieldset mx-auto">
-                <legend class="legend relative -top-5">@icon('nothing-found', 'w-28 h-28')</legend>
-                <div class="p-4 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-start mb-4">
-                    <div class="flex items-start gap-3">
-                        <div class="flex-shrink-0 mt-0.5">
-                            @icon('alert-circle', 'w-5 h-5 text-blue-500 dark:text-blue-400 mr-3 mt-1')
-                        </div>
-                        <div class="flex-1">
-                            <p class="font-bold text-blue-800 dark:text-blue-300">
-                                {{ __('forms.nothing_found') }}
-                            </p>
-                            <p class="text-sm text-blue-600 dark:text-blue-400">
-                                {{ __('forms.changing_search_parameters') }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </fieldset>
+            <x-nothing-found class="mx-auto" maxWidth="" />
         </template>
     </div>
 

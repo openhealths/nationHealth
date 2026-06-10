@@ -548,7 +548,15 @@
             </div>
 
             <div class="space-y-4">
-                @include('livewire.person.records.parts.clinical-impressions')
+                @if(count($this->clinicalImpressions) > 0)
+                    @include('livewire.person.records.parts.clinical-impressions')
+                @else
+                    <x-nothing-found :description="null" />
+                @endif
+            </div>
+
+            <div class="mt-8">
+                {{ $paginatedClinicalImpressions->links() }}
             </div>
         </div>
     </div>

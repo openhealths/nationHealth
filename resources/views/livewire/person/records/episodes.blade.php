@@ -189,7 +189,11 @@
             </div>
 
             <div class="space-y-4">
-                @include('livewire.person.records.parts.episodes', ['episodes' => $this->paginatedEpisodes->items()])
+                @if(count($this->paginatedEpisodes->items()) > 0)
+                    @include('livewire.person.records.parts.episodes', ['episodes' => $this->paginatedEpisodes->items()])
+                @else
+                    <x-nothing-found :description="null" />
+                @endif
             </div>
 
             <div class="mt-6">

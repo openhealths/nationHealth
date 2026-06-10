@@ -151,7 +151,7 @@
             </div>
 
             <div class="space-y-4">
-                @foreach($this->paginatedEncounters->items() as $encounter)
+                @forelse($this->paginatedEncounters->items() as $encounter)
                     <div class="record-inner-card" wire:key="encounter-{{ data_get($encounter, 'uuid') }}">
                         <div class="record-inner-header">
                             <div class="record-inner-checkbox-col">
@@ -283,7 +283,9 @@
                             </div>
                         </div>
                     </div>
-                @endforeach
+                @empty
+                    <x-nothing-found :description="null" />
+                @endforelse
 
                 <div class="mt-6">
                     {{ $this->paginatedEncounters->links() }}
