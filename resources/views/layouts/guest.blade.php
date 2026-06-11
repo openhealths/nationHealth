@@ -16,7 +16,7 @@
             @livewireStyles
         @endonce
 
-        @vite(['resources/css/app.css'])
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
 
         <script>
             // Flowbite's recommendation: On page load or when changing themes, best to add inline in `head` to avoid FOUC
@@ -29,6 +29,7 @@
     </head>
     <body>
         <div class="antialiased bg-white dark:bg-gray-800">
+            <x-forms.loading :global="true" />
             <main class="bg-gray-50 dark:bg-gray-900">
                 <div class="flex flex-col items-center justify-center px-6 mx-auto md:h-screen pt:mt-0 dark:bg-gray-900">
                     @hasSection('content')

@@ -29,6 +29,7 @@
 {{--    @stack('styles')--}}
 </head>
 <body id="body">
+<x-forms.loading :global="true" />
 <header id="header" class="logo bg-gray-800 py-1 px-3.5">
     <div class="lg:container mx-auto sm:w-full flex justify-between items-center">
         <!-- Left-aligned logo -->

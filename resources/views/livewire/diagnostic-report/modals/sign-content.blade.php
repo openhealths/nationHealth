@@ -41,11 +41,19 @@
                     </x-forms.label>
                 </x-slot>
                 <x-slot name="input">
-                    <x-forms.input class="default-input"
-                                   wire:model="file"
-                                   type="file"
-                                   id="keyContainerUpload"
-                    />
+                    <div x-data="{ fileName: '{{ __('forms.no_file_chosen') }}' }" class="file-input-wrapper">
+                        <label for="keyContainerUpload" class="file-input-button">
+                            {{ __('forms.choose_file') }}
+                        </label>
+                        <span class="file-input-text" x-text="fileName"></span>
+                        <input class="hidden"
+                               wire:model="file"
+                               type="file"
+                               id="keyContainerUpload"
+                               accept=".dat,.pfx,.pk8,.zs2,.jks,.p7s"
+                               @change="fileName = $event.target.files[0] ? $event.target.files[0].name : '{{ __('forms.no_file_chosen') }}'"
+                        />
+                    </div>
                 </x-slot>
 
                 @error("keyContainerUpload")

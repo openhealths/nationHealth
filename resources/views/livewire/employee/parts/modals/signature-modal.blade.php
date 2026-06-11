@@ -44,19 +44,23 @@
                                 </label>
                             </x-slot>
                             <x-slot name="input">
-                                <div class="file-input-wrapper">
+                                <div x-data="{ fileName: '{{ __('forms.no_file_chosen') }}' }" 
+                                     x-effect="if (!showSignatureModal) { fileName = '{{ __('forms.no_file_chosen') }}'; if ($refs.keyContainerUpload) $refs.keyContainerUpload.value = ''; }"
+                                     class="file-input-wrapper"
+                                >
                                     <label for="keyContainerUpload" class="file-input-button">
                                         {{ __('forms.choose_file') }}
                                     </label>
-                                    <span class="file-input-text">
-                                        {{ __('forms.no_file_chosen') }}
-                                    </span>
+                                    <span class="file-input-text" x-text="fileName"></span>
                                     <input
                                         id="keyContainerUpload"
                                         type="file"
                                         class="hidden"
+                                        accept=".dat,.pfx,.pk8,.zs2,.jks,.p7s"
+                                        x-ref="keyContainerUpload"
                                         aria-describedby="file_help"
                                         wire:model="form.keyContainerUpload"
+                                        @change="fileName = $event.target.files[0] ? $event.target.files[0].name : '{{ __('forms.no_file_chosen') }}'"
                                     >
                                 </div>
                                 <div class="mt-1 text-sm text-gray-500 dark:text-gray-300" id="file_help">{{ __('forms.key_file_description') ?? 'Upload your key file to sign the document.' }}</div>
@@ -72,14 +76,14 @@
                             @error("form.password")<x-forms.error>{{ $message }}</x-forms.error>@enderror
                         </x-forms.form-group>
                     </div>
-                </div>
 
-                <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 pt-6">
-                    <button type="button" @click="showSignatureModal = false" class="button-minor">{{__('forms.cancel')}}</button>
-                    <button wire:click="sign" type="button" class="button-primary" wire:loading.attr="disabled" wire:target="sign">
-                        <span wire:loading.remove wire:target="sign">{{ __('forms.sign') }}</span>
-                        <span wire:loading wire:target="sign">{{ __('general.loading') }}</span>
-                    </button>
+                    <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 pt-6">
+                        <button type="button" @click="showSignatureModal = false" class="button-minor">{{__('forms.cancel')}}</button>
+                        <button wire:click="sign" type="button" class="button-primary" wire:loading.attr="disabled" wire:target="sign">
+                            <span wire:loading.remove wire:target="sign">{{ __('forms.sign') }}</span>
+                            <span wire:loading wire:target="sign">{{ __('general.loading') }}</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

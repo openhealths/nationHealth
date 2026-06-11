@@ -1,7 +1,11 @@
 @props(['method'])
 
 <template x-teleport="body">
-    <div x-data="{ showSignatureModal: $wire.entangle('showSignatureModal') }"
+    <div x-data="{ 
+            showSignatureModal: $wire.entangle('showSignatureModal'), 
+            fileName: '{{ __('forms.no_file_chosen') }}' 
+         }"
+         x-effect="if (!showSignatureModal) { fileName = '{{ __('forms.no_file_chosen') }}'; if ($refs.keyContainerUpload) $refs.keyContainerUpload.value = ''; }"
          x-show="showSignatureModal"
          x-cloak
          role="dialog"
@@ -47,13 +51,21 @@
                                 <label for="keyContainerUpload" class="default-label">
                                     {{ __('forms.key_container_upload') }} *
                                 </label>
-                                <input type="file"
-                                       wire:model="form.keyContainerUpload"
-                                       class="default-input cursor-pointer"
-                                       id="keyContainerUpload"
-                                       name="keyContainerUpload"
-                                       accept=".dat,.pfx,.pk8,.zs2,.jks,.p7s"
-                                >
+                                <div class="file-input-wrapper">
+                                    <label for="keyContainerUpload" class="file-input-button">
+                                        {{ __('forms.choose_file') }}
+                                    </label>
+                                    <span class="file-input-text" x-text="fileName"></span>
+                                    <input type="file"
+                                           wire:model="form.keyContainerUpload"
+                                           class="hidden"
+                                           id="keyContainerUpload"
+                                           name="keyContainerUpload"
+                                           x-ref="keyContainerUpload"
+                                           accept=".dat,.pfx,.pk8,.zs2,.jks,.p7s"
+                                           @change="fileName = $event.target.files[0] ? $event.target.files[0].name : '{{ __('forms.no_file_chosen') }}'"
+                                    >
+                                </div>
                                 <div wire:loading
                                      wire:target="form.keyContainerUpload"
                                      class="text-sm text-gray-500 mt-2"
@@ -79,22 +91,22 @@
                             </div>
                         </div>
                     </form>
-                </div>
 
-                <div class="modal-footer">
-                    <button type="button" @click="showSignatureModal = false" class="button-minor">
-                        {{ __('forms.cancel') }}
-                    </button>
-                    <button wire:click="{{ $method }}"
-                            type="button"
-                            class="button-primary"
-                            wire:loading.attr="disabled"
-                            wire:loading.class="opacity-50 cursor-not-allowed"
-                            wire:target="{{ $method }}"
-                    >
-                        <span wire:loading.remove wire:target="{{ $method }}">{{ __('forms.sign') }}</span>
-                        <span wire:loading wire:target="{{ $method }}">{{ __('forms.signature') }}...</span>
-                    </button>
+                    <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 pt-6">
+                        <button type="button" @click="showSignatureModal = false" class="button-minor">
+                            {{ __('forms.cancel') }}
+                        </button>
+                        <button wire:click="{{ $method }}"
+                                type="button"
+                                class="button-primary"
+                                wire:loading.attr="disabled"
+                                wire:loading.class="opacity-50 cursor-not-allowed"
+                                wire:target="{{ $method }}"
+                        >
+                            <span wire:loading.remove wire:target="{{ $method }}">{{ __('forms.sign') }}</span>
+                            <span wire:loading wire:target="{{ $method }}">{{ __('forms.signature') }}...</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

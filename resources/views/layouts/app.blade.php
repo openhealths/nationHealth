@@ -29,6 +29,7 @@
 
     <body>
         <div class="antialiased bg-white dark:bg-gray-800">
+            <x-forms.loading :global="true" />
 
             @livewire('components.header')
 
