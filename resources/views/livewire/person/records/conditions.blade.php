@@ -100,20 +100,25 @@
 
             <div class="mb-9 flex flex-wrap items-center justify-between gap-4">
                 <div class="flex flex-wrap gap-2">
-                    <button type="button" wire:click="search"
-                            class="flex items-center gap-2 button-primary px-5 py-2.5 text-sm shadow-sm"
+                    <button
+                        type="button"
+                        wire:click="search"
+                        class="flex items-center gap-2 button-primary px-5 py-2.5 text-sm shadow-sm"
                     >
                         @icon('search', 'w-4 h-4')
                         <span>{{ __('patients.search') }}</span>
                     </button>
-                    <button type="button" wire:click="resetFilters"
-                            class="button-primary-outline-red px-5 py-2.5 text-sm"
+                    <button
+                        type="button"
+                        wire:click="resetFilters"
+                        class="button-primary-outline-red px-5 py-2.5 text-sm"
                     >
                         {{ __('patients.reset_filters') }}
                     </button>
-                    <button type="button"
-                            class="flex items-center gap-2 button-minor px-5 py-2.5 text-sm whitespace-nowrap"
-                            @click.prevent="showAdditionalParams = !showAdditionalParams"
+                    <button
+                        type="button"
+                        class="flex items-center gap-2 button-minor px-5 py-2.5 text-sm whitespace-nowrap"
+                        @click.prevent="showAdditionalParams = !showAdditionalParams"
                     >
                         @icon('adjustments', 'w-4 h-4 text-gray-500')
                         <span>{{ __('patients.additional_params') }}</span>
@@ -406,6 +411,7 @@
                     <x-nothing-found :description="null" />
                 @endforelse
             </div>
+
             <div class="mt-8">
                 {{ $this->paginatedConditions->links() }}
             </div>
