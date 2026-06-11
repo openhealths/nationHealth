@@ -38,6 +38,7 @@
                 <div class="form-group group">
                     <div class="relative">
                         <input wire:model="searchRequisition"
+                               wire:keydown.enter="search"
                                type="text"
                                name="searchRequisition"
                                id="searchRequisition"
@@ -102,6 +103,7 @@
                     <div class="form-group group">
                         <div class="datepicker-wrapper">
                             <input wire:model="filterStartDateRange"
+                                   wire:keydown.enter="search"
                                    type="text"
                                    name="filterStartDateRange"
                                    id="filterStartDateRange"
@@ -118,6 +120,7 @@
                     <div class="form-group group">
                         <div class="datepicker-wrapper">
                             <input wire:model="filterEndDateRange"
+                                   wire:keydown.enter="search"
                                    type="text"
                                    name="filterEndDateRange"
                                    id="filterEndDateRange"
@@ -136,6 +139,7 @@
                     <div class="form-group group">
                         <div class="relative">
                             <input wire:model="filterIsPartOf"
+                                   wire:keydown.enter="search"
                                    type="text"
                                    name="filterIsPartOf"
                                    id="filterIsPartOf"
@@ -157,6 +161,7 @@
                     <div class="form-group group">
                         <div class="relative">
                             <input wire:model="filterIncludes"
+                                   wire:keydown.enter="search"
                                    type="text"
                                    name="filterIncludes"
                                    id="filterIncludes"
@@ -185,9 +190,9 @@
                     $status = strtolower($plan->status ?? '');
 
                     $statusClass = 'badge-dark';
-                    if (in_array($status, ['active', 'new'])) {
+                    if (in_array($status, ['active', 'new', 'completed'])) {
                         $statusClass = 'badge-green';
-                    } elseif (in_array($status, ['draft', 'completed', 'revoked'])) {
+                    } elseif (in_array($status, ['draft', 'revoked'])) {
                         $statusClass = 'badge-red';
                     }
 
@@ -199,14 +204,13 @@
                 @endphp
                 <div class="record-inner-card" wire:key="care-plan-{{ $plan->id }}">
                     <div class="record-inner-header">
-                        <div class="record-inner-checkbox-col">
-                            <input type="checkbox" class="default-checkbox w-5 h-5">
-                        </div>
-
                         <div class="record-inner-column flex-1">
                             <div class="record-inner-label">{{ __('forms.name') }}</div>
                             <div class="record-inner-value text-[17px] font-semibold text-gray-900 dark:text-gray-100">
                                 {{ $plan->title }}
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1.5 dark:text-gray-400">
+                                {{ __('care-plan.patient') }}: {{ $plan->person?->last_name }} {{ $plan->person?->first_name }}
                             </div>
                         </div>
 
