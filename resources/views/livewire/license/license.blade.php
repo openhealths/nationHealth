@@ -49,11 +49,11 @@
          @click.away="open = false"
     >
         <div class="relative w-full">
-            <div class="input-select peer cursor-pointer whitespace-normal break-words min-h-[48px] px-3 py-2 pr-10"
+            <div class="input-select peer cursor-pointer whitespace-normal wrap-break-word min-h-12 px-3 py-2 pr-10"
                  @click="open = !open"
                  :class="{ 'ring-1 ring-blue-500 border-blue-500': open }"
             >
-                <span x-text="selected || 'Оберіть тип ліцензії'"></span>
+                <span x-text="selected || @js(__('licenses.type.placeholder'))"></span>
                 <span
                     class="absolute right-3 top-1/2 w-2 h-2 border-r-2 border-b-2 border-gray-500 dark:border-gray-400 transform -translate-y-1/2 rotate-45 pointer-events-none"></span>
             </div>

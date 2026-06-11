@@ -29,7 +29,7 @@ class LicenseEdit extends LicenseComponent
     public function update(): void
     {
         if (Auth::user()->cannot('update', License::whereUuid($this->uuid)->first())) {
-            Session::flash('error', 'У вас немає дозволу на оновлення ліцензії');
+            Session::flash('error', __('licenses.policy.update'));
 
             return;
         }

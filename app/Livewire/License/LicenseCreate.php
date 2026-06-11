@@ -24,7 +24,7 @@ class LicenseCreate extends LicenseComponent
     public function create(): void
     {
         if (Auth::user()->cannot('create', License::class)) {
-            Session::flash('error', 'У вас немає дозволу на створення ліцензії');
+            Session::flash('error', __('licenses.policy.create'));
 
             return;
         }
@@ -39,7 +39,7 @@ class LicenseCreate extends LicenseComponent
         }
 
         try {
-            $response = EHealth::license()->create(data: $this->form->formatForApi($validated));
+            $response = EHealth::license()->create($this->form->formatForApi($validated));
 
             try {
                 $validated = $response->validate();

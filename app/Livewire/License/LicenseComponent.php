@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\License;
 
+use App\Models\LegalEntity;
 use App\Traits\FormTrait;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -24,7 +25,7 @@ abstract class LicenseComponent extends Component
     {
         $this->licenseTypes = dictionary()->basics()->byName('LICENSE_TYPE')->asCodeDescription()->toArray();
 
-        if (legalEntity()->type->name === 'OUTPATIENT' || legalEntity()->type->name === 'PHARMACY') {
+        if (legalEntity()->type->name === LegalEntity::TYPE_OUTPATIENT || legalEntity()->type->name === LegalEntity::TYPE_PHARMACY) {
             $this->licenseTypes = ['PHARMACY_DRUGS' => $this->licenseTypes['PHARMACY_DRUGS']];
         }
     }

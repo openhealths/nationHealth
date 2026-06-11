@@ -28,7 +28,7 @@
     </x-header-navigation>
 
     <div class="flow-root mt-8 shift-content pl-3.5" wire:key="{{ time() }}">
-        <div class="max-w-screen-xl">
+        <div class="max-w-7xl">
             @if($licenses->isNotEmpty())
                 <div class="index-table-wrapper">
                     <table class="index-table">

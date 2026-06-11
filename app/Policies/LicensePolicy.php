@@ -77,7 +77,7 @@ class LicensePolicy
         }
 
         // The additional license can be created for legal entities with an active primary license.
-        if (!legalEntity()?->hasActivePrimaryLicense()) {
+        if (!legalEntity()->hasActivePrimaryLicense()) {
             return Response::denyWithStatus(404);
         }
 
@@ -109,7 +109,7 @@ class LicensePolicy
 
         // Can't write to the main license
         if ($currentLicense->isPrimary) {
-            return Response::denyWithStatus(403, __('errors.policy.licence.primary_not_editable'));
+            return Response::denyWithStatus(403, __('licenses.policy.primary_not_editable'));
         }
 
         return Response::allow();

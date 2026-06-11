@@ -62,7 +62,7 @@ class LicenseIndex extends Component
             return;
         }
 
-        legalEntity()?->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_LICENSE);
+        legalEntity()->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_LICENSE);
 
         Session::flash('success', __('licenses.success.sync'));
     }
