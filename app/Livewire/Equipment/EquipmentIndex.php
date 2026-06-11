@@ -95,8 +95,6 @@ class EquipmentIndex extends Component
 
     public array $dictionaryNames = ['device_definition_classification_type', 'equipment_status_reasons'];
 
-    private LegalEntity $legalEntity;
-
     #[Computed]
     public function isSync(): bool
     {
@@ -110,7 +108,7 @@ class EquipmentIndex extends Component
      */
     protected function getSyncStatus(): string
     {
-        return legalEntity()?->getEntityStatus(LegalEntity::ENTITY_EQUIPMENT) ?? '';
+        return legalEntity()->getEntityStatus(LegalEntity::ENTITY_EQUIPMENT) ?? '';
     }
 
     /**
@@ -121,7 +119,7 @@ class EquipmentIndex extends Component
     protected function isSyncProcessing(): bool
     {
         // Get the sync status for whole Legal Entity
-        $legalEntitySyncStatus = legalEntity()?->getEntityStatus();
+        $legalEntitySyncStatus = legalEntity()->getEntityStatus();
 
         // Set the sync status only for Equipment
         $this->syncStatus = $this->getSyncStatus();
@@ -130,13 +128,13 @@ class EquipmentIndex extends Component
         $legalEntitySync = $this->isEntitySyncIsInProgress($legalEntitySyncStatus, true);
 
         // Get the sync status only for Division
-        $divisionSyncStatus = legalEntity()?->getEntityStatus(LegalEntity::ENTITY_DIVISION);
+        $divisionSyncStatus = legalEntity()->getEntityStatus(LegalEntity::ENTITY_DIVISION);
 
         // Get the sync status only for HealthCare Service
-        $healthCareServiceSyncStatus = legalEntity()?->getEntityStatus(LegalEntity::ENTITY_HEALTHCARE_SERVICE);
+        $healthCareServiceSyncStatus = legalEntity()->getEntityStatus(LegalEntity::ENTITY_HEALTHCARE_SERVICE);
 
         // Get the sync status only for HealthCare Service
-        $employeeSyncStatus = legalEntity()?->getEntityStatus(LegalEntity::ENTITY_EMPLOYEE);
+        $employeeSyncStatus = legalEntity()->getEntityStatus(LegalEntity::ENTITY_EMPLOYEE);
 
         // Determine if either the Equipment's sync is in progress
         $equipmentSync = $this->isEntitySyncIsInProgress($this->syncStatus);
@@ -183,7 +181,13 @@ class EquipmentIndex extends Component
 
     public function resetFilters(): void
     {
-        $this->reset();
+        $this->reset([
+            'searchByName',
+            'typeFilter',
+            'divisionFilter',
+            'isFiltersApplied'
+        ]);
+
         $this->statusFilter = Status::values();
         $this->availabilityStatusFilter = AvailabilityStatus::values();
     }
@@ -191,13 +195,13 @@ class EquipmentIndex extends Component
     public function sync(): void
     {
         if (Auth::user()->cannot('sync', Equipment::class)) {
-            Session::flash('error', 'У вас немає дозволу на синхронізацію обладнань');
+            Session::flash('error', __('equipments.policy.sync'));
 
             return;
         }
 
         if ($this->isSyncProcessing()) {
-            Session::flash('error', 'Синхронізація вже запущена. Будь ласка, зачекайте її завершення.');
+            Session::flash('error', __('forms.errors.sync_already_running'));
 
             return;
         }
@@ -209,7 +213,7 @@ class EquipmentIndex extends Component
         if ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value) {
             $this->resumeSynchronization($user, $token);
 
-            Session::flash('success', __('Відновлення попередньої синхронізації розпочато'));
+            Session::flash('success', __('forms.success.sync_resumed'));
 
             $user->notify(new SyncNotification('equipment', 'resumed'));
 
@@ -232,7 +236,7 @@ class EquipmentIndex extends Component
             $this->handleDatabaseErrors(
                 $exception,
                 'Error while synchronizing equipments with eHealth: ',
-                'Виникла помилка. Оновіть список місць надання послуг та співробітників і спробуйте ще раз'
+                __('equipments.errors.sync_failed')
             );
 
             return;
@@ -250,7 +254,7 @@ class EquipmentIndex extends Component
                 $user->notify(new SyncNotification('equipment', 'failed'));
             }
         } else {
-            legalEntity()?->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_EQUIPMENT);
+            legalEntity()->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_EQUIPMENT);
 
             Session::flash('success', __('forms.success.updated'));
         }
@@ -277,7 +281,7 @@ class EquipmentIndex extends Component
             if ($batch->name === self::BATCH_NAME) {
                 Log::info('Resuming Equipment sync batch: ' . $batch->name . ' id: ' . $batch->id);
 
-                legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_EQUIPMENT);
+                legalEntity()->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_EQUIPMENT);
 
                 $this->restartBatch($batch, $user, $encryptedToken, legalEntity());
 
@@ -296,9 +300,9 @@ class EquipmentIndex extends Component
             if (!empty($this->searchByName)) {
                 $query->where(function (Builder $searchQuery) {
                     $searchQuery->whereHas('names', function (Builder $nameQuery) {
-                        $nameQuery->where('name', 'ILIKE', "%$this->searchByName%");
+                        $nameQuery->whereLike('name', "%$this->searchByName%");
                     })
-                        ->orWhere('inventory_number', 'ILIKE', "%$this->searchByName%");
+                        ->orWhereLike('inventory_number', "%$this->searchByName%");
                 });
             }
 
@@ -327,6 +331,8 @@ class EquipmentIndex extends Component
     /**
      * Dispatch next sync jobs for remaining pages.
      *
+     * @param  User  $user
+     * @param  string  $token
      * @return void
      * @throws Throwable
      */
@@ -349,7 +355,7 @@ class EquipmentIndex extends Component
             ->name(self::BATCH_NAME)
             ->dispatch();
 
-        legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_EQUIPMENT);
+        legalEntity()->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_EQUIPMENT);
     }
 
     public function render(): View

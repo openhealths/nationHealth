@@ -224,7 +224,7 @@ class HealthcareServiceIndex extends Component
     public function sync(): void
     {
         if ($this->isSyncProcessing()) {
-            Session::flash('error', __('healthcare-services.error.sync_in_progress'));
+            Session::flash('error', __('forms.errors.sync_already_running'));
 
             return;
         }
@@ -242,7 +242,7 @@ class HealthcareServiceIndex extends Component
         if ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value) {
             $this->resumeSynchronization($user, $token);
 
-            Session::flash('success', __('healthcare-services.success.sync_resumed'));
+            Session::flash('success', __('forms.success.sync_resumed'));
 
             $user->notify(new SyncNotification('healthcare_service', 'resumed'));
 

@@ -138,7 +138,7 @@ trait StatusTrait
                 new InDictionary('equipment_availability_statuses'),
                 function ($attribute, $value, $fail) use ($equipment) {
                     if ($value === $equipment->availabilityStatus->value) {
-                        $fail(__('Новий статус доступності повинен відрізнятися від поточного.'));
+                        $fail(__('equipments.validation.availability_status_unchanged'));
                     }
                 }
             ]

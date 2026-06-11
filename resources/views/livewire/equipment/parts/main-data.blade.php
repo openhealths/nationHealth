@@ -76,20 +76,17 @@
         </template>
     </div>
 
-    <div class="form-row-2 mt-6">
-        <div class="form-group group">
-            <select wire:model="form.type"
-                    name="typeMedicalDevice"
-                    id="typeMedicalDevice"
-                    required
-                    class="peer input-select"
-            >
-                <option value="" selected>{{ __('forms.select') }}</option>
-                @foreach($this->dictionaries['device_definition_classification_type'] as $key => $type)
-                    <option value="{{ $key }}">{{ $type }}</option>
-                @endforeach
-            </select>
-            <label for="typeMedicalDevice" class="label peer-focus:text-blue-600 peer-valid:text-blue-600">
+    <div class="form-row-2 mt-6 relative z-10">
+        <div class="form-group group"
+             x-data="{ type: $wire.entangle('form.type') }"
+        >
+            <x-select2 modelPath="type"
+                       dictionaryName="device_definition_classification_type"
+                       id="typeMedicalDevice"
+                       name="typeMedicalDevice"
+                       class="input peer"
+            />
+            <label for="typeMedicalDevice" class="label">
                 {{ __('equipments.type_medical_device') }}
             </label>
 

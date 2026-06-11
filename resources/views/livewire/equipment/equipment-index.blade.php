@@ -36,7 +36,7 @@
                 <div class="flex mb-4 flex-col lg:flex-row items-stretch lg:items-end gap-2 lg:gap-4 w-full">
                     <div class="w-full lg:w-96">
                         <label for="searchByName"
-                               class="text-sm font-medium text-gray-900 dark:text-white block mb-2 flex items-center gap-1"
+                               class="text-sm font-medium text-gray-900 dark:text-white block mb-2 items-center gap-1"
                         >
                             @icon('search-outline', 'w-4.5 h-4.5')
                             <span>{{ __('equipments.search') }}</span>
@@ -57,7 +57,7 @@
                     </div>
 
                     <button @click="showFilter = !showFilter"
-                            class="button-minor flex items-center justify-center gap-2 w-full lg:w-auto self-stretch lg:self-auto lg:-translate-y-[9px]"
+                            class="button-minor flex items-center justify-center gap-2 w-full lg:w-auto self-stretch lg:self-auto lg:-translate-y-2.25"
                     >
                         @icon('adjustments', 'w-4 h-4')
                         <span>{{ __('forms.additional_search_parameters') }}</span>
@@ -229,7 +229,7 @@
     <div class="flow-root mt-8 shift-content pl-3.5"
          wire:key="equipments-table-page-{{ $equipments->total() }}-{{ $equipments->currentPage() }}"
     >
-        <div class="max-w-screen-xl">
+        <div class="max-w-7xl">
             @if($equipments->isNotEmpty())
                 <div class="index-table-wrapper">
                     <table class="index-table">
@@ -320,7 +320,7 @@
                                                  x-transition.origin.top.left
                                                  @click.outside="close($refs.button)"
                                                  :id="$id('dropdown-button')"
-                                                 class="absolute right-0 mt-2 w-auto min-w-[10rem] max-w-[20rem] rounded-md bg-white shadow-md z-50"
+                                                 class="absolute right-0 mt-2 w-auto min-w-40 max-w-[20rem] rounded-md bg-white shadow-md z-50"
                                             >
                                                 @if ($equipment->status === Status::ACTIVE || $equipment->status === Status::INACTIVE)
                                                     @can('view', $equipment)

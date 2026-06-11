@@ -331,7 +331,7 @@ class LegalEntityDetails extends LegalEntityComponent
         }
 
         if ($this->isSyncProcessing()) {
-            Session::flash('error', 'Синхронізація вже запущена. Будь ласка, зачекайте її завершення.');
+            Session::flash('error', __('forms.errors.sync_already_running'));
 
             return;
         }
@@ -344,7 +344,7 @@ class LegalEntityDetails extends LegalEntityComponent
 
             $this->resumeSynchronization($user, $token);
 
-            Session::flash('success', __('Відновлення попередньої синхронізації розпочато'));
+            Session::flash('success', __('forms.success.sync_resumed'));
 
             $user->notify(new SyncNotification('legal_entity', 'resumed'));
 

@@ -181,7 +181,7 @@ class EmployeeRoleIndex extends Component
         }
 
         if ($this->isSyncProcessing()) {
-            Session::flash('error', 'Синхронізація вже запущена. Будь ласка, зачекайте її завершення.');
+            Session::flash('error', __('forms.errors.sync_already_running'));
 
             return;
         }
@@ -192,7 +192,7 @@ class EmployeeRoleIndex extends Component
         if ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value) {
             $this->resumeSynchronization($user, $token);
 
-            Session::flash('success', __('Відновлення попередньої синхронізації розпочато'));
+            Session::flash('success', __('forms.success.sync_resumed'));
 
             $user->notify(new SyncNotification('employee_role', 'resumed'));
 

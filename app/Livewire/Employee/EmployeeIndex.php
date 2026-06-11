@@ -381,7 +381,7 @@ class EmployeeIndex extends EmployeeComponent
     public function sync(): void
     {
         if ($this->isSyncProcessing()) {
-            Session::flash('error', 'Синхронізація вже запущена. Будь ласка, зачекайте її завершення.');
+            Session::flash('error', __('forms.errors.sync_already_running'));
 
             return;
         }
@@ -526,7 +526,7 @@ class EmployeeIndex extends EmployeeComponent
                 $this->restartBatch($batch, $user, $encryptedToken, legalEntity());
 
                 $this->dispatch('flashMessage', [
-                    'message' => __('Відновлення попередньої синхронізації розпочато'),
+                    'message' => __('forms.success.sync_resumed'),
                     'type' => 'success'
                 ]);
 
