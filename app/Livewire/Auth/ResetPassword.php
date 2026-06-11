@@ -51,7 +51,8 @@ class ResetPassword extends Component
             $data,
             function ($user) {
                 $user->forceFill([
-                    'password' => Hash::make($this->password)
+                    'password' => Hash::make($this->password),
+                    'must_change_password' => false,
                 ])->save();
 
                 event(new PasswordReset($user));
@@ -63,7 +64,7 @@ class ResetPassword extends Component
          * the application's home authenticated view. If there is an error we can
          * redirect them back to where they came from with their error message.
          */
-        if ($status != Password::PasswordReset) {
+        if ($status != Password::PASSWORD_RESET) {
             Log::error('Reset password:', ['email' => $this->email, 'status' => __($status)]);
 
             session()->flash('error', __('auth.login.error.reset_password'));

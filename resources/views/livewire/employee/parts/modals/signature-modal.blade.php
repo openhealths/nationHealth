@@ -59,7 +59,7 @@
                                         wire:model="form.keyContainerUpload"
                                     >
                                 </div>
-{{--                                <div class="mt-1 text-sm text-gray-500 dark:text-gray-300" id="file_help">{{ __('forms.key_file_description') ?? 'Upload your key file to sign the document.' }}</div>--}}
+                                <div class="mt-1 text-sm text-gray-500 dark:text-gray-300" id="file_help">{{ __('forms.key_file_description') ?? 'Upload your key file to sign the document.' }}</div>
                                 <div wire:loading wire:target="form.keyContainerUpload" class="text-sm text-gray-500 mt-2">Uploading...</div>
                             </x-slot>
                             @error("form.keyContainerUpload")<x-forms.error>{{ $message }}</x-forms.error>@enderror

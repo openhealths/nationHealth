@@ -13,10 +13,10 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use App\Events\EHealthUserLogin;
 use App\Mail\UserCredentialsMail;
-use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Session;
@@ -211,13 +211,21 @@ class EHealthLoginController extends Controller
         if (!$user) {
             $password = Str::random(8);
 
-            // When the user try login to eHealth directly without having a local user account
             $user = User::forceCreate([
                 'uuid' => $ehealthUserId,
                 'email' => $ehealthEmail,
                 'password' => Hash::make($password),
-                'inserted_at' => Carbon::parse($ehealthInsertedAt)->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
-                'email_verified_at' => now()
+                'inserted_at' => Carbon::parse($ehealthInsertedAt)
+                    ->setTimezone(config('app.timezone'))
+                    ->format('Y-m-d H:i:s'),
+                'email_verified_at' => now(),
+                'must_change_password' => true,
+            ]);
+
+            Log::info('Local user account was created during eHealth login.', [
+                'user_id' => $user->id,
+                'email' => $ehealthEmail,
+                'ehealth_user_id' => $ehealthUserId,
             ]);
 
             try {

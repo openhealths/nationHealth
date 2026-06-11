@@ -66,7 +66,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'password',
         'secret_key',
         'party_id',
-        'inserted_at'
+        'inserted_at',
+        'must_change_password',
     ];
 
     /**
@@ -87,7 +88,8 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'two_factor_code_expires_at' => 'immutable_datetime'
+        'two_factor_code_expires_at' => 'immutable_datetime',
+        'must_change_password' => 'boolean'
     ];
 
     /**

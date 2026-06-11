@@ -18,18 +18,23 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\Employee\BaseEmployee;
 use App\Models\Employee\Employee;
 use App\Models\Employee\EmployeeRequest;
+use App\Repositories\Repository;
 use App\Models\LegalEntity;
 use App\Models\Revision;
 use App\Models\User;
 use Auth;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\WithFileUploads;
+use App\Mail\UserCredentialsMail;
 use RuntimeException;
 use Throwable;
 
@@ -136,6 +141,8 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
 
             $this->updateLocalRecords($requestToSign, $validatedData);
 
+            $this->createLocalUserForEmployeeRequest($requestToSign);
+
             session()?->flash('success', __('employees.sign_success'));
             $this->resetSignatureFields();
             Log::info('Successfully signed and will redirect.');
@@ -154,6 +161,65 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
 
             $this->dispatch('flashMessage', ['message' => __('errors.unexpected_error'), 'type' => 'error', 'persistent' => true]);
             $this->dispatch('close-signature-modal');
+        }
+    }
+
+    protected function createLocalUserForEmployeeRequest(EmployeeRequest $employeeRequest): void
+    {
+        $email = $employeeRequest->email;
+
+        if (empty($email)) {
+            Log::warning('Employee request user was not created because email is empty.', [
+                'employee_request_id' => $employeeRequest->id,
+            ]);
+
+            return;
+        }
+
+        $existingUser = User::where('email', $email)->first();
+
+        if ($existingUser) {
+            $employeeRequest->update([
+                'user_id' => $existingUser->id,
+            ]);
+
+            Log::info('Employee request linked to existing user. Credentials email was not sent.', [
+                'employee_request_id' => $employeeRequest->id,
+                'user_id' => $existingUser->id,
+                'email' => $email,
+            ]);
+
+            return;
+        }
+
+        $password = Str::random(8);
+
+        $user = User::forceCreate([
+            'email' => $email,
+            'password' => Hash::make($password),
+            'email_verified_at' => now(),
+            'must_change_password' => true,
+        ]);
+
+        $employeeRequest->update([
+            'user_id' => $user->id,
+        ]);
+
+        try {
+            Mail::to($user->email)->send(new UserCredentialsMail($user->email, $password));
+
+            Log::info('Employee request user credentials email sent.', [
+                'employee_request_id' => $employeeRequest->id,
+                'user_id' => $user->id,
+                'email' => $user->email,
+            ]);
+        } catch (Exception $e) {
+            Log::error('Failed to send credentials email to user.', [
+                'employee_request_id' => $employeeRequest->id,
+                'user_id' => $user->id,
+                'user_email' => $user->email,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
@@ -271,7 +337,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $errorCode === 422 && str_contains($errorMessage, 'tax_id')
             => __('errors.ehealth.messages.tax_id_exists'),
 
-            default => $e->getTranslatedMessage()
+            default => $errorMessage
         };
 
         $this->dispatch('flashMessage', [

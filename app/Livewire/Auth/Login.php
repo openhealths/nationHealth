@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Features\SupportRedirects\Redirector;
@@ -85,6 +86,18 @@ class Login extends Component
         $key = $this->throttleKey();
 
         $credentials = $this->validate();
+
+        $user = User::where('email', $credentials['email'])->first();
+
+        if ($user && $user->mustChangePassword) {
+            $this->clearLoginAttempts();
+            $token = Password::createToken($user);
+        
+            return redirect()->route('password.reset', [
+                'token' => $token,
+                'email' => $user->email,
+            ]);
+        }
 
         // This need to avoid further user authentication for local auth
         if (!empty($this->legalEntityUuid)) {
