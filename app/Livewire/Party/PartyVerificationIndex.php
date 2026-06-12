@@ -41,16 +41,13 @@ class PartyVerificationIndex extends Component
     {
         $token = session()->get(config('ehealth.api.oauth.bearer_token'));
 
-        $filters = [];
-
-        if (!empty($this->dracsDeathStatus)) {
-            $filters['dracs_death_verification_status'] = $this->dracsDeathStatus;
-        }
-
-        // Запит тепер має проходити без 422 Unprocessable Entity
+        // We do not pass dracs_death_verification_status to the eHealth API as it is not supported
+        // and results in a 422 validation error. Instead, we perform the filtering locally.
+        // We always fetch the first page from the API (with default page size 300) to get all entries,
+        // then slice the collection locally.
         $apiResponse = EHealth::party()
             ->withToken($token)
-            ->getMany($filters, $this->getPage());
+            ->getMany([], 1);
 
         $apiData = $apiResponse->json();
         $paging = $apiData['paging'] ?? [];
@@ -79,12 +76,20 @@ class PartyVerificationIndex extends Component
             return $item;
         })->filter()->values();
 
+        if (!empty($this->dracsDeathStatus)) {
+            $mergedItems = $mergedItems->filter(function ($item) {
+                return data_get($item, 'details.dracs_death.verification_status') === $this->dracsDeathStatus;
+            })->values();
+        }
+
         $perPage = 50;
 
-        $total = $totalFromApi ?: ($this->getPage() * $perPage + ($mergedItems->count() < $perPage ? 0 : 1));
+        $total = $mergedItems->count();
+
+        $currentPageItems = $mergedItems->slice(($this->getPage() - 1) * $perPage, $perPage)->values();
 
         $paginator = new LengthAwarePaginator(
-            $mergedItems,
+            $currentPageItems,
             $total,
             $perPage,
             $this->getPage(),

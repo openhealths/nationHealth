@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 namespace App\Repositories;
- 
+
 use App\Enums\CarePlanStatus;
 use App\Classes\eHealth\EHealth;
 use App\Models\CarePlan;
@@ -11,9 +11,6 @@ use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 
 class CarePlanRepository
 {
@@ -32,22 +29,22 @@ class CarePlanRepository
             ->latest()
             ->get();
     }
-    
+
     public function findById(int $id): ?CarePlan
     {
         return CarePlan::with(['person', 'author.party', 'activities'])->find($id);
     }
-    
+
     public function findByUuid(string $uuid): ?CarePlan
     {
         return CarePlan::with(['person', 'author.party', 'activities'])->where('uuid', $uuid)->first();
     }
-    
+
     public function create(array $data): CarePlan
     {
         return CarePlan::create($data);
     }
-    
+
     public function update(CarePlan $carePlan, array $data): bool
     {
         return $carePlan->update($data);
@@ -59,6 +56,7 @@ class CarePlanRepository
         if (!$carePlan) {
             return false;
         }
+
         return $carePlan->update($data);
     }
 
@@ -86,18 +84,18 @@ class CarePlanRepository
         if (!empty($encounterData['period_start'])) {
             // Encounter start is already in UTC from DB
             $encounterStart = \Carbon\CarbonImmutable::parse($encounterData['period_start'], 'UTC');
-            
-            // Form date is Kyiv time (e.g. "12.05.2026")
-            $formStart = \Carbon\CarbonImmutable::parse($periodStart, config('app.timezone', 'Europe/Kiev'))->startOfDay();
 
-            // If the selected day is the same or earlier than the encounter's day, 
+            // Form date is Kyiv time (e.g. "12.05.2026")
+            $formStart = \Carbon\CarbonImmutable::parse($periodStart, config('app.timezone', 'Europe/Kyiv'))->startOfDay();
+
+            // If the selected day is the same or earlier than the encounter's day,
             // we MUST use the encounter's actual start time to avoid the 422 error.
             if ($formStart->utc()->lt($encounterStart)) {
-                // If user picked today but encounter started later today, 
+                // If user picked today but encounter started later today,
                 // we set care plan start exactly to encounter start + 1 minute for safety
                 $periodStart = $encounterStart->addMinute()->toDateTimeString();
-                
-                // Since convertToEHealthISO8601 parses and converts to UTC again, 
+
+                // Since convertToEHealthISO8601 parses and converts to UTC again,
                 // we need to pass it a format it understands or bypass it.
                 // To keep it simple, we'll use a direct ISO string if we already have UTC.
                 $finalPeriodStart = $encounterStart->addMinute()->toIso8601ZuluString();
@@ -124,14 +122,13 @@ class CarePlanRepository
                 'end' => !empty($form['periodEnd']) ? convertToEHealthISO8601($form['periodEnd'] . ' 23:59:59') : (!empty($form['period_end']) ? convertToEHealthISO8601($form['period_end'] . ' 23:59:59') : null),
             ]),
             'addresses' => !empty($addresses) ? array_values($addresses) : null,
-            'supporting_info' => array_values(array_filter(array_map(fn($e) => 
+            'supporting_info' => array_values(array_filter(array_map(fn ($e) =>
                 (!empty($e['uuid']) || !empty($e['id'])) ? [
                     'identifier' => [
                         'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'episode_of_care']]],
                         'value' => $e['uuid'] ?? $e['id']
                     ]
-                ] : null
-            , $form['episodes'] ?? []))),
+                ] : null, $form['episodes'] ?? []))),
             'encounter' => !empty($form['encounter']) ? [
                 'identifier' => [
                     'type' => [
@@ -150,7 +147,6 @@ class CarePlanRepository
             ]
         ]);
 
-
         return $payload;
     }
 
@@ -161,7 +157,7 @@ class CarePlanRepository
 
         foreach ($plans as $rawFhir) {
             $person = null;
-            
+
             if ($personId) {
                 $person = \App\Models\Person\Person::find($personId);
             } else {
@@ -182,7 +178,7 @@ class CarePlanRepository
 
             // TODO: Move raw FHIR data storage to MongoDB when the driver and collection are ready.
             // Currently disabled to prevent conflicts with the SQL 'care_plans' table.
-            /* 
+            /*
             \App\Models\MedicalEvents\Mongo\CarePlan::updateOrCreate(
                 ['uuid' => $rawFhir['uuid']],
                 ['data' => $rawFhir]
@@ -190,11 +186,11 @@ class CarePlanRepository
             */
 
             DB::transaction(function () use ($person, $rawFhir, $activityRepo) {
-                $categoryData = isset($rawFhir['category']) && is_array($rawFhir['category']) 
-                    ? ($rawFhir['category'][0] ?? null) 
+                $categoryData = isset($rawFhir['category']) && is_array($rawFhir['category'])
+                    ? ($rawFhir['category'][0] ?? null)
                     : ($rawFhir['category'] ?? null);
 
-                $category = $categoryData 
+                $category = $categoryData
                     ? MedicalEventsRepository::codeableConcept()->store($categoryData)
                     : null;
 
@@ -269,11 +265,11 @@ class CarePlanRepository
                         'category_id' => $category?->id,
                         'encounter_identifier_id' => $encounterIdentifier?->id,
                         'care_manager_id' => $careManager?->id,
-                        'period_start' => isset($rawFhir['period']['start']) 
-                            ? \Carbon\Carbon::parse($rawFhir['period']['start']) 
+                        'period_start' => isset($rawFhir['period']['start'])
+                            ? \Carbon\Carbon::parse($rawFhir['period']['start'])
                             : ($rawFhir['ehealth_inserted_at'] ?? now()),
-                        'period_end' => isset($rawFhir['period']['end']) 
-                            ? \Carbon\Carbon::parse($rawFhir['period']['end']) 
+                        'period_end' => isset($rawFhir['period']['end'])
+                            ? \Carbon\Carbon::parse($rawFhir['period']['end'])
                             : null,
                         'terms_of_service' => $rawFhir['terms_of_service']['coding'][0]['code'] ?? null,
                         'addresses' => !empty($addresses) ? $addresses : ($carePlan->addresses ?? null),
@@ -291,11 +287,11 @@ class CarePlanRepository
                         'category_id' => $category?->id,
                         'encounter_identifier_id' => $encounterIdentifier?->id,
                         'care_manager_id' => $careManager?->id,
-                        'period_start' => isset($rawFhir['period']['start']) 
-                            ? \Carbon\Carbon::parse($rawFhir['period']['start']) 
+                        'period_start' => isset($rawFhir['period']['start'])
+                            ? \Carbon\Carbon::parse($rawFhir['period']['start'])
                             : ($rawFhir['ehealth_inserted_at'] ?? now()),
-                        'period_end' => isset($rawFhir['period']['end']) 
-                            ? \Carbon\Carbon::parse($rawFhir['period']['end']) 
+                        'period_end' => isset($rawFhir['period']['end'])
+                            ? \Carbon\Carbon::parse($rawFhir['period']['end'])
                             : null,
                         'terms_of_service' => $rawFhir['terms_of_service']['coding'][0]['code'] ?? null,
                         'addresses' => !empty($addresses) ? $addresses : null,

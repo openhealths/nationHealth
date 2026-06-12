@@ -24,5 +24,6 @@ return [
     'password' => 'Password',
     'password_confirmation' => 'Password confirmation',
     'need_register' => 'Already register?',
-    'has_account' => 'Has account?'
+    'has_account' => 'Has account?',
+    'key_file_description' => 'Key file carrier (e.g., key.dat, *.jks, *.pfx, etc.)',
 ];

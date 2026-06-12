@@ -1,4 +1,5 @@
 <div>
+    <livewire:components.x-message :key="now()->timestamp"/>
     @php
         use App\Enums\Status;
         use App\Enums\User\Role;

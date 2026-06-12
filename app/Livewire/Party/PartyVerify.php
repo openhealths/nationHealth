@@ -54,6 +54,11 @@ class PartyVerify extends Component
         }
     }
 
+    public function updatedStatus(string $value): void
+    {
+        $this->reason = '';
+    }
+
     /**
      * Determines if there is any problem that can be solved manually.
      */
@@ -135,8 +140,8 @@ class PartyVerify extends Component
     public function updateStatus(): void
     {
         $this->validate([
-            'stream' => 'required|string',
-            'status' => 'required|string',
+            'verificationStream' => 'required|string',
+            'status' => 'required|string|in:VERIFIED,NOT_VERIFIED',
             'reason' => 'required|string',
             'comment' => 'nullable|string|max:3000',
         ]);

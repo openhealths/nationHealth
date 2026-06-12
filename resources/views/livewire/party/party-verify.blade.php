@@ -165,7 +165,7 @@
 
                     {{-- 2. Status --}}
                     <div class="form-group group">
-                        <select wire:model.defer="status" id="status" class="input peer px-4 py-2">
+                        <select wire:model.live="status" id="status" class="input peer px-4 py-2">
                             <option value="">{{ __('forms.select_status') }}</option>
                             <option value="VERIFIED">{{ __('party_verification.statuses.VERIFIED') }}</option>
                             <option value="NOT_VERIFIED">{{ __('party_verification.statuses.NOT_VERIFIED') }}</option>
@@ -176,11 +176,17 @@
 
                     {{-- 3. Reason --}}
                     <div class="form-group group">
-                        <select wire:model="reason" id="reason" class="input peer px-4 py-2">
+                        <select wire:model="reason" id="reason" class="input peer px-4 py-2" @if(empty($status)) disabled @endif>
                             <option value="">{{ __('forms.choose_reason') }}</option>
-                            <option value="MANUAL_NOT_CONFIRMED">
-                                {{ __('party_verification.reasons.manual_not_confirmed') }}
-                            </option>
+                            @if($status === 'VERIFIED')
+                                <option value="MANUAL_NOT_CONFIRMED">
+                                    {{ __('party_verification.reasons.MANUAL_NOT_CONFIRMED') }}
+                                </option>
+                            @elseif($status === 'NOT_VERIFIED')
+                                <option value="MANUAL_CONFIRMED">
+                                    {{ __('party_verification.reasons.MANUAL_CONFIRMED') }}
+                                </option>
+                            @endif
                         </select>
                         <label for="reason" class="label">{{ __('forms.reason_code') }}</label>
                         @error('reason') <span class="text-red-500 text-sm mt-1">{{ $message }}</span> @enderror

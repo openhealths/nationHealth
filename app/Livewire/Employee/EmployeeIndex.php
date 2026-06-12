@@ -293,7 +293,7 @@ class EmployeeIndex extends EmployeeComponent
 
         // eHealth requires: end_date >= start_date.
         $startDateStr = $employee->start_date; // 'Y-m-d' string from DB
-        $endDateStr = \Illuminate\Support\Carbon::now('Europe/Kiev')->format('Y-m-d');
+        $endDateStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
 
         // If 'today' in Kiev is lexicographically earlier than 'start_date', use 'start_date' as the dismissal date
         if ($startDateStr && $endDateStr < $startDateStr) {

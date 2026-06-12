@@ -331,6 +331,7 @@ return [
     'knedp' => 'КНЕДП',
     'key_container' => 'Файл ключа (контейнер)',
     'key_container_upload' => 'Оберіть файл ключа',
+    'key_file_description' => 'Файловий носій з ключем (наприклад, key.dat, *.jks, *.pfx тощо)',
     'password' => 'Пароль',
     'password_confirmation' => 'Підтвердження пароля',
     'first_login' => 'Перший вхід',
