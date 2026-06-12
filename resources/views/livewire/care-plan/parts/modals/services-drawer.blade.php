@@ -112,7 +112,6 @@
                                    class="input peer ps-10 datepicker-input"
                                    placeholder="02.04.2025"
                                    datepicker-autohide
-                                   datepicker-format="dd.mm.yyyy"
                                    datepicker-button="false"
                                    wire:model.live="activityForm.scheduled_period_start"
                             />
@@ -164,7 +163,6 @@
                                    class="input peer ps-10 datepicker-input"
                                    placeholder="02.08.2025"
                                    datepicker-autohide
-                                   datepicker-format="dd.mm.yyyy"
                                    datepicker-button="false"
                                    wire:model.live="activityForm.scheduled_period_end"
                             />
@@ -233,12 +231,12 @@
                 <div class="flex gap-4 items-end mb-6">
                     <div class="flex-1">
                         <label class="label">Оберіть клінічний запис пацієнта</label>
-                        <select x-model="selectedGround" 
-                                @change="if(selectedGround) { 
+                        <select x-model="selectedGround"
+                                @change="if(selectedGround) {
                                     let parts = selectedGround.split('|');
                                     $wire.addLinkedGround(parts[0], parts[1]);
                                     selectedGround = '';
-                                }" 
+                                }"
                                 class="input-select peer w-full">
                             <option value="">-- Оберіть запис --</option>
                             @if(!empty($availableConditions))

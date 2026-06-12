@@ -11,8 +11,6 @@ use App\Core\Arr;
 use App\Enums\JobStatus;
 use App\Jobs\ImmunizationSync;
 use App\Models\LegalEntity;
-use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Immunization;
 use App\Repositories\MedicalEvents\Repository;
 use App\Rules\InDictionary;
@@ -25,7 +23,7 @@ use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
 use Throwable;
 
-class PatientImmunization extends BasePatientComponent
+class PatientImmunizations extends BasePatientComponent
 {
     use BatchLegalEntityQueries;
     use HandlesSyncBatch;
@@ -160,6 +158,8 @@ class PatientImmunization extends BasePatientComponent
             Session::flash('success', __('patients.messages.immunizations_synced_successfully'));
         }
 
+        $this->loadFilterOptions();
+
         $this->isSearching = false;
         $this->resetPage();
     }
@@ -232,8 +232,8 @@ class PatientImmunization extends BasePatientComponent
 
     protected function loadFilterOptions(): void
     {
-        $this->episodes = Episode::forPerson($this->personId)->recentlyUpdatedFirst()->get()->toArray();
-        $this->encounters = Encounter::forPerson($this->personId)->recentlyUpdatedFirst()->get()->toArray();
+        $this->episodes = Repository::episode()->getByPersonId($this->personId);
+        $this->encounters = Repository::encounter()->getByPersonId($this->personId);
     }
 
     protected function filterValidationRules(): array

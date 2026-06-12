@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Person\Records;
 
+use Illuminate\View\View;
 use Livewire\Attributes\Url;
 
 class PatientDiagnoses extends BasePatientComponent
@@ -43,11 +44,6 @@ class PatientDiagnoses extends BasePatientComponent
 
     public bool $showAdditionalParams = false;
 
-    public function render()
-    {
-        return view('livewire.person.records.diagnose');
-    }
-
     public function search(): void
     {
 
@@ -73,5 +69,10 @@ class PatientDiagnoses extends BasePatientComponent
             'filterPerformer',
             'filterSource',
         ]);
+    }
+
+    public function render(): View
+    {
+        return view('livewire.person.records.diagnose');
     }
 }

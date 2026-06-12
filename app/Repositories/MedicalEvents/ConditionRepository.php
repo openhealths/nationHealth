@@ -102,54 +102,6 @@ class ConditionRepository extends BaseRepository
     }
 
     /**
-     * Get condition data that is related to the person.
-     *
-     * @param  int  $personId
-     * @return array|null
-     */
-    public function getByPersonId(int $personId): array
-    {
-        return $this->model
-            ->withAllRelations()
-            ->where('person_id', $personId)
-            ->get()
-            ->toArray();
-    }
-
-    /**
-     * Get condition data that is related to the person with pagination.
-     *
-     * @param  int  $personId
-     * @param  int  $page
-     * @param  int  $pageSize
-     * @return array|null
-     */
-    public function getByPersonIdPaginated(int $personId, int $page, int $pageSize): array
-    {
-        return $this->model
-            ->withAllRelations()
-            ->where('person_id', $personId)
-            ->orderByDesc('onset_date')
-            ->offset(($page - 1) * $pageSize)
-            ->limit($pageSize)
-            ->get()
-            ->toArray();
-    }
-
-    /**
-     * Get conunt of condition data that is related to the person.
-     *
-     * @param  int  $personId
-     * @return array|null
-     */
-    public function countByPersonId(int $personId): int
-    {
-        return $this->model
-            ->where('person_id', $personId)
-            ->count();
-    }
-
-    /**
      * Build a UUID => [insertedAt, codeCode] map for the given condition/observation UUIDs.
      *
      * @param  array  $uuids
@@ -189,21 +141,6 @@ class ConditionRepository extends BaseRepository
             $this->getDetailsMapByUuids($detailUuids),
             Repository::observation()->getDetailsMapByUuids($detailUuids)
         );
-    }
-
-    /**
-     * Get the condition for the procedure based on the provided UUID to display the selected reason reference and complication detail.
-     *
-     * @param  string  $uuid
-     * @return array|null
-     */
-    public function getForProcedure(string $uuid): ?array
-    {
-        return Condition::whereUuid($uuid)
-            ->select(['id', 'onset_date', 'code_id'])
-            ->with('code.coding')
-            ->first()
-            ?->toArray();
     }
 
     /**

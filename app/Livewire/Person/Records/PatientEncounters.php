@@ -10,7 +10,6 @@ use App\Enums\JobStatus;
 use App\Jobs\EncounterFullSync;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
@@ -186,7 +185,7 @@ class PatientEncounters extends BasePatientComponent
      */
     protected function loadFilterOptions(): void
     {
-        $this->episodes = Episode::forPerson($this->personId)->recentlyUpdatedFirst()->get()->toArray();
+        $this->episodes = Repository::episode()->getByPersonId($this->personId);
 
         $encounters = Encounter::forPerson($this->personId)
             ->with(['incomingReferral.type.coding', 'originEpisode.type.coding'])

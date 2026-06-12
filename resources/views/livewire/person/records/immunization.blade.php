@@ -34,7 +34,7 @@
                 <p>{{ __('patients.immunization_search') }}</p>
             </div>
 
-            <div class="form-row-3 mb-6">
+            <div class="form-row-3 mb-6" x-data="{ filterCode: $wire.entangle('filterCode') }">
                 <x-select2 modelPath="filterCode"
                            dictionaryName="eHealth/vaccine_codes"
                            id="filterCode"
