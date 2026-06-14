@@ -94,7 +94,7 @@ class CarePlanShow extends Component
     {
         $this->carePlan = $carePlan;
         $this->carePlan->load(['person', 'author.party', 'categoryConcept.coding', 'activities.kindConcept.coding']);
-        
+
         // Fetch patient conditions for outcomeReference selection
         $this->availableConditions = \App\Models\MedicalEvents\Sql\Condition::where('person_id', $this->carePlan->person_id)
             ->with('code.coding')->get()->map(fn($c) => [
@@ -124,7 +124,7 @@ class CarePlanShow extends Component
             $this->dictionaries['care_plan_categories'] = $basics->byName('eHealth/care_plan_categories')
                 ?->asCodeDescription()
                 ?->toArray() ?? [];
-            
+
             $this->dictionaries['care_plan_activity_outcomes'] = $basics->byName('eHealth/care_plan_activity_outcomes')
                 ?->asCodeDescription()
                 ?->toArray() ?? [];
@@ -159,10 +159,10 @@ class CarePlanShow extends Component
 
         $action = request()->query('action');
         if (in_array($action, ['cancel', 'complete'])) {
-            $statusStr = is_array($this->carePlan->status) 
-                ? ($this->carePlan->status['coding'][0]['code'] ?? ($this->carePlan->status['text'] ?? '')) 
+            $statusStr = is_array($this->carePlan->status)
+                ? ($this->carePlan->status['coding'][0]['code'] ?? ($this->carePlan->status['text'] ?? ''))
                 : $this->carePlan->status;
-            
+
             if (strtolower((string) $statusStr) === 'active') {
                 $this->openSignatureModal($action);
             }
@@ -171,8 +171,8 @@ class CarePlanShow extends Component
 
     protected function rulesForSigning(): array
     {
-        $statusReasonRule = in_array($this->actionType, ['sign_activity', 'sign_plan']) 
-            ? 'nullable|string' 
+        $statusReasonRule = in_array($this->actionType, ['sign_activity', 'sign_plan'])
+            ? 'nullable|string'
             : 'required|string';
 
         return [
@@ -622,8 +622,8 @@ class CarePlanShow extends Component
         $categoryCoding = $this->carePlan->categoryConcept?->coding?->first();
         $categorySystem = $categoryCoding?->system ?? 'eHealth/care_plan_categories';
         $categoryCode = $categoryCoding?->code
-            ?? (is_array($this->carePlan->category) 
-                ? ($this->carePlan->category['coding'][0]['code'] ?? null) 
+            ?? (is_array($this->carePlan->category)
+                ? ($this->carePlan->category['coding'][0]['code'] ?? null)
                 : $this->carePlan->category);
 
         $encounter = $this->carePlan->encounter;
@@ -739,7 +739,7 @@ class CarePlanShow extends Component
 
             // Send to eHealth based on action type
             $apiMethod = $this->actionType === 'complete' ? 'complete' : 'cancel';
-            
+
             $eHealthResponse = EHealth::carePlan()->{$apiMethod}(
                 $this->carePlan->person->uuid,
                 $this->carePlan->uuid,
@@ -962,7 +962,7 @@ class CarePlanShow extends Component
             // Extract the actual CarePlanActivity data
             $activityUuid = $finalResponse['id'] ?? null;
             $activityStatus = $finalResponse['status'] ?? 'new';
-            
+
             if (isset($finalResponse['result']) && is_array($finalResponse['result'])) {
                 $entity = $finalResponse['result'][0] ?? $finalResponse['result'];
                 $activityUuid = $entity['id'] ?? $activityUuid;
@@ -984,7 +984,7 @@ class CarePlanShow extends Component
             }
 
             // Store to Mongo
-            /* 
+            /*
             try {
                 \App\Models\MedicalEvents\Mongo\CarePlanActivity::create($finalResponse);
             } catch (\Exception $e) {
@@ -1046,11 +1046,11 @@ class CarePlanShow extends Component
         $activity = $activityRepository->findById($this->activityToSign);
         if (!$activity) return;
 
+        // eHealth requires UPPERCASE status values for care plan activities.
         $statusMap = [
-            'cancel_activity' => 'cancelled',
-            'complete_activity' => 'completed',
+            'cancel_activity' => 'CANCELLED',
+            'complete_activity' => 'COMPLETED',
         ];
-
         $systemMap = [
             'cancel_activity' => 'eHealth/care_plan_activity_cancel_reasons',
             'complete_activity' => 'eHealth/care_plan_activity_complete_reasons',
@@ -1065,7 +1065,9 @@ class CarePlanShow extends Component
             ]
         ];
 
-        $payload = null;
+        // Fetch the original matching activity from eHealth GET details endpoint.
+        // Signing the exact returned payload ensures 100% cryptographic match with the server database state.
+        $payloadForSign = null;
         try {
             $eHealthActivityResponse = EHealth::carePlanActivity()->getDetails(
                 $this->carePlan->person->uuid,
@@ -1077,65 +1079,43 @@ class CarePlanShow extends Component
                 $matchingActivity = $matchingActivity['data'];
             }
             if ($matchingActivity && is_array($matchingActivity)) {
-                $payload = $this->cleanActivityPayload($matchingActivity);
+                $payloadForSign = $matchingActivity;
+                Log::info('CarePlanActivityStatus: fetched matching activity from eHealth for signing');
             }
         } catch (\Throwable $e) {
-            Log::warning('CarePlanActivityStatus: failed to fetch original activity from eHealth, falling back to local payload: ' . $e->getMessage());
+            Log::warning('CarePlanActivityStatus: failed to fetch original activity from eHealth: ' . $e->getMessage());
         }
 
-        if (!$payload) {
-            // Generate the base payload locally to guarantee that it strictly matches the structure and types
-            // of the activity that was originally created. This prevents cryptographic mismatch issues
-            // and avoids pulling server-computed fields from eHealth that were not in the original payload.
-            $payload = $this->cleanActivityPayload($activityRepository->formatCarePlanActivityRequest($activity));
+        if (!$payloadForSign) {
+            // Fallback: Generate the base payload locally using the formatCarePlanActivityRequest repository method.
+            $payloadForSign = $this->cleanActivityPayload($activityRepository->formatCarePlanActivityRequest($activity));
+            Log::info('CarePlanActivityStatus: generated base payload locally for signing');
         }
 
-        // Keep the status inside detail equal to the current status of the activity on eHealth
-        // because the signed content must match the activity as it currently exists in their database.
-        if (isset($payload['detail'])) {
-            $currentStatus = $activity->status;
-            if (strtolower((string)$currentStatus) === 'processed') {
-                $currentStatus = 'scheduled';
-            }
-            $payload['detail']['status'] = $payload['detail']['status'] ?? $currentStatus;
-
-            // Map 'processed' to 'scheduled' if returned by eHealth
-            if (strtolower((string)($payload['detail']['status'] ?? '')) === 'processed') {
-                $payload['detail']['status'] = 'scheduled';
-            }
-
-            if ($this->actionType === 'cancel_activity') {
-                $payload['detail']['status_reason'] = $statusReasonCodeableConcept;
-            } elseif ($this->actionType === 'complete_activity') {
-                if ($this->outcomeCode) {
-                    $payload['outcome_codeable_concept'] = [
-                        'coding' => [
-                            [
-                                'system' => 'eHealth/care_plan_activity_outcomes',
-                                'code' => $this->outcomeCode,
-                            ]
-                        ]
-                    ];
-                }
-                if (!empty($this->outcomeReferences)) {
-                    $payload['outcome_reference'] = collect($this->outcomeReferences)->map(fn($id) => [
-                        'identifier' => [
-                            'value' => $id,
-                        ]
-                    ])->toArray();
-                }
-            }
+        // Inject the updated state into the payload before signing it.
+        // For cancel/complete actions, eHealth expects the signed payload to contain
+        // the required reason/outcome, but the status must remain the original status
+        // so that eHealth can validate the entity was in a valid state before the transition.
+        if (!isset($payloadForSign['detail'])) {
+            $payloadForSign['detail'] = [];
+        }
+        $payloadForSign['detail']['status_reason'] = $statusReasonCodeableConcept;
+        
+        if ($this->actionType === 'complete_activity' && !empty($this->outcomeReferences)) {
+            $payloadForSign['outcome_reference'] = collect($this->outcomeReferences)->map(fn($id) => [
+                'identifier' => [
+                    'value' => $id,
+                ]
+            ])->toArray();
         }
 
-        // Log the full JSON string to prevent Monolog from truncating the output in laravel.log
-        Log::info('CarePlanActivityStatus: Full JSON payload to sign: ' . json_encode(Arr::toSnakeCase($payload), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        // Log the full JSON string of the original payload for debugging.
+        Log::info('CarePlanActivityStatus: Original JSON payload for signing: ' . json_encode(Arr::toSnakeCase($payloadForSign), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 
-        // Dump and die to inspect the payload in the browser network tab/modal as requested
-        // dd(Arr::toSnakeCase($payload));
-
+        // Attempt to sign the original payload.
         try {
             $signedContent = signatureService()->signData(
-                Arr::toSnakeCase($payload),
+                Arr::toSnakeCase($payloadForSign),
                 $this->form['password'],
                 $this->form['knedp'],
                 $this->form['keyContainerUpload'],
@@ -1143,36 +1123,26 @@ class CarePlanShow extends Component
             );
             Log::info('CarePlanActivityStatus: Signing key succeeded');
 
-            $apiMethod = $this->actionType === 'complete_activity' ? 'complete' : 'cancel';
-            
+            // Prepare the data to send to eHealth, including the signed original payload.
             $payloadData = [
-                'signed_data'          => $signedContent,
+                'signed_data' => $signedContent,
                 'signed_data_encoding' => 'base64',
+                'detail' => [
+                    'status_reason' => $statusReasonCodeableConcept,
+                ],
             ];
 
-            if ($this->actionType === 'cancel_activity') {
-                $payloadData['status_reason'] = $statusReasonCodeableConcept;
-            } elseif ($this->actionType === 'complete_activity') {
-                if ($this->outcomeCode) {
-                    $payloadData['outcome_codeable_concept'] = [
-                        'coding' => [
-                            [
-                                'system' => 'eHealth/care_plan_activity_outcomes',
-                                'code' => $this->outcomeCode,
-                            ]
-                        ]
-                    ];
-                }
-                
-                if (!empty($this->outcomeReferences)) {
-                    $payloadData['outcome_reference'] = collect($this->outcomeReferences)->map(fn($id) => [
-                        'identifier' => [
-                            'value' => $id,
-                        ]
-                    ])->toArray();
-                }
+            if ($this->actionType === 'complete_activity' && !empty($this->outcomeReferences)) {
+                $payloadData['outcome_reference'] = collect($this->outcomeReferences)->map(fn($id) => [
+                    'identifier' => [
+                        'value' => $id,
+                    ]
+                ])->toArray();
             }
 
+            $apiMethod = $this->actionType === 'complete_activity' ? 'complete' : 'cancel';
+
+            // Send request to eHealth
             $eHealthResponse = EHealth::carePlanActivity()->{$apiMethod}(
                 $this->carePlan->person->uuid,
                 $this->carePlan->uuid,
@@ -1393,7 +1363,7 @@ class CarePlanShow extends Component
         try {
             $planResponse = EHealth::carePlan()->getDetails($this->carePlan->person->uuid, $this->carePlan->uuid);
             app(CarePlanRepository::class)->syncCarePlans(['data' => [$planResponse->getData()]], $this->carePlan->person_id);
-            
+
             // Sync approvals as well!
             app(\App\Repositories\ApprovalRepository::class)->syncApprovals($this->carePlan, 'care_plan');
 

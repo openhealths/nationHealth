@@ -16,7 +16,6 @@ use App\Repositories\DeclarationRepository;
 
 class CarePlanIndex extends Component
 {
-    public $carePlans = [];
     public string $searchRequisition = '';
 
     public string $filterName = '';
@@ -30,11 +29,6 @@ class CarePlanIndex extends Component
 
     public function mount(CarePlanRepository $repository): void
     {
-        $legalEntity = legalEntity();
-
-        if ($legalEntity) {
-            $this->carePlans = $repository->getByLegalEntity($legalEntity->id);
-        }
     }
 
     public function search(): void
@@ -118,6 +112,11 @@ class CarePlanIndex extends Component
 
             $persons = Person::whereIn('id', $allPersonIds)->get();
 
+            if ($persons->isEmpty()) {
+                session()->flash('error', __('care-plan.sync_no_declarations'));
+                return;
+            }
+
             $allValidatedData = [];
             foreach ($persons as $person) {
                 try {
@@ -158,8 +157,21 @@ class CarePlanIndex extends Component
         }
     }
 
-    public function render()
+    public function render(CarePlanRepository $repository)
     {
-        return view('livewire.care-plan.care-plan-index');
+        $legalEntity = legalEntity();
+        $carePlans = collect();
+
+        if ($legalEntity) {
+            $carePlans = $repository->getByLegalEntity($legalEntity->id, [
+                'name' => $this->filterName,
+                'status' => $this->filterStatus,
+                'encounter_id' => $this->filterEncounterId,
+            ]);
+        }
+
+        return view('livewire.care-plan.care-plan-index', [
+            'carePlans' => $carePlans,
+        ]);
     }
 }

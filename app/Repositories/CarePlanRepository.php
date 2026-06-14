@@ -14,19 +14,56 @@ use Illuminate\Support\Facades\DB;
 
 class CarePlanRepository
 {
-    public function getByLegalEntity(int $legalEntityId): Collection
+    public function getByLegalEntity(int $legalEntityId, array $filters = []): Collection
     {
-        return CarePlan::where('legal_entity_id', $legalEntityId)
-            ->with(['person', 'author.party', 'encounter.diagnoses.condition', 'encounterIdentifier'])
-            ->latest()
-            ->get();
+        $query = CarePlan::where('legal_entity_id', $legalEntityId)
+            ->with(['person', 'author.party', 'encounter.diagnoses.condition', 'encounterIdentifier']);
+
+        if (!empty($filters['name'])) {
+            $query->where('title', 'like', '%' . $filters['name'] . '%');
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['encounter_id'])) {
+            $query->where(function ($q) use ($filters) {
+                $q->where('encounter_id', $filters['encounter_id'])
+                    ->orWhereHas('encounterIdentifier', function ($qi) use ($filters) {
+                        $qi->where('value', 'like', '%' . $filters['encounter_id'] . '%');
+                    });
+            });
+        }
+
+        return $query->latest()->get();
     }
 
-    public function getByPersonId(int $personId): Collection
+    public function getByPersonId(int $personId, array $filters = []): Collection
     {
-        return CarePlan::where('person_id', $personId)
-            ->with(['person', 'author.party', 'encounter.diagnoses.condition', 'encounterIdentifier'])
-            ->latest()
+        $query = CarePlan::where('person_id', $personId)
+            ->with(['person', 'author.party', 'encounter.diagnoses.condition', 'encounterIdentifier']);
+
+        if (!empty($filters['name'])) {
+            $query->where('title', 'like', '%' . $filters['name'] . '%');
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['encounter_id'])) {
+            $query->where(function ($q) use ($filters) {
+                $q->where('encounter_id', $filters['encounter_id'])
+                    ->orWhereHas('encounterIdentifier', function ($qi) use ($filters) {
+                        $qi->where('value', 'like', '%' . $filters['encounter_id'] . '%');
+                    });
+            });
+        }
+
+        return $query
+            ->orderByRaw("CASE WHEN status = 'active' THEN 0 ELSE 1 END")
+            ->orderBy('created_at', 'desc')
             ->get();
     }
 
@@ -170,22 +207,69 @@ class CarePlanRepository
 
             if (!$person) {
                 \Illuminate\Support\Facades\Log::warning('CarePlanRepository: person not found for CarePlan sync', [
-                    'care_plan_uuid' => $rawFhir['id'],
+                    'care_plan_uuid' => $rawFhir['id'] ?? $rawFhir['uuid'] ?? 'missing',
                     'patient_uuid' => $rawFhir['subject']['identifier']['value'] ?? 'missing'
                 ]);
                 continue;
+            }
+
+            // Decide whether we need to fetch full details from eHealth
+            $carePlan = CarePlan::where('uuid', $rawFhir['id'] ?? $rawFhir['uuid'] ?? null)->first();
+            if (!$carePlan) {
+                // Try finding by encounter identifier
+                $encounterIdentifierRaw = $rawFhir['encounter'] ?? null;
+                $encounterIdentifierVal = $encounterIdentifierRaw['identifier']['value'] ?? null;
+                if ($encounterIdentifierVal) {
+                    $encounterIdentifier = \App\Models\MedicalEvents\Sql\Identifier::where('value', $encounterIdentifierVal)->first();
+                    if ($encounterIdentifier) {
+                        $carePlan = CarePlan::where('person_id', $person->id)
+                            ->where('encounter_identifier_id', $encounterIdentifier->id)
+                            ->whereNull('uuid')
+                            ->first();
+                    }
+                }
+            }
+
+            $needsDetails = false;
+            if (!$carePlan) {
+                if (empty($rawFhir['title'])) {
+                    $needsDetails = true;
+                }
+            } else {
+                $remoteStatus = $rawFhir['status'] ?? 'active';
+                $localStatus = $carePlan->status;
+
+                if ($localStatus !== $remoteStatus) {
+                    $needsDetails = true;
+                } elseif ($carePlan->title === 'План лікування' && empty($rawFhir['title'])) {
+                    $needsDetails = true;
+                }
+            }
+
+            if ($needsDetails) {
+                try {
+                    $detailResponse = EHealth::carePlan()->getDetails($person->uuid, $rawFhir['id'] ?? $rawFhir['uuid']);
+                    $detailData = $detailResponse->validate();
+                    if (!empty($detailData)) {
+                        $rawFhir = array_merge($rawFhir, $detailData);
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('CarePlanRepository: failed to fetch details for care plan ' . ($rawFhir['id'] ?? $rawFhir['uuid']), [
+                        'error' => $e->getMessage()
+                    ]);
+                }
             }
 
             // TODO: Move raw FHIR data storage to MongoDB when the driver and collection are ready.
             // Currently disabled to prevent conflicts with the SQL 'care_plans' table.
             /*
             \App\Models\MedicalEvents\Mongo\CarePlan::updateOrCreate(
-                ['uuid' => $rawFhir['uuid']],
+                ['uuid' => $rawFhir['id'] ?? $rawFhir['uuid'] ?? null],
                 ['data' => $rawFhir]
             );
             */
 
-            DB::transaction(function () use ($person, $rawFhir, $activityRepo) {
+            DB::transaction(function () use ($person, $rawFhir, $activityRepo, $carePlan) {
                 $categoryData = isset($rawFhir['category']) && is_array($rawFhir['category'])
                     ? ($rawFhir['category'][0] ?? null)
                     : ($rawFhir['category'] ?? null);
@@ -202,12 +286,13 @@ class CarePlanRepository
                     MedicalEventsRepository::codeableConcept()->attach($encounterIdentifier, $rawFhir['encounter']);
                 }
 
-                $careManager = isset($rawFhir['careManager']['identifier']['value'])
-                    ? MedicalEventsRepository::identifier()->store($rawFhir['careManager']['identifier']['value'])
+                $careManagerRaw = $rawFhir['care_manager'] ?? ($rawFhir['careManager'] ?? null);
+                $careManager = isset($careManagerRaw['identifier']['value'])
+                    ? MedicalEventsRepository::identifier()->store($careManagerRaw['identifier']['value'])
                     : null;
 
-                if ($careManager && isset($rawFhir['careManager']['identifier']['type'])) {
-                    MedicalEventsRepository::codeableConcept()->attach($careManager, $rawFhir['careManager']);
+                if ($careManager && isset($careManagerRaw['identifier']['type'])) {
+                    MedicalEventsRepository::codeableConcept()->attach($careManager, $careManagerRaw);
                 }
 
                 $author = null;
@@ -244,14 +329,24 @@ class CarePlanRepository
                     }
                 }
 
-                // Try to find existing record by UUID OR by (person + encounter) if UUID is missing locally
-                $carePlan = CarePlan::where('uuid', $rawFhir['id'] ?? $rawFhir['uuid'] ?? null)->first();
-                if (!$carePlan && $encounterIdentifier) {
-                    $carePlan = CarePlan::where('person_id', $person->id)
-                        ->where('encounter_identifier_id', $encounterIdentifier->id)
-                        ->whereNull('uuid')
-                        ->first();
+                // Map supportingInfo for local JSON storage
+                $supportingInfoRaw = $rawFhir['supporting_info'] ?? ($rawFhir['supportingInfo'] ?? null);
+                $episodes = [];
+                if (isset($supportingInfoRaw) && is_array($supportingInfoRaw)) {
+                    foreach ($supportingInfoRaw as $info) {
+                        $val = $info['identifier']['value'] ?? null;
+                        if ($val) {
+                            $episodes[] = [
+                                'id' => $val,
+                                'name' => $val
+                            ];
+                        }
+                    }
                 }
+                $supportingInfoDb = [
+                    'episodes' => $episodes,
+                    'medical_records' => []
+                ];
 
                 if ($carePlan) {
                     $carePlan->update([
@@ -273,6 +368,7 @@ class CarePlanRepository
                             : null,
                         'terms_of_service' => $rawFhir['terms_of_service']['coding'][0]['code'] ?? null,
                         'addresses' => !empty($addresses) ? $addresses : ($carePlan->addresses ?? null),
+                        'supporting_info' => $supportingInfoDb,
                     ]);
                 } else {
                     $carePlan = CarePlan::create([
@@ -295,6 +391,7 @@ class CarePlanRepository
                             : null,
                         'terms_of_service' => $rawFhir['terms_of_service']['coding'][0]['code'] ?? null,
                         'addresses' => !empty($addresses) ? $addresses : null,
+                        'supporting_info' => $supportingInfoDb,
                     ]);
                 }
 
@@ -302,9 +399,9 @@ class CarePlanRepository
                     MedicalEventsRepository::period()->sync($carePlan, $rawFhir['period'], 'effectivePeriod');
                 }
 
-                if (isset($rawFhir['supportingInfo'])) {
+                if (isset($supportingInfoRaw)) {
                     $supportingInfoIds = [];
-                    foreach ($rawFhir['supportingInfo'] as $info) {
+                    foreach ($supportingInfoRaw as $info) {
                         $identifier = MedicalEventsRepository::identifier()->store($info['identifier']['value']);
                         if (isset($info['identifier']['type'])) {
                             MedicalEventsRepository::codeableConcept()->attach($identifier, $info);

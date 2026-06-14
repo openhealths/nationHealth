@@ -98,19 +98,17 @@ class CarePlanActivityRepository
 
         $authorUuid = $activity->author?->uuid ?? auth()->user()?->activeDoctorEmployee()?->uuid;
 
-        $quantityRelation = $activity->quantityQuantity;
-        $quantityValue = $quantityRelation ? $quantityRelation->value : $activity->quantity;
-        $quantitySystem = $quantityRelation ? $quantityRelation->system : $activity->quantity_system;
-        $quantityCode = $quantityRelation ? $quantityRelation->code : $activity->quantity_code;
+        $quantityValue = $activity->quantity;
+        $quantitySystem = $activity->quantity_system;
+        $quantityCode = $activity->quantity_code;
         $quantityNormalizedCode = $this->normalizeUnitCode($quantitySystem, $quantityCode);
-        $quantityUnit = $quantityRelation ? $quantityRelation->unit : null;
+        $quantityUnit = null; // Always omit unit to prevent signature mismatch with previously created activity
 
-        $dailyAmountRelation = $activity->dailyAmountQuantity;
-        $dailyAmountValue = $dailyAmountRelation ? $dailyAmountRelation->value : $activity->daily_amount;
-        $dailyAmountSystem = $dailyAmountRelation ? $dailyAmountRelation->system : ($activity->daily_amount_system ?? $quantitySystem);
-        $dailyAmountCode = $dailyAmountRelation ? $dailyAmountRelation->code : ($activity->daily_amount_code ?? $quantityCode);
+        $dailyAmountValue = $activity->daily_amount;
+        $dailyAmountSystem = $activity->daily_amount_system ?? $quantitySystem;
+        $dailyAmountCode = $activity->daily_amount_code ?? $quantityCode;
         $dailyAmountNormalizedCode = $this->normalizeUnitCode($dailyAmountSystem, $dailyAmountCode);
-        $dailyAmountUnit = $dailyAmountRelation ? $dailyAmountRelation->unit : null;
+        $dailyAmountUnit = null; // Always omit unit to prevent signature mismatch with previously created activity
 
         $scheduledPeriod = $activity->scheduledPeriod;
         $startDate = $scheduledPeriod ? $scheduledPeriod->getRawOriginal('start') : $activity->scheduled_period_start;

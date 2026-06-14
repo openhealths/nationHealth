@@ -200,4 +200,62 @@ class CarePlanIndexTest extends TestCase
             'person_id' => $person->id,
         ]);
     }
+
+    public function test_care_plan_index_sync_warns_when_no_declarations(): void
+    {
+        // 1. Setup initial user & doctor data (no declarations or patients)
+        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id') 
+            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+
+        $legalEntity = LegalEntity::create([
+            'uuid' => (string) Str::uuid(),
+            'status' => 'ACTIVE',
+            'sync_status' => 'COMPLETED',
+            'legal_entity_type_id' => $typeId,
+            'is_active' => true,
+        ]);
+        $this->instance('legalEntity', $legalEntity);
+
+        $party = Party::create([
+            'uuid' => (string) Str::uuid(),
+            'first_name' => 'Doctor',
+            'last_name' => 'Who',
+            'tax_id' => '1234567890',
+            'birth_date' => '1970-01-01',
+            'gender' => 'MALE',
+        ]);
+
+        $user = User::create([
+            'uuid' => (string) Str::uuid(),
+            'email' => 'doctor@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'party_id' => $party->id,
+        ]);
+
+        $employee = Employee::create([
+            'uuid' => (string) Str::uuid(),
+            'full_name' => 'Dr. Who',
+            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
+            'status' => \App\Enums\Status::APPROVED->value,
+            'legal_entity_id' => $legalEntity->id,
+            'is_active' => true,
+            'position' => 'Doctor',
+            'start_date' => now()->format('Y-m-d'),
+            'user_id' => $user->id,
+            'party_id' => $party->id,
+        ]);
+        $user->employees()->attach($employee->id);
+
+        if (config('permission.teams')) {
+            setPermissionsTeamId($legalEntity->id);
+        }
+
+        $this->actingAs($user);
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanIndex::class)
+            ->call('sync')
+            ->assertHasNoErrors();
+
+        $this->assertEquals(0, CarePlan::count());
+    }
 }

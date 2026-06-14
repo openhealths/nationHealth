@@ -6,14 +6,23 @@ namespace App\Livewire\CarePlan;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Enums\Person\AuthenticationMethod;
+use App\Enums\Status;
+use App\Enums\User\Role;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\CarePlan;
+use App\Models\Employee\Employee;
+use App\Models\MedicalEvents\Sql\Condition;
+use App\Models\MedicalEvents\Sql\Encounter;
 use App\Repositories\CarePlanRepository;
+use App\Repositories\MedicalEvents\Repository;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use App\Livewire\Person\Records\BasePatientComponent;
 use App\Traits\InteractsWithApprovals;
@@ -127,7 +136,7 @@ class CarePlanCreate extends BasePatientComponent
             ->get(['id', 'uuid', 'status', 'ehealth_inserted_at'])
             ->map(fn ($e) => [
                 'uuid' => $e->uuid,
-                'label' => 'Взаємодія #' . $e->id . ' (' . ($e->ehealth_inserted_at ? \Carbon\Carbon::parse($e->ehealth_inserted_at)->format('d.m.Y') : '-') . ')',
+                'label' => 'Взаємодія #' . $e->id . ' (' . ($e->ehealth_inserted_at ? Carbon::parse($e->ehealth_inserted_at)->format('d.m.Y') : '-') . ')',
             ])
             ->toArray();
 
@@ -139,7 +148,7 @@ class CarePlanCreate extends BasePatientComponent
 
             // Pre-fill title if empty
             if (empty($this->form->title)) {
-                $date = $resolvedEncounter->period?->start ? \Carbon\Carbon::parse($resolvedEncounter->period->start)->format('d.m.Y') : now()->format('d.m.Y');
+                $date = $resolvedEncounter->period?->start ? Carbon::parse($resolvedEncounter->period->start)->format('d.m.Y') : now()->format('d.m.Y');
                 $this->form->title = 'План лікування від ' . $date;
             }
 
@@ -149,15 +158,15 @@ class CarePlanCreate extends BasePatientComponent
                 $conditionUuid = $d->condition?->value;
                 $actualCondition = null;
                 if ($conditionUuid) {
-                    $actualCondition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
+                    $actualCondition = Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
                     if (!$actualCondition) {
                         Log::info('CarePlanCreate mount: condition not found in local SQL DB, attempting to fetch from eHealth', [
                             'condition_uuid' => $conditionUuid
                         ]);
                         try {
                             $conditionData = EHealth::condition()->getById($this->uuid, $conditionUuid)->getData();
-                            \App\Repositories\MedicalEvents\Repository::condition()->store([Arr::toCamelCase($conditionData)], $this->personId);
-                            $actualCondition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
+                            Repository::condition()->store([Arr::toCamelCase($conditionData)], $this->personId);
+                            $actualCondition = Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
                         } catch (\Exception $e) {
                             Log::error('CarePlanCreate mount: failed to fetch condition from eHealth', [
                                 'condition_uuid' => $conditionUuid,
@@ -169,7 +178,7 @@ class CarePlanCreate extends BasePatientComponent
 
                 return [
                     'date' => $actualCondition?->asserted_date
-                        ? \Carbon\Carbon::parse($actualCondition->asserted_date)->format('d.m.Y')
+                        ? Carbon::parse($actualCondition->asserted_date)->format('d.m.Y')
                         : '-',
                     'name' => ($actualCondition?->code?->text ?: null)
                         ?? ($actualCondition?->code?->coding?->first()?->code ?: null)
@@ -192,9 +201,9 @@ class CarePlanCreate extends BasePatientComponent
         // Load doctors for co-authors
         $legalEntity = legalEntity();
         if ($legalEntity) {
-            $this->doctors = \App\Models\Employee\Employee::where('legal_entity_id', $legalEntity->id)
-                ->whereIn('employee_type', [\App\Enums\User\Role::DOCTOR, \App\Enums\User\Role::SPECIALIST])
-                ->where('status', \App\Enums\Status::APPROVED)
+            $this->doctors = Employee::where('legal_entity_id', $legalEntity->id)
+                ->whereIn('employee_type', [Role::DOCTOR, Role::SPECIALIST])
+                ->where('status', Status::APPROVED)
                 ->where('is_active', true)
                 ->with('party')
                 ->get()
@@ -228,7 +237,7 @@ class CarePlanCreate extends BasePatientComponent
             return;
         }
 
-        $this->patientSuggestions = \App\Models\Person\Person::query()
+        $this->patientSuggestions = Person::query()
             ->where('last_name', 'like', "%{$value}%")
             ->orWhere('first_name', 'like', "%{$value}%")
             ->orWhere('tax_id', 'like', "%{$value}%")
@@ -251,14 +260,14 @@ class CarePlanCreate extends BasePatientComponent
         $this->form->patient = $name;
         $this->patientSuggestions = [];
 
-        $person = \App\Models\Person\Person::where('uuid', $uuid)->first();
+        $person = Person::where('uuid', $uuid)->first();
         if ($person) {
             try {
                 $this->authMethods = EHealth::person()->getAuthMethods($uuid)->getData();
             } catch (\Exception $e) {
-                $this->authMethods = collect(\App\Enums\Person\AuthenticationMethod::cases())->map(fn ($m) => [
-                    'id' => (string) \Illuminate\Support\Str::uuid(),
-                    'uuid' => (string) \Illuminate\Support\Str::uuid(),
+                $this->authMethods = collect(AuthenticationMethod::cases())->map(fn ($m) => [
+                    'id' => (string) Str::uuid(),
+                    'uuid' => (string) Str::uuid(),
                     'type' => $m->value,
                     'label' => $m->label(),
                 ])->toArray();
@@ -455,7 +464,7 @@ class CarePlanCreate extends BasePatientComponent
     {
         $encounterUuid = $this->form->encounter;
         if ($encounterUuid) {
-            $encounter = \App\Models\MedicalEvents\Sql\Encounter::where('uuid', $encounterUuid)->first();
+            $encounter = Encounter::where('uuid', $encounterUuid)->first();
             if ($encounter) {
                 $this->redirectRoute('encounter.edit', [legalEntity(), $this->personId, $encounter->id], navigate: true);
                 return;
@@ -467,10 +476,10 @@ class CarePlanCreate extends BasePatientComponent
     public function updatedFormEncounter($value): void
     {
         if ($value) {
-            $encounter = \App\Models\MedicalEvents\Sql\Encounter::where('uuid', $value)->with(['diagnoses.condition'])->first();
+            $encounter = Encounter::where('uuid', $value)->with(['diagnoses.condition'])->first();
             if ($encounter) {
                 if (empty($this->form->title)) {
-                    $date = $encounter->period?->start ? \Carbon\Carbon::parse($encounter->period->start)->format('d.m.Y') : now()->format('d.m.Y');
+                    $date = $encounter->period?->start ? Carbon::parse($encounter->period->start)->format('d.m.Y') : now()->format('d.m.Y');
                     $this->form->title = 'План лікування від ' . $date;
                 }
 
@@ -479,15 +488,15 @@ class CarePlanCreate extends BasePatientComponent
                     $conditionUuid = $d->condition?->value;
                     $actualCondition = null;
                     if ($conditionUuid) {
-                        $actualCondition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
+                        $actualCondition = Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
                         if (!$actualCondition) {
                             Log::info('CarePlanCreate updatedFormEncounter: condition not found in local SQL DB, attempting to fetch from eHealth', [
                                 'condition_uuid' => $conditionUuid
                             ]);
                             try {
                                 $conditionData = EHealth::condition()->getById($this->uuid, $conditionUuid)->getData();
-                                \App\Repositories\MedicalEvents\Repository::condition()->store([Arr::toCamelCase($conditionData)], $this->personId);
-                                $actualCondition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
+                               Repository::condition()->store([Arr::toCamelCase($conditionData)], $this->personId);
+                                $actualCondition = Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
                             } catch (\Exception $e) {
                                 Log::error('CarePlanCreate updatedFormEncounter: failed to fetch condition from eHealth', [
                                     'condition_uuid' => $conditionUuid,
@@ -499,7 +508,7 @@ class CarePlanCreate extends BasePatientComponent
 
                     return [
                         'date' => $actualCondition?->asserted_date
-                            ? \Carbon\Carbon::parse($actualCondition->asserted_date)->format('d.m.Y')
+                            ? Carbon::parse($actualCondition->asserted_date)->format('d.m.Y')
                             : '-',
                         'name' => ($actualCondition?->code?->text ?: null)
                             ?? ($actualCondition?->code?->coding?->first()?->code ?: null)
@@ -625,7 +634,11 @@ class CarePlanCreate extends BasePatientComponent
             if ($finalResponse['status'] !== 'processed' && $finalResponse['status'] !== 'active') {
                 $errorMsg = 'Помилка валідації від ЕСОЗ';
                 if (!empty($finalResponse['error']['invalid'])) {
-                    $errorMsg .= ': ' . json_encode(array_map(fn ($e) => $e['rules'][0]['description'] ?? $e['entry'], $finalResponse['error']['invalid']), JSON_UNESCAPED_UNICODE);
+                    $errorMsg .= ': ' . json_encode(
+                            array_map(static fn($e) => $e['rules'][0]['description'] ?? $e['entry'],
+                                $finalResponse['error']['invalid']),
+                            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE
+                        );
                 }
                 throw new \RuntimeException($errorMsg);
             }
@@ -804,7 +817,7 @@ class CarePlanCreate extends BasePatientComponent
             return $data;
         }
 
-        $encounter = \App\Models\MedicalEvents\Sql\Encounter::where('uuid', $this->form->encounter)
+        $encounter = Encounter::where('uuid', $this->form->encounter)
             ->with(['diagnoses.condition', 'period'])
             ->first();
 
@@ -838,15 +851,15 @@ class CarePlanCreate extends BasePatientComponent
                 ->map(function ($d) use ($encounter) {
                     $conditionUuid = $d->condition?->value;
                     if ($conditionUuid) {
-                        $actualCondition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
+                        $actualCondition = Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
                         if (!$actualCondition) {
                             Log::warning('CarePlanCreate: condition not found in local SQL DB, attempting to fetch from eHealth', [
                                 'condition_uuid' => $conditionUuid
                             ]);
                             try {
                                 $conditionData = EHealth::condition()->getById($this->uuid, $conditionUuid)->getData();
-                                \App\Repositories\MedicalEvents\Repository::condition()->store([Arr::toCamelCase($conditionData)], $this->personId);
-                                $actualCondition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
+                                Repository::condition()->store([Arr::toCamelCase($conditionData)], $this->personId);
+                                $actualCondition = Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
                             } catch (\Exception $e) {
                                 Log::error('CarePlanCreate: failed to fetch condition from eHealth', [
                                     'condition_uuid' => $conditionUuid,

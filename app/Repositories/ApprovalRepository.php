@@ -6,6 +6,8 @@ namespace App\Repositories;
 
 use App\Classes\eHealth\EHealth;
 use App\Models\Approval;
+use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\Person\Person;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 
@@ -25,7 +27,7 @@ class ApprovalRepository
             if (method_exists($entity, 'person') && $entity->person) {
                 $patientUuid = $entity->person->uuid;
             } elseif (isset($entity->person_id)) {
-                $person = \App\Models\Person\Person::find($entity->person_id);
+                $person = Person::find($entity->person_id);
                 $patientUuid = $person?->uuid;
             }
 
@@ -98,7 +100,7 @@ class ApprovalRepository
             return null;
         }
 
-        $identifier = \App\Models\MedicalEvents\Sql\Identifier::where('value', $uuid)->first();
+        $identifier = Identifier::where('value', $uuid)->first();
         if (!$identifier) {
             $identifier = \App\Repositories\MedicalEvents\Repository::identifier()->store($uuid);
         }
