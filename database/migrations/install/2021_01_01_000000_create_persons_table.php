@@ -34,6 +34,7 @@ return new class extends Migration
             $table->string('unzr')->unique()->nullable();
             $table->jsonb('emergency_contact')->nullable();
             $table->boolean('patient_signed')->default(false)->comment("Person's evidence of sign the person request");
+            $table->boolean('is_syncing')->default(false)->comment('Indicates whether the person data is currently being synchronized with an eHealth system');
             $table->boolean('process_disclosure_data_consent')->default(true)->comment("Person's evidence of information about consent to data disclosure");
             $table->date('death_date')->nullable();
             $table->timestamps();
