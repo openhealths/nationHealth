@@ -1,0 +1,18 @@
+{
+    "agents": [
+        "junie",
+        "antigravity",
+        "copilot"
+    ],
+    "cloud": false,
+    "guidelines": true,
+    "mcp": true,
+    "nightwatch": false,
+    "sail": true,
+    "skills": [
+        "developing-with-fortify",
+        "laravel-best-practices",
+        "livewire-development",
+        "tailwindcss-development"
+    ]
+}
