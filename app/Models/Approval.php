@@ -19,7 +19,7 @@ class Approval extends Model
         'granted_to_type',
         'granted_by_id',
         'status',
-        'reason',
+        'reason_id',
     ];
 
     protected $appends = ['granted_to_details'];

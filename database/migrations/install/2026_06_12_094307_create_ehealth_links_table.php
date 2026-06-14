@@ -24,6 +24,8 @@ return new class extends Migration
             $table->text('href')->nullable();
 
             $table->timestamps();
+
+            $table->unique(['linkable_type', 'linkable_id', 'ehealth_job_id'], 'ehealth_links_linkable_job_unique');
         });
     }
 

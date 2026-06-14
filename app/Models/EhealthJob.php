@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class EhealthJob extends Model
 {
     protected $fillable = [
-        'remote_job_id',
         'processing_method',
         'status',
         'request_data',

@@ -205,7 +205,11 @@ abstract class DeclarationComponent extends Component
                             ->where('type', AuthenticationMethod::OFFLINE->value)->value('url');
         }
 
-        $this->showInformationMessageModal = true;
+        if (!$this->isSyncing) {
+            $this->showInformationMessageModal = true;
+        } else {
+            $this->showUpdatePersonDataModal = true;
+        }
     }
 
     /**
@@ -300,6 +304,8 @@ abstract class DeclarationComponent extends Component
 
         if (empty($this->uploadedDocuments)) {
             $this->showAuthModal = true;
+        } else if ($this->isNeedToPersonUpdate) {
+            $this->showUpdatePersonDataModal = true;
         } else {
             $this->showUploadingDocumentsModal = true;
         }
@@ -313,13 +319,6 @@ abstract class DeclarationComponent extends Component
     public function approve(): void
     {
         if (!$this->ensureAbility('approve', __('declarations.policy.approve'))) {
-            return;
-        }
-
-        if ($this->isNeedToPersonUpdate) {
-            $this->showAuthModal = false;
-            $this->showUpdatePersonDataModal = true;
-
             return;
         }
 

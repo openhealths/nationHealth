@@ -47,7 +47,7 @@
                     {{-- Action buttons --}}
                     <div class="flex justify-center gap-8.5 mt-16">
                         <button type="button" @click="isNeedToUpdatePerson = false" class="button-minor">
-                            {{ __('forms.cancel') }}
+                            {{ $isSyncing ? __('forms.close') : __('forms.cancel') }}
                         </button>
 
                         @if(!$isSyncing)

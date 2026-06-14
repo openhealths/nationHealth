@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace App\Livewire\Declaration;
 
+use Exception;
 use App\Core\Arr;
+use Carbon\Carbon;
+use App\Enums\Status;
+use App\Models\Approval;
+use App\Models\EhealthJob;
+use App\Models\EhealthLink;
 use App\Models\LegalEntity;
-use App\Classes\eHealth\EHealth;
 use App\Enums\ResponseStatus;
+use App\Models\Person\Person;
+use App\Classes\eHealth\EHealth;
 use App\Repositories\Repository;
+use Illuminate\Support\Facades\DB;
 use App\Models\DeclarationRequest;
 use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Models\EhealthJob;
-use Carbon\Carbon;
-use Exception;
 
 class DeclarationEdit extends DeclarationComponent
 {
@@ -85,24 +90,48 @@ class DeclarationEdit extends DeclarationComponent
         }
         $jobData= [];
   
-        foreach (Arr::get($responseData, 'links', []) as $link) {
-            $jobData[] = [
-                'remote_job_id' => basename($link['href']),
-                'status' => \strtoupper($responseData['status']),
-                'processing_method' => $responseStatus?->name,
-                'request_data' => null,
-                'response_data' => null,
-                'eta' => Carbon::parse($responseData['eta'])->setTimezone(config('app.timezone', 'Europe/Kyiv'))
-            ];
-        }
-        // dd($jobData);
-        try {
-            EhealthJob::upsert($jobData, ['remote_job_id']);
-        } catch (Exception $exception) {
-            $this->handleDatabaseErrors($exception, 'Error creating eHealth job request after response');
+        $jobData = [
+            'status' => \strtoupper($responseData['status']),
+            'processing_method' => $responseStatus?->name,
+            'request_data' => null,
+            'response_data' => $responseData,
+            'eta' => Carbon::parse($responseData['eta'])->setTimezone(config('app.timezone', 'Europe/Kyiv'))
+        ];
 
-            return;
-        }
+        DB::transaction(function () use ($jobData, $responseData) {
+            $approval = Repository::approval()->create([
+                'uuid' => null,
+                'approvable_id' => $this->personId,
+                'approvable_type' => Person::class,
+                'granted_to_id' => null,
+                'granted_by_id' => null,
+                'status' => Status::NEW->value,
+                'reason_id' => null,
+            ]);
+
+            // dd($jobData);
+            try {
+                $job = EhealthJob::create($jobData);
+            } catch (Exception $exception) {
+                $this->handleDatabaseErrors($exception, 'Error creating eHealth job request after response');
+
+                return;
+            }
+
+            $linksData = [];
+
+            foreach (Arr::get($responseData, 'links', []) as $link) {
+                $linksData[] = [
+                    'linkable_type' => Approval::class,
+                    'linkable_id' => $approval->id,
+                    'ehealth_job_id' => $job->id,
+                    'entity' => $link['entity'],
+                    'href' => $link['href']
+                ];
+            }
+
+            EhealthLink::upsert($linksData, ['linkable_type', 'linkable_id', 'ehealth_job_id']);
+        });
 
         $this->isSyncing = true;
 
