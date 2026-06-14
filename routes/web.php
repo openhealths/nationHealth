@@ -132,6 +132,10 @@ Route::middleware('guest')->group(function () {
     // Login to eHealth for development environment only
     if (App::isLocal()) {
         Route::get('dev/login', LoginDev::class)->name('dev.login');
+        Route::get('dev/dictionary', function (Illuminate\Http\Request $request) {
+            $name = $request->query('name');
+            return app(App\Classes\eHealth\Api\Dictionary::class)->getMany(['name' => $name]);
+        })->name('dev.dictionary');
     }
 });
 

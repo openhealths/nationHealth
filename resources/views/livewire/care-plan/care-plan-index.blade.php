@@ -343,4 +343,5 @@
     </div>
 
     <x-forms.loading/>
+    <livewire:components.x-message :key="time()" />
 </section>

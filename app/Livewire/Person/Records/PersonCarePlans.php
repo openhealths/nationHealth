@@ -15,8 +15,6 @@ use Throwable;
 
 class PersonCarePlans extends BasePatientComponent
 {
-    public $carePlans = [];
-
     public string $filterName = '';
     public string $filterEncounterId = '';
     public string $filterStatus = '';
@@ -43,16 +41,8 @@ class PersonCarePlans extends BasePatientComponent
         }
     }
 
-    /**
-     * Load care plans from the database.
-     */
     public function loadCarePlans(): void
     {
-        $this->carePlans = app(CarePlanRepository::class)->getByPersonId($this->personId, [
-            'name' => $this->filterName,
-            'status' => $this->filterStatus,
-            'encounter_id' => $this->filterEncounterId,
-        ]);
     }
 
     public function sync(): void
@@ -125,6 +115,12 @@ class PersonCarePlans extends BasePatientComponent
 
     public function render(): View
     {
-        return view('livewire.person.records.care-plans');
+        return view('livewire.person.records.care-plans', [
+            'carePlans' => app(CarePlanRepository::class)->getByPersonId($this->personId, [
+                'name' => $this->filterName,
+                'status' => $this->filterStatus,
+                'encounter_id' => $this->filterEncounterId,
+            ]),
+        ]);
     }
 }

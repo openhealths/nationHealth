@@ -25,7 +25,7 @@
 
                 {{-- Content --}}
                 <div class="p-6">
-                    <form>
+                    <form @submit.prevent @keydown.enter.prevent>
                         <div class="flex flex-col gap-6">
                             @yield('custom-fields')
 

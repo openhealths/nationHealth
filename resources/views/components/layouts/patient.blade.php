@@ -3,8 +3,13 @@
     'patientFullName', 
     'hideNavigation' => false,
     'title' => null,
-    'breadcrumbs' => []
+    'breadcrumbs' => [],
+    'declarationNumber' => null,
 ])
+
+@php
+    $declarationNumber = $declarationNumber ?? ($__livewire->declarationNumber ?? null);
+@endphp
 
 @php
     use App\Models\DeclarationRequest;
@@ -38,10 +43,10 @@
         <x-slot name="description">
             @if(isset($description))
                 {{ $description }}
-            @elseif(isset($this->declarationNumber) && $this->declarationNumber)
+            @elseif(isset($declarationNumber) && $declarationNumber)
                 <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm font-semibold rounded-lg mt-1 border border-gray-100 dark:border-gray-700">
                     @icon('file-text', 'w-4 h-4 text-gray-400')
-                    Декларація №{{ $this->declarationNumber }}
+                    Декларація №{{ $declarationNumber }}
                 </div>
             @endif
         </x-slot>
