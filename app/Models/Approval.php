@@ -3,8 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Approval extends Model
 {
@@ -18,7 +19,7 @@ class Approval extends Model
         'granted_to_type',
         'granted_by_id',
         'status',
-        'reason',
+        'reason_id',
     ];
 
     protected $appends = ['granted_to_details'];
@@ -42,6 +43,16 @@ class Approval extends Model
     public function identifier(): BelongsTo
     {
         return $this->belongsTo(\App\Models\MedicalEvents\Sql\Identifier::class, 'granted_to_id');
+    }
+
+    public function grantedResources(): HasMany
+    {
+        return $this->hasMany(ApprovalGrantedResource::class);
+    }
+
+    public function grantedResourceTypes(): HasMany
+    {
+        return $this->hasMany(ApprovalGrantedResource::class);
     }
 
     public function getGrantedToDetailsAttribute(): array

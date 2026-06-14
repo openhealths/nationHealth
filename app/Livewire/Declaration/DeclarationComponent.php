@@ -67,6 +67,15 @@ abstract class DeclarationComponent extends Component
     public bool $isNeedToPersonUpdate = false;
 
     /**
+     * Status of sync person data with eHealth.
+     * {true}: when we get person data from eHealth and update local person data,
+     * {false}: when we didn't do it yet or sync isn't needed.
+     *
+     * @var bool
+     */
+    public bool $isSyncing = false;
+
+    /**
      * Check is patient sign form.
      *
      * @var bool
@@ -147,7 +156,7 @@ abstract class DeclarationComponent extends Component
 
     protected function baseMount(int $personId): void
     {
-        $patient = Person::select(['uuid', 'first_name', 'last_name', 'second_name'])
+        $patient = Person::select(['uuid', 'first_name', 'last_name', 'second_name', 'is_syncing'])
             ->withExists('documents')
             ->whereId($personId)
             ->firstOrFail();
@@ -164,6 +173,7 @@ abstract class DeclarationComponent extends Component
         $this->form->personId = $this->patientUuid;
         $this->authMethods = $this->getPersonAuthMethods();
 
+        $this->isSyncing = $patient->isSyncing;
         $this->isNeedToResign = Repository::declarationRequest()->checkIfNeedToResign($this->patientUuid);
     }
 
@@ -195,7 +205,11 @@ abstract class DeclarationComponent extends Component
                             ->where('type', AuthenticationMethod::OFFLINE->value)->value('url');
         }
 
-        $this->showInformationMessageModal = true;
+        if (!$this->isSyncing) {
+            $this->showInformationMessageModal = true;
+        } else {
+            $this->showUpdatePersonDataModal = true;
+        }
     }
 
     /**
@@ -206,12 +220,6 @@ abstract class DeclarationComponent extends Component
     public function create(): void
     {
         if (!$this->ensureAbility('create', __('declarations.policy.create'))) {
-            return;
-        }
-
-        if ($this->isNeedToPersonUpdate) {
-            $this->showUpdatePersonDataModal = true;
-
             return;
         }
 
@@ -296,6 +304,8 @@ abstract class DeclarationComponent extends Component
 
         if (empty($this->uploadedDocuments)) {
             $this->showAuthModal = true;
+        } else if ($this->isNeedToPersonUpdate) {
+            $this->showUpdatePersonDataModal = true;
         } else {
             $this->showUploadingDocumentsModal = true;
         }
