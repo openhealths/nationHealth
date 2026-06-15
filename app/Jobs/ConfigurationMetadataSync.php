@@ -26,6 +26,11 @@ class ConfigurationMetadataSync implements ShouldQueue
     public int $timeout = 120;
 
     /**
+     * eHealth resource name whose change triggers an observation configurations re-sync.
+     */
+    private const string OBSERVATION_RESOURCE = 'observation_configurations';
+
+    /**
      * Poll the eHealth configurations metadata endpoint and record per-resource changes.
      *
      * @return void
@@ -36,7 +41,11 @@ class ConfigurationMetadataSync implements ShouldQueue
             $resources = EHealth::configuration()->getMetadata()->getData();
 
             foreach ($resources as $resource) {
-                $this->syncResource($resource['resource'], $resource['updated_at']);
+                $changed = $this->syncResource($resource['resource'], $resource['updated_at']);
+
+                if ($changed && $resource['resource'] === self::OBSERVATION_RESOURCE) {
+                    ObservationConfigurationSync::dispatch();
+                }
             }
         } catch (Exception $exception) {
             Log::channel('task_scheduling')->error('Configurations metadata sync failed.', [
@@ -50,16 +59,17 @@ class ConfigurationMetadataSync implements ShouldQueue
      *
      * @param  string  $resource
      * @param  string  $updatedAt
-     * @return void
+     * @return bool Whether the resource's updated_at changed.
      */
-    private function syncResource(string $resource, string $updatedAt): void
+    private function syncResource(string $resource, string $updatedAt): bool
     {
         $record = ConfigurationMetadata::firstOrNew(['resource' => $resource]);
         $previousUpdatedAt = $record->resourceUpdatedAt;
 
         $record->resourceUpdatedAt = $updatedAt;
+        $changed = $previousUpdatedAt !== $record->resourceUpdatedAt;
 
-        if ($previousUpdatedAt !== $record->resourceUpdatedAt) {
+        if ($changed) {
             Log::channel('task_scheduling')->info('Configuration resource changed.', [
                 'resource' => $resource,
                 'previous_updated_at' => $previousUpdatedAt,
@@ -68,5 +78,7 @@ class ConfigurationMetadataSync implements ShouldQueue
         }
 
         $record->save();
+
+        return $changed;
     }
 }

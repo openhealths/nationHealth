@@ -21,6 +21,7 @@ use App\Livewire\Encounter\Forms\Api\EncounterRequestApi;
 use App\Models\Employee\Employee;
 use App\Models\Icd10;
 use App\Models\Person\Person;
+use App\Services\MedicalEvents\ObservationConfigService;
 use App\Traits\FormTrait;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Locked;
@@ -239,31 +240,7 @@ class EncounterComponent extends Component
         'eHealth/ICF/observation_categories',
         'eHealth/LOINC/observation_codes',
         'eHealth/custom/observation_codes',
-        'eHealth/stature',
-        'eHealth/eye_colour',
-        'eHealth/hair_color',
-        'eHealth/hair_length',
         'GENDER',
-        'eHealth/rankin_scale',
-        'eHealth/LOINC/LL2009-0',
-        'eHealth/LOINC/LL2021-5',
-        'eHealth/occupation_type',
-        'eHealth/vaccination_covid_groups',
-        'eHealth/LOINC/LL2451-4',
-        'eHealth/LOINC/LL360-9',
-        'eHealth/LOINC/LL3841-5',
-        'eHealth/LOINC/LL4129-4',
-        'eHealth/LOINC/LL3250-9',
-        'eHealth/LOINC/LL744-4',
-        'eHealth/LOINC/LL951-5',
-        'eHealth/LOINC/LL3290-5',
-        'eHealth/LOINC/LL5128-5',
-        'eHealth/LOINC/LL2478-7',
-        'eHealth/LOINC/LL6876-8',
-        'eHealth/LOINC/LL733-7',
-        'eHealth/LOINC/LL1036-4',
-        'eHealth/LOINC/LL2411-8',
-        'eHealth/LOINC/LL6372-8',
         'eHealth/ICF/qualifiers',
         'eHealth/ICF/qualifiers/extent_or_magnitude_of_impairment',
         'eHealth/ICF/qualifiers/nature_of_change_in_body_structure',
@@ -286,17 +263,24 @@ class EncounterComponent extends Component
     {
         $icd10Cache = $this->dictionaries['eHealth/ICD10_AM/condition_codes'] ?? [];
 
+        $observationConfigService = app(ObservationConfigService::class);
+
+        $this->dictionaryNames = [
+            ...$this->dictionaryNames,
+            ...$observationConfigService->codeableConceptBindings()
+        ];
+
         $this->getDictionary();
 
         $this->dictionaries['eHealth/ICD10_AM/condition_codes'] = $icd10Cache;
 
-        $this->observationLoincCodeMap = config('observation.category_codes.loinc', []);
-        $this->observationCustomCodeMap = config('observation.category_codes.custom', []);
-        $this->observationValueMap = config('observation.code_values');
+        $this->observationLoincCodeMap = $observationConfigService->loincCodeMap();
+        $this->observationCustomCodeMap = $observationConfigService->customCodeMap();
+        $this->observationValueMap = $observationConfigService->valueMap();
 
         $this->loadCustomDictionaries();
 
-        $this->codeableConceptValues = collect(config('observation.code_values'))
+        $this->codeableConceptValues = collect($this->observationValueMap)
             ->filter(static fn (array $value) => $value[1] === 'valueCodeableConcept')
             ->mapWithKeys(fn (array $value) => [
                 $value[0] => $this->dictionaries[$value[0]] ?? [],

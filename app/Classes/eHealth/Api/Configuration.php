@@ -37,7 +37,17 @@ class Configuration extends Request
     /**
      * Get configurations for compositions.
      *
-     * @param  array  $query
+     * @param  array{
+     *     type?: string,
+     *     category?: string,
+     *     is_active?: bool,
+     *     inserted_at_from?: string,
+     *     inserted_at_to?: string,
+     *     updated_at_from?: string,
+     *     updated_at_to?: string,
+     *     page?: int,
+     *     page_size?: int
+     * }  $query
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
@@ -53,7 +63,17 @@ class Configuration extends Request
     /**
      * Get configurations for devices.
      *
-     * @param  array  $query
+     * @param  array{
+     *     code?: string,
+     *     system?: string,
+     *     is_active?: bool,
+     *     inserted_at_from?: string,
+     *     inserted_at_to?: string,
+     *     updated_at_from?: string,
+     *     updated_at_to?: string,
+     *     page?: int,
+     *     page_size?: int
+     * }  $query
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
@@ -69,7 +89,17 @@ class Configuration extends Request
     /**
      * Get configurations for devices parameters.
      *
-     * @param  array  $query
+     * @param  array{
+     *     code?: string,
+     *     system?: string,
+     *     is_active?: bool,
+     *     inserted_at_from?: string,
+     *     inserted_at_to?: string,
+     *     updated_at_from?: string,
+     *     updated_at_to?: string,
+     *     page?: int,
+     *     page_size?: int
+     * }  $query
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
@@ -85,7 +115,16 @@ class Configuration extends Request
     /**
      * Get configurations for dictionaries.
      *
-     * @param  array  $query
+     * @param  array{
+     *     name?: string,
+     *     is_active?: bool,
+     *     inserted_at_from?: string,
+     *     inserted_at_to?: string,
+     *     updated_at_from?: string,
+     *     updated_at_to?: string,
+     *     page?: int,
+     *     page_size?: int
+     * }  $query
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
@@ -101,7 +140,17 @@ class Configuration extends Request
     /**
      * Get configurations for observations.
      *
-     * @param  array  $query
+     * @param  array{
+     *     code?: string,
+     *     system?: string,
+     *     is_active?: bool,
+     *     inserted_at_from?: string,
+     *     inserted_at_to?: string,
+     *     updated_at_from?: string,
+     *     updated_at_to?: string,
+     *     page?: int,
+     *     page_size?: int
+     * }  $query
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
