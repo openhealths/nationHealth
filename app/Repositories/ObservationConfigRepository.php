@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Services\MedicalEvents;
+namespace App\Repositories;
 
 use App\Models\ObservationConfig;
 use Illuminate\Support\Facades\Cache;
 
-class ObservationConfigService
+class ObservationConfigRepository
 {
     private const string CACHE_KEY = 'observation_configs:maps';
     private const string SYSTEM_LOINC = 'eHealth/LOINC/observation_codes';

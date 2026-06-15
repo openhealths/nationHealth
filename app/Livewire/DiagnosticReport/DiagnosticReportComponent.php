@@ -10,7 +10,8 @@ use App\Models\Employee\Employee;
 use App\Models\Icd10;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
-use App\Services\MedicalEvents\ObservationConfigService;
+use App\Repositories\ObservationConfigRepository;
+use App\Repositories\Repository;
 use App\Traits\FormTrait;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -136,18 +137,18 @@ class DiagnosticReportComponent extends Component
             throw new RuntimeException('Authenticated user not found');
         }
 
-        $observationConfigService = app(ObservationConfigService::class);
+        $observationConfigRepository = Repository::observationConfig();
 
         $this->dictionaryNames = [
             ...$this->dictionaryNames,
-            ...$observationConfigService->codeableConceptBindings()
+            ...$observationConfigRepository->codeableConceptBindings()
         ];
 
         $this->getDictionary();
 
         try {
             $this->dictionaries['custom/services'] = dictionary()->services()->flattened()->toArray();
-            $this->loadObservationDictionaries($observationConfigService);
+            $this->loadObservationDictionaries($observationConfigRepository);
         } catch (RuntimeException) {
             Log::channel('e_health_errors')
                 ->error('Error while loading observation dictionary in DiagnosticReportComponent');
@@ -204,19 +205,19 @@ class DiagnosticReportComponent extends Component
     /**
      * Loads dictionaries and related mappings for observations.
      *
-     * @param  ObservationConfigService  $observationConfigService
+     * @param  ObservationConfigRepository  $observationConfigRepository
      * @return void
      */
-    protected function loadObservationDictionaries(ObservationConfigService $observationConfigService): void
+    protected function loadObservationDictionaries(ObservationConfigRepository $observationConfigRepository): void
     {
         $this->dictionaries['eHealth/ICF/classifiers'] = dictionary()->basics()
             ->byName('eHealth/ICF/classifiers')
             ->flattenedChildValues()
             ->toArray();
 
-        $this->observationLoincCodeMap = $observationConfigService->loincCodeMap();
-        $this->observationCustomCodeMap = $observationConfigService->customCodeMap();
-        $this->observationValueMap = $observationConfigService->valueMap();
+        $this->observationLoincCodeMap = $observationConfigRepository->loincCodeMap();
+        $this->observationCustomCodeMap = $observationConfigRepository->customCodeMap();
+        $this->observationValueMap = $observationConfigRepository->valueMap();
 
         $this->codeableConceptValues = collect($this->observationValueMap)
             ->filter(static fn (array $value) => $value[1] === 'valueCodeableConcept')

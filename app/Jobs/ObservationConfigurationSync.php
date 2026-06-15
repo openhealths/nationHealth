@@ -6,7 +6,7 @@ namespace App\Jobs;
 
 use App\Classes\eHealth\EHealth;
 use App\Models\ObservationConfig;
-use App\Services\MedicalEvents\ObservationConfigService;
+use App\Repositories\ObservationConfigRepository;
 use Exception;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -33,10 +33,10 @@ class ObservationConfigurationSync implements ShouldQueue
      * Fetches everything on the first run (empty table) and only records changed since the
      * latest known updated_at on subsequent runs, via the updated_at_from date filter.
      *
-     * @param  ObservationConfigService  $observationConfigService
+     * @param  ObservationConfigRepository  $observationConfigRepository
      * @return void
      */
-    public function handle(ObservationConfigService $observationConfigService): void
+    public function handle(ObservationConfigRepository $observationConfigRepository): void
     {
         try {
             $query = [];
@@ -58,7 +58,7 @@ class ObservationConfigurationSync implements ShouldQueue
                 $page++;
             } while ($response->isNotLast());
 
-            $observationConfigService->flush();
+            $observationConfigRepository->flush();
         } catch (Exception $exception) {
             Log::channel('task_scheduling')->error('Observation configurations sync failed.', [
                 'message' => $exception->getMessage()

@@ -115,4 +115,9 @@ final class Repository
     {
         return app(ApprovalRepository::class);
     }
+
+    public static function observationConfig(): ObservationConfigRepository
+    {
+        return app(ObservationConfigRepository::class);
+    }
 }

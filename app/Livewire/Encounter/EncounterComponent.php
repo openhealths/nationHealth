@@ -21,7 +21,7 @@ use App\Livewire\Encounter\Forms\Api\EncounterRequestApi;
 use App\Models\Employee\Employee;
 use App\Models\Icd10;
 use App\Models\Person\Person;
-use App\Services\MedicalEvents\ObservationConfigService;
+use App\Repositories\Repository;
 use App\Traits\FormTrait;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Locked;
@@ -263,20 +263,20 @@ class EncounterComponent extends Component
     {
         $icd10Cache = $this->dictionaries['eHealth/ICD10_AM/condition_codes'] ?? [];
 
-        $observationConfigService = app(ObservationConfigService::class);
+        $observationConfigRepository = Repository::observationConfig();
 
         $this->dictionaryNames = [
             ...$this->dictionaryNames,
-            ...$observationConfigService->codeableConceptBindings()
+            ...$observationConfigRepository->codeableConceptBindings()
         ];
 
         $this->getDictionary();
 
         $this->dictionaries['eHealth/ICD10_AM/condition_codes'] = $icd10Cache;
 
-        $this->observationLoincCodeMap = $observationConfigService->loincCodeMap();
-        $this->observationCustomCodeMap = $observationConfigService->customCodeMap();
-        $this->observationValueMap = $observationConfigService->valueMap();
+        $this->observationLoincCodeMap = $observationConfigRepository->loincCodeMap();
+        $this->observationCustomCodeMap = $observationConfigRepository->customCodeMap();
+        $this->observationValueMap = $observationConfigRepository->valueMap();
 
         $this->loadCustomDictionaries();
 
