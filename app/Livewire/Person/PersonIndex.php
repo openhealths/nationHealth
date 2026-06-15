@@ -291,7 +291,7 @@ class PersonIndex extends Component
 
             return $person;
         } catch (Exception $exception) {
-            $this->logDatabaseErrors($exception, 'Error while creating new person');
+            $this->handleDatabaseErrors($exception, 'Error while creating new person');
 
             return null;
         }

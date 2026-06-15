@@ -7,6 +7,7 @@ namespace App\Classes\eHealth;
 use App\Classes\eHealth\Api\Address;
 use App\Classes\eHealth\Api\Approval;
 use App\Classes\eHealth\Api\Auth;
+use App\Classes\eHealth\Api\Configuration;
 use App\Classes\eHealth\Api\Contract;
 use App\Classes\eHealth\Api\CarePlan;
 use App\Classes\eHealth\Api\CarePlanActivity;
@@ -59,6 +60,11 @@ final class EHealth
     public static function job(): Job
     {
         return app(Job::class);
+    }
+
+    public static function configuration(): Configuration
+    {
+        return app(Configuration::class);
     }
 
     public static function deviceDefinition(): DeviceDefinition
