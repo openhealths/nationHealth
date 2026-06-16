@@ -74,6 +74,11 @@ class Equipment extends Model
         return $this->belongsTo(__CLASS__, 'parent_id');
     }
 
+    public function children(): HasMany
+    {
+        return $this->hasMany(__CLASS__, 'parent_id');
+    }
+
     public function names(): HasMany
     {
         return $this->hasMany(EquipmentName::class, 'equipment_id');

@@ -15,7 +15,7 @@ return [
     'inventory_number' => 'Інвентарний №',
     'manufacturer' => 'Виробник',
     'manufacture_date' => 'Дата виробництва',
-    'expiration_date' => 'Термін придатності',
+    'expiration_date' => 'Термін експлуатації надавачем',
     'model_number' => '№ моделі',
     'lot_number' => '№ закупівлі',
     'notes_and_comments' => 'Примітки та коментарі',
@@ -30,6 +30,7 @@ return [
     'reason_for_status_change' => 'Причина зміни статусу',
     'update_equipment_status' => 'Оновити статус обладнання ',
     'update_equipment_availability' => 'Оновити доступність обладнання',
+    'child_equipment_warning' => 'Це обладнання є батьківським. З ним зареєстровано таке обладнання:',
 
     'status' => [
         'active' => 'Активний',
