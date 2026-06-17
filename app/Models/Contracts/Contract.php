@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\Contracts;
 
-use App\Enums\Contract\Status;
+use App\Enums\Contract\ContractStatus;
 use App\Enums\JobStatus;
 use App\Models\LegalEntity;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -45,15 +45,20 @@ class Contract extends BaseContract
         'is_active' => 'boolean',
         'is_suspended' => 'boolean',
         'skip_provision_deactivation' => 'boolean',
-        'medical_programs' => 'array',
-        'status' => Status::class,
+        'contractor_signed' => 'boolean',
+        'external_contractor_flag' => 'boolean',
+        'status' => ContractStatus::class,
+        'sync_status' => JobStatus::class,
         'start_date' => 'date',
         'end_date' => 'date',
+        'nhs_signed_date' => 'date',
         'inserted_at' => 'datetime',
-        'data' => 'array',
+        'updated_at' => 'datetime',
+        'medical_programs' => 'array',
         'contractor_payment_details' => 'array',
         'contractor_divisions' => 'array',
-        'sync_status' => JobStatus::class,
+        'external_contractors' => 'array',
+        'data' => 'array',
     ];
 
     public function legalEntity(): BelongsTo

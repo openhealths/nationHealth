@@ -60,6 +60,34 @@ class ContractRequestPolicy
     }
 
     /**
+     * Determine whether the user can approve the contract request from MSP side.
+     */
+    public function approve(User $user, ContractRequest $contractRequest): Response
+    {
+        if ($contractRequest->contractor_legal_entity_id !== legalEntity()->uuid) {
+            return Response::denyWithStatus(404);
+        }
+
+        return $user->can('contract_request:approve')
+            ? Response::allow()
+            : Response::deny(__('contracts.policy.approve_denied'));
+    }
+
+    /**
+     * Determine whether the user can sign the contract request from MSP side.
+     */
+    public function sign(User $user, ContractRequest $contractRequest): Response
+    {
+        if ($contractRequest->contractor_legal_entity_id !== legalEntity()->uuid) {
+            return Response::denyWithStatus(404);
+        }
+
+        return $user->can('contract_request:sign')
+            ? Response::allow()
+            : Response::deny(__('contracts.policy.sign_denied'));
+    }
+
+    /**
      * Determine whether the user can synchronize contract requests.
      */
     public function sync(User $user): Response

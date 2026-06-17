@@ -12,8 +12,8 @@ class ContractRequestRepository
     /**
      * Saves or updates a contract request from E-Health data (or local form data).
      *
-     * @param array $eHealthData The raw data payload.
-     * @param string $type The contract type (e.g., REIMBURSEMENT).
+     * @param  array  $eHealthData  The raw data payload.
+     * @param  string  $type  The contract type (e.g., REIMBURSEMENT).
      * @return ContractRequest
      */
     public function saveFromEHealth(array $eHealthData, string $type): ContractRequest
@@ -32,7 +32,11 @@ class ContractRequestRepository
 
         // 3. Set System/Local fields
         $attributes['contractor_legal_entity_id'] = legalEntity()->uuid;
-        $attributes['type'] = strtoupper($type);
+        $attributes['type'] = strtoupper((string) ($eHealthData['type'] ?? $type));
+
+        if (isset($eHealthData['sync_status'])) {
+            $attributes['sync_status'] = $eHealthData['sync_status'];
+        }
 
         // Fallback to legalEntity owner ONLY if input is missing. Never use auth()->id() (int).
         if (!isset($attributes['contractor_owner_id']) || empty($attributes['contractor_owner_id'])) {

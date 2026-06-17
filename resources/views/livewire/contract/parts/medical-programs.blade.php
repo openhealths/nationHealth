@@ -1,19 +1,21 @@
 @if(isset($contract) && isset($data))
-    @if(data_get($data, 'medical_programs'))
+    @if(data_get($data, 'medical_programs') || !empty($contract->medical_programs))
         <fieldset class="fieldset">
             <legend class="legend">{{ __('contracts.medical_programs') }}</legend>
             <div class="flex flex-wrap gap-2">
-                @foreach($data['medical_programs'] as $program)
+                @foreach(data_get($data, 'medical_programs', $contract->medical_programs ?? []) as $program)
                     @php
-                        $key = is_array($program) ? ($program['name'] ?? $program['id']) : $program;
-                        $translationKey = 'contracts.' . strtolower($key);
-                        $translatedName = __($translationKey);
-                        if ($translatedName === $translationKey) {
-                            $translatedName = $key;
+                        $programId = is_array($program) ? ($program['id'] ?? null) : $program;
+                        $programName = is_array($program) ? ($program['name'] ?? null) : null;
+
+                        if (!$programName && $programId) {
+                            $programName = ($medicalProgramNames ?? [])[$programId] ?? null;
                         }
+
+                        $displayName = $programName ?? $programId;
                     @endphp
                     <span class="text-gray-900 dark:text-white">
-                        {{ $translatedName }}
+                        {{ $displayName }}
                     </span>
                 @endforeach
             </div>

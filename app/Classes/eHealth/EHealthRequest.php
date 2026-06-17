@@ -15,6 +15,7 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\HigherOrderTapProxy;
+use Illuminate\Support\Str;
 
 abstract class EHealthRequest extends PendingRequest
 {
@@ -72,7 +73,9 @@ abstract class EHealthRequest extends PendingRequest
      */
     public function send(string $method, string $url, array $options = []): EHealthResponse|Response
     {
-        Log::debug("eHealth Request: {$method} {$url}", ['options' => $options]);
+        Log::debug("eHealth Request: {$method} {$url}", [
+            'options' => $this->sanitizeOptionsForLog($options),
+        ]);
 
         try {
             $response = parent::send($method, $url, $options);
@@ -93,6 +96,28 @@ abstract class EHealthRequest extends PendingRequest
         }
 
         throw new EHealthResponseException($response);
+    }
+
+    /**
+     * Remove sensitive and too-large values from HTTP client logs.
+     */
+    private function sanitizeOptionsForLog(array $options): array
+    {
+        if (isset($options['json']) && is_array($options['json'])) {
+            $json = $options['json'];
+
+            if (isset($json['signed_content']) && is_string($json['signed_content'])) {
+                $json['signed_content'] = '[base64_signed_content_redacted length=' . strlen($json['signed_content']) . ']';
+            }
+
+            $options['json'] = $json;
+        }
+
+        if (isset($options['body']) && is_string($options['body']) && strlen($options['body']) > 512) {
+            $options['body'] = '[body_redacted length=' . strlen($options['body']) . ' preview=' . Str::limit($options['body'], 120) . ']';
+        }
+
+        return $options;
     }
 
     /**

@@ -22,6 +22,7 @@ enum Status: string
     case TERMINATED = 'TERMINATED';
     case PENDING_NHS_SIGN = 'PENDING_NHS_SIGN';
     case NHS_SIGNED = 'NHS_SIGNED';
+    case MSP_APPROVED = 'MSP_APPROVED';
     case SIGNED = 'SIGNED';
 
     /**
@@ -38,6 +39,7 @@ enum Status: string
             self::TERMINATED => __('contracts.status.terminated'),
             self::PENDING_NHS_SIGN => __('contracts.status.pending_nhs_sign'),
             self::NHS_SIGNED => __('contracts.status.nhs_signed'),
+            self::MSP_APPROVED => __('contracts.status.msp_approved'),
             self::SIGNED => __('contracts.status.signed')
         };
     }
@@ -52,7 +54,7 @@ enum Status: string
             self::DRAFT => 'badge-gray',
             self::NEW, self::SIGNED => 'badge-green',
             self::IN_PROCESS, self::PENDING_NHS_SIGN => 'badge-yellow',
-            self::APPROVED, self::NHS_SIGNED => 'badge-blue',
+            self::APPROVED, self::NHS_SIGNED, self::MSP_APPROVED => 'badge-blue',
             self::TERMINATED, self::DECLINED => 'badge-red'
         };
     }

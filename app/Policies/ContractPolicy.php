@@ -54,8 +54,10 @@ class ContractPolicy
      */
     public function sync(User $user): Response
     {
-        return $user->can('contract_request:read')
-            ? Response::allow()
-            : Response::deny(__('contracts.policy.sync_denied'));
+        if ($user->can('contract:read') || $user->can('contract_request:read')) {
+            return Response::allow();
+        }
+
+        return Response::deny(__('contracts.policy.sync_denied'));
     }
 }

@@ -10,15 +10,14 @@ enum Type: string
 {
     use EnumUtils;
 
-    case REIMBURSEMENT = 'REIMBURSMENT';
-    case CAPITATIONS = 'CAPITATIONS';
+    case REIMBURSEMENT = 'REIMBURSEMENT';
+    case CAPITATION = 'CAPITATION';
 
     public function label(): string
     {
-        return match($this) {
-            // Update translation keys to match contracts.php
+        return match ($this) {
             self::REIMBURSEMENT => __('contracts.reimbursement'),
-            self::CAPITATIONS => __('contracts.capitation'),
+            self::CAPITATION => __('contracts.capitation'),
         };
     }
 }

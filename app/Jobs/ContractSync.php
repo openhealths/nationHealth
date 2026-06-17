@@ -30,7 +30,7 @@ class ContractSync extends EHealthJob
         // and aliases to prevent conflict with Contract Model.
         return app(ApiContract::class)
             ->withToken($token)
-            ->getMany(['legal_entity_id' => $this->legalEntity->uuid]);
+            ->getMany(['contractor_legal_entity_id' => $this->legalEntity->uuid]);
     }
 
     /**

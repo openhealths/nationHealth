@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\Contract;
 
-use App\Classes\eHealth\Api\MedicalProgram;
 use App\Livewire\Contract\Forms\ReimbursementContractRequestForm as Form;
 use App\Models\LegalEntity;
 use App\Repositories\Repository;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Log;
@@ -17,6 +16,7 @@ use Log;
 class ReimbursementContractCreate extends ContractComponent
 {
     public Form $form;
+    public array $allMedicalPrograms = [];
     public array $medicalProgramsList = [];
 
     /**
@@ -35,34 +35,121 @@ class ReimbursementContractCreate extends ContractComponent
         $this->loadMedicalPrograms();
     }
 
+    /**
+     * Load reimbursement programs from dictionary cache, with JSON export as fallback.
+     */
     protected function loadMedicalPrograms(): void
     {
-        Cache::forget('ehealth_medical_programs_reimbursement');
+        $programs = $this->loadMedicalProgramsFromDictionary();
 
-        $programs = Cache::remember('ehealth_medical_programs_reimbursement', 3600, function () {
-            try {
-                $request = new MedicalProgram();
-
-                $response = $request->asMis()->getMany([
-                    'page_size' => 100,
-                ]);
-
-                return $response->getData();
-            } catch (\Exception $e) {
-                Log::error('Medical Programs Fetch Error: ' . $e->getMessage());
-                return [];
-            }
-        });
-
-        $formattedList = [];
-        foreach ($programs as $item) {
-            $formattedList[] = [
-                'id' => $item['id'],
-                'name' => $item['name'] . ' (' . ($item['type'] ?? 'N/A') . ')',
-            ];
+        if ($programs === []) {
+            Log::warning('Medical programs dictionary is empty. Using fallback JSON.');
+            $programs = $this->loadMedicalProgramsFallback();
         }
 
-        $this->medicalProgramsList = $formattedList;
+        $this->allMedicalPrograms = $programs;
+        $this->applyMedicalProgramsFilter();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function loadMedicalProgramsFromDictionary(): array
+    {
+        try {
+            return dictionary()->medicalPrograms()
+                ->filter(fn (array $item): bool => $this->isValidReimbursementProgram($item))
+                ->values()
+                ->all();
+        } catch (\Throwable $exception) {
+            Log::error('Medical Programs Fetch Error: '.$exception->getMessage());
+
+            return [];
+        }
+    }
+
+    private function isValidReimbursementProgram(array $item): bool
+    {
+        $name = mb_strtolower((string) ($item['name'] ?? ''));
+        $settings = $item['medical_program_settings'] ?? [];
+        $requestAllowed = (bool) ($settings['request_allowed'] ?? $item['request_allowed'] ?? false);
+
+        return (bool) ($item['is_active'] ?? true)
+            && ($item['funding_source'] ?? null) === 'NHS'
+            && ($item['type'] ?? null) === 'MEDICATION'
+            && $requestAllowed
+            && !str_contains($name, 'тест')
+            && !str_contains($name, 'test');
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function loadMedicalProgramsFallback(): array
+    {
+        $path = storage_path('app/exports/medical-programs-valid-reimbursement.json');
+
+        if (!File::exists($path)) {
+            Log::warning('Medical Programs fallback file is missing.', ['path' => $path]);
+
+            return [];
+        }
+
+        try {
+            $decoded = json_decode(File::get($path), true, 512, JSON_THROW_ON_ERROR);
+        } catch (\Throwable $exception) {
+            Log::error('Medical Programs fallback JSON decode failed.', [
+                'path' => $path,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return [];
+        }
+
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        $programs = $decoded['programs'] ?? $decoded;
+
+        if (!is_array($programs)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $programs,
+            static fn (mixed $item): bool => is_array($item) && !empty($item['id']) && !empty($item['name'])
+        ));
+    }
+
+    public function updatedFormIdForm(): void
+    {
+        $this->applyMedicalProgramsFilter();
+    }
+
+    private function applyMedicalProgramsFilter(): void
+    {
+        $idForm = $this->form->idForm ?? null;
+
+        $filteredPrograms = array_values(array_filter(
+            $this->allMedicalPrograms,
+            static function (array $item) use ($idForm): bool {
+                $mrBlankType = $item['mr_blank_type'] ?? null;
+
+                // For psychiatry contracts, allow F-3 programs.
+                if ($idForm === 'PSYCHIATRY') {
+                    return in_array($mrBlankType, ['F-1', 'F-3'], true);
+                }
+
+                // For GENERAL/PMD_1/ND_1/INSULIN_1 keep regular reimbursement forms.
+                return $mrBlankType === 'F-1';
+            }
+        ));
+
+        $this->medicalProgramsList = array_map(static fn (array $item) => [
+            'id' => $item['id'],
+            'name' => $item['name'] . ' (' . ($item['type'] ?? 'N/A') . ')',
+        ], $filteredPrograms);
     }
 
     protected function getContractType(): string
@@ -76,29 +163,32 @@ class ReimbursementContractCreate extends ContractComponent
             ?? 'Я підтверджую достовірність наданих даних...';
 
         $payerAccount = str_replace(' ', '', $data['contractorPaymentDetails']['payerAccount'] ?? '');
+        $mfo = preg_replace('/\D/', '', (string) ($data['contractorPaymentDetails']['MFO'] ?? ''));
 
-        $insulinProgramId = ['1a227396-a0e4-4c4f-a0a9-6b358c8929d2'];
+        $selectedProgramIds = array_filter($data['medicalPrograms'] ?? []);
 
-        $idForm = 'GENERAL';
+        $contractorPaymentDetails = [
+            'payer_account' => $payerAccount,
+            'bank_name' => $data['contractorPaymentDetails']['bankName'] ?? '',
+            'MFO' => $mfo,
+        ];
 
         $payload = [
             'contractor_owner_id' => $this->form->contractorOwnerId,
             'contractor_base' => $data['contractorBase'],
-            'contractor_payment_details' => [
-                'payer_account' => $payerAccount,
-                'bank_name' => $data['contractorPaymentDetails']['bankName'] ?? '',
-            ],
+            'contractor_payment_details' => $contractorPaymentDetails,
             'start_date' => Carbon::now()->addDay()->format('Y-m-d'),
             'end_date' => Carbon::parse($data['endDate'])->format('Y-m-d'),
 
-            'id_form' => $idForm,
+            'id_form' => $data['idForm'] ?? 'GENERAL',
 
             'statute_md5' => $data['statuteMd5'] ?? null,
             'additional_document_md5' => $data['additionalDocumentMd5'] ?? null,
 
             'consent_text' => $consentTextString,
 
-            'medical_programs' => $insulinProgramId,
+            // eHealth create contract request schema expects array of UUID strings.
+            'medical_programs' => array_values($selectedProgramIds),
         ];
 
         if (!empty($data['previousRequestId'])) {
@@ -113,6 +203,8 @@ class ReimbursementContractCreate extends ContractComponent
      */
     public function save(): void
     {
+        $this->normalizePaymentDetails();
+
         $validatedData = $this->form->validate();
         $payload = $this->collectPayload($validatedData);
 

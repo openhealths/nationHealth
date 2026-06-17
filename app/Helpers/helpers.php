@@ -71,6 +71,40 @@ if (!function_exists('convertToAppDateFormat')) {
     }
 }
 
+if (!function_exists('formatDisplayDate')) {
+    /**
+     * Formats a model/API date for read-only views (handles Carbon, strings, null).
+     */
+    function formatDisplayDate(mixed $value, ?string $format = null): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        $format ??= config('app.date_format');
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format($format);
+        }
+
+        if (is_string($value)) {
+            return CarbonImmutable::parse($value)->format($format);
+        }
+
+        return '';
+    }
+}
+
+if (!function_exists('formatDisplayDateTime')) {
+    /**
+     * Formats a datetime value for read-only views (handles Carbon, ISO strings, null).
+     */
+    function formatDisplayDateTime(mixed $value, string $format = 'd.m.Y H:i'): string
+    {
+        return formatDisplayDate($value, $format);
+    }
+}
+
 if (!function_exists('frontendDateFormat')) {
     function frontendDateFormat(): string
     {

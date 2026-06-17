@@ -28,6 +28,11 @@
                        name="statuteMd5"
                        class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 @error('form.statuteMd5') border-red-500 @enderror"
                 />
+                @if(isset($this->form->statuteMd5) && is_object($this->form->statuteMd5))
+                    <p class="text-sm text-gray-700">
+                        {{ __('forms.files_selected') }}: {{ $this->form->statuteMd5->getClientOriginalName() }}
+                    </p>
+                @endif
                 <p class="text-xs text-gray-500">{{ __('forms.max_file_size_and_format') }}</p>
                 @error('form.statuteMd5')
                     <p class="text-error">{{ $message }}</p>
@@ -43,6 +48,11 @@
                        name="additionalDocumentMd5"
                        class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 @error('form.additionalDocumentMd5') border-red-500 @enderror"
                 />
+                @if(isset($this->form->additionalDocumentMd5) && is_object($this->form->additionalDocumentMd5))
+                    <p class="text-sm text-gray-700">
+                        {{ __('forms.files_selected') }}: {{ $this->form->additionalDocumentMd5->getClientOriginalName() }}
+                    </p>
+                @endif
                 <p class="text-xs text-gray-500">{{ __('forms.max_file_size_and_format') }}</p>
                 @error('form.additionalDocumentMd5')
                     <p class="text-error">{{ $message }}</p>

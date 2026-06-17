@@ -12,6 +12,7 @@ use App\Models\Contracts\ContractRequest;
 use App\Models\LegalEntity;
 use App\Notifications\SyncNotification;
 use App\Repositories\Repository;
+use App\Traits\BatchLegalEntityQueries;
 use Auth;
 use Illuminate\Bus\Batch;
 use Illuminate\Support\Facades\Bus;
@@ -23,6 +24,7 @@ use Session;
 
 class ContractRequestIndex extends Component
 {
+    use BatchLegalEntityQueries;
     use WithPagination;
 
     /**
@@ -48,6 +50,7 @@ class ContractRequestIndex extends Component
 
         if ($currentLegalEntity->getEntityStatus(LegalEntity::ENTITY_CONTRACT_REQUEST) === JobStatus::PROCESSING) {
             Session::flash('error', 'Synchronization is already in progress.');
+
             return;
         }
 
@@ -74,6 +77,7 @@ class ContractRequestIndex extends Component
 
                 if (!empty($data)) {
                     foreach ($data as $item) {
+                        $item['sync_status'] = JobStatus::PARTIAL->value;
                         Repository::contractRequest()->saveFromEHealth($item, strtoupper($type));
                         $syncedCount++;
                     }
@@ -111,8 +115,16 @@ class ContractRequestIndex extends Component
             $currentLegalEntity->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_CONTRACT_REQUEST);
             $msg = "First pages synced ($syncedCount items). Processing the rest in background.";
         } else {
-            $currentLegalEntity->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_CONTRACT_REQUEST);
-            $msg = __('contracts.sync_completed', ['count' => $syncedCount]);
+            $detailsJob = $this->getContractRequestDetailsStartJob($currentLegalEntity, null);
+
+            if ($detailsJob !== null) {
+                Bus::dispatch($detailsJob)->onQueue('sync');
+                $currentLegalEntity->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_CONTRACT_REQUEST);
+                $msg = __('contracts.sync_details_started', ['count' => $syncedCount]);
+            } else {
+                $currentLegalEntity->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_CONTRACT_REQUEST);
+                $msg = __('contracts.sync_completed', ['count' => $syncedCount]);
+            }
         }
 
         $this->dispatch('flashMessage', ['message' => $msg, 'type' => 'success']);

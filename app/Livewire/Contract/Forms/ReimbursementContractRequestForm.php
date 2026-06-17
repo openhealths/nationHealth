@@ -22,7 +22,7 @@ class ReimbursementContractRequestForm extends BaseContractRequestForm
     {
         $parentRules = parent::rules();
 
-        $parentRules['endDate'][] = function($attribute, $value, $fail) {
+        $parentRules['endDate'][] = function ($attribute, $value, $fail) {
             $startDate = CarbonImmutable::parse($this->startDate);
             $endDate = CarbonImmutable::parse($value);
 
@@ -66,7 +66,7 @@ class ReimbursementContractRequestForm extends BaseContractRequestForm
         $this->contractorPaymentDetails = [
             'payerAccount' => $paymentDetails['payer_account'] ?? '',
             'bankName' => $paymentDetails['bank_name'] ?? '',
-            'MFO' => $paymentDetails['MFO'] ?? '',
+            'MFO' => $paymentDetails['MFO'] ?? $paymentDetails['mfo'] ?? '',
         ];
 
         // 4. Medical applications (UUID array)

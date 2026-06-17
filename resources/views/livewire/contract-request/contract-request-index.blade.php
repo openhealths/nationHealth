@@ -10,6 +10,13 @@
         <x-slot name="title">{{ __('forms.contracts') }}</x-slot>
 
         <div class="mt-3 ml-0 flex flex-col sm:flex-row sm:flex-wrap gap-2 self-start">
+            <a href="{{ route('contract-request.reimbursement.create', [legalEntity()]) }}"
+               wire:navigate
+               class="button-primary flex items-center gap-2 whitespace-nowrap">
+                @icon('plus', 'w-4 h-4')
+                {{ __('contracts.new') }} ({{ __('contracts.reimbursement') }})
+            </a>
+
             @can('sync', ContractRequest::class)
                 <button wire:click="sync" type="button" class="button-sync flex items-center gap-2 whitespace-nowrap">
                     @icon('refresh', 'w-4 h-4')
@@ -63,7 +70,7 @@
                                     {{ $item->start_date?->format(config('app.date_format')) }} - {{ $item->end_date?->format(config('app.date_format')) }}
                                 </td>
                                 <td class="index-table-td text-sm text-gray-500">
-                                    {{ $item->start_date?->format(config('app.date_format')) ?? $item->created_at?->format(config('app.date_format')) }}
+                                    {{ $item->inserted_at?->format(config('app.date_format')) ?? $item->created_at?->format(config('app.date_format')) }}
                                 </td>
 
                                 <td class="index-table-td-actions">
@@ -107,7 +114,7 @@
                                                 class="absolute right-0 mt-2 w-44 rounded-md bg-white shadow-md z-50 border border-gray-100"
                                             >
                                                 {{-- View action with fixed route parameters --}}
-                                                <a href="{{ route('contract-request.show', ['legalEntity' => legalEntity(), 'contract' => $item]) }}"
+                                                <a href="{{ route('contract-request.show', ['legalEntity' => legalEntity(), 'contractRequest' => $item->uuid]) }}"
                                                    wire:navigate
                                                    class="flex items-center gap-2 w-full rounded-md px-4 py-2.5 text-left text-sm text-gray-600 hover:bg-gray-50 transition-colors"
                                                 >
@@ -117,7 +124,7 @@
 
                                                 {{-- Edit action available only for NEW status --}}
                                                 @if($item->status === 'NEW' || (is_object($item->status) && $item->status->value === 'NEW'))
-                                                    <a href="{{ route('contract-request.show', ['legalEntity' => legalEntity(), 'contract' => $item]) }}"
+                                                    <a href="{{ route('contract-request.edit', ['legalEntity' => legalEntity(), 'contractRequest' => $item->uuid]) }}"
                                                        wire:navigate
                                                        class="flex items-center gap-2 w-full rounded-md px-4 py-2.5 text-left text-sm text-gray-600 hover:bg-gray-50 transition-colors"
                                                     >

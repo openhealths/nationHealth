@@ -26,11 +26,20 @@
 
         @include('livewire.contract.parts.nhs-customer', ['data' => $data])
 
-        @include('livewire.contract.parts.payment-details', ['data' => $data])
+        @include('livewire.contract.parts.payment-details', ['contract' => $contract, 'data' => $data])
 
-        @include('livewire.contract.parts.divisions', ['data' => $data])
+        @include('livewire.contract.parts.divisions', ['contract' => $contract, 'data' => $data])
 
-        @include('livewire.contract.parts.medical-programs', ['contract' => $contract, 'data' => $data, 'medicalProgramsList' => []])
+        @include('livewire.contract.parts.medical-programs', [
+            'contract' => $contract,
+            'data' => $data,
+            'medicalProgramsList' => [],
+            'medicalProgramNames' => $medicalProgramNames ?? [],
+        ])
+
+        @include('livewire.contract.parts.external-contractors-readonly', [
+            'externalContractors' => data_get($data, 'external_contractors', $contract->external_contractors ?? []),
+        ])
 
         @include('livewire.contract.parts.documents', ['contract' => $contract, 'data' => $data])
     </fieldset>

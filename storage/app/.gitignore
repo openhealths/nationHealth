@@ -1,3 +1,5 @@
 *
 !public/
+!exports/
+!exports/medical-programs-valid-reimbursement.json
 !.gitignore

@@ -14,29 +14,25 @@ class ContractRepository
      */
     public function saveFromEHealth(array $eHealthData): Contract
     {
-        // 1. Using the right mapper for Contracts
+        // 1. Map API attributes using the Contract mapper
         $mapper = app(ContractMapper::class);
         $attributes = $mapper->mapCreate($eHealthData);
 
-        // 2. API returns 'id' and in the database it is 'uuid'
-        if (isset($eHealthData['id'])) {
-            $attributes['uuid'] = $eHealthData['id'];
-            unset($attributes['id']); // Прибираємо, щоб не плутати з внутрішнім id
-        }
+        // 2. API returns 'id'; mapCreate already sets 'uuid', ensure no stray 'id' key
+        unset($attributes['id']);
 
-        // 3. Adding local context
+        // 3. Local context — always set legal_entity_id and contractor references
         $attributes['legal_entity_id'] = legalEntity()->id;
 
-        // 4. Additional fields that may not pass through the mapper
-        if (isset($eHealthData['contract_number'])) {
-            $attributes['contract_number'] = $eHealthData['contract_number'];
-        }
+        $attributes['contractor_legal_entity_id'] = $eHealthData['contractor_legal_entity']['id']
+            ?? $eHealthData['contractor_legal_entity_id']
+            ?? legalEntity()->uuid;
 
-        // Save raw data for display (if necessary)
-        // $attributes['data'] = $eHealthData;
+        $attributes['contractor_owner_id'] = $eHealthData['contractor_owner']['id']
+            ?? $eHealthData['contractor_owner_id']
+            ?? null;
 
-        // 5.Using updateOrCreate by UUID
-        //This does NOT cause the "invalid input syntax" error, because we search for the uuid column
+        // 4. Persist and return
         return Contract::updateOrCreate(
             ['uuid' => $attributes['uuid']],
             $attributes

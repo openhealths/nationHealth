@@ -1,11 +1,21 @@
 @if(isset($contract) && isset($data))
+    @php
+        $localPaymentDetails = is_array($contract->contractor_payment_details ?? null)
+            ? $contract->contractor_payment_details
+            : [];
+        $remotePaymentDetails = is_array(data_get($data, 'contractor_payment_details'))
+            ? data_get($data, 'contractor_payment_details')
+            : [];
+        $paymentDetails = array_merge($localPaymentDetails, $remotePaymentDetails);
+        $mfo = $paymentDetails['MFO'] ?? $paymentDetails['mfo'] ?? '---';
+    @endphp
     <fieldset class="fieldset">
         <legend class="legend">{{ __('contracts.payment_details_contractor') }}</legend>
         <div class="form-row-3">
             <div class="form-group group">
                 <input id="bank-name"
                        type="text"
-                       value="{{ data_get($data, 'contractor_payment_details.bank_name', '---') }}"
+                       value="{{ $paymentDetails['bank_name'] ?? '---' }}"
                        class="input peer"
                        placeholder=" "
                        disabled
@@ -18,7 +28,7 @@
             <div class="form-group group">
                 <input id="bank-mfo"
                        type="text"
-                       value="{{ data_get($data, 'contractor_payment_details.MFO', '---') }}"
+                       value="{{ $mfo }}"
                        class="input peer"
                        placeholder=" "
                        disabled
@@ -31,7 +41,7 @@
             <div class="form-group group">
                 <input id="bank-iban"
                        type="text"
-                       value="{{ data_get($data, 'contractor_payment_details.payer_account', '---') }}"
+                       value="{{ $paymentDetails['payer_account'] ?? '---' }}"
                        class="input peer font-mono"
                        placeholder=" "
                        disabled
@@ -71,6 +81,9 @@
                        type="text"
                        name="MFO"
                        id="MFO"
+                       inputmode="numeric"
+                       maxlength="6"
+                       pattern="[0-9]{6}"
                        class="peer input @error('form.contractorPaymentDetails.MFO') input-error @enderror"
                        placeholder=" "
                        required

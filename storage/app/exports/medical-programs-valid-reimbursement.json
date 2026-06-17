@@ -1,0 +1,269 @@
+{
+  "generated_at": "2026-06-17T12:51:54+03:00",
+  "source_dump": "medical-programs-dump-20260617-125154.json",
+  "selection_logic": {
+    "is_active": true,
+    "funding_source": "NHS",
+    "type": "MEDICATION",
+    "medical_program_settings.request_allowed": true,
+    "exclude_name_contains": [
+      "test",
+      "тест"
+    ]
+  },
+  "count": 28,
+  "programs": [
+    {
+      "id": "96e1cf78-6524-456c-b8a9-f68177f42597",
+      "name": "Онкологічні захворювання",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "b15d6bfa-66a4-40ba-9965-ef7712f48da9",
+      "name": "Серцево-судинні та цереброваскулярні захворювання, у тому числі з первинною та вторинною профілактикою інфарктів та інсультів",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "7335a30e-61f2-42b0-9ed4-2afe847bba16",
+      "name": "Інсуліни аналоги (безоплатно)",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "2adffeff-be3c-4a23-92a3-2cf4a34a2972",
+      "name": "Хронічні хвороби нижніх дихальних шляхів",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "cda113e4-b8dd-4ec4-a878-3d1c7eae49da",
+      "name": "Інсуліни людські (флакони безоплатно)",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "14e19712-b443-4391-b0f7-aba8e8662459",
+      "name": "Нецукровий діабет",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "ba40bb7f-9084-4266-8316-d753037d26b6",
+      "name": "Епілепсія (наркотичні лікарські засоби)",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-3",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "276faa17-d6cd-4781-9166-fd2c16af20a0",
+      "name": "Хвороби ендокринної системи",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "414e1aa4-2a5d-4a23-9312-9f8b1847fa3b",
+      "name": "Метаболічні, аутоімунні та запальні захворювання",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "e9c6beeb-b19f-4b97-b42a-020c5c996c56",
+      "name": "Інсуліни аналоги (з доплатою)",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "83eee31e-3bb5-49cf-9f90-fde1be13dc95",
+      "name": "Мігрень",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "9d94a21b-ec70-4b91-946a-981f4db8d2b9",
+      "name": "Епілепсія",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "638ec6b8-d461-4399-ac28-5341a2fcffd5",
+      "name": "Лікування вагітних та породілей",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "dcd80c53-e1fc-4b5c-95ce-f22926c9744e",
+      "name": "Інсуліни з доплатою (категорізація)",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "8a11c513-e7a9-4800-9fb9-becb743e08c4",
+      "name": "Стан, пов'язаний з наявністю трансплантованого органу чи тканини",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "8efe29df-18bd-4d49-8995-c3f7e44d9e12",
+      "name": "Інсуліни людські (картриджи та шприцручки безоплатно)",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "b16409ab-af31-4016-bb61-7661dcce23ed",
+      "name": "Біль та надання паліативної допомоги ПМД",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "0eececf1-aaf5-48fb-87e2-da44b7c49db2",
+      "name": "Хвороба Паркінсона",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "b8978c6a-02b1-46f6-90ac-6a3ce4b0754e",
+      "name": "Інсуліни аналоги (безоплатно, категорізація)",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "5562904e-100f-11ee-be56-0242ac120002",
+      "name": "Біль та надання паліативної допомоги ПМД (наркотичні лікарські засоби)",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-3",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "66a96847-49c0-43d9-b578-f229ba3b33e7",
+      "name": "Глаукома",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "9723a9a0-100a-11ee-be56-0242ac120002",
+      "name": "Біль та надання паліативної допомоги СМД (наркотичні лікарські засоби)",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-3",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "014d1d27-a0fc-4591-81cf-46fa6ea2999d",
+      "name": "Цукровий діабет (пероральні гіпоглікемізуючі лікарські засоби)",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "857588d8-9e12-4935-96c4-b08e95d19dce",
+      "name": "Інсуліни людські (картриджи та шприцручки з доплатою)",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "1a227396-a0e4-4c4f-a0a9-6b358c8929d2",
+      "name": "Розлади психіки та поведінки (наркотичні лікарські засоби)",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-3",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "f217889f-736f-462c-8f8b-ed99edddb3be",
+      "name": "Розлади психіки та поведінки",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "75977dc6-49ce-4bb2-aa0f-9100c2edf440",
+      "name": "Дитячі захворювання",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    },
+    {
+      "id": "85a99548-ab99-4ac4-96ae-558251270690",
+      "name": "Біль та надання паліативної допомоги СМД",
+      "type": "MEDICATION",
+      "mr_blank_type": "F-1",
+      "funding_source": "NHS",
+      "medication_request_allowed": true,
+      "request_allowed": true
+    }
+  ]
+}

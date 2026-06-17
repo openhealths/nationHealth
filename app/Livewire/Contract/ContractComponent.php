@@ -6,6 +6,7 @@ namespace App\Livewire\Contract;
 
 use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Exceptions\EHealth\EHealthResponseException;
 use App\Models\Contracts\ContractRequest;
 use App\Models\LegalEntity;
 use App\Repositories\Repository;
@@ -45,13 +46,13 @@ abstract class ContractComponent extends Component
 
         $this->legalEntityName = $edrData['name'] ?? 'Невідома назва';
 
-      $this->form->contractorPaymentDetails = [
-            'bankName' => '',
-            'MFO' => '',
-            'payerAccount' => '',
-        ];
+        $this->form->contractorPaymentDetails = [
+              'bankName' => '',
+              'MFO' => '',
+              'payerAccount' => '',
+          ];
 
-       $address = $legalEntity->addresses()->where('type', 'REGISTRATION')->first();
+        $address = $legalEntity->addresses()->where('type', 'REGISTRATION')->first();
 
         if ($address) {
             $this->form->contractorBase = sprintf(
@@ -62,10 +63,10 @@ abstract class ContractComponent extends Component
                 $address->building ?? ''
             );
         } else {
-           $this->form->contractorBase = $edrData['address'] ?? '';
+            $this->form->contractorBase = $edrData['address'] ?? '';
         }
 
-      $contractorData = Auth::user()->employees()
+        $contractorData = Auth::user()->employees()
             ->contractors($legalEntity->id)
             ->with('party')
             ->first();
@@ -88,6 +89,8 @@ abstract class ContractComponent extends Component
 
     public function save(): void
     {
+        $this->normalizePaymentDetails();
+
         try {
             $validatedData = $this->form->validate();
             $dataToSave = $validatedData;
@@ -128,18 +131,21 @@ abstract class ContractComponent extends Component
 
     public function create(): void
     {
+        $this->normalizePaymentDetails();
+
         // 1. Livewire Form Validation
         try {
             $validatedData = $this->form->validate();
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
+
             return;
         }
 
         // 2.Initialization (API-005-012-0004 Public. Initialize Contract Request)
         // Getting a URL for uploading files
         try {
-            $response    = EHealth::contractRequest()->initialize($this->getContractType());
+            $response = EHealth::contractRequest()->initialize($this->getContractType());
             $eHealthData = $response->getData();
 
             $contractRequestId = $eHealthData['uuid'] ?? $eHealthData['id'] ?? null;
@@ -152,6 +158,7 @@ abstract class ContractComponent extends Component
 
         } catch (\Exception $e) {
             $this->handleEHealthError($e);
+
             return;
         }
 
@@ -201,6 +208,7 @@ abstract class ContractComponent extends Component
 
         } catch (\Exception $e) {
             Session::flash('error', 'Помилка при завантаженні файлів: ' . $e->getMessage());
+
             return;
         }
 
@@ -213,6 +221,7 @@ abstract class ContractComponent extends Component
             $signingData = $this->form->validate($this->form->signingRules());
         } catch (ValidationException $exception) {
             Session::flash('error', 'Помилка параметрів КЕП: ' . $exception->validator->errors()->first());
+
             return;
         }
 
@@ -227,6 +236,7 @@ abstract class ContractComponent extends Component
 
         } catch (\Exception $e) {
             Session::flash('error', 'Помилка накладання КЕП: ' . $e->getMessage());
+
             return;
         }
 
@@ -243,13 +253,12 @@ abstract class ContractComponent extends Component
 
             $createdContractData = $response->getData();
 
-            Repository::contract()->saveFromEHealth($createdContractData);
+            Repository::contractRequest()->saveFromEHealth($createdContractData, strtoupper($this->getContractType()));
 
             Session::flash('success', 'Запит на контракт успішно створено та збережено!');
             $this->showSignatureModal = false;
 
-            // Edit to the list
-            $this->redirectRoute('contract.index', legalEntity(), navigate: true);
+            $this->redirectRoute('contract-request.index', legalEntity(), navigate: true);
 
         } catch (\Exception $e) {
             $this->handleEHealthError($e);
@@ -258,6 +267,24 @@ abstract class ContractComponent extends Component
 
     protected function handleEHealthError(\Exception $exception): void
     {
+        if ($exception instanceof EHealthResponseException) {
+            Log::error('Contract request eHealth API error', [
+                'status' => $exception->response->status(),
+                'reason' => $exception->response->reason(),
+                'url' => $exception->response->effectiveUri()?->__toString(),
+                'body' => $exception->response->body(),
+                'error' => $exception->response->json('error'),
+                'meta' => $exception->response->json('meta'),
+                'contract_type' => $this->getContractType(),
+            ]);
+        } else {
+            Log::error('Contract request error', [
+                'message' => $exception->getMessage(),
+                'class' => $exception::class,
+                'contract_type' => $this->getContractType(),
+            ]);
+        }
+
         $msg = $exception instanceof EHealthValidationException
             ? $exception->getFormattedMessage()
             : 'Помилка від ЕСОЗ: ' . $exception->getMessage();
@@ -267,5 +294,20 @@ abstract class ContractComponent extends Component
     protected function logConnectionError(\Exception $e, string $msg): void
     {
         Log::error($msg . ': ' . $e->getMessage());
+    }
+
+    protected function normalizePaymentDetails(): void
+    {
+        $details = $this->form->contractorPaymentDetails;
+
+        if (isset($details['MFO'])) {
+            $details['MFO'] = preg_replace('/\D/', '', (string) $details['MFO']);
+        }
+
+        if (isset($details['payerAccount'])) {
+            $details['payerAccount'] = str_replace(' ', '', (string) $details['payerAccount']);
+        }
+
+        $this->form->contractorPaymentDetails = $details;
     }
 }

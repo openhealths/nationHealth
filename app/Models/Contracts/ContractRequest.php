@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\Contracts;
 
+use App\Enums\JobStatus;
 use App\Enums\Contract\Status;
 
 class ContractRequest extends BaseContract
@@ -26,6 +27,7 @@ class ContractRequest extends BaseContract
             'ehealth_inserted_at',
             'ehealth_updated_by',
             'ehealth_updated_at',
+            'sync_status',
         ]);
 
         parent::__construct($attributes);
@@ -36,9 +38,18 @@ class ContractRequest extends BaseContract
         'status' => Status::class,
         'start_date' => 'date',
         'end_date' => 'date',
+        'nhs_signed_date' => 'date',
+        'inserted_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'ehealth_inserted_at' => 'datetime',
+        'ehealth_updated_at' => 'datetime',
         'contractor_payment_details' => 'array',
         'contractor_divisions' => 'array',
+        'external_contractors' => 'array',
         'data' => 'array',
         'medical_programs' => 'array',
+        'external_contractor_flag' => 'boolean',
+        'contractor_signed' => 'boolean',
+        'sync_status' => JobStatus::class,
     ];
 }

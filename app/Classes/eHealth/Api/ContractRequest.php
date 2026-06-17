@@ -31,7 +31,7 @@ class ContractRequest extends EHealthRequest
         $this->setDefaultPageSize();
 
         // Combining existing query parameters with passed ones
-        $mergedQuery = array_merge($this->options['query'], $query ?? []);
+        $mergedQuery = array_merge($this->options['query'] ?? [], $query ?? []);
 
         // Pass the type as a query parameter, not part of the URL
         $mergedQuery['type'] = strtoupper($contractType);
@@ -113,7 +113,17 @@ class ContractRequest extends EHealthRequest
     {
         $this->setValidator($this->validateDetails(...));
 
-        return $this->get(self::URL . '/' . $contractType . '/' . $uuid);
+        try {
+            // Current public scopes model documents /api/contract_requests/{id}
+            return $this->get(self::URL . '/' . $uuid);
+        } catch (EHealthResponseException $exception) {
+            // Backward compatibility for environments that still expose typed route.
+            if ($exception->response->status() !== 404) {
+                throw $exception;
+            }
+
+            return $this->get(self::URL . '/' . $contractType . '/' . $uuid);
+        }
     }
 
     /**
@@ -131,15 +141,32 @@ class ContractRequest extends EHealthRequest
 
     /**
      * Sends the signed contract request (Step 2).
-     * Corresponds to: PUT /api/contract_requests/{contract_type}/{id}
+     * Corresponds to: POST /api/contract_requests/{contract_type}/{id}
      */
     public function create(string $uuid, string $contractType, array $payload): PromiseInterface|EHealthResponse
     {
         $this->setValidator($this->validateCreate(...));
 
-        $url = self::URL . '/' . $contractType . '/' . $uuid;
+        try {
+            // Primary route for contract request creation in MIS docs.
+            return $this->post(self::URL . '/' . $contractType . '/' . $uuid, $payload);
+        } catch (EHealthResponseException $exception) {
+            // If typed route is missing in a specific environment, fallback to id-only route.
+            if ($exception->response->status() !== 404) {
+                throw $exception;
+            }
 
-        return $this->post($url, $payload);
+            try {
+                return $this->post(self::URL . '/' . $uuid, $payload);
+            } catch (EHealthResponseException $fallbackException) {
+                // Last fallback for legacy deployments expecting PUT.
+                if ($fallbackException->response->status() !== 404) {
+                    throw $fallbackException;
+                }
+
+                return $this->put(self::URL . '/' . $contractType . '/' . $uuid, $payload);
+            }
+        }
     }
 
     /**
@@ -192,7 +219,7 @@ class ContractRequest extends EHealthRequest
 
     /**
      * Approves a contract request (MSP action).
-     * Corresponds to: PATCH /api/contract_requests/{contract_type}/{id}/actions/approve_msp
+     * Corresponds to: PATCH /api/contract_requests/{id}/actions/approve_msp
      *
      * @param  string  $uuid  The UUID of the contract request.
      * @param  string  $contractType  'capitation' or 'reimbursement'.
@@ -204,12 +231,20 @@ class ContractRequest extends EHealthRequest
     {
         $this->setValidator($this->validateApproveMsp(...));
 
-        return $this->patch(self::URL . '/' . $contractType . '/' . $uuid . '/actions/approve_msp', $payload);
+        try {
+            return $this->patch(self::URL . '/' . $uuid . '/actions/approve_msp', $payload);
+        } catch (EHealthResponseException $exception) {
+            if ($exception->response->status() !== 404) {
+                throw $exception;
+            }
+
+            return $this->patch(self::URL . '/' . $contractType . '/' . $uuid . '/actions/approve_msp', $payload);
+        }
     }
 
     /**
      * Terminates a contract.
-     * Corresponds to: PATCH /api/contract_requests/{contract_type}/{id}/actions/terminate
+     * Corresponds to: PATCH /api/contract_requests/{id}/actions/terminate
      *
      * @param  string  $uuid  The UUID of the contract request.
      * @param  string  $contractType  'capitation' or 'reimbursement'.
@@ -221,23 +256,58 @@ class ContractRequest extends EHealthRequest
     {
         $this->setValidator($this->validateTerminate(...));
 
-        return $this->patch(self::URL . '/' . $contractType . '/' . $uuid . '/actions/terminate', $payload);
+        try {
+            return $this->patch(self::URL . '/' . $uuid . '/actions/terminate', $payload);
+        } catch (EHealthResponseException $exception) {
+            if ($exception->response->status() !== 404) {
+                throw $exception;
+            }
+
+            return $this->patch(self::URL . '/' . $contractType . '/' . $uuid . '/actions/terminate', $payload);
+        }
     }
 
     /**
      * Gets the printable HTML content of a contract.
-     * Corresponds to: GET /api/contract_requests/{contract_type}/{id}/printout_content
+     * Corresponds to: GET /api/contract_requests/{id}/printout_content
      *
      * @param  string  $uuid  The UUID of the contract request.
      * @param  string  $contractType  'capitation' or 'reimbursement'.
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
+    /**
+     * Gets partially signed contract request content (PKCS7) for MSP co-signing.
+     * Corresponds to: GET /api/contract_requests/{id}/signed_content
+     *
+     * @throws EHealthConnectionException|EHealthResponseException
+     */
+    public function getSignedContent(string $uuid, string $contractType): PromiseInterface|EHealthResponse
+    {
+        try {
+            return $this->get(self::URL . '/' . $uuid . '/signed_content');
+        } catch (EHealthResponseException $exception) {
+            if ($exception->response->status() !== 404) {
+                throw $exception;
+            }
+
+            return $this->get(self::URL . '/' . $contractType . '/' . $uuid . '/signed_content');
+        }
+    }
+
     public function getPrintoutContent(string $uuid, string $contractType): PromiseInterface|EHealthResponse
     {
         $this->setValidator($this->validatePrintoutContent(...));
 
-        return $this->get(self::URL . '/' . $contractType . '/' . $uuid . '/printout_content');
+        try {
+            return $this->get(self::URL . '/' . $uuid . '/printout_content');
+        } catch (EHealthResponseException $exception) {
+            if ($exception->response->status() !== 404) {
+                throw $exception;
+            }
+
+            return $this->get(self::URL . '/' . $contractType . '/' . $uuid . '/printout_content');
+        }
     }
 
     /**
@@ -258,7 +328,7 @@ class ContractRequest extends EHealthRequest
 
     /**
      * Signs a contract (MSP action).
-     * Corresponds to: PATCH /api/contract_requests/{contract_type}/{id}/actions/sign_msp
+     * Corresponds to: PATCH /api/contract_requests/{id}/actions/sign_msp
      *
      * @param  string  $uuid  The UUID of the contract request.
      * @param  string  $contractType  'capitation' or 'reimbursement'.
@@ -270,7 +340,15 @@ class ContractRequest extends EHealthRequest
     {
         $this->setValidator($this->validateSignMsp(...));
 
-        return $this->patch(self::URL . '/' . $contractType . '/' . $uuid . '/actions/sign_msp', $payload);
+        try {
+            return $this->patch(self::URL . '/' . $uuid . '/actions/sign_msp', $payload);
+        } catch (EHealthResponseException $exception) {
+            if ($exception->response->status() !== 404) {
+                throw $exception;
+            }
+
+            return $this->patch(self::URL . '/' . $contractType . '/' . $uuid . '/actions/sign_msp', $payload);
+        }
     }
 
     /**
@@ -305,6 +383,9 @@ class ContractRequest extends EHealthRequest
 
     /**
      * Validates the response for getDetails().
+     *
+     * contractor_legal_entity and contractor_owner are optional because eHealth does not
+     * return them for contract requests in NEW status (they are populated after NHS approval).
      */
     protected function validateDetails(EHealthResponse $response): array
     {
@@ -313,22 +394,22 @@ class ContractRequest extends EHealthRequest
         $validator = Validator::make($transformedData, [
             'uuid' => 'required|uuid',
             'status' => 'required|string',
-            'contract_number' => 'required|string',
-            'start_date' => 'required|date_format:Y-m-d',
-            'end_date' => 'required|date_format:Y-m-d',
-            'contractor_legal_entity' => 'required|array',
-            'contractor_legal_entity.uuid' => 'required|uuid',
-            'contractor_owner' => 'required|array',
-            'contractor_owner.uuid' => 'required|uuid',
+            'contract_number' => 'sometimes|nullable|string',
+            'start_date' => 'sometimes|nullable|date_format:Y-m-d',
+            'end_date' => 'sometimes|nullable|date_format:Y-m-d',
+            'contractor_legal_entity' => 'sometimes|array',
+            'contractor_legal_entity.uuid' => 'sometimes|uuid',
+            'contractor_owner' => 'sometimes|array',
+            'contractor_owner.uuid' => 'sometimes|uuid',
         ]);
 
         if ($validator->fails()) {
-            $error = 'EHealth Contract (getDetails) validation failed: ' . implode(', ', $validator->errors()->all());
+            $error = 'EHealth ContractRequest (getDetails) validation failed: ' . implode(', ', $validator->errors()->all());
             Log::channel('e_health_errors')->error($error);
             throw ValidationException::withMessages(['ehealth_error' => $error]);
         }
 
-        return $validator->validated();
+        return $transformedData;
     }
 
     /**

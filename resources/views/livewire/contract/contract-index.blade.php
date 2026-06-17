@@ -1,5 +1,5 @@
 @php
-    use App\Models\Contracts\ContractRequest;
+    use App\Models\Contracts\Contract;
 @endphp
 
 <div>
@@ -10,7 +10,14 @@
         <x-slot name="title">{{ __('forms.contracts') }}</x-slot>
 
         <div class="mt-3 ml-0 flex flex-col sm:flex-row sm:flex-wrap gap-2 self-start">
-            @can('sync', ContractRequest::class)
+            <a href="{{ route('contract-request.reimbursement.create', [legalEntity()]) }}"
+               wire:navigate
+               class="button-primary flex items-center gap-2 whitespace-nowrap">
+                @icon('plus', 'w-4 h-4')
+                {{ __('contracts.new') }} ({{ __('contracts.reimbursement') }})
+            </a>
+
+            @can('sync', Contract::class)
                 <button wire:click="sync" type="button" class="button-sync flex items-center gap-2 whitespace-nowrap">
                     @icon('refresh', 'w-4 h-4')
                     {{ __('forms.synchronise_with_eHealth') }}
@@ -133,7 +140,7 @@
                                     {{ $item->start_date?->format(config('app.date_format')) }} - {{ $item->end_date?->format(config('app.date_format')) }}
                                 </td>
                                 <td class="index-table-td text-sm text-gray-500">
-                                    {{ $item->start_date?->format(config('app.date_format')) ?? $item->created_at?->format(config('app.date_format')) }}
+                                    {{ $item->inserted_at?->format(config('app.date_format')) ?? $item->created_at?->format(config('app.date_format')) }}
                                 </td>
 
                                 <td class="index-table-td-actions">

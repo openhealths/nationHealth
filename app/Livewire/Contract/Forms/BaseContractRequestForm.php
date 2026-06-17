@@ -69,15 +69,22 @@ abstract class BaseContractRequestForm extends BaseForm
             ],
             'contractorPaymentDetails' => ['required', 'array'],
             'contractorPaymentDetails.payerAccount' => ['required', 'string', 'max:255'],
-            'contractorPaymentDetails.MFO' => [
-                'required_unless:contractorPaymentDetails.payerAccount,/^UA[0-9]{22}$/,/^UA[0-9]{27}$/',
-                'string',
-                'max:255'
-            ],
+            'contractorPaymentDetails.MFO' => ['required', 'digits:6'],
             'contractorPaymentDetails.bankName' => ['required', 'string', 'max:255'],
             'contractNumber' => ['nullable', 'string', 'max:255'],
             'statuteMd5' => ['nullable', 'file'],
             'additionalDocumentMd5' => ['nullable', 'file'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'contractorPaymentDetails.MFO.required' => 'МФО є обовʼязковим полем.',
+            'contractorPaymentDetails.MFO.digits' => 'МФО має містити рівно 6 цифр.',
         ];
     }
 

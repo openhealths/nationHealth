@@ -1,126 +1,94 @@
-@php
-    use \Carbon\Carbon;
-@endphp
+<section class="section-form">
+    <livewire:components.x-message :key="time()" />
 
-<div class="space-y-6">
-    {{-- Header --}}
-    <div class="flex items-center justify-between">
-        <div>
-            <h2 class="text-xl font-semibold text-gray-800">
-                Заявка на договір
-                <span class="text-gray-500">#{{ $contract->contract_number ?? 'Чернетка' }}</span>
-            </h2>
-            <div class="text-sm text-gray-500 mt-1">
-                ID: {{ $contract->uuid }}
-            </div>
-        </div>
-        <div class="flex gap-3">
-            <a href="{{ route('contract-request.index', legalEntity()) }}" class="button-secondary flex items-center gap-2" wire:navigate>
-                @icon('arrow-left', 'w-4 h-4')
-                {{ __('Назад') }}
-            </a>
+    <x-header-navigation class="breadcrumb-form flex-1 min-w-0">
+        <x-slot name="title">
+            {{ __('contracts.contract_requests') }} {{ $contractRequest->contract_number ?? '---' }}
+        </x-slot>
 
-            {{-- Кнопка редагування також тут, якщо статус дозволяє --}}
-            @if($contract->status === 'NEW' || (is_object($contract->status) && $contract->status->value === 'NEW'))
-                <a href="{{ route('contract-request.edit', ['legalEntity' => legalEntity()->id, 'contract' => $contract->uuid]) }}"
-                   class="button-primary flex items-center gap-2"
-                   wire:navigate
-                >
-                    @icon('pencil', 'w-4 h-4')
-                    {{ __('Редагувати') }}
+        @if(is_object($contractRequest->status) && method_exists($contractRequest->status, 'label'))
+            <span class="{{ $contractRequest->status->color() }} px-3 py-1 rounded-full text-xs font-bold uppercase">
+                {{ $contractRequest->status->label() }}
+            </span>
+        @else
+            <span class="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-xs font-bold uppercase">
+                {{ (string) $contractRequest->status }}
+            </span>
+        @endif
+    </x-header-navigation>
+
+    <fieldset disabled class="form shift-content space-y-8">
+        @include('livewire.contract.parts.basic-data', ['contract' => $contractRequest, 'data' => $contractData])
+        @include('livewire.contract.parts.contractor', ['data' => $contractData])
+        @include('livewire.contract.parts.nhs-customer', ['data' => $contractData])
+        @include('livewire.contract.parts.payment-details', ['contract' => $contractRequest, 'data' => $contractData])
+        @include('livewire.contract.parts.divisions', ['contract' => $contractRequest, 'data' => $contractData])
+        @include('livewire.contract.parts.medical-programs', [
+            'contract' => $contractRequest,
+            'data' => $contractData,
+            'medicalProgramsList' => [],
+            'medicalProgramNames' => $medicalProgramNames,
+        ])
+        @include('livewire.contract.parts.external-contractors-readonly', [
+            'externalContractors' => data_get($contractData, 'external_contractors', $contractRequest->external_contractors ?? []),
+        ])
+        @include('livewire.contract.parts.documents', ['contract' => $contractRequest, 'data' => $contractData])
+
+        @if(!empty($contractRequest->printout_content))
+            <fieldset class="fieldset">
+                <legend class="legend">Printout Content</legend>
+                <div class="show-alert-info overflow-auto max-h-72 text-xs font-mono whitespace-pre-wrap break-all">
+                    {{ $contractRequest->printout_content }}
+                </div>
+            </fieldset>
+        @endif
+    </fieldset>
+
+    <div class="shift-content mt-8 flex flex-wrap items-center justify-between gap-4">
+        <a href="{{ route('contract-request.index', legalEntity()) }}" class="button-minor" wire:navigate>
+            {{ __('forms.back_to_list') }}
+        </a>
+
+        <div class="flex flex-wrap items-center gap-3">
+            @can('approve', $contractRequest)
+                @if($this->canApproveContractRequest())
+                    <button type="button"
+                            wire:click="openApproveModal"
+                            class="button-primary-outline">
+                        {{ __('contracts.approve_contract_request') }}
+                    </button>
+                @endif
+            @endcan
+
+            @can('sign', $contractRequest)
+                @if($this->canSignContractRequest())
+                    <button type="button"
+                            wire:click="openSignModal"
+                            class="button-primary">
+                        {{ __('contracts.sign_contract_request') }}
+                    </button>
+                @endif
+            @endcan
+
+            @if($contractRequest->status === 'NEW' || (is_object($contractRequest->status) && $contractRequest->status->value === 'NEW'))
+                <a href="{{ route('contract-request.edit', ['legalEntity' => legalEntity()->id, 'contractRequest' => $contractRequest->uuid]) }}"
+                   class="button-primary"
+                   wire:navigate>
+                    {{ __('forms.edit') }}
                 </a>
             @endif
         </div>
     </div>
 
-    {{-- Main Content --}}
-    <div class="bg-white shadow sm:rounded-lg border border-gray-200">
-        <div class="px-4 py-5 sm:px-6 border-b border-gray-200 bg-gray-50">
-            <h3 class="text-lg leading-6 font-medium text-gray-900">
-                Основна інформація
-            </h3>
-        </div>
-        <div class="px-4 py-5 sm:p-6">
-            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-6">
-
-                <div class="sm:col-span-1">
-                    <dt class="text-sm font-medium text-gray-500">Статус</dt>
-                    <dd class="mt-1 text-sm text-gray-900">
-                        @if(is_object($contract->status) && method_exists($contract->status, 'label'))
-                            <x-status-badge :status="$contract->status"/>
-                        @else
-                            {{ $contract->status }}
-                        @endif
-                        
-                        @if($contract->status_reason)
-                            <div class="mt-2 p-2 text-xs bg-yellow-50 text-yellow-800 border border-yellow-200 rounded-md">
-                                <strong>Причина:</strong> {{ $contract->status_reason }}
-                            </div>
-                        @endif
-                    </dd>
-                </div>
-
-                <div class="sm:col-span-1">
-                    <dt class="text-sm font-medium text-gray-500">Тип договору</dt>
-                    <dd class="mt-1 text-sm text-gray-900">{{ $contract->type }}</dd>
-                </div>
-
-                <div class="sm:col-span-1">
-                    <dt class="text-sm font-medium text-gray-500">Період дії</dt>
-                    <dd class="mt-1 text-sm text-gray-900">
-                        {{-- ФІКС: Безпечний парсинг дат --}}
-                        {{ $contract->start_date ? Carbon::parse($contract->start_date)->format(config('app.date_format')) : '-' }}
-                        —
-                        {{ $contract->end_date ? Carbon::parse($contract->end_date)->format(config('app.date_format')) : '-' }}
-                    </dd>
-                </div>
-
-                <div class="sm:col-span-1">
-                    <dt class="text-sm font-medium text-gray-500">Дата створення</dt>
-                    <dd class="mt-1 text-sm text-gray-900">
-                        {{-- ФІКС: Безпечний парсинг inserted_at / created_at --}}
-                        {{ $contract->inserted_at
-                            ? Carbon::parse($contract->inserted_at)->format('d.m.Y H:i')
-                            : ($contract->created_at ? Carbon::parse($contract->created_at)->format('d.m.Y H:i') : '-')
-                        }}
-                    </dd>
-                </div>
-
-                <div class="sm:col-span-2 border-t border-gray-100 pt-4 mt-2">
-                    <dt class="text-sm font-medium text-gray-500 mb-2">Підстава (Contractor Base)</dt>
-                    <dd class="text-sm text-gray-900 bg-gray-50 p-3 rounded">
-                        {{ $contract->contractor_base ?? '-' }}
-                    </dd>
-                </div>
-
-                <div class="sm:col-span-2">
-                    <dt class="text-sm font-medium text-gray-500 mb-2">Платіжні реквізити</dt>
-                    <dd class="text-sm text-gray-900 border rounded p-3">
-                        @php
-                            $payment = $contract->contractor_payment_details;
-                            // Якщо це масив, беремо дані, якщо об'єкт JSON - перетворюємо
-                            if (is_string($payment)) $payment = json_decode($payment, true);
-                        @endphp
-                        <p><strong>Банк:</strong> {{ $payment['bank_name'] ?? ($payment['bankName'] ?? '-') }}</p>
-                        <p><strong>Рахунок (IBAN):</strong> {{ $payment['payer_account'] ?? ($payment['payerAccount'] ?? '-') }}</p>
-                        <p><strong>МФО:</strong> {{ $payment['MFO'] ?? '-' }}</p>
-                    </dd>
-                </div>
-
-                @if(!empty($contract->medical_programs))
-                    <div class="sm:col-span-2">
-                        <dt class="text-sm font-medium text-gray-500 mb-2">Медичні програми (IDs)</dt>
-                        <dd class="text-sm text-gray-900 bg-gray-50 p-3 rounded text-xs font-mono">
-                            @if(is_array($contract->medical_programs))
-                                {{ implode(', ', $contract->medical_programs) }}
-                            @else
-                                {{ $contract->medical_programs }}
-                            @endif
-                        </dd>
-                    </div>
+    <x-signature-modal method="submitSignedAction">
+        <x-slot:customFields>
+            <p class="default-p">
+                @if($pendingAction === 'approve')
+                    {{ __('contracts.approve_signature_hint') }}
+                @elseif($pendingAction === 'sign')
+                    {{ __('contracts.sign_signature_hint') }}
                 @endif
-
-            </dl>
-        </div>
-    </div>
-</div>
+            </p>
+        </x-slot:customFields>
+    </x-signature-modal>
+</section>

@@ -33,7 +33,7 @@ class ContractIndex extends Component
     public function mount(): void
     {
         // Initialize filter using enum values
-        $this->typeFilter = [Type::CAPITATIONS->value, Type::REIMBURSEMENT->value];
+        $this->typeFilter = [Type::CAPITATION->value, Type::REIMBURSEMENT->value];
     }
 
     public function search(): void
@@ -47,7 +47,7 @@ class ContractIndex extends Component
         $this->reset(['typeFilter', 'isFiltersApplied']);
 
         // Reset filter using enum values
-        $this->typeFilter = [Type::CAPITATIONS->value, Type::REIMBURSEMENT->value];
+        $this->typeFilter = [Type::CAPITATION->value, Type::REIMBURSEMENT->value];
     }
 
     public function sync(): void
@@ -56,6 +56,7 @@ class ContractIndex extends Component
 
         if ($currentLegalEntity->getEntityStatus(LegalEntity::ENTITY_CONTRACT) === JobStatus::PROCESSING) {
             Session::flash('error', 'Синхронізація вже триває.');
+
             return;
         }
 

@@ -21,14 +21,19 @@ class CipherApi
     /**
      * Send request to create session and subsequently upload KEYP.
      *
-     * @param  string  $dataSignature  Base64 encoded signed data.
+     * @param  string  $dataSignature  Raw payload to sign (e.g. JSON string) or, when
+     *                                 {@see $dataIsAlreadyBase64} is true, a base64 PKCS7 blob from eHealth.
      * @param  string  $password  Password for KEYP creation.
      * @param  string  $base64File  KEYP file in base64 format.
      * @param  string  $knedp  Certificate Authority Identifier (KNEPD).
-     * @param  string  $taxId
-     * @param  string|null $edrpou
- *
-     * @return array|string Returns KEYP in base64 format.
+     * @param  string  $taxId  Signer's tax ID (DRFOU) for KEP validation.
+     * @param  string|null  $edrpou  Optional EDRPOU for legal-entity KEP validation.
+     * @param  bool  $dataIsAlreadyBase64  When false (default), {@see $dataSignature} is encoded once
+     *                                     before sending to Cipher — used for JSON signing (e.g. contract
+     *                                     request approve). When true, the value is already base64 and must
+     *                                     not be encoded again — used when co-signing NHS-signed content
+     *                                     during contract request sign_msp (status NHS_SIGNED).
+     * @return array|string Signed PKCS7 in base64, or an array of Cipher API errors.
      */
     public function sendSession(
         string $dataSignature,
@@ -36,9 +41,12 @@ class CipherApi
         string $base64File,
         string $knedp,
         string $taxId,
-        ?string $edrpou = null
+        ?string $edrpou = null,
+        bool $dataIsAlreadyBase64 = false,
     ): array|string {
-        $this->dataSignature = base64_encode($dataSignature);
+        $this->dataSignature = $dataIsAlreadyBase64
+            ? $dataSignature
+            : base64_encode($dataSignature);
         $this->password = $password;
         $this->base64File = $base64File;
         $this->knedp = $knedp;
@@ -144,8 +152,7 @@ class CipherApi
     /**
      * Get information about the keys to store the key container
      *
-     * @param string $password Password for the session key container
-     *
+     * @param  string  $password  Password for the session key container
      * @return array
      */
     public function getFileContainerInfo(string $password): array
@@ -156,9 +163,8 @@ class CipherApi
     /**
      * Check if some important data received from the forms are have the same value as in the DS FileContainer
      *
-     * @param string $taxId Data from legalEntityForm
-     * @param null|string $edrpou
-     *
+     * @param  string  $taxId  Data from legalEntityForm
+     * @param  null|string  $edrpou
      * @return void
      */
     public function verifyWithFileContainer(string $taxId, ?string $edrpou = null): void

@@ -56,7 +56,9 @@ class ContractRequestSync extends EHealthJob
     {
         return app(ApiContractRequest::class)
             ->withToken($token)
-            ->getMany($this->contractType, []);
+            ->getMany($this->contractType, [
+                'contractor_legal_entity_id' => $this->legalEntity->uuid,
+            ]);
     }
 
     /**
@@ -103,9 +105,10 @@ class ContractRequestSync extends EHealthJob
             );
         }
 
-        // 2. If all types are fetched, start fetching details for PARTIAL records
-        return $this->standalone
+        $nextJob = $this->standalone
             ? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin)
             : $this->nextEntity;
+
+        return $this->getContractRequestDetailsStartJob($this->legalEntity, $nextJob);
     }
 }
