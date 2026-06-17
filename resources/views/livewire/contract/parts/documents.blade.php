@@ -22,17 +22,19 @@
         <div>
             <p class="default-p mb-6">{{ __('contracts.statute_md5_info') }}</p>
             <div class="flex flex-col gap-3">
-                <input id="statuteMd5"
-                       type="file"
-                       wire:model="form.statuteMd5"
-                       name="statuteMd5"
-                       class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 @error('form.statuteMd5') border-red-500 @enderror"
-                />
-                @if(isset($this->form->statuteMd5) && is_object($this->form->statuteMd5))
-                    <p class="text-sm text-gray-700">
-                        {{ __('forms.files_selected') }}: {{ $this->form->statuteMd5->getClientOriginalName() }}
-                    </p>
-                @endif
+                <div x-data="{ fileName: '{{ __('forms.no_file_chosen') }}' }" class="file-input-wrapper @error('form.statuteMd5') border-red-500 @enderror">
+                    <label for="statuteMd5" class="file-input-button">
+                        {{ __('forms.choose_file') }}
+                    </label>
+                    <span class="file-input-text" x-text="fileName"></span>
+                    <input id="statuteMd5"
+                           type="file"
+                           wire:model="form.statuteMd5"
+                           name="statuteMd5"
+                           class="hidden"
+                           @change="fileName = $event.target.files[0] ? $event.target.files[0].name : '{{ __('forms.no_file_chosen') }}'"
+                    />
+                </div>
                 <p class="text-xs text-gray-500">{{ __('forms.max_file_size_and_format') }}</p>
                 @error('form.statuteMd5')
                     <p class="text-error">{{ $message }}</p>
@@ -42,17 +44,19 @@
         <div>
             <p class="default-p mb-6">{{ __('contracts.additional_document_md5_info') }}</p>
             <div class="flex flex-col gap-3">
-                <input id="additionalDocumentMd5"
-                       type="file"
-                       wire:model="form.additionalDocumentMd5"
-                       name="additionalDocumentMd5"
-                       class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 @error('form.additionalDocumentMd5') border-red-500 @enderror"
-                />
-                @if(isset($this->form->additionalDocumentMd5) && is_object($this->form->additionalDocumentMd5))
-                    <p class="text-sm text-gray-700">
-                        {{ __('forms.files_selected') }}: {{ $this->form->additionalDocumentMd5->getClientOriginalName() }}
-                    </p>
-                @endif
+                <div x-data="{ fileName: '{{ __('forms.no_file_chosen') }}' }" class="file-input-wrapper @error('form.additionalDocumentMd5') border-red-500 @enderror">
+                    <label for="additionalDocumentMd5" class="file-input-button">
+                        {{ __('forms.choose_file') }}
+                    </label>
+                    <span class="file-input-text" x-text="fileName"></span>
+                    <input id="additionalDocumentMd5"
+                           type="file"
+                           wire:model="form.additionalDocumentMd5"
+                           name="additionalDocumentMd5"
+                           class="hidden"
+                           @change="fileName = $event.target.files[0] ? $event.target.files[0].name : '{{ __('forms.no_file_chosen') }}'"
+                    />
+                </div>
                 <p class="text-xs text-gray-500">{{ __('forms.max_file_size_and_format') }}</p>
                 @error('form.additionalDocumentMd5')
                     <p class="text-error">{{ $message }}</p>

@@ -1,5 +1,5 @@
 @php
-    use App\Models\Contracts\Contract;
+    use App\Models\Contracts\ContractRequest;
 @endphp
 
 <div>
@@ -10,14 +10,7 @@
         <x-slot name="title">{{ __('forms.contracts') }}</x-slot>
 
         <div class="mt-3 ml-0 flex flex-col sm:flex-row sm:flex-wrap gap-2 self-start">
-            <a href="{{ route('contract-request.reimbursement.create', [legalEntity()]) }}"
-               wire:navigate
-               class="button-primary flex items-center gap-2 whitespace-nowrap">
-                @icon('plus', 'w-4 h-4')
-                {{ __('contracts.new') }} ({{ __('contracts.reimbursement') }})
-            </a>
-
-            @can('sync', Contract::class)
+            @can('sync', ContractRequest::class)
                 <button wire:click="sync" type="button" class="button-sync flex items-center gap-2 whitespace-nowrap">
                     @icon('refresh', 'w-4 h-4')
                     {{ __('forms.synchronise_with_eHealth') }}
@@ -26,73 +19,60 @@
         </div>
 
         <x-slot name="navigation">
-            <div class="flex flex-col -my-4" x-data="{ showFilter: false }">
-                <div class="flex mb-4 flex-col lg:flex-row items-stretch lg:items-end gap-2 lg:gap-4 w-full">
-                    <button @click="showFilter = !showFilter"
-                            class="button-minor flex items-center justify-center gap-2 w-full lg:w-auto self-stretch lg:self-auto lg:-translate-y-[9px]"
+            <div class="flex flex-col -my-4">
+                <div class="form-row-3 items-end w-full">
+                    <div class="form-group group"
+                         x-data="{
+                             open: false,
+                             selectedTypes: $wire.entangle('typeFilter'),
+                             // Dynamically map enum values to their localized labels
+                             typeLabels: {
+                                 @foreach(\App\Enums\Contract\Type::cases() as $typeCase)
+                                     '{{ $typeCase->value }}': '{{ $typeCase->label() }}',
+                                 @endforeach
+                             }
+                         }"
                     >
-                        @icon('adjustments', 'w-4 h-4')
-                        <span>{{ __('forms.additional_search_parameters') }}</span>
-                    </button>
-                </div>
+                        <label for="typeFilter" class="label">{{ __('contracts.type_label') }}</label>
+                        <div class="relative">
+                            <input type="text"
+                                   id="typeFilter"
+                                   class="peer input pr-10 cursor-pointer"
+                                   :value="selectedTypes.length === 0 ? '{{ __('forms.all') }}' : selectedTypes.map(typeValue => typeLabels[typeValue] || typeValue).join(', ')"
+                                   @click="open = !open"
+                                   readonly
+                            />
+                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none')
 
-                <div x-cloak x-show="showFilter" x-transition>
-                    <div class="form-row-3">
-                        <div class="form-group group"
-                             x-data="{
-                                 open: false,
-                                 selectedTypes: $wire.entangle('typeFilter'),
-                                 // Dynamically map enum values to their localized labels
-                                 typeLabels: {
+                            <div x-show="open"
+                                 @click.away="open = false"
+                                 class="absolute z-10 mt-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg"
+                            >
+                                <ul class="py-2 px-3 space-y-2 text-sm text-gray-700 dark:text-gray-200">
                                      @foreach(\App\Enums\Contract\Type::cases() as $typeCase)
-                                         '{{ $typeCase->value }}': '{{ $typeCase->label() }}',
+                                         <li>
+                                             <label class="flex items-center">
+                                                 <input type="checkbox"
+                                                        value="{{ $typeCase->value }}"
+                                                        x-model="selectedTypes"
+                                                        class="w-4 h-4 text-blue-600 bg-gray-100 dark:bg-gray-600 border-gray-300 rounded focus:ring-blue-500"
+                                                 >
+                                                 <span class="ml-2">{{ $typeCase->label() }}</span>
+                                             </label>
+                                         </li>
                                      @endforeach
-                                 }
-                             }"
-                        >
-                            <label for="typeFilter" class="label">{{ __('contracts.type_label') }}</label>
-                            <div class="relative">
-                                <input type="text"
-                                       id="typeFilter"
-                                       class="peer input pr-10 cursor-pointer"
-                                // Map the selected enum values to their corresponding labels
-                                :value="selectedTypes.length === 0 ? '{{ __('forms.all') }}' : selectedTypes.map(typeValue => typeLabels[typeValue] || typeValue).join(', ')"
-                                @click="open = !open"
-                                readonly
-                                />
-                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none')
-
-                                <div x-show="open"
-                                     @click.away="open = false"
-                                     class="absolute z-10 mt-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg"
-                                >
-                                    <ul class="py-2 px-3 space-y-2 text-sm text-gray-700 dark:text-gray-200">
-                                        {{-- Iterate through enum cases to render checkboxes --}}
-                                        @foreach(\App\Enums\Contract\Type::cases() as $typeCase)
-                                            <li>
-                                                <label class="flex items-center">
-                                                    <input type="checkbox"
-                                                           value="{{ $typeCase->value }}"
-                                                           x-model="selectedTypes"
-                                                           class="w-4 h-4 text-blue-600 bg-gray-100 dark:bg-gray-600 border-gray-300 rounded focus:ring-blue-500"
-                                                    >
-                                                    <span class="ml-2">{{ $typeCase->label() }}</span>
-                                                </label>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                </div>
+                                </ul>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="form-group flex justify-end gap-2 items-center">
-                            <button wire:click="search" class="button-primary min-w-[120px]">
-                                {{ __('forms.search') }}
-                            </button>
-                            <button wire:click="resetFilters" class="button-minor ml-2">
-                                {{ __('forms.reset_all_filters') }}
-                            </button>
-                        </div>
+                    <div class="form-group flex items-center mb-3">
+                        <button wire:click="search"
+                                type="button"
+                                class="p-2.5 text-sm font-medium text-white bg-primary-700 rounded-xl hover:bg-primary-800 focus:ring-4 focus:outline-none focus:ring-primary-300 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800"
+                        >
+                            @icon('search-outline', 'w-6 h-6')
+                        </button>
                     </div>
                 </div>
             </div>
@@ -140,7 +120,7 @@
                                     {{ $item->start_date?->format(config('app.date_format')) }} - {{ $item->end_date?->format(config('app.date_format')) }}
                                 </td>
                                 <td class="index-table-td text-sm text-gray-500">
-                                    {{ $item->inserted_at?->format(config('app.date_format')) ?? $item->created_at?->format(config('app.date_format')) }}
+                                    {{ $item->start_date?->format(config('app.date_format')) ?? $item->created_at?->format(config('app.date_format')) }}
                                 </td>
 
                                 <td class="index-table-td-actions">

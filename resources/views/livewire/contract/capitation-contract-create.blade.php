@@ -1,7 +1,6 @@
 <div>
-    <x-section-navigation class="shift-content" x-data="{ showFilter: false }">
-        <x-slot name="title">{{ __('contracts.new') }}</x-slot>
-    </x-section-navigation>
+    <x-header-navigation class="breadcrumb-form" title="{{ __('contracts.new') }}">
+    </x-header-navigation>
 
     <x-forms.loading />
     <livewire:components.x-message :key="time()" />

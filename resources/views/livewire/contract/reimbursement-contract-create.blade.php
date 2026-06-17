@@ -1,12 +1,10 @@
 <div>
-    <x-section-navigation x-data="{ showFilter: false }">
-        <x-slot name="title">{{ __('contracts.new') }}</x-slot>
-    </x-section-navigation>
+    <x-header-navigation class="breadcrumb-form" title="{{ __('contracts.new') }}"></x-header-navigation>
 
     <x-forms.loading />
     <livewire:components.x-message :key="time()" />
 
-    <div class="form" wire:key="{{ time() }}">
+    <div class="form shift-content" wire:key="{{ time() }}">
         @include('livewire.contract.parts.legal-entity-info')
         @include('livewire.contract.parts.basic-data')
         @include('livewire.contract.parts.medical-programs')

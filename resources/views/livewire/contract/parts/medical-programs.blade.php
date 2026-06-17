@@ -22,10 +22,10 @@
         </fieldset>
     @endif
 @else
-    <div class="mt-6 border-t pt-6">
-        <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">
-            {{ __('contracts.medical_programs') }}
-        </h3>
+    <fieldset class="fieldset">
+        <legend class="legend">
+            <h2>{{ __('contracts.medical_programs') }}</h2>
+        </legend>
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             @if(!empty($medicalProgramsList))
                 @foreach($medicalProgramsList as $program)
@@ -49,5 +49,5 @@
             @endif
         </div>
         <x-input-error for="form.medicalPrograms" class="mt-2" />
-    </div>
+    </fieldset>
 @endif
