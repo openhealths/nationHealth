@@ -28,6 +28,13 @@ trait StatusTrait
     public string $errorReason;
     public string $availabilityStatus;
 
+    /**
+     * Child equipment registered with the parent whose availability status is being changed.
+     *
+     * @var array
+     */
+    public array $childEquipments = [];
+
     public function updateStatus(string $uuid): void
     {
         $equipment = Equipment::whereUuid($uuid)->firstOrFail();
@@ -64,6 +71,21 @@ trait StatusTrait
 
             return;
         }
+    }
+
+    /**
+     * Load child equipment registered with the given parent equipment for display to the user.
+     *
+     * @param  string  $uuid
+     * @return void
+     */
+    public function loadChildEquipments(string $uuid): void
+    {
+        $this->childEquipments = Equipment::whereUuid($uuid)->firstOrFail()
+            ->children()
+            ->with('names')
+            ->get()
+            ->toArray();
     }
 
     public function updateAvailabilityStatus(string $uuid): void
