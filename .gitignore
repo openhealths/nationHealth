@@ -22,3 +22,13 @@ yarn-error.log
 _ide_helper.php
 _ide_helper_models.php
 storage/debugbar
+
+# AI assistants (Laravel Boost) — generated locally via `make boost-install`
+boost.json
+AGENTS.md
+GEMINI.md
+.cursor/
+.agents/
+.github/copilot-instructions.md
+.github/skills/
+.vscode/mcp.json
