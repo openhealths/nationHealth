@@ -21,6 +21,7 @@ use App\Livewire\Encounter\Forms\Api\EncounterRequestApi;
 use App\Models\Employee\Employee;
 use App\Models\Icd10;
 use App\Models\Person\Person;
+use App\Models\Equipment;
 use App\Repositories\Repository;
 use App\Traits\FormTrait;
 use Illuminate\Support\Facades\Auth;
@@ -209,6 +210,13 @@ class EncounterComponent extends Component
     public array $problems = [];
 
     /**
+     * List of equipment options for combobox.
+     *
+     * @var array
+     */
+    public array $equipmentOptions = [];
+
+    /**
      * List of dictionary names.
      *
      * @var array|string[]
@@ -371,6 +379,18 @@ class EncounterComponent extends Component
         $encounterWriterEmployee = $authUser->getEncounterWriterEmployee();
         $this->employeeFullName = $encounterWriterEmployee->fullName;
         $this->allowedConditionCodesBySystem = $this->computeAllowedConditionCodesBySystem($encounterWriterEmployee);
+
+        $this->equipmentOptions = Equipment::query()
+            ->where('legal_entity_id', legalEntity()->id)
+            ->active()
+            ->with('names')
+            ->get()
+            ->map(static fn (Equipment $equipment) => [
+                'uuid' => $equipment->uuid,
+                'name' => $equipment->names->first()->name,
+            ])
+            ->values()
+            ->toArray();
 
         $this->setPatientData();
 

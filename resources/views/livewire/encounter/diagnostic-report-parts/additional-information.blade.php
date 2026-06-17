@@ -278,4 +278,118 @@
             @enderror
         </div>
     </div>
+
+    {{-- Used references / Equipment --}}
+    @if($context === 'diagnostic-report')
+        <div class="form-row-2">
+            <div class="w-full max-w-[430px]">
+                <p class="label-modal mb-2 block text-sm">
+                    {{ __('equipments.label') }}
+                </p>
+
+                <div class="space-y-4">
+                    <template x-for="(usedReference, index) in modalDiagnosticReport.usedReferences" :key="index">
+                        <div class="flex items-center gap-3"
+                            x-data="{
+                                search: '',
+                                open: false,
+
+                                init() {
+                                    this.setSearchFromSelected();
+
+                                    this.$watch('usedReference.id', () => {
+                                        this.setSearchFromSelected();
+                                    });
+                                },
+
+                                get filteredEquipmentOptions() {
+                                    const term = this.search.toLowerCase().trim();
+
+                                    if (!term) {
+                                        return equipmentOptions.slice(0, 50);
+                                    }
+
+                                    return equipmentOptions
+                                        .filter((equipment) => equipment.name.toLowerCase().includes(term))
+                                        .slice(0, 50);
+                                },
+
+                                setSearchFromSelected() {
+                                    const selectedEquipment = equipmentOptions.find((equipment) => equipment.uuid === usedReference.id);
+
+                                    this.search = selectedEquipment ? selectedEquipment.name : '';
+                                },
+
+                                selectEquipment(equipment) {
+                                    usedReference.id = equipment.uuid;
+                                    this.search = equipment.name;
+                                    this.open = false;
+                                },
+
+                                clearSelectionIfChanged() {
+                                    const selectedEquipment = equipmentOptions.find((equipment) => equipment.uuid === usedReference.id);
+
+                                    if (selectedEquipment && selectedEquipment.name !== this.search) {
+                                        usedReference.id = '';
+                                    }
+
+                                    this.open = true;
+                                }
+                            }"
+                        >
+                            <div class="relative flex-1 min-w-0"
+                                @click.away="open = false"
+                            >
+                                <input type="search"
+                                    class="input peer"
+                                    placeholder="{{ __('equipments.search') }}"
+                                    x-model="search"
+                                    @focus="open = true"
+                                    @input.debounce.150ms="clearSelectionIfChanged()"
+                                    autocomplete="off"
+                                >
+
+                                <div x-show="open"
+                                    x-cloak
+                                    class="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto rounded border bg-white p-2 shadow dark:bg-gray-700 dark:text-white"
+                                >
+                                    <template x-for="equipment in filteredEquipmentOptions" :key="equipment.uuid">
+                                        <button type="button"
+                                                class="block w-full rounded px-2 py-1 text-left hover:bg-gray-100 dark:hover:bg-blue-800"
+                                                @mousedown.prevent="selectEquipment(equipment)"
+                                                x-text="equipment.name"
+                                        ></button>
+                                    </template>
+
+                                    <div x-show="filteredEquipmentOptions.length === 0"
+                                        class="px-2 py-1 text-red-400"
+                                    >
+                                        {{ __('forms.nothing_found') }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="button"
+                                    @click.prevent="removeUsedReference(index)"
+                                    class="shrink-0 text-error hover:opacity-80"
+                            >
+                                @icon('delete', 'w-5 h-5')
+                            </button>
+                        </div>
+                    </template>
+                </div>
+
+                @error($diagnosticReportErrorPath . '.usedReferences.*.id')
+                    <p class="text-error mt-2">{{ $message }}</p>
+                @enderror
+
+                <button type="button"
+                        @click.prevent="addUsedReference()"
+                        class="item-add mt-4"
+                >
+                    {{ __('equipments.add') }}
+                </button>
+            </div>
+        </div>
+    @endif
 </fieldset>

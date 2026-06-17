@@ -267,51 +267,53 @@
     /**
      * Representation of the user's personal observation
      */
-    class Observation {
-        codingSystem = 'loinc';
-        categorySystem = 'eHealth/observation_categories';
-        codeSystem = 'eHealth/LOINC/observation_codes';
-        dictionaryName = '';
-        primarySource = true;
-        reportOriginCode = '';
-        categoryCode = '';
-        codeCode = '';
-        methodCode = '';
-        interpretationCode = '';
-        bodySiteCode = '';
-        valueQuantityValue = '';
-        valueQuantityComparator = '';
-        valueQuantityUnit = '';
-        valueQuantitySystem = '';
-        valueQuantityCode = '';
-        comment = '';
-        issuedDate = '';
-        issuedTime = '';
-        effectiveDate = '';
-        effectiveTime = '';
-        components = [
-            {
-                codeCode: '',
-                codeSystem: 'eHealth/ICF/qualifiers',
-                valueCode: '',
-                valueSystem: '',
-                interpretationCode: ''
-            }
-        ];
+    if (!window.Observation) {
+        window.Observation = class Observation {
+            codingSystem = 'loinc';
+            categorySystem = 'eHealth/observation_categories';
+            codeSystem = 'eHealth/LOINC/observation_codes';
+            dictionaryName = '';
+            primarySource = true;
+            reportOriginCode = '';
+            categoryCode = '';
+            codeCode = '';
+            methodCode = '';
+            interpretationCode = '';
+            bodySiteCode = '';
+            valueQuantityValue = '';
+            valueQuantityComparator = '';
+            valueQuantityUnit = '';
+            valueQuantitySystem = '';
+            valueQuantityCode = '';
+            comment = '';
+            issuedDate = '';
+            issuedTime = '';
+            effectiveDate = '';
+            effectiveTime = '';
+            components = [
+                {
+                    codeCode: '',
+                    codeSystem: 'eHealth/ICF/qualifiers',
+                    valueCode: '',
+                    valueSystem: '',
+                    interpretationCode: ''
+                }
+            ];
 
-        constructor(obj = null) {
-            const now = new Date();
-            const [yyyy, mm, dd] = now.toISOString().split('T')[0].split('-');
-            const formattedDate = `${dd}.${mm}.${yyyy}`;
-            const formattedTime = now.toLocaleTimeString('uk-UA', {hour: '2-digit', minute: '2-digit', hour12: false});
+            constructor(obj = null) {
+                const now = new Date();
+                const [yyyy, mm, dd] = now.toISOString().split('T')[0].split('-');
+                const formattedDate = `${dd}.${mm}.${yyyy}`;
+                const formattedTime = now.toLocaleTimeString('uk-UA', {hour: '2-digit', minute: '2-digit', hour12: false});
 
-            this.issuedDate = formattedDate;
-            this.issuedTime = formattedTime;
-            this.effectiveDate = formattedDate;
-            this.effectiveTime = formattedTime;
+                this.issuedDate = formattedDate;
+                this.issuedTime = formattedTime;
+                this.effectiveDate = formattedDate;
+                this.effectiveTime = formattedTime;
 
-            if (obj) {
-                Object.assign(this, JSON.parse(JSON.stringify(obj)));
+                if (obj) {
+                    Object.assign(this, JSON.parse(JSON.stringify(obj)));
+                }
             }
         }
     }

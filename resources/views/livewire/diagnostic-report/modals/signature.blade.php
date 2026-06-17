@@ -105,7 +105,7 @@
                                 {{__('forms.cancel')}}
                             </button>
 
-                            <button @click.prevent="$wire.sign(modalDiagnosticReport)"
+                            <button @click.prevent="normalizeUsedReferences(); $wire.sign(modalDiagnosticReport)"
                                     type="button"
                                     class="button-primary"
                                     wire:loading.attr="disabled"

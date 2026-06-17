@@ -66,6 +66,9 @@ class DiagnosticReportEdit extends DiagnosticReportComponent
         }
 
         $this->form->diagnosticReport = $diagnosticReportData;
+
+        $this->form->diagnosticReport['usedReferences'] = $this->form->diagnosticReport['usedReferences'] ?? [];
+
         $this->form->observations = collect(Repository::observation()->getByDiagnosticReportId($diagnosticReportId))
             ->map(fn (array $observation) => Fhir::observation()->fromFhir($observation))
             ->toArray();
@@ -151,6 +154,11 @@ class DiagnosticReportEdit extends DiagnosticReportComponent
 
     private function buildFormattedData(array $diagnosticReportData, DiagnosticReportStatus $status): ?array 
     {
+        $diagnosticReportData['usedReferences'] = array_values(array_filter(
+            $diagnosticReportData['usedReferences'] ?? [],
+            static fn (array $usedReference) => filled($usedReference['id'] ?? null)
+        ));
+        
         $this->form->diagnosticReport = $diagnosticReportData;
 
         try {

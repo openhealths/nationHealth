@@ -181,6 +181,25 @@ class DiagnosticReportRepository extends BaseRepository
                     ]);
                 }
 
+                if (!empty($datum['usedReferences'])) {
+                    $usedReferenceIds = [];
+
+                    foreach ($datum['usedReferences'] as $usedReferenceData) {
+                        $equipmentUuid = data_get($usedReferenceData, 'identifier.value');
+
+                        if (!$equipmentUuid) {
+                            continue;
+                        }
+
+                        $identifier = Repository::identifier()->store($equipmentUuid);
+                        Repository::codeableConcept()->attach($identifier, $usedReferenceData);
+
+                        $usedReferenceIds[] = $identifier->id;
+                    }
+
+                    $diagnosticReport->usedReferences()->attach($usedReferenceIds);
+                }
+
                 $diagnosticReportId = $diagnosticReport->id;
             }
 
@@ -210,7 +229,8 @@ class DiagnosticReportRepository extends BaseRepository
             'division.type.coding',
             'performer.reference.type.coding',
             'reportOrigin.coding',
-            'resultsInterpreter.reference.type.coding'
+            'resultsInterpreter.reference.type.coding',
+            'usedReferences.type.coding',
         ])
             ->whereHas('encounter', fn (Builder $query) => $query->where('value', $encounterUuid))
             ->get()

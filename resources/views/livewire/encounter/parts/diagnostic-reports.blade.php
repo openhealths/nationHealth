@@ -7,7 +7,18 @@
          openDiagnosticReportDrawer: false,
          item: 0,
          diagnosticReportCategoriesDictionary: $wire.dictionaries['eHealth/diagnostic_report_categories'],
-         servicesDictionary: $wire.dictionaries['custom/services']
+         servicesDictionary: $wire.dictionaries['custom/services'],
+         equipmentOptions: @js($equipmentOptions),
+
+        addUsedReference() {
+            this.modalDiagnosticReport.usedReferences.push({
+                id: ''
+            });
+        },
+
+        removeUsedReference(index) {
+            this.modalDiagnosticReport.usedReferences.splice(index, 1);
+        },
      }"
 >
 
@@ -203,6 +214,7 @@
             this.reportOriginCode = '';
             this.reportOriginText = '';
             this.divisionId = '';
+            this.usedReferences = [];
             this.resultsInterpreterEmployeeId = '';
             this.issuedDate = toFormattedDate(now);
             this.issuedTime = now.toLocaleTimeString('uk-UA', timeOptions);
@@ -213,6 +225,9 @@
 
             if (obj) {
                 Object.assign(this, JSON.parse(JSON.stringify(obj)));
+            }
+            if (!Array.isArray(this.usedReferences)) {
+                this.usedReferences = [];
             }
         }
     }

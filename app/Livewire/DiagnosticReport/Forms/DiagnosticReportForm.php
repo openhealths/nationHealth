@@ -163,6 +163,13 @@ class DiagnosticReportForm extends BaseForm
                 'string',
                 'max:1000',
             ],
+            'diagnosticReport.usedReferences' => ['nullable', 'array'],
+            'diagnosticReport.usedReferences.*.id' => [
+                'nullable',
+                'uuid',
+                'distinct',
+                Rule::exists('equipments', 'uuid')->where('legal_entity_id', legalEntity()->id),
+            ],
             'diagnosticReport.divisionId' => ['nullable', 'uuid'],
             'diagnosticReport.resultsInterpreterEmployeeId' => [
                 Rule::requiredIf(

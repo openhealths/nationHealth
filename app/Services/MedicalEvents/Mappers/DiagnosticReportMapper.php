@@ -73,7 +73,18 @@ class DiagnosticReportMapper implements FhirMapperContract
 
         // todo: specimens
 
-        // todo: used_references (array of equipment)
+        if (!empty($data['usedReferences'])) {
+            $result['usedReferences'] = collect($data['usedReferences'])
+                ->pluck('id')
+                ->filter()
+                ->unique()
+                ->map(static fn (string $equipmentUuid) => FhirResource::make()
+                    ->coding('eHealth/resources', 'equipment')
+                    ->toIdentifier($equipmentUuid)
+                )
+                ->values()
+                ->toArray();
+        }
 
         if (!empty($data['divisionId'])) {
             $result['division'] = FhirResource::make()
@@ -124,6 +135,13 @@ class DiagnosticReportMapper implements FhirMapperContract
             'conclusionCode' => data_get($data, 'conclusionCode.coding.0.code', ''),
             'conclusion' => data_get($data, 'conclusion', ''),
             'divisionId' => data_get($data, 'division.identifier.value', ''),
+            'usedReferences' => collect(data_get($data, 'usedReferences', []))
+                ->map(static fn (array $usedReference) => [
+                    'id' => data_get($usedReference, 'identifier.value', ''),
+                ])
+                ->filter(static fn (array $usedReference) => !empty($usedReference['id']))
+                ->values()
+                ->toArray(),
             'resultsInterpreterEmployeeId' => data_get($data, 'resultsInterpreter.reference.identifier.value', ''),
             'issuedDate' => data_get($data, 'issuedDate'),
             'issuedTime' => data_get($data, 'issuedTime'),

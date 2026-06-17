@@ -9,6 +9,7 @@ use App\Enums\Person\DiagnosticReportStatus;
 use App\Services\MedicalEvents\Fhir;
 use App\Livewire\DiagnosticReport\Forms\DiagnosticReportForm as Form;
 use App\Models\Employee\Employee;
+use App\Models\Equipment;
 use App\Models\Icd10;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
@@ -109,6 +110,13 @@ class DiagnosticReportComponent extends Component
      */
     public array $results;
 
+    /**
+     * List of equipment options for combobox.
+     *
+     * @var array
+     */
+    public array $equipmentOptions = [];
+
     protected array $dictionaryNames = [
         'eHealth/diagnostic_report_categories',
         'eHealth/report_origins',
@@ -175,6 +183,34 @@ class DiagnosticReportComponent extends Component
 
         $this->setPatientData();
         $this->divisions = $legalEntity->divisions()->select(['uuid', 'name'])->get()->toArray();
+
+        $this->equipmentOptions = Equipment::query()
+            ->where('legal_entity_id', $legalEntity->id)
+            ->active()
+            ->with('names')
+            ->get()
+            ->map(static fn (Equipment $equipment) => [
+                'uuid' => $equipment->uuid,
+                'name' => $equipment->names->first()->name,
+            ])
+            ->values()
+            ->toArray();
+
+        $this->form->diagnosticReport['usedReferences'] = $this->form->diagnosticReport['usedReferences'] ?? [];
+    }
+
+    public function addUsedReference(): void
+    {
+        $this->usedReferences[] = [
+            'id' => '',
+        ];
+    }
+
+    public function removeUsedReference(int $index): void
+    {
+        unset($this->usedReferences[$index]);
+
+        $this->usedReferences = array_values($this->usedReferences);
     }
 
     /**

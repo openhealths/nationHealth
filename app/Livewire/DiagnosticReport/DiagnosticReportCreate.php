@@ -43,6 +43,11 @@ class DiagnosticReportCreate extends DiagnosticReportComponent
             return;
         }
 
+        $diagnosticReportData['usedReferences'] = array_values(array_filter(
+            $diagnosticReportData['usedReferences'] ?? [],
+            static fn (array $usedReference) => filled($usedReference['id'] ?? null)
+        ));
+
         $this->form->diagnosticReport = $diagnosticReportData;
 
         try {
@@ -89,6 +94,11 @@ class DiagnosticReportCreate extends DiagnosticReportComponent
 
             return;
         }
+
+        $diagnosticReportData['usedReferences'] = array_values(array_filter(
+            $diagnosticReportData['usedReferences'] ?? [],
+            static fn (array $usedReference) => filled($usedReference['id'] ?? null)
+        ));
 
         $this->form->diagnosticReport = $diagnosticReportData;
 

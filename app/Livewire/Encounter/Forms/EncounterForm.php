@@ -352,6 +352,12 @@ class EncounterForm extends BaseForm
                 'string',
                 'max:3000'
             ]),
+            'diagnosticReports.*.usedReferences' => ['nullable', 'array'],
+            'diagnosticReports.*.usedReferences.*.id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('equipments', 'uuid')->where('legal_entity_id', legalEntity()->id),
+            ],
             'diagnosticReports.*.divisionId' => ['nullable', 'uuid'],
             'diagnosticReports.*.resultsInterpreterEmployeeId' => ['nullable', 'uuid'],
             'diagnosticReports.*.issuedDate' => ['required_with:diagnosticReports', 'date_format:' . config('app.date_format'), 'before_or_equal:today'],
