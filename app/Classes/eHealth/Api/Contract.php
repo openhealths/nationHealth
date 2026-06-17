@@ -21,6 +21,41 @@ class Contract extends EHealthRequest
     protected const string URL = '/api/contracts';
 
     /**
+     * Maps eHealth API contract response fields to local database columns.
+     *
+     * @param  array  $data  Raw data from eHealth API
+     * @return array
+     */
+    public function mapCreate(array $data): array
+    {
+        return [
+            'uuid' => $data['id'] ?? $data['uuid'],
+            'contract_number' => $data['contract_number'] ?? null,
+            'status' => $data['status'] ?? 'ACTIVE',
+            'type' => $data['type'] ?? null,
+            'start_date' => $data['start_date'] ?? null,
+            'end_date' => $data['end_date'] ?? null,
+            'contractor_base' => $data['contractor_base'] ?? null,
+            'contractor_payment_details' => $data['contractor_payment_details'] ?? [],
+            'contractor_rmsp_amount' => $data['contractor_rmsp_amount'] ?? null,
+            'contractor_divisions' => $data['contractor_divisions'] ?? [],
+            'external_contractor_flag' => $data['external_contractor_flag'] ?? false,
+            'external_contractors' => $data['external_contractors'] ?? [],
+            'nhs_signer_id' => $data['nhs_signer']['id'] ?? $data['nhs_signer_id'] ?? null,
+            'nhs_legal_entity_id' => $data['nhs_legal_entity']['id'] ?? $data['nhs_legal_entity_id'] ?? null,
+            'nhs_signer_base' => $data['nhs_signer_base'] ?? null,
+            'nhs_payment_method' => $data['nhs_payment_method'] ?? null,
+            'nhs_contract_price' => $data['nhs_contract_price'] ?? null,
+            'nhs_signed_date' => $data['nhs_signed_date'] ?? null,
+            'id_form' => $data['id_form'] ?? null,
+            'issue_city' => $data['issue_city'] ?? null,
+            'medical_programs' => $data['medical_programs'] ?? [],
+            'inserted_at' => $data['inserted_at'] ?? now(),
+            'data' => $data,
+        ];
+    }
+
+    /**
      * Get the details of the signed contract by ID
      *
      * @param  string  $id  contract UUID

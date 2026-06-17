@@ -37,32 +37,24 @@ class ReimbursementContractCreate extends ContractComponent
 
     protected function loadMedicalPrograms(): void
     {
-        Cache::forget('ehealth_medical_programs_reimbursement');
-
         $programs = Cache::remember('ehealth_medical_programs_reimbursement', 3600, function () {
             try {
-                $request = new MedicalProgram();
-
-                $response = $request->asMis()->getMany([
+                $response = (new MedicalProgram())->asMis()->getMany([
                     'page_size' => 100,
                 ]);
 
                 return $response->getData();
             } catch (\Exception $e) {
                 Log::error('Medical Programs Fetch Error: ' . $e->getMessage());
+
                 return [];
             }
         });
 
-        $formattedList = [];
-        foreach ($programs as $item) {
-            $formattedList[] = [
-                'id' => $item['id'],
-                'name' => $item['name'] . ' (' . ($item['type'] ?? 'N/A') . ')',
-            ];
-        }
-
-        $this->medicalProgramsList = $formattedList;
+        $this->medicalProgramsList = array_map(static fn (array $item) => [
+            'id' => $item['id'],
+            'name' => $item['name'] . ' (' . ($item['type'] ?? 'N/A') . ')',
+        ], $programs);
     }
 
     protected function getContractType(): string
@@ -77,9 +69,7 @@ class ReimbursementContractCreate extends ContractComponent
 
         $payerAccount = str_replace(' ', '', $data['contractorPaymentDetails']['payerAccount'] ?? '');
 
-        $insulinProgramId = ['1a227396-a0e4-4c4f-a0a9-6b358c8929d2'];
-
-        $idForm = 'GENERAL';
+        $selectedProgramIds = array_filter($data['medicalPrograms'] ?? []);
 
         $payload = [
             'contractor_owner_id' => $this->form->contractorOwnerId,
@@ -91,14 +81,14 @@ class ReimbursementContractCreate extends ContractComponent
             'start_date' => Carbon::now()->addDay()->format('Y-m-d'),
             'end_date' => Carbon::parse($data['endDate'])->format('Y-m-d'),
 
-            'id_form' => $idForm,
+            'id_form' => $data['idForm'] ?? 'GENERAL',
 
             'statute_md5' => $data['statuteMd5'] ?? null,
             'additional_document_md5' => $data['additionalDocumentMd5'] ?? null,
 
             'consent_text' => $consentTextString,
 
-            'medical_programs' => $insulinProgramId,
+            'medical_programs' => array_map(static fn (string $id) => ['id' => $id], $selectedProgramIds),
         ];
 
         if (!empty($data['previousRequestId'])) {

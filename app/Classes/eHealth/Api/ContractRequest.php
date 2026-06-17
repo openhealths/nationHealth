@@ -31,7 +31,7 @@ class ContractRequest extends EHealthRequest
         $this->setDefaultPageSize();
 
         // Combining existing query parameters with passed ones
-        $mergedQuery = array_merge($this->options['query'], $query ?? []);
+        $mergedQuery = array_merge($this->options['query'] ?? [], $query ?? []);
 
         // Pass the type as a query parameter, not part of the URL
         $mergedQuery['type'] = strtoupper($contractType);
@@ -139,7 +139,7 @@ class ContractRequest extends EHealthRequest
 
         $url = self::URL . '/' . $contractType . '/' . $uuid;
 
-        return $this->post($url, $payload);
+        return $this->put($url, $payload);
     }
 
     /**
@@ -305,6 +305,9 @@ class ContractRequest extends EHealthRequest
 
     /**
      * Validates the response for getDetails().
+     *
+     * contractor_legal_entity and contractor_owner are optional because eHealth does not
+     * return them for contract requests in NEW status (they are populated after NHS approval).
      */
     protected function validateDetails(EHealthResponse $response): array
     {
@@ -313,22 +316,22 @@ class ContractRequest extends EHealthRequest
         $validator = Validator::make($transformedData, [
             'uuid' => 'required|uuid',
             'status' => 'required|string',
-            'contract_number' => 'required|string',
-            'start_date' => 'required|date_format:Y-m-d',
-            'end_date' => 'required|date_format:Y-m-d',
-            'contractor_legal_entity' => 'required|array',
-            'contractor_legal_entity.uuid' => 'required|uuid',
-            'contractor_owner' => 'required|array',
-            'contractor_owner.uuid' => 'required|uuid',
+            'contract_number' => 'sometimes|nullable|string',
+            'start_date' => 'sometimes|nullable|date_format:Y-m-d',
+            'end_date' => 'sometimes|nullable|date_format:Y-m-d',
+            'contractor_legal_entity' => 'sometimes|array',
+            'contractor_legal_entity.uuid' => 'sometimes|uuid',
+            'contractor_owner' => 'sometimes|array',
+            'contractor_owner.uuid' => 'sometimes|uuid',
         ]);
 
         if ($validator->fails()) {
-            $error = 'EHealth Contract (getDetails) validation failed: ' . implode(', ', $validator->errors()->all());
+            $error = 'EHealth ContractRequest (getDetails) validation failed: ' . implode(', ', $validator->errors()->all());
             Log::channel('e_health_errors')->error($error);
             throw ValidationException::withMessages(['ehealth_error' => $error]);
         }
 
-        return $validator->validated();
+        return $transformedData;
     }
 
     /**
