@@ -112,6 +112,13 @@ class DeclarationIndex extends Component
 
     public array $employeeIds;
 
+    /**
+     * eHealth uuids of the current user's own employees in this legal entity.
+     *
+     * @var array|string[]
+     */
+    public array $ownEmployeeUuids = [];
+
     public bool $isFiltersApplied = false;
 
     /**
@@ -174,10 +181,10 @@ class DeclarationIndex extends Component
 
         // Return true if either sync is in progress
         return $legalEntitySync ||
-               $declarationSync ||
-               $divisionSync ||
-               $healthCareServiceSync ||
-               $employeeSync;
+            $declarationSync ||
+            $divisionSync ||
+            $healthCareServiceSync ||
+            $employeeSync;
     }
 
     public function boot(): void
@@ -190,7 +197,11 @@ class DeclarationIndex extends Component
     {
         $user = Auth::user();
 
-        $this->employeeIds = $user->party->employees()->where('legal_entity_id', $legalEntity->id)->pluck('id')->all();
+        $ownEmployees = $user->party->employees()
+            ->filterByLegalEntityId($legalEntity->id)
+            ->get(['id', 'uuid']);
+
+        $this->ownEmployeeUuids = $ownEmployees->pluck('uuid')->filter()->values()->all();
 
         // Select employee_ids from reorganization_employee_declarations where legal_entity_uuid is in legators of current legal entity
         $reorganizedEmployeeIds = $user->party->reorganizedEmployeeDeclarations()
@@ -198,17 +209,20 @@ class DeclarationIndex extends Component
             ->pluck('employee_id')
             ->all();
 
-        $this->employeeIds = array_values(array_unique(array_merge($this->employeeIds, $reorganizedEmployeeIds)));
+        $this->employeeIds = array_values(array_unique(array_merge($ownEmployees->pluck('id')->all(), $reorganizedEmployeeIds)));
 
-        if ($user->hasAllowedRole(Role::OWNER)) {
-            $this->doctors = $this->getDoctors();
-        } else {
-            $this->countActive = Declaration::query()
-                ->forEmployees($this->employeeIds)
-                ->where('status', Status::ACTIVE)
-                ->filterByLegalEntityId(legalEntity()->id)
-                ->count();
+        $this->doctors = $this->getDoctors();
+
+        // Doctors default to viewing their own declarations, but may switch to another employee via the filter
+        if (!$user->hasAllowedRole(Role::OWNER)) {
+            $this->doctorFilter = $this->ownEmployeeUuids;
         }
+
+        $this->countActive = Declaration::query()
+            ->forEmployees($this->employeeIds)
+            ->where('status', Status::ACTIVE)
+            ->filterByLegalEntityId(legalEntity()->id)
+            ->count();
 
         $this->syncStatus = $this->getSyncStatus();
     }
@@ -226,7 +240,7 @@ class DeclarationIndex extends Component
         $this->typeFilter = ['request', 'declaration'];
         $this->statusFilter = [Status::ACTIVE->value];
         $this->reorganizationFilter = [];
-        $this->doctorFilter = [];
+        $this->doctorFilter = Auth::user()->hasAllowedRole(Role::OWNER) ? [] : $this->ownEmployeeUuids;
 
         $this->isFiltersApplied = false;
 
@@ -242,6 +256,13 @@ class DeclarationIndex extends Component
         $declarationRequests = collect();
 
         if ($user->can('viewAny', Declaration::class)) {
+            $selectedEmployeeIds = $this->doctors
+                ->whereIn('uuid', $this->doctorFilter)
+                ->pluck('id')
+                ->all();
+
+            $employeePool = array_values(array_unique(array_merge($this->employeeIds, $selectedEmployeeIds)));
+
             $declarations = Declaration::with([
                 'reorganizedEmployeeDeclaration',
                 'person:id,first_name,last_name,second_name,birth_date',
@@ -250,8 +271,8 @@ class DeclarationIndex extends Component
             ])
                 ->when(
                     !$user->hasAllowedRole(Role::OWNER),
-                    fn (Builder $query) => $query->forEmployees($this->employeeIds),
-                    fn ($query) => $query->filterByLegalEntityId(legalEntity()->id)
+                    fn (Builder $query) => $query->forEmployees($employeePool),
+                    fn (Builder $query) => $query->filterByLegalEntityId(legalEntity()->id)
                 )
                 ->get(['id', 'person_id', 'employee_id', 'legal_entity_id', 'declaration_number', 'declaration_request_id', 'status'])
                 ->each->setAttribute('type', 'declaration');
@@ -304,7 +325,6 @@ class DeclarationIndex extends Component
                         }
 
                         return \in_array(ReorganizedStatus::TO_BE_RESIGNED->value, $this->reorganizationFilter, true);
-
                     }
 
                     return false;
@@ -410,7 +430,6 @@ class DeclarationIndex extends Component
 
         // Try to resume previous sync if it was paused or failed
         if ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value) {
-
             $this->resumeSynchronization($user, $token);
 
             Session::flash('success', __('forms.success.sync_resumed'));
@@ -725,8 +744,9 @@ class DeclarationIndex extends Component
             ->whereHas('declarations')
             ->get(['id', 'uuid', 'party_id'])
             ->map(fn (Employee $doctor) => [
+                'id' => $doctor->id,
                 'uuid' => $doctor->uuid,
-                'full_name' => trim($doctor->party->fullName)
+                'fullName' => trim($doctor->party->fullName)
             ]);
     }
 

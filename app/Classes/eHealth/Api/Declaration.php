@@ -26,7 +26,15 @@ class Declaration extends Request
     /**
      * Get shortened details about declarations.
      *
-     * @param  $query
+     * @param  array{
+     *     employee_id?: string,
+     *     legal_entity_id?: string,
+     *     declaration_number?: string,
+     *     status: string,
+     *     reason?: string,
+     *     page?: int,
+     *     page_size?: int
+     * }  $query
      * @param  bool  $groupByEntities
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException

@@ -82,6 +82,7 @@
      x-data="{
         open: false,
         open1: false,
+        openDoctor: false,
         selectedStatuses: $wire.entangle('statusFilter'),
         statusLabels: @js([
             Status::ACTIVE->value => __('Активні'),
@@ -93,6 +94,14 @@
             ReorganizedStatus::TO_BE_RESIGNED->value => __('declarations.to_be_resigned'),
             ReorganizedStatus::RESIGNED->value => __('declarations.resigned')
         ]),
+        selectedDoctors: $wire.entangle('doctorFilter'),
+        doctors: @js($this->doctors->toArray()),
+        getSelectedDoctorNames() {
+            return this.doctors
+                .filter(doctor => this.selectedDoctors.includes(doctor.uuid))
+                .map(doctor => doctor.fullName)
+                .join(', ');
+        },
     }"
 >
     <div class="form-group group">
@@ -148,6 +157,47 @@
                             <span>{{ __('declarations.cancelled') }}</span>
                         </label>
                     </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    {{-- Filter by doctor --}}
+    <div class="form-group group">
+        <label for="doctorFilter" class="label mb-1">{{ __('employees.doctor') }}</label>
+        <div class="relative">
+            <input type="text"
+                id="doctorFilter"
+                class="input peer w-full cursor-pointer text-gray-500 dark:text-gray-400"
+                @click="openDoctor = !openDoctor"
+                :value="selectedDoctors.length ? getSelectedDoctorNames() : ''"
+                placeholder="{{ __('employees.doctor_full_name') }}"
+                readonly
+            />
+            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 pointer-events-none')
+            <div x-show="openDoctor"
+                @click.away="openDoctor = false"
+                x-transition:enter="transition ease-out duration-100"
+                x-transition:enter-start="transform opacity-0 scale-95"
+                x-transition:enter-end="transform opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-75"
+                x-transition:leave-start="transform opacity-100 scale-100"
+                x-transition:leave-end="transform opacity-0 scale-95"
+                class="absolute z-10 mt-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto"
+            >
+                <ul class="py-2 px-3 space-y-2 text-sm text-gray-700 dark:text-gray-200">
+                    <template x-for="doctor in doctors" :key="doctor.uuid">
+                        <li>
+                            <label class="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600 p-1 rounded">
+                                <input type="checkbox"
+                                    x-model="selectedDoctors"
+                                    :value="doctor.uuid"
+                                    class="rounded-sm text-blue-600 focus:ring-blue-500 border-gray-300 dark:bg-gray-800 dark:border-gray-600 dark:checked:bg-blue-600 dark:checked:border-transparent"
+                                />
+                                <span x-text="doctor.fullName"></span>
+                            </label>
+                        </li>
+                    </template>
                 </ul>
             </div>
         </div>

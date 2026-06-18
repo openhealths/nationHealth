@@ -100,7 +100,7 @@
             getSelectedDoctorNames() {
                 return this.doctors
                     .filter(doctor => this.selectedDoctors.includes(doctor.uuid))
-                    .map(doctor => doctor.full_name)
+                    .map(doctor => doctor.fullName)
                     .join(', ');
             }
          }"
@@ -137,7 +137,7 @@
                                     :value="doctor.uuid"
                                     class="rounded-sm text-blue-600 focus:ring-blue-500 border-gray-300 dark:bg-gray-800 dark:border-gray-600 dark:checked:bg-blue-600 dark:checked:border-transparent"
                                 />
-                                <span x-text="doctor.full_name"></span>
+                                <span x-text="doctor.fullName"></span>
                             </label>
                         </li>
                     </template>
