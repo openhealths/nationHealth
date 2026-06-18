@@ -38,6 +38,16 @@
         dropdown and inside the input. The list is also filtered on this key.
         Example: bindParam="name"
 
+    - model (string, optional):
+        Alpine expression of an object to bind into instead of a Livewire property.
+        Use this inside an Alpine x-for when there is no Livewire property to entangle.
+        When provided, `bind` is ignored and the selected value is written to model[modelKey].
+        Example: model="usedReference"
+
+    - modelKey (string, optional):
+        The key on the `model` object that receives the selected value. Pairs with `model`.
+        Example: modelKey="id"
+
     - label (string, not required):
         The floating label rendered for the input.
         Example: label="Episode"
@@ -70,6 +80,8 @@
 @props([
     'options' => [],
     'bind' => '',
+    'model' => null,
+    'modelKey' => '',
     'bindValue' => '',
     'bindParam' => '',
     'label' => '',
@@ -86,7 +98,9 @@
      x-id="['input', 'listbox']"
      x-data="combobox({
          options: @js($options),
-         entangled: $wire.entangle('{{ $bind }}'),
+         entangled: @if($bind !== '')$wire.entangle('{{ $bind }}')@else null @endif,
+         model: @if($model !== null && $model !== '') {{ $model }} @else null @endif,
+         modelKey: '{{ $modelKey }}',
          value: '{{ $bindValue }}',
          param: '{{ $bindParam }}',
          limit: {{ (int) $limit }}
@@ -149,11 +163,16 @@
 
 @push('scripts')
     <script>
-        function combobox({ options, entangled, value, param, limit }) {
+        function combobox({ options, entangled, model, modelKey, value, param, limit }) {
+            const usesModel = model !== null && model !== undefined;
+
             return {
                 options,
                 search: '',
-                value: entangled,
+                usesModel: usesModel,
+                model: model,
+                modelKey: modelKey,
+                value: usesModel ? model[modelKey] : entangled,
                 valueName: value,
                 param: param,
                 limit: limit,
@@ -161,7 +180,19 @@
                 typing: false,
 
                 init() {
+                    if (this.value) {
+                        const selected = this.options.find((option) => option[this.valueName] === this.value);
+
+                        if (selected) {
+                            this.search = selected[this.param];
+                        }
+                    }
+
                     this.$watch('value', (newValue) => {
+                        if (this.usesModel) {
+                            this.model[this.modelKey] = newValue ?? '';
+                        }
+
                         if (!newValue && !this.typing) {
                             this.search = '';
                         }

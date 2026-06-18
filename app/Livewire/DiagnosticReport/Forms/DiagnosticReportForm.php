@@ -20,9 +20,9 @@ class DiagnosticReportForm extends BaseForm
 
     public array $observations = [];
 
-    private const LABORANT_ALLOWED_CATEGORIES = ['laboratory_procedure'];
+    private const array LABORANT_ALLOWED_CATEGORIES = ['laboratory_procedure'];
 
-    private const RESULTS_INTERPRETER_REQUIRED_CATEGORIES = [
+    private const array RESULTS_INTERPRETER_REQUIRED_CATEGORIES = [
         'diagnostic_procedure',
         'imaging',
     ];

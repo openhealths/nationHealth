@@ -19,14 +19,15 @@
     $footerItems = [];
 @endphp
 
-<x-layouts.patient :personId="$personId"
-                   :patientFullName="$patientFullName"
-                   :hideNavigation="true"
-                   :title="$title"
-                   :breadcrumbs="[
-                       ['label' => __('general.home'), 'url' => route('dashboard', [legalEntity()])],
-                       ['label' => $patientName]
-                   ]"
+<x-layouts.patient
+    :personId="$personId"
+    :patientFullName="$patientFullName"
+    :hideNavigation="true"
+    :title="$title"
+    :breadcrumbs="[
+        ['label' => __('general.home'), 'url' => route('dashboard', [legalEntity()])],
+        ['label' => $patientName]
+    ]"
 >
     <x-slot name="headerActions"></x-slot>
 
@@ -113,53 +114,53 @@
 
                 <!-- Additional Actions -->
                 @if(isset($encounterId))
-                <div class="pt-10 mt-10 border-t border-gray-100 dark:border-gray-700">
-                    <h3 class="text-[17px] font-bold text-gray-900 dark:text-gray-100 mb-6">
-                        {{ __('patients.additional_actions') }}
-                    </h3>
+                    <div class="pt-10 mt-10 border-t border-gray-100 dark:border-gray-700">
+                        <h3 class="text-[17px] font-bold text-gray-900 dark:text-gray-100 mb-6">
+                            {{ __('patients.additional_actions') }}
+                        </h3>
 
-                    <div class="space-y-6">
-                        <fieldset class="fieldset-card p-5">
-                            <legend class="legend">{{ __('patients.prescriptions') }}</legend>
-                            <button type="button"
-                                    class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors"
-                            >
-                                @icon('plus', 'w-4 h-4')
-                                <span>{{ __('patients.add_prescription') }}</span>
-                            </button>
-                        </fieldset>
+                        <div class="space-y-6">
+                            <fieldset class="fieldset-card p-5">
+                                <legend class="legend">{{ __('patients.prescriptions') }}</legend>
+                                <button type="button"
+                                        class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors"
+                                >
+                                    @icon('plus', 'w-4 h-4')
+                                    <span>{{ __('patients.add_prescription') }}</span>
+                                </button>
+                            </fieldset>
 
-                        <fieldset class="fieldset-card p-5">
-                            <legend class="legend">{{ __('patients.referrals') }}</legend>
-                            <button type="button"
-                                    class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors"
-                            >
-                                @icon('plus', 'w-4 h-4')
-                                <span>{{ __('patients.add_referral') }}</span>
-                            </button>
-                        </fieldset>
+                            <fieldset class="fieldset-card p-5">
+                                <legend class="legend">{{ __('patients.referrals') }}</legend>
+                                <button type="button"
+                                        class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors"
+                                >
+                                    @icon('plus', 'w-4 h-4')
+                                    <span>{{ __('patients.add_referral') }}</span>
+                                </button>
+                            </fieldset>
 
-                        <fieldset class="fieldset-card p-5">
-                            <legend class="legend">{{ __('patients.medical_reports') }}</legend>
-                            <button type="button"
-                                    class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors"
-                            >
-                                @icon('plus', 'w-4 h-4')
-                                <span>{{ __('patients.add_medical_report') }}</span>
-                            </button>
-                        </fieldset>
+                            <fieldset class="fieldset-card p-5">
+                                <legend class="legend">{{ __('patients.medical_reports') }}</legend>
+                                <button type="button"
+                                        class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors"
+                                >
+                                    @icon('plus', 'w-4 h-4')
+                                    <span>{{ __('patients.add_medical_report') }}</span>
+                                </button>
+                            </fieldset>
 
-                        <fieldset class="fieldset-card p-5">
-                            <legend class="legend">{{ __('patients.care_plans') }}</legend>
-                            <a href="{{ route('care-plans.create-by-encounter', [legalEntity(), 'encounter' => $encounterId]) }}"
-                               class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors"
-                            >
-                                @icon('plus', 'w-4 h-4')
-                                <span>{{ __('patients.add_care_plan') }}</span>
-                            </a>
-                        </fieldset>
+                            <fieldset class="fieldset-card p-5">
+                                <legend class="legend">{{ __('patients.care_plans') }}</legend>
+                                <a href="{{ route('care-plans.create-by-encounter', [legalEntity(), 'encounter' => $encounterId]) }}"
+                                   class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors"
+                                >
+                                    @icon('plus', 'w-4 h-4')
+                                    <span>{{ __('patients.add_care_plan') }}</span>
+                                </a>
+                            </fieldset>
+                        </div>
                     </div>
-                </div>
                 @endif
 
                 <!-- Actions -->
@@ -202,7 +203,7 @@
         </div>
     </div>
 
-    <x-signature-modal method="sign"/>
-    <livewire:components.x-message :key="time()"/>
-    <x-forms.loading/>
+    <x-signature-modal method="sign" />
+    <livewire:components.x-message :key="time()" />
+    <x-forms.loading />
 </x-layouts.patient>
