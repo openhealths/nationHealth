@@ -27,6 +27,18 @@ class ContractRequestIndex extends Component
     use BatchLegalEntityQueries;
     use WithPagination;
 
+    public string $search = '';
+
+    public function updatingSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function searchAction(): void
+    {
+        $this->resetPage();
+    }
+
     /**
      * Force reset sync status if stuck
      */
@@ -174,6 +186,9 @@ class ContractRequestIndex extends Component
     {
         $contracts = ContractRequest::query()
             ->where('contractor_legal_entity_id', legalEntity()->uuid)
+            ->when($this->search, function ($query) {
+                $query->where('contract_number', 'like', '%' . $this->search . '%');
+            })
             ->orderByDesc('created_at')
             ->paginate(10);
 

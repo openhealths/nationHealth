@@ -115,9 +115,7 @@ class ContractIndex extends Component
     {
         $contracts = Contract::query()
             ->where('legal_entity_id', legalEntity()->id)
-            ->when($this->isFiltersApplied, function ($query) {
-                $query->whereIn('type', $this->typeFilter);
-            })
+            ->whereIn('type', $this->typeFilter)
             ->orderByDesc('start_date')
             ->paginate(config('app.per_page', 15));
 

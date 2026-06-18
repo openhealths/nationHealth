@@ -24,6 +24,39 @@
                 </button>
             @endcan
         </div>
+
+        <x-slot name="navigation">
+            <div class="form-row-3">
+                <div class="flex items-center gap-4 col-span-1">
+                    <div class="form-group group relative w-full">
+                        @icon('search-outline', 'svg-input')
+                        <input wire:model.live.debounce.300ms="search"
+                               type="text"
+                               id="contractRequestSearch"
+                               placeholder=" "
+                               class="input peer"
+                               autocomplete="off"
+                        />
+                        <label for="contractRequestSearch" class="label">
+                            {{ __('contracts.search_contract') }}
+                        </label>
+                        <button type="button"
+                                class="absolute inset-y-0 end-0 flex items-center pe-1 text-gray-400 hover:text-gray-600"
+                                x-show="$wire.search"
+                                @click="$wire.set('search', '')"
+                        >
+                            @icon('close', 'w-4 h-4')
+                        </button>
+                    </div>
+                    <button type="button"
+                            wire:click="searchAction"
+                            class="p-2.5 text-sm font-medium text-white bg-primary-700 rounded-xl hover:bg-primary-800 focus:ring-4 focus:outline-none focus:ring-primary-300 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800"
+                    >
+                        @icon('search-outline', 'w-6 h-6')
+                    </button>
+                </div>
+            </div>
+        </x-slot>
     </x-header-navigation>
 
     <div class="flow-root mt-8 shift-content pl-3.5">
