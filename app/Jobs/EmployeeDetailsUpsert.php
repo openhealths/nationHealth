@@ -66,7 +66,7 @@ class EmployeeDetailsUpsert extends EHealthJob
         Log::info('Processing EmployeeDetailsUpsert for employee:' . $this->employee->id . ', LE:' . ($this->legalEntity->id ?? 'N/A'));
 
         $divisionUuid = Arr::get($validatedData['division'], 'uuid');
-        $divisionId = Division::where('uuid', $divisionUuid)->value('id') ?? null;
+        $divisionId = $divisionUuid ? Division::where('uuid', $divisionUuid)->value('id') : null;
 
         $this->employee->legalEntityUuid = $this->legalEntity?->uuid;
 
