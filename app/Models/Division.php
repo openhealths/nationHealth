@@ -41,6 +41,8 @@ class Division extends Model
         'is_active',
         'legal_entity_id',
         'status',
+        'dls_id',
+        'dls_verified'
     ];
 
     protected $casts = [

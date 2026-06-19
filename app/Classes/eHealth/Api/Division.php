@@ -389,6 +389,8 @@ class Division extends Request
             'phones.*.note' => 'sometimes|string',
             'status' => 'required|string',
             'type' => 'required|string',
+            'dls_id' => 'nullable|string',
+            'dls_verified' => 'nullable|boolean',
             'working_hours' => 'nullable|array',
             'working_hours.sun' => 'nullable|array',
             'working_hours.sun.*.0' => 'required|string',
