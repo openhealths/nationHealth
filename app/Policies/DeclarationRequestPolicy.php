@@ -5,12 +5,35 @@ declare(strict_types=1);
 namespace App\Policies;
 
 use App\Enums\Declaration\Status;
+use App\Enums\Status as LegalEntityStatus;
 use App\Models\DeclarationRequest;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
 
 class DeclarationRequestPolicy
 {
+    /**
+     * Deny every ability when the current legal entity is not eligible to operate with declarations.
+     * The legal entity must be active and have a type allowed for declaration requests.
+     *
+     * @param  User  $user
+     * @param  string  $ability
+     * @return Response|null
+     */
+    public function before(User $user, string $ability): ?Response
+    {
+        $legalEntity = legalEntity();
+
+        if (
+            $legalEntity->status !== LegalEntityStatus::ACTIVE->value
+            || !in_array($legalEntity->type->name, config('ehealth.declaration_request_legal_entity_types'), true)
+        ) {
+            return Response::denyWithStatus(404);
+        }
+
+        return null;
+    }
+
     /**
      * Determine whether the user can view any declaration.
      */
