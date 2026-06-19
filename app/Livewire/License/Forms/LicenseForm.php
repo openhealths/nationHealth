@@ -25,7 +25,7 @@ class LicenseForm extends Form
 
     public string $whatLicensed = '';
 
-    public string $licenseNumber = '';
+    public ?string $licenseNumber = '';
 
     public string $activeFromDate = '';
 
