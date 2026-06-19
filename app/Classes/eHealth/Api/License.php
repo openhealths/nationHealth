@@ -54,6 +54,8 @@ class License extends Request
         $this->setValidator($this->validateResponse(...));
         $this->setMapper($this->mapResponse(...));
 
+        $data = $this->format($data, ['issuedDate', 'expiryDate', 'activeFromDate']);
+
         return $this->post(self::URL, $data);
     }
 
@@ -71,6 +73,8 @@ class License extends Request
     {
         $this->setValidator($this->validateResponse(...));
         $this->setMapper($this->mapResponse(...));
+
+        $data = $this->format($data, ['issuedDate', 'expiryDate', 'activeFromDate']);
 
         return $this->patch(self::URL . '/' . $uuid, $data);
     }

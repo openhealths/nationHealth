@@ -7,9 +7,7 @@
 
         <div class="mt-3 ml-0 flex flex-col sm:flex-row sm:flex-wrap gap-2 self-start">
             @can('create', License::class)
-                <a href="{{ route('license.create', [legalEntity()]) }}"
-                   class="button-primary flex items-center gap-2"
-                >
+                <a href="{{ route('license.create', [legalEntity()]) }}" class="button-primary flex items-center gap-2">
                     @icon('plus', 'w-4 h-4')
                     {{ __('licenses.create') }}
                 </a>
@@ -31,10 +29,10 @@
                     <table class="index-table">
                         <thead class="index-table-thead">
                         <tr>
-                            <th class="index-table-th w-[20%]">{{ __('licenses.type.label') }}</th>
+                            <th class="index-table-th w-1/4">{{ __('licenses.type.label') }}</th>
                             <th class="index-table-th w-[15%]">{{ __('licenses.active_from_date_label') }}</th>
                             <th class="index-table-th w-[15%]">{{ __('licenses.expiry_date_label') }}</th>
-                            <th class="index-table-th w-[25%]">{{ __('licenses.activity') }}</th>
+                            <th class="index-table-th w-1/4">{{ __('licenses.activity') }}</th>
                             <th class="index-table-th w-[14%]">{{ __('licenses.kind') }}</th>
                             <th class="index-table-th w-[6%]">{{ __('forms.action') }}</th>
                         </tr>
@@ -64,30 +62,34 @@
                                 <td class="index-table-td-actions">
                                     @if($license->isPrimary)
                                         @can('view', $license)
-                                            <a href="{{ route('license.view', [legalEntity(), $license->id]) }}"
-                                               title="{{ __('forms.view') }}"
+                                            <a
+                                                href="{{ route('license.view', [legalEntity(), $license->id]) }}"
+                                                title="{{ __('forms.view') }}"
                                             >
                                                 @icon('eye', 'w-5 h-5 text-gray-600 hover:text-blue-600')
                                             </a>
                                         @endcan
                                     @else
                                         <div x-data="{ open: false }" class="relative inline-block text-left">
-                                            <button @click="open = !open"
-                                                    @click.outside="open = false"
-                                                    class="cursor-pointer text-gray-500 hover:text-gray-800 dark:hover:text-white focus:outline-none"
+                                            <button
+                                                @click="open = !open"
+                                                @click.outside="open = false"
+                                                class="cursor-pointer text-gray-500 hover:text-gray-800 dark:hover:text-white focus:outline-none"
                                             >
                                                 @icon('edit-user-outline', 'svg-hover-action w-6 h-6 text-gray-800 dark:text-white')
                                             </button>
 
-                                            <div x-show="open"
-                                                 x-cloak
-                                                 x-transition
-                                                 class="absolute right-0 z-10 mt-2 w-40 origin-top-right rounded-md bg-white dark:bg-gray-700 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                                            <div
+                                                x-show="open"
+                                                x-cloak
+                                                x-transition
+                                                class="absolute right-0 z-10 mt-2 w-40 origin-top-right rounded-md bg-white dark:bg-gray-700 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
                                             >
                                                 <div class="py-1">
                                                     @can('view', $license)
-                                                        <a href="{{ route('license.view', [legalEntity(), $license->id]) }}"
-                                                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
+                                                        <a
+                                                            href="{{ route('license.view', [legalEntity(), $license->id]) }}"
+                                                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
                                                         >
                                                             @icon('eye', 'w-5 h-5 text-gray-600')
                                                             {{ __('forms.view') }}
@@ -95,8 +97,9 @@
                                                     @endcan
 
                                                     @can('update', $license)
-                                                        <a href="{{ route('license.edit', [legalEntity(), $license->id]) }}"
-                                                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
+                                                        <a
+                                                            href="{{ route('license.edit', [legalEntity(), $license->id]) }}"
+                                                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
                                                         >
                                                             @icon('edit', 'w-5 h-5 text-gray-600')
                                                             {{ __('forms.update') }}
@@ -113,7 +116,7 @@
                     </table>
                 </div>
 
-                <div class="mt-8 pl-3.5 pb-8 lg:pl-8 2xl:pl-5">
+                <div class="pagination">
                     {{ $licenses->links() }}
                 </div>
             @else

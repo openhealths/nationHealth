@@ -44,7 +44,7 @@ class LicenseEdit extends LicenseComponent
         }
 
         try {
-            $response = EHealth::license()->update($this->uuid, $this->form->formatForApi($validated));
+            $response = EHealth::license()->update($this->uuid, $validated);
 
             try {
                 $validated = $response->validate();

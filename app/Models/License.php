@@ -35,7 +35,9 @@ class License extends Model
     ];
 
     protected $hidden = [
-        'id'
+        'id',
+        'created_at',
+        'updated_at'
     ];
 
     protected $casts = [

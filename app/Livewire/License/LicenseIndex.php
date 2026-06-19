@@ -31,10 +31,9 @@ class LicenseIndex extends Component
     #[Computed]
     public function licenses(): LengthAwarePaginator
     {
-        $query = License::whereLegalEntityId(legalEntity()->id)
-            ->select(['id', 'legal_entity_id', 'type', 'active_from_date', 'expiry_date', 'what_licensed', 'is_primary']);
-
-        return $query->paginate(config('pagination.per_page'));
+        return License::whereLegalEntityId(legalEntity()->id)
+            ->orderByDesc('is_primary')
+            ->paginate(config('pagination.per_page'));
     }
 
     /**

@@ -39,7 +39,7 @@ class LicenseCreate extends LicenseComponent
         }
 
         try {
-            $response = EHealth::license()->create($this->form->formatForApi($validated));
+            $response = EHealth::license()->create($validated);
 
             try {
                 $validated = $response->validate();

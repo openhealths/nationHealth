@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\License\Forms;
 
-use App\Core\Arr;
 use App\Enums\License\Type;
 use App\Models\LegalEntity;
 use Illuminate\Validation\Rule;
@@ -62,21 +61,6 @@ class LicenseForm extends Form
             'orderNo' => ['required', 'string', 'max:255'],
             'isPrimary' => ['required', Rule::in([false])]
         ];
-    }
-
-    /**
-     * Convert date to ISO 8601 and format to snake case.
-     */
-    public function formatForApi(array $data): array
-    {
-        collect($data)
-            ->only(['issuedDate', 'expiryDate', 'activeFromDate'])
-            ->filter()
-            ->each(static function (string $value, string $key) use (&$data) {
-                $data[$key] = convertToYmd($value);
-            });
-
-        return removeEmptyKeys(Arr::toSnakeCase($data));
     }
 
     /**
