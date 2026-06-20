@@ -96,7 +96,7 @@ abstract class EHealthJob implements ShouldQueue
     public function middleware(): array
     {
         // Ensure the job has a user with an active session
-        $this->user ??= $this->batch()->options['user'];
+        $this->user ??= $this->batch()?->options['user'] ?? null;
 
         return $this->getAdditionalMiddleware();
     }
@@ -121,7 +121,7 @@ abstract class EHealthJob implements ShouldQueue
             $this->setEntityStatus(JobStatus::PROCESSING);
         }
 
-        $this->token = Crypt::decryptString($this->batch()->options['token'] ?? '');
+        $this->token = Crypt::decryptString($this->batch()?->options['token'] ?? '');
 
         $response = $this->sendRequest($this->token);
 
@@ -166,7 +166,7 @@ abstract class EHealthJob implements ShouldQueue
     public function failed(?Throwable $exception): void
     {
         // It is need because if job is failed the middleware doesn't called
-        $olduser = $this->user ?? ($this->batch()->options['user'] ?? null);
+        $olduser = $this->user ?? ($this->batch()?->options['user'] ?? null);
 
         Log::channel('e_health_errors')->error('Sync job failed: ', [
             'EXCEPTION' => $exception::class,

@@ -65,9 +65,9 @@ class ConfidantPersonSync extends EHealthJob
      */
     protected function processResponse(?EHealthResponse $response): void
     {
-        $validatedData = $response->validate();
+        $searchResults = $response?->getData() ?? [];
 
-        foreach ($validatedData as $data) {
+        foreach ($searchResults as $data) {
             if ($this->checkPersonData($data)) {
                 $personData = $data;
 
@@ -129,10 +129,14 @@ class ConfidantPersonSync extends EHealthJob
      */
     protected function checkPersonData(array $data): bool
     {
+        if (empty($data['first_name']) || empty($data['last_name']) || empty($data['birth_date'])) {
+            return false;
+        }
+
         return $data['first_name'] === $this->person->first_name
             && $data['last_name'] === $this->person->last_name
             && $data['birth_date'] === convertToYmd($this->person->birth_date)
-            && ($this->person->tax_id === null || $data['tax_id'] === $this->person->tax_id);
+            && ($this->person->tax_id === null || ($data['tax_id'] ?? null) === $this->person->tax_id);
     }
 
     /**

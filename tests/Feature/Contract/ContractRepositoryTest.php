@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Contract;
 
+use App\Enums\Status;
+use App\Enums\User\Role;
+use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Models\Relations\Party;
 use App\Repositories\ContractRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -120,6 +124,38 @@ class ContractRepositoryTest extends TestCase
         ]);
     }
 
+    public function test_save_from_ehealth_falls_back_to_owner_employee_uuid(): void
+    {
+        $ownerUuid = (string) Str::uuid();
+        $party = Party::create([
+            'uuid' => (string) Str::uuid(),
+            'first_name' => 'Owner',
+            'last_name' => 'Test',
+            'tax_id' => '1234567890',
+            'birth_date' => '1980-01-01',
+            'gender' => 'MALE',
+        ]);
+
+        Employee::create([
+            'uuid' => $ownerUuid,
+            'full_name' => 'Owner Test',
+            'employee_type' => Role::OWNER->value,
+            'status' => Status::APPROVED->value,
+            'legal_entity_id' => $this->legalEntity->id,
+            'is_active' => true,
+            'position' => 'Owner',
+            'start_date' => now()->format('Y-m-d'),
+            'party_id' => $party->id,
+        ]);
+
+        $payload = $this->eHealthContractPayload();
+        unset($payload['contractor_owner']);
+
+        $contract = $this->repository->saveFromEHealth($payload);
+
+        $this->assertSame($ownerUuid, $contract->contractor_owner_id);
+    }
+
     public function test_save_from_ehealth_persists_full_data_field(): void
     {
         $eHealthData = $this->eHealthContractPayload();
@@ -158,10 +194,9 @@ class ContractRepositoryTest extends TestCase
         $this->assertSame($programs, $contract->medical_programs);
     }
 
-    // -----------------------------------------------------------------------
-    // Helpers
-    // -----------------------------------------------------------------------
-
+    /**
+     * @return array<string, mixed>
+     */
     private function eHealthContractPayload(): array
     {
         return [
@@ -177,7 +212,6 @@ class ContractRepositoryTest extends TestCase
             'contractor_divisions' => [],
             'external_contractor_flag' => false,
             'external_contractors' => [],
-            // eHealth always returns nested objects for these required fields
             'contractor_legal_entity' => ['id' => (string) Str::uuid(), 'name' => 'Test Entity'],
             'contractor_owner' => ['id' => (string) Str::uuid(), 'party' => []],
             'nhs_signer_id' => null,

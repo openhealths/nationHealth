@@ -45,7 +45,7 @@ class ContractRequestDetailsUpsert extends EHealthJob
      */
     protected function processResponse(?EHealthResponse $response): void
     {
-        $ehealthData = $response?->getData();
+        $ehealthData = $response?->validate();
 
         if (!empty($ehealthData)) {
             $this->contractRequestModel->update([
