@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
 use Mockery;
 use Tests\TestCase;
 use Livewire\Livewire;
-use App\Livewire\CarePlan\CarePlanShow;
+use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
 
 class ReferralLifecycleTest extends TestCase
 {
@@ -75,7 +75,7 @@ class ReferralLifecycleTest extends TestCase
         ]);
 
         // 3. Create Legal Entity
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id') 
+        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
             ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = \App\Models\LegalEntity::create([
@@ -270,6 +270,67 @@ class ReferralLifecycleTest extends TestCase
         $this->assertEquals(1, $deviceFhir['quantityInteger']);
     }
 
+    public function test_can_map_to_prequalify_payloads(): void
+    {
+        $serviceMapper = new ServiceRequestMapper();
+        $deviceMapper = new DeviceRequestMapper();
+
+        $carePlanUuid = $this->serviceActivity->carePlan->uuid;
+
+        $serviceData = [
+            'service_id' => '59300-00',
+            'quantity' => 2.0,
+            'intent' => 'order',
+            'category' => 'procedure',
+            'program_id' => 'program-uuid',
+            'priority' => 'routine',
+            'started_at' => '2026-06-01',
+            'ended_at' => '2026-09-01',
+            'supporting_info' => [
+                ['type' => 'condition', 'uuid' => (string) Str::uuid()],
+            ],
+        ];
+
+        $deviceData = [
+            'device_id' => 'D-707',
+            'quantity' => 1.0,
+            'intent' => 'order',
+            'program_id' => 'program-uuid',
+            'supporting_info' => [
+                ['type' => 'condition', 'uuid' => (string) Str::uuid()],
+            ],
+        ];
+
+        $uuids = [
+            'person_uuid' => $this->person->uuid,
+            'encounter_uuid' => $this->encounter->uuid,
+            'employee_uuid' => $this->employee->uuid,
+            'legal_entity_uuid' => $this->employee->legalEntity->uuid,
+        ];
+
+        $servicePrequalify = $serviceMapper->toPrequalifyPayload(
+            $serviceData,
+            $uuids,
+            $carePlanUuid,
+            (string) $this->serviceActivity->uuid
+        );
+        $devicePrequalify = $deviceMapper->toPrequalifyPayload(
+            $deviceData,
+            $uuids,
+            $carePlanUuid,
+            (string) $this->deviceActivity->uuid
+        );
+
+        $this->assertArrayHasKey('service_request', $servicePrequalify);
+        $this->assertEquals('active', $servicePrequalify['service_request']['status']);
+        $this->assertEquals('59300-00', $servicePrequalify['service_request']['code']['identifier']['value']);
+        $this->assertEquals($carePlanUuid, $servicePrequalify['service_request']['based_on'][0]['identifier']['value']);
+
+        $this->assertArrayHasKey('device_request', $devicePrequalify);
+        $this->assertEquals('D-707', $devicePrequalify['device_request']['code']['coding'][0]['code']);
+        $this->assertEquals(1, $devicePrequalify['device_request']['quantity']['value']);
+    }
+
     public function test_mock_api_create_and_sign_lifecycle(): void
     {
         $mockServiceApi = Mockery::mock(ServiceRequestApi::class);
@@ -312,14 +373,33 @@ class ReferralLifecycleTest extends TestCase
 
     public function test_livewire_component_actions(): void
     {
-        // Fetch the CarePlan
         $carePlan = $this->serviceActivity->carePlan;
-
-        // Authenticate the employee user
         $this->actingAs($this->user);
 
-        // Test Livewire triggers
-        Livewire::test(CarePlanShow::class, ['carePlan' => $carePlan])
+        $mockServiceApi = Mockery::mock(ServiceRequestApi::class);
+        $this->instance(ServiceRequestApi::class, $mockServiceApi);
+
+        $prequalifyResponse = Mockery::mock(EHealthResponse::class);
+        $prequalifyResponse->shouldReceive('getData')->andReturn([
+            'data' => [
+                ['status' => 'VALID'],
+            ],
+        ]);
+        $mockServiceApi->shouldReceive('prequalify')->once()->andReturn($prequalifyResponse);
+
+        $serviceRequestId = (string) Str::uuid();
+        $createResponse = Mockery::mock(EHealthResponse::class);
+        $createResponse->shouldReceive('getData')->andReturn([
+            'id' => $serviceRequestId,
+            'status' => 'NEW',
+            'request_number' => 'SR-11112222',
+        ]);
+        $mockServiceApi->shouldReceive('createRequest')->once()->andReturn($createResponse);
+
+        Livewire::test(CarePlanActivityShow::class, [
+            'carePlan' => $carePlan,
+            'activity' => $this->serviceActivity,
+        ])
             ->assertSet('showReferralDrawer', false)
             ->call('initReferralForm', $this->serviceActivity->id)
             ->assertSet('showReferralDrawer', true)
@@ -329,7 +409,49 @@ class ReferralLifecycleTest extends TestCase
             ->set('referralForm.category', 'procedure')
             ->call('validateReferral')
             ->assertSet('showReferralDrawer', false)
-            ->assertSet('showSignatureModal', true);
+            ->assertSet('showSignatureModal', true)
+            ->assertSet('referralRequestIdToSign', $serviceRequestId);
+
+        $this->assertDatabaseHas('service_request_requests', [
+            'uuid' => $serviceRequestId,
+            'status' => 'NEW',
+            'request_number' => 'SR-11112222',
+        ]);
+    }
+
+    public function test_livewire_resend_referral_sms(): void
+    {
+        $carePlan = $this->serviceActivity->carePlan;
+        $this->actingAs($this->user);
+
+        $uuid = (string) Str::uuid();
+        \App\Models\MedicalEvents\Sql\ServiceRequestRequest::create([
+            'uuid' => $uuid,
+            'employee_id' => $this->employee->id,
+            'person_id' => $this->person->id,
+            'status' => 'active',
+            'service_id' => '59300-00',
+            'quantity' => 1.0,
+            'intent' => 'order',
+            'based_on_id' => $this->serviceActivity->id,
+            'context_id' => $this->encounter->id,
+            'priority' => 'routine',
+            'request_number' => 'SR-888888',
+        ]);
+
+        $mockServiceApi = Mockery::mock(ServiceRequestApi::class);
+        $resendResponse = Mockery::mock(EHealthResponse::class);
+        $resendResponse->shouldReceive('successful')->andReturn(true);
+        $resendResponse->shouldReceive('getData')->andReturn(['status' => 'ok']);
+        $mockServiceApi->shouldReceive('resendSms')->once()->with($this->person->uuid, $uuid)->andReturn($resendResponse);
+        $this->instance(ServiceRequestApi::class, $mockServiceApi);
+
+        Livewire::test(CarePlanActivityShow::class, [
+            'carePlan' => $carePlan,
+            'activity' => $this->serviceActivity,
+        ])
+            ->call('resendReferralSms', $uuid, 'service_request')
+            ->assertDispatched('flashMessage');
     }
 
     public function test_livewire_referral_cancellation(): void
@@ -368,7 +490,10 @@ class ReferralLifecycleTest extends TestCase
         $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
 
         // Livewire test
-        Livewire::test(CarePlanShow::class, ['carePlan' => $carePlan])
+        Livewire::test(CarePlanActivityShow::class, [
+            'carePlan' => $carePlan,
+            'activity' => $this->serviceActivity,
+        ])
             ->call('cancelReferral', $uuid, 'service_request')
             ->assertSet('showSignatureModal', true)
             ->assertSet('referralRequestIdToSign', $uuid)

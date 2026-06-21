@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\MedicationRequest;
 
 use App\Classes\eHealth\Api\Patient\MedicationRequest as MedicationRequestApi;
+use App\Classes\eHealth\Api\Person as PersonApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Models\CarePlanActivity;
 use App\Models\Person\Person;
@@ -17,7 +18,7 @@ use Illuminate\Support\Str;
 use Mockery;
 use Tests\TestCase;
 use Livewire\Livewire;
-use App\Livewire\CarePlan\CarePlanShow;
+use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
 
 class MedicationRequestLifecycleTest extends TestCase
 {
@@ -72,7 +73,7 @@ class MedicationRequestLifecycleTest extends TestCase
         ]);
 
         // 3. Create Legal Entity
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id') 
+        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
             ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = \App\Models\LegalEntity::create([
@@ -333,7 +334,10 @@ class MedicationRequestLifecycleTest extends TestCase
         $carePlan = $this->carePlanActivity->carePlan;
 
         // 3. Test Livewire rendering & initEPrescriptionForm
-        Livewire::test(CarePlanShow::class, ['carePlan' => $carePlan])
+        Livewire::test(CarePlanActivityShow::class, [
+            'carePlan' => $carePlan,
+            'activity' => $this->carePlanActivity,
+        ])
             ->assertSet('showEPrescriptionDrawer', false)
             ->call('initEPrescriptionForm', $this->carePlanActivity->id)
             ->assertSet('showEPrescriptionDrawer', true)
@@ -380,7 +384,10 @@ class MedicationRequestLifecycleTest extends TestCase
         $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
 
         // Livewire test
-        Livewire::test(CarePlanShow::class, ['carePlan' => $carePlan])
+        Livewire::test(CarePlanActivityShow::class, [
+            'carePlan' => $carePlan,
+            'activity' => $this->carePlanActivity,
+        ])
             ->call('cancelPrescription', $uuid)
             ->assertSet('showSignatureModal', true)
             ->assertSet('ePrescriptionRequestIdToSign', $uuid)
@@ -397,5 +404,46 @@ class MedicationRequestLifecycleTest extends TestCase
             'uuid' => $uuid,
             'status' => 'cancelled'
         ]);
+    }
+
+    public function test_livewire_loads_printout_from_ehealth_api(): void
+    {
+        $carePlan = $this->carePlanActivity->carePlan;
+        $this->actingAs($this->user);
+
+        $uuid = (string) Str::uuid();
+        \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::create([
+            'uuid' => $uuid,
+            'employee_id' => $this->employee->id,
+            'person_id' => $this->person->id,
+            'status' => 'active',
+            'medication_id' => 'INN-101',
+            'medication_qty' => 30.0,
+            'intent' => 'order',
+            'based_on_id' => $this->carePlanActivity->id,
+            'context_id' => $this->encounter->id,
+            'request_number' => 'MR-555555',
+            'started_at' => '2026-06-01',
+            'ended_at' => '2026-09-01',
+        ]);
+
+        $mockApi = Mockery::mock(PersonApi::class);
+        $printoutResponse = Mockery::mock(EHealthResponse::class);
+        $printoutResponse->shouldReceive('getData')->andReturn([
+            'printout_form' => '<div>Official eHealth printout</div>',
+        ]);
+        $mockApi->shouldReceive('getMedicationRequestPrintoutForm')
+            ->once()
+            ->with($this->person->uuid, $uuid)
+            ->andReturn($printoutResponse);
+        $this->instance(PersonApi::class, $mockApi);
+
+        Livewire::test(CarePlanActivityShow::class, [
+            'carePlan' => $carePlan,
+            'activity' => $this->carePlanActivity,
+        ])
+            ->call('loadPrintoutForm', $uuid)
+            ->assertSet('printableContent', '<div>Official eHealth printout</div>')
+            ->assertDispatched('printoutLoaded');
     }
 }

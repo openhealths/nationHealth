@@ -238,17 +238,38 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
                         });
                 });
 
-            Route::get('/care-plans', \App\Livewire\CarePlan\CarePlanIndex::class)
+            Route::get('/care-plans', \App\Livewire\CarePlan\Index\CarePlanIndex::class)
                 ->name('care-plans.index');
-            Route::get('/care-plans/create/{personId?}', \App\Livewire\CarePlan\CarePlanCreate::class)
+            Route::get('/care-plans/create/{personId?}', \App\Livewire\CarePlan\Create\CarePlanCreate::class)
                 ->name('care-plans.create');
-            Route::get('/encounters/{encounter}/care-plan/create', \App\Livewire\CarePlan\CarePlanCreate::class)
+            Route::get('/encounters/{encounter}/care-plan/create', \App\Livewire\CarePlan\Create\CarePlanCreate::class)
                 ->name('care-plans.create-by-encounter');
-            Route::get('/encounter/{encounter}/care-plan/create', \App\Livewire\CarePlan\CarePlanCreate::class);
-            Route::get('/care-plans/{carePlan}', \App\Livewire\CarePlan\CarePlanShow::class)
+            Route::get('/encounter/{encounter}/care-plan/create', \App\Livewire\CarePlan\Create\CarePlanCreate::class);
+            Route::get('/care-plans/{carePlan}', \App\Livewire\CarePlan\Show\CarePlanShow::class)
                 ->whereNumber('carePlan')
                 ->name('care-plans.show');
-            Route::get('/care-plans/{carePlan}/edit', \App\Livewire\CarePlan\CarePlanUpdate::class)
+            Route::get('/care-plans/{carePlan}/cancel', \App\Livewire\CarePlan\Cancel\CarePlanCancel::class)
+                ->whereNumber('carePlan')
+                ->name('care-plans.cancel');
+            Route::get('/care-plans/{carePlan}/complete', \App\Livewire\CarePlan\Complete\CarePlanComplete::class)
+                ->whereNumber('carePlan')
+                ->name('care-plans.complete');
+            Route::prefix('/care-plans/{carePlan}/activities')
+                ->whereNumber('carePlan')
+                ->scopeBindings()
+                ->group(function () {
+                    Route::get('/create', \App\Livewire\CarePlan\Activity\Create\CarePlanActivityCreate::class)
+                        ->name('care-plans.activities.create');
+                    Route::get('/{activity}', \App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow::class)
+                        ->name('care-plans.activities.show');
+                    Route::get('/{activity}/edit', \App\Livewire\CarePlan\Activity\Edit\CarePlanActivityEdit::class)
+                        ->name('care-plans.activities.edit');
+                    Route::get('/{activity}/cancel', \App\Livewire\CarePlan\Activity\Cancel\CarePlanActivityCancel::class)
+                        ->name('care-plans.activities.cancel');
+                    Route::get('/{activity}/complete', \App\Livewire\CarePlan\Activity\Complete\CarePlanActivityComplete::class)
+                        ->name('care-plans.activities.complete');
+                });
+            Route::get('/care-plans/{carePlan}/edit', \App\Livewire\CarePlan\Update\CarePlanUpdate::class)
                 ->whereNumber('carePlan')
                 ->name('care-plans.edit');
 

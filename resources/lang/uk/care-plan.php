@@ -229,6 +229,7 @@ return [
     'outcome_dictionary' => 'Результат (довідник)',
     'activity_outcomes' => 'Результати виконання',
     'referral_outcome' => 'Пов\'язаний КД (Діагноз/Спостереження)',
+    'referral_prequalify_failed' => 'eHealth відхилив дані направлення. Перевірте поля форми та спробуйте ще раз.',
 
     'activity_kind' => [
         'service_request' => 'Призначення послуги',

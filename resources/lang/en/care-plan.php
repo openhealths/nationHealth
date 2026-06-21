@@ -18,5 +18,6 @@ return [
     'data_synced' => 'Data successfully synced with eHealth.',
     'approval_verify_error' => 'Error verifying approval.',
     'auth_methods_fetch_error' => 'Failed to load authentication methods.',
+    'referral_prequalify_failed' => 'eHealth rejected the referral data. Please review the form and try again.',
     'approval_create_error' => 'Failed to create approval request.',
 ];
