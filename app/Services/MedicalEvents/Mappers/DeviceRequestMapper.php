@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\MedicalEvents\Mappers;
 
 use App\Contracts\FhirMapperContract;
+use App\Core\Arr;
 use App\Services\MedicalEvents\FhirResource;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
@@ -15,7 +16,7 @@ class DeviceRequestMapper implements FhirMapperContract
      * Convert database/form data to FHIR structure for eHealth API.
      *
      * @param  array  $data
-     * @param  mixed  ...$context [0] array $uuids (person_uuid, encounter_uuid, employee_uuid, legal_entity_uuid)
+     * @param  mixed  ...$context  [0] array $uuids (person_uuid, encounter_uuid, employee_uuid, legal_entity_uuid)
      * @return array
      */
     public function toFhir(array $data, mixed ...$context): array
@@ -94,6 +95,73 @@ class DeviceRequestMapper implements FhirMapperContract
         }
 
         return $result;
+    }
+
+    /**
+     * Build payload for PreQualify Device Request API.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string|null>  $uuids
+     * @return array{device_request: array<string, mixed>}
+     */
+    public function toPrequalifyPayload(array $data, array $uuids, string $carePlanUuid, string $activityUuid): array
+    {
+        $deviceRequest = [
+            'intent' => $data['intent'] ?? 'order',
+            'code' => [
+                'coding' => [
+                    [
+                        'system' => 'device_definition_classification_type',
+                        'code' => $data['device_id'],
+                    ],
+                ],
+            ],
+            'quantity' => [
+                'value' => (int) ($data['quantity'] ?? 1),
+                'system' => 'device_unit',
+                'code' => 'piece',
+            ],
+            'encounter' => !empty($uuids['encounter_uuid'])
+                ? FhirResource::make()->coding('eHealth/resources', 'encounter')->toIdentifier($uuids['encounter_uuid'])
+                : null,
+            'basedOn' => [
+                FhirResource::make()->coding('eHealth/resources', 'care_plan')->toIdentifier($carePlanUuid),
+                FhirResource::make()->coding('eHealth/resources', 'activity')->toIdentifier($activityUuid),
+            ],
+            'requester' => [
+                'agent' => FhirResource::make()
+                    ->coding('eHealth/resources', 'employee')
+                    ->toIdentifier($uuids['employee_uuid']),
+                'onBehalfOf' => FhirResource::make()
+                    ->coding('eHealth/resources', 'legal_entity')
+                    ->toIdentifier($uuids['legal_entity_uuid']),
+            ],
+        ];
+
+        if (!empty($data['program_id'])) {
+            $deviceRequest['programs'] = [
+                FhirResource::make()
+                    ->coding('eHealth/resources', 'medical_program')
+                    ->toIdentifier($data['program_id']),
+            ];
+        }
+
+        if (!empty($data['supporting_info'])) {
+            $deviceRequest['reason'] = [];
+            foreach ($data['supporting_info'] as $ref) {
+                if (!empty($ref['uuid']) && !empty($ref['type'])) {
+                    $deviceRequest['reason'][] = FhirResource::make()
+                        ->coding('eHealth/resources', strtolower($ref['type']))
+                        ->toIdentifier($ref['uuid']);
+                }
+            }
+        }
+
+        $deviceRequest = array_filter($deviceRequest, static fn ($value) => $value !== null);
+
+        return [
+            'device_request' => Arr::toSnakeCase($deviceRequest),
+        ];
     }
 
     /**

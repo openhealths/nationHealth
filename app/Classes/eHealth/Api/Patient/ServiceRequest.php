@@ -5,9 +5,6 @@ declare(strict_types=1);
 namespace App\Classes\eHealth\Api\Patient;
 
 use App\Classes\eHealth\EHealthResponse;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
 
 class ServiceRequest extends PatientApiBase
@@ -42,5 +39,25 @@ class ServiceRequest extends PatientApiBase
     public function getById(string $patientId, string $id, array $query = []): PromiseInterface|EHealthResponse
     {
         return $this->get(self::URL . "/{$patientId}/service_requests/{$id}", $query);
+    }
+
+    /**
+     * Pre-qualify service request data before creation.
+     *
+     * @see REST API PreQualify Service Request [API-007-062-0001]
+     */
+    public function prequalify(string $patientId, array $payload): PromiseInterface|EHealthResponse
+    {
+        return $this->post(self::URL . "/{$patientId}/service_requests/prequalify", $payload);
+    }
+
+    /**
+     * Resend SMS with OTP for an active service request.
+     *
+     * @see REST API Resend SMS on Service Request [API-007-062-0009]
+     */
+    public function resendSms(string $patientId, string $id): PromiseInterface|EHealthResponse
+    {
+        return $this->post(self::URL . "/{$patientId}/service_requests/{$id}/actions/resend", []);
     }
 }

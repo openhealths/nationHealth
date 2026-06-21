@@ -64,4 +64,17 @@ class DeviceRequestRequestRepository extends BaseRepository
             ->get()
             ->toArray();
     }
+
+    public function findByUuid(string $uuid): ?DeviceRequestRequest
+    {
+        return $this->model->newQuery()->where('uuid', $uuid)->first();
+    }
+
+    public function sumIssuedQuantityByActivity(int $activityId): float
+    {
+        return (float) $this->model->newQuery()
+            ->where('based_on_id', $activityId)
+            ->where('status', '!=', 'entered-in-error')
+            ->sum('quantity');
+    }
 }
