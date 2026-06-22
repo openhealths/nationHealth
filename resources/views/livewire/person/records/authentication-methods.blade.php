@@ -3,7 +3,6 @@
 <div class="relative"> {{-- This required for table overflow scrolling --}}
     <div
         x-data="{
-            authenticationMethods: [],
             openModal: false,
             modalAuthenticationMethod: new AuthenticationMethod(),
             newAuthenticationMethod: false,
@@ -20,39 +19,33 @@
                     </tr>
                 </thead>
                 <tbody>
-                <template x-for="(authenticationMethod, index) in authenticationMethods">
+                @foreach($authenticationMethods as $index => $authenticationMethod)
                     <tr>
-                        <td class="td-input"
-                            x-data="{ authLabels: @js(AuthenticationMethod::options()) }"
-                            x-text="authLabels[authenticationMethod.type] ?? authenticationMethod.type"
-                        >
+                        <td class="td-input">
+                            {{ AuthenticationMethod::tryFrom($authenticationMethod['type'] ?? '')?->label() ?? ($authenticationMethod['type'] ?? '') }}
                         </td>
                         <td class="td-input">
-                            <span x-show="authenticationMethod.status === 'ACTIVE' || !authenticationMethod.status"
-                                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                            >
-                                {{ __('forms.status.active') }}
-                            </span>
-                            <span x-show="authenticationMethod.status && authenticationMethod.status !== 'ACTIVE'"
-                                  x-cloak
-                                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
-                                  x-text="authenticationMethod.status"
-                            >
-                            </span>
+                            @if(($authenticationMethod['status'] ?? 'ACTIVE') === 'ACTIVE')
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                    {{ __('forms.status.active') }}
+                                </span>
+                            @else
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                                    {{ $authenticationMethod['status'] ?? '' }}
+                                </span>
+                            @endif
                         </td>
                         <td class="td-input text-right">
                             <button type="button"
-                                    class="p-1.5 text-gray-400 hover:text-red-500 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                    class="p-1.5 text-gray-400 hover:text-red-500 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer"
                                     title="{{ __('forms.delete') }}"
-                                    @click.prevent="$wire.deactivateAuthMethod(authenticationMethod).then(() => {
-                                        authenticationMethods = authenticationMethods.filter(m => m.type !== authenticationMethod.type);
-                                    })"
+                                    wire:click.prevent="deactivateAuthMethod({{ json_encode($authenticationMethod) }})"
                             >
                                 @icon('trash', 'w-5 h-5')
                             </button>
                         </td>
                     </tr>
-                </template>
+                @endforeach
                 </tbody>
             </table>
         </div>
@@ -63,7 +56,7 @@
                         newAuthenticationMethod = true;
                         modalAuthenticationMethod = new AuthenticationMethod();
                     "
-                    class="item-add my-5"
+                    class="item-add my-5 cursor-pointer"
             >
                 {{ __('patients.add_authentication_method') }}
             </button>
@@ -121,12 +114,8 @@
                                 </div>
 
                                 <div class="form-group group !mb-0 self-end">
-                                    <button class="button-primary"
+                                    <button class="button-primary cursor-pointer"
                                             @click.prevent="$wire.createAuthMethod(modalAuthenticationMethod).then(() => {
-                                                authenticationMethods.push({
-                                                    type: modalAuthenticationMethod.type,
-                                                    status: 'ACTIVE'
-                                                });
                                                 openModal = false;
                                             })"
                                             :disabled="!modalAuthenticationMethod.type.trim()"
@@ -195,7 +184,7 @@
                                                 x-init=""
                                                 x-effect="if (!modalOpened) { modalOpened = true; startCooldown(); }"
                                                 :disabled="cooldown > 0"
-                                                :class="{ 'cursor-not-allowed': cooldown > 0 }"
+                                                :class="{ 'cursor-not-allowed': cooldown > 0, 'cursor-pointer': cooldown <= 0 }"
                                                 class="button-minor gap-2"
                                         >
                                             @icon('mail', 'w-4 h-4 text-gray-800 dark:text-white')
@@ -211,7 +200,7 @@
                             <div class="mt-6 flex justify-between space-x-2">
                                 <button type="button"
                                         @click="openModal = false"
-                                        class="button-minor"
+                                        class="button-minor cursor-pointer"
                                 >
                                     {{ __('forms.cancel') }}
                                 </button>

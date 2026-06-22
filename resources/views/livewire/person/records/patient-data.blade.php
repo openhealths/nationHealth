@@ -12,7 +12,7 @@
 
             <button wire:click.once="getVerificationStatus"
                     type="button"
-                    class="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
                 {{ __('patients.update_status') }}
                 @icon('refresh', 'w-4 h-4')
@@ -24,7 +24,7 @@
             <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
                 <h2 id="accordion-open-heading-1">
                     <button type="button"
-                            class="flex items-center justify-between w-full px-6 py-4 text-left group"
+                            class="flex items-center justify-between w-full px-6 py-4 text-left group cursor-pointer"
                             data-accordion-target="#accordion-open-body-1"
                             aria-expanded="true"
                             aria-controls="accordion-open-body-1"
@@ -68,7 +68,7 @@
             <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
                 <h2 id="accordion-open-heading-2">
                     <button type="button"
-                            class="flex items-center justify-between w-full px-6 py-4 text-left group"
+                            class="flex items-center justify-between w-full px-6 py-4 text-left group cursor-pointer"
                             data-accordion-target="#accordion-open-body-2"
                             aria-expanded="false"
                             aria-controls="accordion-open-body-2"
@@ -103,7 +103,7 @@
                 <h2 id="accordion-open-heading-3" wire:ignore>
                     <button wire:click.once="getConfidantPersons"
                             type="button"
-                            class="flex items-center justify-between w-full px-6 py-4 text-left group"
+                            class="flex items-center justify-between w-full px-6 py-4 text-left group cursor-pointer"
                             data-accordion-target="#accordion-open-body-3"
                             aria-expanded="false"
                             aria-controls="accordion-open-body-3"
@@ -151,8 +151,9 @@
 
             <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
                 <h2 id="accordion-open-heading-4" wire:ignore>
-                    <button type="button"
-                            class="flex items-center justify-between w-full px-6 py-4 text-left group"
+                    <button wire:click.once="getAuthenticationMethods"
+                            type="button"
+                            class="flex items-center justify-between w-full px-6 py-4 text-left group cursor-pointer"
                             data-accordion-target="#accordion-open-body-4"
                             aria-expanded="false"
                             aria-controls="accordion-open-body-4"
@@ -175,7 +176,7 @@
 
         <div class="mt-8">
             <a href="{{ route('persons.update', [legalEntity(), $personId]) }}"
-               class="inline-flex items-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+               class="inline-flex items-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
                 {{ __('patients.edit_data') }}
             </a>

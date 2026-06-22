@@ -37,7 +37,7 @@ class PatientData extends BasePatientComponent
      *
      * @var array
      */
-    public array $authenticationMethods;
+    public array $authenticationMethods = [];
 
     /**
      * ID that returns after createAuthMethod request, need for resendSMS request.
@@ -148,6 +148,8 @@ class PatientData extends BasePatientComponent
 
         try {
             EHealth::person()->createAuthMethod($this->uuid, Arr::toSnakeCase($validated));
+
+            $this->getAuthenticationMethods();
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when deactivating auth method request');
 
@@ -179,6 +181,8 @@ class PatientData extends BasePatientComponent
 
             if ($response->successful()) {
                 $this->authMethodId = $response->getData()['id'];
+
+                $this->getAuthenticationMethods();
             }
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when creating auth method request');
