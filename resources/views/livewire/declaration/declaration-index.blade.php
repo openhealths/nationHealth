@@ -41,7 +41,7 @@
                         @endisset
                     </div>
                     <div class="flex items-end gap-3 mt-1">
-                        <div class="form-group group top-3 flex-grow max-w-xs">
+                        <div class="form-group group top-3 grow max-w-xs">
                             <input type="text"
                                    id="searchByName"
                                    placeholder=" "
@@ -54,7 +54,7 @@
                             </label>
                         </div>
 
-                        <button class="flex items-center gap-2 button-minor h-[44px] min-w-max px-4"
+                        <button class="flex items-center gap-2 button-minor h-11 min-w-max px-4"
                                 @click="showFilter = !showFilter"
                         >
                             @icon('adjustments', 'w-4 h-4')
@@ -90,10 +90,10 @@
     <div class="flow-root mt-4 shift-content pl-3.5"
          wire:key="declarations-table-page-{{ $declarations->total() }}-{{ $declarations->currentPage() }}"
     >
-        <div class="max-w-screen-xl">
+        <div class="max-w-7xl">
             @if($declarations->isNotEmpty())
                 <div class="relative shadow-md sm:rounded-lg">
-                    <table class="table-input w-full min-w-[1000px]">
+                    <table class="table-input w-full min-w-250">
                             <thead class="thead-input">
                             <tr>
                                 <th scope="col" class="th-input w-[25%]">{{ __('forms.full_name') }}</th>
