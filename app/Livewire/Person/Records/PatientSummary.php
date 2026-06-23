@@ -31,6 +31,7 @@ use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Session;
 use InvalidArgumentException;
 use Throwable;
@@ -47,6 +48,28 @@ class PatientSummary extends BasePatientComponent
     public const string ENTITY_TYPE_OBSERVATION = 'observation';
     public const string ENTITY_TYPE_CONDITION = 'condition';
     public const string ENTITY_TYPE_DIAGNOSTIC_REPORT = 'diagnostic_report';
+
+    public const int SUMMARY_PAGE_SIZE = 5;
+
+    public array $summaryLimits = [
+        'episodes' => self::SUMMARY_PAGE_SIZE,
+        'encounters' => self::SUMMARY_PAGE_SIZE,
+        'clinicalImpressions' => self::SUMMARY_PAGE_SIZE,
+        'immunizations' => self::SUMMARY_PAGE_SIZE,
+        'observations' => self::SUMMARY_PAGE_SIZE,
+        'conditions' => self::SUMMARY_PAGE_SIZE,
+        'diagnosticReports' => self::SUMMARY_PAGE_SIZE,
+    ];
+
+    public array $hasMore = [
+        'episodes' => false,
+        'encounters' => false,
+        'clinicalImpressions' => false,
+        'immunizations' => false,
+        'observations' => false,
+        'conditions' => false,
+        'diagnosticReports' => false,
+    ];
 
     public array $episodes = [];
 
@@ -118,6 +141,51 @@ class PatientSummary extends BasePatientComponent
         return $this->isSyncProcessing($entityConstant);
     }
 
+    public function loadMore(string $section): void
+    {
+        if (!array_key_exists($section, $this->summaryLimits)) {
+            return;
+        }
+
+        $this->summaryLimits[$section] += self::SUMMARY_PAGE_SIZE;
+        $this->loadSummarySection($section);
+    }
+
+    private function resetSummarySection(string $section): void
+    {
+        if (! array_key_exists($section, $this->summaryLimits)) {
+            return;
+        }
+
+        $this->summaryLimits[$section] = self::SUMMARY_PAGE_SIZE;
+    }
+
+    private function loadSummarySection(string $section): void
+    {
+        match ($section) {
+            'episodes' => $this->getEpisodes(),
+            'encounters' => $this->getEncounters(),
+            'clinicalImpressions' => $this->getClinicalImpressions(),
+            'immunizations' => $this->getImmunizations(),
+            'observations' => $this->getObservations(),
+            'conditions' => $this->getConditions(),
+            'diagnosticReports' => $this->getDiagnosticReports(),
+            default => null,
+        };
+    }
+
+    private function setPaginatedRecords(string $section, Builder $query, string $property, ?callable $afterLoad = null): void
+    {
+        $limit = $this->summaryLimits[$section] ?? self::SUMMARY_PAGE_SIZE;
+
+        $this->hasMore[$section] = (clone $query)->count() > $limit;
+        $this->{$property} = $query->limit($limit)->get()->toArray();
+
+        if ($afterLoad !== null) {
+            $afterLoad($this->{$property});
+        }
+    }
+
     protected function initializeComponent(): void
     {
         $this->getDictionary();
@@ -180,12 +248,17 @@ class PatientSummary extends BasePatientComponent
             Session::flash('success', __('patients.messages.episodes_synced_successfully'));
         }
 
-        $this->episodes = Arr::toCamelCase($this->formatDatesForDisplay($validatedData));
+        $this->resetSummarySection('episodes');
+        $this->getEpisodes();
     }
 
     public function getEpisodes(): void
     {
-        $this->episodes = Episode::with('period')->wherePersonId($this->personId)->get()->toArray();
+        $this->setPaginatedRecords(
+            'episodes',
+            Episode::with('period')->wherePersonId($this->personId),
+            'episodes'
+        );
     }
 
     public function syncEncounters(): void
@@ -224,15 +297,18 @@ class PatientSummary extends BasePatientComponent
             Session::flash('success', __('patients.messages.encounters_synced_successfully'));
         }
 
-        $this->encounters = Arr::toCamelCase($this->formatDatesForDisplay($validatedData));
+        $this->resetSummarySection('encounters');
+        $this->getEncounters();
     }
 
     public function getEncounters(): void
     {
-        $this->encounters = Encounter::wherePersonId($this->personId)
-            ->with(['class', 'episode.type.coding', 'type.coding', 'period', 'performerSpeciality.coding'])
-            ->get()
-            ->toArray();
+        $this->setPaginatedRecords(
+            'encounters',
+            Encounter::wherePersonId($this->personId)
+                ->with(['class', 'episode.type.coding', 'type.coding', 'period', 'performerSpeciality.coding']),
+            'encounters'
+        );
     }
 
     public function syncClinicalImpressions(): void
@@ -271,15 +347,17 @@ class PatientSummary extends BasePatientComponent
             Session::flash('success', __('patients.messages.clinical_impressions_synced_successfully'));
         }
 
-        $this->clinicalImpressions = Arr::toCamelCase($this->formatDatesForDisplay($validatedData));
+        $this->resetSummarySection('clinicalImpressions');
+        $this->getClinicalImpressions();
     }
 
     public function getClinicalImpressions(): void
     {
-        $this->clinicalImpressions = ClinicalImpression::wherePersonId($this->personId)
-            ->withAllRelations()
-            ->get()
-            ->toArray();
+        $this->setPaginatedRecords(
+            'clinicalImpressions',
+            ClinicalImpression::wherePersonId($this->personId)->withAllRelations(),
+            'clinicalImpressions'
+        );
     }
 
     public function syncImmunizations(): void
@@ -317,15 +395,17 @@ class PatientSummary extends BasePatientComponent
             legalEntity()->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_IMMUNIZATION);
         }
 
-        $this->immunizations = Arr::toCamelCase($this->formatDatesForDisplay($validatedData));
+        $this->resetSummarySection('immunizations');
+        $this->getImmunizations();
     }
 
     public function getImmunizations(): void
     {
-        $this->immunizations = Immunization::wherePersonId($this->personId)
-            ->withAllRelations()
-            ->get()
-            ->toArray();
+        $this->setPaginatedRecords(
+            'immunizations',
+            Immunization::wherePersonId($this->personId)->withAllRelations(),
+            'immunizations'
+        );
     }
 
     public function syncObservations(): void
@@ -367,15 +447,17 @@ class PatientSummary extends BasePatientComponent
             Session::flash('success', __('patients.messages.observations_synced_successfully'));
         }
 
-        $this->observations = Arr::toCamelCase($this->formatDatesForDisplay($validatedData));
+        $this->resetSummarySection('observations');
+        $this->getObservations();
     }
 
     public function getObservations(): void
     {
-        $this->observations = Observation::wherePersonId($this->personId)
-            ->withAllRelations()
-            ->get()
-            ->toArray();
+        $this->setPaginatedRecords(
+            'observations',
+            Observation::wherePersonId($this->personId)->withAllRelations(),
+            'observations'
+        );
     }
 
     public function syncDiagnoses(): void
@@ -436,18 +518,18 @@ class PatientSummary extends BasePatientComponent
             Session::flash('success', __('patients.messages.conditions_synced_successfully'));
         }
 
-        $this->conditions = Arr::toCamelCase($this->formatDatesForDisplay($validatedData));
-        $this->populateIcd10Descriptions($this->conditions);
+        $this->resetSummarySection('conditions');
+        $this->getConditions();
     }
 
     public function getConditions(): void
     {
-        $this->conditions = Condition::wherePersonId($this->personId)
-            ->withAllRelations()
-            ->get()
-            ->toArray();
-
-        $this->populateIcd10Descriptions($this->conditions);
+        $this->setPaginatedRecords(
+            'conditions',
+            Condition::wherePersonId($this->personId)->withAllRelations(),
+            'conditions',
+            fn (array $conditions) => $this->populateIcd10Descriptions($conditions)
+        );
     }
 
     public function syncDiagnosticReports(): void
@@ -489,15 +571,17 @@ class PatientSummary extends BasePatientComponent
             Session::flash('success', __('patients.messages.diagnostic_reports_synced_successfully'));
         }
 
-        $this->diagnosticReports = Arr::toCamelCase($this->formatDatesForDisplay($validatedData));
+        $this->resetSummarySection('diagnosticReports');
+        $this->getDiagnosticReports();
     }
 
     public function getDiagnosticReports(): void
     {
-        $this->diagnosticReports = DiagnosticReport::wherePersonId($this->personId)
-            ->withAllRelations()
-            ->get()
-            ->toArray();
+        $this->setPaginatedRecords(
+            'diagnosticReports',
+            DiagnosticReport::wherePersonId($this->personId)->withAllRelations(),
+            'diagnosticReports'
+        );
     }
 
     public function syncAllergyIntolerances(): void

@@ -94,29 +94,29 @@
                         <div x-show="activeSection === '{{ $item['id'] }}'" style="display: none;" class="px-5 pb-5">
 
                             @if($item['id'] === 'episodes')
-                                @include('livewire.person.records.parts.episodes', ['episodes' => $episodes, 'limit' => 5])
+                                @include('livewire.person.records.parts.episodes', ['episodes' => $episodes])
                             @elseif($item['id'] === 'encounters')
-                                @include('livewire.person.records.parts.encounters', ['limit' => 5])
+                                @include('livewire.person.records.parts.encounters')
                             @elseif($item['id'] === 'clinicalImpressions')
-                                @include('livewire.person.records.parts.clinical-impressions', ['limit' => 5])
+                                @include('livewire.person.records.parts.clinical-impressions')
                             @elseif($item['id'] === 'immunizations')
-                                @include('livewire.person.records.parts.immunizations', ['limit' => 5])
+                                @include('livewire.person.records.parts.immunizations')
                             @elseif($item['id'] === 'observations')
-                                @include('livewire.person.records.parts.observations', ['limit' => 5])
+                                @include('livewire.person.records.parts.observations')
                             @elseif($item['id'] === 'diagnoses')
-                                @include('livewire.person.records.parts.diagnoses', ['limit' => 5])
+                                @include('livewire.person.records.parts.diagnoses')
                             @elseif($item['id'] === 'conditions')
-                                @include('livewire.person.records.parts.conditions', ['limit' => 5])
+                                @include('livewire.person.records.parts.conditions')
                             @elseif($item['id'] === 'diagnosticReports')
-                                @include('livewire.person.records.parts.diagnostic-reports', ['limit' => 5])
+                                @include('livewire.person.records.parts.diagnostic-reports')
                             @elseif($item['id'] === 'allergies')
-                                @include('livewire.person.records.parts.allergies', ['limit' => 5])
+                                @include('livewire.person.records.parts.allergies')
                             @elseif($item['id'] === 'risk_assessments')
-                                @include('livewire.person.records.parts.risk-assessments', ['limit' => 5])
+                                @include('livewire.person.records.parts.risk-assessments')
                             @elseif($item['id'] === 'devices')
-                                @include('livewire.person.records.parts.devices', ['limit' => 5])
+                                @include('livewire.person.records.parts.devices')
                             @elseif($item['id'] === 'medicines')
-                                @include('livewire.person.records.parts.medicines', ['limit' => 5])
+                                @include('livewire.person.records.parts.medicines')
                             @else
                                 <div
                                     class="py-12 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-dashed border-gray-200 dark:border-gray-700 mt-2">
@@ -130,6 +130,17 @@
                                         <p class="text-[13px] mt-1 text-gray-400">В цьому розділі поки немає
                                             інформації</p>
                                     </div>
+                                </div>
+                            @endif
+                            
+                            @if($hasMore[$item['id']] ?? false)
+                                <div class="flex justify-start mt-4">
+                                    <button type="button"
+                                            wire:click="loadMore('{{ $item['id'] }}')"
+                                            class="item-add"
+                                    >
+                                        {{ __('patients.show_more') }}
+                                    </button>
                                 </div>
                             @endif
                         </div>
