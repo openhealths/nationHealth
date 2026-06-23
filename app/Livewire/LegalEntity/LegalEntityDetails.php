@@ -277,10 +277,7 @@ class LegalEntityDetails extends LegalEntityComponent
             return [];
         }
 
-        // TODO: remove it when all other entity will use the same date format
-        // $documents[0]['issuedAt'] = Carbon::parse($documents[0]['issuedAt'])->format(config('app.date_format'));
-
-        return $this->convertArrayKeysToCamelCase($documents[0]);
+        return $this->convertArrayKeysToCamelCase($documents);
     }
 
     /**

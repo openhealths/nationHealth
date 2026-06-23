@@ -15,7 +15,7 @@ class Name implements ValidationRule
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        foreach ($this->getVvalidationFieldsMap() as $method => $errorMessage) {
+        foreach ($this->getValidationFieldsMap() as $method => $errorMessage) {
             if (! $this->$method($value)) {
                 $fail($errorMessage);
 
@@ -30,7 +30,7 @@ class Name implements ValidationRule
      *
      * @return array
      */
-    protected function getVvalidationFieldsMap() {
+    protected function getValidationFieldsMap() {
         return [
             'checkCommonNamePattern' => ' :attribute містить неприпустимі символи.',
             'checkFirstLetterNamePattern' => ' :attribute має починатись лише з літери',
@@ -52,7 +52,7 @@ class Name implements ValidationRule
      */
     protected function checkCommonNamePattern(string $value): bool
     {
-        return (bool) preg_match('/^(?!.*[ЫЪЭЁыъэё@%&$^#])[А-ЯҐЇІЄа-яґїіє’\\\'\\- ]+$/u', $value);
+        return (bool) preg_match("/^[А-ЩЬЮЯҐЄІЇа-щьюяґєії\\s\\.\\-\\/']+$/u", $value);
     }
 
     /**

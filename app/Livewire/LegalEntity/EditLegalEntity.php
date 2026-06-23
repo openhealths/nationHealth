@@ -150,11 +150,16 @@ class EditLegalEntity extends LegalEntity
 
     private function prepareOwnerData(Employee $owner): array
     {
-        $ownerData = $owner->party->toArray() ?? [];
+        $ownerData = $owner->load([
+                'party.documents:id,documentable_id,documentable_type,type,number,issued_by,issued_at'
+            ])
+            ->party
+            ->toArray() ?? [];
+
         $partyUsers = $owner->party->users()->get();
 
         $ownerData['phones'] = $owner->party->phones->toArray() ?? [];
-        $ownerData['documents'] = $this->prepareDocumentsData($owner->party->documents->toArray());
+        $ownerData['documents'] = $this->prepareDocumentsData($ownerData['documents'] ?? []);
         $ownerData['position'] = $owner->position;
         $ownerData['employee_uuid'] = $owner->uuid;
         $ownerData['employee_id'] = $owner->id;
@@ -177,7 +182,7 @@ class EditLegalEntity extends LegalEntity
             return [];
         }
 
-        return $this->convertArrayKeysToCamelCase($documents[0]);
+        return $this->convertArrayKeysToCamelCase($documents);
     }
 
     public function updateLegalEntity()

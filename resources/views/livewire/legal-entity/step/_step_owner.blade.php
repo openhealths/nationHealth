@@ -1,18 +1,3 @@
-@php
-    $hasOwnerLastName = $errors->has('legalEntityForm.owner.lastName');
-    $hasOwnerFirstName = $errors->has('legalEntityForm.owner.firstName');
-    $hasOwnerSecondName = $errors->has('legalEntityForm.owner.secondName');
-    $hasOwnerBirthDate = $errors->has('legalEntityForm.owner.birthDate');
-    $hasOwnerGender = $errors->has('legalEntityForm.owner.gender');
-    $hasOwnerEmail = $errors->has('legalEntityForm.owner.email');
-    $hasOwnerPosition = $errors->has('legalEntityForm.owner.position');
-    $hasOwnerTaxId = $errors->has('legalEntityForm.owner.taxId');
-    $hasOwnerDocumentType = $errors->has('legalEntityForm.owner.documents.type');
-    $hasOwnerDocumentNumber = $errors->has('legalEntityForm.owner.documents.number');
-    $hasOwnerDocumentIssuedBy = $errors->has('legalEntityForm.owner.documents.issuedBy');
-    $hasOwnerDocumentIssuedAt = $errors->has('legalEntityForm.owner.documents.issuedAt');
-@endphp
-
 <fieldset
     class="p-4 sm:p-8 sm:pb-10 mb-16 mt-6 border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 max-w-7xl"
     xmlns="http://www.w3.org/1999/html"
@@ -30,6 +15,8 @@
         <legend x-text="title" class="legend"></legend>
     </template>
 
+    <h3 class="font-bold text-sm text-gray-600 mb-6">{{ __('forms.credentials_owner') }} *</h3>
+
     <div class='form-row-3'>
         {{-- Owner Last Name --}}
         <div class="form-group group">
@@ -39,17 +26,17 @@
                 placeholder=" "
                 id="ownerLastName"
                 wire:model="legalEntityForm.owner.lastName"
-                aria-describedby="{{ $hasOwnerLastName ? 'ownerLastNameErrorHelp' : '' }}"
-                class="input {{ $hasOwnerLastName ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
+                aria-describedby="@error('legalEntityForm.owner.lastName') ownerLastNameErrorHelp @enderror"
+                class="input @error('legalEntityForm.owner.lastName') input-error border-red-500 focus:border-red-500 @enderror peer"
                 :class="isDisabled ? 'text-gray-400 border-gray-200 dark:text-gray-500' : 'text-gray-900 border-gray-300'"
                 :disabled="isDisabled"
             />
 
-            @if($hasOwnerLastName)
+            @error('legalEntityForm.owner.lastName')
                 <p id="ownerLastNameErrorHelp" class="text-error">
-                    {{ $errors->first('legalEntityForm.owner.lastName') }}
+                    {{ $message }}
                 </p>
-            @endif
+            @enderror
 
             <label for="ownerLastName" class="label z-10">
                 {{ __('forms.last_name') }}
@@ -64,17 +51,17 @@
                 placeholder=" "
                 id="ownerFirstName"
                 wire:model="legalEntityForm.owner.firstName"
-                aria-describedby="{{ $hasOwnerFirstName ? 'ownerFirstNameErrorHelp' : '' }}"
-                class="input {{ $hasOwnerFirstName ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
+                aria-describedby="@error('legalEntityForm.owner.firstName') ownerFirstNameErrorHelp @enderror"
+                class="input @error('legalEntityForm.owner.firstName') input-error border-red-500 focus:border-red-500 @enderror peer"
                 :class="isDisabled ? 'text-gray-400 border-gray-200 dark:text-gray-500' : 'text-gray-900 border-gray-300'"
                 :disabled="isDisabled"
             />
 
-            @if($hasOwnerFirstName)
+            @error('legalEntityForm.owner.firstName')
                 <p id="ownerFirstNameErrorHelp" class="text-error">
-                    {{ $errors->first('legalEntityForm.owner.firstName') }}
+                    {{ $message }}
                 </p>
-            @endif
+            @enderror
 
             <label for="ownerFirstName" class="label z-10">
                 {{ __('forms.first_name') }}
@@ -88,17 +75,17 @@
                 placeholder=" "
                 id="ownerSecondName"
                 wire:model="legalEntityForm.owner.secondName"
-                aria-describedby="{{ $hasOwnerSecondName ? 'ownerSecondNameErrorHelp' : '' }}"
-                class="input {{ $hasOwnerSecondName ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
+                aria-describedby="@error('legalEntityForm.owner.secondName') ownerSecondNameErrorHelp @enderror"
+                class="input @error('legalEntityForm.owner.secondName') input-error border-red-500 focus:border-red-500 @enderror peer"
                 :class="isDisabled ? 'text-gray-400 border-gray-200 dark:text-gray-500' : 'text-gray-900 border-gray-300'"
                 :disabled="isDisabled"
             />
 
-            @if($hasOwnerSecondName)
+            @error('legalEntityForm.owner.secondName')
                 <p id="ownerSecondNameErrorHelp" class="text-error">
-                    {{ $errors->first('legalEntityForm.owner.secondName') }}
+                    {{ $message }}
                 </p>
-            @endif
+            @enderror
 
             <label for="ownerSecondName" class="label z-10">
                 {{ __('forms.second_name') }}
@@ -120,17 +107,17 @@
                 id="ownerBirthDate"
                 datepicker-format="{{ frontendDateFormat() }}"
                 wire:model="legalEntityForm.owner.birthDate"
-                aria-describedby="{{ $hasOwnerBirthDate ? 'ownerBirthDateErrorHelp' : '' }}"
-                class="input datepicker-input {{ $hasOwnerBirthDate ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
+                aria-describedby="@error('legalEntityForm.owner.birthDate') ownerBirthDateErrorHelp @enderror"
+                class="input datepicker-input @error('legalEntityForm.owner.birthDate') input-error border-red-500 focus:border-red-500 @enderror peer"
                 :class="isDisabled ? 'text-gray-400 border-gray-200 dark:text-gray-500' : 'text-gray-900 border-gray-300'"
                 :disabled="isDisabled"
             />
 
-            @if($hasOwnerBirthDate)
+            @error('legalEntityForm.owner.birthDate')
                 <p id="ownerBirthDateErrorHelp" class="text-error">
-                    {{ $errors->first('legalEntityForm.owner.birthDate') }}
+                    {{ $message }}
                 </p>
-            @endif
+            @enderror
 
             <label for="ownerBirthDate" class="label z-10">
                 {{__('forms.birth_date')}}
@@ -144,8 +131,8 @@
             </div>
 
             <ul
-                aria-describedby="{{ $hasOwnerGender ? 'ownerGenderErrorHelp' : '' }}"
-                class="steps-owner_gender_list {{ $hasOwnerGender ? 'text-error border-red-500 focus:border-red-500' : ''}}"
+                aria-describedby="@error('legalEntityForm.owner.gender') ownerGenderErrorHelp @enderror"
+                class="steps-owner_gender_list @error('legalEntityForm.owner.gender') text-error border-red-500 focus:border-red-500 @enderror"
             >
                 @isset($dictionaries['GENDER'])
                     @foreach($dictionaries['GENDER'] as $k => $gender)
@@ -174,11 +161,11 @@
                 @endisset
             </ul>
 
-            @if($hasOwnerGender)
+            @error('legalEntityForm.owner.gender')
                 <p id="ownerGenderErrorHelp" class="text-error">
-                    {{ $errors->first('legalEntityForm.owner.gender') }}
+                    {{ $message }}
                 </p>
-            @endif
+            @enderror
         </div>
     </div>
 
@@ -199,15 +186,15 @@
                 placeholder=" "
                 id="ownerEmail"
                 wire:model="legalEntityForm.owner.email"
-                aria-describedby="{{ $hasOwnerEmail ? 'ownerEmailErrorHelp' : '' }}"
-                class="input {{ $hasOwnerEmail ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
+                aria-describedby="@error('legalEntityForm.owner.email') ownerEmailErrorHelp @enderror"
+                class="input @error('legalEntityForm.owner.email') input-error border-red-500 focus:border-red-500 @enderror peer"
             />
 
-            @if($hasOwnerEmail)
+            @error('legalEntityForm.owner.email')
                 <p id="ownerEmailErrorHelp" class="text-error">
-                    {{ $errors->first('legalEntityForm.owner.email') }}
+                    {{ $message }}
                 </p>
-            @endif
+            @enderror
 
             <label for="ownerEmail" class="label z-10">
                 {{ __('forms.email') }}
@@ -220,8 +207,8 @@
                 required
                 id="ownerPosition"
                 wire:model="legalEntityForm.owner.position"
-                aria-describedby="{{ $hasOwnerPosition ? 'ownerPositionErrorHelp' : '' }}"
-                class="input-select {{ $hasOwnerPosition ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
+                aria-describedby="@error('legalEntityForm.owner.position') ownerPositionErrorHelp @enderror"
+                class="input-select @error('legalEntityForm.owner.position') input-error border-red-500 focus:border-red-500 @enderror peer"
                 :class="isDisabled ? 'text-gray-400 border-gray-200 dark:text-gray-500' : 'text-gray-900 border-gray-300'"
                 :disabled="isDisabled"
             >
@@ -232,11 +219,11 @@
                 @endforeach
             </select>
 
-            @if($hasOwnerPosition)
+            @error('legalEntityForm.owner.position')
                 <p id="ownerPositionErrorHelp" class="text-error">
-                    {{ $errors->first('legalEntityForm.owner.position') }}
+                    {{ $message }}
                 </p>
-            @endif
+            @enderror
 
             <label for="ownerPosition" class="label z-10">
                 {{ __('forms.owner_position') }}
@@ -284,7 +271,12 @@
                         <p class="text-error" x-text="errors[`legalEntityForm.owner.phones.${index}.type`]"></p>
                     </template>
 
-                    <label :for="$id('phone', '_type_' + index)" class="label">{{ __('forms.phone_type') }}</label>
+                    <label
+                        :for="$id('phone', '_type_' + index)"
+                        class="label"
+                    >
+                        {{ __('forms.phone_type') }}
+                    </label>
                 </div>
 
                 {{-- Phone Number Input --}}
@@ -293,7 +285,7 @@
                         required
                         type="tel"
                         placeholder=" "
-                        class="peer input pl-10 with-leading-icon text-gray-500 "
+                        class="peer input pl-10 with-leading-icon text-gray-500"
                         x-model="phones[index].number"
                         x-mask="+380999999999"
                         :id="$id('phone', '_number' + index)"
@@ -304,7 +296,10 @@
                         <p class="text-error" x-text="errors[`legalEntityForm.owner.phones.${index}.number`]"></p>
                     </template>
 
-                    <label :for="$id('phone', '_number' + index)" class="wrapped-label">
+                    <label
+                        :for="$id('phone', '_number' + index)"
+                        class="wrapped-label"
+                    >
                         {{ __('forms.phone') }}
                     </label>
                 </div>
@@ -337,6 +332,8 @@
         </template>
     </div>
 
+    <h3 class="font-bold text-sm text-gray-600 mb-6">{{ __('forms.tax_number_owner') }} *</h3>
+
     {{-- Owner IPN --}}
     <div
         class='form-row-3'
@@ -368,19 +365,19 @@
                 maxlength="10"
                 placeholder=" "
                 x-model="taxId"
-                aria-describedby="{{ $hasOwnerTaxId ? 'ownerTaxIdErrorHelp' : '' }}"
-                class="input {{ $hasOwnerTaxId ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
+                aria-describedby="@error('legalEntityForm.owner.taxId') ownerTaxIdErrorHelp @enderror"
+                class="input @error('legalEntityForm.owner.taxId') input-error border-red-500 focus:border-red-500 @enderror peer"
                 :class="{ 'border-gray-200 dark:border-gray-700': showNoTaxId }"
                 :disabled="showNoTaxId || isDisabled"
                 x-ref="taxIdInput"
                 x-effect="updateTaxIdInput()"
             />
 
-            @if($hasOwnerTaxId)
+            @error('legalEntityForm.owner.taxId')
                 <p id="ownerTaxIdErrorHelp" class="text-error">
-                    {{ $errors->first('legalEntityForm.owner.taxId') }}
+                    {{ $message }}
                 </p>
-            @endif
+            @enderror
 
             <label
                 for="taxId"
@@ -404,112 +401,181 @@
                 <label for="noTaxId" class="ms-2 text-sm font-medium text-gray-500 dark:text-gray-300">
                     {{ __('forms.no_tax_id') }}
                 </label>
+
+                @error('legalEntityForm.owner.noTaxId')
+                    <p id="ownerNoTaxIdErrorHelp" class="text-error">
+                        {{ $message }}
+                    </p>
+                @enderror
             </div>
         </div>
     </div>
 
-    <div class='form-row-3'>
-        {{-- Owner Document Type --}}
-        <div class="form-group group relative z-0">
-            <select
-                required
-                id="documentType"
-                wire:model.defer="legalEntityForm.owner.documents.type"
-                aria-describedby="{{ $hasOwnerDocumentType ? 'ownerDocumentTypeErrorHelp' : '' }}"
-                class="input-select {{ $hasOwnerDocumentType ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
+    {{-- OWNER DOCUMENTS --}}
+    <div
+        class="space-y-2"
+        x-data="{ documents: $wire.entangle('legalEntityForm.owner.documents'), defaultDoc: { type: '', number: '', issuedBy: '', issuedAt: '' } }"
+        x-init="if (!Array.isArray(documents) || documents.length === 0) { documents = [{ ...defaultDoc }] }"
+        x-id="['doc']"
+    >
+        <h3 class="font-bold text-sm text-gray-600 mb-6">{{ __('forms.documents_owner') }} *</h3>
+
+        <template x-for="(doc, index) in documents" :key="crypto.randomUUID()">
+            <div
+                x-data="{errors: [] }"
+                x-init="errors = @js($errors->getMessages())"
+                class="mb-6"
+                :class="{ 'mb-2': index == documents.length - 1 }"
             >
-                <option value="_placeholder_" selected hidden>-- {{ __('Обрати тип') }} --</option>
+                <div class='form-row-3'>
+                    {{-- Owner Document Type --}}
+                    <div class="form-group group relative z-0">
+                        <select
+                            required
+                            x-model="documents[index].type"
+                            class="input-select peer"
+                            :class="{ 'input-error': errors[`legalEntityForm.owner.documents.${index}.type`] }"
+                            :id="$id('document', '_type_' + index)"
+                        >
+                            <option value="_placeholder_" selected hidden>-- {{ __('Обрати тип') }} --</option>
 
-                @foreach($dictionaries['DOCUMENT_TYPE'] as $k_d => $documentType)
-                    <option value="{{ $k_d }}">{{ $documentType }}</option>
-                @endforeach
-            </select>
+                            <template x-for="(docType, key) in $wire.dictionaries.DOCUMENT_TYPE" :key="key">
+                                <option
+                                    x-text="docType"
+                                    :value="key"
+                                    :disabled="documents.some((d, i) => i !== index && d.type === key)"
+                                    :selected="doc.type === key"
+                                ></option>
+                            </template>
+                        </select>
 
-            @if($hasOwnerDocumentType)
-                <p id="ownerDocumentTypeErrorHelp" class="text-error">
-                    {{ $errors->first('legalEntityForm.owner.documents.type') }}
-                </p>
-            @endif
+                        <template x-if="errors[`legalEntityForm.owner.documents.${index}.type`]">
+                            <p class="text-error" x-text="errors[`legalEntityForm.owner.documents.${index}.type`]"></p>
+                        </template>
 
-            <label for="documentType" class="label z-10">
-                {{ __('forms.document_type') }}
-            </label>
-        </div>
+                        <label
+                            :for="$id('document', '_type_' + index)"
+                            class="label
+                            z-10"
+                        >
+                            {{ __('forms.document_type') }}
+                        </label>
+                    </div>
 
-        {{-- Owner Document Number --}}
-        <div class="form-group group relative z-0">
-            <input
-                required
-                type="text"
-                placeholder=" "
-                id="documentNumber"
-                wire:model="legalEntityForm.owner.documents.number"
-                aria-describedby="{{ $hasOwnerDocumentNumber ? 'ownerDocumentNumberErrorHelp' : '' }}"
-                class="input {{ $hasOwnerDocumentNumber ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
-            />
+                    {{-- Owner Document Number --}}
+                    <div class="form-group group relative z-0">
+                        <input
+                            required
+                            type="text"
+                            placeholder=" "
+                            x-model="documents[index].number"
+                            class="peer input"
+                            :id="$id('document', '_number' + index)"
+                            :class="{ 'input-error border-red-500': errors[`legalEntityForm.owner.documents.${index}.number`] }"
+                        />
 
-            @if($hasOwnerDocumentNumber)
-                <p id="ownerDocumentNumberErrorHelp" class="text-error">
-                    {{ $errors->first('legalEntityForm.owner.documents.number') }}
-                </p>
-            @endif
+                        <template x-if="errors[`legalEntityForm.owner.documents.${index}.number`]">
+                            <p class="text-error" x-text="errors[`legalEntityForm.owner.documents.${index}.number`]"></p>
+                        </template>
 
-            <label for="documentNumber" class="label z-10">
-                {{ __('forms.document_number') }}
-            </label>
-        </div>
-    </div>
+                        <label
+                            :for="$id('document', '_number' + index)"
+                            class="label
+                            z-10"
+                        >
+                            {{ __('forms.document_number') }}
+                        </label>
+                    </div>
 
-    <div class='form-row-3'>
-        {{-- Owner Document Issued By --}}
-        <div class="form-group group relative z-0">
-            <input
-                type="text"
-                placeholder=" "
-                id="documentsIssuedBy"
-                wire:model="legalEntityForm.owner.documents.issuedBy"
-                aria-describedby="{{ $hasOwnerDocumentIssuedBy ? 'ownerDocumentIssuedByErrorHelp' : '' }}"
-                class="input {{ $hasOwnerDocumentIssuedBy ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
-            />
+                    {{-- Remove Documents Buttons --}}
+                    <div
+                        x-cloak
+                        x-show="!@json($isDetails ?? false)"
+                        class="flex items-center space-x-4 justify-start"
+                    >
+                        <template x-if="documents.length > 1">
+                            <button
+                                type="button"
+                                @click.prevent="documents.splice(index, 1)"
+                                class="item-remove text-red-600 hover:text-red-800 justify-self-start"
+                            >
+                                <span>{{ __('forms.remove_document') }}</span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
 
-            @if($hasOwnerDocumentIssuedBy)
-                <p id="ownerDocumentIssuedByErrorHelp" class="text-error">
-                    {{ $errors->first('legalEntityForm.owner.documents.issuedBy') }}
-                </p>
-            @endif
+                <div class='form-row-3'>
+                    {{-- Owner Document Issued By --}}
+                    <div class="form-group group relative z-0">
+                        <input
+                            type="text"
+                            placeholder=" "
+                            class="input peer"
+                            x-model="documents[index].issuedBy"
+                            :id="$id('document', '_issuedBy' + index)"
+                            :class="{ 'input-error border-red-500': errors[`legalEntityForm.owner.documents.${index}.issuedBy`] }"
+                        />
+                        <template x-if="errors[`legalEntityForm.owner.documents.${index}.issuedBy`]">
+                            <p class="text-error" x-text="errors[`legalEntityForm.owner.documents.${index}.issuedBy`]"></p>
+                        </template>
 
-            <label for="documentsIssuedBy" class="label z-10">
-                {{__('forms.document_issued_by')}}
-            </label>
-        </div>
+                        <label
+                            :for="$id('document', '_issuedBy' + index)"
+                            class="label z-10"
+                        >
+                            {{__('forms.document_issued_by')}}
+                        </label>
+                    </div>
 
-        {{-- Owner Document Issued At --}}
-        <div class="form-group group relative z-0">
-            <svg class="svg-input" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor"
-                 viewBox="0 0 20 20">
-                <path
-                    d="M20 4a2 2 0 0 0-2-2h-2V1a1 1 0 0 0-2 0v1h-3V1a1 1 0 0 0-2 0v1H6V1a1 1 0 0 0-2 0v1H2a2 2 0 0 0-2 2v2h20V4ZM0 18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8H0v10Zm5-8h10a1 1 0 0 1 0 2H5a1 1 0 0 1 0-2Z" />
-            </svg>
+                    {{-- Owner Document Issued At --}}
+                    <div class="form-group group relative z-0">
+                        <svg class="svg-input" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor"
+                            viewBox="0 0 20 20">
+                            <path
+                                d="M20 4a2 2 0 0 0-2-2h-2V1a1 1 0 0 0-2 0v1h-3V1a1 1 0 0 0-2 0v1H6V1a1 1 0 0 0-2 0v1H2a2 2 0 0 0-2 2v2h20V4ZM0 18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8H0v10Zm5-8h10a1 1 0 0 1 0 2H5a1 1 0 0 1 0-2Z" />
+                        </svg>
 
-            <input
-                type="text"
-                placeholder=" "
-                id="documentsIssuedAt"
-                datepicker-format="{{ frontendDateFormat() }}"
-                wire:model="legalEntityForm.owner.documents.issuedAt"
-                aria-describedby="{{ $hasOwnerDocumentIssuedAt ? 'ownerDocumentIssuedAtErrorHelp' : '' }}"
-                class="input datepicker-input {{ $hasOwnerDocumentIssuedAt ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
-            />
+                        <input
+                            type="text"
+                            placeholder=" "
+                            x-model="documents[index].issuedAt"
+                            datepicker-format="{{ frontendDateFormat() }}"
+                            class="input datepicker-input peer"
+                            :id="$id('document', '_issuedAt' + index)"
+                            :class="{ 'input-error border-red-500': errors[`legalEntityForm.owner.documents.${index}.issuedAt`] }"
+                        />
 
-            @if($hasOwnerDocumentIssuedAt)
-                <p id="ownerDocumentIssuedAtErrorHelp" class="text-error">
-                    {{ $errors->first('legalEntityForm.owner.documents.issuedAt') }}
-                </p>
-            @endif
+                        <template x-if="errors[`legalEntityForm.owner.documents.${index}.issuedAt`]">
+                            <p class="text-error" x-text="errors[`legalEntityForm.owner.documents.${index}.issuedAt`]"></p>
+                        </template>
 
-            <label for="documentsIssuedAt" class="label z-10">
-                {{ __('forms.document_issued_at') }}
-            </label>
+                        <label
+                            :for="$id('document', '_issuedAt' + index)"
+                            class="label z-10"
+                        >
+                            {{ __('forms.document_issued_at') }}
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        {{-- Add Document --}}
+        <div
+            x-cloak
+            x-show="!@json($isDetails ?? false)"
+            class="flex items-center space-x-4 justify-start"
+        >
+            <button
+                x-cloak
+                x-show ="documents.length < 5"
+                type="button"
+                @click.prevent="documents.push({ ...defaultDoc })"
+                class="item-add"
+            >
+                <span>{{__('forms.add_document')}}</span>
+            </button>
         </div>
     </div>
 </fieldset>

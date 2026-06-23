@@ -98,6 +98,7 @@ class CreateLegalEntity extends LegalEntity
         $this->legalEntityForm->owner = Cache::get($this->ownerCacheKey) ?? $this->setInitialOwnerValues([
             'taxId' => '',
             'phones' => [],
+            'documents' => [],
             'noTaxId' => false
         ]); // Set the base owner data if no data in cache
     }
@@ -353,6 +354,19 @@ class CreateLegalEntity extends LegalEntity
         // If no_tax_id=true set related fields to empty
         if (Arr::boolean($this->legalEntityForm->owner, 'noTaxId')) {
             Arr::set($this->legalEntityForm->owner, 'taxId', '');
+        }
+
+        // Remove empty documents and phones records from the owner array
+        foreach (['documents', 'phones'] as $field) {
+            if (!empty($this->legalEntityForm->owner[$field])) {
+                $this->legalEntityForm->owner[$field] = array_values(
+                    array_filter(
+                        $this->legalEntityForm->owner[$field],
+                        fn($item, $index) => $index === 0 || !empty(array_filter($item)),
+                        ARRAY_FILTER_USE_BOTH
+                    )
+                );
+            }
         }
 
         // Check if the owner information is cached

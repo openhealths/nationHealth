@@ -155,10 +155,13 @@ abstract class LegalEntity extends Component
      */
     protected function getOwnerFields(): void
     {
+        $excludeFromDocuments = ['PERMANENT_RESIDENCE_PERMIT'];
+
         // Get owner dictionary fields
         $fields = [
             'POSITION' => config('ehealth.employee_type.OWNER.position'),
-            'DOCUMENT_TYPE' => ['PASSPORT', 'NATIONAL_ID']
+            // TODO: remove some of the documents not mentioned by docs
+            'DOCUMENT_TYPE' => array_filter(config('ehealth.employee_identity_document_types'), fn($docType) => !\in_array($docType, $excludeFromDocuments))
         ];
 
         // Get dictionaries
@@ -417,7 +420,7 @@ abstract class LegalEntity extends Component
             'data.license.order_no' => 'required_if:data.license,array|string',
             'data.license.ehealth_updated_at' => 'required_if:data.license,array|string',
             'data.license.ehealth_updated_by' => 'required_if:data.license,array|string',
-        
+
             'data.archive' => 'nullable|array',
             'data.archive.*.date' => 'required_if:data.archive,array|string',
             'data.archive.*.place' => 'required_if:data.archive,array|string',
@@ -536,7 +539,7 @@ abstract class LegalEntity extends Component
     {
         $dateReformatArray = [
             'owner.birth_date',
-            'owner.documents.issued_at',
+            'owner.documents',
             'accreditation.order_date',
             'accreditation.issued_date',
             'accreditation.expiry_date',
@@ -564,19 +567,22 @@ abstract class LegalEntity extends Component
 
         $data = $this->dateReformat($data, $dateReformatArray);
 
-        // Converting documents to array
+        // If employee_uuid is present, set employee_id to the same value
         if (Arr::has($data, 'owner.employee_uuid')) {
             Arr::set($data, 'owner.employee_id', Arr::get($data, 'owner.employee_uuid'));
         }
 
         // If no_tax_id=true its means that taxID should store related document's number
         if (Arr::boolean($data, 'owner.no_tax_id')) {
-            Arr::set($data, 'owner.tax_id', Arr::get($data, 'owner.documents.number'));
+            $passportNumber = collect(Arr::get($data, 'owner.documents', []))
+                ->first(fn(array $doc) => \in_array($doc['type'], ['PASSPORT', 'NATIONAL_ID']))['number'];
+
+            Arr::set($data, 'owner.tax_id', $passportNumber);
         }
 
         // Converting documents to array
         if (Arr::has($data, 'owner.documents')) {
-            Arr::set($data, 'owner.documents', [Arr::get($data, 'owner.documents')]);
+            Arr::set($data, 'owner.documents', Arr::get($data, 'owner.documents'));
         }
 
         Arr::forget($data, [
@@ -642,6 +648,10 @@ abstract class LegalEntity extends Component
                 $reformatted = collect($itemValue)->map(function ($item) {
                     if (isset($item['date'])) {
                         $item['date'] = convertToYmd($item['date']);
+                    }
+
+                    if (isset($item['issued_at'])) {
+                        $item['issued_at'] = convertToYmd($item['issued_at']);
                     }
 
                     return $item;
