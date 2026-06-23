@@ -121,6 +121,8 @@ class DeclarationIndex extends Component
 
     public bool $isFiltersApplied = false;
 
+    protected array $dictionaryNames = ['POSITION'];
+
     /**
      * Determine if the declaration is synchronized.
      *
@@ -195,13 +197,21 @@ class DeclarationIndex extends Component
 
     public function mount(LegalEntity $legalEntity): void
     {
+        $this->getDictionary();
+
         $user = Auth::user();
 
         $ownEmployees = $user->party->employees()
             ->filterByLegalEntityId($legalEntity->id)
-            ->get(['id', 'uuid']);
+            ->get(['id', 'uuid', 'employee_type']);
 
-        $this->ownEmployeeUuids = $ownEmployees->pluck('uuid')->filter()->values()->all();
+        // Use only the current user's doctor employee UUIDs for the default doctor filter.
+        $this->ownEmployeeUuids = $ownEmployees
+            ->where('employee_type', Role::DOCTOR->value)
+            ->pluck('uuid')
+            ->filter()
+            ->values()
+            ->all();
 
         // Select employee_ids from reorganization_employee_declarations where legal_entity_uuid is in legators of current legal entity
         $reorganizedEmployeeIds = $user->party->reorganizedEmployeeDeclarations()
@@ -742,11 +752,11 @@ class DeclarationIndex extends Component
             ->doctor()
             ->filterByLegalEntityId(legalEntity()->id)
             ->whereHas('declarations')
-            ->get(['id', 'uuid', 'party_id'])
+            ->get(['id', 'uuid', 'party_id', 'position'])
             ->map(fn (Employee $doctor) => [
                 'id' => $doctor->id,
                 'uuid' => $doctor->uuid,
-                'fullName' => trim($doctor->party->fullName)
+                'fullName' => trim($doctor->party->fullName . ' - ' . ($this->dictionaries['POSITION'][$doctor->position]))
             ]);
     }
 
