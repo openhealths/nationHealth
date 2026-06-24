@@ -687,6 +687,16 @@ class Person extends Request
     }
 
     /**
+     * Get printable patient memo for an active medication request.
+     *
+     * @see REST API Get Medication Request Printout Form [API-005-043-0008]
+     */
+    public function getMedicationRequestPrintoutForm(string $personId, string $medicationRequestId): PromiseInterface|EHealthResponse
+    {
+        return $this->get(self::URL . "/{$personId}/medication_requests/{$medicationRequestId}/printout_form");
+    }
+
+    /**
      * Map validated authentication methods to the application format.
      *
      * @param  array  $validated
