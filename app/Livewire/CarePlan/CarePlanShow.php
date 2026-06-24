@@ -694,7 +694,6 @@ class CarePlanShow extends Component
                     ]
                 ]
             ],
-            'instantiates_protocol' => $this->carePlan->clinical_protocol ? [['display' => $this->carePlan->clinical_protocol]] : null,
             'title' => $this->carePlan->title,
             'period' => $period,
             'addresses' => !empty($addresses) ? $addresses : null,
@@ -818,7 +817,6 @@ class CarePlanShow extends Component
             'intent' => 'order',
             'status' => CarePlanStatus::DRAFT->value,
             'category' => is_array($this->carePlan->category) ? ($this->carePlan->category['coding'][0]['code'] ?? null) : $this->carePlan->category,
-            'instantiates_protocol' => $this->carePlan->clinical_protocol ? [['display' => $this->carePlan->clinical_protocol]] : null,
             'context' => $this->carePlan->context ? ['identifier' => ['type_code' => $this->carePlan->context]] : null,
             'title' => $this->carePlan->title,
             'period' => array_filter([
