@@ -22,7 +22,8 @@
 
         {{-- Search by declaration number --}}
         <div class="form-group group">
-            <input type="text"
+            <input
+                type="text"
                 id="searchByNumber"
                 placeholder=" "
                 class="input peer"

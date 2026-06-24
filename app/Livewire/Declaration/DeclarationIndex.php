@@ -223,8 +223,8 @@ class DeclarationIndex extends Component
 
         $this->doctors = $this->getDoctors();
 
-        // Doctors default to viewing their own declarations, but may switch to another employee via the filter
-        if (!$user->hasAllowedRole(Role::OWNER)) {
+        // A user with a doctor employee defaults to viewing that doctor's declarations.
+        if (!empty($this->ownEmployeeUuids)) {
             $this->doctorFilter = $this->ownEmployeeUuids;
         }
 
@@ -250,7 +250,7 @@ class DeclarationIndex extends Component
         $this->typeFilter = ['request', 'declaration'];
         $this->statusFilter = [Status::ACTIVE->value];
         $this->reorganizationFilter = [];
-        $this->doctorFilter = Auth::user()->hasAllowedRole(Role::OWNER) ? [] : $this->ownEmployeeUuids;
+        $this->doctorFilter = $this->ownEmployeeUuids;
 
         $this->isFiltersApplied = false;
 
@@ -283,6 +283,10 @@ class DeclarationIndex extends Component
                     !$user->hasAllowedRole(Role::OWNER),
                     fn (Builder $query) => $query->forEmployees($employeePool),
                     fn (Builder $query) => $query->filterByLegalEntityId(legalEntity()->id)
+                        ->when(
+                            !empty($selectedEmployeeIds),
+                            fn (Builder $ownerQuery) => $ownerQuery->forEmployees($selectedEmployeeIds)
+                        )
                 )
                 ->get(['id', 'person_id', 'employee_id', 'legal_entity_id', 'declaration_number', 'declaration_request_id', 'status'])
                 ->each->setAttribute('type', 'declaration');
@@ -319,25 +323,6 @@ class DeclarationIndex extends Component
                     }
 
                     return true;
-                });
-            }
-
-            // Filter by reorganization type
-            if (!empty($this->reorganizationFilter)) {
-                $allItems = $allItems->filter(function (DeclarationRequest|Declaration $item) {
-                    if ($item instanceof DeclarationRequest) {
-                        return false;
-                    }
-
-                    if ($item->reorganizedEmployeeDeclaration) {
-                        if ($item->hasParentDeclaration()) {
-                            return \in_array(ReorganizedStatus::RESIGNED->value, $this->reorganizationFilter, true);
-                        }
-
-                        return \in_array(ReorganizedStatus::TO_BE_RESIGNED->value, $this->reorganizationFilter, true);
-                    }
-
-                    return false;
                 });
             }
 
