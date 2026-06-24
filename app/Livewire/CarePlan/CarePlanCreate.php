@@ -667,6 +667,7 @@ class CarePlanCreate extends BasePatientComponent
             'description' => $this->form->description ?: null,
             'note' => $this->form->note ?: null,
             'inform_with' => $this->form->informWith ?: null,
+            'terms_of_service' => $this->form->termsOfService ?: null,
         ]);
 
         session()->flash('success', __('care-plan.draft_saved') ?? 'План лікування успішно збережено');
@@ -965,6 +966,17 @@ class CarePlanCreate extends BasePatientComponent
                 'period_start' => convertToYmd($this->form->periodStart),
                 'period_end' => !empty($this->form->periodEnd) ? convertToYmd($this->form->periodEnd) : null,
                 'encounter_id' => $encounterData['id'] ?? null,
+                'clinical_protocol' => $this->form->clinicalProtocol ?: null,
+                'context' => $this->form->context ?: null,
+                'terms_of_service' => $this->form->termsOfService ?: null,
+                'description' => $this->form->description ?: null,
+                'note' => $this->form->note ?: null,
+                'inform_with' => $this->form->informWith ?: null,
+                'addresses' => $encounterData['addresses'],
+                'supporting_info' => [
+                    'episodes' => $this->form->episodes,
+                    'medical_records' => $this->form->medicalRecords,
+                ],
             ]);
 
             if (!empty($carePlanPayload['period'])) {

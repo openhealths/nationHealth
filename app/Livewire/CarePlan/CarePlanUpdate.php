@@ -147,6 +147,7 @@ class CarePlanUpdate extends CarePlanCreate
             'description' => $this->form->description ?: null,
             'note' => $this->form->note ?: null,
             'inform_with' => $this->form->informWith ?: null,
+            'terms_of_service' => $this->form->termsOfService ?: null,
         ]);
 
         session()->flash('success', __('care-plan.draft_updated') ?? 'План лікування успішно збережено');
@@ -291,6 +292,12 @@ class CarePlanUpdate extends CarePlanCreate
                     'episodes' => $this->form->episodes,
                     'medical_records' => $this->form->medicalRecords,
                 ],
+                'clinical_protocol' => $this->form->clinicalProtocol ?: null,
+                'context' => $this->form->context ?: null,
+                'terms_of_service' => $this->form->termsOfService ?: null,
+                'description' => $this->form->description ?: null,
+                'note' => $this->form->note ?: null,
+                'inform_with' => $this->form->informWith ?: null,
             ]);
 
             session()->flash('success', __('care-plan.signed_and_sent'));
