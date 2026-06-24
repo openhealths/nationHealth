@@ -255,6 +255,10 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
             Route::get('/care-plans/{carePlan}', \App\Livewire\CarePlan\CarePlanShow::class)
                 ->whereNumber('carePlan')
                 ->name('care-plans.show');
+            Route::get('/care-plans/{carePlan}/activities/{activity}', \App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow::class)
+                ->whereNumber(['carePlan', 'activity'])
+                ->scopeBindings()
+                ->name('care-plans.activities.show');
             Route::get('/care-plans/{carePlan}/edit', \App\Livewire\CarePlan\CarePlanUpdate::class)
                 ->whereNumber('carePlan')
                 ->name('care-plans.edit');

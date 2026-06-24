@@ -34,7 +34,8 @@ class MedicationRequestRequest extends Model
         'priority',
         'prior_prescription_id',
         'container_dosage',
-        'note'
+        'note',
+        'inform_with'
     ];
 
     public function dosageInstructions(): HasMany
