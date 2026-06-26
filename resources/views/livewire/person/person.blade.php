@@ -1,7 +1,7 @@
 @use('App\Models\Person\PersonRequest')
 @use('App\Livewire\Person\PersonUpdate')
 
-<div>
+<div x-data="{ showUnidentifiedPatientModal: false }">
     <x-header-navigation class="breadcrumb-form">
         <x-slot name="title">{{ __('patients.add_patient') }}</x-slot>
     </x-header-navigation>
@@ -45,13 +45,23 @@
                         </a>
 
                         @can('create', PersonRequest::class)
-                            <button type="submit" wire:click.prevent="createLocally" class="button-primary-outline flex items-center gap-2">
-                                @icon('archive', 'w-4 h-4')
-                                {{ __('forms.save') }}
-                            </button>
-                            <button type="submit" wire:click.prevent="create" class="button-primary">
-                                {{ __('forms.create') }}
-                            </button>
+                            @if(($form->person['patientType'] ?? 'identified') === 'unidentified')
+                                <button type="button" @click.prevent="window.location.href = '{{ route('persons.index', [legalEntity()]) }}'" class="button-primary-outline flex items-center gap-2">
+                                    @icon('archive', 'w-4 h-4')
+                                    {{ __('forms.save') }}
+                                </button>
+                                <button type="button" @click.prevent="showUnidentifiedPatientModal = true" class="button-primary">
+                                    {{ __('forms.create') }}
+                                </button>
+                            @else
+                                <button type="submit" wire:click.prevent="createLocally" class="button-primary-outline flex items-center gap-2">
+                                    @icon('archive', 'w-4 h-4')
+                                    {{ __('forms.save') }}
+                                </button>
+                                <button type="submit" wire:click.prevent="create" class="button-primary">
+                                    {{ __('forms.create') }}
+                                </button>
+                            @endif
                         @endcan
                     @endif
                 </div>
@@ -78,9 +88,7 @@
         @include('livewire.person.parts.modals.leaflet')
     @endif
 
-    @if($showUnidentifiedPatientModal)
-        @include('livewire.person.parts.modals.unidentified-warning')
-    @endif
+    @include('livewire.person.parts.modals.unidentified-warning')
 
     @can('create', PersonRequest::class)
         <x-signature-modal method="sign" />

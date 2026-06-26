@@ -38,41 +38,11 @@ abstract class Addresses extends Component
         $this->address = $address;
 
         try {
-            $this->regions = cache()->remember('ehealth_regions', now()->addWeek(), function () {
-                return EHealth::address()->getRegions()->getData();
-            });
+            $this->regions = EHealth::address()->getRegions()->getData();
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when searching for regions');
 
-            $this->regions = [
-                ['name' => 'АР КРИМ'],
-                ['name' => 'ВІННИЦЬКА ОБЛАСТЬ'],
-                ['name' => 'ВОЛИНСЬКА ОБЛАСТЬ'],
-                ['name' => 'ДНІПРОПЕТРОВСЬКА ОБЛАСТЬ'],
-                ['name' => 'ДОНЕЦЬКА ОБЛАСТЬ'],
-                ['name' => 'ЖИТОМИРСЬКА ОБЛАСТЬ'],
-                ['name' => 'ЗАКАРПАТСЬКА ОБЛАСТЬ'],
-                ['name' => 'ЗАПОРІЗЬКА ОБЛАСТЬ'],
-                ['name' => 'ІВАНО-ФРАНКІВСЬКА ОБЛАСТЬ'],
-                ['name' => 'КИЇВСЬКА ОБЛАСТЬ'],
-                ['name' => 'КІРОВОГРАДСЬКА ОБЛАСТЬ'],
-                ['name' => 'ЛУГАНСЬКА ОБЛАСТЬ'],
-                ['name' => 'ЛЬВІВСЬКА ОБЛАСТЬ'],
-                ['name' => 'М.КИЇВ'],
-                ['name' => 'М.СЕВАСТОПОЛЬ'],
-                ['name' => 'МИКОЛАЇВСЬКА ОБЛАСТЬ'],
-                ['name' => 'ОДЕСЬКА ОБЛАСТЬ'],
-                ['name' => 'ПОЛТАВСЬКА ОБЛАСТЬ'],
-                ['name' => 'РІВНЕНСЬКА ОБЛАСТЬ'],
-                ['name' => 'СУМСЬКА ОБЛАСТЬ'],
-                ['name' => 'ТЕРНОПІЛЬСЬКА ОБЛАСТЬ'],
-                ['name' => 'ХАРКІВСЬКА ОБЛАСТЬ'],
-                ['name' => 'ХЕРСОНСЬКА ОБЛАСТЬ'],
-                ['name' => 'ХМЕЛЬНИЦЬКА ОБЛАСТЬ'],
-                ['name' => 'ЧЕРКАСЬКА ОБЛАСТЬ'],
-                ['name' => 'ЧЕРНІВЕЦЬКА ОБЛАСТЬ'],
-                ['name' => 'ЧЕРНІГІВСЬКА ОБЛАСТЬ'],
-            ];
+            return;
         }
 
         $this->districts = $districts;

@@ -128,11 +128,6 @@ class PersonComponent extends Component
      */
     public ?object $file = null;
 
-    public bool $showUnidentifiedPatientModal = false;
-
-    public bool $createEncounterAfterSigning = false;
-
-
     public bool $showInformationMessageModal = false;
 
     public bool $showSignatureModal = false;
@@ -249,53 +244,23 @@ class PersonComponent extends Component
             return;
         }
 
-        if (($this->form->person['patientType'] ?? 'identified') === 'unidentified' && !$this->showUnidentifiedPatientModal && !$this->createEncounterAfterSigning) {
-            try {
-                $this->form->validate($this->form->rulesForCreate());
-            } catch (ValidationException $exception) {
-                Session::flash('error', $exception->validator->errors()->first());
-                $this->setErrorBag($exception->validator->getMessageBag());
-                $this->formKey++;
+        $this->form->person['addresses'] = [$this->address]; // must be multiple
 
-                return;
+        try {
+            $addressErrors = $this->addressValidation();
+            if (!empty($addressErrors)) {
+                throw ValidationException::withMessages($addressErrors);
             }
 
-            $this->showUnidentifiedPatientModal = true;
+            $validated = $this->form->validate($this->form->rulesForCreate());
+            $this->formKey++;
+        } catch (ValidationException $exception) {
+            Session::flash('error', $exception->validator->errors()->first());
+            $this->setErrorBag($exception->validator->getMessageBag());
+            $this->formKey++;
+
             return;
         }
-
-        if (($this->form->person['patientType'] ?? 'identified') === 'identified') {
-            $this->form->person['addresses'] = [$this->address]; // must be multiple
-
-            try {
-                $addressErrors = $this->addressValidation();
-                if (!empty($addressErrors)) {
-                    throw ValidationException::withMessages($addressErrors);
-                }
-
-                $validated = $this->form->validate($this->form->rulesForCreate());
-                $this->formKey++;
-            } catch (ValidationException $exception) {
-                Session::flash('error', $exception->validator->errors()->first());
-                $this->setErrorBag($exception->validator->getMessageBag());
-                $this->formKey++;
-
-                return;
-            }
-        } else {
-            try {
-                $validated = $this->form->validate($this->form->rulesForCreate());
-                $this->formKey++;
-            } catch (ValidationException $exception) {
-                Session::flash('error', $exception->validator->errors()->first());
-                $this->setErrorBag($exception->validator->getMessageBag());
-                $this->formKey++;
-
-                return;
-            }
-        }
-
-        $this->fillUnidentifiedPatientDefaults($validated);
 
         try {
             $response = EHealth::personRequest()->create($validated);
@@ -343,20 +308,6 @@ class PersonComponent extends Component
         $this->viewState = 'new';
     }
 
-    public function proceedWithoutEncounter(): void
-    {
-        $this->createEncounterAfterSigning = false;
-        $this->showUnidentifiedPatientModal = false;
-        $this->create();
-    }
-
-    public function proceedWithEncounter(): void
-    {
-        $this->createEncounterAfterSigning = true;
-        $this->showUnidentifiedPatientModal = false;
-        $this->create();
-    }
-
     /**
      * Create data about person request in DB.
      *
@@ -370,9 +321,7 @@ class PersonComponent extends Component
             return;
         }
 
-        if (($this->form->person['patientType'] ?? 'identified') === 'identified') {
-            $this->form->person['addresses'] = [$this->address]; // must be multiple
-        }
+        $this->form->person['addresses'] = [$this->address]; // must be multiple
 
         try {
             $validated = $this->form->validate($this->form->rulesForCreate());
@@ -384,8 +333,6 @@ class PersonComponent extends Component
 
             return;
         }
-
-        $this->fillUnidentifiedPatientDefaults($validated);
 
         $selectedConfidantPersonData = null;
         if (!empty($this->selectedConfidantPersonId)) {
@@ -705,16 +652,6 @@ class PersonComponent extends Component
             }
 
             Session::flash('success', $successMessage);
-
-            if (($this->form->person['patientType'] ?? 'identified') === 'unidentified' && $this->createEncounterAfterSigning) {
-                $personId = Person::whereUuid($responseData['person_id'])->value('id');
-                if ($personId) {
-                    $this->redirectRoute('encounter.create', [legalEntity(), 'personId' => $personId], navigate: true);
-
-                    return;
-                }
-            }
-
             $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
         }
     }
@@ -782,32 +719,6 @@ class PersonComponent extends Component
         // Show final status message
         if ($successCount === $totalFiles) {
             Session::flash('success', __('patients.messages.files_uploaded_successfully'));
-        }
-    }
-
-    /**
-     * Fill default values for unidentified patients.
-     *
-     * @param  array  $validated
-     * @return void
-     */
-    private function fillUnidentifiedPatientDefaults(array &$validated): void
-    {
-        if (($this->form->person['patientType'] ?? 'identified') === 'unidentified') {
-            $validated['person']['birthCountry'] = 'UA';
-            $validated['person']['birthSettlement'] = 'Невідомо';
-            $validated['person']['noTaxId'] = true;
-            $validated['person']['secret'] = 'невідомо';
-
-            if (!$this->form->showContactPerson) {
-                $validated['person']['emergencyContact'] = [
-                    'firstName' => 'Невідомо',
-                    'lastName' => 'Невідомо',
-                    'phones' => [
-                        ['type' => 'MOBILE', 'number' => '+380000000000']
-                    ]
-                ];
-            }
         }
     }
 

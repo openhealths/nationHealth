@@ -72,9 +72,7 @@ class PersonForm extends BaseForm
     public function rulesForCreate(): array
     {
         if (($this->person['patientType'] ?? 'identified') === 'unidentified') {
-            return array_merge($this->basicRules(), [
-                'showContactPerson' => ['boolean']
-            ]);
+            return [];
         }
 
         $createRules = [
@@ -153,40 +151,6 @@ class PersonForm extends BaseForm
      */
     protected function basicRules(): array
     {
-        if (($this->person['patientType'] ?? 'identified') === 'unidentified') {
-            $rules = [
-                'person.patientType' => ['required', 'string', 'in:identified,unidentified'],
-                'person.unidentifiedReason' => ['required', 'string', 'in:EMERGENCY_HOSPITALIZATION,POLICE_HOSPITALIZATION,NEWBORN_WITHOUT_CERTIFICATE,OTHER_HOSPITALIZATION'],
-                'person.lastName' => ['required', 'min:3', new NameFields()],
-                'person.firstName' => ['required', 'min:3', new NameFields()],
-                'person.secondName' => ['nullable', 'min:3', new NameFields()],
-                'person.birthDate' => ['required', 'date_format:' . config('app.date_format')],
-                'person.gender' => ['required', 'string', new InDictionary('GENDER')],
-            ];
-
-            $reason = $this->person['unidentifiedReason'] ?? 'EMERGENCY_HOSPITALIZATION';
-            if ($reason === 'EMERGENCY_HOSPITALIZATION') {
-                $rules['person.ambulanceCardNumber'] = ['nullable', 'string', 'max:255'];
-            } elseif ($reason === 'POLICE_HOSPITALIZATION') {
-                $rules['person.policeReportId'] = ['required', 'string', 'max:255'];
-                $rules['person.policeReportDate'] = ['required', 'date_format:' . config('app.date_format')];
-            } elseif ($reason === 'NEWBORN_WITHOUT_CERTIFICATE') {
-                $rules['person.childBirthTime'] = ['required', 'date_format:H:i'];
-            } elseif ($reason === 'OTHER_HOSPITALIZATION') {
-                $rules['person.unidentifiedOtherReason'] = ['required', 'string', 'max:1000'];
-            }
-
-            if ($this->showContactPerson) {
-                $rules['person.emergencyContact.firstName'] = ['required', 'min:3', new NameFields()];
-                $rules['person.emergencyContact.lastName'] = ['required', 'min:3', new NameFields()];
-                $rules['person.emergencyContact.secondName'] = ['nullable', 'min:3', new NameFields()];
-                $rules['person.emergencyContact.phones.*.type'] = ['required', 'string', new InDictionary('PHONE_TYPE')];
-                $rules['person.emergencyContact.phones.*.number'] = ['required', 'string', 'regex:/^\+38[0-9]{10}$/'];
-            }
-
-            return $rules;
-        }
-
         $rules = [
             'person.patientType' => ['required', 'string', 'in:identified,unidentified'],
             'person.unidentifiedReason' => ['nullable', 'string', 'in:EMERGENCY_HOSPITALIZATION,POLICE_HOSPITALIZATION,NEWBORN_WITHOUT_CERTIFICATE,OTHER_HOSPITALIZATION'],
