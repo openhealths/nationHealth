@@ -420,13 +420,17 @@
     >
         <h3 class="font-bold text-sm text-gray-600 mb-6">{{ __('forms.documents_owner') }} *</h3>
 
-        <template x-for="(doc, index) in documents" :key="crypto.randomUUID()">
+        <template x-for="(doc, index) in documents" :key="index">
             <div
                 x-data="{errors: [] }"
                 x-init="errors = @js($errors->getMessages())"
                 class="mb-6"
                 :class="{ 'mb-2': index == documents.length - 1 }"
             >
+                <template x-if="index > 0">
+                    <hr class="border-gray-200 dark:border-gray-700 mb-6">
+                </template>
+
                 <div class='form-row-3'>
                     {{-- Owner Document Type --}}
                     <div class="form-group group relative z-0">
@@ -435,7 +439,7 @@
                             x-model="documents[index].type"
                             class="input-select peer"
                             :class="{ 'input-error': errors[`legalEntityForm.owner.documents.${index}.type`] }"
-                            :id="$id('document', '_type_' + index)"
+                            :id="$id('doc', '_type_' + index)"
                         >
                             <option value="_placeholder_" selected hidden>-- {{ __('Обрати тип') }} --</option>
 
@@ -454,9 +458,8 @@
                         </template>
 
                         <label
-                            :for="$id('document', '_type_' + index)"
-                            class="label
-                            z-10"
+                            :for="$id('doc', '_type_' + index)"
+                            class="label z-10 pointer-events-none"
                         >
                             {{ __('forms.document_type') }}
                         </label>
@@ -470,7 +473,7 @@
                             placeholder=" "
                             x-model="documents[index].number"
                             class="peer input"
-                            :id="$id('document', '_number' + index)"
+                            :id="$id('doc', '_number' + index)"
                             :class="{ 'input-error border-red-500': errors[`legalEntityForm.owner.documents.${index}.number`] }"
                         />
 
@@ -479,9 +482,8 @@
                         </template>
 
                         <label
-                            :for="$id('document', '_number' + index)"
-                            class="label
-                            z-10"
+                            :for="$id('doc', '_number' + index)"
+                            class="label z-10 pointer-events-none"
                         >
                             {{ __('forms.document_number') }}
                         </label>
@@ -513,7 +515,7 @@
                             placeholder=" "
                             class="input peer"
                             x-model="documents[index].issuedBy"
-                            :id="$id('document', '_issuedBy' + index)"
+                            :id="$id('doc', '_issuedBy' + index)"
                             :class="{ 'input-error border-red-500': errors[`legalEntityForm.owner.documents.${index}.issuedBy`] }"
                         />
                         <template x-if="errors[`legalEntityForm.owner.documents.${index}.issuedBy`]">
@@ -521,8 +523,8 @@
                         </template>
 
                         <label
-                            :for="$id('document', '_issuedBy' + index)"
-                            class="label z-10"
+                            :for="$id('doc', '_issuedBy' + index)"
+                            class="label z-10 pointer-events-none"
                         >
                             {{__('forms.document_issued_by')}}
                         </label>
@@ -530,7 +532,7 @@
 
                     {{-- Owner Document Issued At --}}
                     <div class="form-group group relative z-0">
-                        <svg class="svg-input" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor"
+                        <svg class="svg-input pointer-events-none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor"
                             viewBox="0 0 20 20">
                             <path
                                 d="M20 4a2 2 0 0 0-2-2h-2V1a1 1 0 0 0-2 0v1h-3V1a1 1 0 0 0-2 0v1H6V1a1 1 0 0 0-2 0v1H2a2 2 0 0 0-2 2v2h20V4ZM0 18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8H0v10Zm5-8h10a1 1 0 0 1 0 2H5a1 1 0 0 1 0-2Z" />
@@ -542,7 +544,7 @@
                             x-model="documents[index].issuedAt"
                             datepicker-format="{{ frontendDateFormat() }}"
                             class="input datepicker-input peer"
-                            :id="$id('document', '_issuedAt' + index)"
+                            :id="$id('doc', '_issuedAt' + index)"
                             :class="{ 'input-error border-red-500': errors[`legalEntityForm.owner.documents.${index}.issuedAt`] }"
                         />
 
@@ -551,8 +553,8 @@
                         </template>
 
                         <label
-                            :for="$id('document', '_issuedAt' + index)"
-                            class="label z-10"
+                            :for="$id('doc', '_issuedAt' + index)"
+                            class="label z-10 pointer-events-none"
                         >
                             {{ __('forms.document_issued_at') }}
                         </label>
