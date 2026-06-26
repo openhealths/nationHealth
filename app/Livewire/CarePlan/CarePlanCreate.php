@@ -70,7 +70,7 @@ class CarePlanCreate extends BasePatientComponent
         if ($encounterRouteParam) {
             if (\Illuminate\Support\Str::isUuid((string) $encounterRouteParam)) {
                 $resolvedEncounter = \App\Models\MedicalEvents\Sql\Encounter::where('uuid', $encounterRouteParam)->first();
-            } else if (is_numeric($encounterRouteParam)) {
+            } elseif (is_numeric($encounterRouteParam)) {
                 $resolvedEncounter = \App\Models\MedicalEvents\Sql\Encounter::where('id', (int) $encounterRouteParam)->first();
             }
             if ($resolvedEncounter) {
@@ -84,7 +84,7 @@ class CarePlanCreate extends BasePatientComponent
             $possibleEncounter = null;
             if (\Illuminate\Support\Str::isUuid((string) $personId)) {
                 $possibleEncounter = \App\Models\MedicalEvents\Sql\Encounter::where('uuid', $personId)->first();
-            } else if (is_numeric($personId)) {
+            } elseif (is_numeric($personId)) {
                 $possibleEncounter = \App\Models\MedicalEvents\Sql\Encounter::where('id', (int) $personId)->first();
             }
 
@@ -458,6 +458,7 @@ class CarePlanCreate extends BasePatientComponent
             $encounter = \App\Models\MedicalEvents\Sql\Encounter::where('uuid', $encounterUuid)->first();
             if ($encounter) {
                 $this->redirectRoute('encounter.edit', [legalEntity(), $this->personId, $encounter->id], navigate: true);
+
                 return;
             }
         }
@@ -684,6 +685,14 @@ class CarePlanCreate extends BasePatientComponent
                 'encounter_id' => $encounterData['id'] ?? null,
             ]);
 
+            if (!empty($carePlanPayload['period'])) {
+                \App\Repositories\MedicalEvents\Repository::period()->sync(
+                    $carePlan,
+                    $carePlanPayload['period'],
+                    'effectivePeriod'
+                );
+            }
+
             $this->showSignatureModal = false;
 
             // Query eHealth for the approval associated with this new care plan if not found in finalResponse
@@ -811,9 +820,9 @@ class CarePlanCreate extends BasePatientComponent
         if ($encounter) {
             $data['id'] = $encounter->id;
 
-            // Get the encounter's period start for date validation
+            // Use raw UTC value — Period cast returns Kyiv display time, not UTC.
             if ($encounter->period) {
-                $data['period_start'] = $encounter->period->start;
+                $data['period_start'] = $encounter->period->getRawOriginal('start');
             }
 
             Log::info('CarePlanCreate: resolving encounter diagnoses', [

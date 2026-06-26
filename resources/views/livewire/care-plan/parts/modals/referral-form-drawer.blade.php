@@ -106,13 +106,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                     <div class="form-group group">
                         <label class="label">Категорія направлення*</label>
-                        <select class="input-select peer w-full" wire:model="referralForm.category">
-                            <option value="procedure">Процедура (Procedure)</option>
-                            <option value="diagnostic">Діагностичне дослідження (Diagnostic)</option>
-                            <option value="education">Навчання пацієнта (Education)</option>
-                            <option value="counseling">Консультування (Counseling)</option>
-                            <option value="hospital_referral">Направлення в стаціонар (Hospital Referral)</option>
-                        </select>
+                        <input type="text" class="input bg-gray-50 dark:bg-gray-700 cursor-not-allowed" value="{{ $referralForm['category_label'] ?? $referralForm['category'] }}" disabled />
                     </div>
 
                     <div class="form-group group">
@@ -125,6 +119,13 @@
                         </select>
                     </div>
                 </div>
+
+                @if(!empty($referralSelectedActivity['program'] ?? null))
+                    <div class="form-group group mb-4">
+                        <label class="label">Медична програма</label>
+                        <input type="text" class="input bg-gray-50 dark:bg-gray-700 cursor-not-allowed" value="{{ $dictionaries['medical_programs'][$referralSelectedActivity['program']] ?? $referralSelectedActivity['program'] }}" disabled />
+                    </div>
+                @endif
             @else
                 <div class="grid grid-cols-1 gap-6 mb-4">
                     <div class="form-group group">

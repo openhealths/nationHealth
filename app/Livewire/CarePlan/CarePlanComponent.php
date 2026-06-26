@@ -15,6 +15,7 @@ use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -84,6 +85,7 @@ abstract class CarePlanComponent extends Component
     public string $referralWarningMessage = '';
     public ?string $referralRequestIdToSign = null;
     public array $activeReferrals = [];
+    public string $referralServiceCategory = '';
 
     // Search and selection parameters
     public string $searchQuery = '';
@@ -197,6 +199,10 @@ abstract class CarePlanComponent extends Component
                 $programs->filter(fn ($program) => strtoupper($program['type'] ?? '') === Type::DEVICE->value)
             )->pluck('name', 'id')->toArray() ?? [];
 
+            $this->dictionaries['medical_programs_service'] = $this->filterServicePrograms(
+                $programs->filter(fn ($program) => strtoupper($program['type'] ?? '') === Type::SERVICE->value)
+            )->pluck('name', 'id')->toArray() ?? [];
+
             $this->dictionaries['device_definition_classification_type'] = $basics->byName('device_definition_classification_type')
                 ?->asCodeDescription()
                 ?->toArray() ?? [];
@@ -219,10 +225,7 @@ abstract class CarePlanComponent extends Component
         $this->carePlanUuid = $this->carePlan->uuid;
         $this->patientId = $this->carePlan->person->uuid;
         $this->activePrescriptions = \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::whereIn('based_on_id', $this->carePlan->activities->pluck('id'))->get()->toArray();
-        $this->activeReferrals = array_merge(
-            \App\Models\MedicalEvents\Sql\ServiceRequestRequest::whereIn('based_on_id', $this->carePlan->activities->pluck('id'))->get()->toArray(),
-            \App\Models\MedicalEvents\Sql\DeviceRequestRequest::whereIn('based_on_id', $this->carePlan->activities->pluck('id'))->get()->toArray()
-        );
+        $this->loadActiveReferrals();
 
         $action = request()->query('action');
         if (in_array($action, ['cancel', 'complete'])) {
@@ -238,12 +241,16 @@ abstract class CarePlanComponent extends Component
 
     protected function rulesForSigning(): array
     {
-        $statusReasonRule = in_array($this->actionType, ['sign_activity', 'sign_plan'])
-            ? 'nullable|string'
-            : 'required|string';
+        $statusReasonOptional = in_array($this->actionType, [
+            'sign_activity',
+            'sign_plan',
+            'sign_eprescription',
+            'sign_servicerequest',
+            'sign_devicerequest',
+        ], true);
 
         return [
-            'statusReason' => $statusReasonRule,
+            'statusReason' => $statusReasonOptional ? 'nullable|string' : 'required|string',
             'form.knedp' => 'required|string',
             'form.keyContainerUpload' => 'required|file|max:1024',
             'form.password' => 'required|string',
@@ -307,10 +314,96 @@ abstract class CarePlanComponent extends Component
         $this->carePlan->refresh();
         $this->carePlan->load(['person', 'author.party', 'categoryConcept', 'activities.kindConcept.coding']);
         $this->activePrescriptions = \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::whereIn('based_on_id', $this->carePlan->activities->pluck('id'))->get()->toArray();
-        $this->activeReferrals = array_merge(
-            \App\Models\MedicalEvents\Sql\ServiceRequestRequest::whereIn('based_on_id', $this->carePlan->activities->pluck('id'))->get()->toArray(),
-            \App\Models\MedicalEvents\Sql\DeviceRequestRequest::whereIn('based_on_id', $this->carePlan->activities->pluck('id'))->get()->toArray()
-        );
+        $this->loadActiveReferrals();
+    }
+
+    protected function loadActiveReferrals(): void
+    {
+        $activityIds = $this->carePlan->activities->pluck('id');
+
+        $serviceReferrals = \App\Models\MedicalEvents\Sql\ServiceRequestRequest::query()
+            ->with('employee')
+            ->whereIn('based_on_id', $activityIds)
+            ->get()
+            ->map(fn (\App\Models\MedicalEvents\Sql\ServiceRequestRequest $record): array => $this->normalizeReferralForView($record, 'service_request'));
+
+        $deviceReferrals = \App\Models\MedicalEvents\Sql\DeviceRequestRequest::query()
+            ->with('employee')
+            ->whereIn('based_on_id', $activityIds)
+            ->get()
+            ->map(fn (\App\Models\MedicalEvents\Sql\DeviceRequestRequest $record): array => $this->normalizeReferralForView($record, 'device_request'));
+
+        $this->activeReferrals = $serviceReferrals->merge($deviceReferrals)->values()->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function normalizeReferralForView(
+        \App\Models\MedicalEvents\Sql\ServiceRequestRequest|\App\Models\MedicalEvents\Sql\DeviceRequestRequest $record,
+        string $kind
+    ): array {
+        return [
+            'uuid' => $record->uuid,
+            'kind' => $kind,
+            'based_on_id' => $record->based_on_id,
+            'status' => $record->status,
+            'status_label' => $this->resolveReferralStatusLabel((string) $record->status),
+            'request_number' => $record->request_number,
+            'quantity' => $record->quantity,
+            'started_at' => $record->started_at,
+            'ended_at' => $record->ended_at,
+            'service_id' => $record instanceof \App\Models\MedicalEvents\Sql\ServiceRequestRequest ? $record->service_id : null,
+            'device_id' => $record instanceof \App\Models\MedicalEvents\Sql\DeviceRequestRequest ? $record->device_id : null,
+            'product_code' => $record instanceof \App\Models\MedicalEvents\Sql\ServiceRequestRequest
+                ? $record->service_id
+                : ($record instanceof \App\Models\MedicalEvents\Sql\DeviceRequestRequest ? $record->device_id : null),
+            'category' => $record->category,
+            'category_label' => $this->referralCategoryLabel($record->category),
+            'priority' => $record->priority,
+            'priority_label' => $this->referralPriorityLabel($record->priority),
+            'note' => $record->note,
+            'program_id' => $record->program_id,
+            'employee_name' => $record->employee?->full_name,
+        ];
+    }
+
+    protected function resolveReferralStatusLabel(string $status): string
+    {
+        $normalized = strtolower($status);
+        $referralKey = 'care-plan.referral_status.' . $normalized;
+        if (Lang::has($referralKey)) {
+            return __($referralKey);
+        }
+
+        $statusKey = 'care-plan.status.' . $normalized;
+        if (Lang::has($statusKey)) {
+            return __($statusKey);
+        }
+
+        return $status;
+    }
+
+    protected function referralCategoryLabel(?string $category): ?string
+    {
+        if ($category === null || $category === '') {
+            return null;
+        }
+
+        $key = 'care-plan.referral_category.' . $category;
+
+        return Lang::has($key) ? __($key) : $category;
+    }
+
+    protected function referralPriorityLabel(?string $priority): ?string
+    {
+        if ($priority === null || $priority === '') {
+            return null;
+        }
+
+        $key = 'care-plan.referral_priority.' . $priority;
+
+        return Lang::has($key) ? __($key) : $priority;
     }
 
     protected function cleanCarePlanPayload(array $payload): array
@@ -354,7 +447,27 @@ abstract class CarePlanComponent extends Component
             'database_id',
         ];
 
-        return $this->cleanPayloadKeys($payload, $excludeKeys);
+        $cleaned = [];
+        foreach ($payload as $key => $value) {
+            $snakeKey = \Illuminate\Support\Str::snake($key);
+            if (in_array($snakeKey, $excludeKeys, true)) {
+                continue;
+            }
+
+            if ($snakeKey === 'author' && is_array($value)) {
+                if (isset($value[0])) {
+                    $value = $value[0];
+                }
+            }
+
+            if (is_array($value)) {
+                $cleaned[$key] = $this->cleanActivityPayload($value);
+            } else {
+                $cleaned[$key] = $value;
+            }
+        }
+
+        return $cleaned;
     }
 
     protected function cleanPayloadKeys(array $payload, array $excludeKeys): array
@@ -414,7 +527,7 @@ abstract class CarePlanComponent extends Component
             ->where('is_active', '=', true)
             ->filter(function (array $program) use ($roles, $user, $mainSpeciality): bool {
                 $allowedEmployeeTypes = Arr::get($program, 'medical_program_settings.employee_types_to_create_request', []);
-                if ($roles->intersect($allowedEmployeeTypes)->isEmpty()) {
+                if (!empty($allowedEmployeeTypes) && $roles->intersect($allowedEmployeeTypes)->isEmpty()) {
                     return false;
                 }
 
@@ -456,6 +569,42 @@ abstract class CarePlanComponent extends Component
         }
 
         return $filtered;
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $programs
+     * @return Collection<int, array<string, mixed>>
+     */
+    protected function filterServicePrograms(Collection $programs): Collection
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return $programs->where('is_active', '=', true);
+        }
+
+        $roles = $user->allowedRoles;
+        $mainSpeciality = $user->getMainSpeciality(legalEntity());
+
+        return $programs
+            ->where('is_active', '=', true)
+            ->filter(function (array $program) use ($roles, $user, $mainSpeciality): bool {
+                $allowedEmployeeTypes = Arr::get($program, 'medical_program_settings.employee_types_to_create_request', []);
+                if (!empty($allowedEmployeeTypes) && $roles->intersect($allowedEmployeeTypes)->isEmpty()) {
+                    return false;
+                }
+
+                if ($user->hasAllowedRole(Role::SPECIALIST->value) || $user->hasAllowedRole(Role::DOCTOR->value)) {
+                    $allowedSpecialities = Arr::get($program, 'medical_program_settings.speciality_types_care_plan_activity_allowed')
+                        ?? Arr::get($program, 'medical_program_settings.speciality_types_request_allowed')
+                        ?? Arr::get($program, 'medical_program_settings.speciality_types_allowed', []);
+
+                    if (!empty($allowedSpecialities)) {
+                        return $mainSpeciality->intersect($allowedSpecialities)->isNotEmpty();
+                    }
+                }
+
+                return true;
+            });
     }
 
     public function render()

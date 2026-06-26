@@ -116,11 +116,12 @@
                             <option value="">Оберіть упаковку...</option>
                             @foreach($ePrescriptionPackages as $package)
                                 @php
-                                    $value = $package['container_dosage']['value'] ?? null;
-                                    $unit = $package['container_dosage']['numerator']['unit'] ?? ($package['container_dosage']['numerator_unit'] ?? 'од.');
-                                    $code = $package['container_dosage']['code'] ?? '';
+                                    $containerDosage = $package['container_dosage'] ?? [];
+                                    $value = $containerDosage['numerator_value'] ?? ($containerDosage['value'] ?? null);
+                                    $unit = $containerDosage['numerator_unit'] ?? ($containerDosage['numerator']['unit'] ?? 'од.');
+                                    $code = $containerDosage['code'] ?? ($containerDosage['numerator_unit'] ?? '');
                                 @endphp
-                                <option value="{{ $value }}|{{ $unit }}|{{ $code }}">{{ $value }} {{ $unit }} (Код: {{ $code }})</option>
+                                <option value="{{ $value }}|{{ $unit }}|{{ $code }}">{{ $value }} {{ $unit }}@if($code) (Код: {{ $code }})@endif</option>
                             @endforeach
                         </select>
                     </div>
@@ -218,10 +219,13 @@
                     <option value="">Оберіть метод...</option>
                     @foreach($ePrescriptionAuthMethods as $method)
                         @php
+                            $methodId = $method['uuid'] ?? $method['id'] ?? '';
                             $typeLabel = $method['type'] === 'OTP' ? 'Автентифікація через СМС (OTP)' : ($method['type'] === 'THIRD_PERSON' ? 'Автентифікація через довірену особу' : 'Автентифікація через документи');
                             $valueLabel = $method['phone_number'] ?? $method['alias'] ?? '';
                         @endphp
-                        <option value="{{ $method['uuid'] }}|{{ $method['type'] }}|{{ $valueLabel }}">{{ $typeLabel }} {{ $valueLabel ? '('.$valueLabel.')' : '' }}</option>
+                        @if($methodId !== '')
+                        <option value="{{ $methodId }}|{{ $method['type'] }}|{{ $valueLabel }}">{{ $typeLabel }} {{ $valueLabel ? '('.$valueLabel.')' : '' }}</option>
+                        @endif
                     @endforeach
                 </select>
             </div>
@@ -231,7 +235,7 @@
             <button type="button" class="button-minor" @click="showEPrescriptionDrawer = false">
                 {{ __('forms.cancel') }}
             </button>
-            <button type="submit" class="button-primary" @if($ePrescriptionShowDailyDoseWarning || $ePrescriptionWarningMessage) disabled class="opacity-50 cursor-not-allowed button-primary" @endif>
+            <button type="submit" class="button-primary" @if($ePrescriptionShowDailyDoseWarning || ($ePrescriptionWarningMessage && str_contains($ePrescriptionWarningMessage, 'неможливе'))) disabled class="opacity-50 cursor-not-allowed button-primary" @endif>
                 Сформувати Заявку
             </button>
         </div>

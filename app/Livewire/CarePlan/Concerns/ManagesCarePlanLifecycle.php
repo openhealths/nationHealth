@@ -485,39 +485,28 @@ trait ManagesCarePlanLifecycle
             ]
         ];
 
-        // Fetch the original matching activity from eHealth GET details endpoint.
-        // Signing the exact returned payload ensures cryptographic match with the server database state.
-        $payloadForSign = null;
-        try {
-            $eHealthActivityResponse = EHealth::carePlanActivity()->getDetails(
-                $this->carePlan->person->uuid,
-                $this->carePlan->uuid,
-                $activity->uuid
-            );
-            $matchingActivity = $eHealthActivityResponse->getData();
-            if (isset($matchingActivity['data'])) {
-                $matchingActivity = $matchingActivity['data'];
-            }
-            if ($matchingActivity && is_array($matchingActivity)) {
-                $payloadForSign = $matchingActivity;
-                Log::info('CarePlanActivityStatus: fetched matching activity from eHealth for signing');
-            }
-        } catch (\Throwable $e) {
-            Log::warning('CarePlanActivityStatus: failed to fetch original activity from eHealth: ' . $e->getMessage());
-        }
+        // Sign the same payload shape that was used at activity creation (formatCarePlanActivityRequest),
+        // not the enriched eHealth GET response — eHealth validates against the original signed content.
+        $payloadForSign = $this->cleanActivityPayload(
+            $activityRepository->formatCarePlanActivityRequest($activity)
+        );
 
-        if (!$payloadForSign) {
-            $payloadForSign = $this->cleanActivityPayload($activityRepository->formatCarePlanActivityRequest($activity));
-            Log::info('CarePlanActivityStatus: generated base payload locally for signing');
-        }
-
-        // Inject transition fields into the signed payload. Status must remain as stored in eHealth.
         if (!isset($payloadForSign['detail'])) {
             $payloadForSign['detail'] = [];
         }
-        $payloadForSign['detail']['status_reason'] = $statusReasonCodeableConcept;
 
-        if ($this->actionType === 'complete_activity') {
+        $currentStatus = $activity->status;
+        if (strtolower((string) $currentStatus) === 'processed') {
+            $currentStatus = 'scheduled';
+        }
+        $payloadForSign['detail']['status'] = $payloadForSign['detail']['status'] ?? $currentStatus;
+        if (strtolower((string) ($payloadForSign['detail']['status'] ?? '')) === 'processed') {
+            $payloadForSign['detail']['status'] = 'scheduled';
+        }
+
+        if ($this->actionType === 'cancel_activity') {
+            $payloadForSign['detail']['status_reason'] = $statusReasonCodeableConcept;
+        } elseif ($this->actionType === 'complete_activity') {
             if ($this->outcomeCode) {
                 $payloadForSign['outcome_codeable_concept'] = [
                     'coding' => [
@@ -556,12 +545,11 @@ trait ManagesCarePlanLifecycle
             $payloadData = [
                 'signed_data' => $signedContent,
                 'signed_data_encoding' => 'base64',
-                'detail' => [
-                    'status_reason' => $statusReasonCodeableConcept,
-                ],
             ];
 
-            if ($this->actionType === 'complete_activity') {
+            if ($this->actionType === 'cancel_activity') {
+                $payloadData['status_reason'] = $statusReasonCodeableConcept;
+            } elseif ($this->actionType === 'complete_activity') {
                 if ($this->outcomeCode) {
                     $payloadData['outcome_codeable_concept'] = [
                         'coding' => [

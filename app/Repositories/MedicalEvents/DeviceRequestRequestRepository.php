@@ -74,7 +74,16 @@ class DeviceRequestRequestRepository extends BaseRepository
     {
         return (float) $this->model->newQuery()
             ->where('based_on_id', $activityId)
-            ->where('status', '!=', 'entered-in-error')
+            ->whereNotIn('status', MedicalEventsRequestStatuses::EXCLUDED_FROM_ISSUED_SUM)
             ->sum('quantity');
+    }
+
+    public function findDraftByActivity(int $activityId): ?DeviceRequestRequest
+    {
+        return $this->model->newQuery()
+            ->where('based_on_id', $activityId)
+            ->whereIn('status', ['draft', 'DRAFT'])
+            ->latest('id')
+            ->first();
     }
 }

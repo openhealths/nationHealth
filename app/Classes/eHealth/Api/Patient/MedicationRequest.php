@@ -20,9 +20,9 @@ class MedicationRequest extends PatientApiBase
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
-    public function createRequest(string $patientId, array $payload): PromiseInterface|EHealthResponse
+    public function createRequest(array $payload): PromiseInterface|EHealthResponse
     {
-        return $this->post(self::URL . "/{$patientId}/medication_request_requests", $payload);
+        return $this->post('/api/medication_request_requests', $payload);
     }
 
     /**
@@ -34,9 +34,9 @@ class MedicationRequest extends PatientApiBase
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
-    public function signRequest(string $patientId, string $requestId, array $payload): PromiseInterface|EHealthResponse
+    public function signRequest(string $requestId, array $payload): PromiseInterface|EHealthResponse
     {
-        return $this->patch(self::URL . "/{$patientId}/medication_request_requests/{$requestId}/actions/sign", $payload);
+        return $this->patch("/api/medication_request_requests/{$requestId}/actions/sign", $payload);
     }
 
     /**
@@ -96,7 +96,7 @@ class MedicationRequest extends PatientApiBase
         $this->setDefaultPageSize();
         $mergedQuery = array_merge($this->options['query'], $query);
 
-        return $this->get(self::URL . "/{$patientId}/medication_request_requests", $mergedQuery);
+        return $this->get("/api/persons/{$patientId}/medication_request_requests", $mergedQuery);
     }
 
     /**
