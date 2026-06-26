@@ -446,7 +446,7 @@
                     <div class="form-group group relative z-0">
                         <select
                             required
-                            x-model="documents[index].type"
+                            x-model="doc.type"
                             class="input-select peer"
                             :class="{ 'input-error': errors[`legalEntityForm.owner.documents.${index}.type`] }"
                             :id="$id('doc', '_type_' + index)"
@@ -481,7 +481,7 @@
                             required
                             type="text"
                             placeholder=" "
-                            x-model="documents[index].number"
+                            x-model="doc.number"
                             class="peer input"
                             :id="$id('doc', '_number' + index)"
                             :class="{ 'input-error border-red-500': errors[`legalEntityForm.owner.documents.${index}.number`] }"
@@ -524,7 +524,7 @@
                             type="text"
                             placeholder=" "
                             class="input peer"
-                            x-model="documents[index].issuedBy"
+                            x-model="doc.issuedBy"
                             :id="$id('doc', '_issuedBy' + index)"
                             :class="{ 'input-error border-red-500': errors[`legalEntityForm.owner.documents.${index}.issuedBy`] }"
                         />
@@ -551,7 +551,7 @@
                         <input
                             type="text"
                             placeholder=" "
-                            x-model="documents[index].issuedAt"
+                            x-model="doc.issuedAt"
                             datepicker-format="{{ frontendDateFormat() }}"
                             class="input datepicker-input peer"
                             :id="$id('doc', '_issuedAt' + index)"
