@@ -28,19 +28,7 @@ class PatientData extends BasePatientComponent
 
     public string $lastName;
 
-    public string $secondName;
-
-    public ?string $birthDate;
-
-    public string $gender;
-
-    public ?array $emergencyContact;
-
-    public ?string $taxId;
-
     public array $phones = [];
-
-    public bool $isReferenceMode = false;
 
     public array $confidantPersonRelationships;
 
@@ -69,17 +57,9 @@ class PatientData extends BasePatientComponent
     {
         $patient = Person::with('phones')->whereId($this->personId)->firstOrFail();
 
-        $this->isReferenceMode = request()->has('person');
-        $this->firstName       = $patient->firstName;
-        $this->lastName        = $patient->lastName;
-        $this->secondName      = $patient->secondName ?? '';
-        $this->birthDate       = $patient->birthDate
-            ? \Carbon\Carbon::parse($patient->birthDate)->format('d.m.Y')
-            : '-';
-        $this->gender          = $patient->gender;
-        $this->taxId           = $patient->taxId;
-        $this->phones          = $patient->phones->toArray();
-        $this->emergencyContact = (array) $patient->emergencyContact;
+        $this->firstName = $patient->firstName;
+        $this->lastName = $patient->lastName;
+        $this->phones = $patient->phones->toArray();
     }
 
     /**

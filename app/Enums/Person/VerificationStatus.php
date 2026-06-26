@@ -35,10 +35,10 @@ enum VerificationStatus: string
             self::VERIFIED => 'badge-green',
 
             self::CHANGES_NEEDED,
-            self::IN_REVIEW => 'badge-yellow',
+            self::IN_REVIEW,
+            self::VERIFICATION_NEEDED => 'badge-yellow',
 
-            self::NOT_VERIFIED,
-            self::VERIFICATION_NEEDED => 'badge-red',
+            self::NOT_VERIFIED => 'badge-red',
 
             self::VERIFICATION_NOT_NEEDED => 'badge-dark',
         };

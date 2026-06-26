@@ -1,6 +1,20 @@
 @use('App\Enums\Person\AuthenticationMethod')
 @use('App\Enums\Person\VerificationStatus as Status')
 
+@php
+    $isReferenceMode = request()->has('person');
+    if ($isReferenceMode) {
+        $patient = \App\Models\Person\Person::with('phones')->findOrFail($personId);
+        $emergencyContact = (array) $patient->emergencyContact;
+        $taxId = $patient->taxId;
+        $firstName = $patient->firstName;
+        $lastName = $patient->lastName;
+        $secondName = $patient->secondName;
+        $gender = $patient->gender;
+        $birthDate = $patient->birthDate ? \Carbon\Carbon::parse($patient->birthDate)->format('d.m.Y') : '-';
+    }
+@endphp
+
 <x-layouts.patient :personId="$personId" :patientFullName="$patientFullName" :title="$isReferenceMode ? 'ID ' . strtoupper($uuid) : null">
     @if($isReferenceMode)
         <div class="breadcrumb-form p-4 shift-content space-y-6" x-data="{ showCertificate: false }">
