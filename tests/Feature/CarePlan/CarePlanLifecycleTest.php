@@ -1,25 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature\CarePlan;
 
 use App\Classes\eHealth\Api\Approval;
-use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
-use App\Classes\eHealth\Api\CarePlanActivity as ActivityApi;
-use App\Classes\eHealth\EHealthResponse;
-use App\Enums\CarePlanStatus;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\Person\Person;
 use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\Employees\Sql\Employee;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
 use Mockery;
 
 use Illuminate\Support\Str;
-use App\Classes\eHealth\EHealth;
-use Illuminate\Support\Facades\Log;
 
 class CarePlanLifecycleTest extends TestCase
 {
@@ -71,14 +66,14 @@ class CarePlanLifecycleTest extends TestCase
         ]);
         $conditionCc = \App\Models\MedicalEvents\Sql\CodeableConcept::create();
         $conditionCc->save();
-        
+
         $conditionCoding = new \App\Models\MedicalEvents\Sql\Coding();
         $conditionCoding->code = 'D02';
         $conditionCoding->system = 'eHealth/ICPC2/condition_codes';
         $conditionCoding->codeable_type = \App\Models\MedicalEvents\Sql\CodeableConcept::class;
         $conditionCoding->codeable_id = $conditionCc->id;
         $conditionCoding->save();
-        
+
         $condition = \App\Models\MedicalEvents\Sql\Condition::create([
             'uuid' => $conditionIdentifier->value,
             'person_id' => $this->person->id,
@@ -89,7 +84,7 @@ class CarePlanLifecycleTest extends TestCase
             'context_id' => $identifierId,
             'onset_date' => now(),
         ]);
-        
+
         \App\Models\MedicalEvents\Sql\EncounterDiagnose::create([
             'encounter_id' => $this->encounter->id,
             'condition_id' => $conditionIdentifier->id,
@@ -97,7 +92,7 @@ class CarePlanLifecycleTest extends TestCase
             'rank' => 1
         ]);
 
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id') 
+        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
             ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = \App\Models\LegalEntity::create([
@@ -137,9 +132,9 @@ class CarePlanLifecycleTest extends TestCase
             'user_id' => $this->user->id,
             'party_id' => $this->party->id,
         ]);
-        
+
         $this->user->employees()->attach($this->employee->id);
-        
+
         if (config('permission.teams')) {
             setPermissionsTeamId($legalEntity->id);
         }
@@ -279,7 +274,7 @@ class CarePlanLifecycleTest extends TestCase
         $activitySignResponse->shouldReceive('getData')->andReturn(['id' => $activityUuid, 'status' => 'scheduled']);
         $activitySignResponse->shouldReceive('getStatusCode')->andReturn(200);
         $mockActivityApi->shouldReceive('create')->andReturn($activitySignResponse);
-        
+
         $activitySummaryResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
         $activitySummaryResponse->shouldReceive('getData')->andReturn(['data' => []]);
         $activitySummaryResponse->shouldReceive('getStatusCode')->andReturn(200);
@@ -322,7 +317,7 @@ class CarePlanLifecycleTest extends TestCase
     public function test_create_service_activity_with_linked_grounds(): void
     {
         $this->actingAs($this->user);
-        
+
         $carePlan = CarePlan::create([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
@@ -366,7 +361,7 @@ class CarePlanLifecycleTest extends TestCase
     public function test_create_medication_activity_with_program_and_linked_grounds(): void
     {
         $this->actingAs($this->user);
-        
+
         $carePlan = CarePlan::create([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
@@ -387,12 +382,22 @@ class CarePlanLifecycleTest extends TestCase
         $activityCreateResponse->shouldReceive('getStatusCode')->andReturn(201);
         $mockActivityApi->shouldReceive('create')->andReturn($activityCreateResponse);
 
+        $medicationId = '02b5e4de-22ec-429d-81f2-8faf44bd8c92';
+
         Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
             ->call('initActivityForm', 'medication_request')
             ->set('selectedProgram', 'program-id')
             ->set('activityForm.program', 'program-id')
-            ->set('selectedProduct', ['code' => 'INN-123', 'name' => 'Aspirin'])
-            ->set('activityForm.product_reference', 'INN-123')
+            ->set('selectedProduct', [
+                'id' => $medicationId,
+                'name' => 'Aspirin',
+                'ingredients' => [
+                    ['dosage' => ['denumerator_unit' => 'PIECE']],
+                ],
+            ])
+            ->set('activityForm.product_reference', $medicationId)
+            ->set('activityForm.quantity_system', 'MEDICATION_UNIT')
+            ->set('activityForm.quantity_code', 'PIECE')
             ->call('addLinkedGround', 'Condition', $condition->uuid)
             ->set('activityForm.quantity', 30)
             ->set('activityForm.daily_amount', 1.5)
@@ -403,7 +408,7 @@ class CarePlanLifecycleTest extends TestCase
 
         $this->assertDatabaseHas('care_plan_activities', [
             'care_plan_id' => $carePlan->id,
-            'product_reference' => 'INN-123',
+            'product_reference' => $medicationId,
             'program' => 'program-id',
             'quantity' => 30,
         ]);
@@ -412,7 +417,7 @@ class CarePlanLifecycleTest extends TestCase
     public function test_create_device_activity_with_positive_quantity_validation(): void
     {
         $this->actingAs($this->user);
-        
+
         $carePlan = CarePlan::create([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
@@ -431,11 +436,16 @@ class CarePlanLifecycleTest extends TestCase
         $activityCreateResponse->shouldReceive('getStatusCode')->andReturn(201);
         $mockActivityApi->shouldReceive('create')->andReturn($activityCreateResponse);
 
+        $deviceUuid = (string) Str::uuid();
+        $deviceProgram = 'c0ee515e-bdcc-4613-91cf-22d7d8e82efc';
+
         // Validation error for negative or zero quantity
         Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
             ->call('initActivityForm', 'device_request')
-            ->set('selectedProduct', ['code' => 'DEV-456', 'name' => 'Test strips'])
-            ->set('activityForm.product_reference', 'DEV-456')
+            ->set('selectedProgram', $deviceProgram)
+            ->set('activityForm.program', $deviceProgram)
+            ->set('selectedProduct', ['id' => $deviceUuid, 'code' => 'DEV-456', 'name' => 'Test strips'])
+            ->set('activityForm.product_reference', $deviceUuid)
             ->set('activityForm.quantity', -5)
             ->set('activityForm.scheduled_period_start', now()->format('d.m.Y'))
             ->set('activityForm.scheduled_period_end', now()->addDays(7)->format('d.m.Y'))
@@ -445,8 +455,10 @@ class CarePlanLifecycleTest extends TestCase
         // Success when positive integer
         Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
             ->call('initActivityForm', 'device_request')
-            ->set('selectedProduct', ['code' => 'DEV-456', 'name' => 'Test strips'])
-            ->set('activityForm.product_reference', 'DEV-456')
+            ->set('selectedProgram', $deviceProgram)
+            ->set('activityForm.program', $deviceProgram)
+            ->set('selectedProduct', ['id' => $deviceUuid, 'code' => 'DEV-456', 'name' => 'Test strips'])
+            ->set('activityForm.product_reference', $deviceUuid)
             ->set('activityForm.quantity', 10)
             ->set('activityForm.scheduled_period_start', now()->format('d.m.Y'))
             ->set('activityForm.scheduled_period_end', now()->addDays(7)->format('d.m.Y'))
@@ -455,7 +467,7 @@ class CarePlanLifecycleTest extends TestCase
 
         $this->assertDatabaseHas('care_plan_activities', [
             'care_plan_id' => $carePlan->id,
-            'product_reference' => 'DEV-456',
+            'product_reference' => $deviceUuid,
             'quantity' => 10,
         ]);
     }
@@ -463,7 +475,7 @@ class CarePlanLifecycleTest extends TestCase
     public function test_cancel_and_complete_care_plan_activity(): void
     {
         $this->actingAs($this->user);
-        
+
         $carePlan = CarePlan::create([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
@@ -497,46 +509,6 @@ class CarePlanLifecycleTest extends TestCase
         $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
 
         // 1. Test Cancel Activity
-        $activityDetailsResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
-        $activityDetailsResponse->shouldReceive('getData')->andReturn([
-            'data' => [
-                'id' => $activity->uuid,
-                'author' => [
-                    [
-                        'identifier' => [
-                            'type' => [
-                                'coding' => [
-                                    [
-                                        'system' => 'eHealth/resources',
-                                        'code' => 'employee'
-                                    ]
-                                ]
-                            ],
-                            'value' => $this->employee->uuid
-                        ]
-                    ]
-                ],
-                'care_plan' => [
-                    'identifier' => [
-                        'type' => [
-                            'coding' => [
-                                [
-                                    'system' => 'eHealth/resources',
-                                    'code' => 'care_plan'
-                                ]
-                            ]
-                        ],
-                        'value' => $carePlan->uuid
-                    ]
-                ],
-                'detail' => [
-                    'kind' => 'ServiceRequest',
-                    'status' => 'scheduled',
-                ]
-            ]
-        ]);
-        $mockActivityApi->shouldReceive('getDetails')->andReturn($activityDetailsResponse);
-
         $activityCancelResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
         $activityCancelResponse->shouldReceive('getData')->andReturn([
             'links' => [['href' => '/jobs/cancel-123']]
@@ -570,4 +542,3 @@ class CarePlanLifecycleTest extends TestCase
         ]);
     }
 }
-

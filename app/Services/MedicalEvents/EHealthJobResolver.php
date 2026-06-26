@@ -26,7 +26,8 @@ class EHealthJobResolver
                 sleep(2);
                 $finalResponse = $jobApi->getDetails($jobId)->getData();
                 $attempts++;
-            } while (($finalResponse['status'] ?? null) === 'pending' && $attempts < $maxAttempts);
+                $status = strtolower((string) ($finalResponse['status'] ?? ''));
+            } while (in_array($status, ['pending', 'processing'], true) && $attempts < $maxAttempts);
         }
 
         return $finalResponse;
@@ -35,6 +36,30 @@ class EHealthJobResolver
     /**
      * @param  array<string, mixed>  $responseData
      */
+    /**
+     * @param  array<string, mixed>  $finalResponse
+     */
+    public function assertSuccessful(array $finalResponse): void
+    {
+        $status = strtolower((string) ($finalResponse['status'] ?? ''));
+        if (!in_array($status, ['error', 'failed'], true)) {
+            return;
+        }
+
+        $error = $finalResponse['error'] ?? [];
+        if (is_array($error) && (isset($error['invalid']) || isset($error['message']))) {
+            throw new EHealthValidationException(['error' => $error]);
+        }
+
+        throw new EHealthValidationException([
+            'error' => [
+                'message' => is_string($error)
+                    ? $error
+                    : ($error['message'] ?? __('errors.ehealth.messages.request_error')),
+            ],
+        ]);
+    }
+
     public function assertPrequalifyValid(array $responseData): void
     {
         $results = $responseData['data'] ?? $responseData;

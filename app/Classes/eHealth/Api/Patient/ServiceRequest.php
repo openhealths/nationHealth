@@ -10,19 +10,13 @@ use GuzzleHttp\Promise\PromiseInterface;
 class ServiceRequest extends PatientApiBase
 {
     /**
-     * Create a Service Request Request (Заявка на направлення послуги).
+     * Create a signed Service Request in eHealth (PKCS#7).
+     *
+     * @see REST API Create Service Request [API-007-062-0002]
      */
-    public function createRequest(string $patientId, array $payload): PromiseInterface|EHealthResponse
+    public function createSigned(string $patientId, array $payload): PromiseInterface|EHealthResponse
     {
-        return $this->post(self::URL . "/{$patientId}/service_request_requests", $payload);
-    }
-
-    /**
-     * Sign a Service Request Request (Підпис заявки КЕП).
-     */
-    public function signRequest(string $patientId, string $requestId, array $payload): PromiseInterface|EHealthResponse
-    {
-        return $this->patch(self::URL . "/{$patientId}/service_request_requests/{$requestId}/actions/sign", $payload);
+        return $this->post(self::URL . "/{$patientId}/service_requests", $payload);
     }
 
     /**

@@ -364,16 +364,9 @@
                                 <tr>
                                     <td class="px-4 py-4">
                                         @php
-                                            $kindValue = '';
-                                            if ($activity->kindConcept) {
-                                                $kindValue = $activity->kindConcept->text ?? $activity->kindConcept->coding->first()?->display ?? $activity->kindConcept->coding->first()?->code ?? '';
-                                            } elseif (is_array($activity->kind)) {
-                                                $kindValue = $activity->kind['text'] ?? $activity->kind['coding'][0]['display'] ?? $activity->kind['coding'][0]['code'] ?? '';
-                                            } else {
-                                                $kindValue = $activity->kind ?? '';
-                                            }
-                                            $kindTranslationKey = 'care-plan.activity_kind.' . \Illuminate\Support\Str::snake($kindValue);
-                                            $translatedKind = \Illuminate\Support\Facades\Lang::has($kindTranslationKey) ? __($kindTranslationKey) : $kindValue;
+                                            $resolvedKind = $activity->resolvedKind();
+                                            $kindTranslationKey = 'care-plan.activity_kind.' . $resolvedKind;
+                                            $translatedKind = \Illuminate\Support\Facades\Lang::has($kindTranslationKey) ? __($kindTranslationKey) : $resolvedKind;
                                         @endphp
                                         <div class="font-medium text-gray-900 dark:text-white">{{ $translatedKind ?: '-' }}</div>
                                         <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">
@@ -407,7 +400,12 @@
                                         </span>
                                     </td>
                                     <td x-data="{ openDropdown: false }" class="px-4 py-4 text-right relative overflow-visible">
-                                        <div class="flex items-center justify-end">
+                                        <div class="flex items-center justify-end gap-2">
+                                            <a href="{{ route('care-plans.activities.show', [legalEntity(), $carePlan->id, $activity->id]) }}"
+                                               class="text-blue-600 dark:text-blue-400 text-sm hover:underline whitespace-nowrap"
+                                               wire:navigate>
+                                                Переглянути
+                                            </a>
                                             <button @click.stop="openDropdown = !openDropdown" type="button" class="cursor-pointer p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                                                 @icon('dots-vertical', 'w-5 h-5 text-gray-800 dark:text-white')
                                             </button>
@@ -436,8 +434,15 @@
                                                         Підписати призначення
                                                     </button>
                                                 </div>
-                                            @elseif(in_array(strtoupper($activityStatus), ['ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD']))
+                                            @elseif(in_array(strtoupper($activityStatus), ['ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD', 'PROCESSED']))
                                                 <div class="py-1">
+                                                    <a href="{{ route('care-plans.activities.show', [legalEntity(), $carePlan->id, $activity->id]) }}"
+                                                       @click="openDropdown = false"
+                                                       class="text-gray-700 dark:text-gray-200 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600"
+                                                       wire:navigate
+                                                    >
+                                                        Деталі та виписки
+                                                    </a>
                                                     <button type="button" 
                                                             @click="openDropdown = false" 
                                                             wire:click="openSignatureModal('cancel_activity', {{ $activity->id }})" 

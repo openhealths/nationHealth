@@ -102,12 +102,61 @@ class DeviceRequestMapper implements FhirMapperContract
      *
      * @param  array<string, mixed>  $data
      * @param  array<string, string|null>  $uuids
-     * @return array{device_request: array<string, mixed>}
+     * @return array{device_request: array<string, mixed>, programs?: list<array<string, mixed>>}
      */
     public function toPrequalifyPayload(array $data, array $uuids, string $carePlanUuid, string $activityUuid): array
     {
+        return $this->wrapDeviceRequestPayload(
+            $this->buildDeviceRequestBody($data, $uuids, $carePlanUuid, $activityUuid),
+            $data['program_id'] ?? null
+        );
+    }
+
+    /**
+     * Build payload for Create Device Request API (signed PKCS#7 content).
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string|null>  $uuids
+     * @return array{device_request: array<string, mixed>, programs?: list<array<string, mixed>>}
+     */
+    public function toCreateSignedPayload(array $data, array $uuids, string $carePlanUuid, string $activityUuid): array
+    {
+        $deviceRequest = $this->buildDeviceRequestBody($data, $uuids, $carePlanUuid, $activityUuid);
+        $deviceRequest['id'] = $data['uuid'];
+        $deviceRequest['status'] = 'active';
+
+        return $this->wrapDeviceRequestPayload($deviceRequest, $data['program_id'] ?? null);
+    }
+
+    /**
+     * Flat payload for PKCS#7 signing on Create Device Request.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string|null>  $uuids
+     * @return array<string, mixed>
+     */
+    public function toCreateSignedContent(array $data, array $uuids, string $carePlanUuid, string $activityUuid): array
+    {
+        $wrapped = $this->toCreateSignedPayload($data, $uuids, $carePlanUuid, $activityUuid);
+        $content = $wrapped['device_request'];
+        unset($content['authored_on']);
+        if (!empty($wrapped['programs'])) {
+            $content['programs'] = $wrapped['programs'];
+        }
+
+        return $content;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string|null>  $uuids
+     * @return array<string, mixed>
+     */
+    private function buildDeviceRequestBody(array $data, array $uuids, string $carePlanUuid, string $activityUuid): array
+    {
         $deviceRequest = [
             'intent' => $data['intent'] ?? 'order',
+            'priority' => $data['priority'] ?? 'routine',
             'code' => [
                 'coding' => [
                     [
@@ -122,45 +171,109 @@ class DeviceRequestMapper implements FhirMapperContract
                 'code' => 'piece',
             ],
             'encounter' => !empty($uuids['encounter_uuid'])
-                ? FhirResource::make()->coding('eHealth/resources', 'encounter')->toIdentifier($uuids['encounter_uuid'])
+                ? $this->resourceIdentifier('encounter', (string) $uuids['encounter_uuid'])
                 : null,
             'basedOn' => [
-                FhirResource::make()->coding('eHealth/resources', 'care_plan')->toIdentifier($carePlanUuid),
-                FhirResource::make()->coding('eHealth/resources', 'activity')->toIdentifier($activityUuid),
+                $this->resourceIdentifier('care_plan', $carePlanUuid),
+                $this->resourceIdentifier('activity', $activityUuid),
             ],
-            'requester' => [
-                'agent' => FhirResource::make()
-                    ->coding('eHealth/resources', 'employee')
-                    ->toIdentifier($uuids['employee_uuid']),
-                'onBehalfOf' => FhirResource::make()
-                    ->coding('eHealth/resources', 'legal_entity')
-                    ->toIdentifier($uuids['legal_entity_uuid']),
-            ],
+            'requester' => $this->resourceIdentifier('employee', (string) $uuids['employee_uuid']),
+            'authoredOn' => $this->resolveAuthoredOn(),
         ];
 
-        if (!empty($data['program_id'])) {
-            $deviceRequest['programs'] = [
-                FhirResource::make()
-                    ->coding('eHealth/resources', 'medical_program')
-                    ->toIdentifier($data['program_id']),
-            ];
+        $occurrence = $this->mapOccurrence($data);
+        if ($occurrence !== null) {
+            $deviceRequest = array_merge($deviceRequest, $occurrence);
         }
 
         if (!empty($data['supporting_info'])) {
             $deviceRequest['reason'] = [];
             foreach ($data['supporting_info'] as $ref) {
                 if (!empty($ref['uuid']) && !empty($ref['type'])) {
-                    $deviceRequest['reason'][] = FhirResource::make()
-                        ->coding('eHealth/resources', strtolower($ref['type']))
-                        ->toIdentifier($ref['uuid']);
+                    $deviceRequest['reason'][] = $this->resourceIdentifier(
+                        strtolower((string) $ref['type']),
+                        (string) $ref['uuid']
+                    );
                 }
             }
         }
 
-        $deviceRequest = array_filter($deviceRequest, static fn ($value) => $value !== null);
+        return array_filter($deviceRequest, static fn ($value) => $value !== null);
+    }
+
+    /**
+     * @return array{device_request: array<string, mixed>, programs?: list<array<string, mixed>>}
+     */
+    private function wrapDeviceRequestPayload(array $deviceRequest, ?string $programId): array
+    {
+        $payload = [
+            'device_request' => Arr::toSnakeCase($deviceRequest),
+        ];
+
+        if (!empty($programId)) {
+            $payload['programs'] = [
+                $this->resourceIdentifier('medical_program', $programId),
+            ];
+        }
+
+        return $payload;
+    }
+
+    private function resolveAuthoredOn(): string
+    {
+        return CarbonImmutable::now('UTC')->format('Y-m-d\TH:i:s.000\Z');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{occurrencePeriod: array{start: string, end: string}}|null
+     */
+    private function mapOccurrence(array $data): ?array
+    {
+        if (empty($data['started_at']) && empty($data['ended_at'])) {
+            return null;
+        }
+
+        $minStart = CarbonImmutable::now()->addHour();
+        $start = !empty($data['started_at'])
+            ? CarbonImmutable::parse($data['started_at'])
+            : $minStart;
+
+        if ($start->lessThan($minStart)) {
+            $start = $minStart;
+        }
+
+        $end = !empty($data['ended_at'])
+            ? CarbonImmutable::parse($data['ended_at'])
+            : $start->addMonths(3);
+
+        if ($end->lessThanOrEqualTo($start)) {
+            $end = $start->addDay();
+        }
 
         return [
-            'device_request' => Arr::toSnakeCase($deviceRequest),
+            'occurrencePeriod' => [
+                'start' => $start->utc()->format('Y-m-d\TH:i:s.000\Z'),
+                'end' => $end->endOfDay()->utc()->format('Y-m-d\TH:i:s.000\Z'),
+            ],
+        ];
+    }
+
+    /**
+     * @return array{identifier: array{type: array{coding: list<array<string, string>>}, value: string}}
+     */
+    private function resourceIdentifier(string $code, string $value): array
+    {
+        return [
+            'identifier' => [
+                'type' => [
+                    'coding' => [[
+                        'system' => 'eHealth/resources',
+                        'code' => $code,
+                    ]],
+                ],
+                'value' => $value,
+            ],
         ];
     }
 

@@ -142,6 +142,7 @@ class ReferralLifecycleTest extends TestCase
             'kind' => 'service_request',
             'product_reference' => '59300-00', // Diagnostic service code
             'quantity' => 5.0,
+            'program' => (string) Str::uuid(),
         ]);
 
         $this->deviceActivity = CarePlanActivity::create([
@@ -153,6 +154,25 @@ class ReferralLifecycleTest extends TestCase
             'product_reference' => 'D-707', // Assistive device code
             'quantity' => 1.0,
         ]);
+    }
+
+    private function mockActivityRegisteredInEHealth(): void
+    {
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('successful')->andReturn(true);
+        $response->shouldReceive('getData')->andReturn(['id' => (string) Str::uuid()]);
+        $mockActivityApi->shouldReceive('getDetails')->andReturn($response);
+        $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
+    }
+
+    private function mockReferralMissingInEHealth(ServiceRequestApi $mockServiceApi, string $personUuid, string $requestUuid): void
+    {
+        $missingResponse = Mockery::mock(EHealthResponse::class);
+        $missingResponse->shouldReceive('getData')->andReturn([]);
+        $mockServiceApi->shouldReceive('getById')
+            ->with($personUuid, $requestUuid)
+            ->andReturn($missingResponse);
     }
 
     public function test_can_persist_referral_requests_locally(): void
@@ -296,6 +316,8 @@ class ReferralLifecycleTest extends TestCase
             'quantity' => 1.0,
             'intent' => 'order',
             'program_id' => 'program-uuid',
+            'started_at' => '2026-06-01',
+            'ended_at' => '2026-09-01',
             'supporting_info' => [
                 ['type' => 'condition', 'uuid' => (string) Str::uuid()],
             ],
@@ -325,10 +347,104 @@ class ReferralLifecycleTest extends TestCase
         $this->assertEquals('active', $servicePrequalify['service_request']['status']);
         $this->assertEquals('59300-00', $servicePrequalify['service_request']['code']['identifier']['value']);
         $this->assertEquals($carePlanUuid, $servicePrequalify['service_request']['based_on'][0]['identifier']['value']);
+        $this->assertArrayNotHasKey('patient', $servicePrequalify['service_request']);
+        $this->assertArrayHasKey('quantity', $servicePrequalify['service_request']);
+        $this->assertArrayHasKey('programs', $servicePrequalify);
 
         $this->assertArrayHasKey('device_request', $devicePrequalify);
         $this->assertEquals('D-707', $devicePrequalify['device_request']['code']['coding'][0]['code']);
         $this->assertEquals(1, $devicePrequalify['device_request']['quantity']['value']);
+        $this->assertArrayHasKey('identifier', $devicePrequalify['device_request']['requester']);
+        $this->assertArrayNotHasKey('agent', $devicePrequalify['device_request']['requester']);
+        $this->assertArrayHasKey('authored_on', $devicePrequalify['device_request']);
+        $this->assertArrayHasKey('occurrence_period', $devicePrequalify['device_request']);
+        $this->assertArrayHasKey('programs', $devicePrequalify);
+        $this->assertArrayNotHasKey('programs', $devicePrequalify['device_request']);
+    }
+
+    public function test_can_map_to_create_signed_payloads(): void
+    {
+        $serviceMapper = new ServiceRequestMapper();
+        $deviceMapper = new DeviceRequestMapper();
+
+        $carePlanUuid = $this->serviceActivity->carePlan->uuid;
+        $requestUuid = (string) Str::uuid();
+
+        $serviceData = [
+            'uuid' => $requestUuid,
+            'service_id' => '59300-00',
+            'quantity' => 2.0,
+            'intent' => 'order',
+            'category' => 'procedure',
+            'program_id' => 'program-uuid',
+            'priority' => 'routine',
+            'started_at' => '2026-06-01',
+            'ended_at' => '2026-09-01',
+        ];
+
+        $deviceData = [
+            'uuid' => $requestUuid,
+            'device_id' => 'D-707',
+            'quantity' => 1.0,
+            'intent' => 'order',
+            'program_id' => 'program-uuid',
+            'priority' => 'urgent',
+            'started_at' => '2026-06-01',
+            'ended_at' => '2026-09-01',
+        ];
+
+        $uuids = [
+            'person_uuid' => $this->person->uuid,
+            'encounter_uuid' => $this->encounter->uuid,
+            'employee_uuid' => $this->employee->uuid,
+            'legal_entity_uuid' => $this->employee->legalEntity->uuid,
+        ];
+
+        $serviceSigned = $serviceMapper->toCreateSignedPayload(
+            $serviceData,
+            $uuids,
+            $carePlanUuid,
+            (string) $this->serviceActivity->uuid
+        );
+        $deviceSigned = $deviceMapper->toCreateSignedPayload(
+            $deviceData,
+            $uuids,
+            $carePlanUuid,
+            (string) $this->deviceActivity->uuid
+        );
+
+        $this->assertEquals($requestUuid, $serviceSigned['service_request']['id']);
+        $this->assertEquals('active', $serviceSigned['service_request']['status']);
+        $this->assertArrayHasKey('authored_on', $serviceSigned['service_request']);
+        $this->assertArrayHasKey('programs', $serviceSigned);
+
+        $this->assertEquals($requestUuid, $deviceSigned['device_request']['id']);
+        $this->assertEquals('active', $deviceSigned['device_request']['status']);
+        $this->assertArrayHasKey('authored_on', $deviceSigned['device_request']);
+        $this->assertArrayHasKey('occurrence_period', $deviceSigned['device_request']);
+        $this->assertArrayHasKey('programs', $deviceSigned);
+        $this->assertArrayNotHasKey('programs', $deviceSigned['device_request']);
+
+        $serviceSignContent = $serviceMapper->toCreateSignedContent(
+            $serviceData,
+            $uuids,
+            $carePlanUuid,
+            (string) $this->serviceActivity->uuid
+        );
+        $deviceSignContent = $deviceMapper->toCreateSignedContent(
+            $deviceData,
+            $uuids,
+            $carePlanUuid,
+            (string) $this->deviceActivity->uuid
+        );
+
+        $this->assertArrayNotHasKey('authored_on', $serviceSignContent);
+        $this->assertArrayNotHasKey('authored_on', $deviceSignContent);
+        $this->assertEquals($requestUuid, $serviceSignContent['id']);
+        $this->assertArrayNotHasKey('service_request', $serviceSignContent);
+        $this->assertArrayHasKey('requester_employee', $serviceSignContent);
+        $this->assertEquals($requestUuid, $deviceSignContent['id']);
+        $this->assertArrayNotHasKey('device_request', $deviceSignContent);
     }
 
     public function test_mock_api_create_and_sign_lifecycle(): void
@@ -350,7 +466,7 @@ class ReferralLifecycleTest extends TestCase
             'request_number' => 'SR-11112222'
         ]);
         $serviceCreateResponse->shouldReceive('getStatusCode')->andReturn(201);
-        $mockServiceApi->shouldReceive('createRequest')->once()->andReturn($serviceCreateResponse);
+        $mockServiceApi->shouldReceive('createSigned')->once()->andReturn($serviceCreateResponse);
 
         $serviceSignResponse = Mockery::mock(EHealthResponse::class);
         $serviceSignResponse->shouldReceive('getData')->andReturn([
@@ -359,22 +475,18 @@ class ReferralLifecycleTest extends TestCase
             'request_number' => 'SR-11112222'
         ]);
         $serviceSignResponse->shouldReceive('getStatusCode')->andReturn(200);
-        $mockServiceApi->shouldReceive('signRequest')->once()->andReturn($serviceSignResponse);
 
         // Assert ServiceRequest API
-        $resServiceCreate = app(ServiceRequestApi::class)->createRequest($this->person->uuid, []);
+        $resServiceCreate = app(ServiceRequestApi::class)->createSigned($this->person->uuid, []);
         $this->assertEquals(201, $resServiceCreate->getStatusCode());
         $this->assertEquals('NEW', $resServiceCreate->getData()['status']);
-
-        $resServiceSign = app(ServiceRequestApi::class)->signRequest($this->person->uuid, $serviceRequestId, []);
-        $this->assertEquals(200, $resServiceSign->getStatusCode());
-        $this->assertEquals('active', $resServiceSign->getData()['status']);
     }
 
     public function test_livewire_component_actions(): void
     {
         $carePlan = $this->serviceActivity->carePlan;
         $this->actingAs($this->user);
+        $this->mockActivityRegisteredInEHealth();
 
         $mockServiceApi = Mockery::mock(ServiceRequestApi::class);
         $this->instance(ServiceRequestApi::class, $mockServiceApi);
@@ -387,16 +499,7 @@ class ReferralLifecycleTest extends TestCase
         ]);
         $mockServiceApi->shouldReceive('prequalify')->once()->andReturn($prequalifyResponse);
 
-        $serviceRequestId = (string) Str::uuid();
-        $createResponse = Mockery::mock(EHealthResponse::class);
-        $createResponse->shouldReceive('getData')->andReturn([
-            'id' => $serviceRequestId,
-            'status' => 'NEW',
-            'request_number' => 'SR-11112222',
-        ]);
-        $mockServiceApi->shouldReceive('createRequest')->once()->andReturn($createResponse);
-
-        Livewire::test(CarePlanActivityShow::class, [
+        $component = Livewire::test(CarePlanActivityShow::class, [
             'carePlan' => $carePlan,
             'activity' => $this->serviceActivity,
         ])
@@ -409,13 +512,45 @@ class ReferralLifecycleTest extends TestCase
             ->set('referralForm.category', 'procedure')
             ->call('validateReferral')
             ->assertSet('showReferralDrawer', false)
-            ->assertSet('showSignatureModal', true)
-            ->assertSet('referralRequestIdToSign', $serviceRequestId);
+            ->assertSet('showSignatureModal', true);
+
+        $draftUuid = $component->get('referralRequestIdToSign');
+        $this->assertNotEmpty($draftUuid);
 
         $this->assertDatabaseHas('service_request_requests', [
-            'uuid' => $serviceRequestId,
-            'status' => 'NEW',
-            'request_number' => 'SR-11112222',
+            'uuid' => $draftUuid,
+            'status' => 'draft',
+            'quantity' => 3.0,
+            'based_on_id' => $this->serviceActivity->id,
+        ]);
+    }
+
+    public function test_livewire_skips_prequalify_when_activity_has_no_program(): void
+    {
+        $this->serviceActivity->update(['program' => null]);
+        $carePlan = $this->serviceActivity->carePlan;
+        $this->actingAs($this->user);
+        $this->mockActivityRegisteredInEHealth();
+
+        $mockServiceApi = Mockery::mock(ServiceRequestApi::class);
+        $this->instance(ServiceRequestApi::class, $mockServiceApi);
+
+        $mockServiceApi->shouldReceive('prequalify')->never();
+
+        $component = Livewire::test(CarePlanActivityShow::class, [
+            'carePlan' => $carePlan,
+            'activity' => $this->serviceActivity->fresh(),
+        ])
+            ->call('initReferralForm', $this->serviceActivity->id)
+            ->call('validateReferral');
+
+        $draftUuid = $component->get('referralRequestIdToSign');
+        $this->assertNotEmpty($draftUuid);
+
+        $this->assertDatabaseHas('service_request_requests', [
+            'uuid' => $draftUuid,
+            'status' => 'draft',
+            'based_on_id' => $this->serviceActivity->id,
         ]);
     }
 
@@ -510,5 +645,300 @@ class ReferralLifecycleTest extends TestCase
             'uuid' => $uuid,
             'status' => 'entered-in-error'
         ]);
+    }
+
+    public function test_sign_referral_does_not_require_status_reason(): void
+    {
+        $carePlan = $this->serviceActivity->carePlan;
+        $this->actingAs($this->user);
+        $this->mockActivityRegisteredInEHealth();
+
+        $draftUuid = (string) Str::uuid();
+        $signedUuid = (string) Str::uuid();
+        \App\Models\MedicalEvents\Sql\ServiceRequestRequest::create([
+            'uuid' => $draftUuid,
+            'employee_id' => $this->employee->id,
+            'person_id' => $this->person->id,
+            'status' => 'draft',
+            'service_id' => '59300-00',
+            'quantity' => 1.0,
+            'intent' => 'order',
+            'based_on_id' => $this->serviceActivity->id,
+            'context_id' => $this->encounter->id,
+            'priority' => 'routine',
+            'started_at' => '2026-06-01',
+            'ended_at' => '2026-09-01',
+        ]);
+
+        $mockServiceApi = Mockery::mock(ServiceRequestApi::class);
+        $createResponse = Mockery::mock(EHealthResponse::class);
+        $createResponse->shouldReceive('getData')->andReturn([
+            'id' => $signedUuid,
+            'status' => 'active',
+            'request_number' => 'SR-12345678',
+        ]);
+        $this->mockReferralMissingInEHealth($mockServiceApi, $this->person->uuid, $draftUuid);
+        $mockServiceApi->shouldReceive('createSigned')->once()->andReturn($createResponse);
+        $this->instance(ServiceRequestApi::class, $mockServiceApi);
+
+        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
+        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $mockSignatureService->shouldReceive('signData')->andReturn('mock-base64-signature');
+        $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
+
+        Livewire::test(CarePlanActivityShow::class, [
+            'carePlan' => $carePlan,
+            'activity' => $this->serviceActivity,
+        ])
+            ->call('initReferralForm', $this->serviceActivity->id)
+            ->assertSet('showSignatureModal', true)
+            ->assertSet('actionType', 'sign_servicerequest')
+            ->set('form.password', '12345678')
+            ->set('form.knedp', 'acsk_test')
+            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.dat', 10))
+            ->call('sign')
+            ->assertHasNoErrors(['statusReason'])
+            ->assertSet('showSignatureModal', false);
+
+        $this->assertDatabaseHas('service_request_requests', [
+            'uuid' => $signedUuid,
+            'employee_id' => $this->employee->id,
+            'based_on_id' => $this->serviceActivity->id,
+            'context_id' => $this->encounter->id,
+            'status' => 'active',
+            'request_number' => 'SR-12345678',
+        ]);
+    }
+
+    public function test_sign_referral_syncs_when_ehealth_reports_already_exists(): void
+    {
+        $carePlan = $this->serviceActivity->carePlan;
+        $this->actingAs($this->user);
+        $this->mockActivityRegisteredInEHealth();
+
+        $draftUuid = (string) Str::uuid();
+        \App\Models\MedicalEvents\Sql\ServiceRequestRequest::create([
+            'uuid' => $draftUuid,
+            'employee_id' => $this->employee->id,
+            'person_id' => $this->person->id,
+            'status' => 'draft',
+            'service_id' => '59300-00',
+            'quantity' => 1.0,
+            'intent' => 'order',
+            'based_on_id' => $this->serviceActivity->id,
+            'context_id' => $this->encounter->id,
+            'priority' => 'routine',
+            'started_at' => '2026-06-01',
+            'ended_at' => '2026-09-01',
+        ]);
+
+        $mockServiceApi = Mockery::mock(ServiceRequestApi::class);
+        $this->instance(ServiceRequestApi::class, $mockServiceApi);
+
+        $missingResponse = Mockery::mock(EHealthResponse::class);
+        $missingResponse->shouldReceive('getData')->andReturn([]);
+        $getResponse = Mockery::mock(EHealthResponse::class);
+        $getResponse->shouldReceive('getData')->andReturn([
+            'id' => $draftUuid,
+            'status' => 'active',
+            'request_number' => 'SR-EXISTING-99',
+            'code' => [
+                'identifier' => ['value' => '59300-00'],
+            ],
+            'quantity' => ['value' => 1.0],
+            'occurrence_period' => [
+                'start' => '2026-06-01T00:00:00Z',
+                'end' => '2026-09-01T00:00:00Z',
+            ],
+        ]);
+        $mockServiceApi->shouldReceive('getById')
+            ->with($this->person->uuid, $draftUuid)
+            ->andReturn($missingResponse, $getResponse);
+
+        $mockServiceApi->shouldReceive('createSigned')->once()->andThrow(new \App\Exceptions\EHealth\EHealthValidationException([
+            'error' => [
+                'message' => 'Validation failed.',
+                'invalid' => [
+                    [
+                        'entry' => '$.id',
+                        'rules' => [
+                            ['description' => 'Service request with such id already exists'],
+                        ],
+                    ],
+                ],
+            ],
+        ]));
+
+        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
+        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $mockSignatureService->shouldReceive('signData')->andReturn('mock-base64-signature');
+        $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
+
+        Livewire::test(CarePlanActivityShow::class, [
+            'carePlan' => $carePlan,
+            'activity' => $this->serviceActivity,
+        ])
+            ->call('initReferralForm', $this->serviceActivity->id)
+            ->set('form.password', '12345678')
+            ->set('form.knedp', 'acsk_test')
+            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.dat', 10))
+            ->call('sign')
+            ->assertSet('showSignatureModal', false);
+
+        $this->assertDatabaseHas('service_request_requests', [
+            'uuid' => $draftUuid,
+            'status' => 'active',
+            'request_number' => 'SR-EXISTING-99',
+            'employee_id' => $this->employee->id,
+        ]);
+    }
+
+    public function test_init_referral_form_syncs_draft_when_already_active_in_ehealth(): void
+    {
+        $carePlan = $this->serviceActivity->carePlan;
+        $this->actingAs($this->user);
+        $this->mockActivityRegisteredInEHealth();
+
+        $draftUuid = (string) Str::uuid();
+        \App\Models\MedicalEvents\Sql\ServiceRequestRequest::create([
+            'uuid' => $draftUuid,
+            'employee_id' => $this->employee->id,
+            'person_id' => $this->person->id,
+            'status' => 'draft',
+            'service_id' => '59300-00',
+            'quantity' => 1.0,
+            'intent' => 'order',
+            'based_on_id' => $this->serviceActivity->id,
+            'context_id' => $this->encounter->id,
+            'priority' => 'routine',
+            'started_at' => '2026-06-01',
+            'ended_at' => '2026-09-01',
+        ]);
+
+        $mockServiceApi = Mockery::mock(ServiceRequestApi::class);
+        $this->instance(ServiceRequestApi::class, $mockServiceApi);
+
+        $getResponse = Mockery::mock(EHealthResponse::class);
+        $getResponse->shouldReceive('getData')->andReturn([
+            'id' => $draftUuid,
+            'status' => 'active',
+            'request_number' => 'SR-SYNC-ON-OPEN',
+        ]);
+        $mockServiceApi->shouldReceive('getById')
+            ->with($this->person->uuid, $draftUuid)
+            ->andReturn($getResponse);
+        $mockServiceApi->shouldNotReceive('createSigned');
+
+        Livewire::test(CarePlanActivityShow::class, [
+            'carePlan' => $carePlan,
+            'activity' => $this->serviceActivity,
+        ])
+            ->call('initReferralForm', $this->serviceActivity->id)
+            ->assertSet('showSignatureModal', false);
+
+        $this->assertDatabaseHas('service_request_requests', [
+            'uuid' => $draftUuid,
+            'status' => 'active',
+            'request_number' => 'SR-SYNC-ON-OPEN',
+        ]);
+    }
+
+    public function test_active_referrals_are_normalized_for_activity_view(): void
+    {
+        $carePlan = $this->serviceActivity->carePlan;
+        $this->actingAs($this->user);
+
+        $referralUuid = (string) Str::uuid();
+        \App\Models\MedicalEvents\Sql\ServiceRequestRequest::create([
+            'uuid' => $referralUuid,
+            'employee_id' => $this->employee->id,
+            'person_id' => $this->person->id,
+            'status' => 'active',
+            'request_number' => 'SR-VIEW-001',
+            'service_id' => '59300-00',
+            'quantity' => 1.0,
+            'intent' => 'order',
+            'based_on_id' => $this->serviceActivity->id,
+            'context_id' => $this->encounter->id,
+            'priority' => 'routine',
+            'category' => 'procedure',
+            'started_at' => '2026-06-01',
+            'ended_at' => '2026-09-01',
+        ]);
+
+        $component = Livewire::test(CarePlanActivityShow::class, [
+            'carePlan' => $carePlan,
+            'activity' => $this->serviceActivity,
+        ]);
+
+        $linkedReferrals = collect($component->get('activeReferrals'))
+            ->where('based_on_id', $this->serviceActivity->id);
+
+        $this->assertCount(1, $linkedReferrals);
+        $referral = $linkedReferrals->first();
+        $this->assertSame('SR-VIEW-001', $referral['request_number']);
+        $this->assertSame('active', $referral['status']);
+        $this->assertSame('Активне', $referral['status_label']);
+        $this->assertSame('59300-00', $referral['product_code']);
+        $this->assertSame('service_request', $referral['kind']);
+    }
+
+    public function test_load_referral_printout_form_returns_html(): void
+    {
+        $carePlan = $this->serviceActivity->carePlan;
+        $this->actingAs($this->user);
+
+        $referralUuid = (string) Str::uuid();
+        \App\Models\MedicalEvents\Sql\ServiceRequestRequest::create([
+            'uuid' => $referralUuid,
+            'employee_id' => $this->employee->id,
+            'person_id' => $this->person->id,
+            'status' => 'active',
+            'request_number' => 'SR-PRINT-001',
+            'service_id' => '59300-00',
+            'quantity' => 1.0,
+            'intent' => 'order',
+            'based_on_id' => $this->serviceActivity->id,
+            'context_id' => $this->encounter->id,
+            'priority' => 'routine',
+            'started_at' => '2026-06-01',
+            'ended_at' => '2026-09-01',
+        ]);
+
+        $component = Livewire::test(CarePlanActivityShow::class, [
+            'carePlan' => $carePlan,
+            'activity' => $this->serviceActivity,
+        ])
+            ->call('loadReferralPrintoutForm', $referralUuid);
+
+        $html = $component->get('printableContent');
+
+        $this->assertIsString($html);
+        $this->assertStringContainsString('SR-PRINT-001', $html);
+        $this->assertStringContainsString('ІНФОРМАЦІЙНА ДОВІДКА НАПРАВЛЕННЯ', $html);
+    }
+
+    public function test_init_referral_form_blocks_medication_activity(): void
+    {
+        $carePlan = $this->serviceActivity->carePlan;
+        $medicationActivity = CarePlanActivity::create([
+            'uuid' => (string) Str::uuid(),
+            'care_plan_id' => $carePlan->id,
+            'author_id' => $this->employee->id,
+            'status' => 'scheduled',
+            'kind' => 'medication_request',
+            'product_reference' => '02b5e4de-22ec-429d-81f2-8faf44bd8c92',
+            'quantity' => 1.0,
+        ]);
+
+        $this->actingAs($this->user);
+
+        Livewire::test(CarePlanActivityShow::class, [
+            'carePlan' => $carePlan,
+            'activity' => $medicationActivity,
+        ])
+            ->call('initReferralForm', $medicationActivity->id)
+            ->assertSet('showReferralDrawer', false)
+            ->assertDispatched('flashMessage');
     }
 }

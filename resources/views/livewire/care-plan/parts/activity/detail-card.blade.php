@@ -1,14 +1,7 @@
 @php
-    $kindValue = '';
-    if ($activity->kindConcept) {
-        $kindValue = $activity->kindConcept->text ?? $activity->kindConcept->coding->first()?->display ?? $activity->kindConcept->coding->first()?->code ?? '';
-    } elseif (is_array($activity->kind)) {
-        $kindValue = $activity->kind['text'] ?? $activity->kind['coding'][0]['display'] ?? $activity->kind['coding'][0]['code'] ?? '';
-    } else {
-        $kindValue = $activity->kind ?? '';
-    }
-    $kindTranslationKey = 'care-plan.activity_kind.' . \Illuminate\Support\Str::snake($kindValue);
-    $translatedKind = \Illuminate\Support\Facades\Lang::has($kindTranslationKey) ? __($kindTranslationKey) : $kindValue;
+    $resolvedKind = $activity->resolvedKind();
+    $kindTranslationKey = 'care-plan.activity_kind.' . $resolvedKind;
+    $translatedKind = \Illuminate\Support\Facades\Lang::has($kindTranslationKey) ? __($kindTranslationKey) : $resolvedKind;
 
     $activityStatus = is_array($activity->status) ? ($activity->status['coding'][0]['code'] ?? ($activity->status['text'] ?? '')) : $activity->status;
     $statusKey = 'care-plan.status.' . strtolower($activityStatus);

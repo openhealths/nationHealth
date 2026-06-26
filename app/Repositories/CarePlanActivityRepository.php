@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Classes\eHealth\EHealth;
+use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Services\MedicalEvents\Fhir;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -36,7 +38,10 @@ class CarePlanActivityRepository
     public function updateById(int $id, array $data): bool
     {
         $activity = CarePlanActivity::find($id);
-        if (!$activity) return false;
+        if (!$activity) {
+            return false;
+        }
+
         return $activity->update($data);
     }
 
@@ -66,19 +71,85 @@ class CarePlanActivityRepository
         return $code;
     }
 
+    /**
+     * eHealth expects integer quantity for device requests, decimal for service/medication.
+     */
+    private function formatQuantityValueForKind(mixed $value, string $kind): int|float
+    {
+        if (str_contains(strtolower($kind), 'device')) {
+            return (int) $value;
+        }
+
+        return (float) $value;
+    }
+
+    private function formatScheduledPeriodStart(CarePlanActivity $activity, mixed $startDate, mixed $scheduledPeriod): ?string
+    {
+        if (empty($startDate)) {
+            return null;
+        }
+
+        if ($activity->uuid && $scheduledPeriod) {
+            return \Carbon\Carbon::parse($startDate, 'UTC')->utc()->toIso8601ZuluString();
+        }
+
+        $startCarbon = \Carbon\Carbon::parse($startDate);
+        $status = strtolower((string) ($activity->status ?? ''));
+        $isDraft = $status === '' || $status === 'draft';
+
+        if ($isDraft || $startCarbon->isToday()) {
+            $time = now()->format('H:i:s');
+        } else {
+            $time = '12:00:00';
+        }
+
+        $formattedStart = convertToEHealthISO8601($startCarbon->format('Y-m-d') . ' ' . $time);
+
+        return $this->clipScheduledStartToCarePlanPeriod($activity, $formattedStart);
+    }
+
+    private function clipScheduledStartToCarePlanPeriod(CarePlanActivity $activity, string $formattedStart): string
+    {
+        $activity->loadMissing('carePlan.effectivePeriod');
+        $carePlan = $activity->carePlan;
+        if (!$carePlan) {
+            return $formattedStart;
+        }
+
+        $planStart = app(CarePlanRepository::class)->resolveEHealthPeriodBounds($carePlan)['start'];
+        if (!$planStart) {
+            return $formattedStart;
+        }
+
+        $activityStart = \Carbon\Carbon::parse($formattedStart)->utc();
+        if ($activityStart->lt($planStart)) {
+            $nowUtc = now()->utc();
+
+            return ($nowUtc->lt($planStart) ? $planStart : $nowUtc)->toIso8601ZuluString();
+        }
+
+        return $formattedStart;
+    }
+
     public function formatCarePlanActivityRequest(CarePlanActivity $activity): array
     {
+        $kindLower = strtolower((string) $activity->kind);
+        $isDevice = str_contains($kindLower, 'device');
+
         $productReference = null;
-        if (!empty($activity->product_reference)) {
-            $kindLower = strtolower($activity->kind);
+        $productCodeableConcept = null;
+
+        if ($isDevice) {
+            $deviceProduct = $this->resolveDeviceProductFields($activity);
+            $productReference = $deviceProduct['product_reference'];
+            $productCodeableConcept = $deviceProduct['product_codeable_concept'];
+        } elseif (!empty($activity->product_reference)) {
             if (str_contains($kindLower, 'service')) {
                 $code = 'service';
             } elseif (str_contains($kindLower, 'medication')) {
                 $code = 'medication';
-            } elseif (str_contains($kindLower, 'device')) {
-                $code = 'device_definition';
             } else {
-                $code = 'service'; // fallback
+                $code = 'service';
             }
 
             $productReference = [
@@ -87,12 +158,12 @@ class CarePlanActivityRepository
                         'coding' => [
                             [
                                 'system' => 'eHealth/resources',
-                                'code' => $code
-                            ]
-                        ]
+                                'code' => $code,
+                            ],
+                        ],
                     ],
-                    'value' => $activity->product_reference
-                ]
+                    'value' => $activity->product_reference,
+                ],
             ];
         }
 
@@ -116,20 +187,7 @@ class CarePlanActivityRepository
         $startDate = $scheduledPeriod ? $scheduledPeriod->getRawOriginal('start') : $activity->scheduled_period_start;
         $endDate = $scheduledPeriod ? $scheduledPeriod->getRawOriginal('end') : $activity->scheduled_period_end;
 
-        $formattedStart = null;
-        if ($startDate) {
-            if ($activity->uuid && $scheduledPeriod) {
-                $formattedStart = \Carbon\Carbon::parse($startDate, 'UTC')->utc()->toIso8601ZuluString();
-            } else {
-                $startCarbon = \Carbon\Carbon::parse($startDate);
-                if ($activity->uuid && $activity->created_at) {
-                    $time = $activity->created_at->format('H:i:s');
-                } else {
-                    $time = $startCarbon->isToday() ? now()->format('H:i:s') : '12:00:00';
-                }
-                $formattedStart = convertToEHealthISO8601($startCarbon->format('Y-m-d') . ' ' . $time);
-            }
-        }
+        $formattedStart = $this->formatScheduledPeriodStart($activity, $startDate, $scheduledPeriod);
 
         $formattedEnd = null;
         if ($endDate) {
@@ -143,6 +201,7 @@ class CarePlanActivityRepository
 
         // For non-medication requests, eHealth does not allow daily_amount system/code to be set
         $isMedication = str_contains(strtolower($activity->kind), 'medication');
+        $kind = (string) $activity->kind;
 
         return removeEmptyKeys([
             'id' => $activity->uuid,
@@ -178,24 +237,25 @@ class CarePlanActivityRepository
                 'do_not_perform' => (bool)$activity->do_not_perform,
                 'description' => $activity->description ?: null,
                 'product_reference' => $productReference,
+                'product_codeable_concept' => $productCodeableConcept,
                 'scheduled_period' => removeEmptyKeys([
                     'start' => $formattedStart,
                     'end' => $formattedEnd,
                 ]),
                 'quantity' => $quantityValue ? removeEmptyKeys([
-                    'value' => (float)$quantityValue,
+                    'value' => $this->formatQuantityValueForKind($quantityValue, $kind),
                     'system' => $quantitySystem,
                     'code' => $quantityNormalizedCode,
                     'unit' => $quantityUnit ?: null,
                 ]) : null,
                 'daily_amount' => $dailyAmountValue ? removeEmptyKeys([
-                    'value' => (float)$dailyAmountValue,
+                    'value' => $this->formatQuantityValueForKind($dailyAmountValue, $kind),
                     'system' => $isMedication ? $dailyAmountSystem : null,
                     'code' => $isMedication ? $dailyAmountNormalizedCode : null,
                     'unit' => $isMedication ? ($dailyAmountUnit ?: null) : null,
                 ]) : null,
                 'reason_code' => $activity->reason_code ? [['coding' => [['code' => $activity->reason_code]]]] : null,
-                'reason_reference' => !empty($activity->reason_reference) ? array_map(function($r) {
+                'reason_reference' => !empty($activity->reason_reference) ? array_map(function ($r) {
                     $parts = explode('/', $r);
                     if (count($parts) === 2) {
                         $type = strtolower($parts[0]);
@@ -204,6 +264,7 @@ class CarePlanActivityRepository
                         $type = 'condition';
                         $uuid = $r;
                     }
+
                     return [
                         'identifier' => [
                             'type' => [
@@ -218,7 +279,7 @@ class CarePlanActivityRepository
                         ]
                     ];
                 }, $activity->reason_reference) : null,
-                'goal' => !empty($activity->goal) ? array_map(fn($g) => [
+                'goal' => !empty($activity->goal) ? array_map(fn ($g) => [
                     'coding' => [
                         [
                             'system' => 'eHealth/care_plan_activity_goals',
@@ -243,10 +304,163 @@ class CarePlanActivityRepository
         ]);
     }
 
+    /**
+     * @return array{product_reference: ?array<string, mixed>, product_codeable_concept: ?array<string, mixed>}
+     */
+    private function resolveDeviceProductFields(CarePlanActivity $activity): array
+    {
+        $allowedCodeTypes = $this->getDeviceRequestAllowedCodeTypes($activity->program);
+        $allowsClassification = in_array('CLASSIFICATION_TYPE', $allowedCodeTypes, true);
+        $allowsDeviceDefinition = in_array('DEVICE_DEFINITION', $allowedCodeTypes, true);
+        $reference = $activity->product_reference;
+        $isDeviceDefinitionUuid = is_string($reference)
+            && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-/i', $reference) === 1;
+
+        if (!empty($allowedCodeTypes)) {
+            if ($allowsClassification && !$allowsDeviceDefinition && !empty($activity->product_codeable_concept)) {
+                return [
+                    'product_reference' => null,
+                    'product_codeable_concept' => $this->formatDeviceClassificationConcept($activity->product_codeable_concept),
+                ];
+            }
+
+            if ($allowsDeviceDefinition && $isDeviceDefinitionUuid) {
+                return [
+                    'product_reference' => $this->formatDeviceDefinitionReference($reference),
+                    'product_codeable_concept' => null,
+                ];
+            }
+
+            if ($allowsClassification && !empty($activity->product_codeable_concept)) {
+                return [
+                    'product_reference' => null,
+                    'product_codeable_concept' => $this->formatDeviceClassificationConcept($activity->product_codeable_concept),
+                ];
+            }
+        }
+
+        if (!empty($activity->product_codeable_concept)) {
+            return [
+                'product_reference' => null,
+                'product_codeable_concept' => $this->formatDeviceClassificationConcept($activity->product_codeable_concept),
+            ];
+        }
+
+        if ($isDeviceDefinitionUuid) {
+            return [
+                'product_reference' => $this->formatDeviceDefinitionReference($reference),
+                'product_codeable_concept' => null,
+            ];
+        }
+
+        return [
+            'product_reference' => null,
+            'product_codeable_concept' => null,
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function getDeviceRequestAllowedCodeTypes(?string $programId): array
+    {
+        if (empty($programId)) {
+            return [];
+        }
+
+        try {
+            $program = dictionary()->medicalPrograms()->firstWhere('id', $programId);
+            $types = $program['medical_program_settings']['device_request_allowed_code_types'] ?? [];
+
+            return is_array($types) ? $types : [];
+        } catch (\Exception) {
+            return [];
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function formatDeviceClassificationConcept(string $code): array
+    {
+        return [
+            'coding' => [
+                [
+                    'system' => 'device_definition_classification_type',
+                    'code' => $code,
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function formatDeviceDefinitionReference(string $uuid): array
+    {
+        return [
+            'identifier' => [
+                'type' => [
+                    'coding' => [
+                        [
+                            'system' => 'eHealth/resources',
+                            'code' => 'device_definition',
+                        ],
+                    ],
+                ],
+                'value' => $uuid,
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, string|null>  $uuids
+     * @return array{device_request: array<string, mixed>}
+     */
+    public function buildDevicePrequalifyPayload(CarePlanActivity $activity, CarePlan $carePlan, array $uuids): array
+    {
+        $formatted = $this->formatCarePlanActivityRequest($activity);
+        $detail = $formatted['detail'] ?? [];
+
+        $deviceId = $detail['product_codeable_concept']['coding'][0]['code']
+            ?? $detail['product_reference']['identifier']['value']
+            ?? null;
+
+        if (empty($deviceId)) {
+            throw new \InvalidArgumentException('Device product is required for prequalify.');
+        }
+
+        $supportingInfo = [];
+        foreach ($activity->reason_reference ?? [] as $reference) {
+            if (!is_string($reference)) {
+                continue;
+            }
+
+            $parts = explode('/', $reference);
+            if (count($parts) === 2) {
+                $supportingInfo[] = ['type' => $parts[0], 'uuid' => $parts[1]];
+            }
+        }
+
+        return Fhir::deviceRequest()->toPrequalifyPayload(
+            [
+                'device_id' => $deviceId,
+                'quantity' => $activity->quantity,
+                'program_id' => $activity->program,
+                'intent' => 'order',
+                'supporting_info' => $supportingInfo,
+            ],
+            $uuids,
+            (string) $carePlan->uuid,
+            (string) $activity->uuid,
+        );
+    }
+
     public function syncActivities(\App\Models\Person\Person $person, \App\Models\CarePlan $carePlan, array $query = []): void
     {
         if (empty($carePlan->uuid)) {
             \Illuminate\Support\Facades\Log::warning('CarePlanActivityRepository: sync skipped because CarePlan UUID is missing');
+
             return;
         }
 
@@ -263,6 +477,7 @@ class CarePlanActivityRepository
 
         if (!is_array($activities)) {
             \Illuminate\Support\Facades\Log::warning('CarePlanActivityRepository: sync skipped because data is not an array', ['data' => $data]);
+
             return;
         }
 
@@ -513,5 +728,78 @@ class CarePlanActivityRepository
                 }
             });
         }
+    }
+
+    /**
+     * Prepare eHealth activity details for cancel/complete PKCS#7 signing.
+     * Strips read-only fields that are not part of the originally created activity payload.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function normalizeEHealthActivityForSigning(array $payload): array
+    {
+        $excludeKeys = [
+            'remaining_quantity',
+            'remaining_quantity_type',
+            'inserted_at',
+            'inserted_by',
+            'updated_at',
+            'updated_by',
+            'status_history',
+            'database_id',
+            'display_value',
+            'links',
+            'urgent',
+            'ehealth_inserted_at',
+            'ehealth_updated_at',
+            'ehealth_inserted_by',
+        ];
+
+        $normalized = $this->stripActivityPayloadKeys($payload, $excludeKeys);
+
+        if (isset($normalized['author']) && is_array($normalized['author']) && isset($normalized['author'][0])) {
+            $normalized['author'] = $normalized['author'][0];
+        }
+
+        return removeEmptyKeys($normalized);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  list<string>  $excludeKeys
+     * @return array<string, mixed>
+     */
+    private function stripActivityPayloadKeys(array $payload, array $excludeKeys): array
+    {
+        $cleaned = [];
+
+        foreach ($payload as $key => $value) {
+            $snakeKey = \Illuminate\Support\Str::snake($key);
+            if (in_array($snakeKey, $excludeKeys, true)) {
+                continue;
+            }
+
+            if ($value === null) {
+                continue;
+            }
+
+            if (is_array($value)) {
+                if ($value === []) {
+                    continue;
+                }
+
+                $nested = $this->stripActivityPayloadKeys($value, $excludeKeys);
+                if ($nested !== []) {
+                    $cleaned[$key] = $nested;
+                }
+
+                continue;
+            }
+
+            $cleaned[$key] = $value;
+        }
+
+        return $cleaned;
     }
 }
