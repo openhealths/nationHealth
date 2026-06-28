@@ -165,17 +165,17 @@
                                                     </div>
                                                 </div>
 
-                                                <template
-                                                    x-if="method.type === '{{ AuthenticationMethod::OTP->value }}'">
-                                                    <button
-                                                        class="button-primary whitespace-nowrap"
-                                                        @click="selectedMethod = method.id || method.uuid; localStep = {{ AuthStep::ASK_OTP_PERMISSION }}"
-                                                    >
-                                                        {{ __('forms.select') }}
-                                                    </button>
-                                                </template>
-
                                                 @unless($this instanceof PatientData)
+                                                    <template
+                                                        x-if="method.type === '{{ AuthenticationMethod::OTP->value }}'">
+                                                        <button
+                                                            class="button-primary whitespace-nowrap"
+                                                            @click="selectedMethod = method.id || method.uuid; localStep = {{ AuthStep::ASK_OTP_PERMISSION }}"
+                                                        >
+                                                            {{ __('forms.select') }}
+                                                        </button>
+                                                    </template>
+
                                                     <template
                                                         x-if="method.type !== '{{ AuthenticationMethod::OTP->value }}'">
                                                         <button
