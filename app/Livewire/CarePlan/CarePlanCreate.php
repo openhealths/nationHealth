@@ -21,6 +21,7 @@ use App\Models\Person\Person;
 use App\Models\LegalEntity;
 use Livewire\WithFileUploads;
 use App\Livewire\CarePlan\Forms\CarePlanForm;
+use App\Livewire\CarePlan\Forms\PatientSearchForm;
 use App\Enums\CarePlanStatus;
 
 class CarePlanCreate extends BasePatientComponent
@@ -38,10 +39,14 @@ class CarePlanCreate extends BasePatientComponent
     // Care Plan form data
     public CarePlanForm $form;
 
+    public PatientSearchForm $patientSearch;
+
     public array $categories = [];
     public array $diagnoses = [];
     public array $authMethods = [];
-    public array $patientSuggestions = [];
+    public array $patientSearchResults = [];
+    public bool $allowsPatientChange = false;
+    public bool $showAdditionalSearchParams = false;
     public ?array $dictionaries = [];
     public array $doctors = [];
 
@@ -61,16 +66,19 @@ class CarePlanCreate extends BasePatientComponent
 
     public function mount(LegalEntity $legalEntity, $personId = null, $encounter = null): void
     {
+        $routePersonId = request()->route('personId');
+        $encounterRouteParam = request()->route('encounter') ?? request()->query('encounter') ?? request()->query('encounterId');
+        $this->allowsPatientChange = empty($routePersonId) && empty($encounterRouteParam);
+
         $resolvedPersonId = null;
         $resolvedEncounter = null;
 
         // Try to resolve encounter from route parameters, query string or sequence-passed personId
-        $encounterRouteParam = request()->route('encounter') ?? request()->query('encounter') ?? request()->query('encounterId');
 
         if ($encounterRouteParam) {
             if (\Illuminate\Support\Str::isUuid((string) $encounterRouteParam)) {
                 $resolvedEncounter = \App\Models\MedicalEvents\Sql\Encounter::where('uuid', $encounterRouteParam)->first();
-            } else if (is_numeric($encounterRouteParam)) {
+            } elseif (is_numeric($encounterRouteParam)) {
                 $resolvedEncounter = \App\Models\MedicalEvents\Sql\Encounter::where('id', (int) $encounterRouteParam)->first();
             }
             if ($resolvedEncounter) {
@@ -84,7 +92,7 @@ class CarePlanCreate extends BasePatientComponent
             $possibleEncounter = null;
             if (\Illuminate\Support\Str::isUuid((string) $personId)) {
                 $possibleEncounter = \App\Models\MedicalEvents\Sql\Encounter::where('uuid', $personId)->first();
-            } else if (is_numeric($personId)) {
+            } elseif (is_numeric($personId)) {
                 $possibleEncounter = \App\Models\MedicalEvents\Sql\Encounter::where('id', (int) $personId)->first();
             }
 
@@ -96,8 +104,16 @@ class CarePlanCreate extends BasePatientComponent
             }
         }
 
-        $this->personId = (int) $resolvedPersonId;
-        parent::mount($legalEntity, $this->personId);
+        $this->personId = (int) ($resolvedPersonId ?? 0);
+
+        if ($this->personId > 0) {
+            parent::mount($legalEntity, $this->personId);
+        } else {
+            $this->patientFullName = __('care-plan.new_care_plan');
+            $this->verificationStatus = '';
+            $this->uuid = '';
+            $this->declarationNumber = null;
+        }
 
         $person = Person::find($this->personId);
         if ($person) {
@@ -117,19 +133,11 @@ class CarePlanCreate extends BasePatientComponent
                     'label' => $m->label(),
                 ])->toArray();
             }
+        } else {
+            $this->form->medical_number = (string) ((CarePlan::max('id') ?? 0) + 1);
         }
 
-        // Load only encounters that have been confirmed by eHealth (have ehealth_inserted_at)
-        $this->availableEncounters = \App\Models\MedicalEvents\Sql\Encounter::where('person_id', $this->personId)
-            ->whereNotNull('ehealth_inserted_at')
-            ->where('status', 'finished')
-            ->orderBy('ehealth_inserted_at', 'desc')
-            ->get(['id', 'uuid', 'status', 'ehealth_inserted_at'])
-            ->map(fn ($e) => [
-                'uuid' => $e->uuid,
-                'label' => 'Взаємодія #' . $e->id . ' (' . ($e->ehealth_inserted_at ? \Carbon\Carbon::parse($e->ehealth_inserted_at)->format('d.m.Y') : '-') . ')',
-            ])
-            ->toArray();
+        $this->loadAvailableEncounters();
 
         $this->conditionUuid = request()->query('conditionUuid', '');
 
@@ -218,52 +226,107 @@ class CarePlanCreate extends BasePatientComponent
     }
 
     /**
-     * Search for patients as the user types.
+     * Search for a patient in the local registry (same criteria as the patients page).
      */
-    public function updatedFormPatient(string $value): void
+    public function searchForPatient(): void
     {
-        if (strlen($value) < 3) {
-            $this->patientSuggestions = [];
+        try {
+            $validated = $this->patientSearch->validate();
+        } catch (ValidationException $exception) {
+            Session::flash('error', $exception->validator->errors()->first());
+            $this->setErrorBag($exception->validator->getMessageBag());
 
             return;
         }
 
-        $this->patientSuggestions = \App\Models\Person\Person::query()
-            ->where('last_name', 'like', "%{$value}%")
-            ->orWhere('first_name', 'like', "%{$value}%")
-            ->orWhere('tax_id', 'like', "%{$value}%")
-            ->limit(5)
-            ->get()
-            ->map(fn ($p) => [
-                'uuid' => $p->uuid,
-                'name' => trim($p->last_name . ' ' . $p->first_name . ' ' . ($p->second_name ?? '')),
-                'tax_id' => $p->tax_id,
+        $firstName = $validated['firstName'];
+        $lastName = $validated['lastName'];
+        $birthDate = convertToYmd($validated['birthDate']);
+
+        $this->patientSearchResults = Person::query()
+            ->where('birth_date', $birthDate)
+            ->where(function ($query) use ($firstName, $lastName) {
+                $query->where(function ($query) use ($firstName, $lastName) {
+                    $query->where('first_name', $firstName)
+                        ->where('last_name', $lastName);
+                })->orWhere(function ($query) use ($firstName, $lastName) {
+                    $query->where('first_name', $lastName)
+                        ->where('last_name', $firstName);
+                });
+            })
+            ->get(['id', 'uuid', 'first_name', 'last_name', 'second_name', 'birth_date'])
+            ->map(fn (Person $person) => [
+                'id' => $person->id,
+                'uuid' => $person->uuid,
+                'name' => $person->fullName,
+                'birthDate' => $person->birth_date
+                    ? \Carbon\Carbon::parse($person->birth_date)->format(config('app.date_format'))
+                    : '-',
             ])
+            ->values()
             ->toArray();
+
+        if ($this->patientSearchResults === []) {
+            Session::flash('error', __('patients.nobody_found') . '. ' . __('patients.try_change_search_parameters'));
+        }
     }
 
     /**
-     * Select a patient from the suggestions.
+     * Select a patient from the search results.
      */
-    public function selectPatient(string $uuid, string $name): void
+    public function selectPatient(int $personId): void
     {
-        $this->patientUuid = $uuid;
-        $this->form->patient = $name;
-        $this->patientSuggestions = [];
+        $person = Person::query()
+            ->with(['declarations' => fn ($declaration) => $declaration->active()->latest()->take(1)])
+            ->findOrFail($personId);
 
-        $person = \App\Models\Person\Person::where('uuid', $uuid)->first();
-        if ($person) {
-            try {
-                $this->authMethods = EHealth::person()->getAuthMethods($uuid)->getData();
-            } catch (\Exception $e) {
-                $this->authMethods = collect(\App\Enums\Person\AuthenticationMethod::cases())->map(fn ($m) => [
-                    'id' => (string) \Illuminate\Support\Str::uuid(),
-                    'uuid' => (string) \Illuminate\Support\Str::uuid(),
-                    'type' => $m->value,
-                    'label' => $m->label(),
-                ])->toArray();
-            }
+        $this->personId = $person->id;
+        $this->uuid = $person->uuid;
+        $this->patientUuid = $person->uuid;
+        $this->patientFullName = $person->fullName;
+        $this->verificationStatus = $person->verificationStatus;
+        $this->declarationNumber = $person->declarations->first()?->declarationNumber ?? null;
+
+        $birthDate = $person->birth_date
+            ? \Carbon\Carbon::parse($person->birth_date)->format(config('app.date_format'))
+            : null;
+        $this->form->patient = trim($person->fullName . ($birthDate ? ' · ' . $birthDate : ''));
+        $this->form->medical_number = (string) ((CarePlan::max('id') ?? 0) + 1);
+        $this->form->encounter = '';
+        $this->diagnoses = [];
+        $this->patientSearchResults = [];
+        $this->loadAvailableEncounters();
+
+        try {
+            $this->authMethods = EHealth::person()->getAuthMethods($person->uuid)->getData();
+        } catch (\Exception $e) {
+            $this->authMethods = collect(\App\Enums\Person\AuthenticationMethod::cases())->map(fn ($m) => [
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'uuid' => (string) \Illuminate\Support\Str::uuid(),
+                'type' => $m->value,
+                'label' => $m->label(),
+            ])->toArray();
         }
+    }
+
+    /**
+     * Reset patient selection and return to search mode.
+     */
+    public function clearSelectedPatient(): void
+    {
+        $this->personId = 0;
+        $this->patientUuid = '';
+        $this->uuid = '';
+        $this->patientFullName = __('care-plan.new_care_plan');
+        $this->verificationStatus = '';
+        $this->declarationNumber = null;
+        $this->form->patient = '';
+        $this->form->encounter = '';
+        $this->availableEncounters = [];
+        $this->authMethods = [];
+        $this->diagnoses = [];
+        $this->patientSearchResults = [];
+        $this->form->medical_number = (string) ((CarePlan::max('id') ?? 0) + 1);
     }
 
     /**
@@ -458,10 +521,40 @@ class CarePlanCreate extends BasePatientComponent
             $encounter = \App\Models\MedicalEvents\Sql\Encounter::where('uuid', $encounterUuid)->first();
             if ($encounter) {
                 $this->redirectRoute('encounter.edit', [legalEntity(), $this->personId, $encounter->id], navigate: true);
+
                 return;
             }
         }
-        $this->redirectRoute('persons.care-plans', [legalEntity(), $this->personId], navigate: true);
+        if ($this->personId > 0) {
+            $this->redirectRoute('persons.care-plans', [legalEntity(), $this->personId], navigate: true);
+
+            return;
+        }
+
+        $this->redirectRoute('care-plans.index', legalEntity(), navigate: true);
+    }
+
+    /**
+     * Load encounters confirmed by eHealth for the current patient.
+     */
+    protected function loadAvailableEncounters(): void
+    {
+        if ($this->personId <= 0) {
+            $this->availableEncounters = [];
+
+            return;
+        }
+
+        $this->availableEncounters = \App\Models\MedicalEvents\Sql\Encounter::where('person_id', $this->personId)
+            ->whereNotNull('ehealth_inserted_at')
+            ->where('status', 'finished')
+            ->orderBy('ehealth_inserted_at', 'desc')
+            ->get(['id', 'uuid', 'status', 'ehealth_inserted_at'])
+            ->map(fn ($e) => [
+                'uuid' => $e->uuid,
+                'label' => 'Взаємодія #' . $e->id . ' (' . ($e->ehealth_inserted_at ? \Carbon\Carbon::parse($e->ehealth_inserted_at)->format('d.m.Y') : '-') . ')',
+            ])
+            ->toArray();
     }
 
     public function updatedFormEncounter($value): void
@@ -684,6 +777,14 @@ class CarePlanCreate extends BasePatientComponent
                 'encounter_id' => $encounterData['id'] ?? null,
             ]);
 
+            if (!empty($carePlanPayload['period'])) {
+                \App\Repositories\MedicalEvents\Repository::period()->sync(
+                    $carePlan,
+                    $carePlanPayload['period'],
+                    'effectivePeriod'
+                );
+            }
+
             $this->showSignatureModal = false;
 
             // Query eHealth for the approval associated with this new care plan if not found in finalResponse
@@ -811,9 +912,9 @@ class CarePlanCreate extends BasePatientComponent
         if ($encounter) {
             $data['id'] = $encounter->id;
 
-            // Get the encounter's period start for date validation
+            // Use raw UTC value — Period cast returns Kyiv display time, not UTC.
             if ($encounter->period) {
-                $data['period_start'] = $encounter->period->start;
+                $data['period_start'] = $encounter->period->getRawOriginal('start');
             }
 
             Log::info('CarePlanCreate: resolving encounter diagnoses', [

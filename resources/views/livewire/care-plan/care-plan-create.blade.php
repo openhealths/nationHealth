@@ -1,4 +1,4 @@
-<x-layouts.patient :personId="$personId" :uuid="$uuid" :patientFullName="$patientFullName">
+<x-layouts.patient :personId="$personId" :uuid="$uuid" :patientFullName="$patientFullName" :hideNavigation="$allowsPatientChange">
     <div class="breadcrumb-form p-4 shift-content">
         <div x-data="{ activeSection: 'doctors' }" class="flex flex-col lg:flex-row gap-8 lg:gap-12">
             
