@@ -34,6 +34,13 @@ class PersonForm extends BaseForm
     public string $birthCertificate;
 
     public array $person = [
+        'patientType' => 'identified',
+        'unidentifiedReason' => 'EMERGENCY_HOSPITALIZATION',
+        'ambulanceCardNumber' => '',
+        'policeReportId' => '',
+        'policeReportDate' => '',
+        'childBirthTime' => '',
+        'unidentifiedOtherReason' => '',
         'documents' => [],
         'phones' => [['type' => null, 'number' => null]],
         'emergencyContact' => [
@@ -60,10 +67,16 @@ class PersonForm extends BaseForm
 
     public array $uploadedDocuments = [];
 
+    public bool $showContactPerson = false;
+
     private int $personAge;
 
     public function rulesForCreate(): array
     {
+        if (($this->person['patientType'] ?? 'identified') === 'unidentified') {
+            return [];
+        }
+
         $createRules = [
             'person.confidantPerson' => ['nullable', 'array'],
             'person.confidantPerson.personId' => [
@@ -141,6 +154,9 @@ class PersonForm extends BaseForm
     protected function basicRules(): array
     {
         $rules = [
+            'person.patientType' => ['required', 'string', 'in:identified,unidentified'],
+            'person.unidentifiedReason' => ['nullable', 'string', 'in:EMERGENCY_HOSPITALIZATION,POLICE_HOSPITALIZATION,NEWBORN_WITHOUT_CERTIFICATE,OTHER_HOSPITALIZATION'],
+            'person.ambulanceCardNumber' => ['nullable', 'string', 'max:255'],
             'person.firstName' => ['required', 'min:3', new NameFields()],
             'person.lastName' => ['required', 'min:3', new NameFields()],
             'person.secondName' => ['nullable', 'min:3', new NameFields()],

@@ -354,6 +354,11 @@ return [
             'noTaxId' => 'РНОКПП/ІПН відсутній',
             'taxId' => 'номер РНОКПП',
             'secret' => 'кодове слово',
+            'policeReportId' => 'ідентифікатор заяви в поліцію',
+            'policeReportDate' => 'дата подання заяви в поліцію',
+            'childBirthTime' => 'час народження дитини',
+            'unidentifiedOtherReason' => 'причини та обставини звернення пацієнта',
+            'ambulanceCardNumber' => '№ картки виїзду швидкої медичної допомоги',
 
             'emergencyContact' => [
                 'firstName' => "ім'я",

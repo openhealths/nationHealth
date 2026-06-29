@@ -27,7 +27,7 @@ return new class extends Migration
             $table->jsonb('emergency_contact')->nullable();
             $table->date('death_date')->nullable();
             $table->text('note')->nullable();
-            $table->enum('status', Status::options())->nullable();
+            $table->enum('status', Status::values())->nullable();
             $table->dateTime('ehealth_inserted_at')->nullable();
             $table->uuid('ehealth_inserted_by')->nullable();
             $table->dateTime('ehealth_updated_at')->nullable();
