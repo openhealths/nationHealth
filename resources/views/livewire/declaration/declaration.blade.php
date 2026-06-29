@@ -60,6 +60,10 @@
             @include('livewire.declaration.modals.information-message')
         @endif
 
+        @if ($isNeedToPersonUpdate)
+            @include('livewire.declaration.modals.person-missed-data-message')
+        @endif
+
         @if($showAuthModal && !$isNeedToResign)
             @include('livewire.declaration.modals.authentication')
         @endif
