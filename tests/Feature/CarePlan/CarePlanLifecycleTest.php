@@ -504,8 +504,18 @@ class CarePlanLifecycleTest extends TestCase
         $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
         $this->instance(\App\Classes\eHealth\Api\Job::class, $mockJobApi);
 
-        // Sign Mocking
-        $mockSignatureService->shouldReceive('signData')->andReturn('mock-base64-signature');
+        // Cancel signs exact creation payload; status_reason and do_not_perform go in PATCH detail
+        $mockSignatureService->shouldReceive('signData')
+            ->once()
+            ->withArgs(function (array $payload): bool {
+                $keys = array_keys($payload);
+
+                return ($keys[0] ?? null) === 'id'
+                    && ($payload['detail']['kind'] ?? null) === 'ServiceRequest'
+                    && ($payload['detail']['do_not_perform'] ?? null) === false
+                    && !array_key_exists('status_reason', $payload['detail']);
+            })
+            ->andReturn('mock-base64-signature');
         $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
 
         // 1. Test Cancel Activity
@@ -514,7 +524,13 @@ class CarePlanLifecycleTest extends TestCase
             'links' => [['href' => '/jobs/cancel-123']]
         ]);
         $activityCancelResponse->shouldReceive('getStatusCode')->andReturn(202);
-        $mockActivityApi->shouldReceive('cancel')->once()->andReturn($activityCancelResponse);
+        $mockActivityApi->shouldReceive('cancel')
+            ->once()
+            ->withArgs(function (string $personUuid, string $planUuid, string $activityUuid, array $payload): bool {
+                return isset($payload['detail']['status_reason']['coding'][0]['code'])
+                    && array_key_exists('do_not_perform', $payload['detail']);
+            })
+            ->andReturn($activityCancelResponse);
 
         $cancelJobResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
         $cancelJobResponse->shouldReceive('getData')->andReturn([
@@ -540,5 +556,202 @@ class CarePlanLifecycleTest extends TestCase
             'id' => $activity->id,
             'status' => 'cancelled',
         ]);
+    }
+
+    public function test_init_medication_activity_form_sets_default_program_for_search(): void
+    {
+        $this->actingAs($this->user);
+
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'Program Default Plan',
+            'status' => 'draft',
+        ]);
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->call('initActivityForm', 'medication_request')
+            ->assertSet('selectedProgram', '1318eabc-1a1a-42f6-8450-61e11c19eede')
+            ->assertSet('activityForm.program', '1318eabc-1a1a-42f6-8450-61e11c19eede');
+    }
+
+    public function test_init_device_activity_form_prefers_default_device_program(): void
+    {
+        $this->actingAs($this->user);
+
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'Device Program Default Plan',
+            'status' => 'draft',
+        ]);
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->call('initActivityForm', 'device_request')
+            ->assertSet('selectedProgram', '85953838-1834-4ed6-8bf4-3f83057380ec')
+            ->assertSet('activityForm.program', '85953838-1834-4ed6-8bf4-3f83057380ec');
+    }
+
+    public function test_draft_activity_can_be_deleted(): void
+    {
+        $this->actingAs($this->user);
+
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'Delete Draft Plan',
+            'status' => 'draft',
+        ]);
+
+        $activity = CarePlanActivity::create([
+            'care_plan_id' => $carePlan->id,
+            'author_id' => $this->employee->id,
+            'status' => 'draft',
+            'kind' => 'medication_request',
+            'product_reference' => '008d4cbd-beb0-4e56-8b3a-5e472c54d93b',
+            'program' => '1318eabc-1a1a-42f6-8450-61e11c19eede',
+            'scheduled_period_start' => now()->format('Y-m-d'),
+            'scheduled_period_end' => now()->addWeek()->format('Y-m-d'),
+        ]);
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->call('deleteActivity', $activity->id);
+
+        $this->assertDatabaseMissing('care_plan_activities', ['id' => $activity->id]);
+    }
+
+    public function test_scheduled_activity_cannot_be_deleted(): void
+    {
+        $this->actingAs($this->user);
+
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'No Delete Scheduled Plan',
+            'status' => 'active',
+        ]);
+
+        $activity = CarePlanActivity::create([
+            'care_plan_id' => $carePlan->id,
+            'author_id' => $this->employee->id,
+            'status' => 'scheduled',
+            'kind' => 'medication_request',
+            'product_reference' => '008d4cbd-beb0-4e56-8b3a-5e472c54d93b',
+            'scheduled_period_start' => now()->format('Y-m-d'),
+            'scheduled_period_end' => now()->addWeek()->format('Y-m-d'),
+        ]);
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->call('deleteActivity', $activity->id);
+
+        $this->assertDatabaseHas('care_plan_activities', ['id' => $activity->id]);
+    }
+
+    public function test_edit_activity_sets_selected_program_for_program_change(): void
+    {
+        $this->actingAs($this->user);
+
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'Edit Program Plan',
+            'status' => 'draft',
+        ]);
+
+        $activity = CarePlanActivity::create([
+            'care_plan_id' => $carePlan->id,
+            'author_id' => $this->employee->id,
+            'status' => 'draft',
+            'kind' => 'device_request',
+            'product_reference' => '0fa1e6cd-7066-4881-92a5-6d747a1128f7',
+            'program' => '85953838-1834-4ed6-8bf4-3f83057380ec',
+            'scheduled_period_start' => now()->format('Y-m-d'),
+            'scheduled_period_end' => now()->addWeek()->format('Y-m-d'),
+        ]);
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->call('editActivity', $activity->id)
+            ->assertSet('selectedProgram', '85953838-1834-4ed6-8bf4-3f83057380ec')
+            ->set('selectedProgram', '3e56c84a-808c-46a9-94d1-df4a439a50d2')
+            ->assertSet('activityForm.product_reference', '');
+    }
+
+    public function test_open_medical_device_search_loads_program_catalog(): void
+    {
+        $this->actingAs($this->user);
+
+        $targetId = '0fa1e6cd-7066-4881-92a5-6d747a1128f7';
+
+        $devices = [
+            [
+                'id' => '11111111-1111-1111-1111-111111111111',
+                'device_names' => [['name' => 'OneTouch Ultra']],
+                'model_number' => 'ULTRA',
+                'classification_types' => [['code' => '10001', 'name' => 'Глюкометр']],
+                'packaging' => ['packaging_count' => 1, 'packaging_type' => 'piece', 'packaging_unit' => 'piece'],
+            ],
+            [
+                'id' => $targetId,
+                'device_names' => [['name' => 'Accu-Chek Active тест-смужки']],
+                'model_number' => 'AC-TS',
+                'classification_types' => [['code' => '30221', 'name' => 'Тест-смужки']],
+                'packaging' => ['packaging_count' => 50, 'packaging_type' => 'box', 'packaging_unit' => 'piece'],
+            ],
+        ];
+
+        $response = new \App\Classes\eHealth\EHealthResponse(
+            new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+                'data' => $devices,
+                'paging' => [
+                    'page_number' => 1,
+                    'total_pages' => 1,
+                    'total_entries' => 2,
+                ],
+            ]))
+        );
+
+        $this->mock(\App\Classes\eHealth\Api\DeviceDefinition::class, function ($mock) use ($response): void {
+            $mock->shouldReceive('getMany')->andReturn($response);
+        });
+
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'Device Search Catalog Plan',
+            'status' => 'draft',
+        ]);
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->call('initActivityForm', 'device_request')
+            ->call('openMedicalDeviceSearch')
+            ->assertSet('showMedicalDeviceSearchDrawer', true)
+            ->assertSet('deviceSearchTotalEntries', 2)
+            ->assertSee('Accu-Chek Active тест-смужки')
+            ->assertSee('OneTouch Ultra')
+            ->set('searchQuery', 'Accu-Chek')
+            ->assertSet('deviceSearchTotalEntries', 1)
+            ->assertSee('Accu-Chek Active тест-смужки')
+            ->assertDontSee('OneTouch Ultra')
+            ->set('searchQuery', $targetId)
+            ->assertSet('deviceSearchTotalEntries', 1)
+            ->assertSee('Accu-Chek Active тест-смужки');
     }
 }

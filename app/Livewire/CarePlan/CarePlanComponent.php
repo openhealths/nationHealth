@@ -58,7 +58,10 @@ abstract class CarePlanComponent extends Component
     public bool $showMedicalDeviceSearchDrawer = false;
     public bool $showMedicalDeviceFormDrawer = false;
 
-    // E-Prescription State Variables
+    /** @var list<string> */
+    public array $participatingDeviceProgramIds = [];
+
+    public string $deviceParticipationWarning = '';
     public bool $showEPrescriptionDrawer = false;
     public array $ePrescriptionForm = [];
     public ?array $ePrescriptionSelectedActivity = null;
@@ -224,6 +227,7 @@ abstract class CarePlanComponent extends Component
 
         $this->carePlanUuid = $this->carePlan->uuid;
         $this->patientId = $this->carePlan->person->uuid;
+        $this->loadDeviceProgramParticipationState();
         $this->activePrescriptions = \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::whereIn('based_on_id', $this->carePlan->activities->pluck('id'))->get()->toArray();
         $this->loadActiveReferrals();
 
@@ -523,7 +527,7 @@ abstract class CarePlanComponent extends Component
         $roles = $user->allowedRoles;
         $mainSpeciality = $user->getMainSpeciality(legalEntity());
 
-        return $programs
+        $filtered = $programs
             ->where('is_active', '=', true)
             ->filter(function (array $program) use ($roles, $user, $mainSpeciality): bool {
                 $allowedEmployeeTypes = Arr::get($program, 'medical_program_settings.employee_types_to_create_request', []);
@@ -543,6 +547,22 @@ abstract class CarePlanComponent extends Component
 
                 return true;
             });
+
+        if ($this->participatingDeviceProgramIds !== []) {
+            $filtered = app(\App\Services\MedicalEvents\DeviceProgramParticipationGuard::class)
+                ->filterProgramsForParticipation($filtered, $this->participatingDeviceProgramIds);
+        }
+
+        return $filtered;
+    }
+
+    protected function loadDeviceProgramParticipationState(): void
+    {
+        $guard = app(\App\Services\MedicalEvents\DeviceProgramParticipationGuard::class);
+        $this->participatingDeviceProgramIds = $guard->resolveParticipatingProgramIds(legalEntity());
+        $this->deviceParticipationWarning = $this->participatingDeviceProgramIds === []
+            ? __('care-plan.device_program_participation_sync_hint')
+            : '';
     }
 
     /**

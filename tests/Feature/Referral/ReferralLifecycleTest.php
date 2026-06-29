@@ -360,6 +360,56 @@ class ReferralLifecycleTest extends TestCase
         $this->assertArrayHasKey('occurrence_period', $devicePrequalify['device_request']);
         $this->assertArrayHasKey('programs', $devicePrequalify);
         $this->assertArrayNotHasKey('programs', $devicePrequalify['device_request']);
+
+        $devicePrequalifyWithoutDates = $deviceMapper->toPrequalifyPayload(
+            [
+                'device_id' => 'D-707',
+                'quantity' => 1.0,
+                'intent' => 'order',
+                'program_id' => 'program-uuid',
+            ],
+            $uuids,
+            $carePlanUuid,
+            (string) $this->deviceActivity->uuid
+        );
+
+        $this->assertArrayHasKey('occurrence_period', $devicePrequalifyWithoutDates['device_request']);
+    }
+
+    public function test_device_prequalify_uses_device_definition_identifier_for_uuid(): void
+    {
+        $deviceMapper = new DeviceRequestMapper();
+        $carePlanUuid = $this->serviceActivity->carePlan->uuid;
+        $deviceUuid = '0fa1e6cd-7066-4881-92a5-6d747a1128f7';
+
+        $deviceData = [
+            'device_id' => $deviceUuid,
+            'device_code_type' => 'DEVICE_DEFINITION',
+            'quantity' => 100.0,
+            'quantity_code' => 'piece',
+            'intent' => 'order',
+            'program_id' => 'program-uuid',
+            'started_at' => '2026-06-01',
+            'ended_at' => '2026-09-01',
+        ];
+
+        $uuids = [
+            'person_uuid' => $this->person->uuid,
+            'encounter_uuid' => $this->encounter->uuid,
+            'employee_uuid' => $this->employee->uuid,
+            'legal_entity_uuid' => $this->employee->legalEntity->uuid,
+        ];
+
+        $devicePrequalify = $deviceMapper->toPrequalifyPayload(
+            $deviceData,
+            $uuids,
+            $carePlanUuid,
+            (string) $this->deviceActivity->uuid
+        );
+
+        $this->assertSame($deviceUuid, $devicePrequalify['device_request']['code']['identifier']['value']);
+        $this->assertSame('device_definition', $devicePrequalify['device_request']['code']['identifier']['type']['coding'][0]['code']);
+        $this->assertSame('piece', $devicePrequalify['device_request']['quantity']['code']);
     }
 
     public function test_can_map_to_create_signed_payloads(): void

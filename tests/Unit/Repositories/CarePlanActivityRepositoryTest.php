@@ -45,6 +45,45 @@ class CarePlanActivityRepositoryTest extends TestCase
         $this->assertSame(1, $payload['detail']['quantity']['value']);
     }
 
+    public function test_build_device_prequalify_payload_includes_occurrence_period(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-06-29 10:00:00', 'Europe/Kyiv'));
+
+        $carePlan = new CarePlan();
+        $carePlan->setRawAttributes([
+            'uuid' => (string) Str::uuid(),
+        ]);
+
+        $activity = new CarePlanActivity([
+            'kind' => 'device_request',
+            'status' => CarePlanStatus::DRAFT->value,
+            'uuid' => (string) Str::uuid(),
+            'quantity' => 100,
+            'quantity_system' => 'device_unit',
+            'quantity_code' => 'piece',
+            'product_reference' => '0fa1e6cd-7066-4881-92a5-6d747a1128f7',
+            'program' => '85953838-1834-4ed6-8bf4-3f83057380ec',
+            'scheduled_period_start' => '2026-06-27',
+            'scheduled_period_end' => '2026-07-06',
+        ]);
+        $activity->setRelation('carePlan', $carePlan);
+
+        $uuids = [
+            'person_uuid' => (string) Str::uuid(),
+            'encounter_uuid' => (string) Str::uuid(),
+            'employee_uuid' => (string) Str::uuid(),
+            'legal_entity_uuid' => (string) Str::uuid(),
+        ];
+
+        $payload = app(CarePlanActivityRepository::class)->buildDevicePrequalifyPayload($activity, $carePlan, $uuids);
+
+        $this->assertArrayHasKey('occurrence_period', $payload['device_request']);
+        $this->assertArrayHasKey('start', $payload['device_request']['occurrence_period']);
+        $this->assertArrayHasKey('end', $payload['device_request']['occurrence_period']);
+        $this->assertArrayHasKey('identifier', $payload['device_request']['code']);
+        $this->assertSame('0fa1e6cd-7066-4881-92a5-6d747a1128f7', $payload['device_request']['code']['identifier']['value']);
+    }
+
     public function test_draft_activity_start_is_clipped_to_ehealth_care_plan_period_start(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-06-25 17:13:11', 'Europe/Kyiv'));
@@ -158,5 +197,61 @@ class CarePlanActivityRepositoryTest extends TestCase
         $this->assertArrayNotHasKey('reason_code', $normalized['detail']);
         $this->assertArrayNotHasKey('description', $normalized['detail']);
         $this->assertArrayNotHasKey('text', $normalized['author']['identifier']['type']);
+    }
+
+    public function test_build_activity_cancel_sign_payload_preserves_creation_snapshot(): void
+    {
+        $statusReason = [
+            'coding' => [
+                [
+                    'system' => 'eHealth/care_plan_activity_cancel_reasons',
+                    'code' => 'typo',
+                ],
+            ],
+        ];
+
+        $base = [
+            'id' => 'f5ad4f67-7066-4d0d-bcff-c17a11a723e4',
+            'author' => [
+                'identifier' => [
+                    'type' => [
+                        'coding' => [
+                            ['system' => 'eHealth/resources', 'code' => 'employee'],
+                        ],
+                    ],
+                    'value' => '1766ae9e-828d-4daa-bba8-48da3a13393a',
+                ],
+            ],
+            'care_plan' => [
+                'identifier' => [
+                    'type' => [
+                        'coding' => [
+                            ['system' => 'eHealth/resources', 'code' => 'care_plan'],
+                        ],
+                    ],
+                    'value' => '63e74515-13cd-43c5-9e8e-9742854ad949',
+                ],
+            ],
+            'detail' => [
+                'kind' => 'medication_request',
+                'status' => 'scheduled',
+                'do_not_perform' => false,
+                'quantity' => ['value' => 1.0, 'code' => 'PIECE', 'system' => 'MEDICATION_UNIT'],
+                'program' => ['identifier' => ['value' => '1318eabc-1a1a-42f6-8450-61e11c19eede']],
+            ],
+        ];
+
+        $signed = app(CarePlanActivityRepository::class)->buildActivityCancelSignPayload($base);
+
+        $this->assertSame('f5ad4f67-7066-4d0d-bcff-c17a11a723e4', $signed['id']);
+        $this->assertSame('medication_request', $signed['detail']['kind']);
+        $this->assertSame('scheduled', $signed['detail']['status']);
+        $this->assertFalse($signed['detail']['do_not_perform']);
+        $this->assertSame(1.0, $signed['detail']['quantity']['value']);
+        $this->assertArrayNotHasKey('status_reason', $signed['detail']);
+
+        $patchDetail = app(CarePlanActivityRepository::class)->buildActivityCancelPatchDetail($base, $statusReason);
+        $this->assertSame($statusReason, $patchDetail['status_reason']);
+        $this->assertFalse($patchDetail['do_not_perform']);
     }
 }

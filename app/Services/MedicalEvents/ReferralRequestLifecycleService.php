@@ -10,9 +10,11 @@ use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
+use App\Models\Employee\Employee;
 use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Repositories\MedicalEvents\Repository;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
 class ReferralRequestLifecycleService
@@ -38,6 +40,44 @@ class ReferralRequestLifecycleService
         }
 
         return Repository::deviceRequest()->findDraftByActivity($activity->id);
+    }
+
+    /**
+     * @return array{
+     *     employee_id: int|null,
+     *     division_id: int|null,
+     *     employee_uuid: string|null,
+     *     legal_entity_uuid: string|null
+     * }
+     */
+    public function resolveEmployeeContext(CarePlan $carePlan, ?CarePlanActivity $activity = null, ?int $fallbackEmployeeId = null): array
+    {
+        $employee = null;
+
+        $carePlan->loadMissing('encounter.performer');
+        $performerUuid = $carePlan->encounter?->performer?->value;
+        if (is_string($performerUuid) && $performerUuid !== '') {
+            $employee = Employee::query()->where('uuid', $performerUuid)->first();
+        }
+
+        if (!$employee && $activity?->author_id) {
+            $employee = Employee::find($activity->author_id);
+        }
+
+        if (!$employee && $fallbackEmployeeId) {
+            $employee = Employee::find($fallbackEmployeeId);
+        }
+
+        if (!$employee) {
+            $employee = Auth::user()?->activeDoctorEmployee();
+        }
+
+        return [
+            'employee_id' => $employee?->id,
+            'division_id' => $employee?->division_id ?? $carePlan->encounter?->division_id,
+            'employee_uuid' => $employee?->uuid,
+            'legal_entity_uuid' => $employee?->legalEntity?->uuid,
+        ];
     }
 
     /**
@@ -112,7 +152,12 @@ class ReferralRequestLifecycleService
             return $this->persistLocalDraft($dbData, $carePlan->person_id, 'service_request');
         }
 
-        $dbData['device_id'] = $activity->product_reference;
+        $dbData['device_id'] = $activity->product_reference ?: $activity->product_codeable_concept;
+        $dbData['device_code_type'] = !empty($activity->product_reference) ? 'DEVICE_DEFINITION' : 'CLASSIFICATION_TYPE';
+        if (str_contains(strtolower((string) $activity->kind), 'device')) {
+            $dbData['quantity_system'] = $activity->quantity_system ?: 'device_unit';
+            $dbData['quantity_code'] = strtolower($activity->quantity_code ?: 'piece');
+        }
 
         $mapper = Fhir::deviceRequest();
         $prequalifyPayload = $mapper->toPrequalifyPayload(
