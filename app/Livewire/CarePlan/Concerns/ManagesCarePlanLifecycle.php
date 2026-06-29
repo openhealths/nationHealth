@@ -305,12 +305,17 @@ trait ManagesCarePlanLifecycle
         }
 
         if (str_contains(strtolower((string) $activity->kind), 'device')) {
-            $employee = Auth::user()?->activeDoctorEmployee();
+            $employeeContext = app(\App\Services\MedicalEvents\ReferralRequestLifecycleService::class)
+                ->resolveEmployeeContext(
+                    $this->carePlan,
+                    $activity,
+                    Auth::user()?->activeDoctorEmployee()?->id
+                );
             $uuids = [
                 'person_uuid' => $this->carePlan->person->uuid,
                 'encounter_uuid' => $this->carePlan->encounter?->uuid,
-                'employee_uuid' => $employee?->uuid,
-                'legal_entity_uuid' => $employee?->legalEntity?->uuid,
+                'employee_uuid' => $employeeContext['employee_uuid'],
+                'legal_entity_uuid' => $employeeContext['legal_entity_uuid'],
             ];
 
             try {
@@ -485,46 +490,21 @@ trait ManagesCarePlanLifecycle
             ]
         ];
 
-        // Sign the same payload shape that was used at activity creation (formatCarePlanActivityRequest),
-        // not the enriched eHealth GET response — eHealth validates against the original signed content.
-        $payloadForSign = $this->cleanActivityPayload(
-            $activityRepository->formatCarePlanActivityRequest($activity)
-        );
-
-        if (!isset($payloadForSign['detail'])) {
-            $payloadForSign['detail'] = [];
-        }
-
-        $currentStatus = $activity->status;
-        if (strtolower((string) $currentStatus) === 'processed') {
-            $currentStatus = 'scheduled';
-        }
-        $payloadForSign['detail']['status'] = $payloadForSign['detail']['status'] ?? $currentStatus;
-        if (strtolower((string) ($payloadForSign['detail']['status'] ?? '')) === 'processed') {
-            $payloadForSign['detail']['status'] = 'scheduled';
-        }
-
         if ($this->actionType === 'cancel_activity') {
-            $payloadForSign['detail']['status_reason'] = $statusReasonCodeableConcept;
-        } elseif ($this->actionType === 'complete_activity') {
-            if ($this->outcomeCode) {
-                $payloadForSign['outcome_codeable_concept'] = [
-                    'coding' => [
-                        [
-                            'system' => 'eHealth/care_plan_activity_outcomes',
-                            'code' => $this->outcomeCode,
-                        ]
-                    ]
-                ];
-            }
-
-            if (!empty($this->outcomeReferences)) {
-                $payloadForSign['outcome_reference'] = collect($this->outcomeReferences)->map(fn ($id) => [
-                    'identifier' => [
-                        'value' => $id,
-                    ]
-                ])->toArray();
-            }
+            $creationPayload = $activityRepository->resolveActivityCreationPayloadForCancelSigning($activity);
+            $payloadForSign = $activityRepository->buildActivityCancelSignPayload($creationPayload);
+            $basePayload = $creationPayload;
+        } else {
+            $basePayload = $activityRepository->resolveActivityPayloadBase(
+                $activity,
+                $this->carePlan->person->uuid,
+                $this->carePlan->uuid,
+            );
+            $payloadForSign = $activityRepository->buildActivityCompleteSignPayload(
+                $basePayload,
+                $this->outcomeCode ?: null,
+                $this->outcomeReferences,
+            );
         }
 
         Log::info('CarePlanActivityStatus: Original JSON payload for signing: ' . json_encode(
@@ -548,7 +528,10 @@ trait ManagesCarePlanLifecycle
             ];
 
             if ($this->actionType === 'cancel_activity') {
-                $payloadData['status_reason'] = $statusReasonCodeableConcept;
+                $payloadData['detail'] = $activityRepository->buildActivityCancelPatchDetail(
+                    $basePayload,
+                    $statusReasonCodeableConcept,
+                );
             } elseif ($this->actionType === 'complete_activity') {
                 if ($this->outcomeCode) {
                     $payloadData['outcome_codeable_concept'] = [

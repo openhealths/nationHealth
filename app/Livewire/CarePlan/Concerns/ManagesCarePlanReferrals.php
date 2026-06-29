@@ -202,17 +202,17 @@ trait ManagesCarePlanReferrals
         }
 
         try {
-            $employee = Auth::user()?->activeDoctorEmployee();
+            $employeeContext = $this->referralLifecycle->resolveEmployeeContext(
+                $this->carePlan,
+                $activity,
+                Auth::user()?->activeDoctorEmployee()?->id
+            );
+
             $this->referralRequestIdToSign = $this->referralLifecycle->createDraft(
                 $this->carePlan,
                 $this->referralForm,
                 $qty,
-                [
-                    'employee_id' => $employee?->id,
-                    'division_id' => $employee?->division_id,
-                    'employee_uuid' => $employee?->uuid,
-                    'legal_entity_uuid' => $employee?->legalEntity?->uuid,
-                ]
+                $employeeContext
             );
             $signAction = $this->referralForm['kind'] === 'service_request'
                 ? 'sign_servicerequest'
@@ -663,25 +663,17 @@ trait ManagesCarePlanReferrals
         \App\Models\MedicalEvents\Sql\ServiceRequestRequest|\App\Models\MedicalEvents\Sql\DeviceRequestRequest $requestRecord,
         \App\Models\CarePlanActivity $activity
     ): array {
-        $employee = null;
-
-        if ($requestRecord->employee_id) {
-            $employee = \App\Models\Employee\Employee::find($requestRecord->employee_id);
-        }
-
-        if (!$employee && $activity->author_id) {
-            $employee = \App\Models\Employee\Employee::find($activity->author_id);
-        }
-
-        if (!$employee) {
-            $employee = Auth::user()?->activeDoctorEmployee();
-        }
+        $context = $this->referralLifecycle->resolveEmployeeContext(
+            $this->carePlan,
+            $activity,
+            $requestRecord->employee_id
+        );
 
         return [
-            'employee_id' => $requestRecord->employee_id ?? $employee?->id,
-            'division_id' => $requestRecord->division_id ?? $employee?->division_id,
-            'employee_uuid' => $employee?->uuid,
-            'legal_entity_uuid' => $employee?->legalEntity?->uuid,
+            'employee_id' => $requestRecord->employee_id ?? $context['employee_id'],
+            'division_id' => $requestRecord->division_id ?? $context['division_id'],
+            'employee_uuid' => $context['employee_uuid'],
+            'legal_entity_uuid' => $context['legal_entity_uuid'],
         ];
     }
 
@@ -693,8 +685,8 @@ trait ManagesCarePlanReferrals
         \App\Models\CarePlanActivity $activity
     ): array {
         $employeeContext = $this->resolveReferralEmployeeContext($requestRecord, $activity);
-        $startedAt = $requestRecord->started_at;
-        $endedAt = $requestRecord->ended_at;
+        $startedAt = $requestRecord->started_at ?? $activity->scheduled_period_start;
+        $endedAt = $requestRecord->ended_at ?? $activity->scheduled_period_end;
 
         $dbData = [
             'uuid' => $requestRecord->uuid,
@@ -723,7 +715,16 @@ trait ManagesCarePlanReferrals
         if ($requestRecord instanceof \App\Models\MedicalEvents\Sql\ServiceRequestRequest) {
             $dbData['service_id'] = $requestRecord->service_id ?: $activity->product_reference;
         } else {
-            $dbData['device_id'] = $requestRecord->device_id ?: $activity->product_reference;
+            if (!empty($activity->product_reference)) {
+                $dbData['device_id'] = $requestRecord->device_id ?: $activity->product_reference;
+                $dbData['device_code_type'] = 'DEVICE_DEFINITION';
+            } else {
+                $dbData['device_id'] = $requestRecord->device_id ?: $activity->product_codeable_concept;
+                $dbData['device_code_type'] = 'CLASSIFICATION_TYPE';
+            }
+
+            $dbData['quantity_system'] = $activity->quantity_system ?: 'device_unit';
+            $dbData['quantity_code'] = strtolower($activity->quantity_code ?: 'piece');
         }
 
         return $dbData;

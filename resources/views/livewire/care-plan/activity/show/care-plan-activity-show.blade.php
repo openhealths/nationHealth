@@ -24,7 +24,11 @@
             </a>
 
             @if(in_array(strtoupper($activityStatus), ['NEW', 'DRAFT']))
-                <a href="{{ route('care-plans.show', [legalEntity(), $carePlan->id]) }}" class="button-minor" wire:navigate>Редагувати</a>
+                <a href="{{ route('care-plans.show', [legalEntity(), $carePlan->id, 'edit_activity' => $activity->id]) }}"
+                   class="button-minor"
+                   wire:navigate>
+                    Редагувати
+                </a>
                 <button type="button" class="button-primary-outline" wire:click="openSignatureModal('sign_activity', {{ $activity->id }})">Підписати призначення</button>
             @elseif(in_array(strtoupper($activityStatus), ['ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD', 'PROCESSED']))
                 @if($resolvedKind === 'medication_request')
@@ -38,7 +42,10 @@
             @endif
         </div>
 
-        @include('livewire.care-plan.parts.activity.detail-card')
+        @include('livewire.care-plan.parts.activity.detail-card', [
+            'dictionaries' => $dictionaries,
+            'activityProductLabel' => $activityProductLabel,
+        ])
 
         @include('livewire.care-plan.parts.activity.prescriptions-list')
 
