@@ -154,22 +154,13 @@ class DeviceRequestMapper implements FhirMapperContract
      */
     private function buildDeviceRequestBody(array $data, array $uuids, string $carePlanUuid, string $activityUuid): array
     {
+        $occurrence = $this->mapOccurrence($data);
+
         $deviceRequest = [
             'intent' => $data['intent'] ?? 'order',
             'priority' => $data['priority'] ?? 'routine',
-            'code' => [
-                'coding' => [
-                    [
-                        'system' => 'device_definition_classification_type',
-                        'code' => $data['device_id'],
-                    ],
-                ],
-            ],
-            'quantity' => [
-                'value' => (int) ($data['quantity'] ?? 1),
-                'system' => 'device_unit',
-                'code' => 'piece',
-            ],
+            'code' => $this->mapDeviceCode($data),
+            'quantity' => $this->mapDeviceQuantity($data),
             'encounter' => !empty($uuids['encounter_uuid'])
                 ? $this->resourceIdentifier('encounter', (string) $uuids['encounter_uuid'])
                 : null,
@@ -178,13 +169,10 @@ class DeviceRequestMapper implements FhirMapperContract
                 $this->resourceIdentifier('activity', $activityUuid),
             ],
             'requester' => $this->resourceIdentifier('employee', (string) $uuids['employee_uuid']),
-            'authoredOn' => $this->resolveAuthoredOn(),
+            'authoredOn' => $this->resolveAuthoredOn($occurrence['occurrencePeriod']),
         ];
 
-        $occurrence = $this->mapOccurrence($data);
-        if ($occurrence !== null) {
-            $deviceRequest = array_merge($deviceRequest, $occurrence);
-        }
+        $deviceRequest = array_merge($deviceRequest, $occurrence);
 
         if (!empty($data['supporting_info'])) {
             $deviceRequest['reason'] = [];
@@ -219,21 +207,81 @@ class DeviceRequestMapper implements FhirMapperContract
         return $payload;
     }
 
-    private function resolveAuthoredOn(): string
+    /**
+     * @param  array{start: string, end: string}  $occurrencePeriod
+     */
+    private function resolveAuthoredOn(array $occurrencePeriod): string
     {
-        return CarbonImmutable::now('UTC')->format('Y-m-d\TH:i:s.000\Z');
+        $periodStart = CarbonImmutable::parse($occurrencePeriod['start'])->utc();
+        $now = CarbonImmutable::now('UTC');
+        $minStart = $now->addHour();
+
+        if ($periodStart->greaterThanOrEqualTo($minStart)) {
+            return $periodStart->format('Y-m-d\TH:i:s.000\Z');
+        }
+
+        if ($now->greaterThanOrEqualTo($minStart)) {
+            return $now->format('Y-m-d\TH:i:s.000\Z');
+        }
+
+        return $minStart->format('Y-m-d\TH:i:s.000\Z');
     }
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{occurrencePeriod: array{start: string, end: string}}|null
+     * @return array<string, mixed>
      */
-    private function mapOccurrence(array $data): ?array
+    private function mapDeviceCode(array $data): array
     {
-        if (empty($data['started_at']) && empty($data['ended_at'])) {
-            return null;
+        $deviceId = (string) ($data['device_id'] ?? '');
+        $codeType = $data['device_code_type'] ?? null;
+
+        if ($codeType === 'DEVICE_DEFINITION' || ($codeType !== 'CLASSIFICATION_TYPE' && $this->isDeviceDefinitionUuid($deviceId))) {
+            return [
+                'identifier' => [
+                    'type' => [
+                        'coding' => [[
+                            'system' => 'eHealth/resources',
+                            'code' => 'device_definition',
+                        ]],
+                    ],
+                    'value' => $deviceId,
+                ],
+            ];
         }
 
+        return [
+            'coding' => [[
+                'system' => 'device_definition_classification_type',
+                'code' => $deviceId,
+            ]],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{value: int, system: string, code: string}
+     */
+    private function mapDeviceQuantity(array $data): array
+    {
+        return [
+            'value' => (int) ($data['quantity'] ?? 1),
+            'system' => 'device_unit',
+            'code' => strtolower((string) ($data['quantity_code'] ?? 'piece')),
+        ];
+    }
+
+    private function isDeviceDefinitionUuid(string $value): bool
+    {
+        return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-/i', $value) === 1;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{occurrencePeriod: array{start: string, end: string}}
+     */
+    private function mapOccurrence(array $data): array
+    {
         $minStart = CarbonImmutable::now()->addHour();
         $start = !empty($data['started_at'])
             ? CarbonImmutable::parse($data['started_at'])
@@ -298,7 +346,9 @@ class DeviceRequestMapper implements FhirMapperContract
             'request_number' => data_get($data, 'requestNumber') ?? data_get($data, 'request_number'),
             'started_at' => data_get($data, 'occurrencePeriod.start') ?? data_get($data, 'started_at'),
             'ended_at' => data_get($data, 'occurrencePeriod.end') ?? data_get($data, 'ended_at'),
-            'device_id' => data_get($data, 'codeCodeableConcept.coding.0.code'),
+            'device_id' => data_get($data, 'code.identifier.value')
+                ?? data_get($data, 'code.coding.0.code')
+                ?? data_get($data, 'codeCodeableConcept.coding.0.code'),
             'quantity' => data_get($data, 'quantityInteger'),
             'program_id' => data_get($data, 'program.identifier.value'),
             'intent' => data_get($data, 'intent'),

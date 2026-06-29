@@ -1,4 +1,5 @@
 @php
+    $dictionaries = $dictionaries ?? [];
     $resolvedKind = $activity->resolvedKind();
     $kindTranslationKey = 'care-plan.activity_kind.' . $resolvedKind;
     $translatedKind = \Illuminate\Support\Facades\Lang::has($kindTranslationKey) ? __($kindTranslationKey) : $resolvedKind;
@@ -8,6 +9,28 @@
     $activityStatusDisplay = \Illuminate\Support\Facades\Lang::has($statusKey)
         ? __($statusKey)
         : (is_array($activity->status) ? ($activity->status['text'] ?? ($activity->status['coding'][0]['display'] ?? $activityStatus)) : $activityStatus);
+
+    $quantityValue = is_array($activity->quantity) ? ($activity->quantity['value'] ?? null) : $activity->quantity;
+    $quantityUnitCode = $activity->quantity_code ?: (is_array($activity->quantity) ? ($activity->quantity['code'] ?? null) : null);
+    $quantityUnitLabel = $quantityUnitCode
+        ? ($dictionaries['device_unit'][$quantityUnitCode] ?? $quantityUnitCode)
+        : '';
+
+    $programLabel = $activity->program
+        ? ($dictionaries['medical_programs'][$activity->program]
+            ?? $dictionaries['medical_programs_device'][$activity->program]
+            ?? $dictionaries['medical_programs_medication'][$activity->program]
+            ?? $activity->program)
+        : null;
+
+    $productLabel = $activityProductLabel ?? null;
+    if ($productLabel === null && !empty($activity->product_reference)) {
+        $productLabel = $activity->product_reference;
+    }
+    if ($productLabel === null && !empty($activity->product_codeable_concept)) {
+        $productLabel = $dictionaries['device_definition_classification_type'][$activity->product_codeable_concept]
+            ?? $activity->product_codeable_concept;
+    }
 @endphp
 
 <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
@@ -27,14 +50,30 @@
         </span>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
+        @if($productLabel)
+            <div class="md:col-span-2 lg:col-span-3">
+                <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">{{ __('care-plan.medical_device') }}</div>
+                <div class="text-gray-900 dark:text-white">{{ $productLabel }}</div>
+                @if(!empty($activity->product_reference) && $productLabel !== $activity->product_reference)
+                    <div class="text-xs text-gray-400 font-mono mt-1">{{ $activity->product_reference }}</div>
+                @endif
+            </div>
+        @endif
+
+        @if($programLabel)
+            <div>
+                <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">{{ __('care-plan.program') }}</div>
+                <div class="text-gray-900 dark:text-white">{{ $programLabel }}</div>
+            </div>
+        @endif
+
         <div>
             <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">{{ __('care-plan.quantity') }}</div>
             <div class="text-gray-900 dark:text-white">
-                @if(is_array($activity->quantity))
-                    {{ $activity->quantity['value'] ?? '-' }} {{ $activity->quantity['unit'] ?? '' }}
-                @else
-                    {{ $activity->quantity ?? '-' }}
+                {{ $quantityValue ?? '-' }}
+                @if($quantityUnitLabel)
+                    {{ $quantityUnitLabel }}
                 @endif
             </div>
         </div>

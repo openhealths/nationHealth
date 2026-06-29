@@ -433,6 +433,14 @@
                                                     >
                                                         Підписати призначення
                                                     </button>
+                                                    <button type="button"
+                                                            @click="openDropdown = false"
+                                                            wire:click="deleteActivity({{ $activity->id }})"
+                                                            wire:confirm="{{ __('care-plan.confirm_delete_activity') }}"
+                                                            class="text-red-600 dark:text-red-400 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 w-full"
+                                                    >
+                                                        {{ __('forms.delete') }}
+                                                    </button>
                                                 </div>
                                             @elseif(in_array(strtoupper($activityStatus), ['ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD', 'PROCESSED']))
                                                 <div class="py-1">

@@ -45,6 +45,44 @@ class CarePlanActivityRepository
         return $activity->update($data);
     }
 
+    public function deleteById(int $id): bool
+    {
+        $activity = CarePlanActivity::find($id);
+        if (!$activity) {
+            return false;
+        }
+
+        return DB::transaction(function () use ($activity): bool {
+            $activityId = $activity->id;
+
+            \App\Models\MedicalEvents\Sql\ServiceRequestRequest::query()
+                ->where('based_on_id', $activityId)
+                ->whereIn('status', ['draft', 'new'])
+                ->delete();
+
+            \App\Models\MedicalEvents\Sql\DeviceRequestRequest::query()
+                ->where('based_on_id', $activityId)
+                ->whereIn('status', ['draft', 'new'])
+                ->delete();
+
+            \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::query()
+                ->where('based_on_id', $activityId)
+                ->whereIn('status', ['draft', 'new'])
+                ->delete();
+
+            if (\App\Models\MedicalEvents\Sql\ServiceRequestRequest::query()->where('based_on_id', $activityId)->exists()
+                || \App\Models\MedicalEvents\Sql\DeviceRequestRequest::query()->where('based_on_id', $activityId)->exists()
+                || \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::query()->where('based_on_id', $activityId)->exists()) {
+                return false;
+            }
+
+            $activity->quantityQuantity?->delete();
+            $activity->dailyAmountQuantity?->delete();
+
+            return (bool) $activity->delete();
+        });
+    }
+
     private function normalizeUnitCode(?string $system, ?string $code): ?string
     {
         if (empty($code)) {
@@ -442,18 +480,63 @@ class CarePlanActivityRepository
             }
         }
 
+        $scheduledPeriod = $activity->scheduledPeriod;
+        $startDate = $scheduledPeriod ? $scheduledPeriod->getRawOriginal('start') : $activity->scheduled_period_start;
+        $endDate = $scheduledPeriod ? $scheduledPeriod->getRawOriginal('end') : $activity->scheduled_period_end;
+
+        $deviceFields = $this->resolveDeviceRequestFieldsFromActivity($activity, $detail);
+
         return Fhir::deviceRequest()->toPrequalifyPayload(
-            [
-                'device_id' => $deviceId,
+            array_merge([
                 'quantity' => $activity->quantity,
                 'program_id' => $activity->program,
                 'intent' => 'order',
                 'supporting_info' => $supportingInfo,
-            ],
+                'started_at' => $startDate ? \Carbon\Carbon::parse($startDate)->format('Y-m-d') : null,
+                'ended_at' => $endDate ? \Carbon\Carbon::parse($endDate)->format('Y-m-d') : null,
+            ], $deviceFields),
             $uuids,
             (string) $carePlan->uuid,
             (string) $activity->uuid,
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $detail
+     * @return array{device_id: string, device_code_type: string, quantity_system: string, quantity_code: string}
+     */
+    private function resolveDeviceRequestFieldsFromActivity(CarePlanActivity $activity, array $detail): array
+    {
+        $quantitySystem = $activity->quantity_system ?: 'device_unit';
+        $quantityCode = strtolower($activity->quantity_code ?: 'piece');
+
+        if (!empty($detail['product_reference']['identifier']['value'])) {
+            return [
+                'device_id' => (string) $detail['product_reference']['identifier']['value'],
+                'device_code_type' => 'DEVICE_DEFINITION',
+                'quantity_system' => $quantitySystem,
+                'quantity_code' => $quantityCode,
+            ];
+        }
+
+        if (!empty($detail['product_codeable_concept']['coding'][0]['code'])) {
+            return [
+                'device_id' => (string) $detail['product_codeable_concept']['coding'][0]['code'],
+                'device_code_type' => 'CLASSIFICATION_TYPE',
+                'quantity_system' => $quantitySystem,
+                'quantity_code' => $quantityCode,
+            ];
+        }
+
+        $fallbackId = (string) ($activity->product_reference ?: $activity->product_codeable_concept ?: '');
+        $isUuid = preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-/i', $fallbackId) === 1;
+
+        return [
+            'device_id' => $fallbackId,
+            'device_code_type' => $isUuid ? 'DEVICE_DEFINITION' : 'CLASSIFICATION_TYPE',
+            'quantity_system' => $quantitySystem,
+            'quantity_code' => $quantityCode,
+        ];
     }
 
     public function syncActivities(\App\Models\Person\Person $person, \App\Models\CarePlan $carePlan, array $query = []): void
@@ -728,6 +811,142 @@ class CarePlanActivityRepository
                 }
             });
         }
+    }
+
+    /**
+     * Creation-shaped payload for cancel PKCS#7 signing.
+     *
+     * eHealth compares signed_data byte-for-byte with the activity creation request.
+     * GET /activities/{id} returns a different key order and must not be signed for cancel.
+     *
+     * @return array<string, mixed>
+     */
+    public function resolveActivityCreationPayloadForCancelSigning(CarePlanActivity $activity): array
+    {
+        return $this->formatCarePlanActivityRequest($activity);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function resolveActivityPayloadBase(
+        CarePlanActivity $activity,
+        string $personUuid,
+        string $carePlanUuid,
+    ): array {
+        if (!empty($activity->uuid)) {
+            try {
+                $response = EHealth::carePlanActivity()->getDetails(
+                    $personUuid,
+                    $carePlanUuid,
+                    (string) $activity->uuid,
+                );
+                $matchingActivity = $response->getData();
+                if (isset($matchingActivity['data']) && is_array($matchingActivity['data'])) {
+                    $matchingActivity = $matchingActivity['data'];
+                }
+
+                if (is_array($matchingActivity) && $matchingActivity !== []) {
+                    return $this->normalizeEHealthActivityForSigning($matchingActivity);
+                }
+            } catch (\Throwable) {
+                // Fall back to locally formatted creation payload.
+            }
+        }
+
+        return $this->formatCarePlanActivityRequest($activity);
+    }
+
+    /**
+     * Detail block for cancel PATCH body (transition fields required by eHealth).
+     *
+     * @param  array<string, mixed>  $activityPayload
+     * @param  array<string, mixed>  $statusReasonCodeableConcept
+     * @return array<string, mixed>
+     */
+    public function buildActivityCancelPatchDetail(
+        array $activityPayload,
+        array $statusReasonCodeableConcept,
+    ): array {
+        $detail = is_array($activityPayload['detail'] ?? null) ? $activityPayload['detail'] : [];
+
+        return [
+            'status_reason' => $statusReasonCodeableConcept,
+            'do_not_perform' => (bool) ($detail['do_not_perform'] ?? false),
+        ];
+    }
+
+    /**
+     * PKCS#7 payload for cancel — exact creation snapshot without transition fields.
+     *
+     * eHealth compares signed_data byte-for-byte with the activity creation request.
+     * status_reason belongs in the PATCH body only; do_not_perform stays from creation detail.
+     *
+     * @param  array<string, mixed>  $activityPayload
+     * @return array<string, mixed>
+     */
+    public function buildActivityCancelSignPayload(array $activityPayload): array
+    {
+        $payload = $activityPayload;
+
+        if (!isset($payload['detail']) || !is_array($payload['detail'])) {
+            $payload['detail'] = [];
+        }
+
+        $status = $payload['detail']['status'] ?? 'scheduled';
+        if (strtolower((string) $status) === 'processed') {
+            $payload['detail']['status'] = 'scheduled';
+        }
+
+        return $payload;
+    }
+
+    /**
+     * PKCS#7 payload for complete — current activity snapshot plus outcome fields.
+     *
+     * @param  array<string, mixed>  $activityPayload
+     * @return array<string, mixed>
+     */
+    public function buildActivityCompleteSignPayload(
+        array $activityPayload,
+        ?string $outcomeCode,
+        array $outcomeReferences,
+    ): array {
+        $detail = is_array($activityPayload['detail'] ?? null) ? $activityPayload['detail'] : [];
+        $status = $detail['status'] ?? 'scheduled';
+        if (strtolower((string) $status) === 'processed') {
+            $status = 'scheduled';
+        }
+
+        $payload = removeEmptyKeys([
+            'id' => $activityPayload['id'] ?? null,
+            'author' => $activityPayload['author'] ?? null,
+            'care_plan' => $activityPayload['care_plan'] ?? null,
+            'detail' => removeEmptyKeys([
+                'kind' => $detail['kind'] ?? null,
+                'status' => $status,
+            ]),
+        ]);
+
+        if ($outcomeCode) {
+            $payload['outcome_codeable_concept'] = [
+                'coding' => [
+                    [
+                        'system' => 'eHealth/care_plan_activity_outcomes',
+                        'code' => $outcomeCode,
+                    ],
+                ],
+            ];
+        }
+
+        if ($outcomeReferences !== []) {
+            $payload['outcome_reference'] = array_map(
+                static fn (string $id): array => ['identifier' => ['value' => $id]],
+                $outcomeReferences,
+            );
+        }
+
+        return $payload;
     }
 
     /**
