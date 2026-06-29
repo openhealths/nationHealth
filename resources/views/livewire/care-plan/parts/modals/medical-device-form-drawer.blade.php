@@ -34,6 +34,12 @@
         @endif
     </h3>
 
+    @if(!empty($deviceParticipationWarning))
+        <div class="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100">
+            {{ $deviceParticipationWarning }}
+        </div>
+    @endif
+
     {{-- Content --}}
     <form wire:submit.prevent="saveActivity">
         {{-- Main Data Section --}}
@@ -45,24 +51,46 @@
             {{-- Program and Medical Device --}}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                 <div class="form-group group">
-                    <label class="label">
+                    <label class="label" for="device_program_edit">
                         {{ __('care-plan.program') }}
                     </label>
-                    <input type="text"
-                           class="input bg-gray-50 dark:bg-gray-700 cursor-not-allowed"
-                           value="{{ !empty($activityForm['program']) ? ($dictionaries['medical_programs'][$activityForm['program']] ?? $activityForm['program']) : __('care-plan.medical_guarantees_program') }}"
-                           disabled
-                    />
+                    @if(!empty($activityForm['id']))
+                        <select id="device_program_edit"
+                                class="input-select peer"
+                                wire:model.live="selectedProgram"
+                        >
+                            @foreach(($dictionaries['medical_programs_device'] ?? $dictionaries['medical_programs'] ?? []) as $id => $name)
+                                <option value="{{ $id }}">{{ $name }}</option>
+                            @endforeach
+                        </select>
+                    @else
+                        <input type="text"
+                               class="input bg-gray-50 dark:bg-gray-700 cursor-not-allowed"
+                               value="{{ !empty($activityForm['program']) ? ($dictionaries['medical_programs'][$activityForm['program']] ?? $activityForm['program']) : __('care-plan.medical_guarantees_program') }}"
+                               disabled
+                        />
+                    @endif
                 </div>
                 <div class="form-group group">
                     <label class="label">
                         {{ __('care-plan.medical_device') }}*
                     </label>
-                    <input type="text"
-                           class="input bg-gray-50 dark:bg-gray-700 cursor-not-allowed font-medium text-gray-900 dark:text-white"
-                           value="{{ !empty($selectedProduct) ? ($selectedProduct['name'] ?? $selectedProduct['device_names'][0]['name'] ?? $selectedProduct['description'] ?? '') : '' }}"
-                           disabled
-                    />
+                    <div class="relative">
+                        <input type="text"
+                               class="input bg-gray-50 dark:bg-gray-700 {{ empty($activityForm['id']) ? 'cursor-not-allowed' : 'pr-12' }} font-medium text-gray-900 dark:text-white w-full"
+                               value="{{ !empty($selectedProduct) ? ($selectedProduct['name'] ?? $selectedProduct['device_names'][0]['name'] ?? $selectedProduct['description'] ?? '') : '' }}"
+                               disabled
+                        />
+                        @if(!empty($activityForm['id']))
+                            <button type="button"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-blue-600 hover:text-blue-800 text-sm whitespace-nowrap"
+                                    aria-controls="medical-device-search-drawer-right"
+                                    wire:click="openMedicalDeviceSearch"
+                            >
+                                {{ __('care-plan.change_product') }}
+                            </button>
+                        @endif
+                    </div>
                     <input type="hidden" wire:model="activityForm.product_reference" />
                 </div>
             </div>

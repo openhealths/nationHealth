@@ -7,7 +7,7 @@
         </x-slot>
 
         <div class="mt-3 ml-0 flex flex-col sm:flex-row sm:flex-wrap gap-2 self-start">
-            <a href="{{ route('persons.index', legalEntity()) }}" class="button-primary">
+            <a href="{{ route('care-plans.create', legalEntity()) }}" class="button-primary">
                 + {{ __('care-plan.new_care_plan') }}
             </a>
 

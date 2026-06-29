@@ -49,10 +49,9 @@
                         <select id="medication_program"
                                 name="medication_program"
                                 class="input-select peer"
-                                wire:model="selectedProgram"
+                                wire:model.live="selectedProgram"
                         >
-                            <option value="">{{ __('care-plan.prescription_medication') }}</option>
-                            @foreach(($dictionaries['medical_programs'] ?? []) as $id => $name)
+                            @foreach(($dictionaries['medical_programs_medication'] ?? $dictionaries['medical_programs'] ?? []) as $id => $name)
                                 <option value="{{ $id }}">{{ $name }}</option>
                             @endforeach
                         </select>
