@@ -185,15 +185,7 @@ class EmployeeForm extends Form
 
     protected function documentsRules(): array
     {
-        $identityDocTypes = [
-            'COMPLEMENTARY_PROTECTION_CERTIFICATE',
-            'NATIONAL_ID',
-            'PASSPORT',
-            'PERMANENT_RESIDENCE_PERMIT',
-            'REFUGEE_CERTIFICATE',
-            'TEMPORARY_CERTIFICATE',
-            'TEMPORARY_PASSPORT'
-        ];
+        $identityDocTypes = config('ehealth.employee_identity_document_types', []);
 
         return [
             'documents' => [
