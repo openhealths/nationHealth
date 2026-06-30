@@ -96,30 +96,6 @@ class EHealthValidationException extends EHealthException
         return $message;
     }
 
-    public function isDuplicateReferralError(): bool
-    {
-        $haystacks = [];
-
-        $message = $this->details['error']['message'] ?? null;
-        if (is_string($message) && $message !== '') {
-            $haystacks[] = strtolower($message);
-        }
-
-        foreach ($this->details['error']['invalid'] ?? [] as $item) {
-            if (!is_array($item)) {
-                continue;
-            }
-
-            $haystacks[] = strtolower((string) ($item['entry'] ?? ''));
-            $haystacks[] = strtolower((string) ($item['rules'][0]['description'] ?? ''));
-        }
-
-        $combined = implode(' ', $haystacks);
-
-        return str_contains($combined, 'already exists')
-            || str_contains($combined, 'such id already exists');
-    }
-
     /**
      * Get the translated error message based on eHealth details.
      *
