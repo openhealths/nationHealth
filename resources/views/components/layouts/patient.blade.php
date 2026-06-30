@@ -3,7 +3,8 @@
     'patientFullName',
     'hideNavigation' => false,
     'title' => null,
-    'breadcrumbs' => []
+    'breadcrumbs' => [],
+    'activeTab' => null
 ])
 
 @php
@@ -51,7 +52,7 @@
                 <div class="space-y-1">
                     <div class="summary-nav-row">
                         <a href="{{ route('persons.patient-data', [legalEntity(), 'personId' => $personId]) }}"
-                           class="summary-tab {{ request()->routeIs('persons.patient-data') ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                           class="summary-tab {{ ($activeTab === 'patient-data' || request()->routeIs('persons.patient-data')) ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                         >
                             {{ __('patients.patient_data') }}
                         </a>
