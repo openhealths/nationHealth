@@ -71,19 +71,8 @@
                         <div class="flex flex-col gap-6">
                             @hasSection('custom-fields')
                                 @yield('custom-fields')
-                            @elseif(method_exists($this, 'getStatusReasonsProperty') && isset($this->actionType) && in_array($this->actionType, ['cancel_prescription', 'cancel_referral']))
-                                <div>
-                                    <label for="statusReason" class="default-label">{{ __('care-plan.status_reason') }} *</label>
-                                    <select class="input-modal" wire:model="statusReason" name="statusReason" id="statusReason">
-                                        <option value="" selected>{{__('forms.select')}}</option>
-                                        @foreach($this->statusReasons as $code => $description)
-                                            <option value="{{ $code }}" wire:key="reason-{{ $code }}">
-                                                {{ $description }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                    @error('statusReason') <p class="text-error">{{ $message }}</p> @enderror
-                                </div>
+                            @elseif(isset($customFields))
+                                {{ $customFields }}
                             @endif
 
                             {{-- KEP Provider --}}
