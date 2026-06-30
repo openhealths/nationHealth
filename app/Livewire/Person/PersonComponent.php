@@ -25,6 +25,7 @@ use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
@@ -670,6 +671,20 @@ class PersonComponent extends Component
                 $this->handleDatabaseErrors($exception, $exception->getMessage());
 
                 return;
+            }
+
+            // Sync authentication methods for the person after signing the request
+            try {
+                $authMethodsResponse = EHealth::person()->getAuthMethods($responseData['person_id']);
+
+                $authMethodsData = $authMethodsResponse->validate();
+
+                $person = Person::whereUuid($responseData['person_id'])->first();
+
+                Repository::authenticationMethod()->sync($person, $authMethodsData);
+            } catch (EHealthException|EHealthConnectionException $exception) {
+                // Only log the error, but do not block the user from proceeding, as the person's auth methods can be synced via declaration's page
+                $exception->handle('Error when getting person authentication methods', __('patients.errors.person_auth_methods_sync_error'));
             }
 
             Session::flash('success', $successMessage);

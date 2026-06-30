@@ -154,8 +154,8 @@ class PersonForm extends BaseForm
     protected function basicRules(): array
     {
         $rules = [
-            'person.patientType' => ['required', 'string', 'in:identified,unidentified'],
-            'person.unidentifiedReason' => ['nullable', 'string', 'in:EMERGENCY_HOSPITALIZATION,POLICE_HOSPITALIZATION,NEWBORN_WITHOUT_CERTIFICATE,OTHER_HOSPITALIZATION'],
+            // 'person.patientType' => ['required', 'string', 'in:identified,unidentified'],
+            // 'person.unidentifiedReason' => ['nullable', 'string', 'in:EMERGENCY_HOSPITALIZATION,POLICE_HOSPITALIZATION,NEWBORN_WITHOUT_CERTIFICATE,OTHER_HOSPITALIZATION'],
             'person.ambulanceCardNumber' => ['nullable', 'string', 'max:255'],
             'person.firstName' => ['required', 'min:3', new NameFields()],
             'person.lastName' => ['required', 'min:3', new NameFields()],
@@ -196,7 +196,11 @@ class PersonForm extends BaseForm
                 'nullable',
                 'email',
                 'string',
-                Rule::unique('persons', 'email')->ignore($this->person['uuid'], 'uuid')
+                Rule::unique('persons', 'email')
+                    ->when(
+                        !empty($this->person['uuid']),
+                        fn ($rule) => $rule->ignore($this->person['uuid'], 'uuid')
+                    )
             ],
 
             'person.phones.*.type' => ['nullable', 'string', 'distinct', 'required_with:person.phones.*.number'],

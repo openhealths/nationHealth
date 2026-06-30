@@ -266,6 +266,7 @@
 
             <div class="form-group group">
                 <input wire:model="form.person.unzr"
+                       required
                        type="text"
                        name="unzr"
                        id="unzr"

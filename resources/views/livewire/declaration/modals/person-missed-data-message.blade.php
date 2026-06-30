@@ -16,40 +16,32 @@
                         {{ __('patients.patient_data_incomplete') }}
                     </h2>
 
-                    <p class="default-p mb-8">
-                        {{ __('patients.missed_patient_data') }}
-                    </p>
+                    @if(!$isSyncing)
+                        <p class="default-p mb-8">
+                            {{ __('patients.missed_patient_data') }}
+                        </p>
 
-                    <p class="default-p mb-8">
-                        {{ __('patients.patient_data_need_to_update') }}
-                    </p>
+                        <p class="default-p mb-8 font-semibold italic dark:text-white">
+                            {{ __('patients.patient_auth_method_is_obsolete') }}
+                        </p>
 
-                    {{-- Is signed by patient --}}
-                    <div class="form-row">
-                        <div class="form-group group">
-                            <input x-model="isInformed"
-                                   type="checkbox"
-                                   name="isInformed"
-                                   id="isInformed"
-                                   class="default-checkbox"
-                            />
-                            <label class="default-p" for="isInformed">
-                                {{ __('declarations.patient_confirm_sync_message') }}
-                            </label>
-                        </div>
-                    </div>
+                    @else
+                        <p class="default-p mb-8">
+                            {{ __('patients.syncng_patient_data') }}
+                        </p>
+                    @endif
 
                     {{-- Action buttons --}}
                     <div class="flex justify-center gap-8.5 mt-16">
-                        <button type="button" @click="isNeedToUpdatePerson = false" class="button-minor">
-                            {{ __('forms.cancel') }}
+                        <button type="button" @click="isNeedToUpdatePerson = false; isInformed = false" class="button-minor">
+                            {{ __('forms.close') }}
                         </button>
-                        <button wire:click="openApproveModal"
-                                type="button"
-                                class="button-primary flex items-center gap-2"
-                                :disabled="!isInformed"
+
+                        <button type="button"
+                            @click="isNeedToUpdatePerson = false; isInformed = false; $wire.goToPatientData()"
+                            class="button-primary flex items-center gap-2"
                         >
-                            {{ __('patients.patient_data_update') }}
+                            {{ __('patients.patient_record') }}
                         </button>
                     </div>
                 </div>
