@@ -33,14 +33,14 @@ class PersonForm extends BaseForm
     public string $phoneNumber;
     public string $birthCertificate;
 
+    /**
+     * Selected patient type that toggles the form between an identified person and an unidentified preperson.
+     *
+     * @var string
+     */
+    public string $patientType = 'person';
+
     public array $person = [
-        'patientType' => 'identified',
-        'unidentifiedReason' => 'EMERGENCY_HOSPITALIZATION',
-        'ambulanceCardNumber' => '',
-        'policeReportId' => '',
-        'policeReportDate' => '',
-        'childBirthTime' => '',
-        'unidentifiedOtherReason' => '',
         'documents' => [],
         'phones' => [['type' => null, 'number' => null]],
         'emergencyContact' => [
@@ -67,16 +67,10 @@ class PersonForm extends BaseForm
 
     public array $uploadedDocuments = [];
 
-    public bool $showContactPerson = false;
-
     private int $personAge;
 
     public function rulesForCreate(): array
     {
-        if (($this->person['patientType'] ?? 'identified') === 'unidentified') {
-            return [];
-        }
-
         $createRules = [
             'person.confidantPerson' => ['nullable', 'array'],
             'person.confidantPerson.personId' => [
@@ -154,9 +148,6 @@ class PersonForm extends BaseForm
     protected function basicRules(): array
     {
         $rules = [
-            // 'person.patientType' => ['required', 'string', 'in:identified,unidentified'],
-            // 'person.unidentifiedReason' => ['nullable', 'string', 'in:EMERGENCY_HOSPITALIZATION,POLICE_HOSPITALIZATION,NEWBORN_WITHOUT_CERTIFICATE,OTHER_HOSPITALIZATION'],
-            'person.ambulanceCardNumber' => ['nullable', 'string', 'max:255'],
             'person.firstName' => ['required', 'min:3', new NameFields()],
             'person.lastName' => ['required', 'min:3', new NameFields()],
             'person.secondName' => ['nullable', 'min:3', new NameFields()],
@@ -468,7 +459,13 @@ class PersonForm extends BaseForm
      */
     private function addNoTaxIdValidation(array &$rules): void
     {
-        if (!empty($this->person['taxId']) && (!empty($this->person['birthDate']) && $this->person['birthDate'] > self::NO_SELF_AUTH_AGE)) {
+        if (empty($this->person['birthDate'])) {
+            return;
+        }
+
+        $personAge = CarbonImmutable::parse($this->person['birthDate'])->age;
+
+        if (empty($this->person['noTaxId']) && $personAge > self::NO_SELF_AUTH_AGE) {
             $rules['person.taxId'][] = 'required';
         }
     }

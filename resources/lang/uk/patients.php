@@ -546,6 +546,7 @@ return [
         'encounter_updated' => 'Взаємодія успішно оновлена.',
         'person_request_updated' => 'Заявка на створення пацієнта успішно оновлена.',
         'person_request_created' => 'Заявка на створення пацієнта успішно створена.',
+        'preperson_created' => 'Чернетку неідентифікованого пацієнта успішно створено.',
         'person_request_approved' => 'Заявку успішно підтверджено.',
         'person_request_rejected' => 'Заявку успішно відхилено.',
         'person_updated' => 'Пацієнт успішно оновлений',

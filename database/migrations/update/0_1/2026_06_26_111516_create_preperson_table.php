@@ -18,7 +18,7 @@ return new class extends Migration
         Schema::create('prepersons', static function (Blueprint $table) {
             $table->id();
             $table->uuid()->unique()->nullable()->comment('MPI identifier of the preperson');
-            $table->string('external_id')->unique()->comment('Identifier from external system');
+            $table->string('external_id')->nullable()->unique()->comment('Identifier from external system');
             $table->string('first_name')->nullable();
             $table->string('last_name')->nullable();
             $table->string('second_name')->nullable();

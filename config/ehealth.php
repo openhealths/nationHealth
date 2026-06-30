@@ -12,6 +12,7 @@ return [
         'mis_api_key' => env('EHEALTH_MIS_API_KEY', ''),
         'mis_token' => env('EHEALTH_MIS_TOKEN'),
         'mis_id' => env('EHEALTH_MIS_ID'),
+        'mis_edrpou' => env('EHEALTH_MIS_EDRPOU'),
         'callback_prod' => env('EHEALTH_CALLBACK_PROD', true),
         'auth_host' => env('EHEALTH_AUTH_HOST', 'https://auth-preprod.ehealth.gov.ua'),
         'redirect_uri' => env('EHEALTH_REDIRECT_URI', 'https://openhealths.com/ehealth/oauth'),

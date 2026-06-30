@@ -1,7 +1,7 @@
 @use('App\Models\Person\PersonRequest')
 @use('App\Livewire\Person\PersonUpdate')
 
-<div x-data="{ showUnidentifiedPatientModal: false, patientType: $wire.entangle('form.person.patientType') }">
+<div x-data="{ showUnidentifiedPatientModal: false, patientType: $wire.entangle('form.patientType') }">
     <x-header-navigation class="breadcrumb-form">
         <x-slot name="title">{{ __('patients.add_patient') }}</x-slot>
     </x-header-navigation>
@@ -10,13 +10,15 @@
         <section wire:key="{{ $viewState }}" class="section-form shift-content">
             <form class="form" wire:key="patient-form-{{ $formKey }}" novalidate>
                 @include('livewire.person.parts.patient-type')
-                @include('livewire.person.parts.person')
 
-                <div x-show="patientType === 'unidentified'" x-cloak>
-                    @include('livewire.person.parts.unidentified-contact-person')
-                </div>
+                @if(!$this instanceof PersonUpdate)
+                    <div x-show="patientType === 'preperson'" x-cloak>
+                        <livewire:preperson.preperson-create />
+                    </div>
+                @endif
 
-                <div x-show="patientType === 'identified'" x-cloak>
+                <div x-show="patientType === 'person'" x-cloak>
+                    @include('livewire.person.parts.person')
                     @include('livewire.person.parts.documents')
                     @include('livewire.person.parts.identity')
                     @include('livewire.person.parts.contact-data')
@@ -40,21 +42,8 @@
                             </button>
                         @endcan
                     @else
-                        <a href="{{ route('persons.index', [legalEntity()]) }}" class="button-primary-outline-red">
-                            {{ __('forms.delete') }}
-                        </a>
-
                         @can('create', PersonRequest::class)
-                            <div x-show="patientType === 'unidentified'" class="flex flex-wrap gap-4 items-center" x-cloak>
-                                <button type="button" @click.prevent="window.location.href = '{{ route('persons.index', [legalEntity()]) }}'" class="button-primary-outline flex items-center gap-2">
-                                    @icon('archive', 'w-4 h-4')
-                                    {{ __('forms.save') }}
-                                </button>
-                                <button type="button" @click.prevent="showUnidentifiedPatientModal = true" class="button-primary">
-                                    {{ __('forms.create') }}
-                                </button>
-                            </div>
-                            <div x-show="patientType === 'identified'" class="flex flex-wrap gap-4 items-center" x-cloak>
+                            <div x-show="patientType === 'person'" class="flex flex-wrap gap-4 items-center" x-cloak>
                                 <button type="submit" wire:click.prevent="createLocally" class="button-primary-outline flex items-center gap-2">
                                     @icon('archive', 'w-4 h-4')
                                     {{ __('forms.save') }}
