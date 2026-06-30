@@ -115,7 +115,6 @@ class CarePlanRepository
                     ['system' => 'eHealth/care_plan_categories', 'code' => $form['category']]
                 ]
             ],
-            'instantiates_protocol' => !empty($form['clinicalProtocol']) ? [['display' => $form['clinicalProtocol']]] : (!empty($form['clinical_protocol']) ? [['display' => $form['clinical_protocol']]] : null),
             'title' => $form['title'],
             'period' => array_filter([
                 'start' => $finalPeriodStart,
@@ -144,7 +143,8 @@ class CarePlanRepository
                 'coding' => [
                     ['system' => 'PROVIDING_CONDITION', 'code' => $form['termsOfService'] ?? $form['terms_of_service']]
                 ]
-            ]
+            ],
+            'inform_with' => $form['informWith'] ?? ($form['inform_with'] ?? null)
         ]);
 
         return $payload;
