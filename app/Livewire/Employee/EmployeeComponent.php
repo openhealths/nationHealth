@@ -112,7 +112,7 @@ abstract class EmployeeComponent extends Component
     /**
      * Employee request accepts only EMPLOYEE_IDENTITY_DOCUMENT_TYPES (eHealth chart parameter).
      *
-     * @see https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583402887/Create+employee+request+v2
+     * @see https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17570365551/DRAFT+REST+API+Create+Employee+Request+v2+API-005-024-0001
      */
     protected function filterEmployeeDocumentTypes(): void
     {
