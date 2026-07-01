@@ -9,7 +9,6 @@ use App\Core\Arr;
 use App\Models\User;
 use Illuminate\Contracts\Validation\DataAwareRule;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Support\Collection;
 use Illuminate\Translation\PotentiallyTranslatedString;
 
 class TaxId implements ValidationRule, DataAwareRule
@@ -93,45 +92,14 @@ class TaxId implements ValidationRule, DataAwareRule
             // Find the user associated with the provided email (or not find).
             $this->user = User::where('email', $this->email)->first();
 
-            $this->documents = $this->normalizeDocuments(
-                $this->isOwner
-                    ? ($contextData['documents'] ?? [])
-                    : ($data['documents'] ?? $this->user?->party?->documents ?? [])
-            );
+            $this->documents = $this->isOwner
+                ? ($contextData['documents'] ?? [])
+                : ($data['documents'] ?? $this->user?->party?->documents?->toArray() ?? []);
 
             $this->edrpou = Arr::get($data, 'edrpou', '');
         }
 
         return $this;
-    }
-
-    /**
-     * @param  array<int, array<string, mixed>>|Collection<int, mixed>|mixed  $documents
-     * @return array<int, array{type: string, number: string}>
-     */
-    private function normalizeDocuments(mixed $documents): array
-    {
-        if ($documents instanceof Collection) {
-            $documents = $documents->all();
-        }
-
-        if (!is_array($documents)) {
-            return [];
-        }
-
-        return array_values(array_map(static function (mixed $document): array {
-            if (is_array($document)) {
-                return [
-                    'type' => (string) ($document['type'] ?? ''),
-                    'number' => (string) ($document['number'] ?? ''),
-                ];
-            }
-
-            return [
-                'type' => (string) ($document->type ?? ''),
-                'number' => (string) ($document->number ?? ''),
-            ];
-        }, $documents));
     }
 
     /**
