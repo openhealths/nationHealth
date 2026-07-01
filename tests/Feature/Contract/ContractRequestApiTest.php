@@ -151,6 +151,23 @@ class ContractRequestApiTest extends TestCase
         $this->assertSame('CAPITATION', $result[0]['type']);
     }
 
+    public function test_validate_many_allows_missing_contract_number_and_empty_nhs_signer(): void
+    {
+        $api = new ContractRequest();
+        $response = $this->makeEHealthResponseForMany($api, [[
+            'id' => 'c4f40d3a-1111-2222-3333-444455556666',
+            'contract_type' => 'REIMBURSEMENT',
+            'status' => 'NEW',
+            'nhs_signer_id' => '',
+        ]]);
+
+        $validated = $response->validate();
+
+        $this->assertSame('NEW', $validated[0]['status']);
+        $this->assertNull($validated[0]['contract_number'] ?? null);
+        $this->assertNull($validated[0]['nhs_signer_id']);
+    }
+
     // -----------------------------------------------------------------------
     // validateDetails() — tested directly without making an HTTP call
     // -----------------------------------------------------------------------

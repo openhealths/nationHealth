@@ -356,18 +356,21 @@ class ContractRequest extends EHealthRequest
     {
         $transformedData = [];
         foreach ($response->getData() as $item) {
-            $transformedData[] = self::replaceEHealthPropNames($item);
+            $transformedData[] = self::normalizeListItem(
+                self::replaceEHealthPropNames($item)
+            );
         }
 
-        // Validate filters based on user's URL example
+        // List items may lack contract_number and nhs_signer_id (e.g. NEW / early statuses).
+        // See API-005-012-0007 — both fields are optional in the list response.
         $validator = Validator::make($transformedData, [
             '*.uuid' => 'required|uuid',
             '*.status' => 'required|string',
-            '*.contract_number' => 'required|string',
-            '*.contractor_legal_entity_id' => 'sometimes|uuid',
-            '*.contractor_owner_id' => 'sometimes|uuid',
-            '*.nhs_signer_id' => 'sometimes|uuid',
-            '*.edrpou' => 'sometimes|string',
+            '*.contract_number' => 'sometimes|nullable|string',
+            '*.contractor_legal_entity_id' => 'sometimes|nullable|uuid',
+            '*.contractor_owner_id' => 'sometimes|nullable|uuid',
+            '*.nhs_signer_id' => 'sometimes|nullable|string',
+            '*.edrpou' => 'sometimes|nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -686,5 +689,22 @@ class ContractRequest extends EHealthRequest
         }
 
         return $replaced;
+    }
+
+    /**
+     * Normalize optional list fields: eHealth may send "" instead of null for absent UUIDs.
+     *
+     * @param  array<string, mixed>  $item
+     * @return array<string, mixed>
+     */
+    protected static function normalizeListItem(array $item): array
+    {
+        foreach (['contract_number', 'contractor_legal_entity_id', 'contractor_owner_id', 'nhs_signer_id', 'edrpou'] as $field) {
+            if (array_key_exists($field, $item) && $item[$field] === '') {
+                $item[$field] = null;
+            }
+        }
+
+        return $item;
     }
 }
