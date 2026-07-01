@@ -106,15 +106,20 @@ class ContractRequestIndex extends Component
         $encryptedToken = Crypt::encryptString($token);
 
         $types = ['capitation', 'reimbursement'];
-        $batchJobs = [];
+        $batchJob = null;
         $syncedCount = 0;
+        $syncErrors = [];
 
-        foreach ($types as $type) {
+        foreach ($types as $index => $type) {
+            if ($index === 1 && $batchJob !== null) {
+                break;
+            }
+
             try {
                 $response = EHealth::contractRequest()
                     ->withToken($token)
                     ->getMany($type, [
-                        'contractor_legal_entity_id' => $currentLegalEntity->uuid
+                        'contractor_legal_entity_id' => $currentLegalEntity->uuid,
                     ]);
 
                 $data = $response->validate();
@@ -128,22 +133,23 @@ class ContractRequestIndex extends Component
                 }
 
                 if ($response->isNotLast()) {
-                    $batchJobs[] = new ContractRequestSync(
+                    $batchJob = new ContractRequestSync(
                         legalEntity: $currentLegalEntity,
                         nextEntity: null,
                         isFirstLogin: false,
                         user: $user,
                         contractType: strtoupper($type),
+                        page: 2,
                     );
                 }
-
             } catch (\Exception $e) {
                 Log::error("ContractRequest sync ($type) error.", ['error' => $e->getMessage()]);
+                $syncErrors[] = "$type: {$e->getMessage()}";
             }
         }
 
-        if (!empty($batchJobs)) {
-            Bus::batch($batchJobs)
+        if ($batchJob !== null) {
+            Bus::batch([$batchJob])
                 ->withOption('legal_entity_id', $currentLegalEntity->id)
                 ->withOption('token', $encryptedToken)
                 ->withOption('user', $user)
@@ -182,7 +188,14 @@ class ContractRequestIndex extends Component
             }
         }
 
-        $this->dispatch('flashMessage', ['message' => $msg, 'type' => 'success']);
+        if (!empty($syncErrors)) {
+            $msg = implode('; ', $syncErrors) . ($syncedCount > 0 ? " ({$syncedCount} items saved before error)" : '');
+        }
+
+        $this->dispatch('flashMessage', [
+            'message' => $msg,
+            'type' => empty($syncErrors) ? 'success' : 'error',
+        ]);
     }
 
     /**

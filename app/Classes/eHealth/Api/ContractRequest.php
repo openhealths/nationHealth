@@ -24,20 +24,18 @@ class ContractRequest extends EHealthRequest
 
     /**
      * Gets a list of contract requests from E-Health.
+     *
+     * ESOZ API-005-012-0007: GET /api/contract_requests/{contract_type}
      */
     public function getMany(string $contractType, $query = null): PromiseInterface|EHealthResponse
     {
         $this->setValidator($this->validateMany(...));
         $this->setDefaultPageSize();
 
-        // Combining existing query parameters with passed ones
         $mergedQuery = array_merge($this->options['query'] ?? [], $query ?? []);
+        $url = self::URL . '/' . strtolower($contractType);
 
-        // Pass the type as a query parameter, not part of the URL
-        $mergedQuery['type'] = strtoupper($contractType);
-
-        // We use the base URL (self::URL), the parameters will go to the query string
-        return $this->get(self::URL, $mergedQuery);
+        return $this->get($url, $mergedQuery);
     }
 
     /**
@@ -72,7 +70,7 @@ class ContractRequest extends EHealthRequest
             'contract_number' => $data['contract_number'] ?? null,
             'status' => $data['status'],
             'status_reason' => $data['status_reason'] ?? null,
-            'type' => $data['type'] ?? 'REIMBURSEMENT', // Default if missing
+            'type' => strtoupper((string) ($data['type'] ?? $data['contract_type'] ?? 'REIMBURSEMENT')),
             'id_form' => $data['id_form'] ?? null,
 
             // Dates
@@ -378,7 +376,7 @@ class ContractRequest extends EHealthRequest
             throw ValidationException::withMessages(['ehealth_error' => $error]);
         }
 
-        return $validator->validated();
+        return $transformedData;
     }
 
     /**
@@ -641,6 +639,9 @@ class ContractRequest extends EHealthRequest
             switch ($name) {
                 case 'id':
                     $replaced['uuid'] = $value;
+                    break;
+                case 'contract_type':
+                    $replaced['type'] = is_string($value) ? strtoupper($value) : $value;
                     break;
                 case 'party':
                 case 'contractor_legal_entity':

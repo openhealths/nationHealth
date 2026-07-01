@@ -33,11 +33,10 @@ class ContractRequestSync extends EHealthJob
         ?EHealthJob $nextEntity = null,
         bool $isFirstLogin = false,
         ?User $user = null,
-        string $contractType = 'REIMBURSEMENT'
+        string $contractType = 'REIMBURSEMENT',
+        int $page = 1,
     ) {
-        // 1.Call the parent constructor with the correct types
-        // Signature: (LegalEntity $legalEntity, ? EHealthJob $nextEntity, $isFirstLogin drawing, int $page, $standalone drawing)
-        parent::__construct($legalEntity, $nextEntity, $isFirstLogin);
+        parent::__construct($legalEntity, $nextEntity, $isFirstLogin, $page);
 
         // 2.Initialize our specific properties
         $this->contractType = $contractType;
@@ -58,6 +57,7 @@ class ContractRequestSync extends EHealthJob
             ->withToken($token)
             ->getMany($this->contractType, [
                 'contractor_legal_entity_id' => $this->legalEntity->uuid,
+                'page' => $this->page,
             ]);
     }
 

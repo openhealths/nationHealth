@@ -13,9 +13,9 @@ use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
- * Tests for ContractRequest API class bugs:
+ * Tests for ContractRequest API class:
  *  - create() must use POST /api/contract_requests/{contract_type}/{id}
- *  - getMany() must not throw when options['query'] is null
+ *  - getMany() must use GET /api/contract_requests/{contract_type} (API-005-012-0007)
  *  - validateDetails() must not fail for NEW status contract requests
  */
 class ContractRequestApiTest extends TestCase
@@ -109,9 +109,46 @@ class ContractRequestApiTest extends TestCase
         $api->getMany('reimbursement', ['contractor_legal_entity_id' => 'some-entity-uuid']);
 
         Http::assertSent(static function (Request $request): bool {
-            return str_contains($request->url(), 'contractor_legal_entity_id=some-entity-uuid')
-                && str_contains($request->url(), 'type=REIMBURSEMENT');
+            $path = parse_url($request->url(), PHP_URL_PATH) ?? '';
+
+            return $request->method() === 'GET'
+                && str_ends_with($path, '/api/contract_requests/reimbursement')
+                && str_contains($request->url(), 'contractor_legal_entity_id=some-entity-uuid')
+                && !str_contains($request->url(), 'type=');
         });
+    }
+
+    public function test_get_many_passes_page_query_param(): void
+    {
+        Http::fake([
+            '*' => Http::response([
+                'data' => [],
+                'paging' => ['page_number' => 2, 'total_pages' => 3],
+            ], 200),
+        ]);
+
+        $api = $this->makeApi();
+        $api->getMany('capitation', ['contractor_legal_entity_id' => 'entity-uuid', 'page' => 2]);
+
+        Http::assertSent(static function (Request $request): bool {
+            return str_ends_with(parse_url($request->url(), PHP_URL_PATH) ?? '', '/api/contract_requests/capitation')
+                && str_contains($request->url(), 'page=2');
+        });
+    }
+
+    public function test_validate_many_maps_contract_type_to_type(): void
+    {
+        $api = new ContractRequest();
+        $response = $this->makeEHealthResponseForMany($api, [[
+            'id' => 'c4f40d3a-1111-2222-3333-444455556666',
+            'contract_type' => 'CAPITATION',
+            'status' => 'NEW',
+            'contract_number' => '0001-CAP-0001',
+        ]]);
+
+        $result = $response->validate();
+
+        $this->assertSame('CAPITATION', $result[0]['type']);
     }
 
     // -----------------------------------------------------------------------
@@ -225,6 +262,37 @@ class ContractRequestApiTest extends TestCase
         $api->stub($stubs);
 
         return $api;
+    }
+
+    public function test_map_create_maps_contract_type_field(): void
+    {
+        $api = new ContractRequest();
+        $mapped = $api->mapCreate([
+            'id' => 'uuid-1',
+            'status' => 'NEW',
+            'contract_type' => 'CAPITATION',
+        ]);
+
+        $this->assertSame('CAPITATION', $mapped['type']);
+    }
+
+    /**
+     * Build an EHealthResponse wired to ContractRequest::validateMany() via reflection.
+     */
+    private function makeEHealthResponseForMany(ContractRequest $api, array $data): EHealthResponse
+    {
+        $guzzleResponse = new GuzzleResponse(
+            200,
+            ['Content-Type' => 'application/json'],
+            json_encode(['data' => $data])
+        );
+
+        $reflector = new \ReflectionClass($api);
+        $method = $reflector->getMethod('validateMany');
+        $method->setAccessible(true);
+        $validator = $method->getClosure($api);
+
+        return new EHealthResponse($guzzleResponse, $validator);
     }
 
     /**
