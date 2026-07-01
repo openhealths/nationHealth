@@ -1,4 +1,6 @@
 <div>
+    <livewire:components.x-message :key="now()->timestamp"/>
+
     <div
         x-data="{ showSignatureModal: $wire.entangle('showSignatureModal') }"
         x-on:close-signature-modal.window="showSignatureModal = false"

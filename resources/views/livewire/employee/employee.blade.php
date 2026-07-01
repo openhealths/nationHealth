@@ -3,6 +3,8 @@
     x-on:close-signature-modal.window="showSignatureModal = false"
     x-on:open-signature-modal.window="showSignatureModal = true"
 >
+    <livewire:components.x-message :key="now()->timestamp"/>
+
     <x-header-navigation class="breadcrumb-form shift-content">
         <x-slot name="title">
             {{ $pageTitle ?? __('forms.employee') }}

@@ -18,6 +18,18 @@
         <p class="text-error -mt-2 mb-4">{{ $message }}</p>
         @enderror
 
+        @foreach ($this->form->documents ?? [] as $index => $document)
+            @error("form.documents.{$index}.number")
+            <p class="text-error -mt-2 mb-2">{{ $message }}</p>
+            @enderror
+            @error("form.documents.{$index}.issuedAt")
+            <p class="text-error -mt-2 mb-2">{{ $message }}</p>
+            @enderror
+            @error("form.documents.{$index}.issued_at")
+            <p class="text-error -mt-2 mb-2">{{ $message }}</p>
+            @enderror
+        @endforeach
+
         <table class="table-input w-inherit">
             <thead class="thead-input">
             <tr>

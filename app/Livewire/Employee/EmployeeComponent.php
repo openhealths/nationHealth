@@ -70,6 +70,8 @@ abstract class EmployeeComponent extends Component
     {
         $this->traitGetDictionary();
 
+        $this->filterEmployeeDocumentTypes();
+
         if (legalEntity()) {
             $allowedEmployeeTypes = config('ehealth.legal_entity_employee_types.' . legalEntity()->type->name, []);
 
@@ -105,6 +107,21 @@ abstract class EmployeeComponent extends Component
                 $this->employeeTypeDegrees[$employeeType] = array_intersect_key($masterDegreeDict, array_flip($allowedDegreeKeys));
             }
         }
+    }
+
+    /**
+     * Employee request accepts only EMPLOYEE_IDENTITY_DOCUMENT_TYPES (eHealth chart parameter).
+     *
+     * @see https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17570365551/DRAFT+REST+API+Create+Employee+Request+v2+API-005-024-0001
+     */
+    protected function filterEmployeeDocumentTypes(): void
+    {
+        $allowedTypes = config('ehealth.employee_identity_document_types', []);
+
+        $this->dictionaries['DOCUMENT_TYPE'] = array_intersect_key(
+            $this->dictionaries['DOCUMENT_TYPE'] ?? [],
+            array_flip($allowedTypes)
+        );
     }
 
     #[Computed]

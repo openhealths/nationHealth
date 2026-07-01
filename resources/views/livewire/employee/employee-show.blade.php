@@ -38,7 +38,7 @@
             @include('livewire.employee.parts.position')
 
             {{-- Doctor-specific fields --}}
-            @if ($form->employeeType === Role::DOCTOR->value)
+            @if ($this->form->employeeType === Role::DOCTOR->value)
                 <div class="space-y-8">
                     @include('livewire.employee.parts.education')
                     @include('livewire.employee.parts.specialities')

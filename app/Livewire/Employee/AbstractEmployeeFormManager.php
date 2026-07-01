@@ -18,7 +18,6 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\Employee\BaseEmployee;
 use App\Models\Employee\Employee;
 use App\Models\Employee\EmployeeRequest;
-use App\Repositories\Repository;
 use App\Models\LegalEntity;
 use App\Models\Revision;
 use App\Models\User;
@@ -83,7 +82,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $this->employeeRequest = $this->handleDraftPersistence();
             $this->employeeRequestId = $this->employeeRequest->id;
 
-            $this->dispatch('flashMessage', ['message' => __('forms.employee_request_saved_successfully'), 'type' => 'success']);
+            $this->flashSuccess(__('forms.employee_request_saved_successfully'));
         } catch (ValidationException $e) {
             $this->handleValidationException($e);
         } catch (Exception $e) {
@@ -100,11 +99,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $this->employeeRequest = $this->handleDraftPersistence();
             $this->employeeRequestId = $this->employeeRequest->id;
 
-            // Now dispatch the events
-            $this->dispatch(
-                'flashMessage',
-                ['message' => __('forms.employee_request_saved_successfully'), 'type' => 'success']
-            );
+            $this->flashSuccess(__('forms.employee_request_saved_successfully'));
             $this->dispatch('open-signature-modal');
         } catch (ValidationException $e) {
             $this->handleValidationException($e);
@@ -159,7 +154,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
                 'line' => $e->getLine(),
             ]);
 
-            $this->dispatch('flashMessage', ['message' => __('errors.unexpected_error'), 'type' => 'error', 'persistent' => true]);
+            $this->flashError(__('errors.unexpected_error'));
             $this->dispatch('close-signature-modal');
         }
     }
@@ -340,11 +335,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             default => $errorMessage
         };
 
-        $this->dispatch('flashMessage', [
-            'message' => $translatedMessage,
-            'type' => 'error',
-            'persistent' => true
-        ]);
+        $this->flashError($translatedMessage);
 
         Log::error('EHealth Error Handled: ' . $errorMessage);
     }
@@ -549,11 +540,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $this->form->party['noTaxId'] = !$this->form->party['noTaxId'];
             $this->syncTaxIdFromDocument();
         } else {
-            $this->dispatch('flashMessage', [
-                'message' => __('forms.no_tax_id_document_required'),
-                'type' => 'error',
-                'persistent' => true
-            ]);
+            $this->flashError(__('forms.no_tax_id_document_required'));
             $this->dispatch('scroll-to-element', selector: '#section-documents');
             $this->dispatch('highlight-section', selector: '#section-documents');
         }
@@ -587,120 +574,109 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         $allMessages = $validator->errors()->all();
 
         if (in_array($specificEmailError, $allMessages, true)) {
-            $this->dispatch('flashMessage', ['message' => $specificEmailError, 'type' => 'error', 'persistent' => true]);
-
+            $this->flashError($specificEmailError);
+            $this->setErrorBag($validator->getMessageBag());
             $this->dispatch('validation-failed-scroll', firstErrorKey: 'form.party.email');
 
             return;
         }
 
-        $allErrorKeys = collect($validator->errors()->keys())->unique();
+        $flashMessage = $this->buildValidationFlashMessage($validator);
 
-        // A map of translatable field sections.
-        $sections = [
-            'form.party.phones' => __('forms.phone_number'),
-            'form.documents' => __('forms.document'),
-            'form.doctor.educations' => __('forms.education'),
-            'form.doctor.specialities' => __('forms.specialities'),
-            'form.doctor.qualifications' => __('forms.qualifications'),
-            'form.doctor.scienceDegree' => __('forms.science_degree'),
-        ];
-
-        // A map of translatable specific fields (with wildcards for nested arrays).
-        $fieldTranslations = [
-            'form.knedp' => __('forms.provider'),
-            'form.password' => __('forms.password'),
-            'form.keyContainerUpload' => __('forms.key_file'),
-            'form.party.firstName' => __('forms.first_name'),
-            'form.party.lastName' => __('forms.last_name'),
-            'form.party.secondName' => __('forms.second_name'),
-            'form.party.gender' => __('forms.gender'),
-            'form.party.birthDate' => __('forms.birth_date'),
-            'form.party.taxId' => __('forms.tax_id'),
-            'form.party.noTaxId' => __('forms.no_tax_id'),
-            'form.party.email' => __('forms.email'),
-            'form.party.workingExperience' => __('forms.working_experience'),
-            'form.party.aboutMyself' => __('forms.about_myself'),
-            'form.position' => __('forms.position'),
-            'form.employeeType' => __('forms.role'),
-            'form.startDate' => __('forms.start_date_work'),
-            'form.endDate' => __('forms.end_date_work'),
-            'form.party.phones.*.number' => __('forms.phone_number'),
-            'form.party.phones.*.type' => __('forms.phone_type'),
-            'form.documents.*.type' => __('forms.document_type'),
-            'form.documents.*.number' => __('forms.document_number'),
-            'form.documents.*.issuedBy' => __('forms.issued_by'),
-            'form.documents.*.issuedAt' => __('forms.issued_at'),
-            'form.doctor.educations.*.city' => __('forms.city'),
-            'form.doctor.educations.*.institutionName' => __('forms.institution_name'),
-            'form.doctor.educations.*.speciality' => __('forms.speciality'),
-            'form.doctor.educations.*.degree' => __('forms.degree'),
-            'form.doctor.educations.*.issuedDate' => __('forms.issued_date'),
-            'form.doctor.educations.*.diplomaNumber' => __('forms.diploma_number'),
-            'form.doctor.specialities.*.attestationName' => __('forms.attestationName'),
-            'form.doctor.specialities.*.level' => __('forms.select_level'),
-            'form.doctor.qualifications.*.institutionName' => __('forms.institutionName'),
-            'form.doctor.qualifications.*.speciality' => __('forms.speciality'),
-
-            'form.doctor.scienceDegree.city' => __('forms.city'),
-            'form.doctor.scienceDegree.institutionName' => __('forms.institutionName'),
-            'form.doctor.scienceDegree.speciality' => __('forms.speciality'),
-            'form.doctor.scienceDegree.issuedDate' => __('forms.issuedDate'),
-        ];
-
-        $fieldsToDisplay = $allErrorKeys
-            ->map(function ($key) use ($fieldTranslations, $sections, $allErrorKeys) {
-                // Check if this is a top-level section key (e.g., 'form.documents')
-                if (array_key_exists($key, $sections)) {
-                    // Check if there are any more specific errors within this section.
-                    $hasSpecificErrors = $allErrorKeys->contains(
-                        fn ($errorKey) =>
-                        str_starts_with($errorKey, $key . '.')
-                    );
-
-                    // If the section is a top-level error and has no specific sub-errors, it means the whole section is empty/missing.
-                    if (!$hasSpecificErrors) {
-                        return __('forms.section_not_filled', ['section' => $sections[$key]]);
-                    }
-                }
-
-                // Check for an exact field translation match.
-                if (isset($fieldTranslations[$key])) {
-                    return $fieldTranslations[$key];
-                }
-
-                // Match nested keys with wildcards using regex (most reliable method).
-                foreach ($fieldTranslations as $pattern => $translation) {
-                    $patternRegex = '/^' . str_replace('\*', '\d+', preg_quote($pattern, '/')) . '$/';
-                    if (preg_match($patternRegex, $key)) {
-                        return $translation;
-                    }
-                }
-
-                // Fallback to the key itself if no translation is found.
-                return $key;
-            })
-            ->filter()
-            ->unique()
-            ->implode(', ');
-
-        // Check if the flash message is empty and add a default message.
-        if (empty($fieldsToDisplay)) {
-            $flashMessage = __('forms.validation_error_unknown');
-        } else {
-            $flashMessage = __('forms.validation_fix_fields', ['fields' => $fieldsToDisplay]);
-        }
-
-        $this->dispatch('flashMessage', ['message' => $flashMessage, 'type' => 'error', 'persistent' => true]);
+        $this->flashError($flashMessage);
+        $this->setErrorBag($validator->getMessageBag());
 
         if (!empty($validator->errors()->keys())) {
             $this->dispatch('validation-failed-scroll', firstErrorKey: $validator->errors()->keys()[0]);
         }
     }
 
+    /**
+     * Builds a user-facing flash message from validation errors with document context.
+     */
+    private function buildValidationFlashMessage(\Illuminate\Contracts\Validation\Validator $validator): string
+    {
+        $messages = collect($validator->errors()->messages())
+            ->flatMap(function (array $errors, string $key) {
+                return collect($errors)->map(function (string $error) use ($key) {
+                    if ($this->isDetailedValidationMessage($error)) {
+                        return $error;
+                    }
+
+                    $context = $this->resolveValidationErrorContext($key);
+
+                    return $context !== null ? "{$context}: {$error}" : $error;
+                });
+            })
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($messages->isEmpty()) {
+            return __('forms.validation_error_unknown');
+        }
+
+        return $messages->implode(' ');
+    }
+
+    private function isDetailedValidationMessage(string $error): bool
+    {
+        return str_contains($error, '«')
+            || str_starts_with($error, 'У розділі')
+            || str_starts_with($error, 'Не можна одночасно');
+    }
+
+    private function resolveValidationErrorContext(string $key): ?string
+    {
+        if (preg_match('/^form\.documents\.(\d+)\.(\w+)$/', $key, $matches)) {
+            $fieldLabel = match ($matches[2]) {
+                'number' => __('forms.document_number'),
+                'type' => __('forms.document_type'),
+                'issuedAt', 'issued_at' => __('forms.issued_at'),
+                'issuedBy', 'issued_by' => __('forms.issued_by'),
+                default => null,
+            };
+
+            if ($fieldLabel === null) {
+                return null;
+            }
+
+            $documentIndex = (int) $matches[1];
+            $documents = $this->form?->documents ?? [];
+            $documentType = $documents[$documentIndex]['type'] ?? null;
+
+            if ($documentType === null) {
+                return $fieldLabel;
+            }
+
+            $documentLabel = __('patients.documents.' . $documentType);
+            if ($documentLabel === 'patients.documents.' . $documentType) {
+                $documentLabel = $documentType;
+            }
+
+            return "{$fieldLabel} ({$documentLabel})";
+        }
+
+        if ($key === 'form.documents') {
+            return __('forms.documents');
+        }
+
+        return null;
+    }
+
+    protected function flashSuccess(string $message): void
+    {
+        session()->flash('success', $message);
+    }
+
+    protected function flashError(string $message): void
+    {
+        session()->flash('error', $message);
+    }
+
     private function handleConnectionException(EHealthConnectionException $e): void
     {
-        $this->dispatch('flashMessage', ['message' => __('errors.ehealth_connection_error'), 'type' => 'error', 'persistent' => true]);
+        $this->flashError(__('errors.ehealth_connection_error'));
         Log::error('EHealth connection error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
     }
 
@@ -710,7 +686,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     protected function handleException(Exception $e): void
     {
         Log::error('Process failed: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-        $this->dispatch('flashMessage', ['message' => $e->getMessage(), 'type' => 'error', 'persistent' => true]);
+        $this->flashError($e->getMessage());
     }
 
     /**
@@ -719,7 +695,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     protected function handleEHealthValidationError(EHealthValidationException $e): void
     {
         $fullMessage = $e->getTranslatedMessage();
-        $this->dispatch('flashMessage', ['message' => $fullMessage, 'type' => 'error', 'persistent' => true]);
+        $this->flashError($fullMessage);
 
         Log::error(
             'EHealth Validation Error: ' . $fullMessage,

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Rules;
 
 use Closure;
@@ -21,7 +23,7 @@ class UniquePassportRule implements ValidationRule
         $types = collect($value)->pluck('type');
 
         if ($types->contains('PASSPORT') && $types->contains('NATIONAL_ID')) {
-            $fail(__('Employee can have only one of the following document types: PASSPORT or NATIONAL_ID.'));
+            $fail(__('validation.custom.employee.passport_national_id_mutual_exclusion'));
         }
     }
 }
