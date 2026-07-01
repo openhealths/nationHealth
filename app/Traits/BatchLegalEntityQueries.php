@@ -28,6 +28,9 @@ use App\Models\Relations\ConfidantPerson;
 use App\Jobs\EmployeeRequestDetailsUpsert;
 use App\Jobs\DeclarationRequestDetailsSync;
 use App\Models\Relations\AuthenticationMethod;
+use App\Jobs\RemoteEHealthLinksProcessing;
+use App\Models\EhealthJob as EHealthJobModel;
+use App\Models\EhealthLink;
 
 /**
  * Trait for querying batches by legal_entity_id
@@ -487,5 +490,41 @@ trait BatchLegalEntityQueries
         }
 
         return $chainedJob;
+    }
+
+    /**
+     * Creates a chain of ConfidantPersonSync jobs for all confidant_persons with PARTIAL sync status.
+     *
+     * Jobs are created in reverse order, each next job receives the previous one as nextEntity.
+     * Returns the first job in the chain (or null if there are no confidant_persons).
+     * So the jobs will be executed in the original order one by one.
+     *
+     * @param  LegalEntity  $legalEntity
+     * @param  EHealthJob|null  $nextEntity  The job to be executed after the chain completes (or null)
+     * @return EHealthJob|null The first job in the EmployeeDetailsUpsert chain, or null if there are no employees
+     */
+    protected function getEHealthRemoteJobsData(LegalEntity $legalEntity, ?EHealthJob $nextEntity, EHealthJobModel $eHealthJob): ?EHealthJob
+    {
+        $job = null;
+
+        // The incoming $nextEntity will be executed after the whole chain
+        $previousJob = $nextEntity;
+
+        $models = EhealthLink::where('ehealth_job_id', $eHealthJob->id)
+             ->where('status', JobStatus::PENDING->value)
+             ->get();
+
+        foreach ($models->reverse() as $index => $model) {
+            $job = new RemoteEHealthLinksProcessing(
+                eHealthLink: $model,
+                legalEntity: $legalEntity,
+                nextEntity: $previousJob
+            );
+
+            $previousJob = $job;
+        }
+
+        // Here $job is the first job in the chain (or null if no employees)
+        return $job ?? $previousJob;
     }
 }

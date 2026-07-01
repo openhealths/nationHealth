@@ -95,6 +95,7 @@ return [
         'declaration_request' => 20,
         'legal_entity_legators' => 2,
         'person_authentication_method' => 20,
+        'remote_job' => 1399
     ],
     'employee_type' => [
         'OWNER' => [

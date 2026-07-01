@@ -14,7 +14,14 @@ class EhealthLink extends Model
         'linkable_id',
         'ehealth_job_id',
         'entity',
-        'href'
+        'href',
+        'error',
+        'error_code',
+        'status'
+    ];
+
+    protected $casts = [
+        'error' => 'array'
     ];
 
     public function linkable(): MorphTo
@@ -24,11 +31,11 @@ class EhealthLink extends Model
 
     public function job(): BelongsTo
     {
-        return $this->belongsTo(EhealthJob::class);
+        return $this->belongsTo(EhealthJob::class, 'ehealth_job_id');
     }
 
     public function processingData(): HasMany
     {
-        return $this->hasMany(EhealthRequestProcessing::class);
+        return $this->hasMany(EhealthRequestProcessing::class, 'ehealth_link_id');
     }
 }

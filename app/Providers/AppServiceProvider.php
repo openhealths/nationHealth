@@ -17,6 +17,7 @@ use App\Jobs\ImmunizationSync;
 use App\Jobs\LegalEntitySync;
 use App\Jobs\ObservationSync;
 use App\Jobs\PersonAuthMethodSync;
+use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Rules\TranslatedDateValidator;
 use Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider;
 use Fruitcake\LaravelDebugbar\ServiceProvider as DebugbarServiceProvider;
@@ -167,7 +168,14 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for(
             'person-authentication-method-get',
-            static fn (PersonAuthMethodSync $job) => Limit::perMinute(config('ehealth.rate_limit.person_authentication_method'))->by($job->user->id)
+            static fn (PersonAuthMethodSync $job) => Limit::perMinute(config('ehealth.rate_limit.person_authentication_method'))
+            ->by($job->user->id)
+        );
+
+        RateLimiter::for(
+            'ehealth-remote-job-get',
+            static fn (RemoteEHealthLinksProcessing $job) => Limit::perMinute(config('ehealth.rate_limit.remote_job'))
+                ->by($job->user->id)
         );
     }
 }
