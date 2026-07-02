@@ -566,6 +566,9 @@ class EmployeeForm extends Form
         // --- 1. Root fields ---
         $formData['startDate'] = $toApiDate($formData['startDate'] ?? null);
         $formData['endDate'] = $toApiDate($formData['endDate'] ?? null);
+        if (($formData['divisionId'] ?? null) === '') {
+            $formData['divisionId'] = null;
+        }
 
         // --- 2. Identity (Party) ---
         if (isset($formData['party']['birthDate'])) {
