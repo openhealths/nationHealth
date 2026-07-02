@@ -364,16 +364,9 @@
                                 <tr>
                                     <td class="px-4 py-4">
                                         @php
-                                            $kindValue = '';
-                                            if ($activity->kindConcept) {
-                                                $kindValue = $activity->kindConcept->text ?? $activity->kindConcept->coding->first()?->display ?? $activity->kindConcept->coding->first()?->code ?? '';
-                                            } elseif (is_array($activity->kind)) {
-                                                $kindValue = $activity->kind['text'] ?? $activity->kind['coding'][0]['display'] ?? $activity->kind['coding'][0]['code'] ?? '';
-                                            } else {
-                                                $kindValue = $activity->kind ?? '';
-                                            }
-                                            $kindTranslationKey = 'care-plan.activity_kind.' . \Illuminate\Support\Str::snake($kindValue);
-                                            $translatedKind = \Illuminate\Support\Facades\Lang::has($kindTranslationKey) ? __($kindTranslationKey) : $kindValue;
+                                            $resolvedKind = $activity->resolvedKind();
+                                            $kindTranslationKey = 'care-plan.activity_kind.' . $resolvedKind;
+                                            $translatedKind = \Illuminate\Support\Facades\Lang::has($kindTranslationKey) ? __($kindTranslationKey) : $resolvedKind;
                                         @endphp
                                         <div class="font-medium text-gray-900 dark:text-white">{{ $translatedKind ?: '-' }}</div>
                                         <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">
@@ -435,8 +428,16 @@
                                                     >
                                                         Підписати призначення
                                                     </button>
+                                                    <button type="button"
+                                                            @click="openDropdown = false"
+                                                            wire:click="deleteActivity({{ $activity->id }})"
+                                                            wire:confirm="{{ __('care-plan.confirm_delete_activity') }}"
+                                                            class="text-red-600 dark:text-red-400 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 w-full"
+                                                    >
+                                                        {{ __('forms.delete') }}
+                                                    </button>
                                                 </div>
-                                            @elseif(in_array(strtoupper($activityStatus), ['ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD']))
+                                            @elseif(in_array(strtoupper($activityStatus), ['ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD', 'PROCESSED']))
                                                 <div class="py-1">
                                                     <button type="button" 
                                                             @click="openDropdown = false" 

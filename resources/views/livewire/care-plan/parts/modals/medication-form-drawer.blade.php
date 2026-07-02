@@ -45,24 +45,46 @@
             {{-- Program and Medication --}}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                 <div class="form-group group">
-                    <label class="label">
+                    <label class="label" for="medication_program_edit">
                         {{ __('care-plan.program') }}
                     </label>
-                    <input type="text"
-                           class="input bg-gray-50 dark:bg-gray-700 cursor-not-allowed"
-                           value="{{ !empty($activityForm['program']) ? ($dictionaries['medical_programs'][$activityForm['program']] ?? $activityForm['program']) : __('care-plan.prescription_medication') }}"
-                           disabled
-                    />
+                    @if(!empty($activityForm['id']))
+                        <select id="medication_program_edit"
+                                class="input-select peer"
+                                wire:model.live="selectedProgram"
+                        >
+                            @foreach(($dictionaries['medical_programs_medication'] ?? $dictionaries['medical_programs'] ?? []) as $id => $name)
+                                <option value="{{ $id }}">{{ $name }}</option>
+                            @endforeach
+                        </select>
+                    @else
+                        <input type="text"
+                               class="input bg-gray-50 dark:bg-gray-700 cursor-not-allowed"
+                               value="{{ !empty($activityForm['program']) ? ($dictionaries['medical_programs'][$activityForm['program']] ?? $activityForm['program']) : __('care-plan.prescription_medication') }}"
+                               disabled
+                        />
+                    @endif
                 </div>
                 <div class="form-group group">
                     <label class="label">
                         {{ __('care-plan.medication') }}*
                     </label>
-                    <input type="text"
-                           class="input bg-gray-50 dark:bg-gray-700 cursor-not-allowed font-medium text-gray-900 dark:text-white"
-                           value="{{ !empty($selectedProduct) ? ($selectedProduct['name'] ?? '') : '' }}"
-                           disabled
-                    />
+                    <div class="relative">
+                        <input type="text"
+                               class="input bg-gray-50 dark:bg-gray-700 {{ empty($activityForm['id']) ? 'cursor-not-allowed' : 'pr-12' }} font-medium text-gray-900 dark:text-white w-full"
+                               value="{{ !empty($selectedProduct) ? ($selectedProduct['name'] ?? '') : '' }}"
+                               disabled
+                        />
+                        @if(!empty($activityForm['id']))
+                            <button type="button"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-blue-600 hover:text-blue-800 text-sm whitespace-nowrap"
+                                    aria-controls="medication-search-drawer-right"
+                                    @click="showMedicationSearchDrawer = true"
+                            >
+                                {{ __('care-plan.change_product') }}
+                            </button>
+                        @endif
+                    </div>
                     <input type="hidden" wire:model="activityForm.product_reference" />
                 </div>
             </div>
@@ -130,8 +152,10 @@
                                class="input peer w-full"
                                wire:model="activityForm.daily_amount"
                         >
-                        <select class="input-select peer w-20">
-                            <option selected value="ml">{{ __('care-plan.ml') }}</option>
+                        <select class="input-select peer w-20" disabled>
+                            <option selected value="{{ $activityForm['daily_amount_code'] ?? 'PIECE' }}">
+                                {{ $activityForm['daily_amount_code'] ?? __('care-plan.ml') }}
+                            </option>
                         </select>
                     </div>
                 </div>
