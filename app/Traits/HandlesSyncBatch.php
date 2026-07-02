@@ -197,6 +197,7 @@ trait HandlesSyncBatch
             ->withOption('user', $user)
             ->withOption('patient_uuid', $this->uuid)
             ->withOption('person_id', $this->personId)
+            ->withOption('preperson_id', $this->prepersonId)
             ->then(fn () => $user->notify(new SyncNotification($entityType, 'completed')))
             ->catch(function (Batch $batch, Throwable $exception) use ($user, $entityType) {
                 Log::error(ucfirst($entityType) . ' sync batch failed.', [

@@ -7,6 +7,8 @@ namespace App\Models\MedicalEvents\Sql;
 use App\Casts\EHealthTimestampCast;
 use App\Enums\Person\ConditionClinicalStatus;
 use App\Enums\Person\ConditionVerificationStatus;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,6 +25,7 @@ class Condition extends Model
     protected $fillable = [
         'uuid',
         'person_id',
+        'preperson_id',
         'primary_source',
         'asserter_id',
         'report_origin_id',
@@ -51,6 +54,7 @@ class Condition extends Model
     protected $hidden = [
         'id',
         'person_id',
+        'preperson_id',
         'asserter_id',
         'report_origin_id',
         'context_id',
@@ -65,6 +69,11 @@ class Condition extends Model
         'evidences',
         'stage'
     ];
+
+    public function preperson(): BelongsTo
+    {
+        return $this->belongsTo(Preperson::class);
+    }
 
     public function asserter(): BelongsTo
     {
@@ -165,16 +174,18 @@ class Condition extends Model
     }
 
     /**
-     * Scope the query to conditions belonging to the given person.
+     * Filter conditions belonging to the given patient (person or preperson).
      *
      * @param  Builder  $query
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @return Builder
      */
     #[Scope]
-    protected function forPerson(Builder $query, int $personId): Builder
+    protected function forPatient(Builder $query, Person|Preperson $patient): Builder
     {
-        return $query->wherePersonId($personId);
+        return $patient instanceof Preperson
+            ? $query->wherePrepersonId($patient->id)
+            : $query->wherePersonId($patient->id);
     }
 
     /**

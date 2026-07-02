@@ -1,10 +1,12 @@
 @use(App\Enums\Person\ImmunizationStatus)
 @use(App\Models\MedicalEvents\Sql\Encounter)
 
-<x-layouts.patient :personId="$personId" :patientFullName="$patientFullName">
+<x-layouts.patient :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName">
     <x-slot name="headerActions">
         @can('create', Encounter::class)
-            <a href="{{ route('encounter.create', [legalEntity(), 'personId' => $personId]) }}"
+            <a href="{{ $prepersonId
+                ? route('prepersons.encounter.create', [legalEntity(), 'preperson' => $prepersonId])
+                : route('encounter.create', [legalEntity(), 'person' => $personId]) }}"
                class="flex items-center gap-2 button-primary px-5 py-2 text-sm shadow-sm"
             >
                 @icon('plus', 'w-4 h-4')

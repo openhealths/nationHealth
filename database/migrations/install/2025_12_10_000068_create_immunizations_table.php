@@ -17,7 +17,8 @@ return new class extends Migration
         Schema::create('immunizations', static function (Blueprint $table) {
             $table->id();
             $table->uuid()->unique();
-            $table->foreignId('person_id')->constrained('persons');
+            $table->foreignId('person_id')->nullable()->constrained('persons');
+            $table->foreignId('preperson_id')->nullable()->constrained('prepersons');
             $table->enum('status', ImmunizationStatus::values());
             $table->boolean('not_given');
             $table->foreignId('vaccine_code_id')->constrained('codeable_concepts');

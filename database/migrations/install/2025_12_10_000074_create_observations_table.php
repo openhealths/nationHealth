@@ -17,7 +17,8 @@ return new class extends Migration
         Schema::create('observations', static function (Blueprint $table) {
             $table->id();
             $table->uuid()->unique();
-            $table->foreignId('person_id')->constrained('persons');
+            $table->foreignId('person_id')->nullable()->constrained('persons');
+            $table->foreignId('preperson_id')->nullable()->constrained('prepersons');
             $table->enum('status', ObservationStatus::values());
             $table->foreignId('diagnostic_report_id')->nullable()->constrained('identifiers');
             $table->foreignId('code_id')->constrained('codeable_concepts');

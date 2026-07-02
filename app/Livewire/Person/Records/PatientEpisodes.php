@@ -116,7 +116,7 @@ class PatientEpisodes extends BasePatientComponent
 
         try {
             $validatedData = $response->validate();
-            Repository::episode()->syncFull($this->personId, $validatedData);
+            Repository::episode()->syncFull($this->patient(), $validatedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing episodes');
 
@@ -179,7 +179,7 @@ class PatientEpisodes extends BasePatientComponent
      */
     protected function paginateLocalEpisodes(): LengthAwarePaginator
     {
-        $paginator = Episode::forPerson($this->personId)
+        $paginator = Episode::forPatient($this->patient())
             ->withRelationships()
             ->recentlyUpdatedFirst()
             ->paginate(config('pagination.per_page'));

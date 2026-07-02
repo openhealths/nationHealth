@@ -6,6 +6,8 @@ namespace App\Models\MedicalEvents\Sql;
 
 use App\Casts\EHealthTimestampCast;
 use App\Enums\Person\ImmunizationStatus;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use Carbon\CarbonImmutable;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -23,6 +25,7 @@ class Immunization extends Model
     protected $fillable = [
         'uuid',
         'person_id',
+        'preperson_id',
         'status',
         'not_given',
         'vaccine_code_id',
@@ -49,6 +52,7 @@ class Immunization extends Model
     protected $hidden = [
         'id',
         'person_id',
+        'preperson_id',
         'vaccine_code_id',
         'context_id',
         'performer_id',
@@ -94,16 +98,18 @@ class Immunization extends Model
     }
 
     /**
-     * Filter immunizations belonging to the given person.
+     * Filter immunizations belonging to the given patient (person or preperson).
      *
      * @param  Builder  $query
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @return Builder
      */
     #[Scope]
-    protected function forPerson(Builder $query, int $personId): Builder
+    protected function forPatient(Builder $query, Person|Preperson $patient): Builder
     {
-        return $query->wherePersonId($personId);
+        return $patient instanceof Preperson
+            ? $query->wherePrepersonId($patient->id)
+            : $query->wherePersonId($patient->id);
     }
 
     /**
@@ -117,6 +123,11 @@ class Immunization extends Model
     {
         return $query->orderByRaw('CASE WHEN ehealth_updated_at IS NULL THEN 1 ELSE 0 END')
             ->orderByDesc('ehealth_updated_at');
+    }
+
+    public function preperson(): BelongsTo
+    {
+        return $this->belongsTo(Preperson::class);
     }
 
     public function context(): BelongsTo

@@ -17,7 +17,8 @@ return new class extends Migration
         Schema::create('diagnostic_reports', static function (Blueprint $table) {
             $table->id();
             $table->uuid()->unique();
-            $table->foreignId('person_id')->constrained('persons');
+            $table->foreignId('person_id')->nullable()->constrained('persons');
+            $table->foreignId('preperson_id')->nullable()->constrained('prepersons');
             $table->foreignId('based_on_id')->nullable()->constrained('identifiers');
             $table->enum('status', DiagnosticReportStatus::values());
             $table->foreignId('code_id')->constrained('identifiers');

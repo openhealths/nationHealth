@@ -577,7 +577,7 @@ class DeclarationIndex extends Component
 
         $this->redirectRoute(
             'declaration.edit',
-            [legalEntity(), 'personId' => $personId, 'declarationRequest' => $declarationRequest],
+            [legalEntity(), 'person' => $personId, 'declarationRequest' => $declarationRequest],
             navigate: true
         );
     }
@@ -593,7 +593,7 @@ class DeclarationIndex extends Component
 
         $this->redirectRoute(
             'declaration.edit',
-            [legalEntity(), 'personId' => $personId, 'declarationRequest' => $declarationRequest],
+            [legalEntity(), 'person' => $personId, 'declarationRequest' => $declarationRequest],
             navigate: true
         );
     }
@@ -655,7 +655,7 @@ class DeclarationIndex extends Component
 
         $this->redirectRoute(
             'declaration.edit',
-            [legalEntity(), 'personId' => $reorganizedPerson->id, 'declarationRequest' => $declarationRequest],
+            [legalEntity(), 'person' => $reorganizedPerson->id, 'declarationRequest' => $declarationRequest],
             navigate: true
         );
     }

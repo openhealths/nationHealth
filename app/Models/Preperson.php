@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\Person\Gender;
 use App\Enums\Preperson\Status;
 use Eloquence\Behaviours\HasCamelCasing;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 
 class Preperson extends Model
@@ -45,6 +46,18 @@ class Preperson extends Model
         'reason_context' => 'array',
         'status' => Status::class
     ];
+
+    /**
+     * Get the preperson's full name.
+     *
+     * @return Attribute
+     */
+    protected function fullName(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => trim("$this->lastName $this->firstName $this->secondName")
+        );
+    }
 
     /**
      * Build the eHealth external_id following the mask "A.B.C":

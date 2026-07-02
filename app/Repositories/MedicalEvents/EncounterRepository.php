@@ -8,6 +8,8 @@ use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Encounter as EncounterSql;
 use App\Models\MedicalEvents\Sql\EncounterDiagnose;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -17,16 +19,18 @@ use Throwable;
 class EncounterRepository extends BaseRepository
 {
     /**
-     * Create encounter in DB for person with related data.
+     * Create encounter in DB for the patient (person or preperson) with related data.
      *
      * @param  array  $data
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @return false|int
      * @throws Throwable
      */
-    public function store(array $data, int $personId): false|int
+    public function store(array $data, Person|Preperson $patient): false|int
     {
-        return DB::transaction(function () use ($data, $personId) {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        return DB::transaction(function () use ($data, $ownerColumn, $ownerId) {
             $visit = Repository::identifier()->store($data['visit']['identifier']['value']);
             Repository::codeableConcept()->attach($visit, $data['visit']);
 
@@ -57,7 +61,7 @@ class EncounterRepository extends BaseRepository
             }
 
             $encounter = $this->model->create([
-                'person_id' => $personId,
+                $ownerColumn => $ownerId,
                 'uuid' => $data['uuid'] ?? $data['id'],
                 'status' => $data['status'],
                 'visit_id' => $visit->id,
@@ -187,16 +191,18 @@ class EncounterRepository extends BaseRepository
     }
 
     /**
-     * Get encounter data that is related to the person.
+     * Get encounter data that is related to the patient (person or preperson).
      *
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @return array
      */
-    public function getByPersonId(int $personId): array
+    public function getByPersonId(Person|Preperson $patient): array
     {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
         return $this->model
             ->withRelationships()
-            ->where('person_id', $personId)
+            ->where($ownerColumn, $ownerId)
             ->get()
             ->toArray();
     }
@@ -204,14 +210,16 @@ class EncounterRepository extends BaseRepository
     /**
      * Sync encounter data and related data by comparing existing data with API data.
      *
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @param  array  $validatedData
      * @return void
      * @throws Throwable
      */
-    public function sync(int $personId, array $validatedData): void
+    public function sync(Person|Preperson $patient, array $validatedData): void
     {
-        DB::transaction(function () use ($personId, $validatedData) {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        DB::transaction(function () use ($ownerColumn, $ownerId, $validatedData) {
             $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
 
             $existingEncounters = $this->model->whereIn('uuid', $apiUuids)
@@ -247,7 +255,7 @@ class EncounterRepository extends BaseRepository
                 $division = $this->syncIdentifier($existing, $data['division'] ?? null, 'division');
 
                 $encounterData = [
-                    'person_id' => $personId,
+                    $ownerColumn => $ownerId,
                     'status' => $data['status'],
                     'cancellation_reason' => $data['cancellation_reason'] ?? null,
                     'explanatory_letter' => $data['explanatory_letter'] ?? null,

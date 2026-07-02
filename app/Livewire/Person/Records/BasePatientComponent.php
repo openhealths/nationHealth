@@ -6,6 +6,7 @@ namespace App\Livewire\Person\Records;
 
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
+use App\Models\Preperson;
 use App\Traits\FormTrait;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Livewire\Attributes\Computed;
@@ -17,12 +18,27 @@ abstract class BasePatientComponent extends Component
     use FormTrait;
 
     /**
-     * Person ID.
+     * Person ID (set when the patient is a person).
      *
-     * @var int
+     * @var int|null
      */
     #[Locked]
-    public int $personId;
+    public ?int $personId = null;
+
+    /**
+     * Preperson ID (set when the patient is a preperson).
+     *
+     * @var int|null
+     */
+    #[Locked]
+    public ?int $prepersonId = null;
+
+    /**
+     * Request-scoped memoized patient model.
+     *
+     * @var Person|Preperson|null
+     */
+    private Person|Preperson|null $patientModel = null;
 
     /**
      * Patient full name.
@@ -55,11 +71,28 @@ abstract class BasePatientComponent extends Component
     #[Locked]
     public string $uuid;
 
-    public function mount(LegalEntity $legalEntity, int $personId): void
+    public function mount(LegalEntity $legalEntity, ?Person $person = null, ?Preperson $preperson = null): void
     {
-        $this->personId = $personId;
+        if ($preperson !== null) {
+            $this->prepersonId = $preperson->id;
+        } else {
+            $this->personId = $person->id;
+        }
+
         $this->loadPatientData();
         $this->initializeComponent();
+    }
+
+    /**
+     * Resolve the patient model (person or preperson) for the current context.
+     *
+     * @return Person|Preperson
+     */
+    protected function patient(): Person|Preperson
+    {
+        return $this->patientModel ??= ($this->prepersonId !== null
+            ? Preperson::findOrFail($this->prepersonId)
+            : Person::findOrFail($this->personId));
     }
 
     /**
@@ -93,6 +126,16 @@ abstract class BasePatientComponent extends Component
      */
     protected function loadPatientData(): void
     {
+        if ($this->prepersonId !== null) {
+            $preperson = $this->patient();
+
+            $this->patientFullName = $preperson->fullName;
+            $this->uuid = $preperson->uuid;
+            $this->verificationStatus = '';
+
+            return;
+        }
+
         $patient = Person::whereId($this->personId)
             ->with(['declarations' => fn (HasMany $declaration) => $declaration->active()->latest()->take(1)])
             ->select(['id', 'uuid', 'first_name', 'last_name', 'second_name', 'verification_status'])

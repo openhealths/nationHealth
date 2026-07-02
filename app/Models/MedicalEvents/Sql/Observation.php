@@ -6,6 +6,8 @@ namespace App\Models\MedicalEvents\Sql;
 
 use App\Casts\EHealthTimestampCast;
 use App\Enums\Person\ObservationStatus;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use Carbon\CarbonImmutable;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -25,6 +27,7 @@ class Observation extends Model
     protected $fillable = [
         'uuid',
         'person_id',
+        'preperson_id',
         'based_on_id',
         'status',
         'diagnostic_report_id',
@@ -65,6 +68,7 @@ class Observation extends Model
     protected $hidden = [
         'id',
         'person_id',
+        'preperson_id',
         'diagnostic_report_id',
         'code_id',
         'performer_id',
@@ -109,6 +113,11 @@ class Observation extends Model
                 ? CarbonImmutable::parse($this->effectiveDateTime)->format('H:i')
                 : '',
         );
+    }
+
+    public function preperson(): BelongsTo
+    {
+        return $this->belongsTo(Preperson::class);
     }
 
     public function diagnosticReport(): BelongsTo
@@ -197,16 +206,18 @@ class Observation extends Model
     }
 
     /**
-     * Filter observations belonging to the given person.
+     * Filter observations belonging to the given patient (person or preperson).
      *
      * @param  Builder  $query
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @return Builder
      */
     #[Scope]
-    protected function forPerson(Builder $query, int $personId): Builder
+    protected function forPatient(Builder $query, Person|Preperson $patient): Builder
     {
-        return $query->wherePersonId($personId);
+        return $patient instanceof Preperson
+            ? $query->wherePrepersonId($patient->id)
+            : $query->wherePersonId($patient->id);
     }
 
     /**

@@ -7,6 +7,7 @@ namespace App\Livewire\Declaration;
 use Exception;
 use App\Core\Arr;
 use App\Models\LegalEntity;
+use App\Models\Person\Person;
 use App\Repositories\Repository;
 use App\Enums\Declaration\Status;
 use Illuminate\Support\Facades\Session;
@@ -14,9 +15,9 @@ use Illuminate\Validation\ValidationException;
 
 class DeclarationCreate extends DeclarationComponent
 {
-    public function mount(LegalEntity $legalEntity, int $personId): void
+    public function mount(LegalEntity $legalEntity, Person $person): void
     {
-        $this->baseMount($personId);
+        $this->baseMount($person->id);
     }
 
     public function createLocally(): void
