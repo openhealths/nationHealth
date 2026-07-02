@@ -145,7 +145,7 @@ class PatientConditions extends BasePatientComponent
 
         try {
             $validatedData = $response->validate();
-            Repository::condition()->sync($this->personId, $validatedData);
+            Repository::condition()->sync($this->patient(), $validatedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing condition');
 
@@ -188,8 +188,8 @@ class PatientConditions extends BasePatientComponent
 
     private function loadFilterOptions(): void
     {
-        $this->episodes = Repository::episode()->getByPersonId($this->personId);
-        $this->encounters = Repository::encounter()->getByPersonId($this->personId);
+        $this->episodes = Repository::episode()->getByPersonId($this->patient());
+        $this->encounters = Repository::encounter()->getByPersonId($this->patient());
     }
 
     /**
@@ -199,7 +199,7 @@ class PatientConditions extends BasePatientComponent
      */
     protected function paginateLocalConditions(): LengthAwarePaginator
     {
-        $paginator = Condition::forPerson($this->personId)
+        $paginator = Condition::forPatient($this->patient())
             ->withAllRelations()
             ->recentlyUpdatedFirst()
             ->paginate(config('pagination.per_page'));

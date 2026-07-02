@@ -245,8 +245,8 @@ class Encounter extends PatientApiBase
             ValidationRuleBuilder::identifierCollectionRules('supporting_info'),
 
             // Collections of сodeable concept
-            ValidationRuleBuilder::codeableConceptCollectionRules('actions', true),
-            ValidationRuleBuilder::codeableConceptCollectionRules('reasons', true),
+            ValidationRuleBuilder::codeableConceptCollectionRules('actions'),
+            ValidationRuleBuilder::codeableConceptCollectionRules('reasons'),
 
             // Coding relationships
             ValidationRuleBuilder::codingRules('class', true),

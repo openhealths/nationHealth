@@ -25,6 +25,7 @@ use App\Livewire\Person\Records\PatientEpisodes;
 use App\Livewire\Person\Records\PatientImmunizations;
 use App\Livewire\Person\Records\PatientObservations;
 use App\Livewire\Person\Records\PatientSummary;
+use App\Livewire\Preperson\PrepersonData;
 use App\Livewire\Procedure\ProcedureCreate;
 use App\Models\DeclarationRequest;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
@@ -37,7 +38,7 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Person / Patient Routes
+| Person / Preperson Routes
 |--------------------------------------------------------------------------
 |
 | Person- and patient-related routes that will be included in the main route
@@ -56,18 +57,18 @@ Route::prefix('persons')->group(static function () {
         Route::get('/update/{person}', PersonUpdate::class)->can('create', PersonRequest::class)->name('update');
 
         Route::middleware('can:view,' . Person::class)->group(function () {
-            Route::get('/{personId}/patient-data', PatientData::class)->name('patient-data');
-            Route::get('/{personId}/summary', PatientSummary::class)->can('view', Person::class)->name('summary');
-            Route::get('/{personId}/episodes', PatientEpisodes::class)->can('view', Episode::class)->name('episodes');
-            Route::get('/{personId}/care-plans', PatientCarePlans::class)->name('care-plans');
-            Route::get('/{personId}/observations', PatientObservations::class)->name('observations');
-            Route::get('/{personId}/immunizations', PatientImmunizations::class)->name('immunizations');
-            Route::get('/{personId}/conditions', PatientConditions::class)->name('conditions');
-            Route::get('/{personId}/diagnoses', PatientDiagnoses::class)->name('diagnoses');
-            Route::get('/{personId}/diagnostic-reports', PatientDiagnosticReports::class)->name('diagnostic-reports');
-            Route::get('/{personId}/clinical-impressions', PatientClinicalImpressions::class)
+            Route::get('/{person}/patient-data', PatientData::class)->name('patient-data');
+            Route::get('/{person}/summary', PatientSummary::class)->can('view', Person::class)->name('summary');
+            Route::get('/{person}/episodes', PatientEpisodes::class)->can('view', Episode::class)->name('episodes');
+            Route::get('/{person}/care-plans', PatientCarePlans::class)->name('care-plans');
+            Route::get('/{person}/observations', PatientObservations::class)->name('observations');
+            Route::get('/{person}/immunizations', PatientImmunizations::class)->name('immunizations');
+            Route::get('/{person}/conditions', PatientConditions::class)->name('conditions');
+            Route::get('/{person}/diagnoses', PatientDiagnoses::class)->name('diagnoses');
+            Route::get('/{person}/diagnostic-reports', PatientDiagnosticReports::class)->name('diagnostic-reports');
+            Route::get('/{person}/clinical-impressions', PatientClinicalImpressions::class)
                 ->name('clinical-impressions');
-            Route::get('/{personId}/encounters', PatientEncounters::class)->name('encounters');
+            Route::get('/{person}/encounters', PatientEncounters::class)->name('encounters');
         });
     });
 
@@ -76,38 +77,86 @@ Route::prefix('persons')->group(static function () {
             ->can('view', 'declaration')
             ->name('view')
             ->whereNumber('declaration');
-        Route::get('/{personId}/declaration/create', DeclarationCreate::class)
+        Route::get('/{person}/declaration/create', DeclarationCreate::class)
             ->name('create')
             ->can('create', DeclarationRequest::class)
-            ->whereNumber('personId');
-        Route::get('/{personId}/declaration/{declarationRequest}', DeclarationEdit::class)
+            ->whereNumber('person');
+        Route::get('/{person}/declaration/{declarationRequest}', DeclarationEdit::class)
             ->name('edit')
             ->can('update', 'declarationRequest')
-            ->whereNumber(['personId', 'declarationRequest']);
+            ->whereNumber(['person', 'declarationRequest']);
     });
 
     Route::middleware('can:create,' . Encounter::class)->name('encounter.')->group(function () {
-        Route::get('/{personId}/encounter/create', EncounterCreate::class)->name('create');
-        Route::get('/{personId}/encounter/{encounterId}', EncounterEdit::class)->name('edit');
+        Route::get('/{person}/encounter/create', EncounterCreate::class)->name('create');
+        Route::get('/{person}/encounter/{encounterId}', EncounterEdit::class)->name('edit');
     });
 
     Route::get('/{personId}/care-plan/create', CarePlanCreate::class)->name('care-plan.create');
 
-    Route::whereNumber('personId')->group(static function () {
-        Route::get('{personId}/diagnostic-report/create', DiagnosticReportCreate::class)
+    Route::whereNumber('person')->group(static function () {
+        Route::get('{person}/diagnostic-report/create', DiagnosticReportCreate::class)
             ->can('create', DiagnosticReport::class)
             ->name('diagnostic-report.create');
 
-        Route::get('{personId}/diagnostic-report/{diagnosticReportId}', DiagnosticReportEdit::class)
+        Route::get('{person}/diagnostic-report/{diagnosticReportId}', DiagnosticReportEdit::class)
             ->name('diagnostic-report.view')
             ->whereNumber('diagnosticReportId');
 
-        Route::get('{personId}/diagnostic-report/{diagnosticReportId}/edit', DiagnosticReportEdit::class)
+        Route::get('{person}/diagnostic-report/{diagnosticReportId}/edit', DiagnosticReportEdit::class)
             ->name('diagnostic-report.edit')
             ->whereNumber('diagnosticReportId');
 
-        Route::get('{personId}/procedure/create', ProcedureCreate::class)
+        Route::get('{person}/procedure/create', ProcedureCreate::class)
             ->can('create', Procedure::class)
             ->name('procedure.create');
     });
 });
+
+Route::prefix('prepersons')
+    ->name('prepersons.')
+    ->whereNumber('preperson')
+    ->group(static function () {
+        Route::get('/{preperson}/patient-data', PrepersonData::class)->can('view', 'preperson')->name('patient-data');
+        Route::get('/{preperson}/summary', PatientSummary::class)->can('view', 'preperson')->name('summary');
+        Route::get('/{preperson}/episodes', PatientEpisodes::class)->can('view', 'preperson')->name('episodes');
+        Route::get('/{preperson}/observations', PatientObservations::class)
+            ->can('view', 'preperson')
+            ->name('observations');
+        Route::get('/{preperson}/immunizations', PatientImmunizations::class)
+            ->can('view', 'preperson')
+            ->name('immunizations');
+        Route::get('/{preperson}/conditions', PatientConditions::class)->can('view', 'preperson')->name('conditions');
+        Route::get('/{preperson}/diagnoses', PatientDiagnoses::class)->can('view', 'preperson')->name('diagnoses');
+        Route::get('/{preperson}/diagnostic-reports', PatientDiagnosticReports::class)
+            ->can('view', 'preperson')
+            ->name('diagnostic-reports');
+        Route::get('/{preperson}/clinical-impressions', PatientClinicalImpressions::class)
+            ->can('view', 'preperson')
+            ->name('clinical-impressions');
+        Route::get('/{preperson}/encounters', PatientEncounters::class)->can('view', 'preperson')->name('encounters');
+
+        Route::get('/{preperson}/encounter/create', EncounterCreate::class)
+            ->can('view', 'preperson')
+            ->name('encounter.create');
+        Route::get('/{preperson}/encounter/{encounterId}', EncounterEdit::class)
+            ->can('view', 'preperson')
+            ->whereNumber('encounterId')
+            ->name('encounter.edit');
+
+        Route::get('/{preperson}/diagnostic-report/create', DiagnosticReportCreate::class)
+            ->can('view', 'preperson')
+            ->name('diagnostic-report.create');
+        Route::get('/{preperson}/diagnostic-report/{diagnosticReportId}', DiagnosticReportEdit::class)
+            ->can('view', 'preperson')
+            ->whereNumber('diagnosticReportId')
+            ->name('diagnostic-report.view');
+        Route::get('/{preperson}/diagnostic-report/{diagnosticReportId}/edit', DiagnosticReportEdit::class)
+            ->can('view', 'preperson')
+            ->whereNumber('diagnosticReportId')
+            ->name('diagnostic-report.edit');
+
+        Route::get('/{preperson}/procedure/create', ProcedureCreate::class)
+            ->can('view', 'preperson')
+            ->name('procedure.create');
+    });

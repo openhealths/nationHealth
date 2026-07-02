@@ -17,7 +17,8 @@ return new class extends Migration
         Schema::create('encounters', static function (Blueprint $table) {
             $table->id();
             $table->uuid()->unique();
-            $table->foreignId('person_id')->constrained('persons');
+            $table->foreignId('person_id')->nullable()->constrained('persons');
+            $table->foreignId('preperson_id')->nullable()->constrained('prepersons');
             $table->enum('status', EncounterStatus::values());
             $table->string('cancellation_reason')->nullable();
             $table->string('explanatory_letter')->nullable();

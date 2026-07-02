@@ -46,7 +46,7 @@
             $cleanTitle = trim(str_replace([' - ' . $patientName, $patientName . ' - '], '', $title ?? ''));
 
             if ($cleanTitle && $cleanTitle !== $patientName) {
-                $crumbs[] = ['label' => $patientName, 'url' => route('persons.patient-data', [legalEntity(), 'personId' => $person->id])];
+                $crumbs[] = ['label' => $patientName, 'url' => route('persons.patient-data', [legalEntity(), 'person' => $person->id])];
                 $crumbs[] = ['label' => $cleanTitle];
             } else {
                 $crumbs[] = ['label' => $patientName];

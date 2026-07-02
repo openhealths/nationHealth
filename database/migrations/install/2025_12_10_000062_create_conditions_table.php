@@ -18,7 +18,8 @@ return new class extends Migration
         Schema::create('conditions', static function (Blueprint $table) {
             $table->id();
             $table->uuid()->unique();
-            $table->foreignId('person_id')->constrained('persons');
+            $table->foreignId('person_id')->nullable()->constrained('persons');
+            $table->foreignId('preperson_id')->nullable()->constrained('prepersons');
             $table->boolean('primary_source');
             $table->foreignId('asserter_id')->nullable()->constrained('identifiers')->cascadeOnDelete();
             $table->foreignId('report_origin_id')->nullable()->constrained('codeable_concepts')->cascadeOnDelete();

@@ -2,10 +2,12 @@
 @use('App\Enums\Person\EncounterStatus')
 @use('App\Enums\JobStatus')
 
-<x-layouts.patient :personId="$personId" :patientFullName="$patientFullName">
+<x-layouts.patient :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName">
     <x-slot name="headerActions">
         @can('create', Encounter::class)
-            <a href="{{ route('encounter.create', [legalEntity(), 'personId' => $personId]) }}"
+            <a href="{{ $prepersonId
+                ? route('prepersons.encounter.create', [legalEntity(), 'preperson' => $prepersonId])
+                : route('encounter.create', [legalEntity(), 'person' => $personId]) }}"
                class="flex items-center gap-2 button-primary px-5 py-2 text-sm shadow-sm"
             >
                 @icon('plus', 'w-4 h-4')
@@ -214,7 +216,9 @@
                                          class="absolute right-0 mt-2 w-56 rounded-md bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-lg z-50 py-1"
                                     >
                                         @if(!empty(data_get($encounter, 'id')))
-                                            <a href="{{ route('encounter.edit', [legalEntity(), 'personId' => $personId, 'encounterId' => data_get($encounter, 'id')]) }}"
+                                            <a href="{{ $prepersonId
+                                                ? route('prepersons.encounter.edit', [legalEntity(), 'preperson' => $prepersonId, 'encounterId' => data_get($encounter, 'id')])
+                                                : route('encounter.edit', [legalEntity(), 'person' => $personId, 'encounterId' => data_get($encounter, 'id')]) }}"
                                                wire:navigate
                                                class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                                             >

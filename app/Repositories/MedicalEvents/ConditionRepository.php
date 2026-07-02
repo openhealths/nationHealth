@@ -6,6 +6,8 @@ namespace App\Repositories\MedicalEvents;
 
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\ConditionEvidence;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -18,13 +20,15 @@ class ConditionRepository extends BaseRepository
      * Store condition in DB.
      *
      * @param  array  $data
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @return void
      * @throws Throwable
      */
-    public function store(array $data, int $personId): void
+    public function store(array $data, Person|Preperson $patient): void
     {
-        DB::transaction(function () use ($data, $personId) {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        DB::transaction(function () use ($data, $ownerColumn, $ownerId) {
             foreach ($data as $datum) {
                 $reportOrigin = null;
                 $asserter = null;
@@ -50,7 +54,7 @@ class ConditionRepository extends BaseRepository
 
                 $condition = $this->model->create([
                     'uuid' => $datum['id'],
-                    'person_id' => $personId,
+                    $ownerColumn => $ownerId,
                     'primary_source' => $datum['primarySource'],
                     'asserter_id' => $asserter?->id,
                     'report_origin_id' => $reportOrigin?->id,
@@ -146,14 +150,16 @@ class ConditionRepository extends BaseRepository
     /**
      * Sync condition data and related data by deleting and creating.
      *
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @param  array  $validatedData
      * @return void
      * @throws Throwable
      */
-    public function sync(int $personId, array $validatedData): void
+    public function sync(Person|Preperson $patient, array $validatedData): void
     {
-        DB::transaction(function () use ($personId, $validatedData) {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        DB::transaction(function () use ($ownerColumn, $ownerId, $validatedData) {
             $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
 
             $existingConditions = $this->model->whereIn('uuid', $apiUuids)
@@ -176,7 +182,7 @@ class ConditionRepository extends BaseRepository
                 );
 
                 $conditionData = [
-                    'person_id' => $personId,
+                    $ownerColumn => $ownerId,
                     'asserter_id' => $asserter?->id,
                     'report_origin_id' => $reportOrigin?->id,
                     'context_id' => $context->id,

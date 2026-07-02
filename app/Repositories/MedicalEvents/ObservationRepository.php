@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
-use App\Classes\eHealth\Api\PatientApi;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\ObservationComponent;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Quantity;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -40,125 +40,27 @@ class ObservationRepository extends BaseRepository
             return [];
         }
 
-        return $this->model::withAllRelations()
+        return $this->model
+            ->withAllRelations()
             ->whereHas('diagnosticReport', fn (Builder $query) => $query->where('value', $diagnosticReportUuid))
             ->get()
             ->toArray();
     }
 
     /**
-     * Format data before request.
-     *
-     * @param  array  $observations
-     * @param  string  $diagnosticReportUuid
-     * @return array
-     */
-    public function formatEHealthRequest(array $observations, string $diagnosticReportUuid): array
-    {
-        $observationForm = array_map(function (array $observation) use ($diagnosticReportUuid) {
-            // Delete frontend properties
-            unset($observation['codingSystem']);
-
-            // Connect with diagnostic report
-            $observation['diagnosticReport'] = [
-                'identifier' => [
-                    'type' => [
-                        'coding' => [
-                            [
-                                'system' => 'eHealth/resources',
-                                'code' => 'diagnostic_report'
-                            ]
-                        ]
-                    ],
-                    'value' => $diagnosticReportUuid
-                ]
-            ];
-
-            $observation['id'] = Str::uuid()->toString();
-            $observation['status'] = 'valid';
-
-            if (isset($observation['dictionaryName'])) {
-                unset($observation['dictionaryName']);
-            }
-
-            $observation['effectiveDateTime'] = convertToISO8601(
-                $observation['effectiveDate'] . $observation['effectiveTime']
-            );
-            unset($observation['effectiveDate'], $observation['effectiveTime']);
-
-            $observation['issued'] = convertToISO8601($observation['issuedDate'] . $observation['issuedTime']);
-            unset($observation['issuedDate'], $observation['issuedTime']);
-
-            if ($observation['primarySource']) {
-                unset($observation['reportOrigin']);
-                if ($this->employeeUuid) {
-                    $observation['performer']['identifier']['value'] = $this->employeeUuid;
-                }
-            } else {
-                unset($observation['performer']);
-            }
-
-            if ($observation['valueQuantity']['value'] === '') {
-                unset($observation['valueQuantity']);
-            }
-
-            // format to codeable concept type
-            if (isset($observation['valueCodeableConcept'])) {
-                $observation['valueCodeableConcept'] = [
-                    'coding' => [
-                        [
-                            'system' => 'eHealth/' . $observation['code']['coding'][0]['code'],
-                            'code' => $observation['valueCodeableConcept']
-                        ]
-                    ],
-                    'text' => ''
-                ];
-            }
-
-            // combine date&time
-            if (isset($observation['valueDate'], $observation['valueTime'])) {
-                $observation['valueDateTime'] = convertToISO8601($observation['valueDate'] . $observation['valueTime']);
-                unset($observation['valueDate'], $observation['valueTime']);
-            }
-
-            if (empty($observation['interpretation']['coding'][0]['code'])) {
-                unset($observation['interpretation']);
-            }
-
-            if (empty($observation['bodySite']['coding'][0]['code'])) {
-                unset($observation['bodySite']);
-            }
-
-            if (empty($observation['method']['coding'][0]['code'])) {
-                unset($observation['method']);
-            }
-
-            if ($observation['code']['coding'][0]['system'] !== 'eHealth/ICF/classifiers') {
-                unset($observation['components']);
-            }
-
-            return $observation;
-        }, $observations);
-
-        return schemaService()
-            ->setDataSchema(['observations' => $observationForm], app(PatientApi::class))
-            ->requestSchemaNormalize('schemaDiagnosticReportPackageRequest')
-            ->camelCaseKeys()
-            ->getNormalizedData();
-    }
-
-    /**
      * Store observation in DB.
      *
      * @param  array  $data
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @param  int|null  $diagnosticReportId
      * @return void
      * @throws Throwable
      */
-    public function store(array $data, int $personId, ?int $diagnosticReportId = null): void
+    public function store(array $data, Person|Preperson $patient, ?int $diagnosticReportId = null): void
     {
-        DB::transaction(function () use ($data, $personId, $diagnosticReportId) {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        DB::transaction(function () use ($data, $ownerColumn, $ownerId, $diagnosticReportId) {
             foreach ($data as $datum) {
                 $diagnosticReport = null;
                 if ($diagnosticReportId) {
@@ -183,7 +85,7 @@ class ObservationRepository extends BaseRepository
 
                 $observation = $this->model->create([
                     'uuid' => $datum['uuid'] ?? $datum['id'],
-                    'person_id' => $personId,
+                    $ownerColumn => $ownerId,
                     'status' => $datum['status'],
                     'diagnostic_report_id' => $diagnosticReport?->id,
                     'code_id' => $code->id,
@@ -345,16 +247,18 @@ class ObservationRepository extends BaseRepository
     }
 
     /**
-     * Get observations data that is related to the person.
+     * Get observations data that is related to the patient (person or preperson).
      *
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @return array
      */
-    public function getByPersonId(int $personId): array
+    public function getByPersonId(Person|Preperson $patient): array
     {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
         return $this->model
             ->withAllRelations()
-            ->where('person_id', $personId)
+            ->where($ownerColumn, $ownerId)
             ->orderByDesc('issued')
             ->orderByDesc('ehealth_inserted_at')
             ->orderByDesc('id')
@@ -365,15 +269,17 @@ class ObservationRepository extends BaseRepository
     /**
      * Sync observation data and related data by deleting and creating.
      *
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @param  array  $validatedData
      * @param  string|null  $encounterUuid
      * @return void
      * @throws Throwable
      */
-    public function sync(int $personId, array $validatedData, ?string $encounterUuid = null): void
+    public function sync(Person|Preperson $patient, array $validatedData, ?string $encounterUuid = null): void
     {
-        DB::transaction(function () use ($personId, $validatedData, $encounterUuid) {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        DB::transaction(function () use ($ownerColumn, $ownerId, $validatedData, $encounterUuid) {
             $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
 
             if ($encounterUuid !== null) {
@@ -420,7 +326,7 @@ class ObservationRepository extends BaseRepository
                 $method = $this->syncCodeableConcept($existing, $data['method'] ?? null, 'method');
 
                 $observationData = [
-                    'person_id' => $personId,
+                    $ownerColumn => $ownerId,
                     'status' => $data['status'],
                     'code_id' => $code->id,
                     'context_id' => $context?->id,

@@ -8,6 +8,8 @@ use App\Core\Arr;
 use App\Enums\Person\DiagnosticReportStatus;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Fhir;
 use Illuminate\Support\Facades\DB;
@@ -21,15 +23,19 @@ class DiagnosticReportEdit extends DiagnosticReportComponent
 
     public bool $isReadonly = false;
 
-    public function mount(LegalEntity $legalEntity, int $personId, ?int $diagnosticReportId = null): void
-    {
-        parent::mount($legalEntity, $personId);
+    public function mount(
+        LegalEntity $legalEntity,
+        ?Person $person = null,
+        ?Preperson $preperson = null,
+        ?int $diagnosticReportId = null
+    ): void {
+        parent::mount($legalEntity, $person, $preperson);
 
         $this->diagnosticReportId = $diagnosticReportId;
 
         $diagnosticReport = DiagnosticReport::withAllRelations()
             ->whereKey($diagnosticReportId)
-            ->where('person_id', $personId)
+            ->forPatient($this->patient())
             ->firstOrFail();
 
         $this->diagnosticReportUuid = $diagnosticReport->uuid;
@@ -94,12 +100,12 @@ class DiagnosticReportEdit extends DiagnosticReportComponent
     {
         DB::transaction(function () use ($formattedData) {
             Repository::diagnosticReport()->sync(
-                $this->personId,
+                $this->patient(),
                 [$this->fhirToSync($formattedData['diagnosticReport'])]
             );
 
             Repository::observation()->sync(
-                $this->personId,
+                $this->patient(),
                 array_map($this->fhirToSync(...), $formattedData['observations'] ?? [])
             );
         });

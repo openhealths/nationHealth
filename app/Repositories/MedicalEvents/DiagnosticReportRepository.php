@@ -9,6 +9,8 @@ use App\Enums\Person\ObservationStatus;
 use App\Models\Employee\Employee;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Observation;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -66,13 +68,15 @@ class DiagnosticReportRepository extends BaseRepository
      * Store condition in DB.
      *
      * @param  array  $data
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @return int|null
      * @throws Throwable
      */
-    public function store(array $data, int $personId): ?int
+    public function store(array $data, Person|Preperson $patient): ?int
     {
-        return DB::transaction(function () use ($data, $personId) {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        return DB::transaction(function () use ($data, $ownerColumn, $ownerId) {
             foreach ($data as $datum) {
                 $codeValue = $datum['code']['identifier']['value'];
 
@@ -109,7 +113,7 @@ class DiagnosticReportRepository extends BaseRepository
 
                 $diagnosticReport = $this->model->create([
                     'uuid' => $datum['uuid'] ?? $datum['id'],
-                    'person_id' => $personId,
+                    $ownerColumn => $ownerId,
                     'status' => $datum['status'],
                     'code_id' => $code->id,
                     'issued' => $datum['issued'],
@@ -230,8 +234,10 @@ class DiagnosticReportRepository extends BaseRepository
                 'explanatory_letter' => $explanatoryLetter,
             ]);
 
+            $ownerColumn = $diagnosticReport->prepersonId !== null ? 'preperson_id' : 'person_id';
+
             Observation::query()
-                ->where('person_id', $diagnosticReport->person_id)
+                ->where($ownerColumn, $diagnosticReport->getAttribute($ownerColumn))
                 ->whereHas('diagnosticReport', fn (Builder $query) => $query->where('value', $diagnosticReport->uuid))
                 ->where('status', '!=', ObservationStatus::ENTERED_IN_ERROR->value)
                 ->update([
@@ -273,16 +279,18 @@ class DiagnosticReportRepository extends BaseRepository
     }
 
     /**
-     * Get diagnostic reports data that is related to the person.
+     * Get diagnostic reports data that is related to the patient (person or preperson).
      *
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @return array
      */
-    public function getByPersonId(int $personId): array
+    public function getByPersonId(Person|Preperson $patient): array
     {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
         return $this->model
             ->withAllRelations()
-            ->where('person_id', $personId)
+            ->where($ownerColumn, $ownerId)
             ->get()
             ->toArray();
     }
@@ -324,14 +332,16 @@ class DiagnosticReportRepository extends BaseRepository
     /**
      * Sync diagnostic report data and related data by deleting and creating.
      *
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @param  array  $validatedData
      * @return void
      * @throws Throwable
      */
-    public function sync(int $personId, array $validatedData): void
+    public function sync(Person|Preperson $patient, array $validatedData): void
     {
-        DB::transaction(function () use ($personId, $validatedData) {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        DB::transaction(function () use ($ownerColumn, $ownerId, $validatedData) {
             $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
 
             $existingDiagnosticReports = $this->model->whereIn('uuid', $apiUuids)
@@ -373,7 +383,7 @@ class DiagnosticReportRepository extends BaseRepository
                 );
 
                 $diagnosticReportData = [
-                    'person_id' => $personId,
+                    $ownerColumn => $ownerId,
                     'based_on_id' => $basedOn?->id,
                     'code_id' => $code->id,
                     'encounter_id' => $encounter?->id,

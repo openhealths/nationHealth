@@ -138,7 +138,7 @@ class PatientClinicalImpressions extends BasePatientComponent
 
         try {
             $validatedData = $response->validate();
-            Repository::clinicalImpression()->sync($this->personId, $validatedData);
+            Repository::clinicalImpression()->sync($this->patient(), $validatedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing clinical impressions');
             Session::flash('error', __('patients.messages.clinical_impression_sync_database_error'));
@@ -176,8 +176,8 @@ class PatientClinicalImpressions extends BasePatientComponent
 
     private function loadFilterOptions(): void
     {
-        $this->episodes = Repository::episode()->getByPersonId($this->personId);
-        $this->encounters = Repository::encounter()->getByPersonId($this->personId);
+        $this->episodes = Repository::episode()->getByPersonId($this->patient());
+        $this->encounters = Repository::encounter()->getByPersonId($this->patient());
     }
 
     /**
@@ -187,7 +187,7 @@ class PatientClinicalImpressions extends BasePatientComponent
      */
     protected function paginateLocalClinicalImpressions(): LengthAwarePaginator
     {
-        $paginator = ClinicalImpression::forPerson($this->personId)
+        $paginator = ClinicalImpression::forPatient($this->patient())
             ->withAllRelations()
             ->recentlyUpdatedFirst()
             ->paginate(config('pagination.per_page'));

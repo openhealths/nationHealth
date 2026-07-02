@@ -33,8 +33,6 @@ class PatientData extends BasePatientComponent
 
     public Form $form;
 
-    public bool $isUnidentified = false;
-
     public string $firstName;
 
     public string $lastName;

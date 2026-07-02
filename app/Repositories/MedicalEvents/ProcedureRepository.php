@@ -6,6 +6,8 @@ namespace App\Repositories\MedicalEvents;
 
 use App\Classes\eHealth\Api\PatientApi;
 use App\Models\MedicalEvents\Sql\Procedure;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
@@ -125,13 +127,15 @@ class ProcedureRepository extends BaseRepository
      * Store procedure in DB.
      *
      * @param  array  $data
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @return void
      * @throws Throwable
      */
-    public function store(array $data, int $personId): void
+    public function store(array $data, Person|Preperson $patient): void
     {
-        DB::transaction(function () use ($data, $personId) {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        DB::transaction(function () use ($data, $ownerColumn, $ownerId) {
             foreach ($data as $datum) {
                 $basedOn = null;
                 if (isset($datum['basedOn'])) {
@@ -171,7 +175,7 @@ class ProcedureRepository extends BaseRepository
 
                 $procedure = $this->model->create([
                     'uuid' => $datum['uuid'] ?? $datum['id'],
-                    'person_id' => $personId,
+                    $ownerColumn => $ownerId,
                     'status' => $datum['status'],
                     'based_on_id' => $basedOn?->id,
                     'code_id' => $code->id,
@@ -270,14 +274,16 @@ class ProcedureRepository extends BaseRepository
     /**
      * Sync procedure data and related data by updating or creating.
      *
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @param  array  $validatedData
      * @return void
      * @throws Throwable
      */
-    public function sync(int $personId, array $validatedData): void
+    public function sync(Person|Preperson $patient, array $validatedData): void
     {
-        DB::transaction(function () use ($personId, $validatedData) {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        DB::transaction(function () use ($ownerColumn, $ownerId, $validatedData) {
             $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
 
             $existingProcedures = $this->model->whereIn('uuid', $apiUuids)
@@ -302,7 +308,7 @@ class ProcedureRepository extends BaseRepository
                 $category = $this->syncCodeableConcept($existing, $data['category'], 'category');
 
                 $procedureData = [
-                    'person_id' => $personId,
+                    $ownerColumn => $ownerId,
                     'status' => $data['status'],
                     'status_reason_id' => $statusReason?->id,
                     'primary_source' => $data['primary_source'],
