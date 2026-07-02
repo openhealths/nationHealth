@@ -19,7 +19,7 @@
 
                     <h2 class="text-xl font-bold text-gray-900 dark:text-white">
                         {{ $employeeRole->employee->fullName }} -
-                        {{ $dictionaries['SPECIALITY_TYPE'][$employeeRole->healthcareService->specialityType] }} -
+                        {{ $this->dictionaryLabelByCode('SPECIALITY_TYPE', $employeeRole->healthcareService->specialityType) }} -
                         {{ __('employee-roles.deactivate') }}
                     </h2>
 
