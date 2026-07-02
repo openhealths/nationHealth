@@ -9,51 +9,70 @@ use Tests\TestCase;
 
 class AtLeastOneEncounterActionTest extends TestCase
 {
-    public function test_fails_when_encounter_has_no_action_references_diagnostic_reports_or_procedures(): void
+    private function fails(AtLeastOneEncounterAction $rule, mixed $value = []): bool
     {
-        $rule = new AtLeastOneEncounterAction(diagnosticReports: [], procedures: []);
-
         $failed = false;
-        $rule->validate('encounter.actionReferences', [], function () use (&$failed): void {
+        $rule->validate('encounter.actionReferences', $value, function () use (&$failed): void {
             $failed = true;
         });
 
-        $this->assertTrue($failed);
+        return $failed;
     }
 
-    public function test_passes_when_action_references_are_present(): void
+    public function test_amb_class_fails_without_any_action(): void
     {
-        $rule = new AtLeastOneEncounterAction(diagnosticReports: [], procedures: []);
+        $rule = new AtLeastOneEncounterAction(classCode: 'AMB', diagnosticReports: [], procedures: []);
 
-        $failed = false;
-        $rule->validate('encounter.actionReferences', [['uuid' => 'some-uuid']], function () use (&$failed): void {
-            $failed = true;
-        });
-
-        $this->assertFalse($failed);
+        $this->assertTrue($this->fails($rule));
     }
 
-    public function test_passes_when_diagnostic_reports_are_present(): void
+    public function test_inpatient_class_fails_without_any_action(): void
     {
-        $rule = new AtLeastOneEncounterAction(diagnosticReports: [['categoryCode' => 'laboratory_procedure']], procedures: []);
+        $rule = new AtLeastOneEncounterAction(classCode: 'INPATIENT', diagnosticReports: [], procedures: []);
 
-        $failed = false;
-        $rule->validate('encounter.actionReferences', [], function () use (&$failed): void {
-            $failed = true;
-        });
-
-        $this->assertFalse($failed);
+        $this->assertTrue($this->fails($rule));
     }
 
-    public function test_passes_when_procedures_are_present(): void
+    public function test_amb_class_passes_with_action_references(): void
     {
-        $rule = new AtLeastOneEncounterAction(diagnosticReports: [], procedures: [['categoryCode' => 'medical_procedure']]);
+        $rule = new AtLeastOneEncounterAction(classCode: 'AMB', diagnosticReports: [], procedures: []);
 
-        $failed = false;
-        $rule->validate('encounter.actionReferences', [], function () use (&$failed): void {
-            $failed = true;
-        });
+        $this->assertFalse($this->fails($rule, [['uuid' => 'some-uuid']]));
+    }
 
-        $this->assertFalse($failed);
+    public function test_inpatient_class_passes_with_diagnostic_reports(): void
+    {
+        $rule = new AtLeastOneEncounterAction(
+            classCode: 'INPATIENT',
+            diagnosticReports: [['categoryCode' => 'laboratory_procedure']],
+            procedures: []
+        );
+
+        $this->assertFalse($this->fails($rule));
+    }
+
+    public function test_amb_class_passes_with_procedures(): void
+    {
+        $rule = new AtLeastOneEncounterAction(
+            classCode: 'AMB',
+            diagnosticReports: [],
+            procedures: [['categoryCode' => 'medical_procedure']]
+        );
+
+        $this->assertFalse($this->fails($rule));
+    }
+
+    public function test_phc_class_passes_without_any_action_since_actions_icpc2_block_covers_it(): void
+    {
+        $rule = new AtLeastOneEncounterAction(classCode: 'PHC', diagnosticReports: [], procedures: []);
+
+        $this->assertFalse($this->fails($rule));
+    }
+
+    public function test_unknown_class_defaults_to_requiring_an_action(): void
+    {
+        $rule = new AtLeastOneEncounterAction(classCode: null, diagnosticReports: [], procedures: []);
+
+        $this->assertTrue($this->fails($rule));
     }
 }
