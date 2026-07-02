@@ -115,7 +115,7 @@ class EncounterCreate extends EncounterComponent
         $formattedData = $this->packageBuilder->build($validatedData, $this->episodeType);
 
         try {
-            $this->storeValidatedData($formattedData);
+            $encounterId = $this->storeValidatedData($formattedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Failed to store validated data');
 
@@ -159,7 +159,9 @@ class EncounterCreate extends EncounterComponent
             return;
         }
 
-        $this->redirectRoute('persons.encounters', [legalEntity(), $this->personId], navigate: true);
+        // Open the just-created encounter for viewing, same as care plans redirect to their `show` page,
+        // instead of dropping the user back on the full encounters list.
+        $this->redirectRoute('encounter.edit', [legalEntity(), $this->personId, $encounterId], navigate: true);
     }
 
     /**

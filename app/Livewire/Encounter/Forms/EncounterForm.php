@@ -6,6 +6,7 @@ namespace App\Livewire\Encounter\Forms;
 
 use App\Core\BaseForm;
 use App\Rules\AfterOrEqualDateTime;
+use App\Rules\AtLeastOneEncounterAction;
 use App\Rules\InDictionary;
 use App\Rules\OnlyOnePrimaryDiagnosis;
 use App\Rules\PastDateTime;
@@ -637,8 +638,26 @@ class EncounterForm extends BaseForm
         $this->addPsychiatryEvidenceValidation($rules);
         $this->addEmployeeTypeConditionsValidation($rules);
         $this->addSpecialityConditionsValidation($rules);
+        $this->addAtLeastOneActionValidation($rules);
 
         return $rules;
+    }
+
+    /**
+     * eHealth rejects the encounter package (asynchronously, after signing) unless it contains
+     * at least one of: action references, diagnostic reports or procedures. Catch this client-side
+     * so the user gets an immediate, understandable error instead of a silently failed async job.
+     *
+     * @param  array  $rules
+     * @return void
+     */
+    private function addAtLeastOneActionValidation(array &$rules): void
+    {
+        $rules['encounter.actionReferences'][] = new AtLeastOneEncounterAction(
+            $this->encounter['classCode'] ?? null,
+            $this->diagnosticReports ?? [],
+            $this->procedures ?? []
+        );
     }
 
     /**
