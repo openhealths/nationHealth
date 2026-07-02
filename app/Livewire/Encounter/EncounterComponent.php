@@ -23,6 +23,7 @@ use App\Models\Employee\Employee;
 use App\Models\Icd10;
 use App\Models\Person\Person;
 use App\Models\Equipment;
+use App\Models\User;
 use App\Repositories\Repository;
 use App\Traits\FormTrait;
 use Illuminate\Support\Facades\Auth;
@@ -376,6 +377,8 @@ class EncounterComponent extends Component
         $this->legalEntityType = legalEntity()->type->name;
         $this->role = $authUser->roles->first()->name;
         $this->divisions = legalEntity()->divisions()->whereStatus(Status::ACTIVE)->get()->toArray();
+
+        $this->logEncounterScopeDebugInfo($authUser);
 
         $encounterWriterEmployee = $authUser->getEncounterWriterEmployee();
         $this->employeeFullName = $encounterWriterEmployee->fullName;
@@ -731,6 +734,30 @@ class EncounterComponent extends Component
         $ruleEngineRules = dictionary()->ruleEngineRules();
         $this->dictionaries['custom/rule_engine_rule_list'] = $ruleEngineRules->ruleList();
         $this->dictionaries['custom/rule_engine_details'] = $ruleEngineRules->details();
+    }
+
+    /**
+     * Log the current user's roles and the eHealth scopes required to create/manage encounters.
+     * Helps diagnose "Помилка eHealth API" 403 responses caused by missing OAuth scopes
+     * (e.g. encounter:write, episode:write, episode:read, patient_summary:read) without
+     * having to inspect the database or the e_health_errors log directly.
+     *
+     * @param  User  $authUser
+     * @return void
+     */
+    private function logEncounterScopeDebugInfo(User $authUser): void
+    {
+        $requiredPermissions = ['encounter:write', 'episode:write', 'episode:read', 'patient_summary:read', 'person:read'];
+
+        logger()->debug('[Encounter] Opening encounter form - permission snapshot', [
+            'user_id' => $authUser->id,
+            'legal_entity_id' => legalEntity()->id,
+            'legal_entity_type' => $this->legalEntityType,
+            'assigned_roles' => $authUser->roles->pluck('name')->all(),
+            'permissions' => collect($requiredPermissions)
+                ->mapWithKeys(fn (string $permission) => [$permission => $authUser->can($permission)])
+                ->all(),
+        ]);
     }
 
     /**

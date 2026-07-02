@@ -70,4 +70,20 @@ final class Repository
     {
         return app(PeriodRepository::class);
     }
+
+    public static function medicationRequest(): MedicationRequestRepository
+    {
+        return app(MedicationRequestRepository::class);
+    }
+
+    public static function serviceRequest(): ServiceRequestRequestRepository
+    {
+        return app(ServiceRequestRequestRepository::class);
+    }
+
+    public static function deviceRequest(): DeviceRequestRequestRepository
+    {
+        return app(DeviceRequestRequestRepository::class);
+    }
 }
+

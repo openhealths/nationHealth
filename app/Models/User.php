@@ -9,6 +9,7 @@ use Exception;
 use App\Enums\Status;
 use App\Enums\User\Role;
 use InvalidArgumentException;
+use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
 use App\Models\Employee\Employee;
@@ -417,11 +418,59 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * Get employee by priority with care_plan:write permission.
      *
+     * eHealth requires the care plan author to have an active employee_role linking them to a
+     * healthcare_service whose providing_condition exactly matches the care plan's terms_of_service
+     * (see "Employee does not have active role that correspond to the submitted terms of service").
+     * When $termsOfService is given, we prefer the employee (among this user's DOCTOR/SPECIALIST
+     * employees) that actually has such a matching active role, instead of blindly taking the first
+     * one by role priority.
+     *
+     * @param  string|null  $termsOfService  PROVIDING_CONDITION code (OUTPATIENT/INPATIENT/FIELD) the
+     *                                       care plan is being submitted with.
      * @return Employee|null
      */
-    public function getCarePlanWriterEmployee(): ?Employee
+    public function getCarePlanWriterEmployee(?string $termsOfService = null): ?Employee
     {
-        return $this->getWriterEmployeeByRolePriority(Role::DOCTOR, Role::SPECIALIST);
+        $candidates = $this->getWriterEmployeeCandidates(Role::DOCTOR, Role::SPECIALIST);
+
+        if ($termsOfService === null) {
+            return $candidates->first();
+        }
+
+        return $this->findEmployeeWithActiveRoleForProvidingCondition($candidates, $termsOfService)
+            ?? $candidates->first();
+    }
+
+    /**
+     * Find, among the given employees, the first one holding an active employee_role whose
+     * healthcare_service.providing_condition matches $providingCondition.
+     *
+     * @param  Collection<int, Employee>  $employees
+     */
+    private function findEmployeeWithActiveRoleForProvidingCondition(
+        Collection $employees,
+        string $providingCondition
+    ): ?Employee {
+        if ($employees->isEmpty()) {
+            return null;
+        }
+
+        $employeeIdsWithMatchingRole = EmployeeRole::query()
+            ->whereIn('employee_id', $employees->pluck('id'))
+            ->where('status', EmployeeRoleStatus::ACTIVE)
+            ->where('is_active', true)
+            ->whereHas(
+                'healthcareService',
+                fn (Builder $query) => $query
+                    ->where('providing_condition', $providingCondition)
+                    ->where('is_active', true)
+            )
+            ->pluck('employee_id')
+            ->all();
+
+        return $employees->first(
+            fn (Employee $employee) => in_array($employee->id, $employeeIdsWithMatchingRole, true)
+        );
     }
 
     /**
@@ -533,6 +582,18 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     protected function getWriterEmployeeByRolePriority(Role ...$priorityRoles): ?Employee
     {
+        return $this->getWriterEmployeeCandidates(...$priorityRoles)->first();
+    }
+
+    /**
+     * Get all of this user's employees (within the current legal entity) matching any of the given
+     * roles, ordered by role priority (most valuable role first).
+     *
+     * @param  Role  ...$priorityRoles  Ordered role from most valuable to least
+     * @return Collection<int, Employee>
+     */
+    protected function getWriterEmployeeCandidates(Role ...$priorityRoles): Collection
+    {
         $roleValues = array_map(static fn (Role $role) => $role->value, $priorityRoles);
 
         $employees = $this->party?->employees()
@@ -540,11 +601,11 @@ class User extends Authenticatable implements MustVerifyEmail
             ->whereStatus(Status::APPROVED)
             ->with('party:id,first_name,last_name,second_name')
             ->whereIn('employee_type', $roleValues)
-            ->get(['id', 'uuid', 'party_id', 'employee_type']);
+            ->get(['id', 'uuid', 'party_id', 'employee_type', 'position']);
 
-        return $employees->sortBy(
+        return ($employees ?? collect())->sortBy(
             fn (Employee $employee) => array_search($employee->employeeType, $roleValues, true)
-        )->first();
+        )->values();
     }
 
     /**

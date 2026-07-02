@@ -175,7 +175,9 @@ class EncounterEdit extends EncounterComponent
             return;
         }
 
-        $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
+        // Reopen the encounter for viewing, same as care plans redirect to their `show` page,
+        // instead of dropping the user back on the patients list.
+        $this->redirectRoute('encounter.edit', [legalEntity(), $this->personId, $this->encounterId], navigate: true);
     }
 
     protected function loadConditions(array $encounter): void
