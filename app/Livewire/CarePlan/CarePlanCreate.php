@@ -12,6 +12,9 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\CarePlan;
 use App\Models\EhealthJob;
 use App\Models\EhealthLink;
+use App\Models\Employee\Employee;
+use App\Models\EmployeeRole;
+use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Repositories\CarePlanRepository;
 use App\Repositories\MedicalEvents\Repository;
@@ -204,15 +207,34 @@ class CarePlanCreate extends BasePatientComponent
 
         $this->form->periodStart = now()->format('d.m.Y');
 
-        // Pre-fill author from current employee
-        $employee = Auth::user()?->getCarePlanWriterEmployee();
+        $this->refreshAuthorDisplay();
+        $this->loadDoctorsAndDictionaries();
+    }
+
+    /**
+     * Re-resolve the care plan writer employee for the currently selected terms_of_service and
+     * refresh the read-only "Автор" display field. eHealth ties the author to a specific
+     * healthcare_service.providing_condition, so the effective author can change when the user
+     * switches "умови надання послуг" (terms_of_service).
+     */
+    public function updatedFormTermsOfService(): void
+    {
+        $this->refreshAuthorDisplay();
+    }
+
+    private function refreshAuthorDisplay(): void
+    {
+        $employee = Auth::user()?->getCarePlanWriterEmployee($this->form->termsOfService ?: null);
         if ($employee) {
             $party = $employee->party;
             $this->form->author = implode(' ', array_filter([
                 $party?->last_name, $party?->first_name, $party?->second_name,
             ]));
         }
+    }
 
+    private function loadDoctorsAndDictionaries(): void
+    {
         // Load doctors for co-authors
         $legalEntity = legalEntity();
         if ($legalEntity) {
@@ -416,7 +438,7 @@ class CarePlanCreate extends BasePatientComponent
             // Priority: explicitly selected doctor on the form → authenticated user's DOCTOR/SPECIALIST employee.
             // If neither resolves, skip approval creation and instruct the user to create it manually.
             $employeeUuid = (!empty($this->form->doctor) ? $this->form->doctor : null)
-                ?? Auth::user()?->getCarePlanWriterEmployee()?->uuid;
+                ?? Auth::user()?->getCarePlanWriterEmployee($this->form->termsOfService ?: null)?->uuid;
 
             if (!$employeeUuid) {
                 $carePlan = CarePlan::where('uuid', $this->carePlanUuid)->first();
@@ -625,7 +647,7 @@ class CarePlanCreate extends BasePatientComponent
 
         $carePlan = $repository->create([
             'person_id' => $this->resolvePersonId(),
-            'author_id' => Auth::user()?->getCarePlanWriterEmployee()?->id,
+            'author_id' => Auth::user()?->getCarePlanWriterEmployee($this->form->termsOfService ?: null)?->id,
             'legal_entity_id' => $legalEntity?->id,
             'status' => CarePlanStatus::DRAFT->value,
             'category' => $this->form->category,
@@ -818,11 +840,28 @@ class CarePlanCreate extends BasePatientComponent
                 throw new \RuntimeException('Неможливо створити план лікування: у вибраній взаємодії відсутні діагнози (addresses). Будь ласка, переконайтеся, що взаємодія містить діагнози в ЕСОЗ та вони завантажені в локальну БД.');
             }
 
+            $termsOfService = $this->form->termsOfService;
+            $author = Auth::user()?->getCarePlanWriterEmployee($termsOfService);
+            $this->logCarePlanAuthorRoleDebug($author, $termsOfService);
+
+            if ($author && !$this->authorHasActiveRoleForTermsOfService($author, $termsOfService)) {
+                // Not a hard block: getCarePlanWriterEmployee() already tried its best to find a
+                // matching employee and fell back to this one. We still submit so eHealth remains
+                // the single source of truth for the "Employee does not have active role..." rule,
+                // but we log loudly here so the real cause is obvious without digging through the
+                // raw eHealth request/response.
+                Log::warning('[CarePlan] submitting with author lacking a matching active role for terms_of_service', [
+                    'author_uuid' => $author->uuid,
+                    'author_position' => $author->position,
+                    'terms_of_service' => $termsOfService,
+                ]);
+            }
+
             $carePlanPayload = $repository->formatCarePlanRequest(
                 $this->form->toArray(),
                 $this->form->encounter ?: null,
                 $encounterData,
-                Auth::user()?->getCarePlanWriterEmployee()?->uuid,
+                $author?->uuid,
                 $this->carePlanUuid ?: null
             );
             $generatedUuid = $carePlanPayload['id'];
@@ -905,7 +944,7 @@ class CarePlanCreate extends BasePatientComponent
             $carePlan = $repository->create([
                 'uuid' => $carePlanUuid,
                 'person_id' => $this->personId,
-                'author_id' => Auth::user()?->getCarePlanWriterEmployee()?->id,
+                'author_id' => $author?->id,
                 'legal_entity_id' => $legalEntity?->id,
                 'status' => $carePlanStatus,
                 'category' => $this->form->category,
@@ -1197,6 +1236,90 @@ class CarePlanCreate extends BasePatientComponent
         }
 
         return $data;
+    }
+
+    /**
+     * eHealth requires the care plan author (SPECIALIST/DOCTOR) to have an active employee_role
+     * whose healthcare_service.providing_condition matches care_plan.terms_of_service.
+     *
+     * @see https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/19686719489/AR+Create+Care+Plan
+     */
+    private function authorHasActiveRoleForTermsOfService(Employee $author, string $termsOfService): bool
+    {
+        return EmployeeRole::query()
+            ->where('employee_id', $author->id)
+            ->where('status', EmployeeRoleStatus::ACTIVE)
+            ->where('is_active', true)
+            ->whereHas(
+                'healthcareService',
+                fn ($query) => $query
+                    ->where('providing_condition', $termsOfService)
+                    ->where('is_active', true)
+            )
+            ->exists();
+    }
+
+    /**
+     * Log author employee, submitted terms_of_service, and matching employee_roles for debugging
+     * eHealth "Employee does not have active role that correspond to the submitted terms of service".
+     */
+    private function logCarePlanAuthorRoleDebug(?Employee $author, string $termsOfService): void
+    {
+        if ($author === null) {
+            logger()->warning('[CarePlan] terms_of_service author check - no care plan writer employee', [
+                'user_id' => Auth::id(),
+                'legal_entity_id' => legalEntity()->id,
+                'terms_of_service' => $termsOfService,
+            ]);
+
+            return;
+        }
+
+        $author->loadMissing(['party:id,first_name,last_name,second_name', 'specialities']);
+
+        $roles = EmployeeRole::query()
+            ->where('employee_id', $author->id)
+            ->where('status', EmployeeRoleStatus::ACTIVE)
+            ->where('is_active', true)
+            ->with('healthcareService:id,speciality_type,providing_condition,uuid,status')
+            ->get();
+
+        $partyRoles = EmployeeRole::query()
+            ->whereHas('employee', fn ($query) => $query->where('party_id', $author->party_id))
+            ->where('status', EmployeeRoleStatus::ACTIVE)
+            ->where('is_active', true)
+            ->with(['employee:id,uuid,employee_type,position', 'healthcareService:id,speciality_type,providing_condition'])
+            ->get();
+
+        logger()->debug('[CarePlan] terms_of_service author role snapshot', [
+            'user_id' => Auth::id(),
+            'legal_entity_id' => legalEntity()->id,
+            'submitted_terms_of_service' => $termsOfService,
+            'selected_author' => [
+                'employee_uuid' => $author->uuid,
+                'employee_type' => $author->employee_type,
+                'position' => $author->position,
+                'specialities' => $author->specialities->pluck('speciality')->all(),
+                'active_roles_count' => $roles->count(),
+                'matching_roles_count' => $roles->filter(
+                    fn (EmployeeRole $role) => $role->healthcareService?->providing_condition === $termsOfService
+                )->count(),
+                'active_roles' => $roles->map(fn (EmployeeRole $role) => [
+                    'role_uuid' => $role->uuid,
+                    'healthcare_service_uuid' => $role->healthcareService?->uuid,
+                    'speciality' => $role->healthcareService?->speciality_type,
+                    'providing_condition' => $role->healthcareService?->providing_condition,
+                ])->values()->all(),
+            ],
+            'all_party_employee_roles' => $partyRoles->map(fn (EmployeeRole $role) => [
+                'employee_uuid' => $role->employee?->uuid,
+                'employee_type' => $role->employee?->employee_type,
+                'position' => $role->employee?->position,
+                'role_uuid' => $role->uuid,
+                'speciality' => $role->healthcareService?->speciality_type,
+                'providing_condition' => $role->healthcareService?->providing_condition,
+            ])->values()->all(),
+        ]);
     }
 
     public function render()
