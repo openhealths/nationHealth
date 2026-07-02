@@ -518,6 +518,7 @@ class CarePlanCreate extends BasePatientComponent
             'clinical_protocol' => $this->form->clinicalProtocol ?: null,
             'context' => $this->form->context ?: null,
             'title' => $this->form->title,
+            'terms_of_service' => $this->form->termsOfService ?: null,
             'period_start' => convertToYmd($this->form->periodStart),
             'period_end' => !empty($this->form->periodEnd)
                 ? convertToYmd($this->form->periodEnd) : null,
@@ -589,42 +590,53 @@ class CarePlanCreate extends BasePatientComponent
                     $this->form->title = 'План лікування від ' . $date;
                 }
 
-                // Pre-fill diagnoses for the UI list
-                $this->diagnoses = $encounter->diagnoses->map(function ($d) {
-                    $conditionUuid = $d->condition?->value;
-                    $actualCondition = null;
-                    if ($conditionUuid) {
-                        $actualCondition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
-                        if (!$actualCondition) {
-                            Log::info('CarePlanCreate updatedFormEncounter: condition not found in local SQL DB, attempting to fetch from eHealth', [
-                                'condition_uuid' => $conditionUuid
-                            ]);
-                            try {
-                                $conditionData = EHealth::condition()->getById($this->uuid, $conditionUuid)->getData();
-                                \App\Repositories\MedicalEvents\Repository::condition()->store([Arr::toCamelCase($conditionData)], $this->personId);
-                                $actualCondition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
-                            } catch (\Exception $e) {
-                                Log::error('CarePlanCreate updatedFormEncounter: failed to fetch condition from eHealth', [
-                                    'condition_uuid' => $conditionUuid,
-                                    'error' => $e->getMessage()
-                                ]);
-                            }
-                        }
-                    }
-
-                    return [
-                        'date' => $actualCondition?->asserted_date
-                            ? \Carbon\Carbon::parse($actualCondition->asserted_date)->format('d.m.Y')
-                            : '-',
-                        'name' => ($actualCondition?->code?->text ?: null)
-                            ?? ($actualCondition?->code?->coding?->first()?->code ?: null)
-                            ?? '-',
-                    ];
-                })->toArray();
+                $this->diagnoses = $this->buildDiagnosesForUi($encounter);
             }
         } else {
             $this->diagnoses = [];
         }
+    }
+
+    /**
+     * Build the UI list of diagnoses for an encounter. EncounterDiagnose::condition() resolves to
+     * the Identifier row (its uuid lives in ->value), not the actual Condition, so we look the
+     * Condition up locally and, if missing, fetch and store it from eHealth on the fly.
+     *
+     * @return array<int, array{date: string, name: string}>
+     */
+    protected function buildDiagnosesForUi(\App\Models\MedicalEvents\Sql\Encounter $encounter): array
+    {
+        return $encounter->diagnoses->map(function ($d) {
+            $conditionUuid = $d->condition?->value;
+            $actualCondition = null;
+            if ($conditionUuid) {
+                $actualCondition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
+                if (!$actualCondition) {
+                    Log::info('CarePlanCreate: condition not found in local SQL DB, attempting to fetch from eHealth', [
+                        'condition_uuid' => $conditionUuid
+                    ]);
+                    try {
+                        $conditionData = EHealth::condition()->getById($this->uuid, $conditionUuid)->getData();
+                        \App\Repositories\MedicalEvents\Repository::condition()->store([Arr::toCamelCase($conditionData)], $this->personId);
+                        $actualCondition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
+                    } catch (\Exception $e) {
+                        Log::error('CarePlanCreate: failed to fetch condition from eHealth', [
+                            'condition_uuid' => $conditionUuid,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
+            }
+
+            return [
+                'date' => $actualCondition?->asserted_date
+                    ? \Carbon\Carbon::parse($actualCondition->asserted_date)->format('d.m.Y')
+                    : '-',
+                'name' => ($actualCondition?->code?->text ?: null)
+                    ?? ($actualCondition?->code?->coding?->first()?->code ?: null)
+                    ?? '-',
+            ];
+        })->toArray();
     }
 
     /**
@@ -811,6 +823,7 @@ class CarePlanCreate extends BasePatientComponent
                 'status' => $carePlanStatus,
                 'category' => $this->form->category,
                 'title' => $this->form->title,
+                'terms_of_service' => $termsOfService ?: null,
                 'period_start' => convertToYmd($this->form->periodStart),
                 'period_end' => !empty($this->form->periodEnd) ? convertToYmd($this->form->periodEnd) : null,
                 'encounter_id' => $encounterData['id'] ?? null,
@@ -1044,7 +1057,7 @@ class CarePlanCreate extends BasePatientComponent
      *
      * @see https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/19686719489/AR+Create+Care+Plan
      */
-    private function authorHasActiveRoleForTermsOfService(Employee $author, string $termsOfService): bool
+    protected function authorHasActiveRoleForTermsOfService(Employee $author, string $termsOfService): bool
     {
         return EmployeeRole::query()
             ->where('employee_id', $author->id)
@@ -1063,7 +1076,7 @@ class CarePlanCreate extends BasePatientComponent
      * Log author employee, submitted terms_of_service, and matching employee_roles for debugging
      * eHealth "Employee does not have active role that correspond to the submitted terms of service".
      */
-    private function logCarePlanAuthorRoleDebug(?Employee $author, string $termsOfService): void
+    protected function logCarePlanAuthorRoleDebug(?Employee $author, string $termsOfService): void
     {
         if ($author === null) {
             logger()->warning('[CarePlan] terms_of_service author check - no care plan writer employee', [

@@ -67,10 +67,7 @@ class CarePlanUpdate extends CarePlanCreate
 
         // Load encounter diagnoses for UI
         if ($carePlan->encounter) {
-            $this->diagnoses = $carePlan->encounter->diagnoses->map(fn ($d) => [
-                'date' => $d->condition?->asserted_date?->format('d.m.Y') ?? '-',
-                'name' => $d->condition?->code_display ?? $d->condition?->code ?? '-',
-            ])->toArray();
+            $this->diagnoses = $this->buildDiagnosesForUi($carePlan->encounter);
         }
 
         // Load doctors for co-authors (copied from Create)
@@ -127,11 +124,17 @@ class CarePlanUpdate extends CarePlanCreate
 
         $encounterData = $this->resolveEncounterData();
 
+        // Re-resolve the author for the (possibly changed) terms_of_service, same as on create,
+        // so a draft edited to a different "умови надання послуг" keeps a matching author.
+        $author = Auth::user()?->getCarePlanWriterEmployee($this->form->termsOfService ?: null);
+
         $repository->updateById($this->carePlan->id, [
+            'author_id' => $author?->id ?? $this->carePlan->author_id,
             'category' => $this->form->category,
             'clinical_protocol' => $this->form->clinicalProtocol ?: null,
             'context' => $this->form->context ?: null,
             'title' => $this->form->title,
+            'terms_of_service' => $this->form->termsOfService ?: null,
             'period_start' => convertToYmd($this->form->periodStart),
             'period_end' => !empty($this->form->periodEnd)
                 ? convertToYmd($this->form->periodEnd) : null,
@@ -165,6 +168,7 @@ class CarePlanUpdate extends CarePlanCreate
         $encounter = $this->carePlan->encounter;
         if ($encounter) {
             $this->redirectRoute('encounter.edit', [legalEntity(), $this->personId, $encounter->id], navigate: true);
+
             return;
         }
 
@@ -192,12 +196,16 @@ class CarePlanUpdate extends CarePlanCreate
 
         $encounterData = $this->resolveEncounterData();
 
+        $termsOfService = $this->form->termsOfService;
+        $author = Auth::user()?->getCarePlanWriterEmployee($termsOfService);
+        $this->logCarePlanAuthorRoleDebug($author, $termsOfService);
+
         // Build eHealth payload via Repository
         $carePlanPayload = $repository->formatCarePlanRequest(
             $this->form->toArray(),
             $this->form->encounter ?: null,
             $encounterData,
-            Auth::user()?->activeDoctorEmployee()?->uuid
+            $author?->uuid
         );
 
         try {
@@ -270,6 +278,8 @@ class CarePlanUpdate extends CarePlanCreate
                 'status' => $carePlanStatus,
                 'requisition' => $carePlanRequisition,
                 // Update other fields too just in case they were changed before signing
+                'author_id' => $author?->id ?? $this->carePlan->author_id,
+                'terms_of_service' => $termsOfService ?: null,
                 'category' => $this->form->category,
                 'title' => $this->form->title,
                 'period_start' => convertToYmd($this->form->periodStart),

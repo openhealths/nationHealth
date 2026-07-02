@@ -243,6 +243,8 @@ class CarePlanLifecycleTest extends TestCase
         $this->assertDatabaseHas('care_plans', [
             'uuid' => $carePlanUuid,
             'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'terms_of_service' => '736382003',
         ]);
 
         $carePlan = CarePlan::where('uuid', $carePlanUuid)->first();

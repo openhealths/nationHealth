@@ -84,6 +84,13 @@ class Approval extends Request
     /**
      * Resend SMS code for Approval.
      *
+     * This is the only endpoint documented by eHealth for this action (requires the
+     * `approval:create` scope); there is no patient-prefix-less variant. A previous version of
+     * this method tried an undocumented endpoint first, which eHealth confirmed doesn't exist
+     * (404) and only muddied real failures from this endpoint behind a doomed fallback.
+     *
+     * @see https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583403110/Resend+SMS+on+Approval
+     *
      * @param  string  $patientId
      * @param  string  $approvalId
      * @return PromiseInterface|EHealthResponse
@@ -91,13 +98,7 @@ class Approval extends Request
      */
     public function resendSms(string $patientId, string $approvalId): PromiseInterface|EHealthResponse
     {
-        // Fallback for backwards compatibility: try the new endpoint without patient prefix first.
-        // If it throws an HTTP exception (e.g., 404), fallback to the old endpoint with patientId.
-        try {
-            return $this->post("/api/approvals/{$approvalId}/actions/resend", []);
-        } catch (\Exception $e) {
-            return $this->post("/api/patients/{$patientId}/approvals/{$approvalId}/actions/resend", []);
-        }
+        return $this->post("/api/patients/{$patientId}/approvals/{$approvalId}/actions/resend", []);
     }
 
     /**
