@@ -681,7 +681,7 @@ trait ManagesCarePlanLifecycle
                         'type' => [
                             'coding' => [['system' => 'eHealth/resources', 'code' => 'employee']]
                         ],
-                        'value' => Auth::user()?->getCarePlanWriterEmployee()?->uuid,
+                        'value' => Auth::user()?->getCarePlanWriterEmployee($this->carePlan->terms_of_service)?->uuid,
                     ]
                 ],
                 'access_level' => 'write',

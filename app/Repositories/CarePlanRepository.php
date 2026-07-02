@@ -279,7 +279,8 @@ class CarePlanRepository
                 }
 
                 // Fallback to current user if author not found (to satisfy NOT NULL constraint)
-                $authorId = $author?->id ?? Auth::user()?->getCarePlanWriterEmployee()?->id;
+                $termsOfServiceForFallback = $rawFhir['terms_of_service']['coding'][0]['code'] ?? null;
+                $authorId = $author?->id ?? Auth::user()?->getCarePlanWriterEmployee($termsOfServiceForFallback)?->id;
 
                 $addresses = [];
                 if (isset($rawFhir['addresses']) && is_array($rawFhir['addresses'])) {
