@@ -1330,6 +1330,7 @@ class EncounterForm extends BaseForm
     private function addAtLeastOneActionValidation(array &$rules): void
     {
         $rules['encounter.actionReferences'][] = new AtLeastOneEncounterAction(
+            $this->encounter['classCode'] ?? null,
             $this->diagnosticReports ?? [],
             $this->procedures ?? []
         );
