@@ -321,7 +321,12 @@ class EmployeeRequest extends EHealthRequest
         ]);
 
         $partyPayload['no_tax_id'] = (bool) Arr::get($nestedData, 'party.no_tax_id');
-        $partyPayload['working_experience'] = (int) Arr::get($nestedData, 'party.working_experience');
+
+        $workingExperience = Arr::get($nestedData, 'party.working_experience');
+        if ($workingExperience !== null && $workingExperience !== '') {
+            $partyPayload['working_experience'] = (int) $workingExperience;
+        }
+
         $partyPayload['documents'] = $nestedData['documents'] ?? [];
         $partyPayload['phones'] = $nestedData['phones'] ?? [];
 

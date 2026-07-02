@@ -24,7 +24,6 @@ class EmployeeCreate extends AbstractEmployeeFormManager
 
     protected function handleDraftPersistence(): EmployeeRequest
     {
-        $this->applyEmployeeTypeBusinessRules();
         $preparedData = $this->form->getPreparedData();
         $nestedDataForRevision = $this->mapRevisionData($preparedData);
 

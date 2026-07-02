@@ -61,14 +61,13 @@
                     type="number"
                     id="workingExperience"
                     name="workingExperience"
-                    {{-- EHealth rule: strictly greater than 0 --}}
                     min="1"
                     step="1"
                     placeholder=" "
-                    class="peer input text-gray-500"
+                    required
+                    class="peer input text-gray-500 @error('form.party.workingExperience') input-error @enderror"
                 />
                 <label for="workingExperience" class="label">{{__('forms.working_experience')}}</label>
-                <p class="text-xs text-blue-500 mt-1">{{ __('forms.workingExperience_hint') }}</p>
                 @error('form.party.workingExperience') <p class="text-error">{{$message}}</p> @enderror
             </div>
         </div>

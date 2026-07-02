@@ -33,10 +33,11 @@ class EmployeeEdit extends AbstractEmployeeFormManager
         $this->loadDictionaries();
         $this->employee = $employee;
         $this->employeeId = $employee->id;
-        
+
         if (is_null($employee->userId)) {
             session()?->flash('error', 'Користувач має підтвердити вхід');
             $this->redirectRoute('employee.index', ['legalEntity' => legalEntity()->id]);
+
             return;
         }
 
@@ -44,7 +45,7 @@ class EmployeeEdit extends AbstractEmployeeFormManager
         $isOwnerParty = $employee->party->employees()
             ->where('employee_type', \App\Enums\User\Role::OWNER->value)
             ->exists();
-            
+
         $this->isPersonalDataLocked = $isOwnerParty;
         $this->isPositionDataLocked = true;
         $this->loadDivisions($legalEntity);
@@ -76,7 +77,6 @@ class EmployeeEdit extends AbstractEmployeeFormManager
     protected function handleDraftPersistence(): EmployeeRequest
     {
         $preparedData = $this->form->getPreparedData();
-        $this->applyEmployeeTypeBusinessRules();
         $nestedDataForRevision = $this->mapRevisionData($preparedData);
         $nestedDataForRevision['employee_uuid'] = $this->employee->uuid;
 

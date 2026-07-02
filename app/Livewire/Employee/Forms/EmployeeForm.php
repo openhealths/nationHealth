@@ -141,6 +141,7 @@ class EmployeeForm extends Form
             'party.second_name' => __('forms.party.second_name'),
             'party.tax_id' => __('forms.party.tax_id'),
             'party.phones' => __('forms.party.phones'),
+            'party.workingExperience' => __('forms.working_experience'),
             'documents' => __('forms.documents'),
             'position' => __('forms.position'),
             'start_date' => __('forms.start_date'),
@@ -164,6 +165,20 @@ class EmployeeForm extends Form
         return $attributes;
     }
 
+    /**
+     * Custom validation messages.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'party.workingExperience.required' => __('validation.custom.party.working_experience_required'),
+            'party.workingExperience.integer' => __('validation.custom.party.working_experience_integer'),
+            'party.workingExperience.gt' => __('validation.custom.party.working_experience_gt'),
+        ];
+    }
+
     protected function partyRules(): array
     {
         return [
@@ -178,7 +193,7 @@ class EmployeeForm extends Form
             'party.taxId' => ['required', 'string', new TaxId()],
             'party.noTaxId' => ['boolean'],
             'party.email' => ['required', 'present', 'email', new UniqueEmailInLegalEntity($this->existingPartyId)],
-            'party.workingExperience' => ['nullable', 'numeric', 'integer', 'min:1'],
+            'party.workingExperience' => ['required', 'integer', 'gt:0'],
             'party.aboutMyself' => ['nullable', 'present', 'string'],
         ];
     }

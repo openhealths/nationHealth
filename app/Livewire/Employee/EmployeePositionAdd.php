@@ -58,7 +58,6 @@ class EmployeePositionAdd extends AbstractEmployeeFormManager
     protected function handleDraftPersistence(): EmployeeRequest
     {
         $preparedData = $this->form->getPreparedData();
-        $this->applyEmployeeTypeBusinessRules();
         $nestedDataForRevision = $this->mapRevisionData($preparedData);
 
         $employeeRequestData = Arr::only($preparedData, [
@@ -75,6 +74,7 @@ class EmployeePositionAdd extends AbstractEmployeeFormManager
             if ($existingRequest && is_null($existingRequest->uuid)) {
                 $existingRequest->fill($employeeRequestData)->save();
                 $existingRequest->revision?->update(['data' => $nestedDataForRevision]);
+
                 return $existingRequest;
             }
         }

@@ -75,6 +75,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     public function save(): void
     {
         try {
+            $this->applyEmployeeTypeBusinessRules();
             // The validation call is now dynamic
             $this->form->validate($this->form->rulesForSave($this));
             $this->validatePartyDataConsistency();
@@ -94,6 +95,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     public function prepareForSigning(): void
     {
         try {
+            $this->applyEmployeeTypeBusinessRules();
             $this->form->validate($this->form->rulesForSave($this));
             $this->validatePartyDataConsistency();
             $this->employeeRequest = $this->handleDraftPersistence();
@@ -114,6 +116,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
 
         try {
             // 1. Validate the form
+            $this->applyEmployeeTypeBusinessRules();
             $this->form->validate($this->form->rulesForSave($this));
             $this->validatePartyDataConsistency();
             // 2. Persist the draft using the component's specific logic
@@ -623,7 +626,8 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     {
         return str_contains($error, '«')
             || str_starts_with($error, 'У розділі')
-            || str_starts_with($error, 'Не можна одночасно');
+            || str_starts_with($error, 'Не можна одночасно')
+            || str_contains($error, 'eSOZ');
     }
 
     private function resolveValidationErrorContext(string $key): ?string
