@@ -27,7 +27,59 @@
     </div>
 
     @if($isUnidentified)
-        <div class="breadcrumb-form p-4 shift-content space-y-6" x-data="{ showCertificate: false }">
+        <div class="breadcrumb-form p-4 shift-content space-y-6" x-data="{
+            showCertificate: false,
+            currentMethod: 'SMS',
+            showConsentFormModal: false,
+            showMergePatientDrawer: false,
+            showMergeResults: false,
+            showMergeAuthDrawer: false,
+            showMergeConfirmationDrawer: false,
+            showMergeSmsDrawer: false,
+            showMergeDocumentsDrawer: false,
+            showMergeFinalConsentDrawer: false,
+            showMergeSignatureDrawer: false,
+            selectedMergePatient: null,
+            mergeSearchPatients: [],
+            searchForMergePatient() {
+                let firstName = $wire.get('form.firstName') || '';
+                let lastName = $wire.get('form.lastName') || '';
+                let birthDate = $wire.get('form.birthDate') || '';
+                let secondName = $wire.get('form.secondName') || '';
+                let taxId = $wire.get('form.taxId') || '';
+                let phoneNumber = $wire.get('form.phoneNumber') || '';
+                let birthCertificate = $wire.get('form.birthCertificate') || '';
+
+                this.mergeSearchPatients = [
+                    {
+                        id: '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
+                        firstName: firstName || 'Якийсь',
+                        lastName: lastName || 'Пацієнт',
+                        secondName: secondName || 'Так',
+                        birthDate: birthDate || '2001-02-23',
+                        birthSettlement: 'Київ',
+                        taxId: taxId || '-',
+                        birthCertificate: birthCertificate || '-',
+                        phones: [{ number: phoneNumber || '+380951234567' }],
+                        gender: 'male'
+                    }
+                ];
+                this.showMergeResults = true;
+            },
+            selectMergePatient(patient) {
+                this.selectedMergePatient = patient;
+                this.showMergePatientDrawer = false;
+                this.showMergeAuthDrawer = true;
+            },
+            completeMerge(method) {
+                this.showMergeSignatureDrawer = false;
+                this.showMergeAuthDrawer = false;
+
+                alert('{{ __('patients.merge.merge_success_message', ['method' => ':method']) }}'.replace(':method', method === 'SMS' ? '{{ __('patients.merge.auth_via_sms') }}' : '{{ __('patients.merge.auth_via_documents') }}'));
+
+                window.location.href = '{{ route('persons.index', [legalEntity()]) }}';
+            }
+        }">
 
             <div x-data="{ open: true }"
                 class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
@@ -43,7 +95,7 @@
                 </h2>
                 <div x-show="open" wire:ignore.self>
                     <div class="px-6 pb-6 border-t border-gray-100 dark:border-gray-700 pt-4">
-                        <a href="#" class="cursor-pointer text-blue-600 hover:text-blue-800 flex items-center gap-1.5 font-medium">
+                        <a href="#" @click.prevent="showMergePatientDrawer = true" class="cursor-pointer text-blue-600 hover:text-blue-800 flex items-center gap-1.5 font-medium">
                             @icon('plus', 'w-4 h-4')
                             <span class="text-sm">Приєднати записи неідентифікованого пацієнта до записів ідентифікованого пацієнта</span>
                         </a>
@@ -182,6 +234,15 @@
             </div>
 
             @include('livewire.person.records.partials.information-certificate')
+
+            @include('livewire.person.parts.drawers.merge-patients')
+            @include('livewire.person.parts.drawers.merge-auth-methods')
+            @include('livewire.person.parts.drawers.merge-confirmation')
+            @include('livewire.person.parts.drawers.merge-sms-verification')
+            @include('livewire.person.parts.drawers.merge-documents-upload')
+            @include('livewire.person.parts.drawers.merge-final-consent')
+            @include('livewire.person.parts.modals.consent-form-modal')
+            @include('livewire.person.parts.drawers.merge-signature')
 
         </div>
     @else
