@@ -11,7 +11,7 @@
         <fieldset class="fieldset">
             <legend class="legend">
                 {{ $employeeRole->employee->fullName }}
-                - {{ $dictionaries['SPECIALITY_TYPE'][$employeeRole->healthcareService->specialityType] }}
+                - {{ $this->dictionaryLabelByCode('SPECIALITY_TYPE', $employeeRole->healthcareService->specialityType) }}
             </legend>
 
             <div class="form-row-2">
@@ -32,7 +32,7 @@
                 <div class="form-group group">
                     <label for="specialityType" class="label">{{ __('employee-roles.speciality_type') }}</label>
                     <input
-                        value="{{ $dictionaries['SPECIALITY_TYPE'][$employeeRole->healthcareService->specialityType] }}"
+                        value="{{ $this->dictionaryLabelByCode('SPECIALITY_TYPE', $employeeRole->healthcareService->specialityType) }}"
                         type="text"
                         name="specialityType"
                         id="specialityType"

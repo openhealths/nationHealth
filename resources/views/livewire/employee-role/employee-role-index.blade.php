@@ -122,7 +122,7 @@
                                     {{ $employeeRole->employee->fullName }}
                                 </td>
                                 <td class="index-table-td">
-                                    {{ $dictionaries['SPECIALITY_TYPE'][$employeeRole->healthcareService->specialityType] }}
+                                    {{ $this->dictionaryLabelByCode('SPECIALITY_TYPE', $employeeRole->healthcareService->specialityType) }}
                                 </td>
                                 <td class="index-table-td">
                                     {{ $employeeRole->healthcareService->division->name }}

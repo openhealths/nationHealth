@@ -53,6 +53,15 @@ trait FormTrait
         $this->dictionaries = dictionary()->basics()->getMultipleFormatted($this->dictionaryNames ?? [])->toArray();
     }
 
+    public function dictionaryLabelByCode(string $dictionary, ?string $code, string $fallback = ''): string
+    {
+        if ($code === null || $code === '') {
+            return $fallback;
+        }
+
+        return $this->dictionaries[$dictionary][$code] ?? $code;
+    }
+
     /**
      * Filter and keep only the specified keys in a dictionaries array.
      *
