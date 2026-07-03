@@ -51,8 +51,66 @@
                  $wire.form.phoneNumber = '';
                  $wire.form.birthCertificate = '';
              },
-             confidantPerson: {},
-             showConfidantPersonDrawer: $wire.entangle('showConfidantPersonDrawer')
+             showConfidantPersonDrawer: $wire.entangle('showConfidantPersonDrawer'),
+             showDeactivateConfidantPersonDrawer: @if($canManageConfidantRelationships) $wire.entangle('showDeactivateConfidantPersonDrawer') @else false @endif,
+             showDocumentDrawer: false,
+             showAuthDrawer: @if($canManageConfidantRelationships) $wire.entangle('showAuthDrawer') @else false @endif,
+             showSignatureDrawer: @if($canManageConfidantRelationships) $wire.entangle('showSignatureDrawer') @else false @endif,
+             showTerminateModal: @if($canManageConfidantRelationships) $wire.entangle('showTerminateModal') @else false @endif,
+             deactivateDocIndex: null,
+             selectedPatient: null,
+             confidantPerson: $wire.entangle('newConfidantPerson'),
+             confidantPersons: @if($canManageConfidantRelationships) $wire.entangle('confidantPersonRelationships') @else [] @endif,
+             selectedConfidantIndex: null,
+             documentRelationshipTypes: @js($this->dictionaries['DOCUMENT_RELATIONSHIP_TYPE']),
+             documentTypes: @js($this->dictionaries['DOCUMENT_TYPE']),
+             phoneTypes: @js($this->dictionaries['PHONE_TYPE']),
+             newDocument: {
+                 type: '',
+                 typeLabel: '',
+                 number: '',
+                 issuedBy: '',
+                 issuedAt: '',
+                 expiryDate: ''
+             },
+             isEditing: false,
+             editingIndex: null,
+             isEditingLegalRep: false,
+             editingLegalRepIndex: null,
+             addNewConfidant() {
+                 if (this.newDocument.type && this.newDocument.number && this.newDocument.issuedBy && this.newDocument.issuedAt) {
+                     if (!this.confidantPerson.documentsRelationship) {
+                         this.confidantPerson.documentsRelationship = [];
+                     }
+
+                     const documentData = {
+                         type: this.newDocument.type,
+                         number: this.newDocument.number,
+                         issuedBy: this.newDocument.issuedBy,
+                         issuedAt: this.newDocument.issuedAt,
+                         activeTo: this.newDocument.expiryDate
+                     };
+
+                     if (this.isEditing && this.editingIndex !== null) {
+                         this.confidantPerson.documentsRelationship[this.editingIndex] = documentData;
+                         this.isEditing = false;
+                         this.editingIndex = null;
+                     } else {
+                         this.confidantPerson.documentsRelationship.push(documentData);
+                     }
+
+                     this.newDocument = {
+                         type: '',
+                         typeLabel: '',
+                         number: '',
+                         issuedBy: '',
+                         issuedAt: '',
+                         expiryDate: ''
+                     };
+
+                     this.confidantPerson = { ...this.confidantPerson };
+                 }
+             }
          }"
     >
         <div class="flex items-center gap-4 mb-4">
@@ -528,8 +586,8 @@
                                                                     class="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 whitespace-nowrap text-left"
                                                                     @click.prevent="
                                                                         $wire.selectedConfidantPersonId = '{{ $cp['uuid'] ?? '' }}';
-                                                                        $wire.selectedConfidantIndex = '{{ $key }}';
-                                                                        $wire.showDeactivateConfidantPersonDrawer = true;
+                                                                        selectedConfidantIndex = '{{ $key }}';
+                                                                        showDeactivateConfidantPersonDrawer = true;
                                                                         openDropdown = false;
                                                                     "
                                                             >
@@ -854,7 +912,6 @@
                 </div>
             </div>
         </div>
-    </div>
 
     <div class="mt-8 flex items-center gap-4">
         <a href="{{ route('persons.index', [legalEntity()]) }}" class="button-minor" style="margin: 0 !important;">
@@ -878,5 +935,6 @@
         @include('livewire.person.parts.modals.choose-auth-method')
     @endif
 
+    </div>
     <x-forms.loading />
 </x-layouts.patient>

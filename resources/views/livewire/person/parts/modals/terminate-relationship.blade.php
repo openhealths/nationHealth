@@ -3,7 +3,9 @@
     x-data="{
     getParentData() {
       const fieldset = document.querySelector('fieldset[data-fieldset=&quot;incapacitated&quot;]');
-      return fieldset ? Alpine.$data(fieldset) : null;
+      if (fieldset) return Alpine.$data(fieldset);
+      const container = document.querySelector('div.breadcrumb-form');
+      return container ? Alpine.$data(container) : null;
     },
     isVisible: false
   }"
