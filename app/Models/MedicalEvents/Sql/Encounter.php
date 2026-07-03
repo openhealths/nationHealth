@@ -6,6 +6,8 @@ namespace App\Models\MedicalEvents\Sql;
 
 use App\Casts\EHealthTimestampCast;
 use App\Enums\Person\EncounterStatus;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -20,6 +22,7 @@ class Encounter extends Model
     protected $fillable = [
         'uuid',
         'person_id',
+        'preperson_id',
         'status',
         'cancellation_reason',
         'explanatory_letter',
@@ -41,6 +44,7 @@ class Encounter extends Model
     protected $hidden = [
         'id',
         'person_id',
+        'preperson_id',
         'visit_id',
         'episode_id',
         'class_id',
@@ -156,17 +160,24 @@ class Encounter extends Model
         return $this->hasOne(EncounterHospitalization::class);
     }
 
+    public function preperson(): BelongsTo
+    {
+        return $this->belongsTo(Preperson::class);
+    }
+
     /**
-     * Filter encounters belonging to the given person.
+     * Filter encounters belonging to the given patient (person or preperson).
      *
      * @param  Builder  $query
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @return Builder
      */
     #[Scope]
-    protected function forPerson(Builder $query, int $personId): Builder
+    protected function forPatient(Builder $query, Person|Preperson $patient): Builder
     {
-        return $query->wherePersonId($personId);
+        return $patient instanceof Preperson
+            ? $query->wherePrepersonId($patient->id)
+            : $query->wherePersonId($patient->id);
     }
 
     /**

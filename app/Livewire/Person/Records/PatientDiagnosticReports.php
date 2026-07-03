@@ -156,7 +156,7 @@ class PatientDiagnosticReports extends BasePatientComponent
     }
 
     public function sync(): void
-    {     
+    {
         if ($this->cannotStartSync('diagnostic_report')) {
             return;
         }
@@ -180,7 +180,7 @@ class PatientDiagnosticReports extends BasePatientComponent
 
         try {
             $validatedData = $response->validate();
-            Repository::diagnosticReport()->sync($this->personId, $validatedData);
+            Repository::diagnosticReport()->sync($this->patient(), $validatedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing diagnostic report');
 
@@ -504,8 +504,8 @@ class PatientDiagnosticReports extends BasePatientComponent
     private function loadDiagnosticReportsFromDb(): void
     {
         $diagnosticReports = DiagnosticReport::withAllRelations()
-        ->where('person_id', $this->personId)
-        ->get();
+            ->forPatient($this->patient())
+            ->get();
 
         $this->totalEntries = $diagnosticReports->count();
 
@@ -559,7 +559,7 @@ class PatientDiagnosticReports extends BasePatientComponent
 
     private function loadEpisodesFromDb(): void
     {
-        $filterEpisodeOptions = Episode::forPerson($this->personId)->get()->toArray();
+        $filterEpisodeOptions = Episode::forPatient($this->patient())->get()->toArray();
 
         $this->totalEntries = count($filterEpisodeOptions);
 
@@ -608,7 +608,7 @@ class PatientDiagnosticReports extends BasePatientComponent
     {
         $this->filterEncounterOptions = Arr::toCamelCase(
             $this->formatDatesForDisplay(
-                Repository::encounter()->getByPersonId($this->personId)
+                Repository::encounter()->getByPersonId($this->patient())
             )
         );
     }

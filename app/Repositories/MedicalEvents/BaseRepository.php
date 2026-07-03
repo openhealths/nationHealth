@@ -6,6 +6,8 @@ namespace App\Repositories\MedicalEvents;
 
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use Illuminate\Database\Eloquent\Model;
 
 abstract class BaseRepository
@@ -14,6 +16,19 @@ abstract class BaseRepository
     // For now, it's only SQL models for the IDE to prompt
     public function __construct(protected Model $model)
     {
+    }
+
+    /**
+     * Resolve the owner FK column and id for a patient (person or preperson).
+     *
+     * @param  Person|Preperson  $patient
+     * @return array
+     */
+    protected function resolveOwner(Person|Preperson $patient): array
+    {
+        return $patient instanceof Preperson
+            ? ['preperson_id', $patient->id]
+            : ['person_id', $patient->id];
     }
 
     /**

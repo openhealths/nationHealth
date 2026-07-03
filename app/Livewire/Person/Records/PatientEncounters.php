@@ -122,7 +122,7 @@ class PatientEncounters extends BasePatientComponent
 
         try {
             $validatedData = $response->validate();
-            Repository::encounter()->sync($this->personId, $validatedData);
+            Repository::encounter()->sync($this->patient(), $validatedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing encounters');
 
@@ -185,9 +185,9 @@ class PatientEncounters extends BasePatientComponent
      */
     protected function loadFilterOptions(): void
     {
-        $this->episodes = Repository::episode()->getByPersonId($this->personId);
+        $this->episodes = Repository::episode()->getByPersonId($this->patient());
 
-        $encounters = Encounter::forPerson($this->personId)
+        $encounters = Encounter::forPatient($this->patient())
             ->with(['incomingReferral.type.coding', 'originEpisode.type.coding'])
             ->get();
 
@@ -221,7 +221,7 @@ class PatientEncounters extends BasePatientComponent
      */
     protected function paginateLocalEncounters(): LengthAwarePaginator
     {
-        $paginator = Encounter::forPerson($this->personId)
+        $paginator = Encounter::forPatient($this->patient())
             ->withRelationships()
             ->recentlyUpdatedFirst()
             ->paginate(config('pagination.per_page'));

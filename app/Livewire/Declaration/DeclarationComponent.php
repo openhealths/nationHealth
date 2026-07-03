@@ -154,7 +154,7 @@ abstract class DeclarationComponent extends Component
 
     protected function baseMount(int $personId): void
     {
-         $patient = Person::select(['uuid', 'first_name', 'last_name', 'second_name', 'is_syncing'])
+        $patient = Person::select(['uuid', 'first_name', 'last_name', 'second_name', 'is_syncing'])
             ->withExists('documents')
             ->whereId($personId)
             ->firstOrFail();
@@ -170,9 +170,8 @@ abstract class DeclarationComponent extends Component
 
         // Use 'documents_exists' dynamic attribute (added by withExists) to determine if we need to update person data (for one haven't OTP authentication method)
         $this->isNeedToPersonUpdate = !$patient->documents_exists && collect($this->authMethods)
-                ->whereIn('type', [AuthenticationMethod::OTP->value, AuthenticationMethod::THIRD_PERSON->value])
-                ->isEmpty();
-
+            ->whereIn('type', [AuthenticationMethod::OTP->value, AuthenticationMethod::THIRD_PERSON->value])
+            ->isEmpty();
 
         $this->isNeedToResign = Repository::declarationRequest()->checkIfNeedToResign($this->patientUuid);
 
@@ -204,7 +203,7 @@ abstract class DeclarationComponent extends Component
         if ($authMethodType === AuthenticationMethod::OFFLINE->value) {
             $this->uploadedDocuments[] = $declarationRequest?->person?->documents->toArray()[0] ?? [];
             $this->uploadedDocuments[0]['url'] = $declarationRequest->person->authenticationMethods()
-                            ->where('type', AuthenticationMethod::OFFLINE->value)->value('url');
+                ->where('type', AuthenticationMethod::OFFLINE->value)->value('url');
         }
 
         $this->showInformationMessageModal = true;
@@ -298,7 +297,7 @@ abstract class DeclarationComponent extends Component
         // Redirect to edit page after successfully creating new declaration request
         $this->redirectRoute(
             'declaration.edit',
-            [legalEntity(), 'personId' => $declarationRequest->person_id, 'declarationRequest' => $this->declarationRequestId],
+            [legalEntity(), 'person' => $declarationRequest->person_id, 'declarationRequest' => $this->declarationRequestId],
             navigate: true
         );
     }
@@ -616,7 +615,7 @@ abstract class DeclarationComponent extends Component
 
                     $parentDeclaration->status = Status::TERMINATED;
                     $parentDeclaration->save();
-                } else if ($oldDeclaration) {
+                } elseif ($oldDeclaration) {
                     $oldDeclaration->status = Status::TERMINATED;
                     $oldDeclaration->save();
                 }
@@ -734,14 +733,13 @@ abstract class DeclarationComponent extends Component
     /**
      * Redirect to the patient data page for the current person.
      *
-     * @param int |null $personId Optional person ID; if not provided, uses the component's personId property.
-     *
+     * @param  int |null  $personId  Optional person ID; if not provided, uses the component's personId property.
      * @return void
      */
     public function goToPatientData(?int $personId = null): void
     {
         $personId ??= $this->personId;
 
-        $this->redirectRoute('persons.patient-data', [legalEntity(), 'personId' => $personId]);
+        $this->redirectRoute('persons.patient-data', [legalEntity(), 'person' => $personId]);
     }
 }

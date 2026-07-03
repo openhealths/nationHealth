@@ -6,6 +6,8 @@ namespace App\Jobs;
 
 use App\Core\EHealthJob;
 use App\Models\LegalEntity;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use App\Classes\eHealth\EHealth;
 use App\Repositories\MedicalEvents\Repository;
 use GuzzleHttp\Promise\PromiseInterface;
@@ -23,12 +25,14 @@ class ObservationSync extends EHealthJob
 
     protected ?string $patientUuid = null;
     protected ?int $personId = null;
+    protected ?int $prepersonId = null;
 
     public function handle(): void
     {
         // Get patient info from batch options
         $this->patientUuid = $this->batch()->options['patient_uuid'] ?? null;
         $this->personId = $this->batch()->options['person_id'] ?? null;
+        $this->prepersonId = $this->batch()->options['preperson_id'] ?? null;
 
         parent::handle();
     }
@@ -59,7 +63,11 @@ class ObservationSync extends EHealthJob
             return;
         }
 
-        Repository::observation()->sync($this->personId, $validatedData);
+        $patient = $this->prepersonId !== null
+            ? Preperson::findOrFail($this->prepersonId)
+            : Person::findOrFail($this->personId);
+
+        Repository::observation()->sync($patient, $validatedData);
     }
 
     /**

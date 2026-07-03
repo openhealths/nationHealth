@@ -388,12 +388,12 @@
                             @icon('file-lines', 'w-4 h-4')
                             <span class="text-sm">{{ __('patients.view_record') }}</span>
                         </button>
-                        <a href="{{ route('encounter.create', [legalEntity(), 'personId' => 1]) }}"
-                           class="cursor-pointer text-blue-600 hover:text-blue-800 flex items-center gap-1.5 font-medium"
+                        <button @click="triggerAction('success', 'Перехід до створення взаємодії.')"
+                                class="cursor-pointer text-blue-600 hover:text-blue-800 flex items-center gap-1.5 font-medium"
                         >
                             @icon('plus', 'w-4 h-4')
                             <span class="text-sm">{{ __('patients.start_interacting') }}</span>
-                        </a>
+                        </button>
                     </div>
                 </div>
 
@@ -458,7 +458,7 @@
                                                             type="button"
                                                     >
                                                         @icon('trash', 'w-4 h-4')
-                                                        {{ __('patients.register_death') }}
+                                                        {{ __('prepersons.register_death') }}
                                                     </button>
                                                 </div>
                                             </div>

@@ -7,6 +7,8 @@ namespace App\Livewire\Procedure;
 use App\Core\Arr;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Procedure;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Fhir;
 use Illuminate\Support\Facades\DB;
@@ -18,19 +20,23 @@ class ProcedureEdit extends ProcedureComponent
     #[Locked]
     public int $procedureId;
 
-    public function mount(LegalEntity $legalEntity, int $personId, ?int $procedureId = null): void
-    {
-        parent::mount($legalEntity, $personId);
+    public function mount(
+        LegalEntity $legalEntity,
+        ?Person $person = null,
+        ?Preperson $preperson = null,
+        ?int $procedureId = null
+    ): void {
+        parent::mount($legalEntity, $person, $preperson);
 
         $this->procedureId = $procedureId;
 
         $procedure = Procedure::withAllRelations()
             ->whereKey($procedureId)
-            ->where('person_id', $personId)
+            ->forPatient($this->patient())
             ->firstOrFail();
 
         $this->procedureUuid = $procedure->uuid;
-        $this->isReadonly = request()->routeIs('procedure.view');
+        $this->isReadonly = request()->routeIs('*procedure.view');
 
         $procedureData = $procedure->toArray();
 
@@ -66,7 +72,7 @@ class ProcedureEdit extends ProcedureComponent
     protected function persist(array $formattedData): int
     {
         return DB::transaction(function () use ($formattedData) {
-            Repository::procedure()->sync($this->personId, [$this->fhirToSync($formattedData)]);
+            Repository::procedure()->sync($this->patient(), [$this->fhirToSync($formattedData)]);
 
             return $this->procedureId;
         });

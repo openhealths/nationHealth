@@ -22,6 +22,7 @@ use App\Livewire\Encounter\Forms\Api\EncounterRequestApi;
 use App\Models\Employee\Employee;
 use App\Models\Icd10;
 use App\Models\Person\Person;
+use App\Models\Preperson;
 use App\Models\Equipment;
 use App\Repositories\Repository;
 use App\Traits\FormTrait;
@@ -41,12 +42,27 @@ class EncounterComponent extends Component
     public bool $showSignatureModal = false;
 
     /**
-     * ID of the patient for which create an encounter.
+     * Person ID (set when the patient is a person).
      *
-     * @var int
+     * @var int|null
      */
     #[Locked]
-    public int $personId;
+    public ?int $personId = null;
+
+    /**
+     * Preperson ID (set when the patient is a preperson).
+     *
+     * @var int|null
+     */
+    #[Locked]
+    public ?int $prepersonId = null;
+
+    /**
+     * Request-scoped memoized patient model.
+     *
+     * @var Person|Preperson|null
+     */
+    private Person|Preperson|null $patientModel = null;
 
     /**
      * Patient full name.
@@ -349,12 +365,23 @@ class EncounterComponent extends Component
     }
 
     /**
-     * Initialize the component data based on the patient ID.
+     * Resolve the patient model (person or preperson) for the current context.
      *
-     * @param  int  $personId
+     * @return Person|Preperson
+     */
+    protected function patient(): Person|Preperson
+    {
+        return $this->patientModel ??= ($this->prepersonId !== null
+            ? Preperson::findOrFail($this->prepersonId)
+            : Person::findOrFail($this->personId));
+    }
+
+    /**
+     * Initialize the component data for the current patient.
+     *
      * @return void
      */
-    protected function initializeComponent(int $personId): void
+    protected function initializeComponent(): void
     {
         $authUser = Auth::user();
 
@@ -372,7 +399,6 @@ class EncounterComponent extends Component
             ];
         })->toArray();
 
-        $this->personId = $personId;
         $this->legalEntityType = legalEntity()->type->name;
         $this->role = $authUser->roles->first()->name;
         $this->divisions = legalEntity()->divisions()->whereStatus(Status::ACTIVE)->get()->toArray();
@@ -633,9 +659,7 @@ class EncounterComponent extends Component
 
     protected function setPatientData(): void
     {
-        $patient = Person::select(['uuid', 'first_name', 'last_name', 'second_name'])
-            ->whereId($this->personId)
-            ->firstOrFail();
+        $patient = $this->patient();
 
         $this->patientUuid = $patient->uuid;
         $this->patientFullName = $patient->fullName;

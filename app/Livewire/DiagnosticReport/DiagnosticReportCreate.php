@@ -63,10 +63,10 @@ class DiagnosticReportCreate extends DiagnosticReportComponent
     {
         return DB::transaction(function () use ($formattedData) {
             $diagnosticReportId = Repository::diagnosticReport()
-                ->store([$formattedData['diagnosticReport']], $this->personId);
+                ->store([$formattedData['diagnosticReport']], $this->patient());
 
             if (isset($formattedData['observations'])) {
-                Repository::observation()->store($formattedData['observations'], $this->personId, $diagnosticReportId);
+                Repository::observation()->store($formattedData['observations'], $this->patient(), $diagnosticReportId);
             }
 
             return $diagnosticReportId;

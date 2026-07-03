@@ -8,6 +8,7 @@ use App\Casts\EHealthTimestampCast;
 use App\Enums\Person\EpisodeStatus;
 use Eloquence\Behaviours\HasCamelCasing;
 use App\Models\Person\Person;
+use App\Models\Preperson;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -22,6 +23,7 @@ class Episode extends Model
     protected $fillable = [
         'uuid',
         'person_id',
+        'preperson_id',
         'encounter_id',
         'episode_type_id',
         'status',
@@ -38,6 +40,7 @@ class Episode extends Model
     protected $hidden = [
         'id',
         'person_id',
+        'preperson_id',
         'encounter_id',
         'episode_type_id',
         'managing_organization_id',
@@ -88,6 +91,11 @@ class Episode extends Model
         return $this->belongsTo(Person::class);
     }
 
+    public function preperson(): BelongsTo
+    {
+        return $this->belongsTo(Preperson::class);
+    }
+
     public function currentDiagnoses(): HasMany
     {
         return $this->hasMany(EpisodeCurrentDiagnosis::class);
@@ -104,16 +112,18 @@ class Episode extends Model
     }
 
     /**
-     * Filter episodes belonging to the given person.
+     * Filter episodes belonging to the given patient (person or preperson).
      *
      * @param  Builder  $query
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @return Builder
      */
     #[Scope]
-    protected function forPerson(Builder $query, int $personId): Builder
+    protected function forPatient(Builder $query, Person|Preperson $patient): Builder
     {
-        return $query->wherePersonId($personId);
+        return $patient instanceof Preperson
+            ? $query->wherePrepersonId($patient->id)
+            : $query->wherePersonId($patient->id);
     }
 
     #[Scope]

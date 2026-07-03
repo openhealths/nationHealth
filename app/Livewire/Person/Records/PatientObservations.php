@@ -168,7 +168,7 @@ class PatientObservations extends BasePatientComponent
 
         try {
             $validatedData = $response->validate();
-            Repository::observation()->sync($this->personId, $validatedData);
+            Repository::observation()->sync($this->patient(), $validatedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing observation');
 
@@ -179,7 +179,7 @@ class PatientObservations extends BasePatientComponent
             $this->dispatchRemainingPages('observation');
         } else {
             legalEntity()->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_OBSERVATION);
-            Session::flash('success', __('patients.messages.observation_synced_successfully'));
+            Session::flash('success', __('patients.messages.observations_synced_successfully'));
         }
 
         $this->loadFilterOptions();
@@ -207,9 +207,10 @@ class PatientObservations extends BasePatientComponent
 
     protected function loadFilterOptions(): void
     {
-        $this->episodes = Repository::episode()->getByPersonId($this->personId);
-        $this->encounters = Repository::encounter()->getByPersonId($this->personId);
-        $reports = DiagnosticReport::forPerson($this->personId)
+        $this->episodes = Repository::episode()->getByPersonId($this->patient());
+        $this->encounters = Repository::encounter()->getByPersonId($this->patient());
+
+        $reports = DiagnosticReport::forPatient($this->patient())
             ->final()
             ->with(['effectivePeriod', 'code.type.coding'])
             ->recentlyUpdatedFirst()
@@ -237,7 +238,7 @@ class PatientObservations extends BasePatientComponent
      */
     protected function paginateLocalObservations(): LengthAwarePaginator
     {
-        $paginator = Observation::forPerson($this->personId)
+        $paginator = Observation::forPatient($this->patient())
             ->withAllRelations()
             ->recentlyUpdatedFirst()
             ->paginate(config('pagination.per_page'));

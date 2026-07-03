@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use Carbon\CarbonImmutable;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -21,6 +23,7 @@ class Procedure extends Model
     protected $fillable = [
         'uuid',
         'person_id',
+        'preperson_id',
         'status',
         'status_reason_id',
         'based_on_id',
@@ -110,6 +113,11 @@ class Procedure extends Model
         return $this->belongsTo(CodeableConcept::class, 'status_reason_id');
     }
 
+    public function preperson(): BelongsTo
+    {
+        return $this->belongsTo(Preperson::class);
+    }
+
     public function code(): BelongsTo
     {
         return $this->belongsTo(Identifier::class, 'code_id');
@@ -188,6 +196,21 @@ class Procedure extends Model
     public function usedCodes(): BelongsToMany
     {
         return $this->belongsToMany(CodeableConcept::class, 'procedure_used_codes')->withTimestamps();
+    }
+
+    /**
+     * Filter procedures belonging to the given patient (person or preperson).
+     *
+     * @param  Builder  $query
+     * @param  Person|Preperson  $patient
+     * @return Builder
+     */
+    #[Scope]
+    protected function forPatient(Builder $query, Person|Preperson $patient): Builder
+    {
+        return $patient instanceof Preperson
+            ? $query->wherePrepersonId($patient->id)
+            : $query->wherePersonId($patient->id);
     }
 
     #[Scope]

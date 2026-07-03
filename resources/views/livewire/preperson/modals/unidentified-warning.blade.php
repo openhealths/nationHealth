@@ -45,7 +45,7 @@
                                 {{ __('patients.unidentified_modal_btn_later') }}
                             </a>
                             <a
-                                href="{{ $createdPrepersonId ? route('encounter.create', [legalEntity(), 'personId' => $createdPrepersonId]) : '' }}"
+                                href="{{ $createdPrepersonId ? route('encounter.create', [legalEntity(), 'person' => $createdPrepersonId]) : '' }}"
                                 wire:navigate
                                 class="button-primary"
                             >

@@ -14,6 +14,7 @@ use App\Livewire\Procedure\Forms\ProcedureForm as Form;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
 use App\Models\Equipment;
+use App\Models\Preperson;
 use App\Services\MedicalEvents\Fhir;
 use App\Traits\FormTrait;
 use App\Exceptions\EHealth\EHealthConnectionException;
@@ -37,12 +38,27 @@ class ProcedureComponent extends Component
     public Form $form;
 
     /**
-     * ID of the patient for whom the procedure is created.
+     * Person ID (set when the patient is a person).
      *
-     * @var int
+     * @var int|null
      */
     #[Locked]
-    public int $personId;
+    public ?int $personId = null;
+
+    /**
+     * Preperson ID (set when the patient is a preperson).
+     *
+     * @var int|null
+     */
+    #[Locked]
+    public ?int $prepersonId = null;
+
+    /**
+     * Request-scoped memoized patient model.
+     *
+     * @var Person|Preperson|null
+     */
+    private Person|Preperson|null $patientModel = null;
 
     /**
      * Patient UUID for API requests.
@@ -123,9 +139,14 @@ class ProcedureComponent extends Component
             ->toArray();
     }
 
-    public function mount(LegalEntity $legalEntity, int $personId): void
+    public function mount(LegalEntity $legalEntity, ?Person $person = null, ?Preperson $preperson = null): void
     {
-        $this->personId = $personId;
+        if ($preperson !== null) {
+            $this->prepersonId = $preperson->id;
+        } else {
+            $this->personId = $person->id;
+        }
+
         $this->employeeFullName = Auth::user()->getProcedureWriterEmployee()->fullName;
 
         $this->setPatientData();
@@ -137,7 +158,7 @@ class ProcedureComponent extends Component
             ->select(['uuid', 'name'])
             ->get()
             ->toArray();
-        
+
         $this->equipmentOptions = Equipment::query()
             ->whereLegalEntityId($legalEntity->id)
             ->active()
@@ -155,7 +176,7 @@ class ProcedureComponent extends Component
             })
             ->values()
             ->toArray();
-        
+
         $this->equipmentOptionsByDivision = collect($this->equipmentOptions)
             ->filter(static fn (array $equipment) => !empty($equipment['divisionUuid']))
             ->groupBy('divisionUuid')
@@ -198,9 +219,20 @@ class ProcedureComponent extends Component
         }
 
         Session::flash('success', __('patients.messages.procedure_saved'));
+
+        if ($this->prepersonId !== null) {
+            $this->redirectRoute(
+                'prepersons.procedure.edit',
+                [legalEntity(), 'preperson' => $this->prepersonId, 'procedureId' => $procedureId],
+                navigate: true
+            );
+
+            return;
+        }
+
         $this->redirectRoute(
             'procedure.edit',
-            [legalEntity(), 'personId' => $this->personId, 'procedureId' => $procedureId],
+            [legalEntity(), 'person' => $this->personId, 'procedureId' => $procedureId],
             navigate: true
         );
     }
@@ -244,9 +276,20 @@ class ProcedureComponent extends Component
             $procedureId = $this->persist($formattedData);
 
             Session::flash('success', __('patients.messages.procedure_create_request_sent'));
+
+            if ($this->prepersonId !== null) {
+                $this->redirectRoute(
+                    'prepersons.procedure.view',
+                    [legalEntity(), 'preperson' => $this->prepersonId, 'procedureId' => $procedureId],
+                    navigate: true
+                );
+
+                return;
+            }
+
             $this->redirectRoute(
                 'procedure.view',
-                [legalEntity(), 'personId' => $this->personId, 'procedureId' => $procedureId],
+                [legalEntity(), 'person' => $this->personId, 'procedureId' => $procedureId],
                 navigate: true
             );
         } catch (EHealthException|EHealthConnectionException $exception) {
@@ -296,9 +339,7 @@ class ProcedureComponent extends Component
      *
      * @param  string  $type  Reference type: condition or observation.
      * @return array
-     *
-     * @throws EHealthException
-     * @throws EHealthConnectionException
+     * @throws EHealthConnectionException|EHealthException
      */
     private function fetchConditionsOrObservations(string $type): array
     {
@@ -338,15 +379,25 @@ class ProcedureComponent extends Component
     }
 
     /**
+     * Resolve the patient model (person or preperson) for the current context.
+     *
+     * @return Person|Preperson
+     */
+    protected function patient(): Person|Preperson
+    {
+        return $this->patientModel ??= ($this->prepersonId !== null
+            ? Preperson::findOrFail($this->prepersonId)
+            : Person::findOrFail($this->personId));
+    }
+
+    /**
      * Set patient data.
      *
      * @return void
      */
     protected function setPatientData(): void
     {
-        $patient = Person::select(['uuid', 'first_name', 'last_name', 'second_name'])
-            ->where('id', $this->personId)
-            ->firstOrFail();
+        $patient = $this->patient();
 
         $this->patientUuid = $patient->uuid;
         $this->patientFullName = $patient->fullName;

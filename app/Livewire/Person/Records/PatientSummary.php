@@ -160,7 +160,7 @@ class PatientSummary extends BasePatientComponent
 
     private function resetSummarySection(string $section): void
     {
-        if (! array_key_exists($section, $this->summaryLimits)) {
+        if (!array_key_exists($section, $this->summaryLimits)) {
             return;
         }
 
@@ -242,7 +242,7 @@ class PatientSummary extends BasePatientComponent
 
         try {
             $validatedData = $response->validate();
-            Repository::episode()->sync($this->personId, $validatedData);
+            Repository::episode()->sync($this->patient(), $validatedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing episodes');
 
@@ -264,7 +264,7 @@ class PatientSummary extends BasePatientComponent
     {
         $this->setPaginatedRecords(
             'episodes',
-            Episode::with('period')->wherePersonId($this->personId),
+            Episode::with('period')->forPatient($this->patient()),
             'episodes'
         );
     }
@@ -291,7 +291,7 @@ class PatientSummary extends BasePatientComponent
 
         try {
             $validatedData = $response->validate();
-            Repository::encounter()->sync($this->personId, $validatedData);
+            Repository::encounter()->sync($this->patient(), $validatedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing encounters');
 
@@ -313,7 +313,7 @@ class PatientSummary extends BasePatientComponent
     {
         $this->setPaginatedRecords(
             'encounters',
-            Encounter::wherePersonId($this->personId)
+            Encounter::forPatient($this->patient())
                 ->with(['class', 'episode.type.coding', 'type.coding', 'period', 'performerSpeciality.coding']),
             'encounters'
         );
@@ -341,7 +341,7 @@ class PatientSummary extends BasePatientComponent
 
         try {
             $validatedData = $response->validate();
-            Repository::clinicalImpression()->sync($this->personId, $validatedData);
+            Repository::clinicalImpression()->sync($this->patient(), $validatedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing clinical impressions');
 
@@ -363,7 +363,7 @@ class PatientSummary extends BasePatientComponent
     {
         $this->setPaginatedRecords(
             'clinicalImpressions',
-            ClinicalImpression::wherePersonId($this->personId)->withAllRelations(),
+            ClinicalImpression::forPatient($this->patient())->withAllRelations(),
             'clinicalImpressions'
         );
     }
@@ -390,7 +390,7 @@ class PatientSummary extends BasePatientComponent
 
         try {
             $validatedData = $response->validate();
-            Repository::immunization()->sync($this->personId, $validatedData);
+            Repository::immunization()->sync($this->patient(), $validatedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing immunizations');
 
@@ -411,7 +411,7 @@ class PatientSummary extends BasePatientComponent
     {
         $this->setPaginatedRecords(
             'immunizations',
-            Immunization::wherePersonId($this->personId)->withAllRelations(),
+            Immunization::forPatient($this->patient())->withAllRelations(),
             'immunizations'
         );
     }
@@ -441,7 +441,7 @@ class PatientSummary extends BasePatientComponent
 
         try {
             $validatedData = $response->validate();
-            Repository::observation()->sync($this->personId, $validatedData);
+            Repository::observation()->sync($this->patient(), $validatedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing observations');
 
@@ -463,7 +463,7 @@ class PatientSummary extends BasePatientComponent
     {
         $this->setPaginatedRecords(
             'observations',
-            Observation::wherePersonId($this->personId)->withAllRelations(),
+            Observation::forPatient($this->patient())->withAllRelations(),
             'observations'
         );
     }
@@ -512,7 +512,7 @@ class PatientSummary extends BasePatientComponent
 
         try {
             $validatedData = $response->validate();
-            Repository::condition()->sync($this->personId, $validatedData);
+            Repository::condition()->sync($this->patient(), $validatedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing conditions');
 
@@ -534,7 +534,7 @@ class PatientSummary extends BasePatientComponent
     {
         $this->setPaginatedRecords(
             'conditions',
-            Condition::wherePersonId($this->personId)->withAllRelations(),
+            Condition::forPatient($this->patient())->withAllRelations(),
             'conditions',
             fn (array $conditions) => $this->populateIcd10Descriptions($conditions)
         );
@@ -565,7 +565,7 @@ class PatientSummary extends BasePatientComponent
 
         try {
             $validatedData = $response->validate();
-            Repository::diagnosticReport()->sync($this->personId, $validatedData);
+            Repository::diagnosticReport()->sync($this->patient(), $validatedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing diagnostic reports');
 
@@ -587,7 +587,7 @@ class PatientSummary extends BasePatientComponent
     {
         $this->setPaginatedRecords(
             'diagnosticReports',
-            DiagnosticReport::wherePersonId($this->personId)->withAllRelations(),
+            DiagnosticReport::forPatient($this->patient())->withAllRelations(),
             'diagnosticReports'
         );
     }
@@ -596,7 +596,7 @@ class PatientSummary extends BasePatientComponent
     {
         $this->setPaginatedRecords(
             'procedures',
-            Procedure::wherePersonId($this->personId)->withAllRelations(),
+            Procedure::forPatient($this->patient())->withAllRelations(),
             'procedures'
         );
     }
@@ -645,7 +645,7 @@ class PatientSummary extends BasePatientComponent
                 ['managing_organization_id' => legalEntity()->uuid]
             );
 
-            Repository::procedure()->sync($this->personId, $response->validate());
+            Repository::procedure()->sync($this->patient(), $response->validate());
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while synchronizing procedures');
 

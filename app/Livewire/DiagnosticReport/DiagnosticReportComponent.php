@@ -19,6 +19,7 @@ use App\Models\Equipment;
 use App\Models\Icd10;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
+use App\Models\Preperson;
 use App\Repositories\ObservationConfigRepository;
 use App\Repositories\Repository;
 use App\Traits\FormTrait;
@@ -51,12 +52,27 @@ abstract class DiagnosticReportComponent extends Component
     public ?string $diagnosticReportUuid = null;
 
     /**
-     * ID of the patient for which create an encounter.
+     * Person ID (set when the patient is a person).
      *
-     * @var int
+     * @var int|null
      */
     #[Locked]
-    public int $personId;
+    public ?int $personId = null;
+
+    /**
+     * Preperson ID (set when the patient is a preperson).
+     *
+     * @var int|null
+     */
+    #[Locked]
+    public ?int $prepersonId = null;
+
+    /**
+     * Request-scoped memoized patient model.
+     *
+     * @var Person|Preperson|null
+     */
+    private Person|Preperson|null $patientModel = null;
 
     /**
      * Patient UUID for API requests.
@@ -158,8 +174,14 @@ abstract class DiagnosticReportComponent extends Component
         'POSITION'
     ];
 
-    public function mount(LegalEntity $legalEntity, int $personId): void
+    public function mount(LegalEntity $legalEntity, ?Person $person = null, ?Preperson $preperson = null): void
     {
+        if ($preperson !== null) {
+            $this->prepersonId = $preperson->id;
+        } else {
+            $this->personId = $person->id;
+        }
+
         $authUser = Auth::user();
 
         if (!$authUser) {
@@ -183,7 +205,6 @@ abstract class DiagnosticReportComponent extends Component
                 ->error('Error while loading observation dictionary in DiagnosticReportComponent');
         }
 
-        $this->personId = $personId;
         $this->employeeFullName = $authUser->getDiagnosticReportWriterEmployee()->fullName;
 
         $employees = $authUser->party->employees()
@@ -241,15 +262,25 @@ abstract class DiagnosticReportComponent extends Component
     }
 
     /**
+     * Resolve the patient model (person or preperson) for the current context.
+     *
+     * @return Person|Preperson
+     */
+    protected function patient(): Person|Preperson
+    {
+        return $this->patientModel ??= ($this->prepersonId !== null
+            ? Preperson::findOrFail($this->prepersonId)
+            : Person::findOrFail($this->personId));
+    }
+
+    /**
      * Set patient data.
      *
      * @return void
      */
     protected function setPatientData(): void
     {
-        $patient = Person::select(['uuid', 'first_name', 'last_name', 'second_name'])
-            ->whereId($this->personId)
-            ->firstOrFail();
+        $patient = $this->patient();
 
         $this->patientUuid = $patient->uuid;
         $this->patientFullName = $patient->fullName;
@@ -338,9 +369,20 @@ abstract class DiagnosticReportComponent extends Component
         }
 
         Session::flash('success', __('patients.messages.diagnostic_report_draft_saved'));
+
+        if ($this->prepersonId !== null) {
+            $this->redirectRoute(
+                'prepersons.diagnostic-report.edit',
+                [legalEntity(), 'preperson' => $this->prepersonId, 'diagnosticReportId' => $diagnosticReportId],
+                navigate: true
+            );
+
+            return;
+        }
+
         $this->redirectRoute(
             'diagnostic-report.edit',
-            [legalEntity(), 'personId' => $this->personId, 'diagnosticReportId' => $diagnosticReportId],
+            [legalEntity(), 'person' => $this->personId, 'diagnosticReportId' => $diagnosticReportId],
             navigate: true
         );
     }
@@ -387,9 +429,20 @@ abstract class DiagnosticReportComponent extends Component
             $diagnosticReportId = $this->persist($formattedData);
 
             Session::flash('success', __('patients.messages.diagnostic_report_create_request_sent'));
+
+            if ($this->prepersonId !== null) {
+                $this->redirectRoute(
+                    'prepersons.diagnostic-report.view',
+                    [legalEntity(), 'preperson' => $this->prepersonId, 'diagnosticReportId' => $diagnosticReportId],
+                    navigate: true
+                );
+
+                return;
+            }
+
             $this->redirectRoute(
                 'diagnostic-report.view',
-                [legalEntity(), 'personId' => $this->personId, 'diagnosticReportId' => $diagnosticReportId],
+                [legalEntity(), 'person' => $this->personId, 'diagnosticReportId' => $diagnosticReportId],
                 navigate: true
             );
         } catch (EHealthException|EHealthConnectionException $exception) {

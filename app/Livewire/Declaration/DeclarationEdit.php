@@ -6,12 +6,13 @@ namespace App\Livewire\Declaration;
 
 use App\Models\LegalEntity;
 use App\Models\DeclarationRequest;
+use App\Models\Person\Person;
 
 class DeclarationEdit extends DeclarationComponent
 {
-    public function mount(LegalEntity $legalEntity, int $personId, DeclarationRequest $declarationRequest): void
+    public function mount(LegalEntity $legalEntity, Person $person, DeclarationRequest $declarationRequest): void
     {
-        $this->baseMount($personId);
+        $this->baseMount($person->id);
         $this->declarationRequestId = $declarationRequest->id;
 
         if (session('showSignModal')) {

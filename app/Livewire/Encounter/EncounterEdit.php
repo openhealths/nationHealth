@@ -9,6 +9,8 @@ use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Fhir;
 use App\Exceptions\Cipher\CipherConnectionException;
@@ -26,9 +28,15 @@ class EncounterEdit extends EncounterComponent
     #[Locked]
     public int $encounterId;
 
-    public function mount(LegalEntity $legalEntity, int $personId, int $encounterId): void
+    public function mount(LegalEntity $legalEntity, int $encounterId, ?Person $person = null, ?Preperson $preperson = null): void
     {
-        $this->initializeComponent($personId);
+        if ($preperson !== null) {
+            $this->prepersonId = $preperson->id;
+        } else {
+            $this->personId = $person->id;
+        }
+
+        $this->initializeComponent();
         $this->encounterId = $encounterId;
 
         $encounter = Encounter::withRelationships()->whereId($encounterId)->firstOrFail()->toArray();
@@ -80,21 +88,21 @@ class EncounterEdit extends EncounterComponent
         $fhirClinicalImpressions = $fhir['clinicalImpressions'];
 
         try {
-            Repository::encounter()->sync($this->personId, [$this->fhirToSync($fhirEncounter)]);
-            Repository::condition()->sync($this->personId, array_map($this->fhirToSync(...), $fhirConditions));
-            Repository::immunization()->sync($this->personId, array_map($this->fhirToSync(...), $fhirImmunizations));
+            Repository::encounter()->sync($this->patient(), [$this->fhirToSync($fhirEncounter)]);
+            Repository::condition()->sync($this->patient(), array_map($this->fhirToSync(...), $fhirConditions));
+            Repository::immunization()->sync($this->patient(), array_map($this->fhirToSync(...), $fhirImmunizations));
             Repository::diagnosticReport()->sync(
-                $this->personId,
+                $this->patient(),
                 array_map($this->fhirToSync(...), $fhirDiagnosticReports)
             );
             Repository::observation()->sync(
-                $this->personId,
+                $this->patient(),
                 array_map($this->fhirToSync(...), $fhirObservations),
                 $uuids['encounter']
             );
-            Repository::procedure()->sync($this->personId, array_map($this->fhirToSync(...), $fhirProcedures));
+            Repository::procedure()->sync($this->patient(), array_map($this->fhirToSync(...), $fhirProcedures));
             Repository::clinicalImpression()->sync(
-                $this->personId,
+                $this->patient(),
                 array_map($this->fhirToSync(...), $fhirClinicalImpressions)
             );
         } catch (Throwable $exception) {

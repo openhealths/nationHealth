@@ -144,7 +144,7 @@ trait EnsuresEntityExists
 
         try {
             $episodeData = EHealth::episode()->getById($this->patientUuid, $uuid)->validate();
-            Repository::episode()->syncFull($this->personId, [$episodeData]);
+            Repository::episode()->syncFull($this->patient(), [$episodeData]);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Failed while getting episode by ID');
         } catch (Throwable $exception) {
@@ -166,7 +166,7 @@ trait EnsuresEntityExists
 
         try {
             $procedureData = EHealth::procedure()->getById($this->patientUuid, $uuid)->validate();
-            Repository::procedure()->sync($this->personId, [$procedureData]);
+            Repository::procedure()->sync($this->patient(), [$procedureData]);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Failed while getting procedure by ID');
         } catch (Throwable $exception) {
@@ -188,7 +188,7 @@ trait EnsuresEntityExists
 
         try {
             $diagnosticReportData = EHealth::diagnosticReport()->getById($this->patientUuid, $uuid)->validate();
-            Repository::diagnosticReport()->sync($this->personId, [$diagnosticReportData]);
+            Repository::diagnosticReport()->sync($this->patient(), [$diagnosticReportData]);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Failed while getting diagnostic report by ID');
         } catch (Throwable $exception) {
@@ -210,7 +210,7 @@ trait EnsuresEntityExists
 
         try {
             $conditionData = EHealth::condition()->getById($this->patientUuid, $uuid)->validate();
-            Repository::condition()->sync($this->personId, [$conditionData]);
+            Repository::condition()->sync($this->patient(), [$conditionData]);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while getting condition by ID');
         } catch (Throwable $exception) {
@@ -232,7 +232,7 @@ trait EnsuresEntityExists
 
         try {
             $observationData = EHealth::observation()->getById($this->patientUuid, $uuid)->validate();
-            Repository::observation()->sync($this->personId, [$observationData]);
+            Repository::observation()->sync($this->patient(), [$observationData]);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Failed while getting observation by ID');
         } catch (Throwable $exception) {
@@ -254,7 +254,7 @@ trait EnsuresEntityExists
 
         try {
             $clinicalImpressionData = EHealth::clinicalImpression()->getById($this->patientUuid, $uuid)->validate();
-            Repository::clinicalImpression()->sync($this->personId, [$clinicalImpressionData]);
+            Repository::clinicalImpression()->sync($this->patient(), [$clinicalImpressionData]);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Failed while getting clinical impression by ID');
         } catch (Throwable $exception) {
@@ -276,7 +276,7 @@ trait EnsuresEntityExists
 
         try {
             $encounterData = EHealth::encounter()->getById($this->patientUuid, $uuid)->validate();
-            Repository::encounter()->sync($this->personId, [$encounterData]);
+            Repository::encounter()->sync($this->patient(), [$encounterData]);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Failed while ensuring encounter existence');
         } catch (Throwable $exception) {

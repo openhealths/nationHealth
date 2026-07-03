@@ -6,6 +6,8 @@ namespace App\Repositories\MedicalEvents;
 
 use App\Models\MedicalEvents\Sql\ClinicalImpression;
 use App\Models\MedicalEvents\Sql\ClinicalImpressionFinding;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -19,13 +21,15 @@ class ClinicalImpressionRepository extends BaseRepository
      * Store clinical impression in DB.
      *
      * @param  array  $data
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @return void
      * @throws Throwable
      */
-    public function store(array $data, int $personId): void
+    public function store(array $data, Person|Preperson $patient): void
     {
-        DB::transaction(function () use ($data, $personId) {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        DB::transaction(function () use ($data, $ownerColumn, $ownerId) {
             foreach ($data as $datum) {
                 $code = Repository::codeableConcept()->store($datum['code']);
 
@@ -43,7 +47,7 @@ class ClinicalImpressionRepository extends BaseRepository
 
                 $clinicalImpression = $this->model->create([
                     'uuid' => $datum['uuid'] ?? $datum['id'],
-                    'person_id' => $personId,
+                    $ownerColumn => $ownerId,
                     'status' => $datum['status'],
                     'description' => $datum['description'] ?? null,
                     'code_id' => $code->id,
@@ -127,14 +131,16 @@ class ClinicalImpressionRepository extends BaseRepository
     /**
      * Sync clinical impression data and related data by deleting and creating.
      *
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @param  array  $validatedData
      * @return void
      * @throws Throwable
      */
-    public function sync(int $personId, array $validatedData): void
+    public function sync(Person|Preperson $patient, array $validatedData): void
     {
-        DB::transaction(function () use ($personId, $validatedData) {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        DB::transaction(function () use ($ownerColumn, $ownerId, $validatedData) {
             $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
 
             $existingClinicalImpressions = $this->model->whereIn('uuid', $apiUuids)
@@ -151,7 +157,7 @@ class ClinicalImpressionRepository extends BaseRepository
                 $previous = $this->syncIdentifier($existing, $data['previous'] ?? null, 'previous');
 
                 $clinicalImpressionData = [
-                    'person_id' => $personId,
+                    $ownerColumn => $ownerId,
                     'status' => $data['status'],
                     'description' => $data['description'] ?? null,
                     'code_id' => $code->id,

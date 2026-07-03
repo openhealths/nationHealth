@@ -132,10 +132,7 @@ class PatientImmunizations extends BasePatientComponent
         }
 
         try {
-            $response = EHealth::immunization()->getBySearchParams(
-                $this->uuid,
-                ['managing_organization_id' => legalEntity()->uuid]
-            );
+            $response = EHealth::immunization()->getBySearchParams($this->uuid);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while synchronizing immunizations');
 
@@ -144,7 +141,7 @@ class PatientImmunizations extends BasePatientComponent
 
         try {
             $validatedData = $response->validate();
-            Repository::immunization()->sync($this->personId, $validatedData);
+            Repository::immunization()->sync($this->patient(), $validatedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing immunizations');
 
@@ -185,7 +182,7 @@ class PatientImmunizations extends BasePatientComponent
      */
     protected function paginateLocalImmunizations(): LengthAwarePaginator
     {
-        $paginator = Immunization::forPerson($this->personId)
+        $paginator = Immunization::forPatient($this->patient())
             ->withAllRelations()
             ->recentlyUpdatedFirst()
             ->paginate(config('pagination.per_page'));
@@ -232,8 +229,8 @@ class PatientImmunizations extends BasePatientComponent
 
     protected function loadFilterOptions(): void
     {
-        $this->episodes = Repository::episode()->getByPersonId($this->personId);
-        $this->encounters = Repository::encounter()->getByPersonId($this->personId);
+        $this->episodes = Repository::episode()->getByPersonId($this->patient());
+        $this->encounters = Repository::encounter()->getByPersonId($this->patient());
     }
 
     protected function filterValidationRules(): array

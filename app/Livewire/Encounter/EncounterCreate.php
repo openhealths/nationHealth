@@ -14,6 +14,8 @@ use App\Exceptions\EHealth\EHealthException;
 use App\Enums\Person\EpisodeStatus;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\EncounterPackageBuilder;
 use App\Traits\EnsuresEntityExists;
@@ -36,9 +38,15 @@ class EncounterCreate extends EncounterComponent
         $this->packageBuilder = app(EncounterPackageBuilder::class);
     }
 
-    public function mount(LegalEntity $legalEntity, int $personId): void
+    public function mount(LegalEntity $legalEntity, ?Person $person = null, ?Preperson $preperson = null): void
     {
-        $this->initializeComponent($personId);
+        if ($preperson !== null) {
+            $this->prepersonId = $preperson->id;
+        } else {
+            $this->personId = $person->id;
+        }
+
+        $this->initializeComponent();
 
         $this->setDefaultDate();
     }
@@ -76,6 +84,17 @@ class EncounterCreate extends EncounterComponent
         }
 
         Session::flash('success', __('patients.messages.encounter_created'));
+
+        if ($this->prepersonId !== null) {
+            $this->redirectRoute(
+                'prepersons.encounter.edit',
+                [legalEntity(), 'preperson' => $this->prepersonId, 'encounterId' => $encounterId],
+                navigate: true
+            );
+
+            return;
+        }
+
         $this->redirectRoute('encounter.edit', [legalEntity(), $this->personId, $encounterId], navigate: true);
     }
 
@@ -186,30 +205,30 @@ class EncounterCreate extends EncounterComponent
     protected function storeValidatedData(array $formattedData): int
     {
         return DB::transaction(function () use ($formattedData) {
-            $createdEncounterId = Repository::encounter()->store($formattedData['encounter'], $this->personId);
+            $createdEncounterId = Repository::encounter()->store($formattedData['encounter'], $this->patient());
 
             if (isset($formattedData['episode'])) {
-                Repository::episode()->store($formattedData['episode'], $this->personId, $createdEncounterId);
+                Repository::episode()->store($formattedData['episode'], $this->patient(), $createdEncounterId);
             }
 
             if (isset($formattedData['conditions'])) {
-                Repository::condition()->store($formattedData['conditions'], $this->personId);
+                Repository::condition()->store($formattedData['conditions'], $this->patient());
             }
 
             if (isset($formattedData['immunizations'])) {
-                Repository::immunization()->store($formattedData['immunizations'], $this->personId);
+                Repository::immunization()->store($formattedData['immunizations'], $this->patient());
             }
 
             if (isset($formattedData['diagnosticReports'])) {
-                Repository::diagnosticReport()->store($formattedData['diagnosticReports'], $this->personId);
+                Repository::diagnosticReport()->store($formattedData['diagnosticReports'], $this->patient());
             }
 
             if (isset($formattedData['observations'])) {
-                Repository::observation()->store($formattedData['observations'], $this->personId);
+                Repository::observation()->store($formattedData['observations'], $this->patient());
             }
 
             if (isset($formattedData['procedures'])) {
-                Repository::procedure()->store($formattedData['procedures'], $this->personId);
+                Repository::procedure()->store($formattedData['procedures'], $this->patient());
 
                 foreach ($formattedData['procedures'] as $procedure) {
                     $this->processReasonReferences($procedure);
@@ -218,7 +237,7 @@ class EncounterCreate extends EncounterComponent
             }
 
             if (isset($formattedData['clinicalImpressions'])) {
-                Repository::clinicalImpression()->store($formattedData['clinicalImpressions'], $this->personId);
+                Repository::clinicalImpression()->store($formattedData['clinicalImpressions'], $this->patient());
 
                 foreach ($formattedData['clinicalImpressions'] as $clinicalImpression) {
                     $this->processPrevious($clinicalImpression);

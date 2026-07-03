@@ -7,6 +7,8 @@ namespace App\Repositories\MedicalEvents;
 use App\Models\MedicalEvents\Sql\Immunization;
 use App\Models\MedicalEvents\Sql\ImmunizationReaction;
 use App\Models\MedicalEvents\Sql\ImmunizationVaccinationProtocol;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -19,13 +21,15 @@ class ImmunizationRepository extends BaseRepository
      * Store condition in DB.
      *
      * @param  array  $data
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @return void
      * @throws Throwable
      */
-    public function store(array $data, int $personId): void
+    public function store(array $data, Person|Preperson $patient): void
     {
-        DB::transaction(function () use ($data, $personId) {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        DB::transaction(function () use ($data, $ownerColumn, $ownerId) {
             foreach ($data as $datum) {
                 $vaccineCode = Repository::codeableConcept()->store($datum['vaccineCode']);
 
@@ -40,7 +44,7 @@ class ImmunizationRepository extends BaseRepository
 
                 $immunization = $this->model->create([
                     'uuid' => $datum['uuid'] ?? $datum['id'],
-                    'person_id' => $personId,
+                    $ownerColumn => $ownerId,
                     'status' => $datum['status'],
                     'not_given' => $datum['notGiven'],
                     'vaccine_code_id' => $vaccineCode->id,
@@ -135,98 +139,35 @@ class ImmunizationRepository extends BaseRepository
     }
 
     /**
-     * Get immunization data that is related to the person.
+     * Get immunization data that is related to the patient (person or preperson).
      *
-     * @param  string  $personId
-     * @return array|null
-     */
-    public function getByPersonId(int $personId): array
-    {
-        return $this->model
-            ->withAllRelations()
-            ->where('person_id', $personId)
-            ->get()
-            ->toArray();
-    }
-
-    /**
-     * Get immunization data that is related to the person with pagination.
-     *
-     * @param  int  $personId
-     * @param  int  $page
-     * @param  int  $pageSize
+     * @param  Person|Preperson  $patient
      * @return array
      */
-    public function getByPersonIdPaginated(int $personId, int $page, int $pageSize): array
+    public function getByPersonId(Person|Preperson $patient): array
     {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
         return $this->model
             ->withAllRelations()
-            ->where('person_id', $personId)
-            ->orderByDesc('date')
-            ->offset(($page - 1) * $pageSize)
-            ->limit($pageSize)
+            ->where($ownerColumn, $ownerId)
             ->get()
             ->toArray();
-    }
-
-    /**
-     * Get count of immunization data that is related to the person.
-     *
-     * @param  int  $personId
-     * @return array|null
-     */
-    public function countByPersonId(int $personId): int 
-    {
-        return $this->model
-            ->where('person_id', $personId)
-            ->count();
-    }
-
-    /**
-     * Formatting immunizations to show on the frontend.
-     *
-     * @param  array  $immunizations
-     * @return array
-     */
-    public function formatForView(array $immunizations): array
-    {
-        return array_map(static function (array $immunization) {
-            if (empty($immunization['explanation']['reasons'])) {
-                $immunization['explanation']['reasons'] = [];
-            }
-
-            if (empty($immunization['explanation']['reasonsNotGiven'])) {
-                $immunization['explanation']['reasonsNotGiven'] = [];
-            }
-
-            if (empty($immunization['reportOrigin'])) {
-                $immunization['reportOrigin'] = [
-                    'coding' => [
-                        ['code' => '']
-                    ]
-                ];
-            }
-
-            if (is_null($immunization['doseQuantity'])) {
-                $immunization['doseQuantity']['value'] = null;
-                $immunization['doseQuantity']['code'] = null;
-            }
-
-            return $immunization;
-        }, $immunizations);
     }
 
     /**
      * Sync immunization data and related data by deleting and creating.
      *
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @param  array  $validatedData
      * @return void
      * @throws Throwable
      */
-    public function sync(int $personId, array $validatedData): void
+    public function sync(Person|Preperson $patient, array $validatedData): void
     {
-        DB::transaction(function () use ($personId, $validatedData) {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        DB::transaction(function () use ($ownerColumn, $ownerId, $validatedData) {
             $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
 
             $existingImmunizations = $this->model->whereIn('uuid', $apiUuids)
@@ -245,7 +186,7 @@ class ImmunizationRepository extends BaseRepository
                 $route = $this->syncCodeableConcept($existing, $data['route'] ?? null, 'route');
 
                 $immunizationData = [
-                    'person_id' => $personId,
+                    $ownerColumn => $ownerId,
                     'status' => $data['status'],
                     'not_given' => $data['not_given'],
                     'vaccine_code_id' => $vaccineCode->id,

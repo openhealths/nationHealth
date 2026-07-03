@@ -42,9 +42,11 @@
             </a>
 
             @if($isReadonly && $isDraft)
-                <a href="{{ route('diagnostic-report.edit', [legalEntity(), 'personId' => $personId, 'diagnosticReportId' => $diagnosticReportId]) }}"
-                wire:navigate
-                class="button-primary"
+                <a href="{{ $prepersonId
+                    ? route('prepersons.diagnostic-report.edit', [legalEntity(), 'preperson' => $prepersonId, 'diagnosticReportId' => $diagnosticReportId])
+                    : route('diagnostic-report.edit', [legalEntity(), 'person' => $personId, 'diagnosticReportId' => $diagnosticReportId]) }}"
+                   wire:navigate
+                   class="button-primary"
                 >
                     {{ __('forms.edit') }}
                 </a>
@@ -64,12 +66,13 @@
                     {{ __('forms.complete_the_interaction_and_sign') }}
                     @icon('arrow-right', 'w-5 h-5')
                 </button>
-            @endunless
+        @endunless
     </form>
 
     @unless($isReadonly)
         <x-signature-modal method="sign" />
     @endunless
+
     <livewire:components.x-message :key="time()" />
     <x-forms.loading />
 </section>

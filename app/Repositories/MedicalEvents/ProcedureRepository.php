@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
-use App\Classes\eHealth\Api\PatientApi;
 use App\Models\MedicalEvents\Sql\Procedure;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -29,110 +29,18 @@ class ProcedureRepository extends BaseRepository
     }
 
     /**
-     * Format data before request.
-     *
-     * @param  array  $procedure
-     * @return array
-     */
-    public function formatEHealthRequest(array $procedure): array
-    {
-        if ($procedure['referralType'] === 'electronic' || $procedure['referralType'] === '') {
-            unset($procedure['paperReferral']);
-        }
-
-        if ($procedure['referralType'] === 'paper' || $procedure['referralType'] === '') {
-            unset($procedure['basedOn']);
-        }
-
-        // delete frontend properties
-        unset($procedure['isReferralAvailable'], $procedure['referralType']);
-
-        $procedure['id'] = Str::uuid()->toString();
-        $procedure['status'] = 'completed';
-
-        $procedure['recordedBy']['identifier']['value'] = $this->employeeUuid;
-
-        $procedure['managingOrganization'] = [
-            'identifier' => [
-                'type' => [
-                    'coding' => [['system' => 'eHealth/resources', 'code' => 'legal_entity']],
-                    'text' => ''
-                ],
-                'value' => legalEntity()->uuid
-            ],
-        ];
-
-        if (!empty($procedure['reasonReferences'])) {
-            foreach ($procedure['reasonReferences'] as &$reasonReference) {
-                $code = str_contains($reasonReference['code']['coding'][0]['system'], 'condition_codes')
-                    ? 'condition'
-                    : 'observation';
-
-                $identifier = [
-                    'type' => [
-                        'coding' => [['system' => 'eHealth/resources', 'code' => $code]]
-                    ],
-                    'value' => $reasonReference['id']
-                ];
-
-                // Keep only the identifier key
-                $reasonReference = ['identifier' => $identifier];
-            }
-
-            unset($reasonReference);
-        }
-
-        if ($procedure['outcome']['coding'][0]['code'] === '') {
-            unset($procedure['outcome']);
-        }
-
-        if (!empty($procedure['usedCodes'])) {
-            $procedure['usedCodes'] = collect($procedure['usedCodes'])
-                ->map(fn (array $uc) => [
-                    'coding' => [['system' => 'eHealth/assistive_products', 'code' => $uc['code']]]
-                ])
-                ->values()
-                ->toArray();
-        }
-
-        $normalizedData = schemaService()
-            ->setDataSchema($procedure, app(PatientApi::class))
-            ->requestSchemaNormalize('schemaProcedurePackageRequest')
-            ->camelCaseKeys()
-            ->getNormalizedData();
-
-        // schema service delete effectivePeriod, performer and reportOrigin, because of 'One Of', so manually add it
-        if ($normalizedData['primarySource']) {
-            $normalizedData['performer'] = $procedure['performer'];
-            $normalizedData['performer']['identifier']['value'] = $this->employeeUuid;
-        } else {
-            $normalizedData['reportOrigin'] = $procedure['reportOrigin'];
-        }
-
-        $normalizedData['performedPeriod'] = [
-            'start' => convertToISO8601(
-                $procedure['performedPeriodStartDate'] . $procedure['performedPeriodStartTime']
-            ),
-            'end' => convertToISO8601(
-                $procedure['performedPeriodEndDate'] . $procedure['performedPeriodEndTime']
-            ),
-        ];
-
-        return $normalizedData;
-    }
-
-    /**
      * Store procedure in DB.
      *
      * @param  array  $data
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @return void
      * @throws Throwable
      */
-    public function store(array $data, int $personId): int
+    public function store(array $data, Person|Preperson $patient): void
     {
-        return DB::transaction(function () use ($data, $personId): int {
-            $procedureId = null;
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        DB::transaction(function () use ($data, $ownerColumn, $ownerId) {
             foreach ($data as $datum) {
                 $basedOn = null;
                 if (isset($datum['basedOn'])) {
@@ -172,7 +80,7 @@ class ProcedureRepository extends BaseRepository
 
                 $procedure = $this->model->create([
                     'uuid' => $datum['uuid'] ?? $datum['id'],
-                    'person_id' => $personId,
+                    $ownerColumn => $ownerId,
                     'status' => $datum['status'],
                     'based_on_id' => $basedOn?->id,
                     'code_id' => $code->id,
@@ -297,7 +205,7 @@ class ProcedureRepository extends BaseRepository
     /**
      * Get data that is related to the person.
      *
-     * @param  string  $personId
+     * @param  int  $personId
      * @return array
      */
     public function getByPersonId(int $personId): array
@@ -312,14 +220,16 @@ class ProcedureRepository extends BaseRepository
     /**
      * Sync procedure data and related data by updating or creating.
      *
-     * @param  int  $personId
+     * @param  Person|Preperson  $patient
      * @param  array  $validatedData
      * @return void
      * @throws Throwable
      */
-    public function sync(int $personId, array $validatedData): void
+    public function sync(Person|Preperson $patient, array $validatedData): void
     {
-        DB::transaction(function () use ($personId, $validatedData) {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        DB::transaction(function () use ($ownerColumn, $ownerId, $validatedData) {
             $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
 
             $existingProcedures = $this->model->whereIn('uuid', $apiUuids)
@@ -344,7 +254,7 @@ class ProcedureRepository extends BaseRepository
                 $category = $this->syncCodeableConcept($existing, $data['category'], 'category');
 
                 $procedureData = [
-                    'person_id' => $personId,
+                    $ownerColumn => $ownerId,
                     'status' => $data['status'],
                     'status_reason_id' => $statusReason?->id,
                     'primary_source' => $data['primary_source'],
@@ -408,8 +318,8 @@ class ProcedureRepository extends BaseRepository
     /**
      * Get the episode for the clinical impression based on the provided UUID to display the selected supporting info.
      *
-     * @param  string  $uuid
-     * @return array|null
+     * @param  array  $uuids
+     * @return array
      */
     public function getDetailsMapByUuids(array $uuids): array
     {
@@ -424,14 +334,5 @@ class ProcedureRepository extends BaseRepository
                 ],
             ])
             ->toArray();
-    }
-
-    public function getForClinicalImpression(string $uuid): ?array
-    {
-        return Procedure::whereUuid($uuid)
-            ->select(['id', 'code_id'])
-            ->with('code.coding')
-            ->first()
-            ?->toArray();
     }
 }

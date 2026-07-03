@@ -9,6 +9,7 @@
          item: 0,
          dictionary: $wire.dictionaries['eHealth/ICPC2/actions']
      }"
+     x-show="$wire.form.encounter.classCode === 'PHC'"
 >
 
     <div class="space-y-4">

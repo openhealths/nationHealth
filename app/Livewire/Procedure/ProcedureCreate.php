@@ -82,7 +82,7 @@ class ProcedureCreate extends ProcedureComponent
     protected function storeValidatedData(array $formattedData): void
     {
         DB::transaction(function () use ($formattedData) {
-            Repository::procedure()->store([$formattedData], $this->personId);
+            Repository::procedure()->store([$formattedData], $this->patient());
 
             $this->processReasonReferences($formattedData);
         });
