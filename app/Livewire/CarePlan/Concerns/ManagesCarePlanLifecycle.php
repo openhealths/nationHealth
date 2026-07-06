@@ -12,7 +12,6 @@ use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Repositories\CarePlanRepository;
 use App\Repositories\CarePlanActivityRepository;
-use App\Services\MedicalEvents\EHealthJobResolver;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -298,36 +297,6 @@ trait ManagesCarePlanLifecycle
             $deviceWarning = $this->getDeviceSignReadinessWarning($activity);
             if ($deviceWarning !== null) {
                 Session::flash('error', $deviceWarning);
-                $this->showSignatureModal = false;
-
-                return;
-            }
-        }
-
-        if (str_contains(strtolower((string) $activity->kind), 'device')) {
-            $employeeContext = app(\App\Services\MedicalEvents\ReferralRequestLifecycleService::class)
-                ->resolveEmployeeContext(
-                    $this->carePlan,
-                    $activity,
-                    Auth::user()?->activeDoctorEmployee()?->id
-                );
-            $uuids = [
-                'person_uuid' => $this->carePlan->person->uuid,
-                'encounter_uuid' => $this->carePlan->encounter?->uuid,
-                'employee_uuid' => $employeeContext['employee_uuid'],
-                'legal_entity_uuid' => $employeeContext['legal_entity_uuid'],
-            ];
-
-            try {
-                $prequalifyPayload = $activityRepository->buildDevicePrequalifyPayload($activity, $this->carePlan, $uuids);
-                $jobResolver = app(EHealthJobResolver::class);
-                $prequalifyResponse = EHealth::deviceRequest()->prequalify(
-                    $this->carePlan->person->uuid,
-                    $prequalifyPayload
-                );
-                $jobResolver->assertPrequalifyValid($jobResolver->resolve($prequalifyResponse->getData()));
-            } catch (EHealthValidationException $exception) {
-                Session::flash('error', $exception->getTranslatedMessage());
                 $this->showSignatureModal = false;
 
                 return;

@@ -43,6 +43,18 @@ class CarePlanActivityShow extends CarePlanComponent
         return view('livewire.care-plan.activity.show.care-plan-activity-show');
     }
 
+    protected function getDeviceSignReadinessWarning(CarePlanActivity $activity): ?string
+    {
+        $assessment = app(\App\Services\MedicalEvents\DeviceProgramParticipationGuard::class)
+            ->assess($this->carePlan, $activity, legalEntity());
+
+        if ($assessment->warnings !== []) {
+            $this->deviceParticipationWarning = implode(' ', $assessment->warnings);
+        }
+
+        return $assessment->blockingMessage();
+    }
+
     protected function resolveActivityProductLabel(CarePlanActivity $activity): string
     {
         $kindLower = strtolower($activity->resolvedKind());
