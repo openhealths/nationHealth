@@ -25,14 +25,7 @@
                 <span>{{ __('patients.sync_ehealth_data') }}</span>
             </button>
 
-            @include('livewire.preperson.parts.drawers.merge-patients')
-            @include('livewire.preperson.parts.drawers.merge-auth-methods')
-            @include('livewire.preperson.parts.drawers.merge-confirmation')
-            @include('livewire.preperson.parts.drawers.merge-sms-verification')
-            @include('livewire.preperson.parts.drawers.merge-documents-upload')
-            @include('livewire.preperson.parts.drawers.merge-final-consent')
-            @include('livewire.preperson.modals.consent-form-modal')
-            @include('livewire.preperson.parts.drawers.merge-signature')
+
 
         </div>
     </x-slot>
