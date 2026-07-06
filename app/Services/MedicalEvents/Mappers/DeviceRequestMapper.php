@@ -159,7 +159,6 @@ class DeviceRequestMapper implements FhirMapperContract
         $deviceRequest = [
             'intent' => $data['intent'] ?? 'order',
             'priority' => $data['priority'] ?? 'routine',
-            'code' => $this->mapDeviceCode($data),
             'quantity' => $this->mapDeviceQuantity($data),
             'encounter' => !empty($uuids['encounter_uuid'])
                 ? $this->resourceIdentifier('encounter', (string) $uuids['encounter_uuid'])
@@ -172,6 +171,9 @@ class DeviceRequestMapper implements FhirMapperContract
             'authoredOn' => $this->resolveAuthoredOn($occurrence['occurrencePeriod']),
         ];
 
+        // eHealth requires exactly one of `code` (CodeableConcept) or `code_reference`
+        // (Reference to device_definitions) — they are siblings, not nested under `code`.
+        $deviceRequest = array_merge($deviceRequest, $this->mapDeviceCode($data));
         $deviceRequest = array_merge($deviceRequest, $occurrence);
 
         if (!empty($data['supporting_info'])) {
@@ -228,8 +230,14 @@ class DeviceRequestMapper implements FhirMapperContract
     }
 
     /**
+     * Build the `code` or `code_reference` fragment for a device request.
+     *
+     * eHealth validates that one and only one of `code` (CodeableConcept) and
+     * `code_reference` (Reference to device_definitions) is present at the top
+     * level of the device_request — `code` never contains an `identifier`.
+     *
      * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
+     * @return array{code: array<string, mixed>}|array{code_reference: array<string, mixed>}
      */
     private function mapDeviceCode(array $data): array
     {
@@ -238,23 +246,17 @@ class DeviceRequestMapper implements FhirMapperContract
 
         if ($codeType === 'DEVICE_DEFINITION' || ($codeType !== 'CLASSIFICATION_TYPE' && $this->isDeviceDefinitionUuid($deviceId))) {
             return [
-                'identifier' => [
-                    'type' => [
-                        'coding' => [[
-                            'system' => 'eHealth/resources',
-                            'code' => 'device_definition',
-                        ]],
-                    ],
-                    'value' => $deviceId,
-                ],
+                'code_reference' => $this->resourceIdentifier('device_definition', $deviceId),
             ];
         }
 
         return [
-            'coding' => [[
-                'system' => 'device_definition_classification_type',
-                'code' => $deviceId,
-            ]],
+            'code' => [
+                'coding' => [[
+                    'system' => 'device_definition_classification_type',
+                    'code' => $deviceId,
+                ]],
+            ],
         ];
     }
 
@@ -346,7 +348,7 @@ class DeviceRequestMapper implements FhirMapperContract
             'request_number' => data_get($data, 'requestNumber') ?? data_get($data, 'request_number'),
             'started_at' => data_get($data, 'occurrencePeriod.start') ?? data_get($data, 'started_at'),
             'ended_at' => data_get($data, 'occurrencePeriod.end') ?? data_get($data, 'ended_at'),
-            'device_id' => data_get($data, 'code.identifier.value')
+            'device_id' => data_get($data, 'code_reference.identifier.value')
                 ?? data_get($data, 'code.coding.0.code')
                 ?? data_get($data, 'codeCodeableConcept.coding.0.code'),
             'quantity' => data_get($data, 'quantityInteger'),
