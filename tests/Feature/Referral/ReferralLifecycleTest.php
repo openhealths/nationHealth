@@ -407,8 +407,9 @@ class ReferralLifecycleTest extends TestCase
             (string) $this->deviceActivity->uuid
         );
 
-        $this->assertSame($deviceUuid, $devicePrequalify['device_request']['code']['identifier']['value']);
-        $this->assertSame('device_definition', $devicePrequalify['device_request']['code']['identifier']['type']['coding'][0]['code']);
+        $this->assertArrayNotHasKey('code', $devicePrequalify['device_request']);
+        $this->assertSame($deviceUuid, $devicePrequalify['device_request']['code_reference']['identifier']['value']);
+        $this->assertSame('device_definition', $devicePrequalify['device_request']['code_reference']['identifier']['type']['coding'][0]['code']);
         $this->assertSame('piece', $devicePrequalify['device_request']['quantity']['code']);
     }
 

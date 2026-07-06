@@ -80,8 +80,9 @@ class CarePlanActivityRepositoryTest extends TestCase
         $this->assertArrayHasKey('occurrence_period', $payload['device_request']);
         $this->assertArrayHasKey('start', $payload['device_request']['occurrence_period']);
         $this->assertArrayHasKey('end', $payload['device_request']['occurrence_period']);
-        $this->assertArrayHasKey('identifier', $payload['device_request']['code']);
-        $this->assertSame('0fa1e6cd-7066-4881-92a5-6d747a1128f7', $payload['device_request']['code']['identifier']['value']);
+        $this->assertArrayNotHasKey('code', $payload['device_request']);
+        $this->assertArrayHasKey('identifier', $payload['device_request']['code_reference']);
+        $this->assertSame('0fa1e6cd-7066-4881-92a5-6d747a1128f7', $payload['device_request']['code_reference']['identifier']['value']);
     }
 
     public function test_draft_activity_start_is_clipped_to_ehealth_care_plan_period_start(): void

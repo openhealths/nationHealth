@@ -383,7 +383,7 @@ class ReferralRequestLifecycleService
                 ?? data_get($remote, 'code.coding.0.code')
                 ?? $mapped['service_id'] ?? null;
         } else {
-            $dbData['device_id'] = data_get($remote, 'code.identifier.value')
+            $dbData['device_id'] = data_get($remote, 'code_reference.identifier.value')
                 ?? data_get($remote, 'code.coding.0.code')
                 ?? $mapped['device_id'] ?? null;
         }
