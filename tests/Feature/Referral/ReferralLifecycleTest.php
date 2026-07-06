@@ -992,4 +992,66 @@ class ReferralLifecycleTest extends TestCase
             ->assertSet('showReferralDrawer', false)
             ->assertDispatched('flashMessage');
     }
+
+    public function test_sign_device_activity_does_not_run_device_request_prequalify(): void
+    {
+        $carePlan = $this->deviceActivity->carePlan;
+        $programId = (string) Str::uuid();
+        $deviceUuid = (string) Str::uuid();
+        $activityUuid = (string) Str::uuid();
+
+        $draftDeviceActivity = CarePlanActivity::create([
+            'uuid' => $activityUuid,
+            'care_plan_id' => $carePlan->id,
+            'author_id' => $this->employee->id,
+            'status' => 'draft',
+            'kind' => 'device_request',
+            'product_reference' => $deviceUuid,
+            'quantity' => 1.0,
+            'quantity_system' => 'device_unit',
+            'quantity_code' => 'piece',
+            'program' => $programId,
+            'scheduled_period_start' => now()->format('Y-m-d'),
+            'scheduled_period_end' => now()->addWeek()->format('Y-m-d'),
+        ]);
+
+        $this->actingAs($this->user);
+
+        $mockDeviceApi = Mockery::mock(DeviceRequestApi::class);
+        $mockDeviceApi->shouldReceive('prequalify')->never();
+        $this->instance(DeviceRequestApi::class, $mockDeviceApi);
+
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $activityCreateResponse = Mockery::mock(EHealthResponse::class);
+        $activityCreateResponse->shouldReceive('getData')->andReturn(['id' => $activityUuid, 'status' => 'scheduled']);
+        $mockActivityApi->shouldReceive('create')->once()->andReturn($activityCreateResponse);
+        $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
+
+        $mockGuard = Mockery::mock(\App\Services\MedicalEvents\DeviceProgramParticipationGuard::class);
+        $mockGuard->shouldReceive('resolveParticipatingProgramIds')->andReturn([$programId]);
+        $mockGuard->shouldReceive('assess')->andReturn(new \App\Services\MedicalEvents\DeviceActivityReadinessAssessment([], []));
+        $this->instance(\App\Services\MedicalEvents\DeviceProgramParticipationGuard::class, $mockGuard);
+
+        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
+        $mockSignatureService->shouldReceive('signData')->andReturn('mock-base64-signature');
+        $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
+        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+
+        Livewire::test(CarePlanActivityShow::class, [
+            'carePlan' => $carePlan,
+            'activity' => $draftDeviceActivity,
+        ])
+            ->call('openSignatureModal', 'sign_activity', $draftDeviceActivity->id)
+            ->set('form.password', '12345678')
+            ->set('form.knedp', 'acsk_test')
+            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.dat', 10))
+            ->call('sign')
+            ->assertSet('showSignatureModal', false);
+
+        $this->assertDatabaseHas('care_plan_activities', [
+            'id' => $draftDeviceActivity->id,
+            'uuid' => $activityUuid,
+            'status' => 'scheduled',
+        ]);
+    }
 }

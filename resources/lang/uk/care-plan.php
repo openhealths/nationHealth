@@ -134,6 +134,7 @@ return [
     'device_program_participation_unknown' => 'Не вдалося підтвердити участь закладу в програмі «:program» (:program_id). Підпис може бути відхилений ЕСОЗ.',
     'device_program_not_participant' => 'Заклад не є учасником програми «:program» (:program_id). Зверніться до підтримки ЕСОЗ для підключення або оберіть іншу програму.',
     'device_not_in_program_catalog' => 'Медвиріб :device_id не знайдено в каталозі програми «:program» (:program_id). Перевиберіть виріб або змініть програму.',
+    'device_definition_not_active' => 'Медвиріб :device_id неактивний у програмі «:program» (:program_id). Оберіть інший активний виріб у формі призначення.',
     'device_program_participation_ehealth_hint' => 'Перед підписом переконайтесь, що заклад :legal_entity_uuid підключений до програми :program_id в ЕСОЗ (participants).',
     'device_catalog_lookup_failed' => 'Не вдалося перевірити медвиріб :device_id у каталозі програми :program_id. Підпис можливий, але ЕСОЗ може відхилити запит.',
     'medication_unit_mismatch' => 'Одиниця виміру має відповідати препарату (:unit). Перевиберіть лікарський засіб.',

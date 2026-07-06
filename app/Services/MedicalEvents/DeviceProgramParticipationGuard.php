@@ -85,8 +85,14 @@ class DeviceProgramParticipationGuard
             $blockingIssues[] = __('care-plan.device_product_reselect_required');
         } elseif ($deviceId !== '') {
             $catalogResult = $this->lookupDeviceInProgramCatalog($programId, $deviceId);
-            if ($catalogResult === false) {
+            if ($catalogResult === 'missing') {
                 $blockingIssues[] = __('care-plan.device_not_in_program_catalog', [
+                    'device_id' => $deviceId,
+                    'program' => $programName,
+                    'program_id' => $programId,
+                ]);
+            } elseif ($catalogResult === 'inactive') {
+                $blockingIssues[] = __('care-plan.device_definition_not_active', [
                     'device_id' => $deviceId,
                     'program' => $programName,
                     'program_id' => $programId,
@@ -127,10 +133,13 @@ class DeviceProgramParticipationGuard
 
     public function isDeviceInProgramCatalog(string $programId, string $deviceDefinitionId): bool
     {
-        return $this->lookupDeviceInProgramCatalog($programId, $deviceDefinitionId) === true;
+        return $this->lookupDeviceInProgramCatalog($programId, $deviceDefinitionId) === 'active';
     }
 
-    private function lookupDeviceInProgramCatalog(string $programId, string $deviceDefinitionId): ?bool
+    /**
+     * @return 'active'|'inactive'|'missing'|null active/inactive/missing, or null when lookup failed
+     */
+    private function lookupDeviceInProgramCatalog(string $programId, string $deviceDefinitionId): ?string
     {
         try {
             $response = EHealth::deviceDefinition()->getMany([
@@ -150,11 +159,13 @@ class DeviceProgramParticipationGuard
 
                 $id = (string) ($device['id'] ?? $device['uuid'] ?? '');
                 if ($id === $deviceDefinitionId) {
-                    return true;
+                    $isActive = $device['is_active'] ?? $device['isActive'] ?? true;
+
+                    return $isActive ? 'active' : 'inactive';
                 }
             }
 
-            return false;
+            return 'missing';
         } catch (\Throwable $exception) {
             Log::warning('DeviceProgramParticipationGuard: device catalog lookup failed', [
                 'program_id' => $programId,
