@@ -24,6 +24,16 @@
                 @icon('refresh', 'w-4 h-4')
                 <span>{{ __('patients.sync_ehealth_data') }}</span>
             </button>
+
+            @include('livewire.person.parts.drawers.preperson.merge-patients')
+            @include('livewire.person.parts.drawers.preperson.merge-auth-methods')
+            @include('livewire.person.parts.drawers.preperson.merge-confirmation')
+            @include('livewire.person.parts.drawers.preperson.merge-sms-verification')
+            @include('livewire.person.parts.drawers.preperson.merge-documents-upload')
+            @include('livewire.person.parts.drawers.preperson.merge-final-consent')
+            @include('livewire.person.parts.modals.preperson.consent-form-modal')
+            @include('livewire.person.parts.drawers.preperson.merge-signature')
+
         </div>
     </x-slot>
 
@@ -920,7 +930,7 @@
             </div>
         </div>
 
-    <div class="mt-8 flex items-center gap-4">
+    <div class="shift-content mt-8 flex items-center gap-4">
         <a href="{{ route('persons.index', [legalEntity()]) }}" class="button-minor" style="margin: 0 !important;">
             {{ __('forms.back') }}
         </a>

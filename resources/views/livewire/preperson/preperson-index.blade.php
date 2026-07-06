@@ -92,7 +92,7 @@
         @forelse($prepersons as $preperson)
             <fieldset
                 wire:key="preperson-{{ $preperson->id }}"
-                class="shift-content p-4 sm:p-8 sm:pb-10 mb-16 mt-6 border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 max-w-7xl"
+                class="shift-content p-4 sm:p-8 sm:pb-10 mb-16 mt-6 border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 max-w-6xl"
             >
                 <legend class="legend">ID {{ $preperson->externalId }}</legend>
 
@@ -154,7 +154,7 @@
                 </div>
 
                 <div class="flow-root mt-4">
-                    <div class="max-w-7xl">
+                    <div class="max-w-6xl">
                         <table class="table-input w-full table-auto">
                             <thead class="thead-input">
                             <tr>

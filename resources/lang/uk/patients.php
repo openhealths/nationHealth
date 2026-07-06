@@ -635,5 +635,6 @@ return [
         'procedure_sync_already_running' => 'Синхронізація процедур вже запущена. Будь ласка, зачекайте її завершення.',
         'procedure_sync_resume_started' => 'Відновлення попередньої синхронізації процедур розпочато.',
         'procedure_sync_background_dispatch_error' => 'Помилка запуску фонової синхронізації процедур.',
-    ]
+    ],
+
 ];

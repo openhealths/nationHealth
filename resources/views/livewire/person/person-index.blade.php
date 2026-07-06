@@ -44,7 +44,7 @@
         <div class="space-y-6 pl-3.5" wire:key="patients-{{ $paginatedPatients->total() }}">
             @forelse($paginatedPatients->items() as $patient)
                 <fieldset wire:key="patient-{{ $patient['id'] }}"
-                          class="shift-content p-4 sm:p-8 sm:pb-10 mb-16 mt-6 border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 max-w-[1280px]"
+                          class="shift-content p-4 sm:p-8 sm:pb-10 mb-16 mt-6 border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 max-w-6xl"
                 >
                     <legend class="legend">
                         {{ $patient['lastName'] }} {{ $patient['firstName'] }} {{ $patient['secondName'] ?? '' }}
