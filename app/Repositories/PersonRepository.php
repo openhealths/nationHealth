@@ -99,6 +99,41 @@ class PersonRepository
     }
 
     /**
+     * Sync person with related relationships.
+     *
+     * @param  array  $personData
+     * @param  string  $uuid
+     *
+     * @return void
+     *
+     * @throws Throwable
+     */
+    public function sync(array $personData, string $uuid): void
+    {
+        $personFields = Arr::except($personData, ['documents', 'phones', 'addresses']);
+
+        // set created person_id as uuid
+        Arr::set($personFields, 'uuid', $uuid);
+
+        $person = Person::whereUuid($uuid)->firstOrFail();
+        $person->update($personFields);
+
+        // update documents
+        $person->documents()->delete();
+        $person->documents()->createMany($personData['documents']);
+
+        // update addresses
+        $person->addresses()->delete();
+        $person->addresses()->createMany($personData['addresses']);
+
+        // update phones
+        if (!empty($personData['phones'])) {
+            $person->phones()->delete();
+            $person->phones()->createMany($personData['phones']);
+        }
+    }
+
+    /**
      * Update verification status by provided ID or UUID.
      *
      * @param  int|string  $personId

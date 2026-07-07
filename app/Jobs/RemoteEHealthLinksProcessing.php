@@ -122,49 +122,7 @@ class RemoteEHealthLinksProcessing extends EHealthJob
                 $this->eHealthLink->processingData()->create(['response_data' => $approvalData]);
                 $this->eHealthLink->refresh();
 
-                foreach ($approvalData['granted_resources'] ?? [] as $grantedResource) {
-                    $value = Arr::get($grantedResource, 'identifier.value', null);
-
-                    foreach (Arr::get($grantedResource, 'identifier.type.coding', []) as $coding) {
-                        switch (Arr::get($coding, 'code', null)) {
-                        case 'person':
-                            $person = Person::where('uuid', $value)->first();
-
-                            Repository::approval()->sync(modelData: $approvalData, approvableModel: $person, approvalModel: $approval);
-                            break;
-                        case 'encounter':
-                            break;
-                        case 'condition':
-                            break;
-                        case 'observation':
-                            break;
-                        case 'allergy_intolerance':
-                            break;
-                        case 'immunization':
-                            break;
-                        case 'risk_assessment':
-                            break;
-                        case 'device':
-                            break;
-                        case 'medication_statement':
-                            break;
-                        case 'medication_administration':
-                            break;
-                        case 'diagnostic_report':
-                            break;
-                        case 'procedure':
-                            break;
-                        case 'specimen':
-                            break;
-                        case 'device_dispense':
-                            break;
-                        case 'device_association':
-                            break;
-                        case 'detected_issue':
-                            break;
-                        }
-                    }
-                }
+                Repository::approval()->sync(modelData: $approvalData, approvableModel: $approval->approvable, approvalModel: $approval);
             }
 
             return;

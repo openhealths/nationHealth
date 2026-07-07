@@ -26,6 +26,17 @@ if (!function_exists('removeEmptyKeys')) {
     }
 }
 
+if (!function_exists('convertToLocalTimezone')) {
+    function convertToLocalTimezone(string $dateString): string
+    {
+        if (empty($dateString)) {
+            return '';
+        }
+
+        return CarbonImmutable::parse($dateString)->setTimezone(config('app.timezone'))->toDateTimeString();
+    }
+}
+
 if (!function_exists('convertToYmd')) {
     function convertToYmd(string $dateString): string
     {

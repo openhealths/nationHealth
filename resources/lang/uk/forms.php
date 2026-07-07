@@ -343,7 +343,8 @@ return [
         'unsynced' => 'Не синхронізовано',
         'unknown' => 'Невідомо',
         'stopped' => 'Зупинений',
-        'entered_in_error' => 'Внесено помилково'
+        'entered_in_error' => 'Внесено помилково',
+        'expired' => 'Прострочено'
     ],
 
     // Reorganization types

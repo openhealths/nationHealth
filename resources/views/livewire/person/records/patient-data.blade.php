@@ -190,7 +190,7 @@
                             </div>
                             <div class="form-group group">
                                 <input type="text" class="input peer" placeholder=" " readonly
-                                       value="{{ $form->person['birthPlace'] ?? '-' }}" />
+                                       value="{{ $form->person['birthSettlement'] ?? '-' }}" />
                                 <label class="label">{{ __('forms.birth_settlement') }}</label>
                             </div>
                             <div class="form-group group">

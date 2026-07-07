@@ -15,6 +15,8 @@ class Approval extends Request
 {
     protected const string URL = '/api/approvals';
 
+    protected const string APPROVAL_URL = '/api/patients';
+
     /**
      * Get Approvals by search parameters.
      *
@@ -107,9 +109,9 @@ class Approval extends Request
         // Fallback for backwards compatibility: try the new endpoint without patient prefix first.
         // If it throws an HTTP exception (e.g., 404), fallback to the old endpoint with patientId.
         try {
-            return $this->post("/api/approvals/{$approvalId}/actions/resend", []);
+            return $this->post(self::URL . "/approvals/{$approvalId}/actions/resend", []);
         } catch (\Exception $e) {
-            return $this->post("/api/patients/{$patientId}/approvals/{$approvalId}/actions/resend", []);
+            return $this->patch(self::APPROVAL_URL . "/{$patientId}/approvals/{$approvalId}/actions/resend", []);
         }
     }
 

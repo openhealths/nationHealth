@@ -38,7 +38,7 @@ class PersonPolicy
      */
     public function syncPersonData(User $user): Response
     {
-        if ($user->can('personal_data:read') && $user->can('approval:create')) {
+        if ($user->can('personal_data:read')) {
             return Response::allow();
         }
 

@@ -19,6 +19,8 @@ use App\Models\Relations\AuthenticationMethod;
  */
 class ApprovalRepository extends BaseRepository
 {
+    protected const int SMS_CODE_ALIVE_MINUTES = 14;
+
     protected string $employeeUuid;
 
     public function __construct(Model $model)
@@ -204,7 +206,7 @@ class ApprovalRepository extends BaseRepository
                 'status' => Status::APPROVED->value,
                 'access_level' => $modelData['access_level'] ?? 'read',
                 'is_verified' => $modelData['is_verified'] ?? false,
-                'expires_at' => Carbon::parse($modelData['expires_at'])
+                'expires_at' => convertToLocalTimezone($modelData['expires_at'])
             ];
 
             if ($existing) {
@@ -215,22 +217,24 @@ class ApprovalRepository extends BaseRepository
             }
 
             if (isset($modelData['granted_resources'])) {
-                $this->syncResourceEntity(
-                    $approval,
-                    'grantedResources',
-                    'granted_to_id',
-                    $this->syncIdentifiers($existing, $modelData['granted_resources'] ?? [], 'grantedResources')
-                );
+                    $this->syncResourceEntity(
+                        $approval,
+                        'grantedResources',
+                        'granted_to_id',
+                        $this->syncIdentifiers($existing, $modelData['granted_resources'] ?? [], 'grantedResourceIdentifiers')
+                    );
             }
 
             if (isset($modelData['granted_resource_types'])) {
-                $this->syncResourceEntity(
-                    $approval,
-                    'grantedResourceTypes',
-                    'codeable_concept_id',
-                    $this->syncCodeableConcepts($existing, $modelData['granted_resource_types'] ?? [], 'grantedResourceTypes')
-                );
+                    $this->syncResourceEntity(
+                        $approval,
+                        'grantedResourceTypes',
+                        'codeable_concept_id',
+                        $this->syncCodeableConcepts($existing, $modelData['granted_resource_types'] ?? [], 'grantedResourceTypesIdentifiers')
+                    );
             }
+
+            $approval->refresh();
         });
     }
 
@@ -348,5 +352,22 @@ class ApprovalRepository extends BaseRepository
         foreach ($toAdd as $id) {
             $model->{$relation}()->create([$relationAttribute => $id]);
         }
+    }
+
+    /**
+     * Determine whether the SMS verification code for the given approval is still valid.
+     *
+     * A code is considered alive if fewer than {@see SMS_CODE_ALIVE_MINUTES} minutes
+     * have elapsed since the approval was last updated.
+     *
+     * @param  Approval  $approval
+     *
+     * @return bool  `true` if the code has not yet expired, `false` otherwise.
+     */
+    public function isSmsCodeAlive(Approval $approval): bool
+    {
+        $timestamp = $approval->updated_at;
+
+        return !Carbon::parse($timestamp)->addMinutes(self::SMS_CODE_ALIVE_MINUTES)->isPast();
     }
 }

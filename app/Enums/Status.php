@@ -20,7 +20,7 @@ enum Status: string
     case INACTIVE = 'INACTIVE';
     case DRAFT = 'DRAFT';
     case UNSYNCED = 'UNSYNCED';
-
+    case EXPIRED = 'EXPIRED';
     case REORGANIZED = 'REORGANIZED';
     case ENTERED_IN_ERROR = 'ENTERED_IN_ERROR';
 
@@ -39,6 +39,7 @@ enum Status: string
             self::STOPPED => __('forms.status.stopped'),
             self::REORGANIZED => __('forms.status.reorganized'),
             self::ENTERED_IN_ERROR => __('forms.status.entered_in_error'),
+            self::EXPIRED => __('forms.status.expired'),
         };
     }
 

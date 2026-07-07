@@ -130,7 +130,7 @@ class DeclarationRequestRepository
      */
     public function syncPersonData(array $personData): bool
     {
-        $person = Person::where('uuid', $personData['id'])
+        $person = Person::where('uuid', $personData['id'] ?? $personData['uuid'])
             ->with(['addresses', 'authenticationMethods', 'documents', 'phones', 'confidantPersons'])
             ->firstOrFail();
 
