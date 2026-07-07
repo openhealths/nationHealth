@@ -20,6 +20,7 @@ use App\Livewire\Person\Records\PatientConditions;
 use App\Livewire\Person\Records\PatientData;
 use App\Livewire\Person\Records\PatientDiagnoses;
 use App\Livewire\Person\Records\PatientDiagnosticReports;
+use App\Livewire\Person\Records\PatientProcedures;
 use App\Livewire\Person\Records\PatientEncounters;
 use App\Livewire\Person\Records\PatientEpisodes;
 use App\Livewire\Person\Records\PatientImmunizations;
@@ -69,9 +70,9 @@ Route::prefix('persons')->group(static function () {
             Route::get('/{person}/conditions', PatientConditions::class)->name('conditions');
             Route::get('/{person}/diagnoses', PatientDiagnoses::class)->name('diagnoses');
             Route::get('/{person}/diagnostic-reports', PatientDiagnosticReports::class)->name('diagnostic-reports');
-            Route::get('/{person}/clinical-impressions', PatientClinicalImpressions::class)
-                ->name('clinical-impressions');
+            Route::get('/{person}/clinical-impressions', PatientClinicalImpressions::class)->name('clinical-impressions');
             Route::get('/{person}/encounters', PatientEncounters::class)->name('encounters');
+            Route::get('/{person}/procedures', PatientProcedures::class)->name('procedures');
         });
     });
 

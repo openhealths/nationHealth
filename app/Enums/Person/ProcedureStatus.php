@@ -25,4 +25,13 @@ enum ProcedureStatus: string
             self::NOT_DONE => __('patients.status.not_done')
         };
     }
+
+    public function color(): string
+    {
+        return match($this) {
+            self::COMPLETED => 'badge-green',
+            self::ENTERED_IN_ERROR => 'badge-red',
+            self::NOT_DONE => 'badge-dark',
+        };
+    }
 }
