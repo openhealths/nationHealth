@@ -435,6 +435,9 @@ return [
     'added' => 'Додано',
     'rehabilitation_aids' => 'Допоміжні засоби реабілітації',
     'complications_arising_during_the_procedure' => 'Ускладнення, що виникли під час процедури',
+    'based_on' => 'ID направлення',
+    'used_reference_id' => 'ID використаного обладнання',
+    'patients.procedure_search' => 'Пошук процедури',
 
     // Clinical impressions
     'clinical_impression' => 'Клінічна оцінка',
@@ -628,5 +631,9 @@ return [
         'procedure_create_request_sent' => 'Заявку на створення процедури успішно відправлено.',
         'procedure_writer_employee_not_found' => 'Не знайдено активного співробітника для створення процедури.',
         'procedures_synced_successfully' => 'Процедури успішно синхронізовані.',
+        'procedures_first_page_synced_successfully' => 'Перша сторінка процедур синхронізована, решта обробляється у фоні.',
+        'procedure_sync_already_running' => 'Синхронізація процедур вже запущена. Будь ласка, зачекайте її завершення.',
+        'procedure_sync_resume_started' => 'Відновлення попередньої синхронізації процедур розпочато.',
+        'procedure_sync_background_dispatch_error' => 'Помилка запуску фонової синхронізації процедур.',
     ]
 ];

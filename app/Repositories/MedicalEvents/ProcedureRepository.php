@@ -7,6 +7,7 @@ namespace App\Repositories\MedicalEvents;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\Person\Person;
 use App\Models\Preperson;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
@@ -19,13 +20,9 @@ use Throwable;
  */
 class ProcedureRepository extends BaseRepository
 {
-    protected string $employeeUuid;
-
     public function __construct(Model $model)
     {
         parent::__construct($model);
-
-        $this->employeeUuid = Auth::user()?->getProcedureWriterEmployee()->uuid;
     }
 
     /**
@@ -215,6 +212,25 @@ class ProcedureRepository extends BaseRepository
             ->where('person_id', $personId)
             ->get()
             ->toArray();
+    }
+
+    /**
+     * Get paginated procedures related to the patient.
+     *
+     * @param  Person|Preperson  $patient
+     * @param  int  $page
+     * @param  int  $pageSize
+     * @return LengthAwarePaginator
+     */
+    public function getPaginatedByPatient(Person|Preperson $patient, int $page, int $pageSize): LengthAwarePaginator
+    {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        return $this->model
+            ->withAllRelations()
+            ->where($ownerColumn, $ownerId)
+            ->latest()
+            ->paginate($pageSize, ['*'], 'page', $page);
     }
 
     /**

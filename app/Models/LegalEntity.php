@@ -55,6 +55,7 @@ class LegalEntity extends Model
     public const string ENTITY_OBSERVATION = 'observation_';
     public const string ENTITY_CONDITION = 'condition_';
     public const string ENTITY_DIAGNOSTIC_REPORT = 'diagnostic_report_';
+    public const string ENTITY_PROCEDURE = 'procedure_';
 
     protected $fillable = [
         'uuid',

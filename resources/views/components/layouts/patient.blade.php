@@ -150,6 +150,12 @@
                             {{ __('patients.encounters') }}
                         </a>
 
+                        <a href="{{ route("$routePrefix.procedures", [legalEntity(), $routeParamKey => $recordId]) }}"
+                           class="summary-tab {{ request()->routeIs("$routePrefix.procedures") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                        >
+                            {{ __('patients.procedures') }}
+                        </a>
+
                         <div class="flex-1"></div>
                     </div>
                 </div>
