@@ -98,8 +98,7 @@ abstract class PrepersonComponent extends Component
 
         if ($response->successful()) {
             try {
-                // forceFill bypasses mass-assignment guards so identity fields (uuid) set from the trusted eHealth response
-                $preperson->forceFill($response->validate())->save();
+                $preperson->update($response->validate());
             } catch (Throwable $exception) {
                 $this->handleDatabaseErrors($exception, 'Failed to update preperson from eHealth response');
 

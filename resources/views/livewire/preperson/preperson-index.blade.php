@@ -5,20 +5,7 @@
 <div
     x-data="{
         showCertificate: false,
-        isEditModalOpen: false,
-        editingPrepersonData: {
-            emergency_contact: {
-                first_name: '',
-                last_name: '',
-                second_name: '',
-                phones: [
-                    {
-                        type: '',
-                        number: ''
-                    }
-                ]
-            }
-        }
+        isEditModalOpen: false
     }"
 >
     <x-header-navigation class="breadcrumb-form">
@@ -226,27 +213,8 @@
 
                                                     <button
                                                         @click="
-                                                            isEditModalOpen = true;
-                                                            editingPrepersonData = {
-                                                                external_id: '{{ $preperson->external_id }}',
-                                                                first_name: '{{ $preperson->first_name }}',
-                                                                last_name: '{{ $preperson->last_name }}',
-                                                                second_name: '{{ $preperson->second_name }}',
-                                                                gender: '{{ $preperson->gender?->value ?? $preperson->gender }}',
-                                                                birth_date: '{{ $preperson->birth_date }}',
-                                                                emergency_contact: {
-                                                                    first_name: '{{ data_get($preperson->emergency_contact, 'first_name') }}',
-                                                                    last_name: '{{ data_get($preperson->emergency_contact, 'last_name') }}',
-                                                                    second_name: '{{ data_get($preperson->emergency_contact, 'second_name') }}',
-                                                                    phones: [
-                                                                        {
-                                                                            type: '{{ data_get($preperson->emergency_contact, 'phones.0.type') }}',
-                                                                            number: '{{ data_get($preperson->emergency_contact, 'phones.0.number') }}'
-                                                                        }
-                                                                    ]
-                                                                }
-                                                            };
                                                             openDropdown = false;
+                                                            $wire.startEdit({{ $preperson->id }}).then(() => isEditModalOpen = true);
                                                         "
                                                         class="dropdown-button !flex items-center gap-2 px-4 py-2 text-sm border-b border-gray-100 dark:border-gray-600 w-full hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer text-left text-gray-700 dark:text-gray-200"
                                                         type="button"
@@ -305,7 +273,9 @@
         ])
     @endif
 
-    @include('livewire.preperson.modals.edit-preperson')
+    @if($editingId)
+        @include('livewire.preperson.modals.edit-preperson')
+    @endif
 
     <livewire:components.x-message :key="now()->timestamp" />
     <x-forms.loading />

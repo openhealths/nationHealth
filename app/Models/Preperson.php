@@ -19,6 +19,7 @@ class Preperson extends Model
     protected $table = 'prepersons';
 
     protected $fillable = [
+        'uuid',
         'external_id',
         'first_name',
         'last_name',
