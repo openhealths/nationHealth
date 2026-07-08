@@ -52,22 +52,27 @@ class ConditionRepository extends BaseRepository
                     $severity = Repository::codeableConcept()->store($datum['severity']);
                 }
 
-                $condition = $this->model->create([
-                    'uuid' => $datum['id'],
-                    $ownerColumn => $ownerId,
-                    'primary_source' => $datum['primarySource'],
-                    'asserter_id' => $asserter?->id,
-                    'report_origin_id' => $reportOrigin?->id,
-                    'context_id' => $context->id,
-                    'code_id' => $code->id,
-                    'clinical_status' => $datum['clinicalStatus'],
-                    'verification_status' => $datum['verificationStatus'],
-                    'severity_id' => $severity?->id,
-                    'onset_date' => $datum['onsetDate'],
-                    'asserted_date' => $datum['assertedDate'] ?? null
-                ]);
+                $condition = $this->model->updateOrCreate(
+                    ['uuid' => $datum['id']],
+                    [
+                        $ownerColumn => $ownerId,
+                        'primary_source' => $datum['primarySource'],
+                        'asserter_id' => $asserter?->id,
+                        'report_origin_id' => $reportOrigin?->id,
+                        'context_id' => $context->id,
+                        'code_id' => $code->id,
+                        'clinical_status' => $datum['clinicalStatus'],
+                        'verification_status' => $datum['verificationStatus'],
+                        'severity_id' => $severity?->id,
+                        'onset_date' => $datum['onsetDate'],
+                        'asserted_date' => $datum['assertedDate'] ?? null
+                    ]
+                );
 
                 if (!empty($datum['evidences'])) {
+                    if (!$condition->wasRecentlyCreated) {
+                        $condition->evidencesRelation()->delete();
+                    }
                     foreach ($datum['evidences'] as $evidence) {
                         if (!empty($evidence['codes'])) {
                             foreach ($evidence['codes'] as $evidenceCode) {

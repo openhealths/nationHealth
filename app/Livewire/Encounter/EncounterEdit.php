@@ -177,13 +177,76 @@ class EncounterEdit extends EncounterComponent
             ]);
 
             logger()->debug('Job ID to further debug', $resp->getData());
+
+            $jobId = $resp->getData()['job_id'] ?? null;
+            if (!$jobId && isset($resp->getData()['links'][0]['href'])) {
+                $jobId = basename($resp->getData()['links'][0]['href']);
+            }
+
+            if (!$jobId) {
+                throw new \RuntimeException('Не вдалося отримати Job ID від ЕСОЗ.');
+            }
+
+            $jobApi = EHealth::job();
+            $attempts = 0;
+            do {
+                sleep(2);
+                $finalResponse = $jobApi->getDetails($jobId)->getData();
+                $attempts++;
+                $status = strtolower((string) ($finalResponse['status'] ?? ''));
+            } while (in_array($status, ['pending', 'accepted', 'processing'], true) && $attempts < 15);
+
+            if ($status !== 'processed' && $status !== 'active') {
+                $errorHandler = new \App\Classes\eHealth\Errors\ErrorHandler();
+                $errorResult = $errorHandler->handleError($finalResponse);
+                $errorMessages = $errorResult['errors'] ?? [];
+
+                if (empty($errorMessages) || $errorMessages[0] === 'No valid error information provided.') {
+                    $fallbackMsg = data_get($finalResponse, 'error.message')
+                        ?? data_get($finalResponse, 'message')
+                        ?? 'Unknown eHealth Error';
+                    $errorMessages = [$fallbackMsg];
+                }
+
+                $formattedError = implode("\n", $errorMessages);
+                throw new \RuntimeException($formattedError);
+            }
+
+            $encounterUuid = $formattedData['encounter']['id'];
+            $syncData = EHealth::encounter()->getById($this->patientUuid, $encounterUuid)->validate();
+            Repository::encounter()->sync($this->patient(), [$syncData]);
+
+            Session::flash('success', 'Взаємодію успішно підписано та надіслано до ЕСОЗ.');
+            $this->showSignatureModal = false;
+
+            if ($this->prepersonId !== null) {
+                $this->redirectRoute(
+                    'prepersons.encounter.edit',
+                    [legalEntity(), 'preperson' => $this->prepersonId, 'encounterId' => $this->encounterId],
+                    navigate: true
+                );
+            } else {
+                $this->redirectRoute(
+                    'encounter.edit',
+                    [legalEntity(), 'person' => $this->personId, 'encounterId' => $this->encounterId],
+                    navigate: true
+                );
+            }
+
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while submitting encounter');
-
-            return;
+            $this->showSignatureModal = false;
+        } catch (\RuntimeException $exception) {
+            logger()->error('Encounter submission runtime error: ' . $exception->getMessage());
+            Session::flash('error', $exception->getMessage());
+            $this->showSignatureModal = false;
+        } catch (\Throwable $exception) {
+            logger()->error('Encounter submission unexpected error: ' . $exception->getMessage(), [
+                'trace' => $exception->getTraceAsString(),
+            ]);
+            Session::flash('error', __('patients.messages.unexpected_error') ?? 'Виникла непередбачувана помилка.');
+            $this->showSignatureModal = false;
         }
-
-        $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
     }
 
     protected function loadConditions(array $encounter): void

@@ -99,7 +99,7 @@ class EncounterCreate extends EncounterComponent
     }
 
     /**
-     * Sign the encounter, submit it to eHealth, then persist it locally.
+     * Submit encrypted data about person encounter.
      *
      * @return void
      */
@@ -131,17 +131,26 @@ class EncounterCreate extends EncounterComponent
             return;
         }
 
-        $package = $this->packageBuilder->build($validatedData, $this->episodeType);
-        $apiData = Arr::toSnakeCase($package);
+        $formattedData = $this->packageBuilder->build($validatedData, $this->episodeType);
+
+        try {
+            $createdEncounterId = $this->storeValidatedData($formattedData);
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Failed to store validated data');
+
+            return;
+        }
+
+        $formattedData = Arr::toSnakeCase($formattedData);
 
         if ($this->episodeType === 'new') {
-            $this->createEpisode($apiData['episode']);
-            unset($apiData['episode']);
+            $this->createEpisode($formattedData['episode']);
+            unset($formattedData['episode']);
         }
 
         try {
             $signedContent = new CipherRequest()->signData(
-                $apiData,
+                $formattedData,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
                 $validated['password'],
@@ -154,43 +163,85 @@ class EncounterCreate extends EncounterComponent
         }
 
         try {
-            $response = EHealth::encounter()->submit($this->patientUuid, [
+            $resp = EHealth::encounter()->submit($this->patientUuid, [
                 'visit' => [
-                    'id' => data_get($apiData, 'encounter.visit.identifier.value'),
-                    'period' => data_get($apiData, 'encounter.period')
+                    'id' => data_get($formattedData, 'encounter.visit.identifier.value'),
+                    'period' => data_get($formattedData, 'encounter.period')
                 ],
                 'signed_data' => $signedContent->getBase64Data()
             ]);
+
+            logger()->debug('Job ID to further debug', $resp->getData());
+
+            $jobId = $resp->getData()['job_id'] ?? null;
+            if (!$jobId && isset($resp->getData()['links'][0]['href'])) {
+                $jobId = basename($resp->getData()['links'][0]['href']);
+            }
+
+            if (!$jobId) {
+                throw new \RuntimeException('Не вдалося отримати Job ID від ЕСОЗ.');
+            }
+
+            $jobApi = EHealth::job();
+            $attempts = 0;
+            do {
+                sleep(2);
+                $finalResponse = $jobApi->getDetails($jobId)->getData();
+                $attempts++;
+                $status = strtolower((string) ($finalResponse['status'] ?? ''));
+            } while (in_array($status, ['pending', 'accepted', 'processing'], true) && $attempts < 15);
+
+            if ($status !== 'processed' && $status !== 'active') {
+                $errorHandler = new \App\Classes\eHealth\Errors\ErrorHandler();
+                $errorResult = $errorHandler->handleError($finalResponse);
+                $errorMessages = $errorResult['errors'] ?? [];
+
+                if (empty($errorMessages) || $errorMessages[0] === 'No valid error information provided.') {
+                    $fallbackMsg = data_get($finalResponse, 'error.message')
+                        ?? data_get($finalResponse, 'message')
+                        ?? 'Unknown eHealth Error';
+                    $errorMessages = [$fallbackMsg];
+                }
+
+                $formattedError = implode("\n", $errorMessages);
+                throw new \RuntimeException($formattedError);
+            }
+
+            $encounterUuid = $formattedData['encounter']['id'];
+            $syncData = EHealth::encounter()->getById($this->patientUuid, $encounterUuid)->validate();
+            Repository::encounter()->sync($this->patient(), [$syncData]);
+
+            Session::flash('success', 'Взаємодію успішно створено та надіслано до ЕСОЗ.');
+            $this->showSignatureModal = false;
+
+            if ($this->prepersonId !== null) {
+                $this->redirectRoute(
+                    'prepersons.encounter.edit',
+                    [legalEntity(), 'preperson' => $this->prepersonId, 'encounterId' => $createdEncounterId],
+                    navigate: true
+                );
+            } else {
+                $this->redirectRoute(
+                    'encounter.edit',
+                    [legalEntity(), 'person' => $this->personId, 'encounterId' => $createdEncounterId],
+                    navigate: true
+                );
+            }
+
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while submitting encounter');
-
-            return;
+            $this->showSignatureModal = false;
+        } catch (\RuntimeException $exception) {
+            logger()->error('Encounter submission runtime error: ' . $exception->getMessage());
+            Session::flash('error', $exception->getMessage());
+            $this->showSignatureModal = false;
+        } catch (\Throwable $exception) {
+            logger()->error('Encounter submission unexpected error: ' . $exception->getMessage(), [
+                'trace' => $exception->getTraceAsString(),
+            ]);
+            Session::flash('error', __('patients.messages.unexpected_error') ?? 'Виникла непередбачувана помилка.');
+            $this->showSignatureModal = false;
         }
-
-        logger()->debug('Job ID to further debug', $response->getData());
-
-        // eHealth accepted the package; only now persist it locally
-        try {
-            $this->storeValidatedData($package);
-        } catch (Throwable $exception) {
-            $this->handleDatabaseErrors($exception, 'Failed to store validated data');
-
-            return;
-        }
-
-        Session::flash('success', __('patients.messages.encounter_created'));
-
-        if ($this->prepersonId !== null) {
-            $this->redirectRoute(
-                'prepersons.encounters',
-                [legalEntity(), 'preperson' => $this->prepersonId],
-                navigate: true
-            );
-
-            return;
-        }
-
-        $this->redirectRoute('persons.encounters', [legalEntity(), $this->personId], navigate: true);
     }
 
     /**
