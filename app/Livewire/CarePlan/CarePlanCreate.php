@@ -9,8 +9,13 @@ use App\Core\Arr;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Models\CarePlan;
+use App\Models\EhealthJob;
+use App\Models\EhealthLink;
+use App\Models\MedicalEvents\Sql\Approval;
 use App\Repositories\CarePlanRepository;
+use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -36,7 +41,12 @@ class CarePlanCreate extends BasePatientComponent
     public string $medicalRecordType = 'CONDITION';
     public ?string $carePlanUuid = null;
 
-    // Care Plan form data
+    /** Whether we are waiting for an async eHealth approval job to complete. */
+    public bool $isPolling = false;
+
+    /** EhealthLink id being polled (null when not polling). */
+    public ?int $pollingLinkId = null;
+
     public CarePlanForm $form;
 
     public PatientSearchForm $patientSearch;
@@ -164,7 +174,7 @@ class CarePlanCreate extends BasePatientComponent
                         ]);
                         try {
                             $conditionData = EHealth::condition()->getById($this->uuid, $conditionUuid)->getData();
-                            \App\Repositories\MedicalEvents\Repository::condition()->store([Arr::toCamelCase($conditionData)], $this->personId);
+                            \App\Repositories\MedicalEvents\Repository::condition()->store([Arr::toCamelCase($conditionData)], $person);
                             $actualCondition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
                         } catch (\Exception $e) {
                             Log::error('CarePlanCreate mount: failed to fetch condition from eHealth', [
@@ -401,19 +411,19 @@ class CarePlanCreate extends BasePatientComponent
                     [
                         'identifier' => [
                             'type' => [
-                                'coding' => [['system' => 'eHealth/resources', 'code' => 'care_plan']]
+                                'coding' => [['system' => 'eHealth/resources', 'code' => 'care_plan']],
                             ],
                             'value' => $this->carePlanUuid,
-                        ]
-                    ]
+                        ],
+                    ],
                 ],
                 'granted_to' => [
                     'identifier' => [
                         'type' => [
-                            'coding' => [['system' => 'eHealth/resources', 'code' => 'employee']]
+                            'coding' => [['system' => 'eHealth/resources', 'code' => 'employee']],
                         ],
                         'value' => Auth::user()?->getCarePlanWriterEmployee()?->uuid,
-                    ]
+                    ],
                 ],
                 'access_level' => 'write',
                 'authorize_with' => $methodUuid ?: null,
@@ -422,46 +432,130 @@ class CarePlanCreate extends BasePatientComponent
             $response = EHealth::approval()->createApproval($this->uuid, $payload);
             $responseData = $response->getData();
 
-            if (in_array($response->getStatusCode(), [200, 201, 202])) {
-                if ($response->getStatusCode() === 202) {
-                    $jobId = basename($responseData['links'][0]['href'] ?? '');
-                    $attempts = 0;
-                    do {
-                        sleep(2);
-                        $jobResponse = EHealth::job()->getDetails($jobId)->getData();
-                        $attempts++;
-                    } while (($jobResponse['status'] === 'pending' || $jobResponse['status'] === 'accepted') && $attempts < 15);
+            if (!in_array($response->getStatusCode(), [200, 201, 202], true)) {
+                return;
+            }
 
-                    if ($jobResponse['status'] !== 'processed') {
-                        throw new \RuntimeException('Approval job failed: ' . json_encode($jobResponse['error'] ?? 'unknown error'));
-                    }
-                    $responseData = $jobResponse['result'] ?? $jobResponse;
-                }
+            if ($response->getStatusCode() === 202) {
+                // Async: store an EhealthLink and dispatch the polling job
+                $href = $responseData['links'][0]['href'] ?? null;
 
-                $this->approvalId = $responseData['response_data']['id'] ??
-                                   $responseData['data']['id'] ??
-                                   $responseData['id'] ?? null;
-
-                $authenticationMethodCurrent = $responseData['response_data']['authentication_method_current'] ??
-                                               $responseData['data']['authentication_method_current'] ??
-                                               $responseData['authentication_method_current'] ??
-                                               $responseData['urgent']['authentication_method_current'] ?? null;
-
-                $urgentOtp = isset($authenticationMethodCurrent['type']) && $authenticationMethodCurrent['type'] === 'OTP';
-
-                if (($methodUuid || $urgentOtp) && $this->approvalId) {
-                    $this->openAuthModal();
-                } else {
-                    // Approval granted without OTP (e.g., OFFLINE or document)
-                    Session::flash('flash_message', 'План лікування успішно активовано.');
+                if ($href) {
+                    $approvalUuid = $responseData['id'] ?? (string) \Illuminate\Support\Str::uuid();
                     $carePlan = CarePlan::where('uuid', $this->carePlanUuid)->first();
-                    $this->redirectRoute('care-plans.show', [legalEntity(), $carePlan?->id ?? $this->carePlanUuid], navigate: true);
+
+                    $localApproval = Approval::firstOrCreate(
+                        ['uuid' => $approvalUuid],
+                        [
+                            'approvable_type' => CarePlan::class,
+                            'approvable_id' => $carePlan?->id,
+                            'status' => 'NEW',
+                        ]
+                    );
+
+                    $link = Repository::approval()->attachEhealthLink($localApproval, ['href' => $href]);
+
+                    $this->approvalId = $approvalUuid;
+                    $this->pollingLinkId = $link->id;
+                    $this->isPolling = true;
+
+                    RemoteEHealthLinksProcessing::dispatch($link);
+
+                    return;
                 }
+            }
+
+            // Synchronous response (200/201): extract approval ID and auth method
+            $this->approvalId = $responseData['response_data']['id']
+                ?? $responseData['data']['id']
+                ?? $responseData['id']
+                ?? null;
+
+            $authenticationMethodCurrent = $responseData['response_data']['authentication_method_current']
+                ?? $responseData['data']['authentication_method_current']
+                ?? $responseData['authentication_method_current']
+                ?? $responseData['urgent']['authentication_method_current']
+                ?? null;
+
+            $urgentOtp = isset($authenticationMethodCurrent['type'])
+                && $authenticationMethodCurrent['type'] === 'OTP';
+
+            if (($methodUuid || $urgentOtp) && $this->approvalId) {
+                $this->openAuthModal();
+            } else {
+                // Approval granted without OTP (e.g., OFFLINE or document)
+                Session::flash('flash_message', 'План лікування успішно активовано.');
+                $carePlan = CarePlan::where('uuid', $this->carePlanUuid)->first();
+                $this->redirectRoute('care-plans.show', [legalEntity(), $carePlan?->id ?? $this->carePlanUuid], navigate: true);
             }
         } catch (\Exception $e) {
             Log::error('CarePlanCreate: failed to create approval: ' . $e->getMessage());
             session()->flash('error', 'Не вдалося створити запит на дозвіл: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Called by wire:poll.2s while $isPolling === true.
+     * Checks EhealthJob status on the tracked EhealthLink and acts when terminal.
+     */
+    public function checkApprovalJobStatus(): void
+    {
+        if (!$this->isPolling || !$this->pollingLinkId) {
+            return;
+        }
+
+        $link = EhealthLink::with(['job', 'linkable'])->find($this->pollingLinkId);
+
+        if (!$link || !$link->job) {
+            return;
+        }
+
+        $status = strtoupper((string) ($link->job->status ?? ''));
+
+        if ($status === 'PROCESSED') {
+            $this->isPolling = false;
+            $this->pollingLinkId = null;
+
+            $jobResult = $link->job->response_data ?? [];
+
+            // Extract the real approval UUID from eHealth response and update local record & state
+            $realApprovalId = $jobResult['response_data']['id']
+                ?? $jobResult['data']['id']
+                ?? $jobResult['id']
+                ?? null;
+
+            if ($realApprovalId) {
+                if ($link->linkable && $link->linkable instanceof \App\Models\MedicalEvents\Sql\Approval) {
+                    $link->linkable->update(['uuid' => $realApprovalId]);
+                }
+                $this->approvalId = $realApprovalId;
+            }
+
+            $isVerified = $jobResult['response_data']['is_verified']
+                ?? $jobResult['data']['is_verified']
+                ?? $jobResult['is_verified']
+                ?? $jobResult['urgent']['is_verified']
+                ?? true;
+
+            $authMethod = $jobResult['response_data']['authentication_method_current']
+                ?? $jobResult['data']['authentication_method_current']
+                ?? $jobResult['authentication_method_current']
+                ?? $jobResult['urgent']['authentication_method_current']
+                ?? null;
+
+            if (!$isVerified || (isset($authMethod['type']) && $authMethod['type'] === 'OTP')) {
+                $this->openAuthModal();
+            } else {
+                Session::flash('flash_message', 'План лікування успішно активовано.');
+                $carePlan = CarePlan::where('uuid', $this->carePlanUuid)->first();
+                $this->redirectRoute('care-plans.show', [legalEntity(), $carePlan?->id ?? $this->carePlanUuid], navigate: true);
+            }
+        } elseif ($status === 'FAILED') {
+            $this->isPolling = false;
+            $this->pollingLinkId = null;
+            session()->flash('error', 'Не вдалося обробити запит на дозвіл. Спробуйте ще раз.');
+        }
+        // PROCESSING: poll fires again in 2 s automatically
     }
 
     /**
@@ -666,6 +760,7 @@ class CarePlanCreate extends BasePatientComponent
      */
     public function sign(CarePlanRepository $repository): void
     {
+        $generatedUuid = null;
         try {
             $this->form->validate($this->form->rulesForSigning());
         } catch (ValidationException $exception) {
@@ -688,6 +783,7 @@ class CarePlanCreate extends BasePatientComponent
                 Auth::user()?->getCarePlanWriterEmployee()?->uuid,
                 $this->carePlanUuid ?: null
             );
+            $generatedUuid = $carePlanPayload['id'];
 
             $signedContent = signatureService()->signData(
                 Arr::toSnakeCase($carePlanPayload),
@@ -852,21 +948,82 @@ class CarePlanCreate extends BasePatientComponent
             $this->redirectRoute('care-plans.show', [legalEntity(), $carePlan->id], navigate: true);
 
         } catch (EHealthConnectionException $exception) {
+            $this->carePlanUuid = $generatedUuid ?? $this->carePlanUuid;
             Log::error('CarePlan: connection error: ' . $exception->getMessage());
             session()->flash('error', __('care-plan.connection_error'));
             $this->showSignatureModal = false;
         } catch (EHealthValidationException|EHealthResponseException $exception) {
+            $this->carePlanUuid = $generatedUuid ?? $this->carePlanUuid;
             Log::error('CarePlan: eHealth error: ' . $exception->getMessage());
             $msg = $exception instanceof EHealthValidationException
                 ? $exception->getFormattedMessage()
                 : 'Помилка від ЕСОЗ: ' . $exception->getMessage();
+
+            if (
+                $generatedUuid && (
+                    str_contains($exception->getMessage(), 'Care plan with such id already exists')
+                || str_contains($msg, 'Care plan with such id already exists')
+                || (isset($exception->details['error']['message']) && str_contains($exception->details['error']['message'], 'Care plan with such id already exists'))
+                )
+            ) {
+                try {
+                    $localCarePlan = \App\Models\CarePlan::where('uuid', $generatedUuid)->first();
+
+                    if (!$localCarePlan) {
+                        $resp = EHealth::carePlan()->getDetails($this->patientUuid ?: $this->uuid, $generatedUuid);
+                        $carePlanData = $resp->getData();
+
+                        $carePlanStatus = $carePlanData['status'] ?? \App\Enums\CarePlanStatus::PENDING->value;
+                        if ($carePlanStatus === 'processed') {
+                            $carePlanStatus = \App\Enums\CarePlanStatus::PENDING->value;
+                        }
+
+                        if (!isset($encounterData)) {
+                            $encounterData = $this->resolveEncounterData();
+                        }
+
+                        $localCarePlan = $repository->create([
+                            'uuid' => $generatedUuid,
+                            'person_id' => $this->personId,
+                            'author_id' => Auth::user()?->getCarePlanWriterEmployee()?->id,
+                            'legal_entity_id' => legalEntity()?->id,
+                            'status' => $carePlanStatus,
+                            'category' => $this->form->category,
+                            'title' => $this->form->title,
+                            'period_start' => convertToYmd($this->form->periodStart),
+                            'period_end' => !empty($this->form->periodEnd) ? convertToYmd($this->form->periodEnd) : null,
+                            'encounter_id' => $encounterData['id'] ?? null,
+                        ]);
+
+                        if (!empty($carePlanData['period'])) {
+                            \App\Repositories\MedicalEvents\Repository::period()->sync(
+                                $localCarePlan,
+                                $carePlanData['period'],
+                                'effectivePeriod'
+                            );
+                        }
+                    }
+
+                    session()->flash('success', 'План лікування вже зареєстровано в ЕСОЗ. Ви перенаправлені на сторінку детального перегляду для активації дозволу пацієнта.');
+                    $this->redirectRoute('care-plans.show', [legalEntity(), $localCarePlan->id], navigate: true);
+
+                    return;
+                } catch (\Throwable $innerEx) {
+                    Log::error('CarePlanCreate conflict handling failed: ' . $innerEx->getMessage(), [
+                        'trace' => $innerEx->getTraceAsString(),
+                    ]);
+                }
+            }
+
             session()->flash('error', $msg);
             $this->showSignatureModal = false;
         } catch (\RuntimeException $exception) {
+            $this->carePlanUuid = $generatedUuid ?? $this->carePlanUuid;
             Log::error('CarePlan: runtime error: ' . $exception->getMessage());
             session()->flash('error', $exception->getMessage());
             $this->showSignatureModal = false;
         } catch (\Throwable $exception) {
+            $this->carePlanUuid = $generatedUuid ?? $this->carePlanUuid;
             Log::error('CarePlan: unexpected error: ' . $exception->getMessage(), [
                 'file' => $exception->getFile(),
                 'line' => $exception->getLine(),

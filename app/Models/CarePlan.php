@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Models\Employee\Employee;
+use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Identifier;
@@ -21,7 +22,8 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class CarePlan extends Model
 {
-    use HasFactory, HasCamelCasing;
+    use HasFactory;
+    use HasCamelCasing;
 
     protected $fillable = [
         'uuid',
@@ -110,11 +112,17 @@ class CarePlan extends Model
         return $this->morphMany(Approval::class, 'approvable');
     }
 
+    public function ehealthLinks(): MorphMany
+    {
+        return $this->morphMany(EhealthLink::class, 'linkable');
+    }
+
     public function getStatusDisplayAttribute(): string
     {
         // Simple translation check, fallback to english or original
         $statusStr = strtolower($this->status ?? 'new');
         $translated = __('care-plan.status.' . $statusStr);
+
         return $translated === 'care-plan.status.' . $statusStr ? ucfirst($statusStr) : $translated;
     }
 
@@ -128,6 +136,7 @@ class CarePlan extends Model
         if (is_array($this->supporting_info) && isset($this->supporting_info['episodes']) && !empty($this->supporting_info['episodes'])) {
             return $this->supporting_info['episodes'][0]['name'] ?? null;
         }
+
         return null;
     }
 
@@ -159,10 +168,12 @@ class CarePlan extends Model
                 $diagnosis = $this->encounter->diagnoses->first();
                 if ($diagnosis->condition) {
                     $condition = $diagnosis->condition;
+
                     return ($condition->code ?? '') . ' - ' . ($condition->code_display ?? '');
                 }
             }
         }
+
         return '—';
     }
 
@@ -171,6 +182,7 @@ class CarePlan extends Model
         if ($this->relationLoaded('author')) {
             return $this->author?->party?->fullName ?? '—';
         }
+
         return '—';
     }
 }

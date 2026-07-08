@@ -40,6 +40,11 @@
                         <p class="text-sm text-gray-500 dark:text-gray-400">
                             Ми надіслали SMS з 4-значним кодом на номер пацієнта. Будь ласка, введіть його нижче.
                         </p>
+                        @if(config('app.env') !== 'production')
+                            <p class="text-xs text-blue-600 dark:text-blue-400 mt-2 font-medium bg-blue-50 dark:bg-blue-900/30 p-2 rounded-lg">
+                                🔧 Режим тестування: Використовуйте тестовий код <strong>1234</strong>
+                            </p>
+                        @endif
                     </div>
 
                     <div class="px-8 py-6">

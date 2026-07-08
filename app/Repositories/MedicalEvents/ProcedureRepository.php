@@ -75,27 +75,38 @@ class ProcedureRepository extends BaseRepository
 
                 $category = Repository::codeableConcept()->store($datum['category']);
 
-                $procedure = $this->model->create([
-                    'uuid' => $datum['uuid'] ?? $datum['id'],
-                    $ownerColumn => $ownerId,
-                    'status' => $datum['status'],
-                    'based_on_id' => $basedOn?->id,
-                    'code_id' => $code->id,
-                    'encounter_id' => $encounter?->id,
-                    'recorded_by_id' => $recordedBy->id,
-                    'primary_source' => $datum['primarySource'],
-                    'performer_id' => $performer?->id,
-                    'report_origin_id' => isset($datum['reportOrigin'])
-                        ? Repository::codeableConcept()->store($datum['reportOrigin'])->id
-                        : null,
-                    'division_id' => $division?->id,
-                    'managing_organization_id' => $managingOrganization->id,
-                    'outcome_id' => isset($datum['outcome'])
-                        ? Repository::codeableConcept()->store($datum['outcome'])->id
-                        : null,
-                    'note' => $datum['note'] ?? null,
-                    'category_id' => $category->id
-                ]);
+                $procedure = $this->model->updateOrCreate(
+                    ['uuid' => $datum['uuid'] ?? $datum['id']],
+                    [
+                        $ownerColumn => $ownerId,
+                        'status' => $datum['status'],
+                        'based_on_id' => $basedOn?->id,
+                        'code_id' => $code->id,
+                        'encounter_id' => $encounter?->id,
+                        'recorded_by_id' => $recordedBy->id,
+                        'primary_source' => $datum['primarySource'],
+                        'performer_id' => $performer?->id,
+                        'report_origin_id' => isset($datum['reportOrigin'])
+                            ? Repository::codeableConcept()->store($datum['reportOrigin'])->id
+                            : null,
+                        'division_id' => $division?->id,
+                        'managing_organization_id' => $managingOrganization->id,
+                        'outcome_id' => isset($datum['outcome'])
+                            ? Repository::codeableConcept()->store($datum['outcome'])->id
+                            : null,
+                        'note' => $datum['note'] ?? null,
+                        'category_id' => $category->id
+                    ]
+                );
+
+                if (!$procedure->wasRecentlyCreated) {
+                    $procedure->performedPeriod()?->delete();
+                    $procedure->reasonReferences()->detach();
+                    $procedure->complicationDetails()->detach();
+                    $procedure->usedCodes()->detach();
+                    $procedure->usedReferences()->detach();
+                    $procedure->paperReferral?->delete();
+                }
 
                 if (isset($datum['performedPeriod'])) {
                     $procedure->performedPeriod()->create([
