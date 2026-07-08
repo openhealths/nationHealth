@@ -26,13 +26,13 @@
             <button type="button"
                     class="button-primary-outline-red"
                     @click="
-                        $wire.form.firstName = '';
-                        $wire.form.lastName = '';
-                        $wire.form.birthDate = '';
-                        $wire.form.secondName = '';
-                        $wire.form.taxId = '';
-                        $wire.form.phoneNumber = '';
-                        $wire.form.birthCertificate = '';
+                        form.firstName = '';
+                        form.lastName = '';
+                        form.birthDate = '';
+                        form.secondName = '';
+                        form.taxId = '';
+                        form.phoneNumber = '';
+                        form.birthCertificate = '';
                         mergeSearchPatients = [];
                         showMergeResults = false;
                     "

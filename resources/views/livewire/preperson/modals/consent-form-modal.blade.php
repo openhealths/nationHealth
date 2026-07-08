@@ -13,11 +13,11 @@
                  x-data="{
                      printModal() {
                          let printWindow = window.open('', '_blank');
-                         printWindow.document.write('<html><head><title>{{ __('preperson.merge.consent_declaration_header') }}</title>');
+                         printWindow.document.write('<' + 'html><' + 'head><title>{{ addslashes(__('preperson.merge.consent_declaration_header')) }}</title>');
                          printWindow.document.write('<link href=&quot;https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css&quot; rel=&quot;stylesheet&quot;>');
-                         printWindow.document.write('</head><body class=&quot;p-12 text-gray-900 bg-white&quot;>');
+                         printWindow.document.write('<' + '/head><' + 'body class=&quot;p-12 text-gray-900 bg-white&quot;>');
                          printWindow.document.write(document.getElementById('consent-print-area').innerHTML);
-                         printWindow.document.write('</body></html>');
+                         printWindow.document.write('<' + '/body><' + '/html>');
                          printWindow.document.close();
                          printWindow.focus();
                          setTimeout(() => {

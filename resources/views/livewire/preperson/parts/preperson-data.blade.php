@@ -22,13 +22,14 @@
         </h2>
         <div x-show="open">
             <div class="px-6 pb-6 border-t border-gray-100 dark:border-gray-700 pt-4">
-                <a
-                    href="#"
+                <button
+                    type="button"
+                    @click="showMergePatientDrawer = true"
                     class="cursor-pointer text-blue-600 hover:text-blue-800 flex items-center gap-1.5 font-medium"
                 >
                     @icon('plus', 'w-4 h-4')
                     <span class="text-sm">{{ __('preperson.associate_patient') }}</span>
-                </a>
+                </button>
             </div>
         </div>
     </div>
