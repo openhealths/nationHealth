@@ -7,6 +7,7 @@ namespace App\Services\MedicalEvents\Mappers;
 use App\Contracts\FhirMapperContract;
 use App\Enums\Person\ProcedureStatus;
 use App\Services\MedicalEvents\FhirResource;
+use App\Core\Arr;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 
@@ -158,6 +159,32 @@ class ProcedureMapper implements FhirMapperContract
         }
 
         return $result;
+    }
+
+    public function toCancellationPackage(
+        array $procedure,
+        string $statusReason,
+        ?string $explanatoryLetter = null,
+        ?string $statusReasonText = null
+    ): array {
+        $procedure = Arr::toSnakeCase($procedure);
+
+        unset(
+            $procedure['inserted_at'],
+            $procedure['updated_at'],
+            $procedure['created_at'],
+            $procedure['updated_by'],
+            $procedure['inserted_by']
+        );
+
+        $procedure['status'] = ProcedureStatus::ENTERED_IN_ERROR->value;
+        $procedure['status_reason'] = FhirResource::make()
+            ->coding('eHealth/procedure_status_reasons', $statusReason)
+            ->toCodeableConcept($statusReasonText ?? '');
+
+        $procedure['explanatory_letter'] = $explanatoryLetter;
+
+        return $procedure;
     }
 
     /**

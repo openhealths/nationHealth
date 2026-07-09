@@ -7,6 +7,7 @@ namespace App\Repositories\MedicalEvents;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\Person\Person;
 use App\Models\Preperson;
+use App\Enums\Person\ProcedureStatus;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -212,6 +213,53 @@ class ProcedureRepository extends BaseRepository
             ->where('person_id', $personId)
             ->get()
             ->toArray();
+    }
+
+    /**
+     * Get procedure by id.
+     *
+     * @param  int  $procedureId
+     * @return Procedure
+     */
+    public function findById(int $procedureId): Procedure
+    {
+        return $this->model
+            ->withAllRelations()
+            ->findOrFail($procedureId);
+    }
+
+    /**
+     * Get procedure by eHealth uuid.
+     *
+     * @param  string  $uuid
+     * @return Procedure
+     */
+    public function findByUuid(string $uuid): Procedure
+    {
+        return $this->model
+            ->withAllRelations()
+            ->where('uuid', $uuid)
+            ->firstOrFail();
+    }
+
+    public function markAsEnteredInError(
+        Procedure $procedure,
+        array $statusReason,
+        ?string $explanatoryLetter = null
+    ): void {
+        DB::transaction(static function () use ($procedure, $statusReason, $explanatoryLetter): void {
+            $procedure->loadMissing(['statusReason.coding']);
+
+            $statusReasonModel = $procedure->statusReason
+                ? Repository::codeableConcept()->update($procedure->statusReason, $statusReason)
+                : Repository::codeableConcept()->store($statusReason);
+
+            $procedure->update([
+                'status' => ProcedureStatus::ENTERED_IN_ERROR->value,
+                'status_reason_id' => $statusReasonModel->id,
+                'explanatory_letter' => $explanatoryLetter,
+            ]);
+        });
     }
 
     /**

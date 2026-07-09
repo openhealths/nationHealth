@@ -19,11 +19,21 @@ use App\Models\MedicalEvents\Sql\Procedure;
 use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
+use App\Classes\Cipher\Api\CipherRequest;
+use App\Exceptions\Cipher\CipherConnectionException;
+use App\Exceptions\Cipher\CipherException;
+use App\Livewire\Procedure\Forms\ProcedureCancellationForm as Form;
+use App\Services\MedicalEvents\Fhir;
+use App\Services\MedicalEvents\FhirResource;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Livewire\WithPagination;
+use Livewire\WithFileUploads;
 use Throwable;
 
 class PatientProcedures extends BasePatientComponent 
@@ -31,6 +41,17 @@ class PatientProcedures extends BasePatientComponent
     use BatchLegalEntityQueries;
     use HandlesSyncBatch;
     use WithPagination;
+    use WithFileUploads;
+
+    public Form $form;
+
+    public bool $showCancellationModal = false;
+
+    public bool $showSignatureModal = false;
+
+    public ?string $procedureUuid = null;
+
+    public ?int $procedureId = null;
 
     public bool $showAdditionalParams = false;
 
@@ -77,6 +98,7 @@ class PatientProcedures extends BasePatientComponent
     public int $pageSize = 10;
 
     protected array $dictionaryNames = [
+        'eHealth/procedure_status_reasons',
         'eHealth/procedure_categories',
         'eHealth/procedure_outcomes',
         'eHealth/report_origins',
@@ -197,6 +219,264 @@ class PatientProcedures extends BasePatientComponent
         $this->getFilters();
     }
 
+    public function openProcedureView(string $procedureUuid): void
+    {
+        $procedure = $this->findProcedureForAction($procedureUuid);
+
+        if (!$procedure) {
+            return;
+        }
+
+        if ($this->prepersonId !== null) {
+            $this->redirectRoute(
+                'prepersons.procedure.view',
+                [legalEntity(), 'preperson' => $this->prepersonId, 'procedureId' => $procedure->id],
+                navigate: true
+            );
+
+            return;
+        }
+
+        $this->redirectRoute(
+            'procedure.view',
+            [legalEntity(), 'person' => $this->personId, 'procedureId' => $procedure->id],
+            navigate: true
+        );
+    }
+
+    public function openProcedureCancellation(string $procedureUuid): void
+    {
+        $procedure = $this->findProcedureForAction($procedureUuid);
+
+        if (!$procedure) {
+            return;
+        }
+
+        if ($message = $this->getCancellationForbiddenMessage($procedure)) {
+            Session::flash('error', $message);
+
+            return;
+        }
+
+        $this->resetCancellationState();
+
+        $this->procedureId = $procedure->id;
+        $this->procedureUuid = $procedure->uuid;
+        $this->showCancellationModal = true;
+    }
+
+    public function closeProcedureCancellationModal(): void
+    {
+        $this->resetCancellationState();
+    }
+
+    public function proceedToSignature(): void
+    {
+        if ($this->procedureUuid === null) {
+            Session::flash('error', __('patients.messages.procedure_not_found'));
+
+            return;
+        }
+
+        $procedure = Repository::procedure()->findByUuid($this->procedureUuid);
+
+        if ($message = $this->getCancellationForbiddenMessage($procedure)) {
+            $this->resetCancellationState();
+            Session::flash('error', $message);
+
+            return;
+        }
+
+        $this->form->explanatoryLetter = filled($this->form->explanatoryLetter)
+            ? $this->form->explanatoryLetter
+            : null;
+
+        try {
+            $this->form->validate($this->form->cancellationRules());
+        } catch (ValidationException $exception) {
+            $this->showCancellationModal = true;
+            $this->showSignatureModal = false;
+
+            Session::flash('error', $exception->validator->errors()->first());
+            $this->setErrorBag($exception->validator->getMessageBag());
+
+            return;
+        }
+
+        $this->showCancellationModal = false;
+        $this->showSignatureModal = true;
+    }
+
+    public function cancelSelectedProcedure(): void
+    {
+        if ($this->procedureUuid === null) {
+            Session::flash('error', __('patients.messages.procedure_not_found'));
+
+            return;
+        }
+
+        try {
+            $validated = $this->form->validate([
+                ...$this->form->cancellationRules(),
+                ...$this->form->signingRules(),
+            ]);
+        } catch (ValidationException $exception) {
+            Session::flash('error', $exception->validator->errors()->first());
+            $this->setErrorBag($exception->validator->getMessageBag());
+
+            return;
+        }
+
+        $procedure = Repository::procedure()->findByUuid($this->procedureUuid);
+
+        if ($message = $this->getCancellationForbiddenMessage($procedure)) {
+            $this->showSignatureModal = false;
+            Session::flash('error', $message);
+
+            return;
+        }
+
+        $explanatoryLetter = $validated['explanatoryLetter'] ?? null;
+
+        try {
+            $signedPayload = $this->buildCancellationPackage(
+                $procedure,
+                $validated['statusReason'],
+                $explanatoryLetter
+            );
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle(
+                'Error while building procedure cancellation package',
+                __('patients.messages.procedure_cancel_package_prepare_error')
+            );
+
+            return;
+        }
+
+        try {
+            $signedContent = new CipherRequest()->signData(
+                $signedPayload,
+                $validated['knedp'],
+                $validated['keyContainerUpload'],
+                $validated['password'],
+                Auth::user()->party->taxId
+            );
+        } catch (CipherException|CipherConnectionException $exception) {
+            $exception->handle(
+                'Error while signing procedure cancellation package',
+                __('patients.messages.procedure_cancel_package_sign_error')
+            );
+
+            return;
+        } finally {
+            $this->form->resetSigningFields();
+        }
+
+        $statusReason = FhirResource::make()
+            ->coding('eHealth/procedure_status_reasons', $validated['statusReason'])
+            ->toCodeableConcept(
+                data_get($this->dictionaries, 'eHealth/procedure_status_reasons.' . $validated['statusReason'], '')
+            );
+
+        try {
+            EHealth::procedure()->cancel($this->uuid, $procedure->uuid, [
+                'signed_data' => $signedContent->getBase64Data(),
+                'signed_data_encoding' => 'base64',
+            ]);
+
+            Repository::procedure()->markAsEnteredInError(
+                $procedure,
+                $statusReason,
+                $explanatoryLetter
+            );
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle(
+                'Error while sending procedure cancellation package',
+                __('patients.messages.procedure_cancel_package_request_error')
+            );
+
+            return;
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors(
+                $exception,
+                'Error while saving procedure cancellation status',
+                __('patients.messages.procedure_cancel_package_save_error')
+            );
+
+            return;
+        }
+
+        $this->resetCancellationState();
+        $this->fromDb = true;
+        $this->getProceduresFromDb();
+
+        Session::flash('success', __('patients.messages.procedure_cancel_request_sent'));
+    }
+
+    private function findProcedureForAction(string $procedureUuid): ?Procedure
+    {
+        if (blank($procedureUuid)) {
+            Session::flash('error', __('patients.messages.procedure_not_found'));
+
+            return null;
+        }
+
+        try {
+            return Repository::procedure()->findByUuid($procedureUuid);
+        } catch (ModelNotFoundException) {
+            Session::flash('error', __('patients.messages.procedure_not_found_in_db'));
+
+            return null;
+        }
+    }
+
+    private function getCancellationForbiddenMessage(Procedure $procedure): ?string
+    {
+        if ($procedure->status === ProcedureStatus::ENTERED_IN_ERROR->value) {
+            return __('patients.messages.procedure_already_entered_in_error');
+        }
+
+        if ($procedure->encounter_id !== null) {
+            return __('patients.messages.procedure_with_encounter_cannot_be_cancelled_separately');
+        }
+
+        if (Auth::user()?->cannot('cancel', $procedure)) {
+            return __('patients.policy.cancel_procedure');
+        }
+
+        return null;
+    }
+
+    private function buildCancellationPackage(
+        Procedure $procedure,
+        string $statusReason,
+        ?string $explanatoryLetter
+    ): array {
+        $procedureRaw = EHealth::procedure()
+            ->getById($this->uuid, $procedure->uuid)
+            ->getData();
+
+        return Fhir::procedure()->toCancellationPackage(
+            $procedureRaw,
+            $statusReason,
+            $explanatoryLetter,
+            data_get($this->dictionaries, 'eHealth/procedure_status_reasons.' . $statusReason)
+        );
+    }
+
+    private function resetCancellationState(): void
+    {
+        $this->showCancellationModal = false;
+        $this->showSignatureModal = false;
+        $this->procedureUuid = null;
+        $this->procedureId = null;
+        $this->form->resetCancellationFields();
+        $this->form->resetSigningFields();
+
+        $this->resetErrorBag();
+        $this->resetValidation();
+    }
+
     public function getProcedures(array $params = []): void
     {
         try {
@@ -233,6 +513,7 @@ class PatientProcedures extends BasePatientComponent
                 ->map(function (Procedure $procedure) {
                     $data = Arr::toCamelCase($procedure->toArray());
                     $data['id'] = $procedure->id;
+                    $data['createdAt'] = $procedure->created_at?->toDateTimeString();
 
                     return $data;
                 })

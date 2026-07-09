@@ -489,30 +489,27 @@
                                          :id="$id('dropdown-button')"
                                          class="absolute right-0 mt-2 w-56 rounded-md bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-lg z-50 py-1"
                                     >
-                                        @if(!empty(data_get($procedure, 'id')))
-                                            <a  href="{{ $prepersonId
-                                                ? route('prepersons.procedure.view', [legalEntity(), 'preperson' => $prepersonId, 'procedureId' => data_get($procedure, 'id')])
-                                                : route('procedure.view', [legalEntity(), 'person' => $personId, 'procedureId' => data_get($procedure, 'id')]) }}"
-                                                wire:navigate
+                                        <button type="button"
+                                                @click="close($refs.button)"
+                                                wire:click="openProcedureView('{{ data_get($procedure, 'uuid') }}')"
+                                                wire:loading.attr="disabled"
+                                                wire:target="openProcedureView"
                                                 class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-                                            >
-                                                @icon('eye', 'w-5 h-5 text-gray-500')
-                                                {{ __('patients.view_details') }}
-                                            </a>
-                                        @endif
-
-                                        @if(!empty(data_get($procedure, 'id')))
-                                            <button type="button"
-                                                    @click="close($refs.button)"
-                                                    wire:click="openDiagnosticReportCancellation({{ data_get($procedure, 'id') }})"
-                                                    wire:loading.attr="disabled"
-                                                    wire:target="openDiagnosticReportCancellation({{ data_get($procedure, 'id') }})"
-                                                    class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-                                            >
-                                                @icon('alert-circle', 'w-5 h-5 text-gray-500')
-                                                {{ __('patients.status.entered_in_error') }}
-                                            </button>
-                                        @endif
+                                        >
+                                            @icon('eye', 'w-5 h-5 text-gray-500')
+                                            {{ __('patients.view_details') }}
+                                        </button>
+                                        
+                                        <button type="button"
+                                                @click="close($refs.button)"
+                                                wire:click="openProcedureCancellation('{{ data_get($procedure, 'uuid') }}')"
+                                                wire:loading.attr="disabled"
+                                                wire:target="openProcedureCancellation"
+                                                class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                                        >
+                                            @icon('alert-circle', 'w-5 h-5 text-gray-500')
+                                            {{ __('patients.status.entered_in_error') }}
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -570,7 +567,11 @@
                                             <div
                                                 class="record-inner-label text-[10px] uppercase">{{ __('patients.created') }}</div>
                                             <div class="record-inner-value text-[14px] font-semibold break-words">
-                                                {{ optional(\Carbon\Carbon::make(data_get($procedure, 'ehealthInsertedAt')))->format('d.m.Y H:i') ?? '-' }}
+                                                @php
+                                                    $createdAt = data_get($procedure, 'ehealthInsertedAt') ?: data_get($procedure, 'createdAt');
+                                                @endphp
+
+                                                {{ $createdAt ? optional(\Carbon\Carbon::make($createdAt))->format('d.m.Y H:i') : '-' }}
                                             </div>
                                         </div>
                                         <div class="min-w-0">
