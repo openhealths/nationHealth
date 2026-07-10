@@ -9,7 +9,6 @@ use App\Core\Arr;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
-use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Models\CarePlan;
 use App\Models\EhealthJob;
 use App\Models\EhealthLink;
@@ -46,6 +45,13 @@ class CarePlanCreate extends BasePatientComponent
 
     /** EhealthLink id being polled (null when not polling). */
     public ?int $pollingLinkId = null;
+
+    /**
+     * The authentication_method_current returned by eHealth for the pending approval.
+     * Null when ESOZ has no declaration on file (sandbox behaviour) — the UI shows a
+     * dedicated notice instructing testers to use code 1234.
+     */
+    public ?array $currentAuthMethod = null;
 
     public CarePlanForm $form;
 
@@ -389,7 +395,7 @@ class CarePlanCreate extends BasePatientComponent
         }
 
         try {
-            $this->authMethods = EHealth::person()->getAuthMethods($this->uuid)->getData();
+            $this->authMethods = EHealth::person()->getAuthMethods($this->patientUuid)->getData();
             $this->showMethodSelectionModal = true;
         } catch (\Exception $e) {
             Log::error('CarePlanCreate: failed to load auth methods: ' . $e->getMessage());
@@ -406,6 +412,20 @@ class CarePlanCreate extends BasePatientComponent
     protected function createApproval(string $methodUuid): void
     {
         try {
+            // Resolve the employee UUID that will be granted access.
+            // Priority: explicitly selected doctor on the form → authenticated user's DOCTOR/SPECIALIST employee.
+            // If neither resolves, skip approval creation and instruct the user to create it manually.
+            $employeeUuid = (!empty($this->form->doctor) ? $this->form->doctor : null)
+                ?? Auth::user()?->getCarePlanWriterEmployee()?->uuid;
+
+            if (!$employeeUuid) {
+                $carePlan = CarePlan::where('uuid', $this->carePlanUuid)->first();
+                session()->flash('info', 'Не вдалося визначити лікаря для створення дозволу. Перейдіть на вкладку "Дозволи" та створіть дозвіл вручну.');
+                $this->redirectRoute('care-plans.show', [legalEntity(), $carePlan?->id ?? $this->carePlanUuid], navigate: true);
+
+                return;
+            }
+
             $payload = [
                 'resources' => [
                     [
@@ -422,14 +442,14 @@ class CarePlanCreate extends BasePatientComponent
                         'type' => [
                             'coding' => [['system' => 'eHealth/resources', 'code' => 'employee']],
                         ],
-                        'value' => Auth::user()?->getCarePlanWriterEmployee()?->uuid,
+                        'value' => $employeeUuid,
                     ],
                 ],
                 'access_level' => 'write',
                 'authorize_with' => $methodUuid ?: null,
             ];
 
-            $response = EHealth::approval()->createApproval($this->uuid, $payload);
+            $response = EHealth::approval()->createApproval($this->patientUuid, $payload);
             $responseData = $response->getData();
 
             if (!in_array($response->getStatusCode(), [200, 201, 202], true)) {
@@ -458,8 +478,20 @@ class CarePlanCreate extends BasePatientComponent
                     $this->approvalId = $approvalUuid;
                     $this->pollingLinkId = $link->id;
                     $this->isPolling = true;
-
-                    RemoteEHealthLinksProcessing::dispatch($link);
+                    $token = session()->get(config('ehealth.api.oauth.bearer_token'));
+                    \Illuminate\Support\Facades\Bus::batch([
+                        new \App\Jobs\RemoteEHealthLinksProcessing(
+                            eHealthLink: $link,
+                            legalEntity: legalEntity(),
+                            standalone: true
+                        )
+                    ])
+                        ->withOption('legal_entity_id', legalEntity()->id)
+                        ->withOption('token', \Illuminate\Support\Facades\Crypt::encryptString($token))
+                        ->withOption('user', \Illuminate\Support\Facades\Auth::user())
+                        ->name(\App\Jobs\RemoteEHealthLinksProcessing::BATCH_NAME)
+                        ->onQueue('sync')
+                        ->dispatch();
 
                     return;
                 }
@@ -526,6 +558,11 @@ class CarePlanCreate extends BasePatientComponent
 
             if ($realApprovalId) {
                 if ($link->linkable && $link->linkable instanceof \App\Models\MedicalEvents\Sql\Approval) {
+                    Log::info('CarePlanCreate: swapping provisional UUID to real ESOZ approval UUID', [
+                        'old_uuid' => $link->linkable->uuid,
+                        'new_uuid' => $realApprovalId,
+                        'linkable_id' => $link->linkable->id,
+                    ]);
                     $link->linkable->update(['uuid' => $realApprovalId]);
                 }
                 $this->approvalId = $realApprovalId;
@@ -543,7 +580,12 @@ class CarePlanCreate extends BasePatientComponent
                 ?? $jobResult['urgent']['authentication_method_current']
                 ?? null;
 
-            if (!$isVerified || (isset($authMethod['type']) && $authMethod['type'] === 'OTP')) {
+            // Always open the OTP modal when the approval is not yet verified,
+            // regardless of whether authentication_method_current is set.
+            // When it is null (no declaration on file in sandbox), the modal
+            // displays a dedicated notice telling testers to use code 1234.
+            if (!$isVerified) {
+                $this->currentAuthMethod = $authMethod;
                 $this->openAuthModal();
             } else {
                 Session::flash('flash_message', 'План лікування успішно активовано.');
@@ -672,7 +714,7 @@ class CarePlanCreate extends BasePatientComponent
                                 'condition_uuid' => $conditionUuid
                             ]);
                             try {
-                                $conditionData = EHealth::condition()->getById($this->uuid, $conditionUuid)->getData();
+                                $conditionData = EHealth::condition()->getById($this->patientUuid, $conditionUuid)->getData();
                                 \App\Repositories\MedicalEvents\Repository::condition()->store([Arr::toCamelCase($conditionData)], $this->personId);
                                 $actualCondition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $conditionUuid)->with('code.coding')->first();
                             } catch (\Exception $e) {
@@ -723,7 +765,7 @@ class CarePlanCreate extends BasePatientComponent
         $this->validate($this->approvalVerificationRules());
 
         try {
-            $response = EHealth::approval()->verify($this->uuid, $this->approvalId, [
+            $response = EHealth::approval()->verify($this->patientUuid, $this->approvalId, [
                 'code' => (int) $this->verificationCode,
             ]);
 
@@ -746,7 +788,7 @@ class CarePlanCreate extends BasePatientComponent
         }
 
         try {
-            EHealth::approval()->resendSms($this->uuid, $this->approvalId);
+            EHealth::approval()->resendSms($this->patientUuid, $this->approvalId);
             $this->smsResent = true;
             session()->flash('success', 'SMS надіслано повторно');
         } catch (\Exception $e) {
@@ -1040,6 +1082,7 @@ class CarePlanCreate extends BasePatientComponent
     protected function initializeComponent(): void
     {
         // Handled by BasePatientComponent for id, uuid, patientFullName
+        $this->patientUuid = $this->uuid;
     }
 
     /**

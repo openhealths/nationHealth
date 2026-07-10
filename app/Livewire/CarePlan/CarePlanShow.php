@@ -205,6 +205,8 @@ class CarePlanShow extends Component
         if (is_numeric($editActivityId)) {
             $this->editActivity((int) $editActivityId, app(CarePlanActivityRepository::class));
         }
+
+        $this->activityForm['scheduled_period_end'] = now()->addDays(10)->format('d.m.Y');
     }
 
     protected function rulesForSigning(): array
@@ -263,7 +265,7 @@ class CarePlanShow extends Component
             'goal' => '',
             'description' => '',
             'scheduled_period_start' => now()->format('d.m.Y'),
-            'scheduled_period_end' => '',
+            'scheduled_period_end' => now()->addDays(10)->format('d.m.Y'),
             'product_reference' => '',
             'product_codeable_concept' => '',
         ];
@@ -1624,6 +1626,10 @@ class CarePlanShow extends Component
                 ? $exception->getTranslatedMessage()
                 : __('care-plan.ehealth_error_prefix') . $exception->getMessage();
             Session::flash('error', $msg);
+            $this->showSignatureModal = false;
+        } catch (\RuntimeException $exception) {
+            Log::error('CarePlanActivity: signature error: ' . $exception->getMessage());
+            Session::flash('error', $exception->getMessage());
             $this->showSignatureModal = false;
         } catch (\Throwable $exception) {
             Log::error('CarePlanActivity: unexpected error: ' . $exception->getMessage(), [
