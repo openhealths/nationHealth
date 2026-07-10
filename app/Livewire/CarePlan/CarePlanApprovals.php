@@ -50,6 +50,13 @@ class CarePlanApprovals extends Component
     /** EhealthLink id being polled (null when not polling). */
     public ?int $pollingLinkId = null;
 
+    /**
+     * The authentication_method_current returned by eHealth for the pending approval.
+     * Null when ESOZ has no declaration on file (sandbox behaviour) — the UI shows a
+     * dedicated notice instructing testers to use code 1234.
+     */
+    public ?array $currentAuthMethod = null;
+
     public ?string $selectedAuthMethodUuid = null;
     public array $authMethods = [];
 
@@ -68,8 +75,10 @@ class CarePlanApprovals extends Component
         $this->patientUuid = $carePlan->person?->uuid ?? '';
         $this->fetchApprovals();
 
-        // Load active employees for the dropdown, filtered by this care plan's legal entity.
-        $legalEntityId = $carePlan->legalEntity?->id ?? $legalEntity->id ?? null;
+        // Load active employees for the dropdown, filtered by the current active legal entity.
+        // We must use the active legal entity (not the care plan's owner), because eHealth validates
+        // that the granted employee belongs to the requesting clinic.
+        $legalEntityId = legalEntity()->id;
         if ($legalEntityId) {
             $this->employees = \App\Models\Employee\Employee::where('legal_entity_id', $legalEntityId)
                 ->where('status', 'APPROVED')
@@ -149,6 +158,9 @@ class CarePlanApprovals extends Component
         try {
             $carePlan = CarePlan::findOrFail($this->carePlanId);
 
+            $isSameLegalEntity = ($carePlan->legal_entity_id === legalEntity()->id);
+            $accessLevel = $isSameLegalEntity ? 'write' : 'read';
+
             $payload = [
                 'resources' => [
                     [
@@ -168,7 +180,7 @@ class CarePlanApprovals extends Component
                         'value' => $this->newApproval['employee_uuid'],
                     ],
                 ],
-                'access_level' => 'write',
+                'access_level' => $accessLevel,
                 'authorize_with' => $this->selectedAuthMethodUuid ?: null,
             ];
 
@@ -199,7 +211,20 @@ class CarePlanApprovals extends Component
                     $this->approvalId = $localApproval->uuid;
                     $this->isPolling = true;
 
-                    RemoteEHealthLinksProcessing::dispatch($link);
+                    $token = session()->get(config('ehealth.api.oauth.bearer_token'));
+                    \Illuminate\Support\Facades\Bus::batch([
+                        new \App\Jobs\RemoteEHealthLinksProcessing(
+                            eHealthLink: $link,
+                            legalEntity: legalEntity(),
+                            standalone: true
+                        )
+                    ])
+                        ->withOption('legal_entity_id', legalEntity()->id)
+                        ->withOption('token', \Illuminate\Support\Facades\Crypt::encryptString($token))
+                        ->withOption('user', \Illuminate\Support\Facades\Auth::user())
+                        ->name(\App\Jobs\RemoteEHealthLinksProcessing::BATCH_NAME)
+                        ->onQueue('sync')
+                        ->dispatch();
 
                     Session::flash('info', __('care-plan.approval_processing'));
 
@@ -265,6 +290,11 @@ class CarePlanApprovals extends Component
 
             if ($realApprovalId) {
                 if ($link->linkable && $link->linkable instanceof \App\Models\MedicalEvents\Sql\Approval) {
+                    Log::info('CarePlanApprovals: swapping provisional UUID to real ESOZ approval UUID', [
+                        'old_uuid' => $link->linkable->uuid,
+                        'new_uuid' => $realApprovalId,
+                        'linkable_id' => $link->linkable->id,
+                    ]);
                     $link->linkable->update(['uuid' => $realApprovalId]);
                 }
                 $this->approvalId = $realApprovalId;
@@ -283,7 +313,12 @@ class CarePlanApprovals extends Component
                 ?? $jobResult['urgent']['authentication_method_current']
                 ?? null;
 
-            if (!$isVerified || (isset($authMethod['type']) && $authMethod['type'] === 'OTP')) {
+            // Always open the OTP modal when the approval is not yet verified,
+            // regardless of whether authentication_method_current is set.
+            // When it is null (no declaration on file in sandbox), the modal
+            // displays a dedicated notice telling testers to use code 1234.
+            if (!$isVerified) {
+                $this->currentAuthMethod = $authMethod;
                 $this->openAuthModal();
             } else {
                 Session::flash('success', __('care-plan.approval_created'));
@@ -320,6 +355,12 @@ class CarePlanApprovals extends Component
             Session::flash('error', $this->errorMessage);
         }
         // PROCESSING: do nothing — poll will fire again in 2 s
+    }
+
+    public function verifyExistingApproval(string $approvalUuid): void
+    {
+        $this->approvalId = $approvalUuid;
+        $this->openAuthModal();
     }
 
     public function verify(): void

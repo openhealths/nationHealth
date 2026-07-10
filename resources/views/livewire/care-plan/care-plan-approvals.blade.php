@@ -59,6 +59,12 @@
                                                 class="text-red-500 hover:text-red-700">
                                             @icon('close-outline', 'w-4 h-4')
                                         </button>
+                                    @elseif(in_array(($approval['status'] ?? ''), ['pending', 'NEW']))
+                                        <button type="button"
+                                                wire:click="verifyExistingApproval('{{ $approval['uuid'] }}')"
+                                                class="btn btn-sm btn-primary text-xs py-1 px-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition">
+                                            Підтвердити
+                                        </button>
                                     @endif
                                 </td>
                             </tr>
