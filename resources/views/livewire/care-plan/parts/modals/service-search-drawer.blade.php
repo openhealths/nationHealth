@@ -42,7 +42,7 @@
             <input type="text"
                    class="input peer ps-10 w-full"
                    placeholder="Киснева терапія"
-                   wire:model.live.debounce.400ms="searchQuery"
+                   wire:model="searchQuery"
                    wire:keydown.enter="searchServices"
             />
         </div>

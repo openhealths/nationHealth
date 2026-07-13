@@ -25,6 +25,8 @@ use Throwable;
 
 class EncounterEdit extends EncounterComponent
 {
+    use \App\Traits\SubmitsEHealthEncounter;
+
     #[Locked]
     public int $encounterId;
 
@@ -177,13 +179,47 @@ class EncounterEdit extends EncounterComponent
             ]);
 
             logger()->debug('Job ID to further debug', $resp->getData());
+            $encounterUuid = $formattedData['encounter']['id'];
+
+            // Call trait helper
+            $this->waitForEncounterJobAndSync(
+                $resp->getData(),
+                $this->patientUuid,
+                $encounterUuid,
+                $this->patient()
+            );
+
+            Session::flash('success', 'Взаємодію успішно підписано та надіслано до ЕСОЗ.');
+            $this->showSignatureModal = false;
+
+            if ($this->prepersonId !== null) {
+                $this->redirectRoute(
+                    'prepersons.encounter.edit',
+                    [legalEntity(), 'preperson' => $this->prepersonId, 'encounterId' => $this->encounterId],
+                    navigate: true
+                );
+            } else {
+                $this->redirectRoute(
+                    'encounter.edit',
+                    [legalEntity(), 'person' => $this->personId, 'encounterId' => $this->encounterId],
+                    navigate: true
+                );
+            }
+
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while submitting encounter');
-
-            return;
+            $this->showSignatureModal = false;
+        } catch (\RuntimeException $exception) {
+            logger()->error('Encounter submission runtime error: ' . $exception->getMessage());
+            Session::flash('error', $exception->getMessage());
+            $this->showSignatureModal = false;
+        } catch (\Throwable $exception) {
+            logger()->error('Encounter submission unexpected error: ' . $exception->getMessage(), [
+                'trace' => $exception->getTraceAsString(),
+            ]);
+            Session::flash('error', __('patients.messages.unexpected_error') ?? 'Виникла непередбачувана помилка.');
+            $this->showSignatureModal = false;
         }
-
-        $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
     }
 
     protected function loadConditions(array $encounter): void

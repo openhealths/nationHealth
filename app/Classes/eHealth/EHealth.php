@@ -46,6 +46,9 @@ use App\Classes\eHealth\Api\Preperson;
 use App\Classes\eHealth\Api\RuleEngineRules;
 use App\Classes\eHealth\Api\Service;
 use App\Classes\eHealth\Api\Verification;
+use App\Classes\eHealth\Api\Patient\MedicationRequest;
+use App\Classes\eHealth\Api\Patient\ServiceRequest;
+use App\Classes\eHealth\Api\Patient\DeviceRequest;
 
 final class EHealth
 {
@@ -258,5 +261,20 @@ final class EHealth
     public static function diagnosticReport(): DiagnosticReport
     {
         return app(DiagnosticReport::class);
+    }
+
+    public static function medicationRequest(): MedicationRequest
+    {
+        return app(MedicationRequest::class);
+    }
+
+    public static function serviceRequest(): ServiceRequest
+    {
+        return app(ServiceRequest::class);
+    }
+
+    public static function deviceRequest(): DeviceRequest
+    {
+        return app(DeviceRequest::class);
     }
 }

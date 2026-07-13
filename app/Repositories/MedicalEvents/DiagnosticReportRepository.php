@@ -112,28 +112,39 @@ class DiagnosticReportRepository extends BaseRepository
                     Repository::codeableConcept()->attach($division, $datum['division']);
                 }
 
-                $diagnosticReport = $this->model->create([
-                    'uuid' => $datum['uuid'] ?? $datum['id'],
-                    $ownerColumn => $ownerId,
-                    'status' => $datum['status'],
-                    'code_id' => $code->id,
-                    'issued' => $datum['issued'],
-                    'conclusion' => $datum['conclusion'] ?? null,
-                    'explanatory_letter' => $datum['explanatoryLetter'] ?? null,
-                    'conclusion_code_id' => isset($datum['conclusionCode'])
-                        ? Repository::codeableConcept()->store($datum['conclusionCode'])->id
-                        : null,
-                    'recorded_by_id' => $recordedBy->id,
-                    'encounter_id' => $encounter->id ?? null,
-                    'primary_source' => $datum['primarySource'],
-                    'managing_organization_id' => $managingOrganization->id,
-                    'division_id' => $division?->id,
-                    'report_origin_id' => isset($datum['reportOrigin'])
-                        ? Repository::codeableConcept()->store($datum['reportOrigin'])->id
-                        : null,
-                    'ehealth_inserted_at' => now(),
-                    'ehealth_updated_at' => now(),
-                ]);
+                $diagnosticReport = $this->model->updateOrCreate(
+                    ['uuid' => $datum['uuid'] ?? $datum['id']],
+                    [
+                        $ownerColumn => $ownerId,
+                        'status' => $datum['status'],
+                        'code_id' => $code->id,
+                        'issued' => $datum['issued'],
+                        'conclusion' => $datum['conclusion'] ?? null,
+                        'explanatory_letter' => $datum['explanatoryLetter'] ?? null,
+                        'conclusion_code_id' => isset($datum['conclusionCode'])
+                            ? Repository::codeableConcept()->store($datum['conclusionCode'])->id
+                            : null,
+                        'recorded_by_id' => $recordedBy->id,
+                        'encounter_id' => $encounter->id ?? null,
+                        'primary_source' => $datum['primarySource'],
+                        'managing_organization_id' => $managingOrganization->id,
+                        'division_id' => $division?->id,
+                        'report_origin_id' => isset($datum['reportOrigin'])
+                            ? Repository::codeableConcept()->store($datum['reportOrigin'])->id
+                            : null,
+                        'ehealth_inserted_at' => now(),
+                        'ehealth_updated_at' => now(),
+                    ]
+                );
+
+                if (!$diagnosticReport->wasRecentlyCreated) {
+                    $diagnosticReport->paperReferral?->delete();
+                    $diagnosticReport->category()->detach();
+                    $diagnosticReport->effectivePeriod()?->delete();
+                    $diagnosticReport->performer()?->delete();
+                    $diagnosticReport->resultsInterpreter()?->delete();
+                    $diagnosticReport->usedReferences()->detach();
+                }
 
                 if (isset($datum['paperReferral'])) {
                     Repository::paperReferral()->store($datum['paperReferral'], $diagnosticReport);

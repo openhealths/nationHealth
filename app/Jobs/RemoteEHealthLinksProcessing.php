@@ -51,12 +51,13 @@ class RemoteEHealthLinksProcessing extends EHealthJob
     {
         $entity = $this->eHealthLink->entity;
 
-        switch($entity) {
+        switch ($entity) {
             case 'job':
+            case 'approval':
                 $jobUuid = basename($this->eHealthLink->href);
 
                 return EHealth::job()->withToken($token)->getDetails($jobUuid);
-            // TODO: fill the entities below with the correct API calls and data processing logic
+                // TODO: fill the entities below with the correct API calls and data processing logic
             case 'encounter':
                 return null;
             case 'condition':
@@ -102,7 +103,7 @@ class RemoteEHealthLinksProcessing extends EHealthJob
     protected function processResponse(?EHealthResponse $response): void
     {
         if (\is_null($response)) {
-           return;
+            return;
         }
 
         $responseData = $response->getData();
@@ -127,53 +128,53 @@ class RemoteEHealthLinksProcessing extends EHealthJob
 
                     foreach (Arr::get($grantedResource, 'identifier.type.coding', []) as $coding) {
                         switch (Arr::get($coding, 'code', null)) {
-                        case 'person':
-                            $person = Person::where('uuid', $value)->first();
+                            case 'person':
+                                $person = Person::where('uuid', $value)->first();
 
-                            Repository::approval()->sync(modelData: $approvalData, approvableModel: $person, approvalModel: $approval);
-                            break;
-                        case 'encounter':
-                            break;
-                        case 'condition':
-                            break;
-                        case 'observation':
-                            break;
-                        case 'allergy_intolerance':
-                            break;
-                        case 'immunization':
-                            break;
-                        case 'risk_assessment':
-                            break;
-                        case 'device':
-                            break;
-                        case 'medication_statement':
-                            break;
-                        case 'medication_administration':
-                            break;
-                        case 'diagnostic_report':
-                            break;
-                        case 'procedure':
-                            break;
-                        case 'specimen':
-                            break;
-                        case 'device_dispense':
-                            break;
-                        case 'device_association':
-                            break;
-                        case 'detected_issue':
-                            break;
+                                Repository::approval()->sync(modelData: $approvalData, approvableModel: $person, approvalModel: $approval);
+                                break;
+                            case 'encounter':
+                                break;
+                            case 'condition':
+                                break;
+                            case 'observation':
+                                break;
+                            case 'allergy_intolerance':
+                                break;
+                            case 'immunization':
+                                break;
+                            case 'risk_assessment':
+                                break;
+                            case 'device':
+                                break;
+                            case 'medication_statement':
+                                break;
+                            case 'medication_administration':
+                                break;
+                            case 'diagnostic_report':
+                                break;
+                            case 'procedure':
+                                break;
+                            case 'specimen':
+                                break;
+                            case 'device_dispense':
+                                break;
+                            case 'device_association':
+                                break;
+                            case 'detected_issue':
+                                break;
                         }
                     }
                 }
             }
 
             return;
-        } else if($status === 'pending' && (!$statusCode || $statusCode === 202)) {
+        } elseif ($status === 'pending' && (!$statusCode || $statusCode === 202)) {
             // Handle pending status (it means the request is still being processed)
             $this->release(self::TIME_TO_RETRY); // Release the job back to the queue to be retried after specified time
 
             return; // Exit the method to avoid further processing
-        } else if (strtolower($status) === strtolower(JobStatus::FAILED->value)) {
+        } elseif (strtolower($status) === strtolower(JobStatus::FAILED->value)) {
             if ($this->eHealthLink->linkable_type === Approval::class) {
                 $this->eHealthLink->linkable->update(['status' => JobStatus::FAILED->value]);
             }

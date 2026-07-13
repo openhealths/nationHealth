@@ -165,6 +165,7 @@ class CarePlanUpdate extends CarePlanCreate
         $encounter = $this->carePlan->encounter;
         if ($encounter) {
             $this->redirectRoute('encounter.edit', [legalEntity(), $this->personId, $encounter->id], navigate: true);
+
             return;
         }
 
@@ -220,7 +221,7 @@ class CarePlanUpdate extends CarePlanCreate
             // If it is an async job, poll it
             if (isset($responseData['links'][0]['href']) && str_contains($responseData['links'][0]['href'], '/jobs/')) {
                 $jobId = str_replace('/jobs/', '', $responseData['links'][0]['href']);
-                $jobApi = app(\App\Classes\eHealth\Api\Job::class);
+                $jobApi = EHealth::job();
                 $attempts = 0;
                 do {
                     sleep(2);

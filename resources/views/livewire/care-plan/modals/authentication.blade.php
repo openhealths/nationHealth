@@ -40,6 +40,21 @@
                         <p class="text-sm text-gray-500 dark:text-gray-400">
                             Ми надіслали SMS з 4-значним кодом на номер пацієнта. Будь ласка, введіть його нижче.
                         </p>
+                        @if(is_null($currentAuthMethod))
+                            <div class="mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 text-left">
+                                <p class="text-xs text-amber-700 dark:text-amber-300 font-semibold">
+                                    ⚠️ Метод підтвердження не визначено
+                                </p>
+                                <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                    Пацієнт не має активної декларації з цим закладом в ЕСОЗ (типова поведінка тестового середовища). У тестовому середовищі введіть код <strong>1234</strong>.
+                                </p>
+                            </div>
+                        @endif
+                        @if(config('app.env') !== 'production')
+                            <p class="text-xs text-blue-600 dark:text-blue-400 mt-2 font-medium bg-blue-50 dark:bg-blue-900/30 p-2 rounded-lg">
+                                🔧 Режим тестування: Використовуйте тестовий код <strong>1234</strong>
+                            </p>
+                        @endif
                     </div>
 
                     <div class="px-8 py-6">

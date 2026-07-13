@@ -49,10 +49,9 @@
                         <select id="medical_device_program"
                                 name="medical_device_program"
                                 class="input-select peer"
-                                wire:model="selectedProgram"
+                                wire:model.live="selectedProgram"
                         >
-                            <option value="">{{ __('care-plan.medical_guarantees_program') }}</option>
-                            @foreach(($dictionaries['medical_programs'] ?? []) as $id => $name)
+                            @foreach(($dictionaries['medical_programs_device'] ?? $dictionaries['medical_programs'] ?? []) as $id => $name)
                                 <option value="{{ $id }}">{{ $name }}</option>
                             @endforeach
                         </select>
@@ -71,7 +70,7 @@
 
                 <button type="button"
                         class="button-primary"
-                        @click="showMedicalDeviceDrawer = false; showMedicalDeviceSearchDrawer = true"
+                        wire:click="openMedicalDeviceSearch"
                 >
                     {{ __('forms.continue') }}
                 </button>

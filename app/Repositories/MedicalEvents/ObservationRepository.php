@@ -83,31 +83,42 @@ class ObservationRepository extends BaseRepository
                     Repository::codeableConcept()->attach($context, $datum['context']);
                 }
 
-                $observation = $this->model->create([
-                    'uuid' => $datum['uuid'] ?? $datum['id'],
-                    $ownerColumn => $ownerId,
-                    'status' => $datum['status'],
-                    'diagnostic_report_id' => $diagnosticReport?->id,
-                    'code_id' => $code->id,
-                    'effective_date_time' => $datum['effectiveDateTime'] ?? null,
-                    'issued' => $datum['issued'],
-                    'primary_source' => $datum['primarySource'],
-                    'performer_id' => $performer?->id,
-                    'report_origin_id' => isset($datum['reportOrigin'])
-                        ? Repository::codeableConcept()->store($datum['reportOrigin'])->id
-                        : null,
-                    'interpretation_id' => isset($datum['interpretation'])
-                        ? Repository::codeableConcept()->store($datum['interpretation'])->id
-                        : null,
-                    'comment' => $datum['comment'] ?? null,
-                    'body_site_id' => isset($datum['bodySite'])
-                        ? Repository::codeableConcept()->store($datum['bodySite'])->id
-                        : null,
-                    'method_id' => isset($datum['method'])
-                        ? Repository::codeableConcept()->store($datum['method'])->id
-                        : null,
-                    'context_id' => $context?->id
-                ]);
+                $observation = $this->model->updateOrCreate(
+                    ['uuid' => $datum['uuid'] ?? $datum['id']],
+                    [
+                        $ownerColumn => $ownerId,
+                        'status' => $datum['status'],
+                        'diagnostic_report_id' => $diagnosticReport?->id,
+                        'code_id' => $code->id,
+                        'effective_date_time' => $datum['effectiveDateTime'] ?? null,
+                        'issued' => $datum['issued'],
+                        'primary_source' => $datum['primarySource'],
+                        'performer_id' => $performer?->id,
+                        'report_origin_id' => isset($datum['reportOrigin'])
+                            ? Repository::codeableConcept()->store($datum['reportOrigin'])->id
+                            : null,
+                        'interpretation_id' => isset($datum['interpretation'])
+                            ? Repository::codeableConcept()->store($datum['interpretation'])->id
+                            : null,
+                        'comment' => $datum['comment'] ?? null,
+                        'body_site_id' => isset($datum['bodySite'])
+                            ? Repository::codeableConcept()->store($datum['bodySite'])->id
+                            : null,
+                        'method_id' => isset($datum['method'])
+                            ? Repository::codeableConcept()->store($datum['method'])->id
+                            : null,
+                        'context_id' => $context?->id
+                    ]
+                );
+
+                if (!$observation->wasRecentlyCreated) {
+                    $observation->value()?->delete();
+                    $observation->categories()->detach();
+                    foreach ($observation->components as $component) {
+                        $component->value()?->delete();
+                        $component->delete();
+                    }
+                }
 
                 $this->storeValue($datum, $observation);
 
