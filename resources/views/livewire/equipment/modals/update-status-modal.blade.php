@@ -1,11 +1,16 @@
 @use('App\Enums\Equipment\Status')
+@use('App\Enums\Equipment\AvailabilityStatus')
 
-<div x-data="{ show: false, equipmentUuid: null, equipmentName: '', currentStatus: '' }"
+<div x-data="{ show: false, equipmentUuid: null, equipmentName: '', currentStatus: '', currentAvailability: '' }"
      @open-update-status-modal.window="
          equipmentUuid = $event.detail.uuid;
          equipmentName = $event.detail.name;
          currentStatus = $event.detail.status;
+         currentAvailability = $event.detail.availabilityStatus;
+         $wire.set('status', '', false);
+         $wire.set('errorReason', '', false);
          show = true;
+         $wire.loadChildEquipments(equipmentUuid);
     "
      @close-update-status-modal.window="show = false"
 >
@@ -31,6 +36,26 @@
                         {{ __('equipments.update_equipment_status') }} "<span x-text="equipmentName"></span>"
                     </h2>
 
+                    @if (!empty($childEquipments))
+                        <div
+                            class="mb-6 rounded-md border border-yellow-300 bg-yellow-50 p-4 text-left dark:border-yellow-700 dark:bg-yellow-900/30">
+                            <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                                {{ __('equipments.child_equipment_warning') }}
+                            </p>
+                            <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-yellow-800 dark:text-yellow-200">
+                                @foreach ($childEquipments as $childEquipment)
+                                    <li wire:key="child-equipment-{{ $loop->index }}">
+                                        {{ $childEquipment['names'][0]['name'] ?? '' }}
+                                        @if (!empty($childEquipment['inventoryNumber']))
+                                            ({{ __('equipments.inventory_number') }}
+                                            : {{ $childEquipment['inventoryNumber'] }})
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
                     <form @submit.prevent="$wire.updateStatus(equipmentUuid)" wire:key="{{ time() }}">
                         <div class="mb-4 text-left">
                             <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -43,7 +68,10 @@
                             >
                                 <option value="">{{ __('forms.select') }}</option>
 
-                                <template x-if="currentStatus !== '{{ Status::INACTIVE->value }}'">
+                                <template x-if="
+                                    currentStatus !== '{{ Status::INACTIVE->value }}'
+                                    && currentAvailability !== '{{ AvailabilityStatus::AVAILABLE->value }}'
+                                ">
                                     <option value="{{ Status::INACTIVE->value }}">
                                         {{ __('equipments.status.inactive') }}
                                     </option>

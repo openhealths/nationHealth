@@ -27,4 +27,13 @@ enum Status: string
             self::ENTERED_IN_ERROR => __('equipments.status.entered_in_error')
         };
     }
+
+    public function color(): string
+    {
+        return match($this) {
+            self::DRAFT => 'badge-dark',
+            self::ACTIVE => 'badge-green',
+            self::INACTIVE, self::ENTERED_IN_ERROR => 'badge-red'
+        };
+    }
 }

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 return [
     'new' => 'Нове обладнання',
-    'name_medical_product' => 'Назва медичного виробу',
+    'name_medical_product' => 'Назва медичного обладнання',
     'name_type' => 'Тип назви',
-    'type_medical_device' => 'Тип медичного виробу',
+    'type_medical_device' => 'Тип медичного обладнання',
     'serial_number' => 'Серійний №',
     'id' => 'eHealth ID',
     'recorder' => 'Співробітник, що вносить дані',
@@ -18,7 +18,6 @@ return [
     'expiration_date' => 'Термін експлуатації надавачем',
     'model_number' => '№ моделі',
     'lot_number' => '№ закупівлі',
-    'notes_and_comments' => 'Примітки та коментарі',
     'label' => 'Обладнання',
     'add' => 'Додати обладнання',
     'search' => 'Пошук обладнання',

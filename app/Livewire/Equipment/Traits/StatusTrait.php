@@ -29,7 +29,7 @@ trait StatusTrait
     public string $availabilityStatus;
 
     /**
-     * Child equipment registered with the parent whose availability status is being changed.
+     * Child equipment registered with the parent whose status or availability status is being changed.
      *
      * @var array
      */

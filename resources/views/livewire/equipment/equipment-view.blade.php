@@ -100,7 +100,7 @@
 
                 <div class="form-group group">
                     <input type="text"
-                           value="{{ $form->errorReason ? ($this->dictionaries['device_definition_classification_type'][$form->errorReason] ?? $form->errorReason) : '' }}"
+                           value="{{ $form->errorReason ? ($this->dictionaries['equipment_status_reasons'][$form->errorReason] ?? $form->errorReason) : '' }}"
                            name="errorReason"
                            id="errorReason"
                            placeholder=" "
@@ -177,7 +177,8 @@
                                 @click.prevent="$dispatch('open-update-status-modal', {
                                     uuid: '{{ $equipment->uuid }}',
                                     name: '{{ $equipment->names->first()->name }}',
-                                    status: '{{ $equipment->status }}'
+                                    status: '{{ $equipment->status }}',
+                                    availabilityStatus: '{{ $equipment->availabilityStatus }}'
                                 })"
                                 class="button-primary"
                         >

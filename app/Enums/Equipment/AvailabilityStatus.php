@@ -27,4 +27,12 @@ enum AvailabilityStatus: string
             self::LOST => __('equipments.availability_status.lost')
         };
     }
+
+    public function color(): string
+    {
+        return match($this) {
+            self::AVAILABLE => 'badge-green',
+            self::DAMAGED, self::DESTROYED, self::LOST => 'badge-red'
+        };
+    }
 }
