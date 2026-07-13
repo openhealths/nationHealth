@@ -14,7 +14,7 @@ class EmployeePolicy
 {
     public function viewAny(User $user): Response
     {
-        return $user->can('employee:read')
+        return ($user->can('employee:read') || $user->hasAllowedRole(Role::ADMIN))
             ? Response::allow()
             : Response::deny(__('employees.policy.view_any_denied'));
     }
@@ -25,7 +25,7 @@ class EmployeePolicy
             return Response::denyWithStatus(404);
         }
 
-        return $user->can('employee:details')
+        return ($user->can('employee:details') || $user->hasAllowedRole(Role::ADMIN))
             ? Response::allow()
             : Response::deny(__('employees.policy.view_denied'));
     }
@@ -43,7 +43,7 @@ class EmployeePolicy
         }
 
         // 3. Check if there is a connection with the user (user_id)
-        if (is_null($employee->party?->users()->first()?->id)) {
+        if (is_null($employee->party?->users()->first()?->id) && !$user->hasAllowedRole([Role::ADMIN, Role::HR])) {
             return Response::deny(__('employees.policy.no_user_linked'));
         }
 

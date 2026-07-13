@@ -231,7 +231,7 @@ abstract class EmployeeComponent extends Component
     protected function actualizePendingRequests(Employee $employee, string $token): void
     {
         $pendingRequests = EmployeeRequest::where('employee_id', $employee->id)
-            ->where('status', RequestStatus::SIGNED)
+            ->whereIn('status', [RequestStatus::NEW, RequestStatus::SIGNED])
             ->whereNull('applied_at')
             ->get();
 

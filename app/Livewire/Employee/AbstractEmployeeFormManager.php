@@ -239,7 +239,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
                 'uuid' => $uuid,
                 'legal_entity_uuid' => $legalEntity->uuid,
                 'inserted_at' => Carbon::parse($insertedAt)->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
-                'status' => RequestStatus::SIGNED,
+                'status' => RequestStatus::NEW,
                 'sync_status' => JobStatus::PARTIAL,
                 'division_id' => $request->division_id,
                 'division_uuid' => Arr::get($eHealthResponse, 'ehealth_response.data.division_id', null),
@@ -528,7 +528,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $this->form->documents,
             fn ($document) => !empty($document['number']) && in_array(
                 $document['type'],
-                ['PASSPORT', 'NATIONAL_ID', 'REFUGEE_CERTIFICATE']
+                ['PASSPORT', 'NATIONAL_ID', 'REFUGEE_CERTIFICATE', 'PERMANENT_RESIDENCE_PERMIT']
             )
         );
 
@@ -559,7 +559,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         }
 
         foreach ($this->form->documents as $document) {
-            if (!empty($document['number']) && in_array($document['type'], ['PASSPORT', 'NATIONAL_ID', 'REFUGEE_CERTIFICATE'])) {
+            if (!empty($document['number']) && in_array($document['type'], ['PASSPORT', 'NATIONAL_ID', 'REFUGEE_CERTIFICATE', 'PERMANENT_RESIDENCE_PERMIT'])) {
                 $this->form->party['taxId'] = $document['number'];
 
                 return;
