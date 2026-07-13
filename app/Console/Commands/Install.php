@@ -11,12 +11,17 @@ use App\Console\Commands\MigrationsCommand;
 
 class Install extends MigrationsCommand
 {
+    protected bool $showHelpWhenEmpty = true;
+
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'install {--clear : Clear the cache before installation} {--wipe : Wipe the database before installation} {--key : Generate application key}';
+    protected $signature = 'install
+        {--clear : Clear the cache before installation}
+        {--wipe : Wipe the database before installation}
+        {--key : Generate application key}';
 
     /**
      * The console command description.
