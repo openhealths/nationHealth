@@ -8,7 +8,7 @@ use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
-use App\Models\Employee;
+use App\Models\Employee\Employee;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
