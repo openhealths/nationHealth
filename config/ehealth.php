@@ -459,6 +459,11 @@ return [
     'legal_entity_outpatient_providing_conditions' => ['INPATIENT', 'OUTPATIENT', 'FIELD'],
     'legal_entity_emergency_providing_conditions' => ['FIELD'],
 
+    // Additional license types allowed per legal entity type (LEGAL_ENTITY_<LEGAL_ENTITY_TYPE>_ADDITIONAL_LICENSE_TYPES)
+    // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/17092870145/Legal+Entities+configurable+parameters
+    'legal_entity_outpatient_additional_license_types' => ['PHARMACY_DRUGS'],
+    'legal_entity_pharmacy_additional_license_types' => ['PHARMACY_DRUGS'],
+
     // TBD: values are not published yet.
     // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20233683284/DRAFT+Config+params+Preperson+ENT-057#PREPERSON_HEALTHCARE_SERVICES_SPECIALITY_TYPES
     'preperson_healthcare_services_speciality_types' => [],

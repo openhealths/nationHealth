@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\License\Forms;
 
 use App\Enums\License\Type;
-use App\Models\LegalEntity;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Livewire\Form;
@@ -36,7 +35,7 @@ class LicenseForm extends Form
      */
     protected function rules(): array
     {
-        $allowedTypes = array_keys($this->getAllowedLicenseTypes());
+        $allowedTypes = array_keys($this->component->licenseTypes);
 
         return [
             'type' => [
@@ -71,25 +70,5 @@ class LicenseForm extends Form
     protected function validationAttributes(): array
     {
         return ['type' => __('licenses.type.label')];
-    }
-
-    /**
-     * Get allowed types based on LEGAL_ENTITY_<LEGAL_ENTITY_TYPE>_ADDITIONAL_LICENSE_TYPES.
-     * https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/17092870145/Legal+Entities+configurable+parameters#Configurable-parameters
-     *
-     * @return array
-     */
-    private function getAllowedLicenseTypes(): array
-    {
-        $licenseTypes = dictionary()->basics()->byName('LICENSE_TYPE')->asCodeDescription()->toArray();
-
-        if (
-            legalEntity()->type->name === LegalEntity::TYPE_OUTPATIENT ||
-            legalEntity()->type->name === LegalEntity::TYPE_PHARMACY
-        ) {
-            return ['PHARMACY_DRUGS' => $licenseTypes['PHARMACY_DRUGS']];
-        }
-
-        return $licenseTypes;
     }
 }

@@ -65,9 +65,10 @@ class LicensePolicy
             return Response::denyWithStatus(404);
         }
 
-        // The license can be created only with the following type of legal entity, based on LEGAL_ENTITY_<LEGAL_ENTITY_TYPE>_ADDITIONAL_LICENSE_TYPES
+        // The license can be created only for legal entity types that have additional license types configured,
+        // based on LEGAL_ENTITY_<LEGAL_ENTITY_TYPE>_ADDITIONAL_LICENSE_TYPES
         // see: https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/17092870145/Legal+Entities+configurable+parameters
-        if (!in_array(legalEntity()->type->name, [LegalEntity::TYPE_OUTPATIENT, LegalEntity::TYPE_PHARMACY], true)) {
+        if (empty(legalEntity()->additionalLicenseTypeCodes())) {
             return Response::denyWithStatus(404);
         }
 

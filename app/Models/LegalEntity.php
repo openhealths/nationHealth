@@ -243,6 +243,17 @@ class LegalEntity extends Model
     }
 
     /**
+     * License type codes allowed as additional licenses for this legal entity type.
+     * Driven by the LEGAL_ENTITY_<LEGAL_ENTITY_TYPE>_ADDITIONAL_LICENSE_TYPES configuration parameter.
+     *
+     * @return array
+     */
+    public function additionalLicenseTypeCodes(): array
+    {
+        return config('ehealth.legal_entity_' . strtolower($this->type->name) . '_additional_license_types', []);
+    }
+
+    /**
      * Scope a query to get all Legal Entities with selected fields
      * Default fields are: id, uuid, edr, legal_entity_type_id
      *
