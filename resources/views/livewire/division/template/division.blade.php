@@ -268,15 +268,13 @@
                                 <div class="form-row-3">
                                     <div class="form-group">
                                         <input type="number"
-                                            step="0.01"
                                             id="longitude"
+                                            required
                                             placeholder=" "
-                                            x-ref="longitude"
                                             class="peer input"
                                             x-bind:disabled="isDisabled"
                                             name="longitude"
                                             wire:model='divisionForm.division.location.longitude'
-                                            x-effect="$refs.longitude.value == 0 ? $refs.longitude.value = null : $refs.longitude.value"
                                         />
                                         <label
                                             for="longitude"
@@ -292,15 +290,13 @@
 
                                     <div class="form-group">
                                         <input id="latitude"
+                                            required
                                             type="number"
-                                            step="0.01"
                                             name="latitude"
                                             placeholder=" "
-                                            x-ref="latitude"
                                             class="peer input"
                                             x-bind:disabled="isDisabled"
                                             wire:model='divisionForm.division.location.latitude'
-                                            x-effect="$refs.latitude.value == 0 ? $refs.latitude.value = null : $refs.latitude.value"
                                         />
 
                                         <label

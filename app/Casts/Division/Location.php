@@ -21,7 +21,7 @@ class Location implements CastsAttributes
             $data = !empty($value) ? json_decode($value,true) : [];
         }
 
-        return empty($data) ? ['latitude' => 0, 'longitude' => 0] : $data;
+        return empty($data) ? ['latitude' => null, 'longitude' => null] : $data;
     }
 
     /**

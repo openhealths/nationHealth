@@ -53,15 +53,15 @@ class DivisionComponent extends Component
      */
     public function hydrate()
     {
-        $this->divisionForm->division['location']['latitude'] =
-            (float) (empty($this->divisionForm->division['location']['latitude'])
-                ? 0
-                : $this->divisionForm->division['location']['latitude']);
+        $lat = $this->divisionForm->division['location']['latitude'] ?? null;
+        $this->divisionForm->division['location']['latitude'] = is_null($lat)
+            ? null
+            : (float) $lat;
 
-        $this->divisionForm->division['location']['longitude'] =
-            (float) (empty($this->divisionForm->division['location']['longitude'])
-                ? 0
-                : $this->divisionForm->division['location']['longitude']);
+        $lng = $this->divisionForm->division['location']['longitude'] ?? null;
+        $this->divisionForm->division['location']['longitude'] = is_null($lng)
+            ? null
+            : (float) $lng;
     }
 
     /**

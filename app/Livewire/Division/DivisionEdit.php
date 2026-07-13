@@ -61,9 +61,9 @@ class DivisionEdit extends DivisionComponent
      */
     public function updatedDivisionFormDivisionLocationLatitude($value)
     {
-        $latitude = (float) (empty($value) ? 0 : $value);
-
-        $this->divisionForm->division['location']['latitude'] = (float) number_format($latitude, 6, '.', '');
+        $this->divisionForm->division['location']['latitude'] = empty($value) && !is_numeric($value)
+            ? null
+            : (float) number_format((float) $value, 6, '.', '');
     }
 
     /**
@@ -78,10 +78,9 @@ class DivisionEdit extends DivisionComponent
      */
     public function updatedDivisionFormDivisionLocationLongitude($value)
     {
-        $longitude = (float) (empty($value) ? 0 : $value);
-
-        $this->divisionForm->division['location']['longitude'] = (float) number_format($longitude, 6, '.', '') ;
-        ;
+        $this->divisionForm->division['location']['longitude'] = empty($value) && !is_numeric($value)
+            ? null
+            : (float) number_format((float) $value, 6, '.', '');
     }
 
     /**

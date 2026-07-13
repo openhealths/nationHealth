@@ -24,8 +24,6 @@ class Division extends Model
 {
     use HasCamelCasing;
 
-    public const float LOCATION_DEFAULT_LATITUDE = 0.0;
-    public const float LOCATION_DEFAULT_LONGITUDE = 0.0;
     public const string WORKING_TIME_DEFAULT_START = '00:00';
     public const string WORKING_TIME_DEFAULT_END = '00:00';
 
@@ -99,8 +97,8 @@ class Division extends Model
     public static function getLocationTemplate(): array
     {
         return [
-            'latitide' => self::LOCATION_DEFAULT_LATITUDE,
-            'longitude' => self::LOCATION_DEFAULT_LONGITUDE
+            'latitude' => null,
+            'longitude' => null
         ];
     }
 
