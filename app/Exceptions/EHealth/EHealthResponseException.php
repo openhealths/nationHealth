@@ -83,6 +83,10 @@ class EHealthResponseException extends EHealthException
             return __('forms.invalid_kep_password');
         }
 
+        if ($response->status() === 403 && (str_contains($errorMessage, 'Party is not verified') || str_contains($errorMessage, 'party is not verified'))) {
+            return __('errors.ehealth.messages.party_not_verified');
+        }
+
         // Hide detailed technical errors in production unless debug is enabled
         if (!config('app.debug') && !app()->isLocal()) {
             return __('care-plan.unexpected_error') ?? 'Виникла помилка при взаємодії з eHealth';
