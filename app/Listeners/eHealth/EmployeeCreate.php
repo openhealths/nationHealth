@@ -35,7 +35,7 @@ class EmployeeCreate
             ->where('email', $user->email)
             ->where(fn(EloquentBuilder $q) => $q
                 ->where(fn(EloquentBuilder $query) =>
-                    $query->where('status', RequestStatus::SIGNED)
+                    $query->whereIn('status', [RequestStatus::NEW, RequestStatus::SIGNED])
                 )
                 // Sync for requests approved through our system and synced before user's first login
                 ->orWhere(fn(EloquentBuilder $query) =>
