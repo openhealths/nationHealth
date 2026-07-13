@@ -44,6 +44,13 @@ class ContractRequestShow extends Component
 
     public function canApproveContractRequest(): bool
     {
+        if (($this->contractRequest->type === 'REIMBURSEMENT' || $this->contractRequest->type === \App\Enums\Contract\Type::REIMBURSEMENT->value)
+            && auth()->user()->hasAllowedRole([\App\Enums\User\Role::OWNER])
+            && legalEntity()->type->name === \App\Models\LegalEntity::TYPE_PRIMARY_CARE
+        ) {
+            return false;
+        }
+
         return $this->statusValue() === Status::APPROVED->value;
     }
 
@@ -374,6 +381,15 @@ class ContractRequestShow extends Component
 
     public function render()
     {
-        return view('livewire.contract-request.contract-request-show');
+        $dictionaryName = $this->contractRequest->type === 'REIMBURSEMENT' ? 'REIMBURSEMENT_CONTRACT_TYPE' : 'CONTRACT_TYPE';
+        try {
+            $idFormName = dictionary()->basics()->byName($dictionaryName)->asCodeDescription()->toArray()[$this->contractRequest->id_form] ?? $this->contractRequest->id_form;
+        } catch (\Throwable) {
+            $idFormName = $this->contractRequest->id_form;
+        }
+
+        return view('livewire.contract-request.contract-request-show', [
+            'idFormName' => $idFormName,
+        ]);
     }
 }

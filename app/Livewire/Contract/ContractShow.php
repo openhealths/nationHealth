@@ -49,6 +49,8 @@ class ContractShow extends Component
                     'nhs_contract_price' => $ehealthData['nhs_contract_price'] ?? null,
                     'nhs_payment_method' => $ehealthData['nhs_payment_method'] ?? null,
                     'medical_programs' => $ehealthData['medical_programs'] ?? $this->contract->medical_programs,
+                    'id_form' => $ehealthData['id_form'] ?? $this->contract->id_form,
+                    'inserted_at' => isset($ehealthData['inserted_at']) ? \Illuminate\Support\Carbon::parse($ehealthData['inserted_at']) : $this->contract->inserted_at,
                     'data' => $ehealthData,
                 ]);
 
@@ -95,10 +97,18 @@ class ContractShow extends Component
 
     public function render(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\View\View
     {
+        $dictionaryName = $this->contract->type === 'REIMBURSEMENT' ? 'REIMBURSEMENT_CONTRACT_TYPE' : 'CONTRACT_TYPE';
+        try {
+            $idFormName = dictionary()->basics()->byName($dictionaryName)->asCodeDescription()->toArray()[$this->contract->id_form] ?? $this->contract->id_form;
+        } catch (\Throwable) {
+            $idFormName = $this->contract->id_form;
+        }
+
         return view('livewire.contract.contract-show', [
             'contract' => $this->contract,
             'data' => $this->data,
             'medicalProgramNames' => $this->medicalProgramNames,
+            'idFormName' => $idFormName,
         ]);
     }
 }
