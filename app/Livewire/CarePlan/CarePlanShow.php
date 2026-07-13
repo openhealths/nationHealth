@@ -68,7 +68,7 @@ class CarePlanShow extends Component
     /** @var array<int, array<string, mixed>> */
     public array $deviceSearchCatalog = [];
     public ?array $selectedProduct = null;
-    public string $selectedProgram = '';
+    public ?string $selectedProgram = '';
 
     // Linked justification references (grounds)
     public array $linkedGrounds = [];
@@ -512,10 +512,17 @@ class CarePlanShow extends Component
             'activityForm.reason_code' => 'nullable|string',
         ];
 
+        $tos = is_array($this->carePlan->terms_of_service)
+            ? ($this->carePlan->terms_of_service['coding'][0]['code'] ?? null)
+            : $this->carePlan->terms_of_service;
+        $isInpatient = strtoupper((string) $tos) === 'INPATIENT';
+
         $kindLower = strtolower($this->activityForm['kind']);
         if (str_contains($kindLower, 'device')) {
             $rules['activityForm.quantity'] = 'required|integer|min:1';
-            $rules['activityForm.program'] = 'required|string';
+            if (!$isInpatient) {
+                $rules['activityForm.program'] = 'required|string';
+            }
             $rules['activityForm.product_reference'] = 'required|uuid';
 
             $programId = $this->activityForm['program'] ?: $this->selectedProgram;
@@ -1555,7 +1562,10 @@ class CarePlanShow extends Component
             Log::info('CarePlanActivity: Final response from eHealth/Job', ['final_response' => $finalResponse]);
 
             if (($finalResponse['status'] ?? null) === 'failed') {
-                Log::error('CarePlanActivity: Job failed in eHealth', ['final_response' => $finalResponse]);
+                Log::error('CarePlanActivity: Job failed in eHealth. Full details for support:', [
+                    'request_payload_unsigned' => Arr::toSnakeCase($activityPayload),
+                    'ehealth_response_data' => $finalResponse,
+                ]);
                 throw new EHealthValidationException($finalResponse);
             }
 
@@ -1618,9 +1628,10 @@ class CarePlanShow extends Component
             if (method_exists($exception, 'report')) {
                 $exception->report();
             }
-            Log::error('CarePlanActivity: eHealth error: ' . $exception->getMessage(), [
-                'exception' => $exception,
-                'errors' => method_exists($exception, 'getErrors') ? $exception->getErrors() : null
+            Log::error('CarePlanActivity: eHealth request failed with validation/response error. Details for support:', [
+                'message' => $exception->getMessage(),
+                'errors' => method_exists($exception, 'getErrors') ? $exception->getErrors() : null,
+                'request_payload_unsigned' => Arr::toSnakeCase($activityPayload ?? []),
             ]);
             $msg = $exception instanceof EHealthValidationException
                 ? $exception->getTranslatedMessage()
@@ -2136,23 +2147,33 @@ class CarePlanShow extends Component
         }
     }
 
-    protected function resolveMedicationProgramId(): string
+    protected function resolveMedicationProgramId(): ?string
     {
         if ($this->selectedProgram !== '') {
             return $this->selectedProgram;
+        }
+        $tos = is_array($this->carePlan->terms_of_service)
+            ? ($this->carePlan->terms_of_service['coding'][0]['code'] ?? null)
+            : $this->carePlan->terms_of_service;
+        if (strtoupper((string) $tos) === 'INPATIENT') {
+            return null;
         }
 
         return self::DEFAULT_MEDICATION_PROGRAM_ID;
     }
 
-    protected function resolveDeviceProgramId(): string
+    protected function resolveDeviceProgramId(): ?string
     {
         if ($this->selectedProgram !== '') {
             return $this->selectedProgram;
         }
-
+        $tos = is_array($this->carePlan->terms_of_service)
+            ? ($this->carePlan->terms_of_service['coding'][0]['code'] ?? null)
+            : $this->carePlan->terms_of_service;
+        if (strtoupper((string) $tos) === 'INPATIENT') {
+            return null;
+        }
         $devicePrograms = array_keys($this->dictionaries['medical_programs_device'] ?? []);
-
         if (in_array(self::DEFAULT_DEVICE_PROGRAM_ID, $devicePrograms, true)) {
             return self::DEFAULT_DEVICE_PROGRAM_ID;
         }
