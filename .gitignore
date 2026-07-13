@@ -32,3 +32,8 @@ GEMINI.md
 .github/copilot-instructions.md
 .github/skills/
 .vscode/mcp.json
+
+# Spec Kit (Temporarily ignored)
+.specify/
+.gemini/
+
