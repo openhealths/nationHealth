@@ -110,31 +110,31 @@ class Party extends EHealthRequest
             'details' => 'required|array',
 
             // DRFO block
-            'details.drfo' => 'present|array',
+            'details.drfo' => 'sometimes|array',
             'details.drfo.verification_status' => 'string',
             'details.drfo.verification_reason' => 'nullable|string',
             'details.drfo.result' => 'nullable|numeric',
 
             // DRACS Death block
-            'details.dracs_death' => 'present|array',
+            'details.dracs_death' => 'sometimes|array',
             'details.dracs_death.verification_status' => 'string',
             'details.dracs_death.verification_reason' => 'nullable|string',
             'details.dracs_death.verification_comment' => 'nullable|string',
 
             // MVS Passport block
-            'details.mvs_passport' => 'present|array',
+            'details.mvs_passport' => 'sometimes|array',
             'details.mvs_passport.verification_status' => 'string',
             'details.mvs_passport.verification_reason' => 'nullable|string',
             'details.mvs_passport.status' => 'nullable|numeric',
 
             // DMS Passport block
-            'details.dms_passport' => 'present|array',
+            'details.dms_passport' => 'sometimes|array',
             'details.dms_passport.verification_status' => 'string',
             'details.dms_passport.verification_reason' => 'nullable|string',
             'details.dms_passport.status' => 'nullable|numeric',
 
             // DRACS Name Change block
-            'details.dracs_name_change' => 'present|array',
+            'details.dracs_name_change' => 'sometimes|array',
             'details.dracs_name_change.verification_status' => 'string',
             'details.dracs_name_change.verification_reason' => 'nullable|string',
             'details.dracs_name_change.verification_comment' => 'nullable|string',
