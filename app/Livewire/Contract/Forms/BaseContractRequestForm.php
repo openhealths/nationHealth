@@ -66,6 +66,21 @@ abstract class BaseContractRequestForm extends BaseForm
                 'required',
                 'date_format:' . config('app.date_format'),
                 'after_or_equal:startDate',
+                function ($attribute, $value, $fail) {
+                    if (empty($this->startDate) || empty($value)) {
+                        return;
+                    }
+                    try {
+                        $startDate = CarbonImmutable::createFromFormat(config('app.date_format'), $this->startDate);
+                        $endDate = CarbonImmutable::createFromFormat(config('app.date_format'), $value);
+
+                        if ($startDate->year !== $endDate->year) {
+                            $fail('рік початку дії договору та рік кінця дії мають співпадати');
+                        }
+                    } catch (\Exception) {
+                        // Let standard format validation handle the error
+                    }
+                }
             ],
             'contractorPaymentDetails' => ['required', 'array'],
             'contractorPaymentDetails.payerAccount' => ['required', 'string', 'max:255'],

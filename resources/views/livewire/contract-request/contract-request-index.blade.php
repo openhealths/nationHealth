@@ -115,7 +115,13 @@
                                 <td class="index-table-td">
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                         {{-- Translate the contract type dynamically --}}
-                                        {{ $item->type ? __('contracts.' . strtolower($item->type)) : __('contracts.missing') }}
+                                        @php
+                                            $displayType = $item->type ? __('contracts.' . strtolower($item->type)) : __('contracts.missing');
+                                            if ($item->type === 'REIMBURSEMENT' && legalEntity()->type->name === \App\Models\LegalEntity::TYPE_PRIMARY_CARE) {
+                                                $displayType = __('contracts.capitation');
+                                            }
+                                        @endphp
+                                        {{ $displayType }}
                                     </span>
                                 </td>
                                 <td class="index-table-td">

@@ -1,4 +1,4 @@
-@props(['method'])
+@props(['method', 'agreementText' => null])
 
 <template x-teleport="body">
     <div x-data="{
@@ -73,6 +73,14 @@
                                 @yield('custom-fields')
                             @elseif(isset($customFields))
                                 {{ $customFields }}
+                            @endif
+
+                            @if(!empty($agreementText))
+                                <div class="show-alert-warning">
+                                    <p class="text-sm font-medium">
+                                        {{ $agreementText }}
+                                    </p>
+                                </div>
                             @endif
 
                             {{-- KEP Provider --}}

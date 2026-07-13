@@ -42,10 +42,16 @@
                 {{ __('contracts.base_label') }}
             </label>
         </div>
+        @php
+            $paymentMethod = data_get($data, 'nhs_payment_method');
+            $paymentMethodTranslationKey = 'contracts.payment_methods.' . strtolower((string)$paymentMethod);
+            $translatedMethod = __($paymentMethodTranslationKey);
+            $translatedMethod = $translatedMethod === $paymentMethodTranslationKey ? $paymentMethod : $translatedMethod;
+        @endphp
         <div class="form-group group">
             <input id="nhs-payment-method"
                    type="text"
-                   value="{{ data_get($data, 'nhs_payment_method', '---') }}"
+                   value="{{ $translatedMethod ?: '---' }}"
                    class="input peer font-mono"
                    placeholder=" "
                    disabled

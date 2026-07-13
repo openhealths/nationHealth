@@ -23,14 +23,32 @@ class ReimbursementContractRequestForm extends BaseContractRequestForm
         $parentRules = parent::rules();
 
         $parentRules['endDate'][] = function ($attribute, $value, $fail) {
-            $startDate = CarbonImmutable::parse($this->startDate);
-            $endDate = CarbonImmutable::parse($value);
+            if (empty($this->startDate) || empty($value)) {
+                return;
+            }
 
-            if ($startDate->diffInDays($endDate) > self::REIMBURSEMENT_CONTRACT_MAX_PERIOD_DAY) {
-                $fail(
-                    'різниця між датою закінчення договору та датою початку договору '
-                    . 'не повинна перевищувати ' . self::REIMBURSEMENT_CONTRACT_MAX_PERIOD_DAY . ' днів'
-                );
+            try {
+                $startDate = CarbonImmutable::createFromFormat(config('app.date_format'), $this->startDate);
+                $endDate = CarbonImmutable::createFromFormat(config('app.date_format'), $value);
+
+                $maxDays = config('ehealth.reimbursement_contract_max_period_day', 1096);
+
+                if (!empty($this->previousRequestId)) {
+                    // Prolongation limit: maximum 3 months
+                    if ($startDate->addMonths(3)->lessThan($endDate)) {
+                        $fail('продовження дії договору можливе не більше ніж на три місяці');
+                    }
+                } else {
+                    // Standard reimbursement contract limit
+                    if ($startDate->diffInDays($endDate) > $maxDays) {
+                        $fail(
+                            'різниця між датою закінчення договору та датою початку договору '
+                            . 'не повинна перевищувати ' . $maxDays . ' днів'
+                        );
+                    }
+                }
+            } catch (\Exception) {
+                // Let standard date format validation rules handle the error
             }
         };
 

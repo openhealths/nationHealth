@@ -20,7 +20,7 @@
     <fieldset disabled class="form shift-content space-y-8">
         {{-- We pass $contract and $data to each partial --}}
 
-        @include('livewire.contract.parts.basic-data', ['contract' => $contract, 'data' => $data])
+        @include('livewire.contract.parts.basic-data', ['contract' => $contract, 'data' => $data, 'idFormName' => $idFormName])
 
         @include('livewire.contract.parts.contractor', ['data' => $data])
 

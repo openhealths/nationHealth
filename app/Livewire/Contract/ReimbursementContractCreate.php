@@ -177,7 +177,7 @@ class ReimbursementContractCreate extends ContractComponent
             'contractor_owner_id' => $this->form->contractorOwnerId,
             'contractor_base' => $data['contractorBase'],
             'contractor_payment_details' => $contractorPaymentDetails,
-            'start_date' => Carbon::now()->addDay()->format('Y-m-d'),
+            'start_date' => Carbon::parse($data['startDate'])->format('Y-m-d'),
             'end_date' => Carbon::parse($data['endDate'])->format('Y-m-d'),
 
             'id_form' => $data['idForm'] ?? 'GENERAL',
