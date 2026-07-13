@@ -166,11 +166,18 @@ class EmployeeRole extends Request
 
         // Map uuid to id
         return collect($validated)->map(static function (array $item) use ($employeeMap, $healthcareServiceMap) {
-            $item['employee_id'] = $employeeMap[$item['employee_id']];
-            $item['healthcare_service_id'] = $healthcareServiceMap[$item['healthcare_service_id']];
+            $employeeId = $employeeMap[$item['employee_id']] ?? null;
+            $serviceId = $healthcareServiceMap[$item['healthcare_service_id']] ?? null;
+
+            if ($employeeId === null || $serviceId === null) {
+                return null;
+            }
+
+            $item['employee_id'] = $employeeId;
+            $item['healthcare_service_id'] = $serviceId;
 
             return $item;
-        })->toArray();
+        })->filter()->values()->toArray();
     }
 
     /**

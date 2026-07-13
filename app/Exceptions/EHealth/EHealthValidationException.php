@@ -162,8 +162,8 @@ class EHealthValidationException extends EHealthException
                     'errors.ehealth.messages.speciality_officio_not_allowed',
                     ['speciality' => $specialityName]
                 );
-            } elseif (str_contains($message, 'speciality') && str_contains($message, 'not allowed for doctor')) {
-                $translatedMessage = __('errors.ehealth.messages.speciality not allowed for doctor');
+            } elseif (str_contains($message, 'speciality') && (str_contains($message, 'not allowed') || str_contains($message, 'not_allowed') || str_contains($message, 'mismatch'))) {
+                $translatedMessage = __('validation.attributes.employeeRole.constraint.specialityMismatch');
             } elseif (str_contains($message, 'type mismatch')) {
                 $messages = trans('errors.ehealth.messages');
                 $translatedMessage = is_array($messages) && isset($messages[$message])
