@@ -19,11 +19,28 @@
                        placeholder=" "
                        disabled
                        readonly
-                />
+                 />
                 <label for="contract-type-id" class="label">
                     {{ __('contracts.type') }} • {{ __('contracts.id') }}
                 </label>
             </div>
+            @if(!empty($idFormName))
+                <div class="form-group group">
+                    <input id="contract-form"
+                           type="text"
+                           value="{{ $idFormName }}"
+                           class="input peer"
+                           placeholder=" "
+                           disabled
+                           readonly
+                    />
+                    <label for="contract-form" class="label">
+                        {{ __('contracts.id_form_label') }}
+                    </label>
+                </div>
+            @endif
+        </div>
+        <div class="form-row-2">
             @if(isset($data['parent_contract_id']))
                 <div class="form-group group">
                     <input id="contract-parent"
@@ -39,8 +56,6 @@
                     </label>
                 </div>
             @endif
-        </div>
-        <div class="form-row-2">
             <div class="form-group group">
                 <input id="contract-created-at"
                        type="text"
@@ -54,6 +69,8 @@
                     {{ __('contracts.created_at_label') }}
                 </label>
             </div>
+        </div>
+        <div class="form-row-2">
             <div class="form-group group">
                 <input id="contract-period"
                        type="text"
