@@ -44,8 +44,16 @@ class PrepersonForm extends BaseForm
             'person.secondName' => ['nullable', 'min:3', new NameFields()],
             'person.birthDate' => ['nullable', 'date_format:' . config('app.date_format'), 'before_or_equal:today'],
             'person.gender' => ['required', 'string', new InDictionary('GENDER')],
-            'person.emergencyContact.firstName' => [Rule::requiredIf($emergencyContactRequired), 'min:3', new NameFields()],
-            'person.emergencyContact.lastName' => [Rule::requiredIf($emergencyContactRequired), 'min:3', new NameFields()],
+            'person.emergencyContact.firstName' => [
+                Rule::requiredIf($emergencyContactRequired),
+                'min:3',
+                new NameFields()
+            ],
+            'person.emergencyContact.lastName' => [
+                Rule::requiredIf($emergencyContactRequired),
+                'min:3',
+                new NameFields()
+            ],
             'person.emergencyContact.secondName' => ['nullable', 'min:3', new NameFields()],
             'person.emergencyContact.phones.*.type' => [
                 'nullable',
@@ -95,6 +103,49 @@ class PrepersonForm extends BaseForm
                 'required_if:reasonContext.reason,' . Reason::OTHER_HOSPITALIZATION->value,
                 'string',
                 'max:255'
+            ]
+        ];
+    }
+
+    /**
+     * Validation rules for updating a registered preperson.
+     * Covers every editable field of the record except note (derived from the reason) and status (system-managed).
+     *
+     * @return array
+     */
+    public function rulesForUpdate(): array
+    {
+        $emergencyContactRequired = $this->hasEmergencyContactData();
+
+        return [
+            'person.firstName' => ['nullable', 'min:3', new NameFields()],
+            'person.lastName' => ['nullable', 'min:3', new NameFields()],
+            'person.secondName' => ['nullable', 'min:3', new NameFields()],
+            'person.birthDate' => ['nullable', 'date_format:' . config('app.date_format'), 'before_or_equal:today'],
+            'person.gender' => ['required', 'string', new InDictionary('GENDER')],
+            'person.emergencyContact.firstName' => [
+                Rule::requiredIf($emergencyContactRequired),
+                'min:3',
+                new NameFields()
+            ],
+            'person.emergencyContact.lastName' => [
+                Rule::requiredIf($emergencyContactRequired),
+                'min:3',
+                new NameFields()
+            ],
+            'person.emergencyContact.secondName' => ['nullable', 'min:3', new NameFields()],
+            'person.emergencyContact.phones.*.type' => [
+                'nullable',
+                Rule::requiredIf($emergencyContactRequired),
+                'string',
+                'distinct'
+            ],
+            'person.emergencyContact.phones.*.number' => [
+                'nullable',
+                Rule::requiredIf($emergencyContactRequired),
+                'string',
+                new PhoneNumber(),
+                'distinct'
             ]
         ];
     }

@@ -186,25 +186,12 @@
                                     </span>
                                 </td>
                                 <td class="index-table-td">
-                                    <span class="inline-flex items-center whitespace-nowrap {{
-                                        match($equipment->status) {
-                                            Status::DRAFT => ' badge-dark',
-                                            Status::ACTIVE => ' badge-green',
-                                            Status::INACTIVE, Status::ENTERED_IN_ERROR => ' badge-red',
-                                            default => ''
-                                        }
-                                    }}">
+                                    <span class="inline-flex items-center whitespace-nowrap {{ $equipment->status->color() }}">
                                         {{ $equipment->status->label() }}
                                     </span>
                                 </td>
                                 <td class="index-table-td">
-                                    <span class="inline-flex items-center whitespace-nowrap {{
-                                        match($equipment->availabilityStatus) {
-                                            AvailabilityStatus::AVAILABLE => 'badge-green',
-                                            AvailabilityStatus::DAMAGED, AvailabilityStatus::DESTROYED, AvailabilityStatus::LOST => 'badge-red',
-                                            default => ''
-                                        }
-                                    }}">
+                                    <span class="inline-flex items-center whitespace-nowrap {{ $equipment->availabilityStatus->color() }}">
                                         {{ $equipment->availabilityStatus->label() }}
                                     </span>
                                 </td>
@@ -254,7 +241,8 @@
                                                            @click.prevent="$dispatch('open-update-status-modal', {
                                                                uuid: '{{ $equipment->uuid }}',
                                                                name: '{{ $equipment->names->first()->name }}',
-                                                               status: '{{ $equipment->status }}'
+                                                               status: '{{ $equipment->status }}',
+                                                               availabilityStatus: '{{ $equipment->availabilityStatus }}'
                                                            })"
                                                            class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-600 hover:bg-gray-50"
                                                         >

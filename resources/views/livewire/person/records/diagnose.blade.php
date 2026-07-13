@@ -22,7 +22,7 @@
                 class="button-sync flex items-center gap-2 whitespace-nowrap px-5 py-2 text-sm shadow-sm"
         >
             @icon('refresh', 'w-4 h-4')
-            {{ __('patients.sync_ehealth_data') }}
+            {{ __('forms.synchronise_with_eHealth') }}
         </button>
     </x-slot>
 
@@ -97,7 +97,7 @@
                             class="flex items-center gap-2 button-primary px-5 py-2.5 text-sm shadow-sm"
                     >
                         @icon('search', 'w-4 h-4')
-                        <span>{{ __('patients.search') }}</span>
+                        <span>{{ __('forms.search') }}</span>
                     </button>
                     <button type="button" wire:click="resetFilters"
                             class="button-primary-outline-red px-5 py-2.5 text-sm"
@@ -109,7 +109,7 @@
                             @click.prevent="showAdditionalParams = !showAdditionalParams"
                     >
                         @icon('adjustments', 'w-4 h-4 text-gray-500')
-                        <span>{{ __('patients.additional_params') }}</span>
+                        <span>{{ __('forms.additional_search_parameters') }}</span>
                     </button>
                 </div>
 
@@ -200,7 +200,7 @@
                                    autocomplete="off"
                             />
                             <label for="filterStartedAtRange" class="wrapped-label">
-                                {{ __('patients.start_date') }}
+                                {{ __('forms.start_date') }}
                             </label>
                         </div>
                     </div>
@@ -368,7 +368,7 @@
                                         class="record-inner-value text-[14px] break-words">{{ __('patients.head') }}</div>
                                 </div>
                                 <div class="min-w-0">
-                                    <div class="record-inner-label">{{ __('patients.start_date') }}</div>
+                                    <div class="record-inner-label">{{ __('forms.start_date') }}</div>
                                     <div class="record-inner-value text-[14px]">02.02.2025</div>
                                 </div>
                                 <div class="min-w-0">

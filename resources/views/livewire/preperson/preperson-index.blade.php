@@ -5,20 +5,7 @@
 <div
     x-data="{
         showCertificate: false,
-        isEditModalOpen: false,
-        editingPrepersonData: {
-            emergency_contact: {
-                first_name: '',
-                last_name: '',
-                second_name: '',
-                phones: [
-                    {
-                        type: '',
-                        number: ''
-                    }
-                ]
-            }
-        }
+        isEditModalOpen: false
     }"
 >
     <x-header-navigation class="breadcrumb-form">
@@ -96,7 +83,7 @@
             <div class="mb-9 mt-6 flex gap-2">
                 <button wire:click.prevent="search" class="flex items-center gap-2 button-primary">
                     @icon('search', 'w-4 h-4')
-                    <span>{{ __('patients.search') }}</span>
+                    <span>{{ __('forms.search') }}</span>
                 </button>
                 <button type="button" wire:click="resetFilters" class="button-primary-outline-red">
                     {{ __('forms.reset_all_filters') }}
@@ -226,27 +213,8 @@
 
                                                     <button
                                                         @click="
-                                                            isEditModalOpen = true;
-                                                            editingPrepersonData = {
-                                                                external_id: '{{ $preperson->external_id }}',
-                                                                first_name: '{{ $preperson->first_name }}',
-                                                                last_name: '{{ $preperson->last_name }}',
-                                                                second_name: '{{ $preperson->second_name }}',
-                                                                gender: '{{ $preperson->gender?->value ?? $preperson->gender }}',
-                                                                birth_date: '{{ $preperson->birth_date }}',
-                                                                emergency_contact: {
-                                                                    first_name: '{{ data_get($preperson->emergency_contact, 'first_name') }}',
-                                                                    last_name: '{{ data_get($preperson->emergency_contact, 'last_name') }}',
-                                                                    second_name: '{{ data_get($preperson->emergency_contact, 'second_name') }}',
-                                                                    phones: [
-                                                                        {
-                                                                            type: '{{ data_get($preperson->emergency_contact, 'phones.0.type') }}',
-                                                                            number: '{{ data_get($preperson->emergency_contact, 'phones.0.number') }}'
-                                                                        }
-                                                                    ]
-                                                                }
-                                                            };
                                                             openDropdown = false;
+                                                            $wire.startEdit({{ $preperson->id }}).then(() => isEditModalOpen = true);
                                                         "
                                                         class="dropdown-button !flex items-center gap-2 px-4 py-2 text-sm border-b border-gray-100 dark:border-gray-600 w-full hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer text-left text-gray-700 dark:text-gray-200"
                                                         type="button"
@@ -261,7 +229,7 @@
                                                         type="button"
                                                     >
                                                         @icon('trash', 'w-4 h-4')
-                                                        {{ __('preperson.register_death') }}
+                                                        {{ __('patients.register_death') }}
                                                     </button>
                                                 @endif
 
@@ -286,7 +254,7 @@
                 </div>
             </fieldset>
         @empty
-            <div class="max-w-6xl font-medium text-gray-500 text-center py-12">
+            <div class="shift-content max-w-6xl">
                 <x-nothing-found />
             </div>
         @endforelse
@@ -305,7 +273,9 @@
         ])
     @endif
 
-    @include('livewire.preperson.modals.edit-preperson')
+    @if($editingId)
+        @include('livewire.preperson.modals.edit-preperson')
+    @endif
 
     <livewire:components.x-message :key="now()->timestamp" />
     <x-forms.loading />

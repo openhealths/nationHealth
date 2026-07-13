@@ -42,6 +42,17 @@ class PatientEpisodes extends BasePatientComponent
 
     public bool $showAdditionalParams = false;
 
+    public bool $showCancellationModal = false;
+    public ?string $cancellingEpisodeUuid = null;
+    public string $cancellationReason = '';
+    public string $explanatoryLetter = '';
+
+    public bool $showClosureModal = false;
+    public ?string $closingEpisodeUuid = null;
+    public string $closingDate = '';
+    public string $closingReason = '';
+    public string $closingSummary = '';
+
     protected array $dictionaryNames = ['eHealth/ICPC2/condition_codes'];
 
     /**
@@ -222,6 +233,18 @@ class PatientEpisodes extends BasePatientComponent
             'path' => LengthAwarePaginator::resolveCurrentPath()
         ]);
     }
+
+    public function openEpisodeCancellation(string $uuid): void {}
+
+    public function closeEpisodeCancellationModal(): void {}
+
+    public function cancelSelectedEpisode(): void {}
+
+    public function openEpisodeClosure(string $uuid): void {}
+
+    public function closeEpisodeClosureModal(): void {}
+
+    public function closeSelectedEpisode(): void {}
 
     public function render(): View
     {

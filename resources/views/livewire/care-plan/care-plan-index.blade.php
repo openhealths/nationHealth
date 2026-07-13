@@ -21,7 +21,7 @@
                 <span wire:loading wire:target="sync" class="animate-spin">
                     @icon('refresh', 'w-4 h-4')
                 </span>
-                <span>{{ __('patients.sync_ehealth_data') }}</span>
+                <span>{{ __('forms.synchronise_with_eHealth') }}</span>
             </button>
         </div>
     </x-header-navigation>

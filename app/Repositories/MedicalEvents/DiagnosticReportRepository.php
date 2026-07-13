@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Throwable;
 
 /**
@@ -246,7 +247,7 @@ class DiagnosticReportRepository extends BaseRepository
             ]);
 
             $ownerColumn = $diagnosticReport->prepersonId !== null ? 'preperson_id' : 'person_id';
-
+            
             Observation::query()
                 ->where($ownerColumn, $diagnosticReport->getAttribute($ownerColumn))
                 ->whereHas('diagnosticReport', fn (Builder $query) => $query->where('value', $diagnosticReport->uuid))
@@ -305,6 +306,28 @@ class DiagnosticReportRepository extends BaseRepository
     }
 
     /**
+     * Get paginated diagnostic reports related to the patient.
+     *
+     * @param  Person|Preperson  $patient
+     * @param  int  $page
+     * @param  int  $pageSize
+     * @return LengthAwarePaginator
+     */
+    public function getPaginatedByPatient(
+        Person|Preperson $patient,
+        int $page,
+        int $pageSize
+    ): LengthAwarePaginator {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        return $this->model
+            ->withAllRelations()
+            ->where($ownerColumn, $ownerId)
+            ->latest()
+            ->paginate($pageSize, ['*'], 'page', $page);
+    }
+
+    /**
      * Get diagnostic report by id.
      *
      * @param  int  $diagnosticReportId
@@ -315,6 +338,20 @@ class DiagnosticReportRepository extends BaseRepository
         return $this->model
             ->withAllRelations()
             ->findOrFail($diagnosticReportId);
+    }
+
+    /**
+     * Get diagnostic report by eHealth UUID.
+     *
+     * @param  string  $uuid
+     * @return DiagnosticReport
+     */
+    public function findByUuid(string $uuid): DiagnosticReport
+    {
+        return $this->model
+            ->withAllRelations()
+            ->where('uuid', $uuid)
+            ->firstOrFail();
     }
 
     /**

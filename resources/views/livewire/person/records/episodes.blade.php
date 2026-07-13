@@ -29,7 +29,7 @@
                     class="button-sync flex items-center gap-2 whitespace-nowrap px-5 py-2 text-sm shadow-sm"
             >
                 @icon('refresh', 'w-4 h-4')
-                {{ __('patients.sync_ehealth_data') }}
+                {{ __('forms.synchronise_with_eHealth') }}
             </button>
         @endcan
     </x-slot>
@@ -125,7 +125,7 @@
                             class="flex items-center gap-2 button-primary px-5 py-2.5 text-sm shadow-sm"
                     >
                         @icon('search', 'w-4 h-4')
-                        <span>{{ __('patients.search') }}</span>
+                        <span>{{ __('forms.search') }}</span>
                     </button>
                     <button type="button"
                             wire:click="resetFilters"
@@ -138,17 +138,28 @@
                             @click.prevent="showAdditionalParams = !showAdditionalParams"
                     >
                         @icon('adjustments', 'w-4 h-4 text-gray-500')
-                        <span>{{ __('patients.additional_params') }}</span>
+                        <span>{{ __('forms.additional_search_parameters') }}</span>
                     </button>
                 </div>
 
-                <div class="relative" x-data="{ openGroupActions: false }" @click.outside="openGroupActions = false">
-                    <button type="button"
-                            @click="openGroupActions = !openGroupActions"
-                            class="button-primary-outline px-5 py-2.5 text-sm"
+                <div class="flex items-center gap-3">
+                    <a href="{{ $prepersonId
+                        ? route('prepersons.episodes.create', [legalEntity(), 'preperson' => $prepersonId])
+                        : route('persons.episodes.create', [legalEntity(), 'person' => $personId]) }}"
+                       wire:navigate
+                       class="cursor-pointer text-blue-600 hover:text-blue-800 flex items-center gap-1.5 font-medium text-sm"
                     >
-                        {{ __('patients.group_actions') }}
-                    </button>
+                        @icon('plus', 'w-4 h-4')
+                        <span>{{ __('patients.create_episode') ?? 'Створити епізод' }}</span>
+                    </a>
+
+                    <div class="relative" x-data="{ openGroupActions: false }" @click.outside="openGroupActions = false">
+                        <button type="button"
+                                @click="openGroupActions = !openGroupActions"
+                                class="button-primary-outline px-5 py-2.5 text-sm"
+                        >
+                            {{ __('patients.group_actions') }}
+                        </button>
 
                     <div x-show="openGroupActions"
                          x-transition
@@ -167,6 +178,7 @@
                             </button>
                         </div>
                     </div>
+                </div>
                 </div>
             </div>
 
@@ -203,6 +215,9 @@
             </div>
         </div>
     </div>
+
+    @include('livewire.person.records.parts.episode-cancellation-modal')
+    @include('livewire.person.records.parts.episode-closure-modal')
 
     <x-forms.loading />
 </x-layouts.patient>

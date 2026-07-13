@@ -445,7 +445,7 @@
                         <label for="onsetDate"
                                class="text-xs text-gray-500 dark:text-gray-400 font-medium block mb-1"
                         >
-                            {{ __('patients.start_date') }}<span class="text-red-600"> *</span>
+                            {{ __('forms.start_date') }}<span class="text-red-600"> *</span>
                         </label>
                         <div class="relative">
                             <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none pl-1">

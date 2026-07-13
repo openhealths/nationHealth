@@ -65,7 +65,7 @@
                         <div class="record-inner-subvalue">Сидоренко І.В.</div>
                     </div>
                     <div>
-                        <div class="record-inner-label">{{ __('patients.comment') }}</div>
+                        <div class="record-inner-label">{{ __('forms.comment') }}</div>
                         <div class="record-inner-subvalue">Коментар</div>
                     </div>
                 </div>

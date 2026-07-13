@@ -156,7 +156,7 @@
                        autocomplete="off"
                 />
                 <label for="periodStart" class="wrapped-label required">
-                    {{ __('patients.period_start') }}
+                    {{ __('forms.start_time') }}
                 </label>
             </div>
             @error('form.encounter.periodStart')

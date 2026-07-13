@@ -32,7 +32,7 @@
                     wire:click.prevent="searchForPerson"
             >
                 @icon('search', 'w-4 h-4')
-                <span>{{ __('patients.search') }}</span>
+                <span>{{ __('forms.search') }}</span>
             </button>
             <button type="button"
                     class="button-primary-outline-red"

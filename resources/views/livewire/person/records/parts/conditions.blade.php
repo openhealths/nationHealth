@@ -89,7 +89,7 @@
                             </div>
                         </div>
                         <div>
-                            <div class="record-inner-label">{{ __('patients.start_date') }}</div>
+                            <div class="record-inner-label">{{ __('forms.start_date') }}</div>
                             <div class="record-inner-subvalue">{{ data_get($condition, 'ehealthInsertedAt') }}</div>
                         </div>
                     </div>

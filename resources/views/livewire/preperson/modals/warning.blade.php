@@ -38,18 +38,18 @@
 
                         <div class="flex gap-4 xl:flex-row justify-start items-center mt-4">
                             <a
-                                href="{{ route('persons.index', [legalEntity()]) }}"
+                                href="{{ route('prepersons.index', [legalEntity()]) }}"
                                 wire:navigate
                                 class="button-minor"
                             >
-                                {{ __('preperson.modal_btn_later') }}
+                                {{ __('preperson.continue_later') }}
                             </a>
                             <a
                                 href="{{ $createdPrepersonId ? route('prepersons.encounter.create', [legalEntity(), 'preperson' => $createdPrepersonId]) : '' }}"
                                 wire:navigate
                                 class="button-primary"
                             >
-                                {{ __('preperson.modal_btn_create') }}
+                                {{ __('preperson.create_encounter') }}
                             </a>
                         </div>
                     </div>

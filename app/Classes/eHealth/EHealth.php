@@ -29,6 +29,7 @@ use App\Classes\eHealth\Api\Job;
 use App\Classes\eHealth\Api\LegalEntity;
 use App\Classes\eHealth\Api\License;
 use App\Classes\eHealth\Api\MedicalProgram;
+use App\Classes\eHealth\Api\MergeRequest;
 use App\Classes\eHealth\Api\Party;
 use App\Classes\eHealth\Api\Patient;
 use App\Classes\eHealth\Api\Patient\ClinicalImpression;
@@ -79,6 +80,11 @@ final class EHealth
     public static function preperson(): Preperson
     {
         return app(Preperson::class);
+    }
+
+    public static function mergeRequest(): MergeRequest
+    {
+        return app(MergeRequest::class);
     }
 
     public static function personRequest(): PersonRequest

@@ -536,7 +536,7 @@
                             :for="$id('doc', '_issuedBy' + index)"
                             class="label z-10 pointer-events-none"
                         >
-                            {{__('forms.document_issued_by')}}
+                            {{__('forms.issued_by')}}
                         </label>
                     </div>
 

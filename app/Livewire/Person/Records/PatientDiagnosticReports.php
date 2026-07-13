@@ -28,6 +28,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\View\View;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
@@ -47,6 +48,8 @@ class PatientDiagnosticReports extends BasePatientComponent
     public bool $showSignatureModal = false;
 
     public ?int $cancellingDiagnosticReportId = null;
+
+    public bool $fromDb = true;
 
     public array $diagnosticReports = [];
 
@@ -131,6 +134,8 @@ class PatientDiagnosticReports extends BasePatientComponent
     {
         $this->validate($this->filterValidationRules());
 
+        $this->fromDb = false;
+
         $this->resetPage();
 
         $this->loadDiagnosticReports($this->buildSearchParams());
@@ -151,6 +156,8 @@ class PatientDiagnosticReports extends BasePatientComponent
         ]);
 
         $this->resetPage();
+
+        $this->fromDb = false;
 
         $this->loadDiagnosticReports($this->buildSearchParams());
     }
@@ -200,9 +207,46 @@ class PatientDiagnosticReports extends BasePatientComponent
         $this->loadEncounters();
     }
 
-    public function openDiagnosticReportCancellation(int $diagnosticReportId): void
+    public function openDiagnosticReportView(string $diagnosticReportUuid): void
     {
-        $diagnosticReport = Repository::diagnosticReport()->findById($diagnosticReportId);
+        $diagnosticReport = $this->findDiagnosticReportForAction($diagnosticReportUuid);
+
+        if (!$diagnosticReport) {
+            return;
+        }
+
+        if ($this->prepersonId !== null) {
+            $this->redirectRoute(
+                'prepersons.diagnostic-report.view',
+                [
+                    legalEntity(),
+                    'preperson' => $this->prepersonId,
+                    'diagnosticReportId' => $diagnosticReport->id,
+                ],
+                navigate: true
+            );
+
+            return;
+        }
+
+        $this->redirectRoute(
+            'diagnostic-report.view',
+            [
+                legalEntity(),
+                'person' => $this->personId,
+                'diagnosticReportId' => $diagnosticReport->id,
+            ],
+            navigate: true
+        );
+    }
+
+    public function openDiagnosticReportCancellation(string $diagnosticReportUuid): void
+    {
+        $diagnosticReport = $this->findDiagnosticReportForAction($diagnosticReportUuid);
+
+        if (!$diagnosticReport) {
+            return;
+        }
 
         if ($message = $this->getCancellationForbiddenMessage($diagnosticReport)) {
             Session::flash('error', $message);
@@ -363,6 +407,23 @@ class PatientDiagnosticReports extends BasePatientComponent
         Session::flash('success', __('patients.messages.diagnostic_report_cancel_request_sent'));
     }
 
+    private function findDiagnosticReportForAction(string $diagnosticReportUuid): ?DiagnosticReport
+    {
+        if (blank($diagnosticReportUuid)) {
+            Session::flash('error', __('patients.messages.diagnostic_report_not_found'));
+
+            return null;
+        }
+
+        try {
+            return Repository::diagnosticReport()->findByUuid($diagnosticReportUuid);
+        } catch (ModelNotFoundException) {
+            Session::flash('error', __('patients.messages.diagnostic_report_not_found_in_db'));
+
+            return null;
+        }
+    }
+
     private function getCancellationForbiddenMessage(DiagnosticReport $diagnosticReport): ?string
     {
         if ($diagnosticReport->status === DiagnosticReportStatus::ENTERED_IN_ERROR) {
@@ -470,6 +531,12 @@ class PatientDiagnosticReports extends BasePatientComponent
 
     public function updatedPage(): void
     {
+        if ($this->fromDb) {
+            $this->loadDiagnosticReportsFromDb();
+
+            return;
+        }
+
         $this->loadDiagnosticReports($this->buildSearchParams());
     }
 
@@ -503,22 +570,26 @@ class PatientDiagnosticReports extends BasePatientComponent
 
     private function loadDiagnosticReportsFromDb(): void
     {
-        $diagnosticReports = DiagnosticReport::withAllRelations()
-            ->forPatient($this->patient())
-            ->get();
+        $paginator = Repository::diagnosticReport()->getPaginatedByPatient(
+            $this->patient(),
+            $this->getPage(),
+            $this->pageSize
+        );
 
-        $this->totalEntries = $diagnosticReports->count();
+        $this->totalEntries = $paginator->total();
+        $this->pageSize = $paginator->perPage();
 
-        $this->diagnosticReports = $diagnosticReports
-            ->map(function (DiagnosticReport $diagnosticReport) {
-                $data = Arr::toCamelCase($diagnosticReport->toArray());
-                $data['id'] = $diagnosticReport->id;
+        $this->diagnosticReports = $this->formatDatesForDisplay(
+            $paginator
+                ->getCollection()
+                ->map(function (DiagnosticReport $diagnosticReport): array {
+                    $data = Arr::toCamelCase($diagnosticReport->toArray());
+                    $data['id'] = $diagnosticReport->id;
 
-                return $data;
-            })
-            ->toArray();
-
-        $this->diagnosticReports = $this->formatDatesForDisplay($this->diagnosticReports);
+                    return $data;
+                })
+                ->toArray()
+        );
     }
 
     private function loadEpisodes(): void

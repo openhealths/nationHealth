@@ -188,7 +188,7 @@
 
                                     <div>
                                         <label for="confDocumentIssuedBy" class="label-modal">
-                                            {{ __('forms.document_issued_by') }}
+                                            {{ __('forms.issued_by') }}
                                             <span class="text-red-600"> *</span>
                                         </label>
                                         <input x-model="modalDocument.issuedBy"

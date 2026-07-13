@@ -8,7 +8,7 @@
             id="showContactPerson"
         />
         <label for="showContactPerson" class="cursor-pointer select-none">
-            {{ __('preperson.emergency_contact_mother_or_father') }}
+            {{ __('preperson.emergency_contact') }}
         </label>
     </legend>
 

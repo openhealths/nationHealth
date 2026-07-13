@@ -7,6 +7,7 @@ namespace App\Services\MedicalEvents\Mappers;
 use App\Contracts\FhirMapperContract;
 use App\Enums\Person\ProcedureStatus;
 use App\Services\MedicalEvents\FhirResource;
+use App\Core\Arr;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 
@@ -160,6 +161,32 @@ class ProcedureMapper implements FhirMapperContract
         return $result;
     }
 
+    public function toCancellationPackage(
+        array $procedure,
+        string $statusReason,
+        ?string $explanatoryLetter = null,
+        ?string $statusReasonText = null
+    ): array {
+        $procedure = Arr::toSnakeCase($procedure);
+
+        unset(
+            $procedure['inserted_at'],
+            $procedure['updated_at'],
+            $procedure['created_at'],
+            $procedure['updated_by'],
+            $procedure['inserted_by']
+        );
+
+        $procedure['status'] = ProcedureStatus::ENTERED_IN_ERROR->value;
+        $procedure['status_reason'] = FhirResource::make()
+            ->coding('eHealth/procedure_status_reasons', $statusReason)
+            ->toCodeableConcept($statusReasonText ?? '');
+
+        $procedure['explanatory_letter'] = $explanatoryLetter;
+
+        return $procedure;
+    }
+
     /**
      * Convert a FHIR procedure (from DB) to a flat form structure.
      *
@@ -176,6 +203,7 @@ class ProcedureMapper implements FhirMapperContract
             'status' => data_get($data, 'status', ProcedureStatus::COMPLETED->value),
             'categoryCode' => data_get($data, 'category.coding.0.code', ''),
             'codeValue' => data_get($data, 'code.identifier.value', ''),
+            'encounterId' => data_get($data, 'encounter.identifier.value', ''),
             'primarySource' => data_get($data, 'primarySource'),
             'reportOriginCode' => data_get($data, 'reportOrigin.coding.0.code', ''),
             'reportOriginText' => data_get($data, 'reportOrigin.text', ''),
@@ -201,7 +229,7 @@ class ProcedureMapper implements FhirMapperContract
                         'id' => $uuid,
                         'type' => data_get($reasonReference, 'identifier.type.coding.0.code'),
                         'ehealthInsertedAt' => $details['ehealthInsertedAt'] ?? null,
-                        'codeCode' => $details['codeCode'],
+                        'codeCode' => data_get($details, 'codeCode', ''),
                         'codeSystem' => $details['codeSystem'] ?? null
                     ];
                 },
@@ -227,9 +255,9 @@ class ProcedureMapper implements FhirMapperContract
 
                     return [
                         'id' => $uuid,
-                        'ehealthInsertedAt' => $details['ehealthInsertedAt'] ?? null,
-                        'codeCode' => $details['codeCode'],
-                        'codeSystem' => $details['codeSystem']
+                        'ehealthInsertedAt' => data_get($details, 'ehealthInsertedAt'),
+                        'codeCode' => data_get($details, 'codeCode', ''),
+                        'codeSystem' => data_get($details, 'codeSystem'),
                     ];
                 },
                 data_get($data, 'complicationDetails', [])

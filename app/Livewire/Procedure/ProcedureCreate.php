@@ -53,6 +53,12 @@ class ProcedureCreate extends ProcedureComponent
             return;
         }
 
+        if (!Auth::user()->getProcedureWriterEmployee()) {
+            Session::flash('error', __('patients.messages.procedure_writer_employee_not_found'));
+
+            return;
+        }
+
         parent::sign();
     }
 
@@ -68,7 +74,7 @@ class ProcedureCreate extends ProcedureComponent
         return DB::transaction(function () use ($formattedData) {
             $this->processReasonReferences($formattedData);
             
-            return Repository::procedure()->store([$formattedData], $this->personId);
+            return Repository::procedure()->store([$formattedData], $this->patient());
         });
     }
 

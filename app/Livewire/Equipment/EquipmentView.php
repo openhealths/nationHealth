@@ -22,6 +22,7 @@ class EquipmentView extends EquipmentComponent
         $this->baseMount($legalEntity);
         $this->loadEquipmentToForm($equipment);
         $this->form->ehealthInsertedAt = $equipment->ehealthInsertedAt;
+        $this->recorderFullName = $equipment->recorder()->with('party')->first()?->fullName ?? '';
     }
 
     public function render(): View

@@ -88,7 +88,7 @@
             @enderror
 
             <label for="licenseIssuedBy" class="label z-10">
-                {{ __('forms.document_issued_by') }}
+                {{ __('forms.issued_by') }}
             </label>
         </div>
 

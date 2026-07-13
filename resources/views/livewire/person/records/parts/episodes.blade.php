@@ -69,28 +69,34 @@
                                  :id="$id('dropdown-button')"
                                  class="absolute right-0 mt-2 w-56 rounded-md bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-md z-50 py-1"
                             >
-                                <button @click="close($refs.button)"
-                                        class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                                <a href="{{ route($prepersonId !== null ? 'prepersons.episodes.view' : 'persons.episodes.view', [legalEntity(), $prepersonId !== null ? 'preperson' : 'person' => $prepersonId ?? $personId, 'episodeUuid' => data_get($episode, 'uuid')]) }}"
+                                   wire:navigate
+                                   @click="close($refs.button)"
+                                   class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                                 >
                                     @icon('eye', 'w-5 h-5 text-gray-600 dark:text-gray-300')
                                     {{ __('patients.view_details') }}
-                                </button>
+                                </a>
 
-                                <button @click="close($refs.button)"
-                                        class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                                <a href="{{ route($prepersonId !== null ? 'prepersons.episodes.edit' : 'persons.episodes.edit', [legalEntity(), $prepersonId !== null ? 'preperson' : 'person' => $prepersonId ?? $personId, 'episodeUuid' => data_get($episode, 'uuid')]) }}"
+                                   wire:navigate
+                                   @click="close($refs.button)"
+                                   class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                                 >
                                     @icon('edit', 'w-5 h-5 text-gray-600 dark:text-gray-300')
                                     {{ __('forms.edit') }}
-                                </button>
+                                </a>
 
-                                <button @click="close($refs.button)"
+                                <button type="button"
+                                        @click="$dispatch('open-episode-closure', { uuid: '{{ data_get($episode, 'uuid') }}' }); close($refs.button)"
                                         class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                                 >
                                     @icon('close', 'w-5 h-5 text-gray-600 dark:text-gray-300')
                                     {{ __('forms.close') }}
                                 </button>
 
-                                <button @click="close($refs.button)"
+                                <button type="button"
+                                        @click="$dispatch('open-episode-cancellation', { uuid: '{{ data_get($episode, 'uuid') }}' }); close($refs.button)"
                                         class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                                 >
                                     @icon('alert-circle', 'w-5 h-5 text-gray-600 dark:text-gray-300')

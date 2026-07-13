@@ -146,7 +146,7 @@
                 @can('viewAny', HealthcareService::class)
                     <button wire:click.prevent="search" class="flex items-center gap-2 button-primary">
                         @icon('search', 'w-4 h-4')
-                        <span>{{ __('patients.search') }}</span>
+                        <span>{{ __('forms.search') }}</span>
                     </button>
                     <button type="button" wire:click="resetFilters" class="button-primary-outline-red">
                         {{ __('forms.reset_all_filters') }}

@@ -31,6 +31,9 @@
             @include('livewire.encounter.procedure-parts.additional-information', ['context' => 'procedure'])
             @include('livewire.encounter.procedure-parts.reason-references', ['wireProp' => 'reasonReferenceResults'])
             @include('livewire.encounter.procedure-parts.used-codes')
+            @if(!empty(data_get($this->form->procedure, 'encounterId')))
+                @include('livewire.encounter.procedure-parts.complication-details', ['context' => 'procedure'])
+            @endif
         </fieldset>
 
         <div class="flex gap-8">
@@ -99,6 +102,8 @@
             this.note = '';
             this.reasonReferences = [];
             this.usedCodes = [];
+            this.complicationDetails = [];
+            this.encounterId = '';
             this.performedPeriodStartDate = toFormattedDate(startTime);
             this.performedPeriodStartTime = startTime.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
             this.performedPeriodEndDate = toFormattedDate(now);

@@ -5,11 +5,11 @@
              role="dialog"
              aria-modal="true"
              class="modal"
-             @keydown.escape.prevent.stop="$wire.closeDiagnosticReportCancellationModal()"
+             @keydown.escape.prevent.stop="$wire.closeProcedureCancellationModal()"
         >
             <div x-transition.opacity
                  class="fixed inset-0 bg-black/30"
-                 @click="$wire.closeDiagnosticReportCancellationModal()"
+                 @click="$wire.closeProcedureCancellationModal()"
             ></div>
 
             <div class="modal-wrapper">
@@ -34,27 +34,27 @@
 
                             <select
                                 class="w-full border-0 border-b border-gray-300 dark:border-gray-600 bg-transparent px-1 py-3 text-lg text-gray-700 dark:text-gray-100 focus:border-blue-500 focus:ring-0"
-                                wire:model="form.cancellationReason"
-                                name="cancellationReason"
-                                id="cancellationReason"
+                                wire:model="form.statusReason"
+                                name="statusReason"
+                                id="statusReason"
                             >
                                 <option value="">{{ __('patients.messages.procedure_cancel_reason_placeholder') }}</option>
 
-                                @foreach(data_get($this->dictionaries, 'eHealth/cancellation_reasons', []) as $code => $label)
+                                @foreach(data_get($this->dictionaries, 'eHealth/procedure_status_reasons', []) as $code => $label)
                                     <option value="{{ $code }}" wire:key="procedure-cancel-reason-{{ $code }}">
                                         {{ $label }}
                                     </option>
                                 @endforeach
                             </select>
 
-                            @error('form.cancellationReason')
+                            @error('form.statusReason')
                                 <p class="text-error mt-2">{{ $message }}</p>
                             @enderror
                         </div>
 
                         <div class="mt-10 max-w-5xl">
                             <label for="explanatoryLetter" class="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-4">
-                                {{ __('patients.messages.procedure_cancel_explanation_label') }}
+                                {{ __('patients.messages.procedure_cancel_explanation_label') }} *
                             </label>
 
                             <textarea
@@ -63,7 +63,7 @@
                                 name="explanatoryLetter"
                                 maxlength="255"
                                 class="w-full min-h-48 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-5 py-4 text-lg text-gray-700 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500"
-                                placeholder="{{ __('patients.messages.procedure_cancel_explanation_placeholder') }}"
+                                placeholder="{{ __('forms.write_comment_here') }}"
                             ></textarea>
 
                             @error('form.explanatoryLetter')
@@ -73,7 +73,7 @@
 
                         <div class="mt-16 flex flex-row items-center gap-8 text-gray-900 dark:text-gray-100">
                             <button type="button"
-                                    wire:click="closeDiagnosticReportCancellationModal"
+                                    wire:click="closeProcedureCancellationModal"
                                     class="button-minor px-8"
                             >
                                 {{ __('forms.cancel') }}
@@ -101,5 +101,5 @@
         </div>
     </template>
 
-    <x-signature-modal method="cancelSelectedDiagnosticReport"/>
+    <x-signature-modal method="cancelSelectedProcedure"/>
 </div>

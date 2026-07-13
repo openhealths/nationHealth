@@ -16,7 +16,7 @@
                 {{ __('patients.edit_data') }}
             </h2>
             <p class="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-1">
-                ID <span x-text="editingPrepersonData.external_id || ''"></span>
+                ID {{ $form->person['uuid'] }}
             </p>
         </div>
 
@@ -36,7 +36,7 @@
                         </label>
                         <input
                             type="text"
-                            x-model="editingPrepersonData.first_name"
+                            wire:model="form.person.firstName"
                             class="w-full bg-transparent border-0 p-0 text-gray-900 dark:text-white focus:ring-0 focus:outline-none placeholder-gray-300"
                             placeholder="-"
                         >
@@ -48,7 +48,7 @@
                         </label>
                         <input
                             type="text"
-                            x-model="editingPrepersonData.last_name"
+                            wire:model="form.person.lastName"
                             class="w-full bg-transparent border-0 p-0 text-gray-900 dark:text-white focus:ring-0 focus:outline-none placeholder-gray-300"
                             placeholder="-"
                         >
@@ -60,7 +60,7 @@
                         </label>
                         <input
                             type="text"
-                            x-model="editingPrepersonData.second_name"
+                            wire:model="form.person.secondName"
                             class="w-full bg-transparent border-0 p-0 text-gray-900 dark:text-white focus:ring-0 focus:outline-none placeholder-gray-300"
                             placeholder="-"
                         >
@@ -71,7 +71,7 @@
                             {{ __('forms.gender') }}
                         </label>
                         <select
-                            x-model="editingPrepersonData.gender"
+                            wire:model="form.person.gender"
                             class="w-full bg-transparent border-0 p-0 text-gray-900 dark:text-white focus:ring-0 focus:outline-none"
                         >
                             <option value="">
@@ -86,7 +86,7 @@
                     </div>
                     <div
                         class="relative border-b border-gray-300 dark:border-gray-600 pb-1 flex items-end gap-2">
-                        <div class="flex-grow">
+                        <div class="grow">
                             <label class="block text-xs font-medium text-gray-400">
                                 {{ __('forms.birth_date') }}
                             </label>
@@ -95,7 +95,7 @@
                                 @icon('calendar', 'w-4 h-4 text-gray-400')
                                 <input
                                     type="text"
-                                    x-model="editingPrepersonData.birth_date"
+                                    wire:model="form.person.birthDate"
                                     class="w-full bg-transparent border-0 p-0 focus:ring-0 focus:outline-none placeholder-gray-300"
                                     placeholder="-"
                                 >
@@ -120,7 +120,7 @@
                         </label>
                         <input
                             type="text"
-                            x-model="editingPrepersonData.emergency_contact.first_name"
+                            wire:model="form.person.emergencyContact.firstName"
                             class="w-full bg-transparent border-0 p-0 text-gray-900 dark:text-white focus:ring-0 focus:outline-none placeholder-gray-300"
                             placeholder="-"
                         >
@@ -132,7 +132,7 @@
                         </label>
                         <input
                             type="text"
-                            x-model="editingPrepersonData.emergency_contact.last_name"
+                            wire:model="form.person.emergencyContact.lastName"
                             class="w-full bg-transparent border-0 p-0 text-gray-900 dark:text-white focus:ring-0 focus:outline-none placeholder-gray-300"
                             placeholder="-"
                         >
@@ -144,7 +144,7 @@
                         </label>
                         <input
                             type="text"
-                            x-model="editingPrepersonData.emergency_contact.second_name"
+                            wire:model="form.person.emergencyContact.secondName"
                             class="w-full bg-transparent border-0 p-0 text-gray-900 dark:text-white focus:ring-0 focus:outline-none placeholder-gray-300"
                             placeholder="-"
                         >
@@ -155,7 +155,7 @@
                             {{ __('forms.phone_type') }}
                         </label>
                         <select
-                            x-model="editingPrepersonData.emergency_contact.phones[0].type"
+                            wire:model="form.person.emergencyContact.phones.0.type"
                             class="w-full bg-transparent border-0 p-0 text-gray-900 dark:text-white focus:ring-0 focus:outline-none"
                         >
                             <option value="">
@@ -170,7 +170,7 @@
                     </div>
                     <div
                         class="relative border-b border-gray-300 dark:border-gray-600 pb-1 flex items-end gap-2">
-                        <div class="flex-grow">
+                        <div class="grow">
                             <label class="block text-xs font-medium text-gray-400">
                                 {{ __('forms.phone') }}
                             </label>
@@ -179,7 +179,7 @@
                                 @icon('tabler-phone', 'w-4 h-4 text-gray-400')
                                 <input
                                     type="text"
-                                    x-model="editingPrepersonData.emergency_contact.phones[0].number"
+                                    wire:model="form.person.emergencyContact.phones.0.number"
                                     class="w-full bg-transparent border-0 p-0 focus:ring-0 focus:outline-none placeholder-gray-300"
                                     placeholder="-"
                                 >
@@ -200,8 +200,8 @@
             </button>
             <button
                 type="button"
-                @click="isEditModalOpen = false"
-                class="button-primary min-w-[150px]"
+                @click="$wire.saveEdit($wire.get('editingId')).then(() => { if (! $wire.get('editingId')) isEditModalOpen = false })"
+                class="button-primary min-w-37.5"
             >
                 {{ __('forms.save') }}
             </button>

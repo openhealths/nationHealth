@@ -90,7 +90,7 @@
                             class="flex items-center gap-2 button-primary px-5 py-2.5 text-sm shadow-sm"
                     >
                         @icon('search', 'w-4 h-4')
-                        <span>{{ __('patients.search') }}</span>
+                        <span>{{ __('forms.search') }}</span>
                     </button>
                     <button type="button" wire:click="resetFilters"
                             class="button-primary-outline-red px-5 py-2.5 text-sm"
@@ -102,7 +102,7 @@
                             @click.prevent="showAdditionalParams = !showAdditionalParams"
                     >
                         @icon('adjustments', 'w-4 h-4 text-gray-500')
-                        <span>{{ __('patients.additional_params') }}</span>
+                        <span>{{ __('forms.additional_search_parameters') }}</span>
                     </button>
                 </div>
 
@@ -256,7 +256,7 @@
                                     <div class="min-w-0">
                                         <div class="record-inner-label">{{ __('patients.doctor_speciality') }}</div>
                                         <div class="record-inner-value text-[14px]">
-                                            {{ data_get($encounter, 'performer.displayValue', '-') }}
+                                            {{ data_get($encounter, 'performer.displayValue') ?? '-' }}
                                         </div>
                                     </div>
                                     <div class="min-w-0">

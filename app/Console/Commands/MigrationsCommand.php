@@ -12,10 +12,10 @@ use Illuminate\Support\Carbon;
 use App\Models\LegalEntityType;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\PermissionRegistrar;
 use Illuminate\Database\Migrations\Migrator;
-use Illuminate\Support\Facades\File;
 
 abstract class MigrationsCommand extends Command
 {
@@ -26,6 +26,9 @@ abstract class MigrationsCommand extends Command
     protected const string CONFIG_ROLES_SCOPE_PATH = 'config/scopes/roles.php';
 
     protected const int CHUNK_SIZE = 1000;
+
+    // Flag to display the command help if no additional arguments were provided
+    protected bool $showHelpWhenEmpty = false;
 
     // Flag indicating whether the command is performing a rollback operation.
     protected bool $isRollback = false;
@@ -59,6 +62,10 @@ abstract class MigrationsCommand extends Command
      */
     public function handle(Migrator $migrator): void
     {
+        if ($this->showHelpIfNeeded()) {
+            return;
+        }
+
         if ($this->hasOption('scopes') && $this->option('scopes')) {
             $this->call('config:clear');
 
@@ -860,5 +867,23 @@ abstract class MigrationsCommand extends Command
         } catch (Exception $err) {
             $this->error("Error writing to file: {$path}. Error: " . $err->getMessage());
         }
+    }
+
+    /**
+     * Display the command help if no additional arguments were provided and the flag is enabled.
+     *
+     * @return bool True if help was displayed and execution should stop, false otherwise.
+     */
+    protected function showHelpIfNeeded(): bool
+    {
+        if ($this->showHelpWhenEmpty && count($_SERVER['argv']) === 2) {
+            $this->call('help', [
+                'command_name' => $this->getName(),
+            ]);
+
+            return true;
+        }
+
+        return false;
     }
 }

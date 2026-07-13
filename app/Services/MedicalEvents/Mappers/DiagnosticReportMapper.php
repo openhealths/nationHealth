@@ -206,6 +206,29 @@ class DiagnosticReportMapper implements FhirMapperContract
             ->map(function (array $observation) use ($explanatoryLetter): array {
                 $observation = Arr::toSnakeCase($observation);
 
+                unset(
+                    $observation['inserted_at'],
+                    $observation['updated_at'],
+                    $observation['created_at'],
+                    $observation['inserted_by'],
+                    $observation['updated_by']
+                );
+
+                if ($observation['interpretation'] === null) {
+                    unset($observation['interpretation']);
+                }
+
+                $observation['components'] = collect($observation['components'] ?? [])
+                    ->map(static function (array $component): array {
+                        if (($component['interpretation'] ?? null) === null) {
+                            unset($component['interpretation']);
+                        }
+
+                        return $component;
+                    })
+                    ->values()
+                    ->toArray();
+
                 $observation['status'] = ObservationStatus::ENTERED_IN_ERROR->value;
                 $observation['explanatory_letter'] = $explanatoryLetter;
 

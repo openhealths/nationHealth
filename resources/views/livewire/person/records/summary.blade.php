@@ -27,7 +27,7 @@
                 class="button-sync flex items-center gap-2 whitespace-nowrap px-5 py-2 text-sm shadow-sm"
         >
             @icon('refresh', 'w-4 h-4')
-            {{ __('patients.sync_ehealth_data') }}
+            {{ __('forms.synchronise_with_eHealth') }}
         </button>
     </x-slot>
 
@@ -84,7 +84,7 @@
                                       @if($isEntitySync) text-gray-400 dark:text-gray-500 cursor-not-allowed @else text-blue-600 dark:text-blue-400 cursor-pointer hover:text-blue-700 dark:hover:text-blue-300 @endif"
                                 >
                                     @icon('refresh', 'w-4 h-4')
-                                    <span>{{ $item['syncEntity'] && $isRetryable ? __('forms.sync_retry') : __('patients.sync_ehealth_data') }}</span>
+                                    <span>{{ $item['syncEntity'] && $isRetryable ? __('forms.sync_retry') : __('forms.synchronise_with_eHealth') }}</span>
                                 </span>
                                 <div class="shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-300"
                                      :class="activeSection === '{{ $item['id'] }}' ? '' : '-rotate-90'"

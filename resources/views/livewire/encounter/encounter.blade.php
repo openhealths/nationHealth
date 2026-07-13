@@ -6,7 +6,7 @@
 
     $mainGroups = [
         ['id' => 'referral', 'label' => __('patients.referrals'), 'icon' => 'arrow-right', 'view' => 'livewire.encounter.parts.referral'],
-        ['id' => 'main-data', 'label' => __('patients.main_data'), 'icon' => 'pie-chart', 'view' => 'livewire.encounter.parts.main-data'],
+        ['id' => 'main-data', 'label' => __('forms.main_information'), 'icon' => 'pie-chart', 'view' => 'livewire.encounter.parts.main-data'],
         ['id' => 'conditions', 'label' => __('patients.diagnoses'), 'icon' => 'file', 'view' => 'livewire.encounter.parts.conditions'],
         ['id' => 'reasons', 'label' => __('patients.reasons_for_visit'), 'icon' => 'person', 'view' => 'livewire.encounter.parts.reasons'],
         ['id' => 'actions', 'label' => __('forms.actions'), 'icon' => 'check-box', 'view' => 'livewire.encounter.parts.actions'],
@@ -40,6 +40,7 @@
         @endphp
         <div x-data='{
                 activeSections: {!! $initialActiveSections !!},
+                typeCode: $wire.entangle("form.encounter.typeCode"),
                 toggle(id) {
                     if (this.activeSections.includes(id)) {
                         this.activeSections = this.activeSections.filter(i => i !== id);
@@ -55,6 +56,24 @@
             <div class="flex-1 space-y-4">
                 @foreach(array_merge($mainGroups, $footerItems) as $item)
                     @if(isset($item['view']))
+                        @if($item['id'] === 'observations')
+                            <div x-show="typeCode === 'patient_identity'"
+                                 x-cloak
+                                 class="flex items-start gap-4 p-5 bg-[#e8f1fc] dark:bg-blue-950/40 border border-[#d2e4f9] dark:border-blue-900 rounded-xl mb-4"
+                            >
+                                <span class="shrink-0 text-[#2563eb] dark:text-[#60a5fa] mt-0.5">
+                                    @icon('info-circle', 'w-5 h-5')
+                                </span>
+                                <div class="flex-1 space-y-1">
+                                    <h4 class="text-sm font-bold text-[#1e40af] dark:text-[#93c5fd]">
+                                        {{ __('patients.preperson_observations_alert_title') }}
+                                    </h4>
+                                    <p class="text-xs text-[#2563eb] dark:text-[#60a5fa]">
+                                        {{ __('patients.preperson_observations_alert_text') }}
+                                    </p>
+                                </div>
+                            </div>
+                        @endif
                         <div id="block-{{ $item['id'] }}"
                              class="bg-white dark:bg-gray-800 rounded-xl scroll-mt-24 dark:border-gray-700"
                              :class="activeSections.includes('{{ $item['id'] }}') ? 'summary-section-active' : 'summary-section-inactive'"

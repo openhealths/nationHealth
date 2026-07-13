@@ -4,19 +4,30 @@ declare(strict_types=1);
 
 namespace App\Livewire\Preperson;
 
+use App\Classes\eHealth\EHealth;
+use App\Core\Arr;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
+use App\Livewire\Preperson\Forms\PrepersonForm as Form;
 use App\Models\Preperson;
+use App\Traits\LogsExceptions;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Throwable;
 
 class PrepersonIndex extends Component
 {
     use WithPagination;
+    use LogsExceptions;
+
+    public Form $form;
 
     public ?string $searchId = null;
 
@@ -25,6 +36,13 @@ class PrepersonIndex extends Component
     public ?string $searchBirthDate = null;
 
     public ?int $certificatePrepersonId = null;
+
+    /**
+     * Local database ID of the registered preperson currently open in the edit modal.
+     *
+     * @var int|null
+     */
+    public ?int $editingId = null;
 
     /**
      * The preperson whose information certificate is currently open, if any.
@@ -48,6 +66,88 @@ class PrepersonIndex extends Component
     public function selectCertificate(int $prepersonId): void
     {
         $this->certificatePrepersonId = $prepersonId;
+    }
+
+    /**
+     * Load a registered preperson into the form so it can be edited in the modal.
+     *
+     * @param  Preperson  $preperson
+     * @return void
+     */
+    public function startEdit(Preperson $preperson): void
+    {
+        if (Auth::user()->cannot('update', $preperson)) {
+            Session::flash('error', __('preperson.policy.update'));
+
+            return;
+        }
+
+        $this->editingId = $preperson->id;
+
+        $person = Arr::only(
+            Arr::toCamelCase($preperson->toArray()),
+            ['uuid', 'firstName', 'lastName', 'secondName', 'birthDate', 'gender', 'emergencyContact']
+        );
+
+        if (!empty($person['birthDate'])) {
+            $person['birthDate'] = convertToAppDateFormat($person['birthDate']);
+        }
+
+        // keep the phones row the emergency-contact inputs bind to even when no contact was stored
+        $person['emergencyContact'] ??= [];
+        $person['emergencyContact']['phones'] ??= [['type' => null, 'number' => null]];
+
+        $this->form->person = $person;
+    }
+
+    /**
+     * Validate the edited preperson, push the changes to eHealth and persist the response locally, then close the modal.
+     *
+     * @param  Preperson  $preperson
+     * @return void
+     */
+    public function saveEdit(Preperson $preperson): void
+    {
+        if (Auth::user()->cannot('update', $preperson)) {
+            Session::flash('error', __('preperson.policy.update'));
+
+            return;
+        }
+
+        try {
+            $validated = $this->form->validate($this->form->rulesForUpdate());
+        } catch (ValidationException $exception) {
+            Session::flash('error', $exception->validator->errors()->first());
+
+            throw $exception;
+        }
+
+        $personData = $validated['person'];
+
+        if (!empty($personData['birthDate'])) {
+            $personData['birthDate'] = convertToYmd($personData['birthDate']);
+        }
+
+        $payload = removeEmptyKeys(Arr::toSnakeCase($personData));
+
+        try {
+            $response = EHealth::preperson()->update($preperson->uuid, $payload);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when updating a preperson');
+
+            return;
+        }
+
+        try {
+            $preperson->update($response->validate());
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Failed to update preperson');
+
+            return;
+        }
+
+        $this->reset('editingId');
+        Session::flash('success', __('preperson.messages.updated'));
     }
 
     /**

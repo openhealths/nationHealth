@@ -137,9 +137,9 @@ class EmployeeForm extends Form
     {
         $attributes = [
             'party.first_name' => __('forms.party.first_name'),
-            'party.last_name' => __('forms.party.last_name'),
-            'party.second_name' => __('forms.party.second_name'),
-            'party.tax_id' => __('forms.party.tax_id'),
+            'party.last_name' => __('forms.last_name'),
+            'party.second_name' => __('forms.second_name'),
+            'party.tax_id' => __('forms.rnokpp'),
             'party.phones' => __('forms.party.phones'),
             'party.workingExperience' => __('forms.working_experience'),
             'documents' => __('forms.documents'),

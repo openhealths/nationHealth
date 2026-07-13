@@ -33,6 +33,22 @@ class Procedure extends PatientApiBase
     }
 
     /**
+     * Cancel procedure by marking it as entered in error.
+     *
+     * @param  string  $patientId  Person UUID
+     * @param  string  $procedureId  Procedure UUID
+     * @param  array  $data
+     * @return EHealthResponse|PromiseInterface
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+     *
+     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/procedures/cancel-procedure
+     */
+    public function cancel(string $patientId, string $procedureId, array $data = []): PromiseInterface|EHealthResponse
+    {
+        return $this->patch(self::URL . "/$patientId/procedures/$procedureId/actions/cancel", $data);
+    }
+
+    /**
      * Return a procedure record by ID.
      *
      * @param  string  $patientId

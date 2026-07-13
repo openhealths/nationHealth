@@ -6,7 +6,7 @@
             <li>
                 <a href="#patient-data-section" class="encounter-nav-item">
                     @icon('pie-chart', 'w-6 h-6 dark:text-white')
-                    <p class="default-p">{{ __('patients.main_data') }}</p>
+                    <p class="default-p">{{ __('forms.main_information') }}</p>
                 </a>
             </li>
             <li>

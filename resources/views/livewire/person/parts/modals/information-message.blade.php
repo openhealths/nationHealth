@@ -29,18 +29,16 @@
                     </div>
 
                     <ul class="list-disc list-inside mb-8">
-                        <p class="default-p">Ви, як медичний працівник закладу охорони здоров'я:</p>
-                        <li class="default-p pl-2">підтверджуєте, що пацієнта як особу ідентифіковано;</li>
-                        <li class="default-p pl-2">підтверджуєте, що повідомили пацієнту або його законному представнику
-                            мету та підстави обробки персональних даних.
-                        </li>
+                        <p class="default-p">{{ __('declarations.medical_worker_confirmation') }}</p>
+                        <li class="default-p pl-2">{{ __('declarations.patient_identified') }}</li>
+                        <li class="default-p pl-2">{{ __('declarations.informed_about_data_processing') }}</li>
                         @if($form->person['authenticationMethods'][0]['type'] === AuthenticationMethod::THIRD_PERSON->value)
                             <li class="default-p pl-2">підтверджуєте перевірку повноважень представника пацієнта (у разі
                                 надання даних про законного представника).
                             </li>
                         @endif
 
-                        <p class="default-p">ПАМ'ЯТКА ПАЦІЄНТУ</p>
+                        <p class="default-p">{{ __('declarations.patient_memo') }}</p>
                         @if($form->person['authenticationMethods'][0]['type'] === AuthenticationMethod::THIRD_PERSON->value)
                             <p class="default-p">Надаючи код законний представник пацієнта, від імені пацієнта, для
                                 якого створюється запис в електронній системі охорони здоров'я
@@ -48,14 +46,8 @@
                         @else
                             <p class="default-p">Надаючи код або документи особа чи її законний представник:</p>
                         @endif
-                        <li class="default-p pl-2"> підтверджує, що інформована/ий медичним працівником закладу
-                            охорони здоров’я про мету та підстави обробки персональних даних пацієнта,
-                            для якого створюється запис в реєстрі пацієнтів Електронної системи охорони здоров'я;
-                        </li>
-                        <li class="default-p pl-2">надає згоду медичному працівнику закладу охорони здоров’я
-                            створити та при необхідності оновити запис про пацієнта у Електронній системі охорони
-                            здоров’я від імені особи або її законного представника
-                        </li>
+                        <li class="default-p pl-2">{{ __('preperson.merge.memo_point_1') }}</li>
+                        <li class="default-p pl-2">{{ __('preperson.merge.memo_point_2') }}</li>
                     </ul>
 
                     {{-- Is signed by patient --}}

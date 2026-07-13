@@ -73,11 +73,11 @@
                         </svg>
                         <p class="mb-2 px-2 text-sm text-gray-500 dark:text-gray-400 text-center">
                             <span
-                                class="font-semibold text-blue-600 dark:text-blue-400">Перетягніть сюди файл ключа</span>
-                            або завантажте його зі свого носія
+                                class="font-semibold text-blue-600 dark:text-blue-400">{{ __('forms.drag_key_file') }}</span>
+                            {{ __('forms.or_upload_from_device') }}
                         </p>
                         <p class="px-2 text-xs text-gray-500 dark:text-gray-400 text-center">
-                            (зазвичай його назва "Key-6.dat" або *.pfx, *.pk8, *.zs2, *.jks)
+                            {{ __('forms.key_file_extension_hint') }}
                         </p>
                     </div>
                     <input wire:model="form.keyContainerUpload"
@@ -92,7 +92,7 @@
                 </label>
                 <template x-if="fileUploaded">
                     <div x-transition class="text-sm text-green-700 mt-2">
-                        Файл <span x-text="fileName"></span> успішно завантажено!
+                        {!! __('forms.file_uploaded_success', ['name' => '<span x-text="fileName"></span>']) !!}
                     </div>
                 </template>
             </div>

@@ -56,8 +56,16 @@ class ProcedureEdit extends ProcedureComponent
             ->values()
             ->toArray();
 
+        $complicationUuids = collect(data_get($procedureData, 'complicationDetails', []))
+            ->pluck('identifier.value')
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+
         $detailsMap = array_merge(
             Repository::condition()->getProcedureReferenceDetailsMapByUuids($conditionUuids),
+            Repository::condition()->getProcedureReferenceDetailsMapByUuids($complicationUuids),
             Repository::observation()->getDetailsMapByUuids($observationUuids)
         );
 

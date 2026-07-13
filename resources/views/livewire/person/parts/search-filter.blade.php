@@ -194,7 +194,7 @@
                                    placeholder="{{ __('forms.select_filter') }}"
                                    @click="open = !open"
                                    :value="
-                                       $wire.activeFilter === 'all' ? '{{ __('patients.all') }}' :
+                                       $wire.activeFilter === 'all' ? '{{ __('forms.all') }}' :
                                        $wire.activeFilter === 'ehealth' ? '{{ __('patients.source.ehealth') }}' :
                                        $wire.activeFilter === 'local' ? '{{ __('patients.source.local') }}' :
                                        $wire.activeFilter === 'request' ? '{{ __('patients.applications') }}'
@@ -214,7 +214,7 @@
                             >
                                 @php
                                     $filters = [
-                                        'all' => __('patients.all'),
+                                        'all' => __('forms.all'),
                                         'local' => __('patients.source.local'),
                                         'ehealth' => __('patients.source.ehealth'),
                                         'request' => __('patients.applications')
