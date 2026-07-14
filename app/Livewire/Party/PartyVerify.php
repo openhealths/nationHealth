@@ -166,9 +166,9 @@ class PartyVerify extends Component
             // Wrap the data in the stream key
             $payload = [
                 $this->verificationStream => [
-                    'verification_status' => $this->status,
-                    'verification_reason' => $this->reason,
-                    'verification_comment' => $this->comment,
+                    'status' => $this->status,
+                    'reason' => $this->reason,
+                    'comment' => $this->comment,
                 ]
             ];
 
