@@ -671,11 +671,13 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     protected function flashSuccess(string $message): void
     {
         session()->flash('success', $message);
+        $this->dispatch('flashMessage', ['message' => $message, 'type' => 'success']);
     }
 
     protected function flashError(string $message): void
     {
         session()->flash('error', $message);
+        $this->dispatch('flashMessage', ['message' => $message, 'type' => 'error']);
     }
 
     private function handleConnectionException(EHealthConnectionException $e): void
