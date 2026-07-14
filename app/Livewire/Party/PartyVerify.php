@@ -67,10 +67,18 @@ class PartyVerify extends Component
     {
         // 1. Getting the current death status
         $deathStatus = data_get($this->verificationDetails, 'details.dracs_death.verification_status');
+        $deathReason = data_get($this->verificationDetails, 'details.dracs_death.verification_reason');
 
-        // 2. Allow the button ONLY if the status is 'NOT_VERIFIED'
-        // All other statuses (VERIFIED, VERIFICATION_NEEDED, etc.) will be false and the button will be gray.
-        return $deathStatus === 'NOT_VERIFIED';
+        // 2. Allow the button if status is NOT_VERIFIED, VERIFICATION_NEEDED, or if it is VERIFIED with a manual reason
+        if (in_array($deathStatus, ['NOT_VERIFIED', 'VERIFICATION_NEEDED'], true)) {
+            return true;
+        }
+
+        if ($deathStatus === 'VERIFIED' && in_array($deathReason, ['MANUAL_DECEASED', 'MANUAL_NO_DEATH_RECORD'], true)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -158,9 +166,9 @@ class PartyVerify extends Component
             // Wrap the data in the stream key
             $payload = [
                 $this->verificationStream => [
-                    'status' => $this->status,
-                    'reason' => $this->reason,
-                    'comment' => $this->comment,
+                    'verification_status' => $this->status,
+                    'verification_reason' => $this->reason,
+                    'verification_comment' => $this->comment,
                 ]
             ];
 
