@@ -190,10 +190,13 @@ class PartyVerify extends Component
                 'details' => method_exists($e, 'getDetails') ? $e->getDetails() : [],
             ]);
 
+            $message = $e instanceof EHealthValidationException
+                ? $e->getTranslatedMessage()
+                : $e->getMessage();
+
             // Displaying a general understandable message
-            // Or you can use $e->getFormattedMessage() if you have it well configured
             $this->dispatch('flashMessage', [
-                'message' => 'Помилка оновлення в ЕСОЗ: ' . $e->getMessage(),
+                'message' => 'Помилка оновлення в ЕСОЗ: ' . $message,
                 'type' => 'error',
                 'persistent' => true
             ]);
