@@ -109,10 +109,10 @@ class TaxId implements ValidationRule, DataAwareRule
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        // Check if the validation is for a passport/national ID.
+        // Check if the validation is for a passport/national ID/residence permit.
         if ($this->noTaxId) {
-            if (empty(array_filter($this->documents, fn (array $doc) => $doc['type'] === 'NATIONAL_ID' || $doc['type'] === 'PASSPORT'))) {
-                // If a no any document of type NATIONAL_ID or PASSPORT exists, raise an error.
+            if (empty(array_filter($this->documents, fn (array $doc) => in_array($doc['type'], ['NATIONAL_ID', 'PASSPORT', 'PERMANENT_RESIDENCE_PERMIT'], true)))) {
+                // If no document of type NATIONAL_ID, PASSPORT or PERMANENT_RESIDENCE_PERMIT exists, raise an error.
                 $fail(__('validation.employee.owner_passport_mandatory_no_tax_id'));
 
                 return;
@@ -121,13 +121,14 @@ class TaxId implements ValidationRule, DataAwareRule
             // If the value is a boolean (true/false), we need to fetch the actual document number for validation.
             if (\is_bool($value)) {
                 $value = collect($this->documents)
-                    ->first(fn (array $doc) => \in_array($doc['type'], ['PASSPORT', 'NATIONAL_ID']))['number'] ?? null;
+                    ->first(fn (array $doc) => in_array($doc['type'], ['PASSPORT', 'NATIONAL_ID', 'PERMANENT_RESIDENCE_PERMIT'], true))['number'] ?? null;
             }
 
-            // TODO: check if it need to be validated (the same validation used in the document's field)
-            // A national ID can be either 9 digits or 2 Ukrainian letters followed by 6 digits.
-            // The "\\d" correctly escapes the backslash for the regex engine.
-            if (!preg_match('/^([0-9]{9}|[А-ЯЁЇIЄҐ]{2}\\d{6})$/u', $value)) {
+            // Validates against formats of NATIONAL_ID, PASSPORT, and PERMANENT_RESIDENCE_PERMIT
+            // - 9 digits (NATIONAL_ID / PERMANENT_RESIDENCE_PERMIT)
+            // - 2 Ukrainian letters and 4-6 digits (PASSPORT / PERMANENT_RESIDENCE_PERMIT / REFUGEE_CERTIFICATE etc)
+            // - 2 Ukrainian letters and 5 digits / 5 digits (PERMANENT_RESIDENCE_PERMIT)
+            if (!preg_match('/^([0-9]{9}|((?![ЫЪЭЁ])([А-ЯҐЇІЄ])){2}[0-9]{4,6}|((?![ЫЪЭЁ])([А-ЯҐЇІЄ])){2}[0-9]{5}\/[0-9]{5})$/u', (string) $value)) {
                 $fail(__('validation.attributes.errors.invalidNationalId'));
 
                 return;
