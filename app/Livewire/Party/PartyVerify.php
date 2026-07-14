@@ -74,7 +74,7 @@ class PartyVerify extends Component
             return true;
         }
 
-        if ($deathStatus === 'VERIFIED' && in_array($deathReason, ['MANUAL_DECEASED', 'MANUAL_NO_DEATH_RECORD'], true)) {
+        if ($deathStatus === 'VERIFIED' && in_array($deathReason, ['MANUAL_CONFIRMED', 'MANUAL_NOT_CONFIRMED'], true)) {
             return true;
         }
 
