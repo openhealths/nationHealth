@@ -14,6 +14,12 @@ trait BaseAddress
 
     public const string ADDRESS_CONTEXT_RECEPTION = 'reception';
 
+    // Flag to determine if settlement search for addresses should be exact match or not
+    public bool $exactSettlementMatch = false;
+
+    // Flag to determine if settlement search for reception addresses should be exact match or not
+    public bool $exactSettlementReceptionMatch = false;
+
     /**
      * Keyed state storage for suggestion lists per address context.
      * Example keys: 'address', 'receptionAddress'
@@ -200,17 +206,26 @@ trait BaseAddress
     {
         $region = $this->{$property}['region'];
 
-        if (empty($region)) {
-            return;
-        }
-
         $area = $this->{$property}['area'];
-        $settlement = $this->{$property}['settlement'];
+        $settlement = $this->{$property}['settlement']; // Name of the settlement to search for
 
         try {
-            $this->{$settlements} = EHealth::address()->getSettlements(
+            $settlementsData = EHealth::address()->getSettlements(
                 ['region' => $area, 'district' => $region, 'name' => $settlement]
             )->getData();
+
+            // Check if we need to perform an exact match for settlements based on the property being searched
+            $exactMatch = $property === 'address'
+                ? $this->exactSettlementMatch
+                : $this->exactSettlementReceptionMatch;
+
+            // If exact match is required, filter the settlements data to only include those that match the settlement name exactly (case-insensitive)
+            $this->{$settlements} = $exactMatch
+                ? array_filter(
+                    $settlementsData,
+                    fn (array $founded) => mb_strtolower($founded['name']) === mb_strtolower($settlement)
+                )
+                : $settlementsData;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when searching for settlements');
 

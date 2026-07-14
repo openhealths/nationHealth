@@ -22,22 +22,13 @@ class AddressesSearch extends Addresses
     {
         return [
             'address.area' => ['required', 'string'],
-            'address.region' => [
-                'sometimes',
-                Rule::requiredIf(function () use ($address) {
-                    if (empty($address['area'])) {
-                        return true;
-                    }
-
-                    return $address['area'] !== 'М.КИЇВ';
-                }),
-            ],
+            'address.region' => ['nullable', 'string'],
             'address.settlementType' => ['required', 'string'],
             'address.settlement' => ['required', 'string'],
             'address.settlementId' => ['required', 'string'],
             'address.streetType' => ['nullable', 'string'],
-            'address.street' => ['nullable', 'string'],
-            'address.building' => ['nullable', 'string'],
+            'address.street' => ['required_with:address.building', 'nullable', 'string'],
+            'address.building' => ['required_with:address.apartment', 'nullable', 'string'],
             'address.apartment' => ['nullable', 'string'],
             'address.zip' => ['nullable', 'string', new Zip()],
         ];
@@ -46,13 +37,14 @@ class AddressesSearch extends Addresses
     public static function getAddressMessages(): array
     {
         return [
-            'address.area' => __("Поле 'Область' є обов’язковим"),
-            'address.region.required' => __("Поле 'Район' є обов’язковим"),
-            'address.settlementType' => __("Поле 'Тип населеного пункту' є обов’язковим"),
-            'address.settlement' => __("Поле 'Населений пункт' є обов’язковим"),
-            'address.building' => __("Неправильний формат номеру будинка"),
-            'address.apartment' => __("Неправильний формат номеру квартири"),
-            'address.zip' => __("Неправильний формат поштового індекса"),
+            'address.area' => __('forms.addresses.error.area'),
+            'address.settlementType' => __('forms.addresses.error.settlementType'),
+            'address.settlement' => __('forms.addresses.error.settlement'),
+            'address.street.required_with' => __('forms.addresses.error.street_required_with'),
+            'address.building.required_with' => __('forms.addresses.error.building_required_with'),
+            'address.building' => __('forms.addresses.error.building'),
+            'address.apartment' => __('forms.addresses.error.apartment'),
+            'address.zip' => __('forms.addresses.error.zip'),
         ];
     }
 
