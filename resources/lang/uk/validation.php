@@ -296,6 +296,7 @@ return [
     */
 
     'attributes' => [
+        'reason' => 'причина',
         'name' => 'ім\'я',
         'phone' => 'телефон',
         'reasonContext.reason' => 'причина створення неідентифікованого пацієнта',
