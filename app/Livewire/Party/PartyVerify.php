@@ -175,6 +175,13 @@ class PartyVerify extends Component
             EHealth::party()->update($this->party->uuid, $payload);
 
             $this->loadVerificationDetails();
+
+            // Sync the overall status to the local party record
+            $overallStatus = data_get($this->verificationDetails, 'verification_status');
+            if ($overallStatus) {
+                $this->party->update(['verification_status' => $overallStatus]);
+            }
+
             $this->closeUpdateModal();
 
             $this->dispatch('flashMessage', [
