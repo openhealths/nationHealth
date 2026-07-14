@@ -205,15 +205,15 @@ class PartyVerificationTest extends TestCase
         // Expect update call
         $updateResponse = Mockery::mock(EHealthResponse::class);
         $mockPartyApi->shouldReceive('update')
-            ->with($party->uuid, [
-                'dracs_death' => [
-                    'status' => 'VERIFIED',
-                    'reason' => 'MANUAL_NOT_CONFIRMED',
-                    'comment' => 'Everything is fine',
-                ]
-            ])
-            ->once()
-            ->andReturn($updateResponse);
+             ->with($party->uuid, [
+                 'dracs_death' => [
+                     'verification_status' => 'VERIFIED',
+                     'verification_reason' => 'MANUAL_NOT_CONFIRMED',
+                     'verification_comment' => 'Everything is fine',
+                 ]
+             ])
+             ->once()
+             ->andReturn($updateResponse);
 
         // Livewire test the detail component
         Livewire::test(\App\Livewire\Party\PartyVerify::class, ['legalEntity' => $legalEntity, 'party' => $party])
