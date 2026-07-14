@@ -36,6 +36,13 @@ class PartyEdit extends AbstractEmployeeFormManager
             ->latest('start_date')
             ->first();
 
+        if ($employee && is_null($employee->userId) && !auth()->user()->hasAllowedRole([\App\Enums\User\Role::ADMIN, \App\Enums\User\Role::HR])) {
+            session()?->flash('error', 'Користувач має підтвердити вхід');
+            $this->redirectRoute('employee.index', ['legalEntity' => $legalEntity->id]);
+
+            return;
+        }
+
         // MERGE STRATEGY
         $existingDraft = null;
         if ($employee) {
