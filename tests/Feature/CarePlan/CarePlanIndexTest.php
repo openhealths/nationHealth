@@ -1,8 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature\CarePlan;
 
-use App\Models\CarePlan;
 use App\Models\Person\Person;
 use App\Models\Declaration;
 use App\Models\LegalEntity;
@@ -36,7 +37,7 @@ class CarePlanIndexTest extends TestCase
     public function test_care_plan_index_sync_flow(): void
     {
         // 1. Setup initial data
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id') 
+        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
             ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = LegalEntity::create([
@@ -100,7 +101,7 @@ class CarePlanIndexTest extends TestCase
 
         $declarationRequest = \App\Models\DeclarationRequest::create([
             'uuid' => (string) Str::uuid(),
-            'status' => \App\Enums\Declaration\Status::SIGNED,
+            'status' => \App\Enums\Declaration\RequestStatus::SIGNED,
             'declaration_number' => '123',
             'employee_id' => $employee->id,
             'person_id' => $person->id,

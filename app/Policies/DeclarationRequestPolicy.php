@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
-use App\Enums\Declaration\Status;
+use App\Enums\Declaration\RequestStatus;
 use App\Enums\Status as LegalEntityStatus;
 use App\Models\DeclarationRequest;
 use App\Models\User;
@@ -127,7 +127,7 @@ class DeclarationRequestPolicy
         }
 
         // Check if status is DRAFT
-        if ($declarationRequest->status !== Status::DRAFT) {
+        if ($declarationRequest->status !== RequestStatus::DRAFT) {
             return Response::denyWithStatus(404);
         }
 

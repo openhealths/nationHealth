@@ -7,6 +7,7 @@ namespace App\Livewire\Declaration;
 use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Enums\Declaration\RequestStatus;
 use App\Enums\Declaration\Status;
 use App\Enums\JobStatus;
 use App\Enums\Person\AuthenticationMethod;
@@ -60,9 +61,9 @@ abstract class DeclarationComponent extends Component
     /**
      * Status of declaration request, that we use to determine which actions user can do with declaration request and which buttons show.
      *
-     * @var Status
+     * @var RequestStatus
      */
-    public Status $status = Status::DRAFT;
+    public RequestStatus $status = RequestStatus::DRAFT;
 
     public bool $isNeedToPersonUpdate = false;
 
@@ -364,7 +365,7 @@ abstract class DeclarationComponent extends Component
                 $this->showAuthModal = false;
                 $this->showSignModal = true;
 
-                $this->status = Status::APPROVED;
+                $this->status = RequestStatus::APPROVED;
             }
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when approving a declaration');
@@ -487,7 +488,7 @@ abstract class DeclarationComponent extends Component
     public function approveSimplifiedDeclaration(): void
     {
         $resignedDeclarationRequest = DeclarationRequest::where('person_id', $this->personId)
-            ->where('status', Status::NEW->value)
+            ->where('status', RequestStatus::NEW->value)
             ->whereNotNull('parent_declaration_uuid')
             ->firstOrFail();
 
@@ -497,7 +498,7 @@ abstract class DeclarationComponent extends Component
 
         $this->showSignModal = true;
 
-        $this->status = Status::APPROVED;
+        $this->status = RequestStatus::APPROVED;
     }
 
     /**
@@ -536,7 +537,7 @@ abstract class DeclarationComponent extends Component
             $this->showUploadingDocumentsModal = false;
             $this->showSignModal = true;
 
-            $this->status = Status::APPROVED;
+            $this->status = RequestStatus::APPROVED;
         }
     }
 
@@ -603,7 +604,7 @@ abstract class DeclarationComponent extends Component
             if ($response->getStatusCode() === 200) {
                 try {
                     $context = 'updating declaration request status';
-                    Repository::declarationRequest()->updateStatus($this->declarationRequestId, Status::SIGNED->value);
+                    Repository::declarationRequest()->updateStatus($this->declarationRequestId, RequestStatus::SIGNED->value);
 
                     $context = 'creating declaration';
                     Repository::declaration()->store($response->getData());

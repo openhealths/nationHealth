@@ -6,7 +6,7 @@ namespace App\Models;
 
 use App\Enums\JobStatus;
 use App\Models\Person\Person;
-use App\Enums\Declaration\Status;
+use App\Enums\Declaration\RequestStatus;
 use App\Models\Employee\Employee;
 use Illuminate\Database\Eloquent\Model;
 use Eloquence\Behaviours\HasCamelCasing;
@@ -22,7 +22,7 @@ class DeclarationRequest extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'status' => Status::class,
+        'status' => RequestStatus::class,
         'data_to_be_signed' => 'array'
     ];
 

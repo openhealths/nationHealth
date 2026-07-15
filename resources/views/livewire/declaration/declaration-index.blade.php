@@ -1,4 +1,5 @@
 @use('App\Enums\Declaration\Status')
+@use('App\Enums\Declaration\RequestStatus')
 @use('App\Enums\JobStatus')
 @use('Carbon\CarbonImmutable')
 @use('\App\Enums\User\Role')
@@ -113,15 +114,13 @@
                                     <td class="td-input">{{ $declaration->employee->fullName }}</td>
 
                                     <td class="td-input">
-                                        <span class="{{
-                                            match($declaration->status) {
-                                                Status::DRAFT => 'badge-dark',
-                                                Status::NEW, Status::APPROVED => 'badge-yellow',
-                                                Status::ACTIVE => $hasLegators && $declaration->reorganizedEmployeeDeclaration && !$declaration->hasParentDeclaration() ? 'badge-yellow' : 'badge-green',
-                                                Status::REJECTED, Status::CANCELLED, Status::TERMINATED => 'badge-red',
-                                                default => ''
-                                            }
-                                        }}">
+                                        @php
+                                            $isToBeResigned = $declaration->status === Status::ACTIVE
+                                                && $hasLegators
+                                                && $declaration->reorganizedEmployeeDeclaration
+                                                && !$declaration->hasParentDeclaration();
+                                        @endphp
+                                        <span class="{{ $isToBeResigned ? 'badge-yellow' : $declaration->status->color() }}">
                                             @if($declaration->type === 'declaration')
                                                 @if ($hasLegators && $declaration->reorganizedEmployeeDeclaration && $declaration->status == Status::ACTIVE)
                                                     {{ __('declarations.status.to_be_resigned') }}
@@ -141,7 +140,7 @@
                                         @if(
                                             $declaration->status === Status::REJECTED ||
                                             $declaration->status === Status::TERMINATED ||
-                                            $declaration->status === Status::CANCELLED ||
+                                            $declaration->status === Status::CLOSED ||
                                             ($declaration->type === 'declaration' && !$declaration->reorganizedEmployeeDeclaration)
                                         )
                                             @can('view', $declaration)
@@ -166,7 +165,7 @@
                                              style="display: none"
                                         >
                                             @if($declaration->type === 'request')
-                                                @if($declaration->status === Status::DRAFT)
+                                                @if($declaration->status === RequestStatus::DRAFT)
                                                     <a href="{{ route('declaration.edit', [legalEntity(), $declaration->person->id, $declaration->id]) }}"
                                                        @click="openDropdown = false"
                                                        class="cursor-pointer text-[#222222] text-nowrap flex gap-3 items-center py-2 pl-4 pr-10 hover:bg-gray-100"
@@ -184,7 +183,7 @@
                                                     </button>
                                                 @endif
 
-                                                @if($declaration->status === Status::NEW)
+                                                @if($declaration->status === RequestStatus::NEW)
                                                     @can('approve', $declaration)
                                                         <button @click="openDropdown = false"
                                                                 wire:click="approve({{ $declaration->person->id }}, {{ $declaration->id }})"
@@ -206,7 +205,7 @@
                                                     @endcan
                                                 @endif
 
-                                                @if($declaration->status === Status::APPROVED)
+                                                @if($declaration->status === RequestStatus::APPROVED)
                                                     @can('sign', $declaration)
                                                         <button @click="openDropdown = false"
                                                                 wire:click="sign({{ $declaration->person->id }}, {{ $declaration->id }})"

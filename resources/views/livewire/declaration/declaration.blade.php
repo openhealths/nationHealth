@@ -1,4 +1,4 @@
-@use('App\Enums\Declaration\Status')
+@use('App\Enums\Declaration\RequestStatus')
 @use('App\Models\DeclarationRequest')
 @use('App\Livewire\Declaration\DeclarationCreate')
 
@@ -21,18 +21,18 @@
                 {{ __('forms.cancel') }}
             </a>
             @can('create', DeclarationRequest::class)
-                @if($this instanceof DeclarationCreate && $status === Status::DRAFT)
+                @if($this instanceof DeclarationCreate && $status === RequestStatus::DRAFT)
                     <button wire:click.prevent="createLocally" type="submit" class="button-primary-outline">
                         {{ __('forms.create_locally') }}
                     </button>
                 @endif
                 <button
                     wire:click.prevent="{{
-                        $isNeedToResign && $status === Status::NEW
+                        $isNeedToResign && $status === RequestStatus::NEW
                             ? 'approveSimplifiedDeclaration'
-                            : ($status === Status::NEW
+                            : ($status === RequestStatus::NEW
                                 ? 'openMessageInformationModal'
-                                : ($status === Status::APPROVED
+                                : ($status === RequestStatus::APPROVED
                                     ? 'openSignatureModal'
                                     : 'create'
                                 )
@@ -41,9 +41,9 @@
                     type="submit"
                     class="button-primary"
                 >
-                    {{ $status === Status::NEW
+                    {{ $status === RequestStatus::NEW
                         ? __('declarations.approve_declaration_request')
-                        : ($status === Status::APPROVED
+                        : ($status === RequestStatus::APPROVED
                             ? __('declarations.sign_declaration_request')
                             : __('declarations.create_an_application')
                         ) 

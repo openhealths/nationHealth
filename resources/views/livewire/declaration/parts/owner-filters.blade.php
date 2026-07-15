@@ -1,12 +1,5 @@
 @php
     use App\Enums\Declaration\ReorganizedStatus;
-    use App\Enums\Declaration\Status;
-
-    $statusOptions = [
-        Status::ACTIVE->value => __('Активні'),
-        Status::TERMINATED->value => __('Протерміновані'),
-        Status::CANCELLED->value => __('Відмінені'),
-    ];
 @endphp
 
 <div>
@@ -14,7 +7,7 @@
     <div class="form-row-3">
         <x-forms.multiselect
             bind="statusFilter"
-            :options="$statusOptions"
+            :options="$dictionaries['DECLARATION_STATUSES']"
             label="{{ __('declarations.show') }}"
             placeholder="{{ __('Оберіть статус декларацій') }}"
             @open-changed="openType = $event.detail.open"

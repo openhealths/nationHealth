@@ -277,7 +277,7 @@
                     </li>
                 @endif
 
-                @if(Auth::user()->can('viewAny', Person::class) || Auth::user()->can('viewAny', PersonRequest::class))
+                @if(Auth::user()->can('viewAny', Preperson::class))
                     <li>
                         <a href="{{ route('prepersons.index', [legalEntity()]) }}"
                            class="menu-item-simple {{ request()->routeIs('persons.preperson') ? 'menu-item-active' : '' }}"

@@ -23,6 +23,7 @@ use App\Jobs\DeclarationsSync;
 use App\Repositories\Repository;
 use App\Classes\eHealth\EHealth;
 use App\Enums\Declaration\Status;
+use App\Enums\Declaration\RequestStatus;
 use App\Models\Employee\Employee;
 use Livewire\Attributes\Computed;
 use App\Models\DeclarationRequest;
@@ -121,7 +122,7 @@ class DeclarationIndex extends Component
 
     public bool $isFiltersApplied = false;
 
-    protected array $dictionaryNames = ['POSITION'];
+    protected array $dictionaryNames = ['POSITION', 'DECLARATION_STATUSES'];
 
     /**
      * Determine if the declaration is synchronized.
@@ -141,7 +142,7 @@ class DeclarationIndex extends Component
      */
     protected function getSyncStatus(): string
     {
-        return legalEntity()?->getEntityStatus(LegalEntity::ENTITY_DECLARATION) ?? '';
+        return legalEntity()->getEntityStatus(LegalEntity::ENTITY_DECLARATION) ?? '';
     }
 
     /**
@@ -152,16 +153,16 @@ class DeclarationIndex extends Component
     protected function isSyncProcessing(): bool
     {
         // Get the sync status for whole Legal Entity
-        $legalEntitySyncStatus = legalEntity()?->getEntityStatus();
+        $legalEntitySyncStatus = legalEntity()->getEntityStatus();
 
         // Get the sync status only for Division
-        $divisionSyncStatus = legalEntity()?->getEntityStatus(LegalEntity::ENTITY_DIVISION);
+        $divisionSyncStatus = legalEntity()->getEntityStatus(LegalEntity::ENTITY_DIVISION);
 
         // Get the sync status only for HealthCare Service
-        $healthCareServiceSyncStatus = legalEntity()?->getEntityStatus(LegalEntity::ENTITY_HEALTHCARE_SERVICE);
+        $healthCareServiceSyncStatus = legalEntity()->getEntityStatus(LegalEntity::ENTITY_HEALTHCARE_SERVICE);
 
         // Get the sync status only for HealthCare Service
-        $employeeSyncStatus = legalEntity()?->getEntityStatus(LegalEntity::ENTITY_EMPLOYEE);
+        $employeeSyncStatus = legalEntity()->getEntityStatus(LegalEntity::ENTITY_EMPLOYEE);
 
         // Set the sync status only for Declaration
         $this->syncStatus = $this->getSyncStatus();
@@ -219,7 +220,9 @@ class DeclarationIndex extends Component
             ->pluck('employee_id')
             ->all();
 
-        $this->employeeIds = array_values(array_unique(array_merge($ownEmployees->pluck('id')->all(), $reorganizedEmployeeIds)));
+        $this->employeeIds = array_values(
+            array_unique(array_merge($ownEmployees->pluck('id')->all(), $reorganizedEmployeeIds))
+        );
 
         $this->doctors = $this->getDoctors();
 
@@ -275,9 +278,7 @@ class DeclarationIndex extends Component
 
             $declarations = Declaration::with([
                 'reorganizedEmployeeDeclaration',
-                'person:id,first_name,last_name,second_name,birth_date',
-                'employee:id,uuid,party_id',
-                'employee.party:id,first_name,last_name,second_name'
+                'person:id,first_name,last_name,second_name,birth_date'
             ])
                 ->when(
                     !$user->hasAllowedRole(Role::OWNER),
@@ -288,24 +289,34 @@ class DeclarationIndex extends Component
                             fn (Builder $ownerQuery) => $ownerQuery->forEmployees($selectedEmployeeIds)
                         )
                 )
-                ->get(['id', 'person_id', 'employee_id', 'legal_entity_id', 'declaration_number', 'declaration_request_id', 'status'])
+                ->get()
                 ->each->setAttribute('type', 'declaration');
         }
 
         // Don't show declaration requests for OWNER
         if (!$user->hasAllowedRole(Role::OWNER) && $user->can('viewAny', DeclarationRequest::class)) {
-            $declarationRequests = DeclarationRequest::with([
-                'person:id,first_name,last_name,second_name,birth_date',
-                'employee:id,party_id',
-                'employee.party:id,first_name,last_name,second_name'
-            ])
+            $declarationRequests = DeclarationRequest::with(['person:id,first_name,last_name,second_name,birth_date'])
                 ->forEmployees($this->employeeIds)
-                ->whereNotIn('status', [Status::SIGNED->value])
-                ->get(['id', 'uuid', 'person_id', 'employee_id', 'declaration_number', 'status', 'parent_declaration_uuid'])
+                ->whereNotIn('status', [RequestStatus::SIGNED->value])
+                ->get()
                 ->each->setAttribute('type', 'request');
         }
 
         $allItems = $declarationRequests->concat($declarations);
+
+        // Load the employees (with their party) once and share the relation across both
+        // declaration and request rows so the same party is not fetched per collection.
+        $employees = Employee::with('party:id,first_name,last_name,second_name')
+            ->whereKey($allItems->pluck('employee_id')->unique()->filter()->all())
+            ->get(['id', 'uuid', 'party_id'])
+            ->keyBy('id');
+
+        $allItems->each(
+            static fn (Declaration|DeclarationRequest $item) => $item->setRelation(
+                'employee',
+                $employees->get($item->employee_id)
+            )
+        );
 
         if ($this->isFiltersApplied) {
             // Filter by type
@@ -619,18 +630,22 @@ class DeclarationIndex extends Component
         }
 
         $reorganizedDeclaration = Declaration::find($declarationId)->reorganizedEmployeeDeclaration()->first();
-        $currentEmployee = Employee::where('user_id', Auth::id())->where('employee_type', 'DOCTOR')->whereNot('status', EntityStatus::REORGANIZED)->first();
+        $currentEmployee = Employee::whereUserId(Auth::id())
+            ->whereEmployeeType('DOCTOR')
+            ->whereNot('status', EntityStatus::REORGANIZED)
+            ->first();
         $reorganizedPerson = Person::find($reorganizedDeclaration->personId);
 
         $resignRequestData = [
-                "person_id" => $reorganizedPerson->uuid,
-                "employee_id" => $currentEmployee->uuid,
-                "division_id" => $currentEmployee->divisionUuid,
-                "authorize_with" => $reorganizedDeclaration->authorizeWith,
-                "parent_declaration_id" => $reorganizedDeclaration->declarationUuid
+            'person_id' => $reorganizedPerson->uuid,
+            'employee_id' => $currentEmployee->uuid,
+            'division_id' => $currentEmployee->divisionUuid,
+            'authorize_with' => $reorganizedDeclaration->authorizeWith,
+            'parent_declaration_id' => $reorganizedDeclaration->declarationUuid
         ];
 
-        $declarationRequest = Repository::declarationRequest()->store(array_merge($resignRequestData, ['status' => EntityStatus::DRAFT->value]));
+        $declarationRequest = Repository::declarationRequest()
+            ->store(array_merge($resignRequestData, ['status' => EntityStatus::DRAFT->value]));
 
         try {
             $response = EHealth::declarationRequest()->create(removeEmptyKeys(Arr::toSnakeCase($resignRequestData)));
@@ -741,14 +756,14 @@ class DeclarationIndex extends Component
             ->map(fn (Employee $doctor) => [
                 'id' => $doctor->id,
                 'uuid' => $doctor->uuid,
-                'fullName' => trim($doctor->party->fullName . ' - ' . ($this->dictionaries['POSITION'][$doctor->position]))
+                'fullName' => trim(
+                    $doctor->party->fullName . ' - ' . ($this->dictionaries['POSITION'][$doctor->position])
+                )
             ]);
     }
 
     public function render(): View
     {
-        return view('livewire.declaration.declaration-index', [
-            'declarations' => $this->declarations
-        ]);
+        return view('livewire.declaration.declaration-index', ['declarations' => $this->declarations]);
     }
 }
