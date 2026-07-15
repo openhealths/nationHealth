@@ -876,7 +876,7 @@ abstract class MigrationsCommand extends Command
      */
     protected function showHelpIfNeeded(): bool
     {
-        if ($this->showHelpWhenEmpty && count($_SERVER['argv']) === 2) {
+        if ($this->showHelpWhenEmpty && !array_filter($this->options())) {
             $this->call('help', [
                 'command_name' => $this->getName(),
             ]);
