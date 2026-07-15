@@ -64,7 +64,6 @@ class PartyVerificationTest extends TestCase
 
         $employee = Employee::create([
             'uuid' => (string) Str::uuid(),
-            'full_name' => 'John Doe',
             'employee_type' => \App\Enums\User\Role::HR->value,
             'status' => \App\Enums\Status::APPROVED->value,
             'legal_entity_id' => $legalEntity->id,
@@ -152,7 +151,6 @@ class PartyVerificationTest extends TestCase
 
         $employee = Employee::create([
             'uuid' => (string) Str::uuid(),
-            'full_name' => 'John Doe',
             'employee_type' => \App\Enums\User\Role::HR->value,
             'status' => \App\Enums\Status::APPROVED->value,
             'legal_entity_id' => $legalEntity->id,

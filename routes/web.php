@@ -193,9 +193,11 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
             });
 
             Route::get('/party-verifications', PartyVerificationIndex::class)
-                ->name('party.verification.index');
+                ->name('party.verification.index')
+                ->can('party_verification:read');
             Route::get('/party/{party}/verification', PartyVerify::class)
-                ->name('party.verification.show');
+                ->name('party.verification.show')
+                ->can('party_verification:read');
             Route::get('/party/{party}/edit', PartyEdit::class)->name('party.edit');
 
             Route::prefix('employee-role')->name('employee-role.')->group(static function () {
