@@ -162,7 +162,7 @@ abstract class EmployeeComponent extends Component
         // 1. Validation
         if (Gate::denies('syncEmployee', $employee)) {
             $this->dispatch('flashMessage', [
-                'message' => 'Синхронізація недоступна для цього співробітника.',
+                'message' => 'Синхронізація недоступна для цього працівника.',
                 'type' => 'error'
             ]);
 
@@ -199,7 +199,7 @@ abstract class EmployeeComponent extends Component
             $this->actualizePendingRequests($employee, $token);
 
             $this->dispatch('flashMessage', [
-                'message' => 'Дані співробітника успішно оновлено з ЕСОЗ',
+                'message' => 'Дані працівника успішно оновлено з ЕСОЗ',
                 'type' => 'success'
             ]);
 
@@ -231,7 +231,7 @@ abstract class EmployeeComponent extends Component
     protected function actualizePendingRequests(Employee $employee, string $token): void
     {
         $pendingRequests = EmployeeRequest::where('employee_id', $employee->id)
-            ->where('status', RequestStatus::SIGNED)
+            ->whereIn('status', [RequestStatus::NEW, RequestStatus::SIGNED])
             ->whereNull('applied_at')
             ->get();
 

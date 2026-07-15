@@ -103,8 +103,16 @@ class EmployeeForm extends Form
 
     protected function rootFieldsRules(): array
     {
+        $customPositionAllowed = config('ehealth.employee_type_custom_position_allowed', []);
+        $isCustomPositionAllowed = in_array($this->employeeType, $customPositionAllowed, true);
+
+        $positionRules = ['required', 'string'];
+        if (!$isCustomPositionAllowed) {
+            $positionRules[] = Rule::in(array_keys($this->component->dictionaries['POSITION'] ?? []));
+        }
+
         return [
-            'position' => ['required', 'string', Rule::in(array_keys($this->component->dictionaries['POSITION'] ?? []))],
+            'position' => $positionRules,
             'employeeType' => ['required', 'string', Rule::in(array_keys($this->component->dictionaries['EMPLOYEE_TYPE'] ?? []))],
             'startDate' => ['required', new DateFormat()],
             'endDate' => [
@@ -135,34 +143,30 @@ class EmployeeForm extends Form
      */
     public function validationAttributes(): array
     {
-        $attributes = [
-            'party.first_name' => __('forms.party.first_name'),
-            'party.last_name' => __('forms.last_name'),
-            'party.second_name' => __('forms.second_name'),
-            'party.tax_id' => __('forms.rnokpp'),
-            'party.phones' => __('forms.party.phones'),
-            'party.workingExperience' => __('forms.working_experience'),
-            'documents' => __('forms.documents'),
-            'position' => __('forms.position'),
-            'start_date' => __('forms.start_date'),
+        return [
+            'form.position' => __('forms.position'),
+            'form.employeeType' => __('employees.employee_type'),
+            'form.startDate' => __('forms.start_date'),
+            'form.endDate' => __('forms.end_date'),
+            'form.divisionId' => __('forms.division'),
+            'form.party.lastName' => __('forms.party.lastName'),
+            'form.party.firstName' => __('forms.party.firstName'),
+            'form.party.secondName' => __('forms.party.secondName'),
+            'form.party.gender' => __('forms.party.gender'),
+            'form.party.birthDate' => __('forms.party.birthDate'),
+            'form.party.taxId' => __('forms.party.taxId'),
+            'form.party.noTaxId' => __('forms.party.noTaxId'),
+            'form.party.email' => __('forms.party.email'),
+            'form.party.workingExperience' => __('forms.working_experience'),
+            'form.party.aboutMyself' => __('forms.about_myself'),
+            'form.party.phones.*.number' => __('forms.phone_number'),
+            'form.party.phones.*.type' => __('forms.phone_type'),
+            'form.documents.*.number' => __('forms.document_number'),
+            'form.documents.*.type' => __('forms.document_type'),
+            'form.documents.*.issuedAt' => __('forms.document_issued_at'),
+            'form.documents.*.expirationDate' => __('forms.document_expiration_date'),
+            'form.documents.*.issuedBy' => __('forms.document_issued_by'),
         ];
-
-        // Add attributes for dynamic fields of documents and phones
-        if (!empty($this->party['phones'])) {
-            foreach ($this->party['phones'] as $index => $phone) {
-                $attributes["party.phones.{$index}.number"] = __('forms.phone_number') . ' #' . ($index + 1);
-                $attributes["party.phones.{$index}.type"] = __('forms.phone_type');
-            }
-        }
-
-        if (!empty($this->documents)) {
-            foreach ($this->documents as $index => $doc) {
-                $attributes["documents.{$index}.number"] = __('forms.document_number');
-                $attributes["documents.{$index}.type"] = __('forms.document_type');
-            }
-        }
-
-        return $attributes;
     }
 
     /**

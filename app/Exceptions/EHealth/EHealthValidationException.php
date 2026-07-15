@@ -117,9 +117,28 @@ class EHealthValidationException extends EHealthException
             'employee_request' => __('forms.employee_requests'),
             'doctor.science_degree' => __('forms.science_degree'),
             'party.documents.[0].number' => __('forms.document_number'),
+            'party.documents.*.number' => __('forms.document_number'),
+            'party.documents.*.type' => __('forms.document_type'),
+            'party.documents.*.issued_by' => __('forms.document_issued_by'),
+            'party.documents.*.issued_at' => __('forms.document_issued_at'),
+            'party.phones.*.number' => __('forms.phone_number'),
+            'party.phones.*.type' => __('forms.phone_type'),
             'doctor.qualifications' => __('forms.qualifications'),
             'doctor.specialities' => __('forms.specialities'),
             'doctor.specialities.speciality_officio' => __('forms.speciality_officio'),
+            'doctor.specialities.*.speciality' => __('forms.speciality'),
+            'doctor.specialities.*.speciality_officio' => __('forms.speciality_officio'),
+            'doctor.specialities.*.attestation_name' => __('forms.issued_by'),
+            'doctor.specialities.*.level' => __('forms.speciality_level'),
+            'doctor.educations.*.city' => __('forms.city'),
+            'doctor.educations.*.institution_name' => __('forms.institutionName'),
+            'doctor.educations.*.speciality' => __('forms.speciality'),
+            'code.coding[0].value' => __('care-plan.ehealth_fields.service_or_device_code'),
+            'code.coding[0]' => __('care-plan.ehealth_fields.service_or_device_code'),
+            'based_on[1].identifier.value' => __('care-plan.ehealth_fields.based_on_activity'),
+            'quantity.code' => __('care-plan.ehealth_fields.quantity_code'),
+            'requester.identifier.value' => __('care-plan.ehealth_fields.requester'),
+            'authored_on' => __('care-plan.ehealth_fields.authored_on'),
         ];
 
         $invalidErrors = Arr::get($this->details, 'error.invalid') ?? Arr::get($this->details, 'invalid') ?? [];
@@ -134,13 +153,18 @@ class EHealthValidationException extends EHealthException
             }
 
             $eHealthKey = str_replace(['$.', 'employee_request.'], '', $eHealthKey);
-            $translatedKey = $eHealthFieldTranslations[$eHealthKey] ?? $eHealthKey;
+            $normalizedKey = preg_replace('/\.?\[\d+\]/', '.*', $eHealthKey);
+            $translatedKey = $eHealthFieldTranslations[$normalizedKey] ?? $eHealthFieldTranslations[$eHealthKey] ?? $eHealthKey;
 
             $translatedMessage = '';
 
             if (str_contains($message, 'employee doesn\'t have speciality with active speciality_officio')) {
                 $translatedMessage = __(
                     'errors.ehealth.messages.employee doesn\'t have speciality with active speciality_officio'
+                );
+            } elseif (str_contains($message, 'employee have more than one speciality with active speciality_officio')) {
+                $translatedMessage = __(
+                    'errors.ehealth.messages.multiple_primary_specialities'
                 );
             } elseif (str_contains($message, 'speciality') && str_contains(
                 $message,
@@ -165,6 +189,16 @@ class EHealthValidationException extends EHealthException
                     : $message;
             } elseif (str_contains($message, 'Another activity with status') && str_contains($message, 'already exists')) {
                 $translatedMessage = __('errors.ehealth.messages.another_activity_exists');
+            } elseif (str_contains($message, 'Activity not found')) {
+                $translatedMessage = __('errors.ehealth.messages.activity_not_found_in_ehealth');
+            } elseif (str_contains($message, 'Requester doesn\'t match with encounter performer')) {
+                $translatedMessage = __('errors.ehealth.messages.requester_encounter_mismatch');
+            } elseif (str_contains($message, 'Not found any active Device Definition')) {
+                $translatedMessage = $message;
+            } elseif (str_contains($message, 'Authored on date must be in range')) {
+                $translatedMessage = __('errors.ehealth.messages.authored_on_out_of_range');
+            } elseif (!empty($message)) {
+                $translatedMessage = $message;
             }
 
             if (empty($translatedMessage) && !empty($ruleName)) {
@@ -174,8 +208,12 @@ class EHealthValidationException extends EHealthException
                 }
             }
 
+            if (empty($translatedMessage) && !empty($message)) {
+                $translatedMessage = $message;
+            }
+
             if (empty($translatedMessage)) {
-                $translatedMessage = __('errors.ehealth.messages.untranslated_error_message', ['message' => $message]);
+                $translatedMessage = __('errors.ehealth.messages.untranslated_error_message', ['message' => $message ?: __('errors.ehealth.messages.request_error')]);
             }
 
             return "{$translatedKey}: {$translatedMessage}";

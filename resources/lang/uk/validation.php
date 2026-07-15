@@ -271,6 +271,18 @@ return [
             'employee_type_code_forbidden' => 'Цей код діагнозу недоступний для вашого типу співробітника',
             'speciality_condition_code_forbidden' => 'Спеціальність встановлювача діагнозу не дозволяє використовувати код :code'
         ],
+        'form.documents' => [
+            'min' => 'Необхідно додати хоча б один документ, що посвідчує особу.',
+        ],
+        'form.doctor.educations' => [
+            'min' => 'Для ролі лікаря необхідно заповнити розділ "Освіта".',
+        ],
+        'form.doctor.specialities' => [
+            'min' => 'Для ролі лікаря необхідно заповнити розділ "Спеціальності".',
+        ],
+        'form.party.email' => [
+            'unique' => 'Користувач з такою поштою вже зареєстрований у цій мед. організації.',
+        ],
     ],
 
     'employee' => [
@@ -353,10 +365,6 @@ return [
         'documents.*.number' => __('forms.document_number'),
         'documents.*.issuedBy' => __('forms.document_issued_by'),
         'documents.*.issuedAt' => __('forms.document_issued_at'),
-        'form.documents.min' => 'Необхідно додати хоча б один документ, що посвідчує особу.',
-        'form.doctor.educations.min' => 'Для ролі лікаря необхідно заповнити розділ "Освіта".',
-        'form.doctor.specialities.min' => 'Для ролі лікаря необхідно заповнити розділ "Спеціальності".',
-        'form.party.email.unique' => 'Користувач з такою поштою вже зареєстрований у цій мед. організації.',
         'form.documents' => __('forms.documents'),
         'form.phoneNumber' => __('forms.phone_number'),
         'form.doctor.educations' => __('forms.education'),
@@ -847,7 +855,7 @@ return [
         'employeeId' => 'ПІБ лікаря',
 
         // Equipment
-        'names.*.name' => 'назва медичного обладнання',
+        'names.*.name' => 'назва медичного виробу',
         'names.*.type' => 'тип назви',
         'serialNumber' => 'серійний №',
         'recorder' => 'співробітник, що вносить дані',

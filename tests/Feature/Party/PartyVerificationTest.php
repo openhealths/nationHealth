@@ -207,9 +207,9 @@ class PartyVerificationTest extends TestCase
         $mockPartyApi->shouldReceive('update')
             ->with($party->uuid, [
                 'dracs_death' => [
-                    'status' => 'VERIFIED',
-                    'reason' => 'MANUAL_NOT_CONFIRMED',
-                    'comment' => 'Everything is fine',
+                    'verification_status' => 'VERIFIED',
+                    'verification_reason' => 'MANUAL_NO_DEATH_RECORD',
+                    'verification_comment' => 'Everything is fine',
                 ]
             ])
             ->once()
@@ -222,7 +222,7 @@ class PartyVerificationTest extends TestCase
             ->assertSet('showUpdateModal', true)
             ->set('status', 'VERIFIED')
             ->assertSet('reason', '') // Assert reactivity resets reason
-            ->set('reason', 'MANUAL_NOT_CONFIRMED')
+            ->set('reason', 'MANUAL_NO_DEATH_RECORD')
             ->set('comment', 'Everything is fine')
             ->call('updateStatus')
             ->assertHasNoErrors();

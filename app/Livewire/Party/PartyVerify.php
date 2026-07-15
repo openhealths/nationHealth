@@ -29,9 +29,9 @@ class PartyVerify extends Component
     public bool $showUpdateModal = false;
 
     #[Validate('required|string|in:VERIFIED,NOT_VERIFIED')]
-    public string $status = '';
+    public string $status = 'VERIFIED';
 
-    #[Validate('required_if:status,NOT_VERIFIED|string|max:255')]
+    #[Validate('required|string|max:255')]
     public string $reason = '';
 
     #[Validate('nullable|string|max:1000')]
@@ -97,13 +97,13 @@ class PartyVerify extends Component
             if (!empty($data['data']['details']) && is_array($data['data']['details'])) {
                 $data['data']['details'] = array_filter(
                     $data['data']['details'],
-                    static fn($key) => in_array($key, $allowedStreams, true),
+                    static fn ($key) => in_array($key, $allowedStreams, true),
                     ARRAY_FILTER_USE_KEY
                 );
             } elseif (!empty($data['details']) && is_array($data['details'])) {
                 $data['details'] = array_filter(
                     $data['details'],
-                    static fn($key) => in_array($key, $allowedStreams, true),
+                    static fn ($key) => in_array($key, $allowedStreams, true),
                     ARRAY_FILTER_USE_KEY
                 );
             }
@@ -119,6 +119,8 @@ class PartyVerify extends Component
     {
         if ($this->canUpdateVerification) {
             $this->showUpdateModal = true;
+            $this->status = 'VERIFIED';
+            $this->verificationStream = 'dracs_death';
         } else {
             $message = __('party_verification.update_unavailable_reason')
                 ?? 'Оновлення даних наразі неможливе, оскільки статус не потребує верифікації.';
@@ -147,18 +149,12 @@ class PartyVerify extends Component
         ]);
 
         try {
-            $data = [
-                'verification_status' => $this->status,
-                'verification_reason' => $this->reason,
-                'verification_comment' => $this->comment,
-            ];
-
             // Wrap the data in the stream key
             $payload = [
                 $this->verificationStream => [
-                    'status' => $this->status,
-                    'reason' => $this->reason,
-                    'comment' => $this->comment,
+                    'verification_status' => $this->status,
+                    'verification_reason' => $this->reason,
+                    'verification_comment' => $this->comment,
                 ]
             ];
 

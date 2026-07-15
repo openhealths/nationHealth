@@ -14,7 +14,7 @@ class EmployeePolicy
 {
     public function viewAny(User $user): Response
     {
-        return $user->can('employee:read')
+        return ($user->can('employee:read') || $user->hasAllowedRole([Role::ADMIN, Role::HR]))
             ? Response::allow()
             : Response::deny(__('employees.policy.view_any_denied'));
     }
@@ -25,7 +25,7 @@ class EmployeePolicy
             return Response::denyWithStatus(404);
         }
 
-        return $user->can('employee:details')
+        return ($user->can('employee:details') || $user->hasAllowedRole([Role::ADMIN, Role::HR]))
             ? Response::allow()
             : Response::deny(__('employees.policy.view_denied'));
     }
@@ -43,7 +43,7 @@ class EmployeePolicy
         }
 
         // 3. Check if there is a connection with the user (user_id)
-        if (is_null($employee->party?->users()->first()?->id)) {
+        if (is_null($employee->party?->users()->first()?->id) && !$user->hasAllowedRole([Role::ADMIN, Role::HR])) {
             return Response::deny(__('employees.policy.no_user_linked'));
         }
 
@@ -53,7 +53,7 @@ class EmployeePolicy
         }
 
         // 5. Checking the access rights of the current user (ACL)
-        return $user->can('employee:write')
+        return ($user->can('employee:write') || $user->hasAllowedRole([Role::ADMIN, Role::HR]))
             ? Response::allow()
             : Response::deny(__('employees.policy.update_denied'));
     }
@@ -64,7 +64,7 @@ class EmployeePolicy
             return Response::denyWithStatus(404);
         }
 
-        return $user->can('employee:deactivate')
+        return ($user->can('employee:deactivate') || $user->hasAllowedRole([Role::ADMIN, Role::HR]))
             ? Response::allow()
             : Response::deny(__('employees.policy.deactivate_denied'));
     }
