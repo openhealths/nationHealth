@@ -65,12 +65,9 @@ class PartyVerificationSyncStatusOnLogin
             return;
         }
 
-        // 3. CHECK: Scope (party_verification:details or :read — ADMIN has details, not read)
+        // 3. CHECK: Scope (party_verification:details)
         // We manually validate the JWT scope to ensure the user has permission BEFORE making a request.
-        if (
-            !$this->tokenHasScope($token, self::SCOPE_REQUIRED)
-            && !$this->tokenHasScope($token, 'party_verification:read')
-        ) {
+        if (!$this->tokenHasScope($token, self::SCOPE_REQUIRED)) {
             Log::info('Party verification sync skipped: User missing required scope.', [
                 'user_id' => $user->id,
                 'required_scope' => self::SCOPE_REQUIRED,

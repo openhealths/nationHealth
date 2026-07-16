@@ -29,7 +29,7 @@ class PartyVerificationIndex extends Component
 
     public function mount(LegalEntity $legalEntity): void
     {
-        if (!ehealthCanAccessPartyVerification()) {
+        if (!ehealthHasScope('party_verification:details')) {
             abort(403, __('forms.no_actions_available'));
         }
         $this->legalEntity = $legalEntity;

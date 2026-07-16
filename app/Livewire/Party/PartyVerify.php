@@ -40,7 +40,7 @@ class PartyVerify extends Component
 
     public function mount(LegalEntity $legalEntity, Party $party): void
     {
-        if (!ehealthCanAccessPartyVerification()) {
+        if (!ehealthHasScope('party_verification:details')) {
             abort(403, __('forms.no_actions_available'));
         }
 
