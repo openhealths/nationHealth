@@ -1,44 +1,47 @@
-# Quickstart / Manual UAT — ESОЗ 3.23 (PR #488 branch)
+# Quickstart / Manual UAT — ESОЗ 3.23 (PR #488)
+
+**Повний алгоритм:** [uat-algorithm-3-23.md](./uat-algorithm-3-23.md)
 
 **Branch**: `i485_i486_i487_esoz_employee_party_uat`  
-**Login**: `/dev/login` — credentials from project rules (PRIMARY_CARE + OUTPATIENT)
+**Login**: `/dev/login` — credentials from project rules (PRIMARY_CARE + OUTPATIENT); for 3.23 prefer OWNER/HR/ADMIN.
 
 ## Preconditions
 
-- [ ] Sail up; DB restored with LE + employee scopes
-- [ ] `vendor/bin/sail artisan config:clear` before tests
-- [ ] Roles OWNER or HR/ADMIN available
+- [ ] Sail up; DB with LE + employee / party_verification scopes
+- [ ] `vendor/bin/sail artisan config:clear` before PHPUnit
+- [ ] Roles OWNER / HR / ADMIN (or PHARMACY_OWNER) available
 
-## A. Create employee request (3.23.1)
+## Smoke checklist (all gaps closed)
 
-- [ ] A1 Open create → status not editable; draft behaves as NEW
-- [ ] A2 Fill position / type / start_date / division
-- [ ] A3 Party: names, birth_date, gender, tax_id or no_tax_id + identity doc, email, phones
-- [ ] A4 Medical type: education + specialities; try two primary → validation error
-- [ ] A5 Sign KEP → success; **check whether invitation wording is shown** (expect GAP until T012)
-- [ ] A6 Force API error → can edit and resubmit
+### A. Create (3.23.1)
 
-## B. Update APPROVED employee (3.23.1.7)
+- [ ] A1 Create form opens for elevated roles
+- [ ] A2 Draft status «Новий»; no user-editable status field
+- [ ] A3 Position / type / start_date / division filled
+- [ ] A4 Party + identity doc; PASSPORT = series + number fields
+- [ ] A5 Medical: exactly one primary speciality; two primaries fail
+- [ ] A6 «Завершити та підписати» → **preview modal** → KEP
+- [ ] A7 Success flash mentions **email invitation**
+- [ ] A8 After submit: uuid present; edit/delete hidden (pending NEW)
 
-- [ ] B1 Open edit for APPROVED → `employee_id` path
-- [ ] B2 Confirm tax_id / birth_date locked
-- [ ] B3 Confirm position / type / start_date **locked** (expect FAIL until T010)
-- [ ] B4 Confirm division **editable** (expect FAIL until T011)
+### B. Update APPROVED (3.23.1.7)
 
-## C. Lists & verification (3.23.2–3.23.3)
+- [ ] B1 tax_id / birth_date locked
+- [ ] B2 position / employee_type / start_date locked
+- [ ] B3 division editable
+- [ ] B4 Preview → KEP → invitation flash
 
-- [ ] C1 Requests list: PIB, datetime, status filter; note missing id (GAP T021)
-- [ ] C2 Request details show status + inserted_at
-- [ ] C3 Employees list filters; note missing tax_id / verification_status (GAP T020)
-- [ ] C4 Party verify: DRFO/DRACS/DMS NOT_VERIFIED warnings match TZ
-- [ ] C5 Death confirm/refute + comment → MANUAL_CONFIRMED / MANUAL_NOT_CONFIRMED
+### C. Lists (3.23.2–3.23.3)
 
-## D. Deactivation (3.23.4)
+- [ ] C1 Requests list shows **id/uuid**, PIB, datetime, status filter
+- [ ] C2 Employees list filters: tax_id, verification_status (+ status, division, type)
+- [ ] C3 Party card shows tax_id + verification_status
+- [ ] C4 Show SPECIALIST/ASSISTANT: professional blocks visible
 
-- [ ] D1 STOPPED requires end_date in [start_date, today]
-- [ ] D2 ENTERED_IN_ERROR sends no end_date
-- [ ] D3 DOCTOR vs other confirmation texts
+### D. Verification & deactivate
 
-## E. Show professional data
-
-- [ ] E1 Open show for SPECIALIST/ASSISTANT — professional blocks visible (expect FAIL until T013)
+- [ ] D1 DRFO/DRACS/DMS NOT_VERIFIED warnings match TZ
+- [ ] D2 Death confirm/refute: MANUAL_CONFIRMED / MANUAL_NOT_CONFIRMED + comment
+- [ ] D3 STOPPED needs end_date in [start_date, today]
+- [ ] D4 ENTERED_IN_ERROR omits end_date
+- [ ] D5 DOCTOR confirmation mentions declarations
