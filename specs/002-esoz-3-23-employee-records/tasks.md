@@ -27,9 +27,9 @@
 
 ## Phase 3 — Low / polish
 
-- [ ] T030 **FR-GAP-323-DOC-SERIES**: Clarify PASSPORT series+number UX vs DocumentNumber rule
-- [ ] T031 Align delete-draft modal wording («чернетка») with status labels
-- [ ] T032 PHPUnit coverage for T010–T022
+- [x] T030 **FR-GAP-323-DOC-SERIES**: Clarify PASSPORT series+number UX vs DocumentNumber rule
+- [x] T031 Align delete-draft modal wording («чернетка») with status labels
+- [x] T032 PHPUnit coverage for T010–T022
 - [ ] T033 Full manual UAT via `quickstart.md`
 
 ## Out of scope

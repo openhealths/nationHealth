@@ -132,7 +132,7 @@ As OWNER/HR/ADMIN I can deactivate APPROVED employee with STOPPED (end_date) or 
 | **FR-GAP-323-OFFICIO-ONE** | 3.23.1.3.5 | ~~Medium~~ **FIXED** | Exactly one `speciality_officio=true` for medical types |
 | **FR-GAP-323-OWNER-FALLBACK** | 3.23.1.1 | ~~Medium~~ **FIXED** | OWNER/PHARMACY_OWNER elevated like ADMIN/HR in policies/UI |
 | **FR-GAP-323-STATUS-MODEL** | 3.23.1.2.1 / UAT | ~~Medium~~ **FIXED** | Keep NEW after create; draft = NEW+uuid null; SIGNED = «Надіслано» |
-| **FR-GAP-323-DOC-SERIES** | 3.23.1.3.2 | Low | Series+number often combined in one `number` field (PASSPORT) vs separate series UX |
+| **FR-GAP-323-DOC-SERIES** | 3.23.1.3.2 | ~~Low~~ **FIXED** | Separate series + number UI for PASSPORT-like docs; API still gets combined `number` |
 
 ### Non-Goals
 

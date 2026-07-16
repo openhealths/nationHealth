@@ -83,7 +83,11 @@
                                 @foreach($this->form->documents as $document)
                                     <li>
                                         {{ $this->dictionaries['DOCUMENT_TYPE'][$document['type'] ?? ''] ?? ($document['type'] ?? '—') }}:
-                                        {{ $document['number'] ?? '—' }}
+                                        {{ \App\Support\EmployeeDocumentSeriesNumber::combine(
+                                            $document['type'] ?? null,
+                                            $document['series'] ?? null,
+                                            $document['number'] ?? null
+                                        ) ?: '—' }}
                                     </li>
                                 @endforeach
                             </ul>
