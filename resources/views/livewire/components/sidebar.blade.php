@@ -176,7 +176,7 @@
                                 </a>
                             </li>
 
-                            @if(ehealthHasScope('party_verification:details'))
+                            @can('party_verification:details')
                                 <li>
                                     <a href="{{ route('party.verification.index', [legalEntity()]) }}"
                                        class="submenu-item"
@@ -185,7 +185,7 @@
                                         <span>{{ __('forms.verifications') }}</span>
                                     </a>
                                 </li>
-                            @endif
+                            @endcan
                         </ul>
                     </li>
                 @endif
