@@ -20,7 +20,7 @@ class PartyVerificationSync extends EHealthJob
     use ProcessesPartyVerificationResponses;
 
     public const string BATCH_NAME = 'PartyVerificationFullSync';
-    public const string SCOPE_REQUIRED = 'party_verification:read';
+    public const string SCOPE_REQUIRED = 'party_verification:details';
 
     /**
      * @throws EHealthConnectionException

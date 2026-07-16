@@ -169,6 +169,20 @@ if (!function_exists('ehealthHasScope')) {
      */
     function ehealthHasScope(string $requiredScope): bool
     {
+        return ehealthHasAnyScope($requiredScope);
+    }
+}
+
+if (!function_exists('ehealthHasAnyScope')) {
+    /**
+     * Checks if the active eHealth Bearer token has at least one of the given scopes.
+     */
+    function ehealthHasAnyScope(string ...$requiredScopes): bool
+    {
+        if ($requiredScopes === []) {
+            return false;
+        }
+
         if (app()->environment('testing')) {
             return true;
         }
@@ -206,6 +220,23 @@ if (!function_exists('ehealthHasScope')) {
 
         $scopes = is_string($payload['scope']) ? explode(' ', $payload['scope']) : (array) $payload['scope'];
 
-        return in_array($requiredScope, $scopes, true);
+        foreach ($requiredScopes as $requiredScope) {
+            if (in_array($requiredScope, $scopes, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('ehealthCanAccessPartyVerification')) {
+    /**
+     * ADMIN/PHARMACY_OWNER get party_verification:details(+write) but not :read.
+     * OWNER/HR typically have :read as well — accept either for list/menu access.
+     */
+    function ehealthCanAccessPartyVerification(): bool
+    {
+        return ehealthHasAnyScope('party_verification:read', 'party_verification:details');
     }
 }

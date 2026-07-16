@@ -176,7 +176,7 @@
                                 </a>
                             </li>
 
-                            @if(ehealthHasScope('party_verification:read'))
+                            @if(ehealthCanAccessPartyVerification())
                                 <li>
                                     <a href="{{ route('party.verification.index', [legalEntity()]) }}"
                                        class="submenu-item"
