@@ -23,7 +23,7 @@ class PartyVerificationSyncStatusOnLogin
 {
     use ProcessesPartyVerificationResponses;
 
-    public const string SCOPE_REQUIRED = 'party_verification:read';
+    public const string SCOPE_REQUIRED = 'party_verification:details';
     // Cache key prefix: party_verification_last_run:{legal_entity_id}
     private const string CACHE_KEY_PREFIX = 'party_verification_last_run:';
     private const int CACHE_TTL_SECONDS = 86400; // 24 hours
@@ -49,6 +49,7 @@ class PartyVerificationSyncStatusOnLogin
 
         if (Cache::has($cacheKey)) {
             Log::info('Party verification sync skipped: Already ran today.', ['legal_entity_id' => $legalEntity->id]);
+
             return;
         }
 
@@ -60,16 +61,21 @@ class PartyVerificationSyncStatusOnLogin
             $token = $event->token;
         } catch (Throwable $e) {
             Log::error('Party verification listener: Token decryption failed.', ['error' => $e->getMessage()]);
+
             return;
         }
 
-        // 3. CHECK: Scope (party_verification:read)
+        // 3. CHECK: Scope (party_verification:details or :read — ADMIN has details, not read)
         // We manually validate the JWT scope to ensure the user has permission BEFORE making a request.
-        if (!$this->tokenHasScope($token, self::SCOPE_REQUIRED)) {
+        if (
+            !$this->tokenHasScope($token, self::SCOPE_REQUIRED)
+            && !$this->tokenHasScope($token, 'party_verification:read')
+        ) {
             Log::info('Party verification sync skipped: User missing required scope.', [
                 'user_id' => $user->id,
-                'required_scope' => self::SCOPE_REQUIRED
+                'required_scope' => self::SCOPE_REQUIRED,
             ]);
+
             return;
         }
 
@@ -118,10 +124,9 @@ class PartyVerificationSyncStatusOnLogin
 
     /**
      * Checks if the JWT token contains the specified scope.
+     *
      * * @param string $token The raw Bearer token (JWT).
-     *
-     * @param string $requiredScope The scope to check for.
-     *
+     * @param  string  $requiredScope  The scope to check for.
      * @return bool
      * @throws JsonException
      */
