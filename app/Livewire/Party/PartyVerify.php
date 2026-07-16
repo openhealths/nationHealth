@@ -72,9 +72,16 @@ class PartyVerify extends Component
     {
         // 1. Getting the current death status
         $deathStatus = data_get($this->verificationDetails, 'details.dracs_death.verification_status');
+        $deathReason = data_get($this->verificationDetails, 'details.dracs_death.verification_reason');
 
-        // 2. Allow the button if the status is 'NOT_VERIFIED' or 'VERIFICATION_NEEDED'
-        return in_array($deathStatus, ['NOT_VERIFIED', 'VERIFICATION_NEEDED'], true);
+        // 2. Allow the button if status is NOT_VERIFIED, VERIFICATION_NEEDED,
+        // or VERIFIED with a manual DRACS reason (ESОЗ acceptance codes).
+        if (in_array($deathStatus, ['NOT_VERIFIED', 'VERIFICATION_NEEDED'], true)) {
+            return true;
+        }
+
+        return $deathStatus === 'VERIFIED'
+            && in_array($deathReason, ['MANUAL_CONFIRMED', 'MANUAL_NOT_CONFIRMED'], true);
     }
 
     /**
