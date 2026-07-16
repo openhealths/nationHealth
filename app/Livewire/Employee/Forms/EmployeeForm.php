@@ -271,7 +271,7 @@ class EmployeeForm extends Form
             'doctor.educations.*.speciality' => ['required', 'string', 'max:255'],
 
             'doctor.specialities' => array_merge($specialitiesRules, [
-                function (string $attribute, mixed $value, \Closure $fail): void {
+                function (string $attribute, mixed $value, \Closure $fail) use ($isMedicalType): void {
                     if (!is_array($value)) {
                         return;
                     }
@@ -286,6 +286,8 @@ class EmployeeForm extends Form
 
                     if ($primaryCount > 1) {
                         $fail(__('errors.ehealth.messages.multiple_primary_specialities'));
+                    } elseif ($isMedicalType && $primaryCount !== 1) {
+                        $fail(__('errors.ehealth.messages.missing_primary_speciality'));
                     }
                 },
             ]),

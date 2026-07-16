@@ -26,6 +26,6 @@ enum VerificationStatus: string
      */
     public function label(): string
     {
-        return Lang::get('general.verification_statuses.' . $this->value);
+        return Lang::get('party_verification.statuses.' . $this->value);
     }
 }

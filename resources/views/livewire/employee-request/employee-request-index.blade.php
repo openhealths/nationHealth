@@ -6,9 +6,9 @@
         $currentUser = auth()->user();
 
        $permissions = [
-        'request_view'   => $currentUser->can('employee_request:read'),
-        'request_write'  => $currentUser->can('employee_request:write'),
-        'request_delete' => $currentUser->can('employee_request:write'),
+        'request_view'   => $currentUser->can('employee_request:read') || $currentUser->hasAllowedRole([\App\Enums\User\Role::ADMIN, \App\Enums\User\Role::HR, \App\Enums\User\Role::OWNER, \App\Enums\User\Role::PHARMACY_OWNER]),
+        'request_write'  => $currentUser->can('employee_request:write') || $currentUser->hasAllowedRole([\App\Enums\User\Role::ADMIN, \App\Enums\User\Role::HR, \App\Enums\User\Role::OWNER, \App\Enums\User\Role::PHARMACY_OWNER]),
+        'request_delete' => $currentUser->can('employee_request:write') || $currentUser->hasAllowedRole([\App\Enums\User\Role::ADMIN, \App\Enums\User\Role::HR, \App\Enums\User\Role::OWNER, \App\Enums\User\Role::PHARMACY_OWNER]),
 
         'employee_view' => false, 'employee_write' => false, 'employee_deactivate' => false
     ];
@@ -64,17 +64,23 @@
                     <table class="index-table">
                         <thead class="index-table-thead">
                         <tr>
-                            <th class="index-table-th w-[25%]">{{ __('forms.full_name') }}</th>
-                            <th class="index-table-th w-[20%]">{{ __('forms.role') }}</th>
-                            <th class="index-table-th w-[20%]">{{ __('forms.division') }}</th>
-                            <th class="index-table-th w-[15%]">{{ __('forms.created_at') }}</th>
-                            <th class="index-table-th w-[14%]">{{ __('forms.status.label') }}</th>
-                            <th class="index-table-th w-[6%]">{{ __('forms.action') }}</th>
+                            <th class="index-table-th w-[12%]">{{ __('forms.request_id') }}</th>
+                            <th class="index-table-th w-[22%]">{{ __('forms.full_name') }}</th>
+                            <th class="index-table-th w-[16%]">{{ __('forms.role') }}</th>
+                            <th class="index-table-th w-[16%]">{{ __('forms.division') }}</th>
+                            <th class="index-table-th w-[14%]">{{ __('forms.created_at') }}</th>
+                            <th class="index-table-th w-[12%]">{{ __('forms.status.label') }}</th>
+                            <th class="index-table-th w-[8%]">{{ __('forms.action') }}</th>
                         </tr>
                         </thead>
                         <tbody>
                         @foreach($requests as $request)
                             <tr class="index-table-tr">
+                                <td class="index-table-td">
+                                    <span class="font-mono text-xs" title="{{ $request->uuid ?? $request->id }}">
+                                        {{ $request->uuid ?? $request->id }}
+                                    </span>
+                                </td>
                                 <td class="index-table-td-primary">
                                     @php
                                         $data = $request->revision->data ?? [];

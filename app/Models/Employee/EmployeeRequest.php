@@ -105,6 +105,43 @@ class EmployeeRequest extends BaseEmployee
         return $this->morphMany(Speciality::class, 'specialityable');
     }
 
+    /**
+     * Local draft not yet submitted to eHealth (editable / deletable).
+     */
+    public function isLocalDraft(): bool
+    {
+        return $this->status === RequestStatus::NEW && empty($this->uuid);
+    }
+
+    /**
+     * Submitted to eHealth, awaiting APPROVED / REJECTED / EXPIRED.
+     */
+    public function isPendingEhealth(): bool
+    {
+        if (!empty($this->uuid) && in_array($this->status, [RequestStatus::NEW, RequestStatus::SIGNED], true)) {
+            return true;
+        }
+
+        return $this->status === RequestStatus::SIGNED && empty($this->applied_at);
+    }
+
+    /**
+     * @param  Builder<EmployeeRequest>  $query
+     * @return Builder<EmployeeRequest>
+     */
+    public function scopePendingEhealth(Builder $query): Builder
+    {
+        return $query->whereNull('applied_at')
+            ->where(function (Builder $q): void {
+                $q->where(function (Builder $inner): void {
+                    $inner->whereNotNull('uuid')
+                        ->whereIn('status', [RequestStatus::NEW, RequestStatus::SIGNED]);
+                })->orWhere(function (Builder $inner): void {
+                    $inner->where('status', RequestStatus::SIGNED);
+                });
+            });
+    }
+
     // --- TEMPORARY SCOPES (to be removed after controller refactoring) ---
 
     public function scopeEmployeeInstance(Builder $query, int $userId, string $legalEntityUUID, array $roles, bool $isInclude = false): void

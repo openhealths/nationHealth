@@ -37,6 +37,7 @@ return [
             'type mismatch. Expected integer but got string' => 'Невірний тип даних (очікувалося число)',
             'type mismatch. Expected object but got null' => 'Невірний тип даних (очікувався об’єкт)',
             'employee doesn\'t have speciality with active speciality_officio' => 'Відсутня основна спеціалізація',
+            'missing_primary_speciality' => 'Необхідно позначити рівно одну спеціальність як основну.',
             'speciality not allowed' => 'Невірна спеціалізація для лікаря',
             'Incorrect value.' => 'Некоректне значення.',
             'required' => 'відсутнє',

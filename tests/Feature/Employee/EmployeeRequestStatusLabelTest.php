@@ -11,9 +11,9 @@ use Tests\TestCase;
 class EmployeeRequestStatusLabelTest extends TestCase
 {
     #[Test]
-    public function pending_request_statuses_display_as_new(): void
+    public function pending_request_statuses_have_expected_labels(): void
     {
         $this->assertSame('Новий', RequestStatus::NEW->label());
-        $this->assertSame('Новий', RequestStatus::SIGNED->label());
+        $this->assertSame('Надіслано', RequestStatus::SIGNED->label());
     }
 }

@@ -62,4 +62,50 @@ class EmployeePrimarySpecialityValidationTest extends TestCase
             $validator->errors()->first('doctor.specialities')
         );
     }
+
+    #[Test]
+    public function rejects_zero_primary_specialities_for_medical_type(): void
+    {
+        $component = new class extends Component
+        {
+            public array $dictionaries = [
+                'GENDER' => ['MALE' => 'Чоловік'],
+                'PHONE_TYPE' => ['MOBILE' => 'Мобільний'],
+                'POSITION' => ['P1' => 'Лікар'],
+            ];
+
+            public function render()
+            {
+                return '';
+            }
+        };
+
+        $form = new EmployeeForm($component, 'form');
+        $form->employeeType = 'DOCTOR';
+
+        $method = new ReflectionMethod(EmployeeForm::class, 'doctorRules');
+        $rules = $method->invoke($form);
+
+        $validator = Validator::make(
+            [
+                'doctor' => [
+                    'specialities' => [
+                        [
+                            'speciality' => 'FAMILY_DOCTOR',
+                            'specialityOfficio' => false,
+                        ],
+                    ],
+                ],
+            ],
+            [
+                'doctor.specialities' => $rules['doctor.specialities'],
+            ]
+        );
+
+        $this->assertTrue($validator->fails());
+        $this->assertStringContainsString(
+            'рівно одну спеціальність',
+            $validator->errors()->first('doctor.specialities')
+        );
+    }
 }

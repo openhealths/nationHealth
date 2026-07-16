@@ -41,9 +41,9 @@ class EmployeeIndexAdminActionsTest extends TestCase
 
         $admin = Mockery::mock(User::class)->makePartial();
         $admin->shouldReceive('can')->with('employee:write')->andReturn(false);
-        $admin->shouldReceive('hasAllowedRole')->with([Role::ADMIN, Role::HR])->andReturn(true);
+        $admin->shouldReceive('hasAllowedRole')->with([Role::ADMIN, Role::HR, Role::OWNER, Role::PHARMACY_OWNER])->andReturn(true);
 
-        $response = (new EmployeePolicy)->update($admin, $employee);
+        $response = (new EmployeePolicy())->update($admin, $employee);
 
         $this->assertTrue($response->allowed());
     }

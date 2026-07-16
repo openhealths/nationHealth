@@ -60,6 +60,8 @@ class EmployeeIndex extends EmployeeComponent
         'role' => '',
         'position' => '',
         'division_id' => '',
+        'tax_id' => '',
+        'verification_status' => '',
     ];
 
     // --- State for Modals ---
@@ -214,6 +216,16 @@ class EmployeeIndex extends EmployeeComponent
         // 4. Filter: Phone
         if (!empty($this->filter['phone'])) {
             $query->whereHas('phones', fn ($q) => $q->where('number', 'like', '%' . $this->filter['phone'] . '%'));
+        }
+
+        // 5. Filter: tax_id (РНОКПП) — 3.23.3.1.1
+        if (!empty($this->filter['tax_id'])) {
+            $query->where('tax_id', 'ILIKE', '%' . trim($this->filter['tax_id']) . '%');
+        }
+
+        // 6. Filter: overall party verification_status — 3.23.3.1.1
+        if (!empty($this->filter['verification_status'])) {
+            $query->where('verification_status', $this->filter['verification_status']);
         }
     }
 
@@ -651,8 +663,8 @@ class EmployeeIndex extends EmployeeComponent
         if ($this->requestToDeleteId) {
             $request = EmployeeRequest::with('revision')->find($this->requestToDeleteId);
 
-            // Make sure the request exists and it's a draft (without UUID)
-            if ($request && !$request->uuid) {
+            // Make sure the request exists and it's a local draft (without UUID)
+            if ($request && $request->isLocalDraft()) {
 
                 // 1. Delete the related revision if it exists
                 if ($request->revision) {

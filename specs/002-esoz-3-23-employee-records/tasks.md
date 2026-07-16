@@ -19,11 +19,11 @@
 
 ## Phase 2 — Medium
 
-- [ ] T020 **FR-GAP-323-EMP-FILTERS**: Employees list filters + columns for tax_id and verification_status
-- [ ] T021 **FR-GAP-323-REQ-ID**: Show request id on EmployeeRequestIndex
-- [ ] T022 **FR-GAP-323-OFFICIO-ONE**: Validate exactly one `speciality_officio=true` for medical types
-- [ ] T023 **FR-GAP-323-OWNER-FALLBACK**: Policy/UI elevate OWNER + PHARMACY_OWNER like ADMIN/HR when scopes incomplete
-- [ ] T024 **FR-GAP-323-STATUS-MODEL**: Integrate / merge #493 (keep NEW after eHealth create)
+- [x] T020 **FR-GAP-323-EMP-FILTERS**: Employees list filters + columns for tax_id and verification_status
+- [x] T021 **FR-GAP-323-REQ-ID**: Show request id on EmployeeRequestIndex
+- [x] T022 **FR-GAP-323-OFFICIO-ONE**: Validate exactly one `speciality_officio=true` for medical types
+- [x] T023 **FR-GAP-323-OWNER-FALLBACK**: Policy/UI elevate OWNER + PHARMACY_OWNER like ADMIN/HR when scopes incomplete
+- [x] T024 **FR-GAP-323-STATUS-MODEL**: Keep NEW after eHealth create; local draft = NEW+uuid null; SIGNED label «Надіслано»
 
 ## Phase 3 — Low / polish
 

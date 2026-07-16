@@ -12,9 +12,19 @@ use Illuminate\Auth\Access\Response;
 
 class EmployeePolicy
 {
+    /**
+     * Roles that may manage employees even when eHealth scopes are incomplete (3.23.1.1 / 3.23.3).
+     *
+     * @return list<Role>
+     */
+    private function elevatedRoles(): array
+    {
+        return [Role::ADMIN, Role::HR, Role::OWNER, Role::PHARMACY_OWNER];
+    }
+
     public function viewAny(User $user): Response
     {
-        return ($user->can('employee:read') || $user->hasAllowedRole([Role::ADMIN, Role::HR]))
+        return ($user->can('employee:read') || $user->hasAllowedRole($this->elevatedRoles()))
             ? Response::allow()
             : Response::deny(__('employees.policy.view_any_denied'));
     }
@@ -25,7 +35,7 @@ class EmployeePolicy
             return Response::denyWithStatus(404);
         }
 
-        return ($user->can('employee:details') || $user->hasAllowedRole([Role::ADMIN, Role::HR]))
+        return ($user->can('employee:details') || $user->hasAllowedRole($this->elevatedRoles()))
             ? Response::allow()
             : Response::deny(__('employees.policy.view_denied'));
     }
@@ -33,7 +43,7 @@ class EmployeePolicy
     public function update(User $user, Employee $employee): Response
     {
         // 1. Verification of affiliation with the current institution
-        if ((int)$employee->legalEntityId !== (int)legalEntity()->id) {
+        if ((int) $employee->legalEntityId !== (int) legalEntity()->id) {
             return Response::denyWithStatus(404);
         }
 
@@ -43,7 +53,7 @@ class EmployeePolicy
         }
 
         // 3. Check if there is a connection with the user (user_id)
-        if (is_null($employee->party?->users()->first()?->id) && !$user->hasAllowedRole([Role::ADMIN, Role::HR])) {
+        if (is_null($employee->party?->users()->first()?->id) && !$user->hasAllowedRole($this->elevatedRoles())) {
             return Response::deny(__('employees.policy.no_user_linked'));
         }
 
@@ -53,7 +63,7 @@ class EmployeePolicy
         }
 
         // 5. Checking the access rights of the current user (ACL)
-        return ($user->can('employee:write') || $user->hasAllowedRole([Role::ADMIN, Role::HR]))
+        return ($user->can('employee:write') || $user->hasAllowedRole($this->elevatedRoles()))
             ? Response::allow()
             : Response::deny(__('employees.policy.update_denied'));
     }
@@ -64,7 +74,7 @@ class EmployeePolicy
             return Response::denyWithStatus(404);
         }
 
-        return ($user->can('employee:deactivate') || $user->hasAllowedRole([Role::ADMIN, Role::HR, Role::OWNER, Role::PHARMACY_OWNER]))
+        return ($user->can('employee:deactivate') || $user->hasAllowedRole($this->elevatedRoles()))
             ? Response::allow()
             : Response::deny(__('employees.policy.deactivate_denied'));
     }

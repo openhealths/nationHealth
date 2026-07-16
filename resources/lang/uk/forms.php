@@ -226,6 +226,8 @@ return [
     'employee_request_preview_hint' => 'Перевірте внесені дані. Після підтвердження можна накласти електронний підпис.',
     'proceed_to_kep_sign' => 'Продовжити до підпису ЕП',
     'request_status_label' => 'Статус запиту',
+    'all_verification_statuses' => 'Усі статуси верифікації',
+    'request_id' => 'ID запиту',
     'save_and_send' => 'Зберегти та надіслати',
     'cyrillic_with_spaces_and_dots' => ':Attribute має містити лише кириличні символи, пробіли та крапки.',
     'update_verification_status_dracs' => 'Оновити статус верифікації працівника в ДРАЦС',

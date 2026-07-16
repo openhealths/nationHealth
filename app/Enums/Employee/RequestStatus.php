@@ -22,8 +22,8 @@ enum RequestStatus: string
             self::NEW => 'Новий',
             self::APPROVED => 'Підтверджено',
             self::REJECTED => 'Відхилено',
-            // Pending before eHealth approval — UI must show «Новий» (п.1.2.1), not «Підписано в ЕСОЗ»
-            self::SIGNED => 'Новий',
+            // Legacy local status after KEP; new flow keeps NEW after Create Employee Request v2
+            self::SIGNED => 'Надіслано',
             self::EXPIRED => 'Протермінований',
         };
     }
