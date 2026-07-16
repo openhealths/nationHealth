@@ -188,6 +188,8 @@
 Phase1 → Phase2 → US1 → US2 → US3 → (US4 ∥ US5) → US6 → US7 → Polish
 ```
 
+**Clarify 2026-07-17**: Priority = **B** — finish US1–US3 before US6 Cancel/Complete.
+
 US4 і US5 можуть йти паралельно після US3.  
 US6 залежить від US1 persistence fixes (T004/T013).
 

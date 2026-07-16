@@ -28,6 +28,7 @@
 - Q: Звідки брати контент для підпису Cancel Care Plan? → A: Обов’язково `Get Care Plan by ID` з ЕСОЗ, потім підписувати CBD-знімок + `status_reason` (без activities). Патерн як у `CarePlanShow::signStatusActivity` (getDetails → clean → sign). Локальна збірка payload для cancel плану — заборонена як primary path (часта 422 Signed content doesn't match).
 - Q: Як оформити Complete в UI? → A: Окремий flow без КЕП (модалка: причина + підтвердження); Cancel — окремо через signature modal з КЕП.
 - Q: Хто бачить кнопку «Скасувати план»? → A: Cancel — лише автор плану; Complete — автор або працівник того ж LE з write Approval.
+- Q: З чого починати імплементацію першим? → A: Спочатку US1–US3 (create plan / approvals / activities), потім US6 Cancel/Complete плану.
 
 ---
 

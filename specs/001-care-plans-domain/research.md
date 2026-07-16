@@ -3,7 +3,10 @@
 **Date**: 2026-07-16  
 **Feature**: `001-care-plans-domain`
 
-## R1. Що дає вставлене ТЗ (3.2–3.3) для Care Plans
+## Implementation priority (clarify)
+
+**Order**: US1 → US2 → US3 first; then US4/US5; then US6 (Cancel/Complete CBD-first + split UI).  
+Do not start US6 ahead of create/approval/activity foundation unless a hotfix is explicitly requested.
 
 **Decision**: Трактувати 3.2/3.3 як **передумови та суміжні контракти**, не як повний текст вимог до Care Plan.
 
