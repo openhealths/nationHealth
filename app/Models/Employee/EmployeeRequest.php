@@ -106,39 +106,50 @@ class EmployeeRequest extends BaseEmployee
     }
 
     /**
-     * Local draft not yet submitted to eHealth (editable / deletable).
+     * Local draft: not yet submitted to eHealth (no uuid). Status stays NEW.
      */
     public function isLocalDraft(): bool
     {
-        return $this->status === RequestStatus::NEW && empty($this->uuid);
+        return $this->uuid === null
+            && $this->status === RequestStatus::NEW
+            && $this->applied_at === null;
     }
 
     /**
-     * Submitted to eHealth, awaiting APPROVED / REJECTED / EXPIRED.
+     * Submitted to eHealth, awaiting APPROVED/REJECTED/EXPIRED.
+     * Includes legacy rows that still use local SIGNED status.
      */
     public function isPendingEhealth(): bool
     {
-        if (!empty($this->uuid) && in_array($this->status, [RequestStatus::NEW, RequestStatus::SIGNED], true)) {
+        if ($this->applied_at !== null) {
+            return false;
+        }
+
+        if ($this->status === RequestStatus::SIGNED) {
             return true;
         }
 
-        return $this->status === RequestStatus::SIGNED && empty($this->applied_at);
+        return $this->status === RequestStatus::NEW && $this->uuid !== null;
     }
 
     /**
+     * Pending eHealth decision: NEW with uuid, or legacy SIGNED.
+     *
      * @param  Builder<EmployeeRequest>  $query
      * @return Builder<EmployeeRequest>
      */
     public function scopePendingEhealth(Builder $query): Builder
     {
-        return $query->whereNull('applied_at')
-            ->where(function (Builder $q): void {
-                $q->where(function (Builder $inner): void {
-                    $inner->whereNotNull('uuid')
-                        ->whereIn('status', [RequestStatus::NEW, RequestStatus::SIGNED]);
-                })->orWhere(function (Builder $inner): void {
-                    $inner->where('status', RequestStatus::SIGNED);
-                });
+        return $query
+            ->whereNull('applied_at')
+            ->where(function (Builder $inner): void {
+                $inner
+                    ->where('status', RequestStatus::SIGNED)
+                    ->orWhere(function (Builder $newSubmitted): void {
+                        $newSubmitted
+                            ->where('status', RequestStatus::NEW)
+                            ->whereNotNull('uuid');
+                    });
             });
     }
 

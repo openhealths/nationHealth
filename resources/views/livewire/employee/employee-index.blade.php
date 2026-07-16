@@ -29,6 +29,7 @@
     $statusOptions = [
         Status::APPROVED->value => __('forms.status.active'),
         Status::NEW->value => __('forms.status.new'),
+        // Legacy local SIGNED rows (pre keep-NEW); same UI meaning as submitted NEW
         Status::SIGNED->value => __('forms.status.new'),
         Status::STOPPED->value => __('forms.status.stopped'),
         Status::ENTERED_IN_ERROR->value => __('forms.status.entered_in_error'),
@@ -437,8 +438,9 @@
                                                         <span class="badge-yellow">{{__('forms.status.reorganized')}}</span>
                                                     @endif
                                                 @else
-                                                    {{-- Employee request after Create Employee Request v2 is NEW (п.3.1.1.4 / 1.2.1) --}}
-                                                    @if(in_array($employeeStatus, [Status::NEW->value, Status::SIGNED->value], true))
+                                                    @if($position->isLocalDraft())
+                                                        <span class="badge-red">{{__('forms.status.draft')}}</span>
+                                                    @elseif($position->isPendingEhealth())
                                                         <span class="badge-yellow">{{__('forms.status.new')}}</span>
                                                     @endif
                                                 @endif

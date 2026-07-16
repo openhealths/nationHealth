@@ -109,10 +109,10 @@
                                 </td>
 
                                 <td class="index-table-td">
-                                    @if($request->status == \App\Enums\Employee\RequestStatus::NEW)
-                                        <span class="badge-yellow">{{ $request->status->label() }}</span>
-                                    @elseif($request->status == \App\Enums\Employee\RequestStatus::SIGNED)
-                                        <span class="badge-yellow">{{ $request->status->label() }}</span>
+                                    @if($request->isLocalDraft())
+                                        <span class="badge-red">{{ __('forms.status.draft') }}</span>
+                                    @elseif($request->isPendingEhealth())
+                                        <span class="badge-yellow">{{ __('forms.status.new') }}</span>
                                     @elseif($request->status == \App\Enums\Employee\RequestStatus::APPROVED)
                                         <span class="badge-green">{{ $request->status->label() }}</span>
                                     @else
