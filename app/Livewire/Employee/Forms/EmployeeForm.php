@@ -22,6 +22,7 @@ use App\Rules\BirthDate;
 use App\Rules\PhoneNumber;
 use App\Rules\PhoneDuplicates;
 use App\Models\Relations\Party;
+use App\Models\User;
 use Illuminate\Validation\Rule;
 use App\Models\Employee\Employee;
 use App\Rules\UniqueEmailInLegalEntity;
@@ -343,8 +344,7 @@ class EmployeeForm extends Form
         $this->party['birthDate'] = convertToAppDateFormat($party->birthDate);
         $this->party['taxId'] = $party->taxId;
         $this->party['noTaxId'] = (bool)$party->noTaxId;
-        $user = $party->users->first();
-        $this->party['email'] = $user ? $user->email : null;
+        $this->party['email'] = $this->resolvePartyEmailForCurrentLegalEntity($party);
         $this->party['workingExperience'] = $party->workingExperience;
         $this->party['aboutMyself'] = $party->aboutMyself;
 
@@ -366,6 +366,44 @@ class EmployeeForm extends Form
                 ];
             })->toArray();
         }
+    }
+
+    /**
+     * Prefer a user linked to this party in the current legal entity over users from other LEs.
+     */
+    private function resolvePartyEmailForCurrentLegalEntity(Party $party): ?string
+    {
+        $legalEntityId = legalEntity()?->id;
+
+        if ($legalEntityId) {
+            $user = User::query()
+                ->where('party_id', $party->id)
+                ->where(function ($query) use ($legalEntityId, $party) {
+                    $query->whereHas(
+                        'employees',
+                        fn ($employees) => $employees
+                            ->where('legal_entity_id', $legalEntityId)
+                            ->where('party_id', $party->id)
+                    )->orWhereIn(
+                        'id',
+                        Employee::query()
+                            ->where('legal_entity_id', $legalEntityId)
+                            ->where('party_id', $party->id)
+                            ->whereNotNull('user_id')
+                            ->select('user_id')
+                    );
+                })
+                ->oldest('id')
+                ->first();
+
+            if ($user) {
+                return $user->email;
+            }
+        }
+
+        $party->loadMissing('users');
+
+        return $party->users->sortBy('id')->first()?->email;
     }
 
     private function hydrateFromEmployee(Employee $employee): void
