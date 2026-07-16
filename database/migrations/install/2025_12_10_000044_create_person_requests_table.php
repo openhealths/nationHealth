@@ -19,9 +19,6 @@ return new class extends Migration
             $table->uuid()->unique()->nullable();
             $table->enum('status', Status::values());
             $table->foreignId('person_id')->nullable()->constrained('persons');
-            $table->string('first_name');
-            $table->string('last_name');
-            $table->string('second_name')->nullable();
             $table->date('birth_date');
             $table->string('birth_country');
             $table->string('birth_settlement');

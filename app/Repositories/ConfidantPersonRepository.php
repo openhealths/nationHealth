@@ -12,6 +12,7 @@ use App\Models\Relations\Phone;
 use App\Models\Relations\Document;
 use App\Models\Relations\ConfidantPerson;
 use Exception;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class ConfidantPersonRepository
@@ -33,13 +34,18 @@ class ConfidantPersonRepository
             $documentsPerson = Arr::pull($personData, 'documents_person', null);
             $documentsRelationship = Arr::pull($personData, 'documents_relationship', null);
             $phones = Arr::pull($personData, 'phones', []);
+            $names = Arr::pull($personData, 'names', []);
             // $relationType = Arr::pull($personData, 'relation_type', null);
 
             unset($personData['relation_type'], $personData['preferred_way_communication']);
 
-            $query = Person::where('first_name', $personData['first_name'])
-                ->where('last_name', $personData['last_name'])
-                ->where('birth_date', $personData['birth_date']);
+            $primaryName = collect($names)->firstWhere('language', 'uk') ?? ($names[0] ?? []);
+
+            $query = Person::whereHas('names', static function (Builder $query) use ($primaryName): void {
+                $query->where('language', $primaryName['language'] ?? null)
+                    ->where('first_name', $primaryName['first_name'] ?? null)
+                    ->where('last_name', $primaryName['last_name'] ?? null);
+            })->where('birth_date', $personData['birth_date']);
 
             if (!empty($personData['tax_id'])) {
                 $query->where('tax_id', $personData['tax_id']);
@@ -49,6 +55,8 @@ class ConfidantPersonRepository
 
             if (empty($person)) {
                 $person = Person::forceCreate($personData);
+
+                $person->names()->createMany($names);
 
                 Repository::declarationRequest()->syncRelatedData(
                     $person,

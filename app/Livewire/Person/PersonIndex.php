@@ -51,8 +51,11 @@ class PersonIndex extends Component
 
     public bool $showAdditionalParams;
 
+    public array $dictionaryNames = ['DOCUMENT_TYPE', 'LANGUAGE'];
+
     public function mount(LegalEntity $legalEntity): void
     {
+        $this->getDictionary();
     }
 
     /**
@@ -65,13 +68,16 @@ class PersonIndex extends Component
         $this->activeFilter = 'all';
 
         // Reset search form fields
+        $this->form->language = 'uk';
         $this->form->firstName = '';
         $this->form->lastName = '';
+        $this->form->noLastName = false;
         $this->form->birthDate = '';
         $this->form->secondName = '';
         $this->form->taxId = '';
         $this->form->phoneNumber = '';
-        $this->form->birthCertificate = '';
+        $this->form->documentType = '';
+        $this->form->documentNumber = '';
 
         // Clear patients list
         $this->patients = [];
@@ -127,10 +133,21 @@ class PersonIndex extends Component
         $validated['birthDate'] = convertToYmd($validated['birthDate']);
         $phoneNumber = data_get($validated, 'phoneNumber');
         $filters = Arr::except(removeEmptyKeys(Arr::toSnakeCase($validated)), ['phone_number']);
+        $nameFilters = Arr::only($filters, ['language', 'first_name', 'last_name', 'second_name', 'no_last_name']);
+        $documentFilters = Arr::whereNotNull([
+            'type' => $filters['document_type'] ?? null,
+            'number' => $filters['document_number'] ?? null
+        ]);
+        $filters = Arr::except(
+            $filters,
+            ['language', 'first_name', 'last_name', 'second_name', 'no_last_name', 'document_type', 'document_number']
+        );
 
         // Search for persons in our DB
-        $persons = Person::with('phones')
+        $persons = Person::with(['phones', 'names', 'documents'])
             ->where($filters)
+            ->forNameFilters($nameFilters)
+            ->forDocumentFilters($documentFilters)
             ->when($phoneNumber, static function ($query) use ($phoneNumber) {
                 $query->whereHas('phones', static function (Builder $query) use ($phoneNumber) {
                     $query->whereNumber($phoneNumber);
@@ -141,9 +158,6 @@ class PersonIndex extends Component
                 'uuid',
                 'gender',
                 'birth_settlement',
-                'first_name',
-                'last_name',
-                'second_name',
                 'birth_date',
                 'tax_id',
                 'verification_status'
@@ -153,9 +167,11 @@ class PersonIndex extends Component
         $persons = $this->setPersonSource($persons, 'local');
 
         // Search for person_requests
-        $personRequests = PersonRequest::with('phones')
+        $personRequests = PersonRequest::with(['phones', 'names', 'documents'])
             ->where($filters)
             ->whereIn('status', [Status::DRAFT, Status::NEW, Status::APPROVED, Status::REJECTED])
+            ->forNameFilters($nameFilters)
+            ->forDocumentFilters($documentFilters)
             ->when($phoneNumber, static function ($query) use ($phoneNumber) {
                 $query->whereHas('phones', static function (Builder $query) use ($phoneNumber) {
                     $query->whereNumber($phoneNumber);
@@ -166,9 +182,6 @@ class PersonIndex extends Component
                 'status',
                 'gender',
                 'birth_settlement',
-                'first_name',
-                'last_name',
-                'second_name',
                 'birth_date',
                 'tax_id'
             ])
@@ -257,15 +270,17 @@ class PersonIndex extends Component
         // Validate incoming data
         $validator = Validator::make($patientData, [
             'uuid' => ['required', 'uuid'],
-            'firstName' => ['required', 'string', 'max:255'],
-            'lastName' => ['required', 'string', 'max:255'],
+            'names' => ['required', 'array', 'min:1'],
+            'names.*.language' => ['required', 'string', 'max:255'],
+            'names.*.firstName' => ['required', 'string', 'max:255'],
+            'names.*.lastName' => ['nullable', 'string', 'max:255'],
+            'names.*.secondName' => ['nullable', 'string', 'max:255'],
+            'names.*.noLastName' => ['sometimes', 'boolean'],
             'birthDate' => ['required', 'date'],
             'birthCountry' => ['required', 'string', 'max:255'],
             'birthSettlement' => ['required', 'string', 'max:255'],
             'gender' => ['required', new InDictionary('GENDER')],
-            'second_name' => ['nullable', 'string', 'max:255'],
-            'taxId' => ['nullable', 'string', 'size:10', Rule::unique('persons', 'tax_id')],
-            'birth_certificate' => ['nullable', 'string', 'max:255'],
+            'taxId' => ['nullable', 'string', 'size:10', Rule::unique('persons', 'tax_id')]
         ]);
 
         $phoneValidator = Validator::make($patientData['phones'] ?? [], [
@@ -283,7 +298,14 @@ class PersonIndex extends Component
         $validatedPhones = $phoneValidator->validated();
 
         try {
-            $person = Person::firstOrCreate(['uuid' => $validated['uuid']], Arr::toSnakeCase($validated));
+            $person = Person::firstOrCreate(
+                ['uuid' => $validated['uuid']],
+                Arr::toSnakeCase(Arr::except($validated, ['names']))
+            );
+
+            if ($person->wasRecentlyCreated) {
+                $person->names()->createMany(Arr::toSnakeCase($validated['names']));
+            }
 
             if (!empty($validatedPhones)) {
                 $person->phones()->createMany($validatedPhones);

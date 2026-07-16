@@ -10,6 +10,7 @@ use App\Models\Employee\Employee;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\Relations\ConfidantPerson;
+use App\Models\Relations\PersonName;
 use App\Models\MedicalEvents\Sql\Approval;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -55,6 +56,16 @@ class Person extends BasePerson
     public function personRequest(): HasOne
     {
         return $this->hasOne(PersonRequest::class);
+    }
+
+    /**
+     * The person's name groups, one per language.
+     *
+     * @return HasMany
+     */
+    public function names(): HasMany
+    {
+        return $this->hasMany(PersonName::class);
     }
 
     /**

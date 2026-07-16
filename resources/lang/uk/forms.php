@@ -210,7 +210,6 @@ return [
     'issued_by' => 'Ким виданий документ',
     'issued_at' => 'Коли виданий',
     'select_document_type' => 'Оберіть тип документа',
-    'birth_certificate' => 'Свідоцтво про народження',
     'uploading_documents' => 'Завантаження документів',
     'remove_document' => 'Видалити документ',
 

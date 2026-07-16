@@ -137,8 +137,11 @@ abstract class BasePatientComponent extends Component
         }
 
         $patient = Person::whereId($this->personId)
-            ->with(['declarations' => fn (HasMany $declaration) => $declaration->active()->latest()->take(1)])
-            ->select(['id', 'uuid', 'first_name', 'last_name', 'second_name', 'verification_status'])
+            ->with([
+                'names',
+                'declarations' => fn (HasMany $declaration) => $declaration->active()->latest()->take(1)
+            ])
+            ->select(['id', 'uuid', 'verification_status'])
             ->firstOrFail();
 
         $this->patientFullName = $patient->fullName;

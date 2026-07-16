@@ -125,6 +125,7 @@ class PatientData extends BasePatientComponent
         'DOCUMENT_TYPE',
         'DOCUMENT_RELATIONSHIP_TYPE',
         'GENDER',
+        'LANGUAGE',
         'PHONE_TYPE',
         'SETTLEMENT_TYPE'
     ];
@@ -145,15 +146,17 @@ class PatientData extends BasePatientComponent
         $this->getDictionary();
 
         $patient = Person::with([
+            'names',
             'phones',
             'authenticationMethods',
+            'confidantPersons.person.names',
             'confidantPersons.person.documents',
             'confidantPersons.person.phones',
             'confidantPersons.documentsRelationship'
         ])->whereId($this->personId)->firstOrFail();
 
-        $this->firstName = $patient->firstName;
-        $this->lastName = $patient->lastName;
+        $this->firstName = $patient->primaryName?->firstName ?? '';
+        $this->lastName = $patient->primaryName?->lastName ?? '';
         $this->phones = $patient->phones->toArray();
         $this->form->person = Arr::toCamelCase($patient->toArray());
         $this->confidantPersonRelationshipRequests = $this->loadConfidantPersonRelationshipRequests($patient);
@@ -313,9 +316,9 @@ class PatientData extends BasePatientComponent
     {
         // Check if an Approval already exists for the current person and is in the APPROVED state
         $existingApproval = Approval::getByModel($this->personId, Person::class)
-                ->whereStatus(Status::APPROVED->value)
-                ->whereNotNull('uuid')
-                ->first();
+            ->whereStatus(Status::APPROVED->value)
+            ->whereNotNull('uuid')
+            ->first();
 
         // If syncing is already in progress, one needs to check the status of the existing approval.
         if ($this->isSyncing && $existingApproval) {
@@ -326,7 +329,7 @@ class PatientData extends BasePatientComponent
                 Session::flash('error', __('patients.errors.approval_expired'));
 
                 // If it is alive but not verified, one needs to resend the SMS code or/and show the confirmation modal.
-            } else if (!$existingApproval->isVerified()->exists()) {
+            } elseif (!$existingApproval->isVerified()->exists()) {
                 // Check if the approval sms code still active (14 min from last Approvals's updated_at)
                 if (!MERepository::approval()->isSmsCodeAlive($existingApproval)) {
                     $this->resendApprovalSms($existingApproval);

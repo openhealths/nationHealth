@@ -332,9 +332,6 @@ class TestUserMigrate extends Seeder
                 $personId = DB::table('persons')->insertGetId([
                     'uuid' => '60c00b7e-b12a-429c-a9cd-4138fd0132cc',
                     'verification_status' => 'VERIFIED',
-                    'first_name' => 'Михайло',
-                    'last_name' => 'Грушевський',
-                    'second_name' => 'Сергійович',
                     'birth_date' => new Carbon('1985-01-07'),
                     'birth_country' => 'Україна',
                     'birth_settlement' => null, // Here set to null to properly synchronization
@@ -355,6 +352,19 @@ class TestUserMigrate extends Seeder
                     'created_at' => new Carbon(),
                     'updated_at' => new Carbon()
                 ]);
+
+                DB::table('person_names')->insert([
+                    'person_id' => $personId,
+                    'language' => 'uk',
+                    'first_name' => 'Михайло',
+                    'last_name' => 'Грушевський',
+                    'second_name' => 'Сергійович',
+                    'no_last_name' => false,
+                    'created_at' => new Carbon(),
+                    'updated_at' => new Carbon()
+                ]);
+
+                $this->command->info("\tINFO: A new PersonName entry has been successfully inserted into the database");
 
                 DB::table('phones')->insert([
                     'type' => 'MOBILE',

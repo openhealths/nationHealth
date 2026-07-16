@@ -7,6 +7,10 @@ namespace App\Repositories;
 use App\Core\Arr;
 use App\Models\Person\Person;
 use App\Models\Person\PersonRequest;
+use App\Models\Relations\ConfidantPerson;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOneOrMany;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -27,12 +31,13 @@ class PersonRequestRepository
         $personData = $validatedData['person'];
         $personFields = Arr::except(
             $personData,
-            ['documents', 'phones', 'authentication_methods', 'addresses', 'confidant_person']
+            ['names', 'documents', 'phones', 'authentication_methods', 'addresses', 'confidant_person']
         );
 
         DB::transaction(static function () use ($personFields, $personData) {
             $personRequest = PersonRequest::create($personFields);
 
+            $personRequest->names()->createMany($personData['names']);
             $personRequest->documents()->createMany($personData['documents']);
             $personRequest->addresses()->createMany($personData['addresses']);
             $personRequest->authenticationMethods()->createMany($personData['authentication_methods']);
@@ -73,55 +78,23 @@ class PersonRequestRepository
         $personData = $validatedData['person'];
         $personFields = Arr::except(
             $personData,
-            ['documents', 'phones', 'authentication_methods', 'addresses', 'confidant_person']
+            ['names', 'documents', 'phones', 'authentication_methods', 'addresses', 'confidant_person']
         );
 
-        DB::transaction(static function () use ($id, $personFields, $personData) {
+        DB::transaction(function () use ($id, $personFields, $personData): void {
             $personRequest = PersonRequest::findOrFail($id);
             $personRequest->update($personFields);
 
-            $personRequest->documents()->delete();
-            $personRequest->documents()->createMany($personData['documents']);
+            $this->syncChildren($personRequest->names(), $personData['names']);
+            $this->syncChildren($personRequest->documents(), $personData['documents']);
+            $this->syncChildren($personRequest->addresses(), $personData['addresses']);
+            $this->syncChildren(
+                $personRequest->authenticationMethods(),
+                $personData['authentication_methods']
+            );
+            $this->syncChildren($personRequest->phones(), $personData['phones'] ?? []);
 
-            $personRequest->addresses()->delete();
-            $personRequest->addresses()->createMany($personData['addresses']);
-
-            $personRequest->authenticationMethods()->delete();
-            $personRequest->authenticationMethods()->createMany($personData['authentication_methods']);
-
-            $personRequest->phones()->delete();
-            if (!empty($personData['phones'])) {
-                $personRequest->phones()->createMany($personData['phones']);
-            }
-
-            // Confidant persons - now using HasMany relationship
-            $existingConfidants = $personRequest->confidantPersons;
-
-            if (!empty($personData['confidant_person'])) {
-                // Delete existing confidant persons
-                foreach ($existingConfidants as $existingConfidant) {
-                    $existingConfidant->documentsRelationship()->delete();
-                    $existingConfidant->delete();
-                }
-
-                $confidant = $personRequest->confidantPersons()->create([
-                    'uuid' => $personData['uuid'],
-                    'person_id' => $personData['confidant_person']['person_id'],
-                    'subject_person_id' => $personRequest->personId
-                ]);
-
-                if (!empty($personData['confidant_person']['documents_relationship'])) {
-                    $confidant->documentsRelationship()->createMany(
-                        $personData['confidant_person']['documents_relationship']
-                    );
-                }
-            } elseif ($existingConfidants->isNotEmpty()) {
-                // Delete all existing confidant persons
-                foreach ($existingConfidants as $existingConfidant) {
-                    $existingConfidant->documentsRelationship()->delete();
-                    $existingConfidant->delete();
-                }
-            }
+            $this->syncConfidantPerson($personRequest, $personData);
         });
     }
 
@@ -137,12 +110,13 @@ class PersonRequestRepository
         $personData = $validatedData['person'];
         $personFields = Arr::except(
             $personData,
-            ['documents', 'phones', 'addresses', 'confidant_person']
+            ['names', 'documents', 'phones', 'addresses', 'confidant_person']
         );
 
         DB::transaction(static function () use ($personFields, $personData) {
             $personRequest = PersonRequest::create($personFields);
 
+            $personRequest->names()->createMany($personData['names']);
             $personRequest->documents()->createMany($personData['documents']);
             $personRequest->addresses()->createMany($personData['addresses']);
 
@@ -164,6 +138,88 @@ class PersonRequestRepository
     }
 
     /**
+     * Sync child rows positionally: update the row already sitting at each position, create the missing ones and drop the surplus tail.
+     *
+     * @param  HasOneOrMany  $relation
+     * @param  array  $rows
+     * @return void
+     */
+    private function syncChildren(HasOneOrMany $relation, array $rows): void
+    {
+        $existingRows = $relation->get();
+        $rows = array_values($rows);
+
+        foreach ($rows as $index => $row) {
+            $existingRow = $existingRows[$index] ?? null;
+
+            if ($existingRow) {
+                $existingRow->update($row);
+            } else {
+                $relation->create($row);
+            }
+        }
+
+        $existingRows->slice(count($rows))->each(static fn (Model $extra): ?bool => $extra->delete());
+    }
+
+    /**
+     * Sync the confidant person: keep the existing row when it still points to the same person,
+     * drop the ones that no longer belong to the request.
+     *
+     * @param  PersonRequest  $personRequest
+     * @param  array  $personData
+     * @return void
+     */
+    private function syncConfidantPerson(PersonRequest $personRequest, array $personData): void
+    {
+        $confidantPersonData = $personData['confidant_person'] ?? [];
+        $existingConfidants = $personRequest->confidantPersons()->get();
+
+        if (empty($confidantPersonData)) {
+            $this->deleteConfidantPersons($existingConfidants);
+
+            return;
+        }
+
+        $confidant = $existingConfidants->firstWhere('person_id', $confidantPersonData['person_id']);
+
+        $this->deleteConfidantPersons(
+            $existingConfidants->reject(static fn (ConfidantPerson $existing): bool => $existing->is($confidant))
+        );
+
+        $attributes = [
+            'uuid' => $personData['uuid'],
+            'person_id' => $confidantPersonData['person_id'], // Who is a confidant person
+            'subject_person_id' => $personRequest->personId // Who needs a confidant person
+        ];
+
+        if ($confidant) {
+            $confidant->update($attributes);
+        } else {
+            $confidant = $personRequest->confidantPersons()->create($attributes);
+        }
+
+        $this->syncChildren(
+            $confidant->documentsRelationship(),
+            $confidantPersonData['documents_relationship'] ?? []
+        );
+    }
+
+    /**
+     * Delete confidant persons along with the documents proving the relationship.
+     *
+     * @param  Collection  $confidantPersons
+     * @return void
+     */
+    private function deleteConfidantPersons(Collection $confidantPersons): void
+    {
+        foreach ($confidantPersons as $confidantPerson) {
+            $confidantPerson->documentsRelationship()->delete();
+            $confidantPerson->delete();
+        }
+    }
+
+    /**
      * Set confidant person ID from provided UUID.
      *
      * @param  array  $validatedData
@@ -178,8 +234,12 @@ class PersonRequestRepository
 
         $confidantPerson = Person::firstOrCreate(
             ['uuid' => $confidantPersonData['uuid']],
-            Arr::toSnakeCase($confidantPersonData)
+            Arr::toSnakeCase(Arr::except($confidantPersonData, ['names']))
         );
+
+        if ($confidantPerson->wasRecentlyCreated && !empty($confidantPersonData['names'])) {
+            $confidantPerson->names()->createMany(Arr::toSnakeCase($confidantPersonData['names']));
+        }
 
         $validatedData['person']['confidant_person']['person_id'] = $confidantPerson->id;
     }

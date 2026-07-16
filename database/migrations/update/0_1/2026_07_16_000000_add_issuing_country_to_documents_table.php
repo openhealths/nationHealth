@@ -10,30 +10,36 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
+     *
+     * @return void
      */
     public function up(): void
     {
-        Schema::create('documents', static function (Blueprint $table) {
-            $table->id();
-            $table->string('type');
-            $table->string('number');
-            $table->string('issued_by')->nullable();
+        if (Schema::hasColumn('documents', 'issuing_country')) {
+            return;
+        }
+
+        Schema::table('documents', static function (Blueprint $table): void {
             $table->string('issuing_country')
                 ->nullable()
+                ->after('issued_by')
                 ->comment('Dictionary ISSUING_COUNTRY - country that issued the document');
-            $table->date('issued_at')->nullable();
-            $table->date('expiration_date')->nullable();
-            $table->date('active_to')->nullable();
-            $table->morphs('documentable');
-            $table->timestamps();
         });
     }
 
     /**
      * Reverse the migrations.
+     *
+     * @return void
      */
     public function down(): void
     {
-        Schema::dropIfExists('documents');
+        if (!Schema::hasColumn('documents', 'issuing_country')) {
+            return;
+        }
+
+        Schema::table('documents', static function (Blueprint $table): void {
+            $table->dropColumn('issuing_country');
+        });
     }
 };

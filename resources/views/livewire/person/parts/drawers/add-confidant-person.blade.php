@@ -1,18 +1,21 @@
-<div x-show="showConfidantPersonDrawer"
-     x-transition:enter="transition ease-out duration-300"
-     x-transition:enter-start="translate-x-full"
-     x-transition:enter-end="translate-x-0"
-     x-transition:leave="transition ease-in duration-200"
-     x-transition:leave-start="translate-x-0"
-     x-transition:leave-end="translate-x-full"
-     x-cloak
-     class="fixed top-0 right-0 z-40 h-screen pt-20 p-4 overflow-y-auto transition-transform bg-white w-4/5 dark:bg-gray-800 shadow-2xl"
-     x-data="{
-         showResults: false,
-         showDocumentDrawer: false,
-     }"
-     id="legal-representative-drawer"
-     tabindex="-1"
+@use('App\Enums\Person\Gender')
+
+<div
+    x-show="showConfidantPersonDrawer"
+    x-transition:enter="transition ease-out duration-300"
+    x-transition:enter-start="translate-x-full"
+    x-transition:enter-end="translate-x-0"
+    x-transition:leave="transition ease-in duration-200"
+    x-transition:leave-start="translate-x-0"
+    x-transition:leave-end="translate-x-full"
+    x-cloak
+    class="fixed top-0 right-0 z-40 h-screen pt-20 p-4 overflow-y-auto transition-transform bg-white w-4/5 dark:bg-gray-800 shadow-2xl"
+    x-data="{
+        showResults: false,
+        showDocumentDrawer: false,
+    }"
+    id="legal-representative-drawer"
+    tabindex="-1"
 >
     <h3 class="modal-header"
         x-text="isEditingLegalRep ? '{{ __('patients.edit_confidant_person') }}' : '{{ __('patients.add_confidant_person') }}'"
@@ -26,17 +29,19 @@
 
         @include('livewire.person.parts.search-filter', ['context' => 'create'])
         <div class="mb-9 mt-6 flex gap-2">
-            <button type="button"
-                    class="flex items-center gap-2 button-primary"
-                    @click="showResults = true"
-                    wire:click.prevent="searchForPerson"
+            <button
+                type="button"
+                class="flex items-center gap-2 button-primary"
+                @click="showResults = true"
+                wire:click.prevent="searchForPerson"
             >
                 @icon('search', 'w-4 h-4')
                 <span>{{ __('forms.search') }}</span>
             </button>
-            <button type="button"
-                    class="button-primary-outline-red"
-                    @click="showResults = false; resetSearchFilters()"
+            <button
+                type="button"
+                class="button-primary-outline-red"
+                @click="showResults = false; resetSearchFilters()"
             >
                 {{ __('forms.reset_all_filters') }}
             </button>
@@ -44,15 +49,20 @@
     </div>
 
     {{-- Results of founded --}}
-    <div class="space-y-6 mt-6" x-show="showResults" x-transition x-cloak>
+    <div class="space-y-6 mt-6" wire:ignore x-show="showResults" x-transition x-cloak>
         <template x-for="patient in $wire.confidantPerson" :key="patient.id">
             <fieldset class="fieldset" :class="{ 'ring-2 ring-blue-500': selectedPatient?.id === patient.id }">
-                <legend class="legend"
-                        x-text="`${patient.lastName} ${patient.firstName} ${patient.secondName || ''}`"
-                ></legend>
+                <legend class="legend">
+                    <template x-for="(patientName, index) in patient.names" :key="index">
+                        <span
+                            class="block"
+                            x-text="`${patientName.lastName ?? ''} ${patientName.firstName} ${patientName.secondName ?? ''}`.trim()"
+                        ></span>
+                    </template>
+                </legend>
 
                 <div
-                        class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-700 pb-4">
+                    class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-700 pb-4">
                     <div class="flex items-center flex-wrap gap-x-6 gap-y-2 text-sm text-gray-500 mt-2">
                         <span class="flex items-center gap-1.5" x-show="patient.birthDate">
                             <svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true"
@@ -66,47 +76,46 @@
                             <span x-text="patient.birthDate"></span>
                         </span>
 
-                        <span class="flex items-center gap-1.5 min-w-0" x-show="patient.phone">
+                        <span class="flex items-center gap-1.5 min-w-0" x-show="patient.phones?.[0]?.number">
                             @icon('tabler-phone', 'w-6 h-6 text-gray-800 dark:text-white')
-                            <a :href="'tel:' + patient.phone"
-                               class="truncate hover:underline font-medium text-gray-900 dark:text-gray-200 text-base"
-                               x-text="patient.phone"
+                            <a
+                                :href="'tel:' + patient.phones?.[0]?.number"
+                                class="truncate hover:underline font-medium text-gray-900 dark:text-gray-200 text-base"
+                                x-text="patient.phones?.[0]?.number"
                             ></a>
                         </span>
 
                         <span class="flex items-center gap-1.5" x-show="patient.gender">
-                            <template x-if="patient.gender === 'male'">
-                                <span class="flex items-center gap-1.5">
-                                    @icon('men', 'w-6 h-6 text-gray-800 dark:text-white')
-                                    <span>{{ __('patients.male') }}</span>
-                                </span>
-                            </template>
-                            <template x-if="patient.gender === 'female'">
-                                <span class="flex items-center gap-1.5">
-                                    @icon('women', 'w-6 h-6 text-gray-800 dark:text-white')
-                                    <span>{{ __('patients.female') }}</span>
-                                </span>
-                            </template>
+                            @foreach(Gender::cases() as $gender)
+                                <template x-if="patient.gender?.toUpperCase() === '{{ $gender->value }}'">
+                                    <span class="flex items-center gap-1.5">
+                                        @icon($gender->icon(), 'w-6 h-6 text-gray-800 dark:text-white')
+                                        <span>{{ $gender->label() }}</span>
+                                    </span>
+                                </template>
+                            @endforeach
                         </span>
                     </div>
 
-                    <button type="button"
-                            class="button-primary text-sm"
-                            @click="selectedPatient = patient"
-                            wire:click.prevent="chooseConfidantPerson(patient)"
+                    <button
+                        type="button"
+                        class="button-primary text-sm"
+                        @click="selectedPatient = patient"
+                        wire:click.prevent="chooseConfidantPerson(patient)"
                     >
                         {{ __('forms.select') }}
                     </button>
                 </div>
 
                 <div class="flow-root mt-4">
-                    <div class="max-w-screen-xl">
+                    <div class="max-w-7xl">
                         <table class="table-input w-full table-auto">
                             <thead class="thead-input">
                             <tr>
                                 <th scope="col" class="th-input">{{ __('forms.city') }}</th>
                                 <th scope="col" class="th-input">{{ __('forms.rnokpp') }}</th>
-                                <th scope="col" class="th-input">{{ __('patients.birth_certificate') }}</th>
+                                <th scope="col" class="th-input">{{ __('forms.document_type') }}</th>
+                                <th scope="col" class="th-input">{{ __('forms.document_number') }}</th>
                                 <th scope="col" class="th-input">{{ __('forms.status.label') }}</th>
                             </tr>
                             </thead>
@@ -120,7 +129,10 @@
                                     x-text="patient.taxId || '-'"
                                 ></td>
                                 <td class="td-input whitespace-nowrap overflow-hidden text-ellipsis align-top font-bold text-gray-900 dark:text-white"
-                                    x-text="patient.birthCertificate || '-'"
+                                    x-text="patient.documents?.map(patientDocument => $wire.dictionaries.DOCUMENT_TYPE[patientDocument.type] ?? patientDocument.type).join(', ') || '-'"
+                                ></td>
+                                <td class="td-input whitespace-nowrap overflow-hidden text-ellipsis align-top font-bold text-gray-900 dark:text-white"
+                                    x-text="patient.documents?.map(patientDocument => patientDocument.number).join(', ') || '-'"
                                 ></td>
                                 <td class="td-input whitespace-nowrap align-top">
                                     <span class="badge-green">{{ __('patients.source.ehealth') }}</span>
@@ -131,9 +143,10 @@
                     </div>
                 </div>
 
-                <div x-show="$wire.invalidPersonId === patient.id"
-                     x-cloak
-                     class="mt-4 p-4 rounded-lg bg-red-50 dark:bg-red-900/20"
+                <div
+                    x-show="$wire.invalidPersonId === patient.id"
+                    x-cloak
+                    class="mt-4 p-4 rounded-lg bg-red-50 dark:bg-red-900/20"
                 >
                     <div class="flex items-center gap-2">
                         @icon('alert-circle', 'w-5 h-5 text-red-700 dark:text-red-400')
@@ -160,25 +173,28 @@
         <button class="button-minor" type="button" @click="showConfidantPersonDrawer = false">
             {{ __('forms.cancel') }}
         </button>
-        <button x-show="isEditingLegalRep && selectedPatient"
-                class="button-primary"
-                type="button"
-                @click="saveConfidantPerson()"
+        <button
+            x-show="isEditingLegalRep && selectedPatient"
+            class="button-primary"
+            type="button"
+            @click="saveConfidantPerson()"
         >
             {{ __('forms.save') }}
         </button>
 
         @if($canManageConfidantRelationships)
-            <button type="button"
-                    class="button-primary"
-                    wire:click.prevent="createNewConfidantPersonRelationshipRequest"
+            <button
+                type="button"
+                class="button-primary"
+                wire:click.prevent="createNewConfidantPersonRelationshipRequest"
             >
                 {{ __('patients.add_confidant_person') }}
             </button>
         @else
-            <button type="button"
-                    class="button-primary"
-                    @click="addConfidantPersonToForm(); showConfidantPersonDrawer = false"
+            <button
+                type="button"
+                class="button-primary"
+                @click="addConfidantPersonToForm(); showConfidantPersonDrawer = false"
             >
                 {{ __('patients.add_confidant_person') }}
             </button>

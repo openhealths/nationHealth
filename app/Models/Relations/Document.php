@@ -27,6 +27,7 @@ class Document extends Model
         'type',
         'number',
         'issued_by',
+        'issuing_country',
         'issued_at',
         'expiration_date',
         'active_to'

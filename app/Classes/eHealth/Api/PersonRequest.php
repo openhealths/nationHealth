@@ -23,17 +23,16 @@ use Illuminate\Support\Facades\Validator;
 class PersonRequest extends Request
 {
     protected const string URL = '/api/person_requests';
-    protected const string URL_V2 = '/api/v2/person_requests';
     protected const string URL_V3 = '/api/v3/person_requests';
 
     /**
-     * Create Person Request v2 (as part of Person creation w/o declaration process).
+     * Create Person Request v3 (as part of Person creation w/o declaration process).
      *
      * @param  array  $data
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
-     * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/create/update-person-request-v2
+     * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/create/update-person-request-v3
      */
     public function create(array $data): PromiseInterface|EHealthResponse
     {
@@ -42,51 +41,51 @@ class PersonRequest extends Request
 
         $data = $this->format($data, ['birthDate', 'issuedAt', 'expirationDate', 'activeTo']);
 
-        return $this->post(self::URL_V2, $data);
+        return $this->post(self::URL_V3, $data);
     }
 
     /**
-     * Approve previously created Person Request v2.
+     * Approve previously created Person Request v3.
      *
      * @param  string  $id
      * @param  array  $data
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
-     * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/approve-person-request-v2
+     * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/approve-person-request-v3
      */
     public function approve(string $id, array $data = []): PromiseInterface|EHealthResponse
     {
-        return $this->patch(self::URL_V2 . "/$id/actions/approve", $data ?: (object)$data);
+        return $this->patch(self::URL_V3 . "/$id/actions/approve", $data ?: (object)$data);
     }
 
     /**
-     * Reject previously created Person Request v2.
+     * Reject previously created Person Request v3.
      *
      * @param  string  $id
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
-     * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/reject-person-request-v2
+     * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/reject-person-request-v3
      */
     public function reject(string $id): PromiseInterface|EHealthResponse
     {
-        return $this->patch(self::URL_V2 . "/$id/actions/reject");
+        return $this->patch(self::URL_V3 . "/$id/actions/reject");
     }
 
     /**
-     * Sign approved previously created Person Request v2.
+     * Sign approved previously created Person Request v3.
      *
      * @param  string  $id
      * @param  array  $data
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
-     * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/sign-person-request-v2
+     * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/sign-person-request-v3
      */
     public function signed(string $id, array $data): PromiseInterface|EHealthResponse
     {
-        return $this->patch(self::URL_V2 . "/$id/actions/sign", $data);
+        return $this->patch(self::URL_V3 . "/$id/actions/sign", $data);
     }
 
     /**
@@ -97,14 +96,14 @@ class PersonRequest extends Request
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
-     * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/get-person-request-by-id-v2
+     * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/get-person-request-by-id-v3
      */
     public function getById(string $id, array $query = []): PromiseInterface|EHealthResponse
     {
         $this->setValidator($this->validateResponse(...));
         $this->setMapper($this->mapResponseById(...));
 
-        return $this->get(self::URL_V2 . "/$id", $query);
+        return $this->get(self::URL_V3 . "/$id", $query);
     }
 
     /**
@@ -114,7 +113,7 @@ class PersonRequest extends Request
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
-     * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/get-person-requests-list
+     * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/person-requests/get-person-requests-list-v3
      */
     public function getList(array $query = []): PromiseInterface|EHealthResponse
     {
@@ -122,7 +121,7 @@ class PersonRequest extends Request
 
         $mergedQuery = array_merge($this->options['query'], $query);
 
-        return $this->get(self::URL, $mergedQuery);
+        return $this->get(self::URL_V3, $mergedQuery);
     }
 
     /**
@@ -161,7 +160,6 @@ class PersonRequest extends Request
             'person.addresses.*.area' => ['required', 'string', 'max:255'],
             'person.addresses.*.region' => ['nullable', 'string', 'max:255'],
             'person.addresses.*.settlement' => ['required', 'string', 'max:255'],
-            'person.addresses.*.settlement_type' => ['required', new InDictionary('SETTLEMENT_TYPE')],
             'person.addresses.*.settlement_id' => ['required', 'uuid'],
             'person.addresses.*.street_type' => ['nullable', new InDictionary('STREET_TYPE')],
             'person.addresses.*.building' => ['nullable', 'string', 'max:255'],
@@ -185,15 +183,18 @@ class PersonRequest extends Request
             'person.emergency_contact.second_name' => ['nullable', 'string', 'max:255'],
             'person.emergency_contact.phones.*.type' => ['required', new InDictionary('PHONE_TYPE')],
             'person.emergency_contact.phones.*.number' => ['required', new PhoneNumber()],
-            'person.first_name' => ['required', 'string', 'max:255'],
+            'person.names' => ['required', 'array', 'min:1'],
+            'person.names.*.language' => ['required', 'string', 'max:255'],
+            'person.names.*.first_name' => ['required', 'string', 'max:255'],
+            'person.names.*.last_name' => ['nullable', 'string', 'max:255'],
+            'person.names.*.second_name' => ['nullable', 'string', 'max:255'],
+            'person.names.*.no_last_name' => ['required', 'boolean'],
             'person.gender' => ['required', new InDictionary('GENDER')],
             'person.email' => ['nullable', new Email()],
             'person.unzr' => ['nullable', 'string', 'max:255'],
-            'person.last_name' => ['required', 'string', 'max:255'],
             'person.no_tax_id' => ['required', 'boolean:strict'],
             'person.phones.*.type' => ['required', new InDictionary('PHONE_TYPE')],
             'person.phones.*.number' => ['required', new PhoneNumber()],
-            'person.second_name' => ['nullable', 'string', 'max:255'],
             'person.secret' => ['required', 'string', 'max:255'],
             'person.tax_id' => ['nullable', new TaxId()],
             'person.confidant_person' => ['sometimes', 'array'],

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Rules;
 
 use Closure;
@@ -18,7 +20,7 @@ class EightDigitsHyphenFiveDigits implements ValidationRule
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         if (!preg_match('/^[0-9]{8}-[0-9]{5}$/', $value)) {
-            $fail(' :attribute має відповідати формату 8 цифр, дефіс, 5 цифр.');
+            $fail(':attribute має відповідати формату 8 цифр, дефіс, 5 цифр.');
         }
     }
 }

@@ -42,8 +42,9 @@ class DeclarationView extends Component
         $this->declaration = $declaration->load([
             'declarationRequest:id,data_to_be_signed,parent_declaration_uuid',
             'employee',
+            'person:id,birth_date',
+            'person.names',
             'employee.party:id,last_name,first_name,second_name',
-            'person:id,first_name,last_name,second_name,birth_date',
             'division:id,name'
         ]);
 

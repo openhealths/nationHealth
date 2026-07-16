@@ -153,11 +153,13 @@ class PersonUpdate extends PersonComponent
 
         $this->form->person = Arr::toCamelCase(
             $person->load([
+                'names',
                 'addresses',
                 'documents',
                 'phones',
                 'authenticationMethods',
-                'confidantPersons.person:id,uuid,gender,last_name,first_name,second_name,tax_id,unzr',
+                'confidantPersons.person:id,uuid,gender,tax_id,unzr',
+                'confidantPersons.person.names',
                 'confidantPersons.documentsRelationship',
                 'confidantPersons.person.phones',
                 'confidantPersons.person.documents'
@@ -261,22 +263,20 @@ class PersonUpdate extends PersonComponent
             return;
         }
 
-        if ($response->successful()) {
-            // save in DB
-            try {
-                Repository::personRequest()->update(removeEmptyKeys($response->map($response->validate())));
-            } catch (Throwable $exception) {
-                $this->handleDatabaseErrors($exception, 'Failed to update person request');
+        // save in DB
+        try {
+            Repository::personRequest()->update(removeEmptyKeys($response->map($response->validate())));
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Failed to update person request');
 
-                return;
-            }
-
-            $urgent = $response->getUrgent();
-            $this->form->person['id'] = $response->getData()['id'];
-            $this->uploadedDocuments = $urgent['documents'] ?? [];
-            $this->authenticationMethodCurrent = $urgent['authentication_method_current'] ?? [];
-            $this->viewState = 'new';
+            return;
         }
+
+        $urgent = $response->getUrgent();
+        $this->form->person['id'] = $response->getData()['id'];
+        $this->uploadedDocuments = $urgent['documents'] ?? [];
+        $this->authenticationMethodCurrent = $urgent['authentication_method_current'] ?? [];
+        $this->viewState = 'new';
     }
 
     public function render(): View

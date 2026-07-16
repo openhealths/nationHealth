@@ -101,7 +101,7 @@ class CarePlanCreate extends BasePatientComponent
 
         $person = Person::find($this->personId);
         if ($person) {
-            $this->form->patient = trim($person->last_name . ' ' . $person->first_name . ' ' . ($person->second_name ?? ''));
+            $this->form->patient = $person->fullName;
             $this->form->medical_number = (string) ((CarePlan::max('id') ?? 0) + 1);
 
             // Load actual authentication methods from eHealth
@@ -229,15 +229,19 @@ class CarePlanCreate extends BasePatientComponent
         }
 
         $this->patientSuggestions = \App\Models\Person\Person::query()
-            ->where('last_name', 'like', "%{$value}%")
-            ->orWhere('first_name', 'like', "%{$value}%")
-            ->orWhere('tax_id', 'like', "%{$value}%")
+            ->where(static function (\Illuminate\Database\Eloquent\Builder $query) use ($value): void {
+                $query->whereHas('names', static function (\Illuminate\Database\Eloquent\Builder $query) use ($value): void {
+                    $query->where('last_name', 'like', "%{$value}%")
+                        ->orWhere('first_name', 'like', "%{$value}%");
+                })->orWhere('tax_id', 'like', "%{$value}%");
+            })
+            ->with('names')
             ->limit(5)
             ->get()
-            ->map(fn ($p) => [
-                'uuid' => $p->uuid,
-                'name' => trim($p->last_name . ' ' . $p->first_name . ' ' . ($p->second_name ?? '')),
-                'tax_id' => $p->tax_id,
+            ->map(fn (\App\Models\Person\Person $person) => [
+                'uuid' => $person->uuid,
+                'name' => $person->fullName,
+                'tax_id' => $person->tax_id,
             ])
             ->toArray();
     }

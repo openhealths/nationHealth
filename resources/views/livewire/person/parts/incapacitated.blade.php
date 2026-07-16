@@ -1,5 +1,6 @@
 @use(App\Livewire\Person\PersonCreate)
 @use(App\Livewire\Person\PersonRequestEdit)
+@use(App\Enums\Person\Gender)
 
 <fieldset class="fieldset"
           data-fieldset="incapacitated"
@@ -34,11 +35,13 @@
                   this.selectedPatient = null;
                   $wire.form.firstName = '';
                   $wire.form.lastName = '';
+                  $wire.form.noLastName = false;
                   $wire.form.birthDate = '';
                   $wire.form.secondName = '';
                   $wire.form.taxId = '';
                   $wire.form.phoneNumber = '';
-                  $wire.form.birthCertificate = '';
+                  $wire.form.documentType = '';
+                  $wire.form.documentNumber = '';
                   $wire.confidantPerson = [];
               },
               timer: 60,
@@ -196,7 +199,7 @@
                                         ></span>
                                     </div>
                                     <div class="text-sm text-gray-500 dark:text-gray-400">
-                                    <span x-text="(confidantPerson.person?.gender) === 'MALE' ? '{{ __('patients.male') }}' : '{{ __('patients.female') }}'"></span>
+                                    <span x-text="confidantPerson.person?.gender === '{{ Gender::MALE->value }}' ? '{{ Gender::MALE->label() }}' : (confidantPerson.person?.gender === '{{ Gender::FEMALE->value }}' ? '{{ Gender::FEMALE->label() }}' : '')"></span>
                                     </div>
                                     <div class="text-sm text-gray-500 dark:text-gray-400">
                                         <span>{{ __('forms.rnokpp') }} </span>
@@ -323,12 +326,12 @@
                                 {{-- Personal Data - only show on first row --}}
                                 <td class="td-input align-top" x-show="docIndex === 0">
                                     <div class="font-bold text-gray-900 dark:text-white">
-                                        <span x-text="confidantPerson.lastName"></span>
-                                        <span x-text="confidantPerson.firstName"></span>
-                                        <span x-text="confidantPerson.secondName || ''"></span>
+                                        <span x-text="confidantPerson.names?.[0]?.lastName"></span>
+                                        <span x-text="confidantPerson.names?.[0]?.firstName"></span>
+                                        <span x-text="confidantPerson.names?.[0]?.secondName || ''"></span>
                                     </div>
                                     <div class="text-sm text-gray-500 dark:text-gray-400">
-                                    <span x-text="confidantPerson.gender === 'MALE' ? '{{ __('patients.male') }}' : (confidantPerson.gender === 'FEMALE' ? '{{ __('patients.female') }}' : '')"></span>
+                                    <span x-text="confidantPerson.gender === '{{ Gender::MALE->value }}' ? '{{ Gender::MALE->label() }}' : (confidantPerson.gender === '{{ Gender::FEMALE->value }}' ? '{{ Gender::FEMALE->label() }}' : '')"></span>
                                     </div>
                                     <div class="text-sm text-gray-500 dark:text-gray-400">
                                         <span>{{ __('forms.rnokpp') }} </span>

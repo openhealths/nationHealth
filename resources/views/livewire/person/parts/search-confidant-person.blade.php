@@ -28,10 +28,14 @@
                             </x-slot>
                             <x-slot name="tbody">
                                 @foreach($confidantPerson as $confidantPatient)
+                                    @php
+                                        $confidantPrimaryName = collect($confidantPatient['names'] ?? [])
+                                            ->firstWhere('language', 'uk') ?? ($confidantPatient['names'][0] ?? []);
+                                    @endphp
                                     <tr wire:key="{{ $confidantPatient['personUuid'] ?? $confidantPatient['id'] }}">
                                         <td class="p-4 text-sm font-normal text-gray-500 whitespace-nowrap dark:text-gray-400">
                                             <p class="text-base text-gray-900 dark:text-white">
-                                                {{ $confidantPatient['lastName'] }} {{ $confidantPatient['firstName'] }} {{ $confidantPatient['secondName'] }}
+                                                {{ $confidantPrimaryName['lastName'] ?? '' }} {{ $confidantPrimaryName['firstName'] ?? '' }} {{ $confidantPrimaryName['secondName'] ?? '' }}
                                             </p>
                                         </td>
                                         <td class="p-4 text-sm font-normal text-gray-500 whitespace-nowrap dark:text-gray-400">

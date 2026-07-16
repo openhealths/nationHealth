@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Policies;
 
 use App\Enums\Person\Status;
+use App\Enums\Status as LegalEntityStatus;
 use App\Models\Person\PersonRequest;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
@@ -41,6 +42,13 @@ class PersonRequestPolicy
     public function create(User $user): Response
     {
         if ($user->cannot('person_request:write')) {
+            return Response::denyWithStatus(404);
+        }
+
+        $legalEntity = legalEntity();
+
+        // client_id must belong to an active legal entity
+        if ($legalEntity->status !== LegalEntityStatus::ACTIVE->value || !$legalEntity->isActive) {
             return Response::denyWithStatus(404);
         }
 

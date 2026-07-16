@@ -54,6 +54,14 @@ class ConfidantPersonSync extends EHealthJob
      */
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse|null
     {
+        if (!$this->person->primaryName) {
+            Log::info("Confidant Person sync skipped: person {$this->person->id} has no name to search by");
+
+            echo "Confidant Person sync skipped: person {$this->person->id} has no name to search by" . PHP_EOL;
+
+            return null;
+        }
+
         return EHealth::person()->withToken($token)->searchForPersonByParams($this->getPersonSearchData());
     }
 
@@ -65,6 +73,10 @@ class ConfidantPersonSync extends EHealthJob
      */
     protected function processResponse(?EHealthResponse $response): void
     {
+        if (!$response) {
+            return;
+        }
+
         $validatedData = $response->validate();
 
         foreach ($validatedData as $data) {
@@ -109,9 +121,15 @@ class ConfidantPersonSync extends EHealthJob
      */
     protected function getPersonSearchData(): array
     {
+        $primaryName = $this->person->primaryName;
+
         return [
-            'first_name' => $this->person->firstName,
-            'last_name' => $this->person->lastName,
+            'language' => $primaryName->language,
+            'first_name' => $primaryName->firstName,
+            'last_name' => $primaryName->lastName,
+            // Confidant names may originate from the person search response, which omits no_last_name,
+            // leaving the stored flag at its default. Deriving from the last name holds for every source.
+            'no_last_name' => blank($primaryName->lastName),
             'birth_date' => convertToYmd($this->person->birthDate),
             'tax_id' => $this->person->taxId ?? null,
             'phone_number' => $this->person->phones->first()?->number ?? null,
@@ -129,10 +147,17 @@ class ConfidantPersonSync extends EHealthJob
      */
     protected function checkPersonData(array $data): bool
     {
-        return $data['first_name'] === $this->person->firstName
-            && $data['last_name'] === $this->person->lastName
+        $primaryName = $this->person->primaryName;
+
+        $hasMatchingName = collect($data['names'])->contains(
+            static fn (array $name): bool => $name['language'] === $primaryName->language
+                && $name['first_name'] === $primaryName->firstName
+                && ($name['last_name'] ?? null) === $primaryName->lastName
+        );
+
+        return $hasMatchingName
             && $data['birth_date'] === convertToYmd($this->person->birthDate)
-            && ($this->person->taxId === null || $data['tax_id'] === $this->person->taxId);
+            && ($this->person->taxId === null || ($data['tax_id'] ?? null) === $this->person->taxId);
     }
 
     /**

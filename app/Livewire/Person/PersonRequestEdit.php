@@ -30,6 +30,7 @@ class PersonRequestEdit extends PersonComponent
 
         $this->form->person = Arr::toCamelCase(
             $personRequest->load([
+                'names',
                 'addresses',
                 'documents',
                 'phones',

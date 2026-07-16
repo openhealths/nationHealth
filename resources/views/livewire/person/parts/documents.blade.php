@@ -9,7 +9,10 @@
                   modalDocument: new Document(),
                   newDocument: false,
                   item: 0,
-                  dictionary: $wire.dictionaries['DOCUMENT_TYPE']
+                  dictionary: $wire.dictionaries['DOCUMENT_TYPE'],
+                  issuingCountryDictionary: $wire.dictionaries['ISSUING_COUNTRY'],
+                  uaOnlyTypes: ['{{ implode("', '", config('ehealth.document_types_issuing_country_ua_only')) }}'],
+                  notUaTypes: ['{{ implode("', '", config('ehealth.document_types_issuing_country_not_ua')) }}']
               }"
     >
         <legend class="legend">
@@ -21,6 +24,7 @@
             <tr>
                 <th scope="col" class="th-input">{{ __('forms.type') }}</th>
                 <th scope="col" class="th-input">{{ __('forms.number') }} </th>
+                <th scope="col" class="th-input">{{ __('patients.issuing_country') }}</th>
                 <th scope="col" class="th-input">{{ __('forms.issued_by') }}</th>
                 <th scope="col" class="th-input">{{ __('forms.issued_at') }}</th>
                 <th scope="col" class="th-input">{{ __('forms.valid_until') }}</th>
@@ -32,6 +36,7 @@
                 <tr>
                     <td class="td-input" x-text="dictionary[document.type]"></td>
                     <td class="td-input" x-text="document.number"></td>
+                    <td class="td-input" x-text="issuingCountryDictionary[document.issuingCountry]"></td>
                     <td class="td-input" x-text="document.issuedBy"></td>
                     <td class="td-input" x-text="document.issuedAt"></td>
                     <td class="td-input" x-text="document.expirationDate"></td>
@@ -85,12 +90,12 @@
                                 >
 
                                     <button @click.prevent="
-                                                    openModal = true; {{-- Open the modal --}}
-                                                    item = index; {{-- Identify the item we are corrently editing --}}
-                                                    {{-- Replace the previous document with the current, don't assign object directly (modalDocument = document) to avoid reactiveness --}}
-                                                    modalDocument = new Document(document);
-                                                    newDocument = false; {{-- This document is already created --}}
-                                                "
+                                                openModal = true; {{-- Open the modal --}}
+                                                item = index; {{-- Identify the item we are corrently editing --}}
+                                                {{-- Replace the previous document with the current, don't assign object directly (modalDocument = document) to avoid reactiveness --}}
+                                                modalDocument = new Document(document);
+                                                newDocument = false; {{-- This document is already created --}}
+                                            "
                                             class="dropdown-button"
                                     >
                                         {{ __('forms.edit') }}
@@ -158,6 +163,7 @@
                                             <span class="text-red-600"> *</span>
                                         </label>
                                         <select x-model="modalDocument.type"
+                                                @change="modalDocument.issuingCountry = uaOnlyTypes.includes(modalDocument.type) ? 'UA' : ''"
                                                 id="documentType"
                                                 class="input-modal"
                                                 type="text"
@@ -166,6 +172,26 @@
                                             <option selected value="">{{ __('forms.select') }} *</option>
                                             @foreach($this->dictionaries['DOCUMENT_TYPE'] as $key => $documentType)
                                                 <option value="{{ $key }}">{{ $documentType }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+
+                                    {{-- Country of issue: required for every type except the UA-only ones, which are set to UA automatically.
+                                         Types outside both configurations accept any country, UA included --}}
+                                    <div x-show="modalDocument.type && !uaOnlyTypes.includes(modalDocument.type)" x-cloak>
+                                        <label for="documentIssuingCountry" class="label-modal">
+                                            {{ __('patients.issuing_country') }}
+                                            <span class="text-red-600"> *</span>
+                                        </label>
+                                        <select x-model="modalDocument.issuingCountry"
+                                                id="documentIssuingCountry"
+                                                class="input-modal"
+                                        >
+                                            <option value="" selected>{{ __('forms.select') }} *</option>
+                                            @foreach($this->dictionaries['ISSUING_COUNTRY'] as $key => $country)
+                                                <option value="{{ $key }}"
+                                                        @if($key === 'UA') :disabled="notUaTypes.includes(modalDocument.type)" @endif
+                                                >{{ $country }}</option>
                                             @endforeach
                                         </select>
                                     </div>
@@ -261,7 +287,8 @@
                                                 !modalDocument.type.trim() ||
                                                 !modalDocument.number.trim() ||
                                                 !modalDocument.issuedBy.trim() ||
-                                                !modalDocument.issuedAt.trim()
+                                                !modalDocument.issuedAt.trim() ||
+                                                (!uaOnlyTypes.includes(modalDocument.type) && !modalDocument.issuingCountry)
                                             "
                                     >
                                         {{ __('forms.save') }}
@@ -283,6 +310,7 @@
     class Document {
         type = '';
         number = '';
+        issuingCountry = '';
         issuedBy = '';
         issuedAt = '';
         expirationDate = '';

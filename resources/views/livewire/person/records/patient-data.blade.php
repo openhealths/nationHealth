@@ -1,6 +1,7 @@
 @use('App\Models\Person')
 @use('App\Enums\Person\AuthenticationMethod')
 @use('App\Enums\Person\VerificationStatus as Status')
+@use('App\Enums\Person\Gender')
 
 <x-layouts.patient :personId="$personId" :patientFullName="$patientFullName" :activeTab="'patient-data'">
     <x-slot name="headerActions">
@@ -49,11 +50,13 @@
              resetSearchFilters() {
                  $wire.form.firstName = '';
                  $wire.form.lastName = '';
+                 $wire.form.noLastName = false;
                  $wire.form.birthDate = '';
                  $wire.form.secondName = '';
                  $wire.form.taxId = '';
                  $wire.form.phoneNumber = '';
-                 $wire.form.birthCertificate = '';
+                 $wire.form.documentType = '';
+                 $wire.form.documentNumber = '';
              },
              showConfidantPersonDrawer: $wire.entangle('showConfidantPersonDrawer'),
              showDeactivateConfidantPersonDrawer: @if($canManageConfidantRelationships) $wire.entangle('showDeactivateConfidantPersonDrawer') @else false @endif,
@@ -164,20 +167,24 @@
                             </button>
                         </div>
 
+                        @php
+                            $primaryName = collect($form->person['names'] ?? [])->firstWhere('language', 'uk')
+                                ?? ($form->person['names'][0] ?? []);
+                        @endphp
                         <div class="form-row-3">
                             <div class="form-group group">
                                 <input type="text" class="input peer" placeholder=" " readonly
-                                       value="{{ $form->person['lastName'] ?? '-' }}" />
+                                       value="{{ $primaryName['lastName'] ?? '-' }}" />
                                 <label class="label">{{ __('forms.last_name') }}</label>
                             </div>
                             <div class="form-group group">
                                 <input type="text" class="input peer" placeholder=" " readonly
-                                       value="{{ $form->person['firstName'] ?? '-' }}" />
+                                       value="{{ $primaryName['firstName'] ?? '-' }}" />
                                 <label class="label">{{ __('forms.first_name') }}</label>
                             </div>
                             <div class="form-group group">
                                 <input type="text" class="input peer" placeholder=" " readonly
-                                       value="{{ $form->person['secondName'] ?? '-' }}" />
+                                       value="{{ $primaryName['secondName'] ?? '-' }}" />
                                 <label class="label">{{ __('forms.second_name') }}</label>
                             </div>
                         </div>
@@ -203,7 +210,7 @@
                         <div class="form-row-3">
                             <div class="form-group group">
                                 <input type="text" class="input peer" placeholder=" " readonly
-                                       value="{{ ($form->person['gender'] ?? '') === 'FEMALE' ? __('patients.female') : (($form->person['gender'] ?? '') === 'MALE' ? __('patients.male') : '-') }}" />
+                                       value="{{ Gender::tryFrom($form->person['gender'] ?? '')?->label() ?? '-' }}" />
                                 <label class="label">{{ __('forms.gender') }}</label>
                             </div>
                             <div class="form-group group">
@@ -509,7 +516,7 @@
                                             <div>{{ $cp['lastName'] ?? '' }} {{ $cp['firstName'] ?? '' }} {{ $cp['secondName'] ?? '' }}</div>
                                             <div class="text-xs text-gray-500 font-normal mt-1">
                                                 {{ __('forms.gender') }}
-                                                : {{ ($cp['gender'] ?? '') === 'MALE' ? __('patients.male') : (($cp['gender'] ?? '') === 'FEMALE' ? __('patients.female') : '-') }}
+                                                : {{ Gender::tryFrom($cp['gender'] ?? '')?->label() ?? '-' }}
                                             </div>
                                             <div class="text-xs text-gray-500 font-normal">
                                                 {{ __('forms.rnokpp') }}: {{ $cp['taxId'] ?? '-' }}

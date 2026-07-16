@@ -425,19 +425,41 @@ return [
         'NATIONAL_ID', 'COMPLEMENTARY_PROTECTION_CERTIFICATE', 'PERMANENT_RESIDENCE_PERMIT', 'REFUGEE_CERTIFICATE',
         'TEMPORARY_CERTIFICATE', 'TEMPORARY_PASSPORT'
     ],
+    // PERSON_DOCUMENTS_USE_SPECIFIC_EXPIRATION_DATE / PERSON_DOCUMENTS_SPECIFIC_EXPIRATION_DATE — when enabled,
+    // a document expiration_date must be later than the specific date instead of just being in the future
+    'person_documents_use_specific_expiration_date' => true,
+    'person_documents_specific_expiration_date' => null,
     // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/17999299028/Person+documents+configurable+parameters#Person-documents-configurable-parameters
     'self_auth_age_document_types' => [
-        'COMPLEMENTARY_PROTECTION_CERTIFICATE', 'NATIONAL_ID', 'PASSPORT', 'PERMANENT_RESIDENCE_PERMIT',
-        'REFUGEE_CERTIFICATE', 'TEMPORARY_CERTIFICATE', 'TEMPORARY_PASSPORT'
+        'COMPLEMENTARY_PROTECTION_CERTIFICATE', 'FOREIGN_DOCUMENT_OTHER', 'FOREIGN_PASSPORT', 'NATIONAL_ID',
+        'NO_CITIZENSHIP_CERTIFICATE', 'PASSPORT', 'PERMANENT_RESIDENCE_PERMIT', 'REFUGEE_CERTIFICATE',
+        'TEMPORARY_CERTIFICATE', 'TEMPORARY_PASSPORT'
+    ],
+    'no_self_auth_age_document_types' => [
+        'BIRTH_CERTIFICATE', 'BIRTH_CERTIFICATE_FOREIGN', 'FOREIGN_PASSPORT', 'FOREIGN_DOCUMENT_OTHER'
     ],
     'person_legal_capacity_document_types' => [
         'DIVORCE_CERTIFICATE', 'MARRIAGE_CERTIFICATE', 'STATE_REGISTER_EXTRACT', 'COURT_DECISION_LEGAL_CAPACITY',
         'COURT_DECISION_DIVORCE', 'GUARDIANSHIP_DECISION_LEGAL_CAPACITY', 'LEGAL_CAPACITY_DOCUMENT'
     ],
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/19725978326/RCC_FOREIGN+Foreigners+registration+Charts+Configuration+Parameters_EN#Charts-configuration-parameters
     'person_registration_document_types' => [
         'BIRTH_CERTIFICATE', 'BIRTH_CERTIFICATE_FOREIGN', 'COMPLEMENTARY_PROTECTION_CERTIFICATE', 'NATIONAL_ID',
-        'PASSPORT', 'PERMANENT_RESIDENCE_PERMIT', 'REFUGEE_CERTIFICATE', 'TEMPORARY_CERTIFICATE', 'TEMPORARY_PASSPORT'
+        'PASSPORT', 'PERMANENT_RESIDENCE_PERMIT', 'REFUGEE_CERTIFICATE', 'TEMPORARY_CERTIFICATE', 'TEMPORARY_PASSPORT',
+        'FOREIGN_PASSPORT', 'NO_CITIZENSHIP_CERTIFICATE', 'FOREIGN_DOCUMENT_OTHER'
     ],
+    'document_types_issuing_country_ua_only' => [
+        'BIRTH_CERTIFICATE', 'COMPLEMENTARY_PROTECTION_CERTIFICATE', 'NATIONAL_ID', 'PASSPORT',
+        'PERMANENT_RESIDENCE_PERMIT', 'REFUGEE_CERTIFICATE', 'TEMPORARY_PASSPORT', 'TEMPORARY_CERTIFICATE'
+    ],
+    'document_types_issuing_country_not_ua' => [
+        'FOREIGN_PASSPORT', 'FOREIGN_DOCUMENT_OTHER', 'BIRTH_CERTIFICATE_FOREIGN'
+    ],
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20214317118/DRAFT+Config+params+Person+ENT-050#IDENTITY_DOCUMENT_TYPES_FOREIGN
+    'identity_document_types_foreign' => ['FOREIGN_PASSPORT', 'NO_CITIZENSHIP_CERTIFICATE', 'FOREIGN_DOCUMENT_OTHER'],
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20214317118/DRAFT+Config+params+Person+ENT-050#VALIDATE_PERSON_TAX_ID_UNIQUENESS
+    'validate_person_tax_id_uniqueness' => true,
+    'third_person_limit' => 150,
     'employee_identity_document_types' => [
         // EMPLOYEE_IDENTITY_DOCUMENT_TYPES — chart parameter, API-005-024-0001 §9 Validate request (Logic)
         // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17570365551/DRAFT+REST+API+Create+Employee+Request+v2+API-005-024-0001

@@ -47,7 +47,11 @@
                           class="shift-content p-4 sm:p-8 sm:pb-10 mb-16 mt-6 border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 max-w-6xl"
                 >
                     <legend class="legend">
-                        {{ $patient['lastName'] }} {{ $patient['firstName'] }} {{ $patient['secondName'] ?? '' }}
+                        @foreach($patient['names'] ?? [] as $name)
+                            <span wire:key="patient-{{ $patient['id'] }}-name-{{ $loop->index }}" class="block">
+                                {{ trim(($name['lastName'] ?? '') . ' ' . $name['firstName'] . ' ' . ($name['secondName'] ?? '')) }}
+                            </span>
+                        @endforeach
                     </legend>
 
                     <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-700 pb-4">
@@ -121,7 +125,8 @@
                                 <tr>
                                     <th scope="col" class="th-input">{{ __('forms.city') }}</th>
                                     <th scope="col" class="th-input">{{ __('forms.rnokpp') }}</th>
-                                    <th scope="col" class="th-input">{{ __('patients.birth_certificate') }}</th>
+                                    <th scope="col" class="th-input">{{ __('forms.document_type') }}</th>
+                                    <th scope="col" class="th-input">{{ __('forms.document_number') }}</th>
                                     <th scope="col" class="th-input">{{ __('forms.status.label') }}</th>
                                     <th scope="col" class="th-input text-center">{{ __('forms.actions') }}</th>
                                 </tr>
@@ -136,7 +141,20 @@
                                         {{ $patient['taxId'] ?? '-' }}
                                     </td>
                                     <td class="td-input whitespace-nowrap overflow-hidden text-ellipsis align-top font-bold text-gray-900 dark:text-white">
-                                        {{ $patient['birthCertificate'] ?? '-' }}
+                                        @forelse($patient['documents'] ?? [] as $document)
+                                            <span class="block">
+                                                {{ $this->dictionaries['DOCUMENT_TYPE'][$document['type']] ?? $document['type'] }}
+                                            </span>
+                                        @empty
+                                            -
+                                        @endforelse
+                                    </td>
+                                    <td class="td-input whitespace-nowrap overflow-hidden text-ellipsis align-top font-bold text-gray-900 dark:text-white">
+                                        @forelse($patient['documents'] ?? [] as $document)
+                                            <span class="block">{{ $document['number'] }}</span>
+                                        @empty
+                                            -
+                                        @endforelse
                                     </td>
                                     <td class="td-input whitespace-nowrap align-top">
                                         @php

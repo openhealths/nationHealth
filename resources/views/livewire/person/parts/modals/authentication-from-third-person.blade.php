@@ -1,4 +1,5 @@
 @use('App\Enums\Person\AuthStep')
+@use('App\Enums\Person\Gender')
 
 <div x-data="{
          confidantPersons: $wire.entangle('form.person.confidantPersons'),
@@ -65,7 +66,7 @@
                             </div>
                             <div class="text-sm text-gray-500 dark:text-gray-400">
                             <span
-                                x-text="(confidantPerson.person?.gender) === 'MALE' ? '{{ __('patients.male') }}' : '{{ __('patients.female') }}'"
+                                x-text="confidantPerson.person?.gender === '{{ Gender::MALE->value }}' ? '{{ Gender::MALE->label() }}' : (confidantPerson.person?.gender === '{{ Gender::FEMALE->value }}' ? '{{ Gender::FEMALE->label() }}' : '')"
                             ></span>
                             </div>
                             <div class="text-sm text-gray-500 dark:text-gray-400">

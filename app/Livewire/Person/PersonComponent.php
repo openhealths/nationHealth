@@ -158,7 +158,9 @@ class PersonComponent extends Component
         'DOCUMENT_TYPE',
         'DOCUMENT_RELATIONSHIP_TYPE',
         'GENDER',
-        'PHONE_TYPE'
+        'PHONE_TYPE',
+        'LANGUAGE',
+        'ISSUING_COUNTRY'
     ];
 
     public function baseMount(): void
@@ -182,7 +184,9 @@ class PersonComponent extends Component
     {
         $birthDate = CarbonImmutable::parse($personData['birthDate']);
 
-        if ($birthDate->age < 18) {
+        // Below the self-registration age a person cannot be a confidant (the remaining eligibility
+        // rules — legal capacity, verification statuses, existing relationships — are enforced by eHealth)
+        if ($birthDate->age < Form::NO_SELF_REGISTRATION_AGE) {
             $this->invalidPersonId = $personData['id'];
 
             return;
@@ -242,7 +246,7 @@ class PersonComponent extends Component
 
         try {
             $this->confidantPerson = Arr::toCamelCase(
-                EHealth::person()->searchForPersonByParams($validated)->getData()
+                EHealth::person()->searchForPersonByParams($validated)->validate()
             );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when searching for person');
@@ -296,32 +300,30 @@ class PersonComponent extends Component
         }
 
         // Save in DB and show new frontend
-        if ($response->successful()) {
-            try {
-                if ($this instanceof PersonRequestEdit) {
-                    Repository::personRequest()->updateDraft(
-                        $this->form->person['id'],
-                        removeEmptyKeys($response->map($response->validate())),
-                        $selectedConfidantPersonData
-                    );
-                } else {
-                    Repository::personRequest()->create(
-                        removeEmptyKeys($response->map($response->validate())),
-                        $selectedConfidantPersonData
-                    );
-                }
-            } catch (Throwable $exception) {
-                $this->handleDatabaseErrors($exception, 'Failed to store person request');
-
-                return;
+        try {
+            if ($this instanceof PersonRequestEdit) {
+                Repository::personRequest()->updateDraft(
+                    $this->form->person['id'],
+                    removeEmptyKeys($response->map($response->validate())),
+                    $selectedConfidantPersonData
+                );
+            } else {
+                Repository::personRequest()->create(
+                    removeEmptyKeys($response->map($response->validate())),
+                    $selectedConfidantPersonData
+                );
             }
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Failed to store person request');
 
-            $urgent = $response->getUrgent();
-            $this->form->person['id'] = $response->getData()['id'];
-            $this->uploadedDocuments = $urgent['documents'] ?? [];
-            $this->authenticationMethodCurrent = $urgent['authentication_method_current'] ?? [];
-            $this->showInformationMessageModal = true;
+            return;
         }
+
+        $urgent = $response->getUrgent();
+        $this->form->person['id'] = $response->getData()['id'];
+        $this->uploadedDocuments = $urgent['documents'] ?? [];
+        $this->authenticationMethodCurrent = $urgent['authentication_method_current'] ?? [];
+        $this->showInformationMessageModal = true;
     }
 
     public function openNewState(): void
@@ -585,18 +587,16 @@ class PersonComponent extends Component
             return;
         }
 
-        if ($response->successful()) {
-            try {
-                Repository::personRequest()->updateStatusByUuid($response->getData());
-            } catch (Exception|Throwable $exception) {
-                $this->handleDatabaseErrors($exception, $exception->getMessage());
+        try {
+            Repository::personRequest()->updateStatusByUuid($response->getData());
+        } catch (Exception|Throwable $exception) {
+            $this->handleDatabaseErrors($exception, $exception->getMessage());
 
-                return;
-            }
-
-            Session::flash('success', __('patients.messages.person_request_rejected'));
-            $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
+            return;
         }
+
+        Session::flash('success', __('patients.messages.person_request_rejected'));
+        $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
     }
 
     /**
@@ -658,48 +658,46 @@ class PersonComponent extends Component
         }
 
         // Create/update person, update request status
-        if ($signResponse->successful()) {
-            try {
-                DB::transaction(function () use ($responseData, $approvedPersonRequest, &$successMessage) {
-                    Repository::personRequest()->updateStatusByUuid($responseData);
+        try {
+            DB::transaction(function () use ($responseData, $approvedPersonRequest, &$successMessage) {
+                Repository::personRequest()->updateStatusByUuid($responseData);
 
-                    if ($this instanceof PersonUpdate) {
-                        Repository::person()->update(
-                            $approvedPersonRequest->map($approvedPersonRequest->validate()),
-                            $responseData['person_id']
-                        );
-                        $successMessage = __('patients.messages.person_updated');
-                    } else {
-                        Repository::person()->create(
-                            $approvedPersonRequest->map($approvedPersonRequest->validate()),
-                            $responseData['person_id']
-                        );
-                        $successMessage = __('patients.messages.person_created');
-                    }
-                });
-            } catch (Exception|Throwable $exception) {
-                $this->handleDatabaseErrors($exception, $exception->getMessage());
+                if ($this instanceof PersonUpdate) {
+                    Repository::person()->update(
+                        $approvedPersonRequest->map($approvedPersonRequest->validate()),
+                        $responseData['person_id']
+                    );
+                    $successMessage = __('patients.messages.person_updated');
+                } else {
+                    Repository::person()->create(
+                        $approvedPersonRequest->map($approvedPersonRequest->validate()),
+                        $responseData['person_id']
+                    );
+                    $successMessage = __('patients.messages.person_created');
+                }
+            });
+        } catch (Exception|Throwable $exception) {
+            $this->handleDatabaseErrors($exception, $exception->getMessage());
 
-                return;
-            }
-
-            // Sync authentication methods for the person after signing the request
-            try {
-                $authMethodsResponse = EHealth::person()->getAuthMethods($responseData['person_id']);
-
-                $authMethodsData = $authMethodsResponse->validate();
-
-                $person = Person::whereUuid($responseData['person_id'])->first();
-
-                Repository::authenticationMethod()->sync($person, $authMethodsData);
-            } catch (EHealthException|EHealthConnectionException $exception) {
-                // Only log the error, but do not block the user from proceeding, as the person's auth methods can be synced via declaration's page
-                $exception->handle('Error when getting person authentication methods', __('patients.errors.person_auth_methods_sync_error'));
-            }
-
-            Session::flash('success', $successMessage);
-            $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
+            return;
         }
+
+        // Sync authentication methods for the person after signing the request
+        try {
+            $authMethodsResponse = EHealth::person()->getAuthMethods($responseData['person_id']);
+
+            $authMethodsData = $authMethodsResponse->validate();
+
+            $person = Person::whereUuid($responseData['person_id'])->first();
+
+            Repository::authenticationMethod()->sync($person, $authMethodsData);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            // Only log the error, but do not block the user from proceeding, as the person's auth methods can be synced via declaration's page
+            $exception->handle('Error when getting person authentication methods', __('patients.errors.person_auth_methods_sync_error'));
+        }
+
+        Session::flash('success', $successMessage);
+        $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
     }
 
     /**
@@ -784,14 +782,12 @@ class PersonComponent extends Component
         $response = EHealth::personRequest()->approve($this->form->person['id'], $requestData);
         $responseData = $response->getData();
 
-        if ($response->successful()) {
-            try {
-                Repository::personRequest()->updateStatusByUuid($responseData);
-            } catch (Exception $exception) {
-                $this->handleDatabaseErrors($exception, 'Failed to update person request status');
+        try {
+            Repository::personRequest()->updateStatusByUuid($responseData);
+        } catch (Exception $exception) {
+            $this->handleDatabaseErrors($exception, 'Failed to update person request status');
 
-                return;
-            }
+            return;
         }
 
         $this->leafletContent = $responseData['content'];

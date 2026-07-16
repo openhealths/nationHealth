@@ -18,6 +18,7 @@ use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MergeRequest;
 use App\Models\Person\Person;
 use App\Models\Preperson;
+use App\Traits\FormTrait;
 use Exception;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -34,11 +35,14 @@ use Throwable;
 
 class PrepersonMerge extends Component
 {
+    use FormTrait;
     use WithFileUploads;
 
     private const int OTP_RESEND_LIMIT = 1;
 
     public Form $form;
+
+    public array $dictionaryNames = ['DOCUMENT_TYPE', 'LANGUAGE'];
 
     public bool $showAdditionalParams = false;
 
@@ -122,6 +126,8 @@ class PrepersonMerge extends Component
     {
         $this->prepersonId = $preperson->id;
         $this->prepersonUuid = $preperson->uuid;
+
+        $this->getDictionary();
     }
 
     /**
@@ -495,11 +501,13 @@ class PrepersonMerge extends Component
     {
         $this->form->firstName = '';
         $this->form->lastName = '';
+        $this->form->noLastName = false;
         $this->form->birthDate = '';
         $this->form->secondName = '';
         $this->form->taxId = '';
         $this->form->phoneNumber = '';
-        $this->form->birthCertificate = '';
+        $this->form->documentType = '';
+        $this->form->documentNumber = '';
 
         $this->mergeSearchPatients = [];
     }

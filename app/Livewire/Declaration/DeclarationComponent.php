@@ -155,7 +155,8 @@ abstract class DeclarationComponent extends Component
 
     protected function baseMount(int $personId): void
     {
-        $patient = Person::select(['uuid', 'first_name', 'last_name', 'second_name', 'is_syncing'])
+        $patient = Person::select(['id', 'uuid', 'is_syncing'])
+            ->with('names')
             ->withExists('documents')
             ->whereId($personId)
             ->firstOrFail();

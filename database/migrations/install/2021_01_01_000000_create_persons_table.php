@@ -20,9 +20,6 @@ return new class extends Migration
             $table->uuid()->unique()->nullable();
             $table->enum('verification_status', VerificationStatus::values())
                 ->default(VerificationStatus::IN_REVIEW->value);
-            $table->string('first_name');
-            $table->string('last_name');
-            $table->string('second_name')->nullable();
             $table->date('birth_date')->nullable();
             $table->string('birth_country')->nullable();
             $table->string('birth_settlement')->nullable();

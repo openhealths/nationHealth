@@ -31,14 +31,20 @@ class Person extends Request
     /**
      * Search for a person by parameters.
      *
+     * Pass no_last_name to look for a person who has no last name: it sends an empty last_name, which the API
+     * treats differently from omitting the parameter. It is not sent itself, being an application-level flag.
+     *
      * @param  array{
+     *     language: string,
      *     first_name: string,
      *     last_name: string,
+     *     no_last_name?: bool,
      *     second_name?: string,
      *     birth_date: string,
      *     tax_id?: string,
      *     phone_number?: string,
-     *     birth_certificate?: string
+     *     document_type?: string,
+     *     document_number?: string
      * }  $query
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
@@ -50,8 +56,13 @@ class Person extends Request
         $this->setValidator($this->validateSearch(...));
 
         $query = $this->format($query, ['birthDate']);
+        $searchesPersonWithoutLastName = Arr::pull($query, 'no_last_name');
 
-        return $this->get(self::URL, $query);
+        if ($searchesPersonWithoutLastName) {
+            $query['last_name'] = '';
+        }
+
+        return $this->get(self::URL_V2, $query);
     }
 
     /**
@@ -86,6 +97,7 @@ class Person extends Request
     public function getPersonalData(string $uuid): PromiseInterface|EHealthResponse
     {
         $this->setValidator($this->validatePersonalData(...));
+
         return $this->get(self::URL . '/' . $uuid . '/personal_data');
     }
 
@@ -447,13 +459,18 @@ class Person extends Request
 
         $validator = Validator::make($data, [
             '*.birth_country' => ['required', 'string', 'max:255'],
-            '*.birth_date' => ['nullable', 'date'],
+            '*.birth_date' => ['required', 'date'],
             '*.birth_settlement' => ['required', 'string', 'max:255'],
-            '*.first_name' => ['required', 'string', 'max:255'],
+            '*.names' => ['required', 'array', 'min:1'],
+            '*.names.*.language' => ['required', 'string', 'max:255'],
+            '*.names.*.first_name' => ['required', 'string', 'max:255'],
+            '*.names.*.last_name' => ['nullable', 'string', 'max:255'],
+            '*.names.*.second_name' => ['nullable', 'string', 'max:255'],
+            '*.documents' => ['sometimes', 'array'],
+            '*.documents.*.type' => ['required', new InDictionary('DOCUMENT_TYPE')],
+            '*.documents.*.number' => ['required', 'string', 'max:255'],
             '*.gender' => ['required', new InDictionary('GENDER')],
-            '*.id' => ['nullable', 'uuid'],
-            '*.last_name' => ['required', 'string', 'max:255'],
-            '*.second_name' => ['nullable', 'string', 'max:255'],
+            '*.id' => ['required', 'uuid'],
             '*.phones' => ['nullable', 'array'],
             '*.phones.*.number' => ['required', new PhoneNumber()],
             '*.phones.*.type' => ['required', new InDictionary('PHONE_TYPE')],
@@ -667,7 +684,7 @@ class Person extends Request
         return $validator->validate();
     }
 
-     protected function validatePersonalData(EHealthResponse $response): array
+    protected function validatePersonalData(EHealthResponse $response): array
     {
         $replaced = self::replaceEHealthPropNames($response->getData());
 
@@ -738,9 +755,12 @@ class Person extends Request
             'emergency_contact.phones.*.number' => ['required', 'string', 'max:255'],
             'emergency_contact.phones.*.type' => ['required', 'string', new InDictionary('PHONE_TYPE')],
 
-            'first_name' => ['required', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
-            'second_name' => ['nullable', 'string', 'max:255'],
+            'names' => ['required', 'array', 'min:1'],
+            'names.*.language' => ['required', 'string', 'max:255'],
+            'names.*.first_name' => ['required', 'string', 'max:255'],
+            'names.*.last_name' => ['nullable', 'string', 'max:255'],
+            'names.*.second_name' => ['nullable', 'string', 'max:255'],
+            'names.*.no_last_name' => ['required', 'boolean'],
 
             'gender' => ['required', new InDictionary('GENDER')],
             'uuid' => ['required', 'uuid'],

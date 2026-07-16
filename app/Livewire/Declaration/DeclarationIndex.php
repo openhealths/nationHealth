@@ -278,7 +278,8 @@ class DeclarationIndex extends Component
 
             $declarations = Declaration::with([
                 'reorganizedEmployeeDeclaration',
-                'person:id,first_name,last_name,second_name,birth_date'
+                'person:id,birth_date',
+                'person.names'
             ])
                 ->when(
                     !$user->hasAllowedRole(Role::OWNER),
@@ -295,7 +296,10 @@ class DeclarationIndex extends Component
 
         // Don't show declaration requests for OWNER
         if (!$user->hasAllowedRole(Role::OWNER) && $user->can('viewAny', DeclarationRequest::class)) {
-            $declarationRequests = DeclarationRequest::with(['person:id,first_name,last_name,second_name,birth_date'])
+            $declarationRequests = DeclarationRequest::with([
+                'person:id,birth_date',
+                'person.names'
+            ])
                 ->forEmployees($this->employeeIds)
                 ->whereNotIn('status', [RequestStatus::SIGNED->value])
                 ->get()
@@ -342,8 +346,9 @@ class DeclarationIndex extends Component
                 $searchTerm = Str::lower(trim($this->searchByName));
 
                 $allItems = $allItems->filter(function (DeclarationRequest|Declaration $item) use ($searchTerm) {
-                    $last = Str::lower(data_get($item, 'person.last_name', ''));
-                    $first = Str::lower(data_get($item, 'person.first_name', ''));
+                    $primaryName = $item->person?->primaryName;
+                    $last = Str::lower($primaryName?->lastName ?? '');
+                    $first = Str::lower($primaryName?->firstName ?? '');
 
                     return Str::contains($last, $searchTerm) || Str::contains($first, $searchTerm);
                 });

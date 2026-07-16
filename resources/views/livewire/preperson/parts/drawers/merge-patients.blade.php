@@ -40,12 +40,16 @@
             </div>
         </div>
 
-        <div class="space-y-6 mt-6" x-show="showMergeResults" x-transition x-cloak>
+        <div class="space-y-6 mt-6" wire:ignore x-show="showMergeResults" x-transition x-cloak>
             <template x-for="patient in mergeSearchPatients" :key="patient.id">
                 <fieldset class="fieldset">
-                    <legend class="legend"
-                            x-text="`${patient.lastName} ${patient.firstName} ${patient.secondName || ''}`"
-                    ></legend>
+                    <legend class="legend">
+                        <template x-for="(patientName, index) in patient.names" :key="index">
+                            <span class="block"
+                                  x-text="`${patientName.lastName ?? ''} ${patientName.firstName} ${patientName.secondName ?? ''}`.trim()"
+                            ></span>
+                        </template>
+                    </legend>
 
                     <div
                         class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-700 pb-4">
@@ -94,7 +98,8 @@
                                 <tr>
                                     <th scope="col" class="th-input">{{ strtoupper(__('forms.city')) }}</th>
                                     <th scope="col" class="th-input">{{ __('preperson.merge.tax_id') }}</th>
-                                    <th scope="col" class="th-input">{{ __('preperson.merge.birth_certificate') }}</th>
+                                    <th scope="col" class="th-input">{{ strtoupper(__('forms.document_type')) }}</th>
+                                    <th scope="col" class="th-input">{{ strtoupper(__('forms.document_number')) }}</th>
                                     <th scope="col" class="th-input">{{ strtoupper(__('forms.status.label')) }}</th>
                                 </tr>
                                 </thead>
@@ -108,7 +113,10 @@
                                         x-text="patient.taxId || '-'"
                                     ></td>
                                     <td class="td-input whitespace-nowrap overflow-hidden text-ellipsis align-top font-bold text-gray-900 dark:text-white"
-                                        x-text="patient.birthCertificate || '-'"
+                                        x-text="patient.documents?.map(patientDocument => $wire.dictionaries.DOCUMENT_TYPE[patientDocument.type] ?? patientDocument.type).join(', ') || '-'"
+                                    ></td>
+                                    <td class="td-input whitespace-nowrap overflow-hidden text-ellipsis align-top font-bold text-gray-900 dark:text-white"
+                                        x-text="patient.documents?.map(patientDocument => patientDocument.number).join(', ') || '-'"
                                     ></td>
                                     <td class="td-input whitespace-nowrap align-top">
                                         <span class="badge-green">ЕСОЗ</span>
