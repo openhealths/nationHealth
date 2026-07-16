@@ -1,14 +1,4 @@
 @php
-    $hasZipError = $errors->has('receptionAddress.zip');
-    $hasApartmentError = $errors->has('receptionAddress.apartment');
-    $hasBuildingError = $errors->has('receptionAddress.building');
-    $hasAreaError = $errors->has('receptionAddress.area');
-    $hasSettlementTypeError = $errors->has('receptionAddress.settlementType');
-    $hasRegionError = $errors->has('receptionAddress.region');
-    $hasSettlementError = $errors->has('receptionAddress.settlement');
-    $hasStreetTypeError = $errors->has('receptionAddress.streetType');
-    $hasStreetError = $errors->has('receptionAddress.street');
-
     natcasesort($dictionaries['STREET_TYPE']);
 @endphp
 
@@ -76,7 +66,6 @@
     x-init="init()"
     class="{{ $class }}"
 >
-
     {{-- AREA --}}
     <div class="form-group group !z-[18]">
         <select
@@ -85,8 +74,8 @@
             id="addressRArea"
             @blur="selecting=false"
             @change="address.settlement=null" {{-- This need to properly set a Kyiv area --}}
-            aria-describedby="{{ $hasAreaError ? 'addressRAreaErrorHelp' : '' }}"
-            class="input-select text-gray-800 {{ $hasAreaError ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
+            aria-describedby="@error('receptionAddress.area') addressRAreaErrorHelp @enderror"
+            class="input-select text-gray-800 @error('receptionAddress.area') input-error border-red-500 focus:border-red-500 @enderror peer"
             :disabled="readonly"
         >
             <option value="_placeholder_" hidden>-- {{ __('forms.select') }} --</option>
@@ -100,11 +89,11 @@
 
         </select>
 
-        @if($hasAreaError)
+        @error('receptionAddress.area')
             <p id="addressRAreaErrorHelp" class="text-error">
-                {{ $errors->first('receptionAddress.area') }}
+                {{ $message }}
             </p>
-        @endif
+        @enderror
 
         <label for="addressRArea" class="label z-10">
             {{ __('forms.area') }}
@@ -158,8 +147,8 @@
             placeholder=" "
             id="addressRRegion"
             autocomplete="off"
-            aria-describedby="{{ $hasRegionError ? 'addressRRegionErrorHelp' : '' }}"
-            class="input {{ $hasRegionError ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
+            aria-describedby="@error('receptionAddress.region') addressRRegionErrorHelp @enderror"
+            class="input @error('receptionAddress.region') input-error border-red-500 focus:border-red-500 @enderror peer"
             :disabled="!address.area || address.area === 'М.КИЇВ' || readonly"
         />
 
@@ -193,11 +182,11 @@
             </div>
         </div>
 
-        @if($hasRegionError)
+        @error('receptionAddress.region')
             <p id="addressRRegionErrorHelp" class="text-error">
-                {{ $errors->first('receptionAddress.region') }}
+                {{ $message }}
             </p>
-        @endif
+        @enderror
 
         <label for="addressRRegion" class="label z-10">
             {{ __('forms.region') }}
@@ -207,14 +196,13 @@
     {{-- TYPE --}}
     <div class="form-group group !z-[16]">
         <select
-            {{-- wire:model.live="address.settlementType" --}}
             x-model="address.settlementType"
             required
             @blur="selecting=false"
             id="addressRSettlementType"
-            aria-describedby="{{ $hasSettlementTypeError ? 'addressRSettlementTypeErrorHelp' : '' }}"
-            class="input-select text-gray-800 {{ $hasSettlementTypeError ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
-            :disabled="!address.region || readonly"
+            aria-describedby="@error('receptionAddress.settlementType') addressRSettlementTypeErrorHelp @enderror"
+            class="input-select text-gray-800 @error('receptionAddress.settlementType') input-error border-red-500 focus:border-red-500 @enderror peer"
+            :disabled="!address.area || readonly"
         >
             <option value="_placeholder_" selected hidden>-- {{ __('forms.select') }} --</option>
 
@@ -227,14 +215,14 @@
                         {{ $type }}
                     </option>
                 @endforeach
-            @endif
+            @endisset
         </select>
 
-        @if($hasSettlementTypeError)
+        @error('receptionAddress.settlementType')
             <p id="addressRSettlementTypeErrorHelp" class="text-error">
-                {{ $errors->first('receptionAddress.settlementType') }}
+                {{ $message }}
             </p>
-        @endif
+        @enderror
 
         <label for="addressRSettlementType" class="label z-10">
             {{ __('forms.settlement_type') }}
@@ -248,6 +236,7 @@
             showTo: false,
             settlements: $wire.entangle('receptionSettlements'),
             initialized: false,
+            exactSearch: $wire.entangle('exactSettlementReceptionMatch'),
             init() {
                 this.$watch('address.settlement', value => {
                     // tracking changes of settlement, but skip first time
@@ -289,8 +278,8 @@
             placeholder=" "
             id="addressRSettlement"
             autocomplete="off"
-            aria-describedby="{{ $hasSettlementError ? 'addressRSettlementErrorHelp' : '' }}"
-            class="input {{ $hasSettlementError ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
+            aria-describedby="@error('receptionAddress.settlement') addressRSettlementErrorHelp @enderror"
+            class="input @error('receptionAddress.settlement') input-error border-red-500 focus:border-red-500 @enderror peer"
             :disabled="!address.settlementType || address.area === 'М.КИЇВ' || readonly"
         />
 
@@ -325,15 +314,27 @@
             </div>
         </div>
 
-        @if($hasSettlementError)
+        @error('receptionAddress.settlement')
             <p id="addressRSettlementErrorHelp" class="text-error">
-                {{ $errors->first('receptionAddress.settlement') }}
+                {{ $message }}
             </p>
-        @endif
+        @enderror
 
         <label for="addressRSettlement" class="label z-10">
             {{ __('forms.settlement') }}
         </label>
+
+        <div class="form-group group">
+            <input
+                type="checkbox"
+                id="exactSettlementSearch"
+                class="default-checkbox text-blue-500 focus:ring-blue-200"
+                x-model="exactSearch"
+                :checked="exactSearch"
+                :disabled="!address.settlementType || address.area === 'М.КИЇВ' || readonly"
+            >
+            <label for="exactSettlementSearch" class="text-xs font-medium text-gray-500 dark:text-gray-300">{{ __('Шукати по точному співпадінню назви') }}</label>
+        </div>
     </div>
 
     {{-- STREET_TYPE --}}
@@ -342,8 +343,8 @@
             x-model="address.streetType"
             id="addressRStreetType"
             @blur="selecting=false"
-            aria-describedby="{{ $hasStreetTypeError ? 'addressRStreetTypeErrorHelp' : '' }}"
-            class="input-select text-gray-800 {{ $hasStreetTypeError ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
+            aria-describedby="@error('receptionAddress.streetType') addressRStreetTypeErrorHelp @enderror"
+            class="input-select text-gray-800 @error('receptionAddress.streetType') input-error border-red-500 focus:border-red-500 @enderror peer"
             :disabled="!address.settlement || readonly"
         >
             <option value="_placeholder_" selected hidden>-- {{ __('forms.select') }} --</option>
@@ -360,11 +361,11 @@
             @endif
         </select>
 
-        @if($hasStreetTypeError)
+        @error('receptionAddress.streetType')
             <p id="addressRStreetTypeErrorHelp" class="text-error">
-                {{ $errors->first('receptionAddress.streetType') }}
+                {{ $message }}
             </p>
-        @endif
+        @enderror
 
         <label for="addressRStreetType" class="label absolute z-20">
             {{ __('forms.street_type') }}
@@ -421,8 +422,8 @@
             placeholder=" "
             id="addressRStreet"
             autocomplete="off"
-            aria-describedby="{{ $hasStreetError ? 'addressRStreetErrorHelp' : '' }}"
-            class="input {{ $hasStreetError ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
+            aria-describedby="@error('receptionAddress.street') addressRStreetErrorHelp @enderror"
+            class="input @error('receptionAddress.street') input-error border-red-500 focus:border-red-500 @enderror peer"
             :disabled="(!address.settlementType && !selecting) || readonly"
         />
 
@@ -457,11 +458,11 @@
         </div>
 
 
-        @if($hasStreetError)
+        @error('receptionAddress.street')
             <p id="addressRStreetErrorHelp" class="text-error">
-                {{ $errors->first('receptionAddress.street') }}
+                {{ $message }}
             </p>
-        @endif
+        @enderror
 
         <label for="addressRStreet" class="label z-10">
             {{ __('forms.street') }}
@@ -475,16 +476,16 @@
             type="text"
             placeholder=" "
             id="addressRBuilding"
-            aria-describedby="{{ $hasBuildingError ? 'addressRBuildingErrorHelp' : '' }}"
-            class="input {{ $hasBuildingError ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
+            aria-describedby="@error('receptionAddress.building') addressRBuildingErrorHelp @enderror"
+            class="input @error('receptionAddress.building') input-error border-red-500 focus:border-red-500 @enderror peer"
             :disabled="!address.street || readonly"
         />
 
-        @if($hasBuildingError)
+        @error('receptionAddress.building')
             <p id="addressRBuildingErrorHelp" class="text-error">
-                {{ $errors->first('receptionAddress.building') }}
+                {{ $message }}
             </p>
-        @endif
+        @enderror
 
         <label for="addressRBuilding" class="label z-10">
             {{ __('forms.building') }}
@@ -498,16 +499,16 @@
             type="text"
             placeholder=" "
             id="addressRApartment"
-            aria-describedby="{{ $hasApartmentError ? 'addressRApartmentErrorHelp' : '' }}"
-            class="input {{ $hasApartmentError ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
+            aria-describedby="@error('receptionAddress.apartment') addressRApartmentErrorHelp @enderror"
+            class="input @error('receptionAddress.apartment') input-error border-red-500 focus:border-red-500 @enderror peer"
             :disabled="!address.street || readonly"
         />
 
-        @if($hasApartmentError)
+        @error('receptionAddress.apartment')
             <p id="addressRApartmentErrorHelp" class="text-error">
-                {{ $errors->first('receptionAddress.apartment') }}
+                {{ $message}}
             </p>
-        @endif
+        @enderror
 
         <label for="addressRApartment" class="label z-10">
             {{ __('forms.apartment') }}
@@ -522,16 +523,16 @@
             x-mask="99999"
             placeholder=" "
             id="addressRZip"
-            aria-describedby="{{ $hasZipError ? 'addressRZipErrorHelp' : '' }}"
-            class="input {{ $hasZipError ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
+            aria-describedby="@error('receptionAddress.zip') addressRZipErrorHelp @enderror"
+            class="input @error('receptionAddress.zip') input-error border-red-500 focus:border-red-500 @enderror peer"
             :disabled="!address.street || readonly"
         />
 
-        @if($hasZipError)
+        @error('receptionAddress.zip')
             <p id="addressRZipErrorHelp" class="text-error">
-                {{ $errors->first('receptionAddress.zip') }}
+                {{ $message }}
             </p>
-        @endif
+        @enderror
 
         <label for="addressRZip" class="label z-10">
             {{ __('forms.zip_code') }}

@@ -397,6 +397,12 @@
                                         </label>
                                     </div>
                                 @endif
+
+                                @if(!$readonly)
+                                <div class="pt-6 mt-auto">
+                                    <p class="italic text-xs font-medium text-gray-400 dark:text-gray-300">{{ __('forms.addresses.try_without_region') }}</p>
+                                </div>
+                                @endif
                             </div>
                         </fieldset>
 
