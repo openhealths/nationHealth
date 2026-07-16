@@ -12,13 +12,14 @@
         $currentLegalEntityId = legalEntity()->id;
 
         $isAdminOrHr = $currentUser->hasAllowedRole([Role::ADMIN, Role::HR]);
+        $canDeactivateElevated = $currentUser->hasAllowedRole([Role::ADMIN, Role::HR, Role::OWNER, Role::PHARMACY_OWNER]);
 
        // Cache access rights with an array.
-       // ADMIN/HR are elevated in EmployeePolicy even when eHealth ADMIN scopes omit employee:write/details/deactivate.
+       // ADMIN/HR/OWNER are elevated even when eHealth scopes omit employee:write/details/deactivate.
        $permissions = [
         'employee_view' => $currentUser->can('employee:details') || $isAdminOrHr,
         'employee_write' => $currentUser->can('employee:write') || $isAdminOrHr,
-        'employee_deactivate' => $currentUser->can('employee:deactivate') || $isAdminOrHr,
+        'employee_deactivate' => $currentUser->can('employee:deactivate') || $canDeactivateElevated,
         'employee_admin_hr' => $isAdminOrHr,
         'request_view' => $currentUser->can('employee_request:read') || $isAdminOrHr,
         'request_write' => $currentUser->can('employee_request:write') || $isAdminOrHr,
@@ -29,7 +30,9 @@
         Status::APPROVED->value => __('forms.status.active'),
         Status::NEW->value => __('forms.status.new'),
         Status::SIGNED->value => __('forms.status.new'),
-        Status::DISMISSED->value => __('forms.dismissed'),
+        Status::STOPPED->value => __('forms.status.stopped'),
+        Status::ENTERED_IN_ERROR->value => __('forms.status.entered_in_error'),
+        Status::DISMISSED->value => __('forms.status.stopped'),
         Status::REORGANIZED->value => __('forms.reorganized'),
     ];
     @endphp
@@ -390,8 +393,10 @@
                                                 @if($isEmployee)
                                                     @if($employeeStatus === Status::APPROVED->value)
                                                         <span class="badge-green">{{__('forms.status.active')}}</span>
-                                                    @elseif($employeeStatus === Status::DISMISSED->value || $employeeStatus === Status::STOPPED->value)
-                                                        <span class="badge-red">{{__('forms.status.dismissed')}}</span>
+                                                    @elseif($employeeStatus === Status::STOPPED->value || $employeeStatus === Status::DISMISSED->value)
+                                                        <span class="badge-red">{{__('forms.status.stopped')}}</span>
+                                                    @elseif($employeeStatus === Status::ENTERED_IN_ERROR->value)
+                                                        <span class="badge-red">{{__('forms.status.entered_in_error')}}</span>
                                                     @elseif($employeeStatus === Status::REORGANIZED->value)
                                                         <span class="badge-yellow">{{__('forms.status.reorganized')}}</span>
                                                     @endif

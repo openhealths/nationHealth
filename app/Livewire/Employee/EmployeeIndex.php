@@ -67,6 +67,8 @@ class EmployeeIndex extends EmployeeComponent
     public ?int $employeeIdToDeactivate = null;
     public ?string $employeeToDeactivateName = null;
     public bool $isDoctorToDeactivate = false;
+    public string $deactivationEndDate = '';
+    public string $deactivationStatus = 'STOPPED';
 
     public ?int $employeeToDismissId = null;
     public ?string $employeeToDismissName = null;
@@ -259,14 +261,29 @@ class EmployeeIndex extends EmployeeComponent
             $this->employeeToDeactivateName = $employee->full_name
                 ?? ($employee->last_name . ' ' . $employee->first_name);
 
-            // Logic to determine if the employee is a doctor
-            // Checks both the property/accessor and the position code
             $type = $employee->employeeType ?? $employee->employee_type ?? '';
 
             $this->isDoctorToDeactivate = ($type === Role::DOCTOR->value);
         }
 
+        $this->deactivationStatus = Status::STOPPED->value;
+        $startDateStr = isset($employee) ? ($employee->start_date ?? '') : '';
+        $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
+        $this->deactivationEndDate = ($startDateStr && $todayStr < $startDateStr) ? $startDateStr : $todayStr;
+
         $this->showDeactivateModal = true;
+    }
+
+    public function updatedDeactivationStatus(string $value): void
+    {
+        if ($value === Status::ENTERED_IN_ERROR->value) {
+            $this->deactivationEndDate = '';
+        } elseif ($this->deactivationEndDate === '' && $this->employeeIdToDeactivate) {
+            $employee = Employee::find($this->employeeIdToDeactivate);
+            $startDateStr = $employee?->start_date ?? '';
+            $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
+            $this->deactivationEndDate = ($startDateStr && $todayStr < $startDateStr) ? $startDateStr : $todayStr;
+        }
     }
 
     public function closeModal(): void
@@ -299,14 +316,37 @@ class EmployeeIndex extends EmployeeComponent
             return;
         }
 
-        // eHealth requires: end_date >= start_date.
-        $startDateStr = $employee->start_date; // 'Y-m-d' string from DB
-        $endDateStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
+        // eHealth: STOPPED requires end_date (>= start_date, <= today); ENTERED_IN_ERROR omits end_date.
+        $startDateStr = $employee->start_date;
+        $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
+        $status = in_array($this->deactivationStatus, [Status::STOPPED->value, Status::ENTERED_IN_ERROR->value], true)
+            ? $this->deactivationStatus
+            : Status::STOPPED->value;
 
-        // If 'today' in Kiev is lexicographically earlier than 'start_date', use 'start_date' as the dismissal date
-        if ($startDateStr && $endDateStr < $startDateStr) {
-            $formattedEndDate = $startDateStr;
-        } else {
+        $formattedEndDate = null;
+
+        if ($status === Status::STOPPED->value) {
+            $endDateInput = trim($this->deactivationEndDate);
+            $endDateStr = $endDateInput !== '' ? $endDateInput : $todayStr;
+
+            if ($startDateStr && $endDateStr < $startDateStr) {
+                $this->dispatch('flashMessage', [
+                    'message' => __('employees.deactivation_end_date_before_start'),
+                    'type' => 'error',
+                ]);
+
+                return;
+            }
+
+            if ($endDateStr > $todayStr) {
+                $this->dispatch('flashMessage', [
+                    'message' => __('employees.deactivation_end_date_in_future'),
+                    'type' => 'error',
+                ]);
+
+                return;
+            }
+
             $formattedEndDate = $endDateStr;
         }
 
@@ -328,14 +368,18 @@ class EmployeeIndex extends EmployeeComponent
         }
 
         try {
-            // 2. eHealth API Call using formatted string
-            $response = $ehealthEmployeeService->deactivate($employee->uuid, $formattedEndDate);
+            $response = $ehealthEmployeeService->deactivate(
+                $employee->uuid,
+                $formattedEndDate,
+                $status
+            );
 
             if (!empty($response)) {
                 // 3. Updates in the local database
                 $employee->update([
-                    'status' => Status::STOPPED->value,
+                    'status' => $status,
                     'end_date' => $formattedEndDate,
+                    'is_active' => false,
                 ]);
 
                 // 4. Safe User Cleanup: Remove a role from a user (if binding exists)
@@ -396,6 +440,8 @@ class EmployeeIndex extends EmployeeComponent
         $this->employeeIdToDeactivate = null;
         $this->employeeToDeactivateName = null;
         $this->isDoctorToDeactivate = false;
+        $this->deactivationEndDate = '';
+        $this->deactivationStatus = Status::STOPPED->value;
     }
 
     /**

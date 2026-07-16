@@ -64,7 +64,7 @@ class EmployeePolicy
             return Response::denyWithStatus(404);
         }
 
-        return ($user->can('employee:deactivate') || $user->hasAllowedRole([Role::ADMIN, Role::HR]))
+        return ($user->can('employee:deactivate') || $user->hasAllowedRole([Role::ADMIN, Role::HR, Role::OWNER, Role::PHARMACY_OWNER]))
             ? Response::allow()
             : Response::deny(__('employees.policy.deactivate_denied'));
     }

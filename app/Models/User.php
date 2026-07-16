@@ -356,8 +356,17 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function getScopes(): string
     {
-        // Collect all permissions (direct + via roles)
-        return $this->getAllPermissions()->pluck('name')->unique()->join(' ');
+        // eHealth rejects unknown scopes (e.g. party_verification:read) and auth fails with 500.
+        $unsupported = [
+            'party_verification:read',
+        ];
+
+        return $this->getAllPermissions()
+            ->pluck('name')
+            ->unique()
+            ->reject(fn (string $name) => in_array($name, $unsupported, true))
+            ->values()
+            ->join(' ');
     }
 
     /**

@@ -43,5 +43,9 @@ class PartyVerificationWarningCopyTest extends TestCase
         $this->assertStringContainsString('ДПС, ДРАЦСГ або ДМС', $footer);
         $this->assertStringContainsString('залежно від отриманого статусу', $footer);
         $this->assertStringContainsString('Якщо оновлення не можливе', $footer);
+
+        $this->assertSame($drfo, __('party_verification.recommendations.drfo'));
+        $this->assertSame($dracsDeath, __('party_verification.recommendations.dracs_death'));
+        $this->assertSame($dmsPassport, __('party_verification.recommendations.dms_passport'));
     }
 }

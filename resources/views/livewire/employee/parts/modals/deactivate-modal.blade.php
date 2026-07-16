@@ -14,12 +14,10 @@
                      role="dialog"
                      aria-modal="true"
                 >
-                    {{-- Затемнення фону --}}
                     <div x-show="show"
                          x-transition.opacity
                          class="fixed inset-0 bg-black/50"></div>
 
-                    {{-- Контент модалки --}}
                     <div x-show="show"
                          x-transition
                          @click="show = false"
@@ -28,7 +26,8 @@
                         <div @click.stop
                              x-trap.noscroll.inert="show"
                              class="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white p-6 text-center shadow-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-800"
-                                                    @if($employeeToDeactivateName)
+                        >
+                            @if($employeeToDeactivateName)
                                 <h2 class="text-xl font-bold text-gray-900 dark:text-white">
                                     {{ __('employees.modals.deactivate.title_with_name', ['name' => $employeeToDeactivateName]) }}
                                 </h2>
@@ -41,17 +40,35 @@
                                     @endif
                                 </div>
 
-                                {{-- Date Picker for end_date --}}
                                 <div class="mt-4 text-left">
-                                    <label for="deactivation-end-date" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        {{ __('forms.end_date') }}
+                                    <label for="deactivation-status" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        {{ __('forms.status.label') }}
                                     </label>
-                                    <input type="date"
-                                           id="deactivation-end-date"
-                                           wire:model="deactivationEndDate"
-                                           class="input w-full px-3 py-2 text-sm"
-                                    />
+                                    <select id="deactivation-status"
+                                            wire:model.live="deactivationStatus"
+                                            class="input w-full px-3 py-2 text-sm"
+                                    >
+                                        <option value="{{ \App\Enums\Status::STOPPED->value }}">
+                                            {{ __('forms.status.stopped') }}
+                                        </option>
+                                        <option value="{{ \App\Enums\Status::ENTERED_IN_ERROR->value }}">
+                                            {{ __('forms.status.entered_in_error') }}
+                                        </option>
+                                    </select>
                                 </div>
+
+                                @if($deactivationStatus === \App\Enums\Status::STOPPED->value)
+                                    <div class="mt-4 text-left">
+                                        <label for="deactivation-end-date" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            {{ __('forms.end_date') }}
+                                        </label>
+                                        <input type="date"
+                                               id="deactivation-end-date"
+                                               wire:model="deactivationEndDate"
+                                               class="input w-full px-3 py-2 text-sm"
+                                        />
+                                    </div>
+                                @endif
 
                                 <div class="mt-6 flex justify-center gap-4">
                                     <button type="button" @click="show = false" class="button-minor">

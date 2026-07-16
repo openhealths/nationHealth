@@ -395,7 +395,7 @@ return [
         'unsynced' => 'Не синхронізовано',
         'dracs_death_unverified' => 'Потребує підтвердження смерті',
         'unknown' => 'Невідомо',
-        'stopped' => 'Зупинений',
+        'stopped' => 'Припинено',
         'entered_in_error' => 'Внесено помилково'
     ],
 

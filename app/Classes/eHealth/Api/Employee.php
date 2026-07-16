@@ -63,12 +63,16 @@ class Employee extends EHealthRequest
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthResponseException
      */
-    public function deactivate(string $id, string $endDate): PromiseInterface|EHealthResponse
+    public function deactivate(string $id, ?string $endDate = null, string $status = 'STOPPED'): PromiseInterface|EHealthResponse
     {
         $payload = [
-            'status' => 'STOPPED',
-            'end_date' => $endDate,
+            'status' => $status,
         ];
+
+        // ENTERED_IN_ERROR must not include end_date (п.4.1.2).
+        if ($status === 'STOPPED' && $endDate !== null && $endDate !== '') {
+            $payload['end_date'] = $endDate;
+        }
 
         return $this->patch(self::URL . '/' . $id . '/actions/deactivate', $payload);
     }
