@@ -38,6 +38,8 @@ GEMINI.md
 /storage/cli-testing/
 .worktrees/
 
-# Spec Kit project infra + feature specs are tracked (.specify/, specs/)
-# Cursor agent skills remain under ignored .cursor/ — regenerate via:
+# Spec Kit install/scaffold (local only) — do not commit
+.specify/
+# Feature specs are tracked under specs/
+# Cursor skills stay under ignored .cursor/ — regenerate via:
 #   specify init --here --force --integration cursor-agent --script sh --ignore-agent-tools
