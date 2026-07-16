@@ -59,6 +59,16 @@
             @include('components.signature-modal', ['method' => 'sign'])
         @endif
 
+        @if($isPolling)
+            <div wire:poll.2s="checkApprovalJobStatus" class="hidden"></div>
+        @endif
+        @if($showAuthModal)
+            @include('livewire.care-plan.modals.authentication')
+        @endif
+        @if($showMethodSelectionModal)
+            @include('livewire.care-plan.modals.method-selection')
+        @endif
+
         @include('livewire.care-plan.parts.modals.eprescription-form-drawer')
         @include('livewire.care-plan.parts.modals.referral-form-drawer')
     </div>

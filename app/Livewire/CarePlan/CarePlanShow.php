@@ -15,7 +15,7 @@ use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Repositories\CarePlanRepository;
 use App\Repositories\CarePlanActivityRepository;
-use App\Repositories\MedicalEvents\Repository;
+use App\Services\MedicalEvents\CarePlanApprovalService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -1859,71 +1859,87 @@ class CarePlanShow extends Component
     protected function createApproval(string $methodUuid): void
     {
         try {
-            $payload = [
-                'resources' => [
-                    [
-                        'identifier' => [
-                            'type' => [
-                                'coding' => [['system' => 'eHealth/resources', 'code' => 'care_plan']]
-                            ],
-                            'value' => $this->carePlan->uuid,
-                        ]
-                    ]
-                ],
-                'granted_to' => [
-                    'identifier' => [
-                        'type' => [
-                            'coding' => [['system' => 'eHealth/resources', 'code' => 'employee']]
-                        ],
-                        'value' => Auth::user()?->getCarePlanWriterEmployee($this->carePlan->terms_of_service)?->uuid,
-                    ]
-                ],
-                'access_level' => 'write',
-                'authorize_with' => $methodUuid ?: null,
-            ];
+            $employeeUuid = Auth::user()?->getCarePlanWriterEmployee($this->carePlan->terms_of_service)?->uuid;
 
-            $response = EHealth::approval()->createApproval($this->carePlan->person->uuid, $payload);
-            $responseData = $response->getData();
+            if (!$employeeUuid) {
+                $this->dispatch('flashMessage', [
+                    'type' => 'error',
+                    'message' => 'Не вдалося визначити лікаря для створення дозволу.',
+                ]);
 
-            if (in_array($response->getStatusCode(), [200, 201, 202])) {
-                if ($response->getStatusCode() === 202) {
-                    $jobId = basename($responseData['links'][0]['href'] ?? '');
-                    $attempts = 0;
-                    do {
-                        sleep(2);
-                        $jobResponse = EHealth::job()->getDetails($jobId)->getData();
-                        $attempts++;
-                    } while (($jobResponse['status'] === 'pending' || $jobResponse['status'] === 'accepted') && $attempts < 15);
-
-                    if ($jobResponse['status'] !== 'processed') {
-                        throw new \RuntimeException('Approval job failed: ' . json_encode($jobResponse['error'] ?? 'unknown error'));
-                    }
-                    $responseData = $jobResponse['result'] ?? $jobResponse;
-                }
-
-                $this->approvalId = $responseData['response_data']['id'] ??
-                                   $responseData['data']['id'] ??
-                                   $responseData['id'] ?? null;
-
-                $authenticationMethodCurrent = $responseData['response_data']['authentication_method_current'] ??
-                                               $responseData['data']['authentication_method_current'] ??
-                                               $responseData['authentication_method_current'] ??
-                                               $responseData['urgent']['authentication_method_current'] ?? null;
-
-                $urgentOtp = isset($authenticationMethodCurrent['type']) && $authenticationMethodCurrent['type'] === 'OTP';
-
-                if (($methodUuid || $urgentOtp) && $this->approvalId) {
-                    $this->openAuthModal();
-                } else {
-                    // Approval granted without OTP (e.g., OFFLINE or document)
-                    $this->syncPlanStatus();
-                    Session::flash('success', 'План лікування успішно активовано.');
-                }
+                return;
             }
+
+            $result = app(CarePlanApprovalService::class)->create(
+                carePlan: $this->carePlan,
+                patientUuid: $this->carePlan->person->uuid,
+                employeeUuid: $employeeUuid,
+                accessLevel: 'write',
+                authorizeWith: $methodUuid ?: null,
+            );
+
+            if ($result->isAsync()) {
+                $this->approvalId = $result->approvalId;
+                $this->pollingLinkId = $result->pollingLinkId;
+                $this->isPolling = true;
+
+                return;
+            }
+
+            $this->approvalId = $result->approvalId;
+
+            if ($result->requiresOtp()) {
+                $this->currentAuthMethod = $result->authMethod;
+                $this->openAuthModal();
+
+                return;
+            }
+
+            $this->syncPlanStatus();
+            Session::flash('success', 'План лікування успішно активовано.');
         } catch (\Exception $e) {
             Log::error('CarePlanShow: failed to create approval: ' . $e->getMessage());
             $this->dispatch('flashMessage', ['type' => 'error', 'message' => 'Не вдалося створити запит на дозвіл: ' . $e->getMessage()]);
         }
+    }
+
+    public function checkApprovalJobStatus(): void
+    {
+        if (!$this->isPolling || !$this->pollingLinkId) {
+            return;
+        }
+
+        $status = app(CarePlanApprovalService::class)->resolveAsyncJob($this->pollingLinkId);
+
+        if ($status->isPending()) {
+            return;
+        }
+
+        $this->isPolling = false;
+        $this->pollingLinkId = null;
+
+        if ($status->isFailed()) {
+            $this->dispatch('flashMessage', [
+                'type' => 'error',
+                'message' => $status->errorMessage ?: 'Не вдалося обробити запит на дозвіл.',
+            ]);
+
+            return;
+        }
+
+        if ($status->approvalId) {
+            $this->approvalId = $status->approvalId;
+        }
+
+        if ($status->requiresOtp()) {
+            $this->currentAuthMethod = $status->authMethod;
+            $this->openAuthModal();
+
+            return;
+        }
+
+        $this->syncPlanStatus();
+        Session::flash('success', 'План лікування успішно активовано.');
     }
 
     public function verify(): void
@@ -1931,9 +1947,11 @@ class CarePlanShow extends Component
         $this->validate($this->approvalVerificationRules());
 
         try {
-            $response = EHealth::approval()->verify($this->carePlan->person->uuid, $this->approvalId, [
-                'code' => (int) $this->verificationCode,
-            ]);
+            $response = app(CarePlanApprovalService::class)->verify(
+                $this->carePlan->person->uuid,
+                $this->approvalId,
+                (int) $this->verificationCode,
+            );
 
             if ($response->successful()) {
                 $this->closeAuthModal();
@@ -1952,7 +1970,7 @@ class CarePlanShow extends Component
             return;
         }
         try {
-            EHealth::approval()->resendSms($this->carePlan->person->uuid, $this->approvalId);
+            app(CarePlanApprovalService::class)->resendSms($this->carePlan->person->uuid, $this->approvalId);
             $this->smsResent = true;
             $this->dispatch('flashMessage', ['type' => 'success', 'message' => 'SMS надіслано повторно']);
         } catch (\Exception $e) {
@@ -1973,7 +1991,7 @@ class CarePlanShow extends Component
             app(CarePlanRepository::class)->syncCarePlans(['data' => [$planResponse->getData()]], $this->carePlan->person_id);
 
             // Sync approvals as well!
-            Repository::approval()->syncApprovals($this->carePlan, 'care_plan');
+            app(CarePlanApprovalService::class)->syncForCarePlan($this->carePlan);
 
             $this->refreshCarePlan();
             $this->dispatch('refreshApprovals');

@@ -5,13 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire\CarePlan;
 
 use App\Classes\eHealth\EHealth;
-use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Models\CarePlan;
-use App\Models\EhealthJob;
-use App\Models\EhealthLink;
 use App\Models\LegalEntity;
-use App\Models\MedicalEvents\Sql\Approval;
-use App\Repositories\MedicalEvents\Repository;
+use App\Services\MedicalEvents\CarePlanApprovalService;
 use App\Traits\FormTrait;
 use App\Traits\InteractsWithApprovals;
 use Illuminate\Support\Facades\Log;
@@ -40,22 +36,6 @@ class CarePlanApprovals extends Component
     public ?string $errorMessage = null;
 
     public bool $isLoading = false;
-
-    /**
-     * Tracks whether a background approval job is currently being processed.
-     * When true, wire:poll.2s will check the EhealthJob status.
-     */
-    public bool $isPolling = false;
-
-    /** EhealthLink id being polled (null when not polling). */
-    public ?int $pollingLinkId = null;
-
-    /**
-     * The authentication_method_current returned by eHealth for the pending approval.
-     * Null when ESOZ has no declaration on file (sandbox behaviour) — the UI shows a
-     * dedicated notice instructing testers to use code 1234.
-     */
-    public ?array $currentAuthMethod = null;
 
     public ?string $selectedAuthMethodUuid = null;
     public array $authMethods = [];
@@ -109,7 +89,6 @@ class CarePlanApprovals extends Component
 
     /**
      * Sync from eHealth and refresh the local approvals list.
-     * Uses the new MedicalEvents\ApprovalRepository via MedicalEvents\Repository::approval().
      */
     public function fetchApprovals(): void
     {
@@ -117,7 +96,7 @@ class CarePlanApprovals extends Component
 
         try {
             $carePlan = CarePlan::findOrFail($this->carePlanId);
-            Repository::approval()->syncApprovals($carePlan, 'care_plan');
+            app(CarePlanApprovalService::class)->syncForCarePlan($carePlan);
             $this->approvals = $carePlan->approvals()
                 ->with(['grantedTo', 'reason'])
                 ->latest()
@@ -132,20 +111,7 @@ class CarePlanApprovals extends Component
     }
 
     /**
-     * Submit a new approval request to eHealth.
-     *
-     * The eHealth API expects:
-     *   resources[].identifier.type.coding[].code = 'care_plan'
-     *   resources[].identifier.value = Care Plan UUID
-     *   granted_to.identifier.type.coding[].code = 'employee'
-     *   granted_to.identifier.value = Employee UUID (doctor being granted access)
-     *   access_level = 'read' | 'write'
-     *   authorize_with = auth method UUID (OTP)
-     *
-     * Note: 'granted_to_type' and 'reason' are NOT allowed at the root level.
-     *
-     * On 202: dispatches RemoteEHealthLinksProcessing and starts wire:poll.2s.
-     * On 200/201 + OTP: opens the auth modal directly.
+     * Submit a new approval request to eHealth via CarePlanApprovalService.
      */
     public function createApproval(): void
     {
@@ -157,92 +123,36 @@ class CarePlanApprovals extends Component
 
         try {
             $carePlan = CarePlan::findOrFail($this->carePlanId);
+            $service = app(CarePlanApprovalService::class);
 
-            $isSameLegalEntity = ($carePlan->legal_entity_id === legalEntity()->id);
-            $accessLevel = $isSameLegalEntity ? 'write' : 'read';
+            $result = $service->create(
+                carePlan: $carePlan,
+                patientUuid: $this->patientUuid,
+                employeeUuid: $this->newApproval['employee_uuid'],
+                accessLevel: $service->resolveAccessLevel($carePlan),
+                authorizeWith: $this->selectedAuthMethodUuid ?: null,
+            );
 
-            $payload = [
-                'resources' => [
-                    [
-                        'identifier' => [
-                            'type' => [
-                                'coding' => [['system' => 'eHealth/resources', 'code' => 'care_plan']],
-                            ],
-                            'value' => $carePlan->uuid,
-                        ],
-                    ],
-                ],
-                'granted_to' => [
-                    'identifier' => [
-                        'type' => [
-                            'coding' => [['system' => 'eHealth/resources', 'code' => 'employee']],
-                        ],
-                        'value' => $this->newApproval['employee_uuid'],
-                    ],
-                ],
-                'access_level' => $accessLevel,
-                'authorize_with' => $this->selectedAuthMethodUuid ?: null,
-            ];
+            if ($result->isAsync()) {
+                $this->pollingLinkId = $result->pollingLinkId;
+                $this->approvalId = $result->approvalId;
+                $this->isPolling = true;
+                Session::flash('info', __('care-plan.approval_processing'));
 
-            $response = EHealth::approval()->createApproval($this->patientUuid, $payload);
-            $responseData = $response->getData();
-            $statusCode = $response->getStatusCode();
-
-            if ($statusCode === 202) {
-                // Async job — create an EhealthLink and dispatch the polling job
-                $href = $responseData['links'][0]['href'] ?? null;
-
-                if ($href) {
-                    $approvalRepo = Repository::approval();
-
-                    // Create a provisional local Approval so we have a linkable_id
-                    $localApproval = Approval::firstOrCreate(
-                        ['uuid' => $responseData['id'] ?? (string) \Illuminate\Support\Str::uuid()],
-                        [
-                            'approvable_type' => CarePlan::class,
-                            'approvable_id' => $carePlan->id,
-                            'status' => 'NEW',
-                        ]
-                    );
-
-                    $link = $approvalRepo->attachEhealthLink($localApproval, ['href' => $href]);
-
-                    $this->pollingLinkId = $link->id;
-                    $this->approvalId = $localApproval->uuid;
-                    $this->isPolling = true;
-
-                    $token = session()->get(config('ehealth.api.oauth.bearer_token'));
-                    \Illuminate\Support\Facades\Bus::batch([
-                        new \App\Jobs\RemoteEHealthLinksProcessing(
-                            eHealthLink: $link,
-                            legalEntity: legalEntity(),
-                            standalone: true
-                        )
-                    ])
-                        ->withOption('legal_entity_id', legalEntity()->id)
-                        ->withOption('token', \Illuminate\Support\Facades\Crypt::encryptString($token))
-                        ->withOption('user', \Illuminate\Support\Facades\Auth::user())
-                        ->name(\App\Jobs\RemoteEHealthLinksProcessing::BATCH_NAME)
-                        ->onQueue('sync')
-                        ->dispatch();
-
-                    Session::flash('info', __('care-plan.approval_processing'));
-
-                    return;
-                }
+                return;
             }
 
-            // Synchronous response (200/201) — check for OTP
-            if (isset($responseData['urgent']['authentication_method_current']['type'])
-                && $responseData['urgent']['authentication_method_current']['type'] === 'OTP'
-            ) {
-                $this->approvalId = $responseData['id'];
+            if ($result->requiresOtp()) {
+                $this->approvalId = $result->approvalId;
+                $this->currentAuthMethod = $result->authMethod;
                 $this->openAuthModal();
-            } else {
-                Session::flash('success', __('care-plan.approval_created'));
-                $this->reset('newApproval');
-                $this->fetchApprovals();
+
+                return;
             }
+
+            Session::flash('success', __('care-plan.approval_created'));
+            $this->reset('newApproval');
+            $this->fetchApprovals();
         } catch (EHealthValidationException|EHealthResponseException $e) {
             Log::error('CarePlanApprovals: eHealth error: ' . $e->getMessage());
             $this->errorMessage = $e instanceof EHealthValidationException
@@ -258,8 +168,6 @@ class CarePlanApprovals extends Component
 
     /**
      * Called by wire:poll.2s while $isPolling === true.
-     * Checks the EhealthJob status on the tracked EhealthLink.
-     * Once the job reaches PROCESSED or FAILED, stops polling and acts.
      */
     public function checkApprovalJobStatus(): void
     {
@@ -267,94 +175,36 @@ class CarePlanApprovals extends Component
             return;
         }
 
-        $link = EhealthLink::with(['job', 'linkable'])->find($this->pollingLinkId);
+        $status = app(CarePlanApprovalService::class)->resolveAsyncJob($this->pollingLinkId);
 
-        if (!$link || !$link->job) {
+        if ($status->isPending()) {
             return;
         }
 
-        $status = strtoupper((string) ($link->job->status ?? ''));
+        $this->isPolling = false;
+        $this->pollingLinkId = null;
 
-        if ($status === 'PROCESSED') {
-            $this->isPolling = false;
-            $this->pollingLinkId = null;
-
-            // Determine if OTP is required from the job response_data
-            $jobResult = $link->job->response_data ?? [];
-
-            // Extract the real approval UUID from eHealth response and update local record & state
-            $realApprovalId = $jobResult['response_data']['id']
-                ?? $jobResult['data']['id']
-                ?? $jobResult['id']
-                ?? null;
-
-            if ($realApprovalId) {
-                if ($link->linkable && $link->linkable instanceof \App\Models\MedicalEvents\Sql\Approval) {
-                    Log::info('CarePlanApprovals: swapping provisional UUID to real ESOZ approval UUID', [
-                        'old_uuid' => $link->linkable->uuid,
-                        'new_uuid' => $realApprovalId,
-                        'linkable_id' => $link->linkable->id,
-                    ]);
-                    $link->linkable->update(['uuid' => $realApprovalId]);
-                }
-                $this->approvalId = $realApprovalId;
-            }
-
-            // Extract is_verified status (check response_data nesting first)
-            $isVerified = $jobResult['response_data']['is_verified']
-                ?? $jobResult['data']['is_verified']
-                ?? $jobResult['is_verified']
-                ?? $jobResult['urgent']['is_verified']
-                ?? true;
-
-            $authMethod = $jobResult['response_data']['authentication_method_current']
-                ?? $jobResult['data']['authentication_method_current']
-                ?? $jobResult['authentication_method_current']
-                ?? $jobResult['urgent']['authentication_method_current']
-                ?? null;
-
-            // Always open the OTP modal when the approval is not yet verified,
-            // regardless of whether authentication_method_current is set.
-            // When it is null (no declaration on file in sandbox), the modal
-            // displays a dedicated notice telling testers to use code 1234.
-            if (!$isVerified) {
-                $this->currentAuthMethod = $authMethod;
-                $this->openAuthModal();
-            } else {
-                Session::flash('success', __('care-plan.approval_created'));
-                $this->reset('newApproval');
-                $this->fetchApprovals();
-            }
-        } elseif ($status === 'FAILED') {
-            $this->isPolling = false;
-            $this->pollingLinkId = null;
-
-            // Extract validation/response errors from eHealth job response_data
-            $jobResult = $link->job->response_data ?? [];
-            $errorMessage = null;
-
-            if (isset($jobResult['error']['invalid'])) {
-                $errors = [];
-                foreach ($jobResult['error']['invalid'] as $invalid) {
-                    $entry = $invalid['entry'] ?? '';
-                    $rules = $invalid['rules'] ?? [];
-                    foreach ($rules as $rule) {
-                        $errors[] = ($entry ? $entry . ': ' : '') . ($rule['description'] ?? '');
-                    }
-                }
-                if (!empty($errors)) {
-                    $errorMessage = 'Помилка від ЕСОЗ: ' . implode(', ', $errors);
-                }
-            }
-
-            if (!$errorMessage && isset($jobResult['error']['message'])) {
-                $errorMessage = 'Помилка від ЕСОЗ: ' . $jobResult['error']['message'];
-            }
-
-            $this->errorMessage = $errorMessage ?: __('care-plan.approval_create_error');
+        if ($status->isFailed()) {
+            $this->errorMessage = $status->errorMessage ?: __('care-plan.approval_create_error');
             Session::flash('error', $this->errorMessage);
+
+            return;
         }
-        // PROCESSING: do nothing — poll will fire again in 2 s
+
+        if ($status->approvalId) {
+            $this->approvalId = $status->approvalId;
+        }
+
+        if ($status->requiresOtp()) {
+            $this->currentAuthMethod = $status->authMethod;
+            $this->openAuthModal();
+
+            return;
+        }
+
+        Session::flash('success', __('care-plan.approval_created'));
+        $this->reset('newApproval');
+        $this->fetchApprovals();
     }
 
     public function verifyExistingApproval(string $approvalUuid): void
@@ -368,9 +218,11 @@ class CarePlanApprovals extends Component
         $this->validate($this->approvalVerificationRules());
 
         try {
-            $response = EHealth::approval()->verify($this->patientUuid, $this->approvalId, [
-                'code' => (int) $this->verificationCode,
-            ]);
+            $response = app(CarePlanApprovalService::class)->verify(
+                $this->patientUuid,
+                $this->approvalId,
+                (int) $this->verificationCode,
+            );
 
             if ($response->successful()) {
                 Session::flash('success', __('care-plan.approval_verified'));
@@ -397,7 +249,7 @@ class CarePlanApprovals extends Component
         }
 
         try {
-            EHealth::approval()->resendSms($this->patientUuid, $this->approvalId);
+            app(CarePlanApprovalService::class)->resendSms($this->patientUuid, $this->approvalId);
             $this->smsResent = true;
             Session::flash('success', __('care-plan.sms_resent'));
         } catch (\Exception $e) {
@@ -410,7 +262,7 @@ class CarePlanApprovals extends Component
     {
         try {
             EHealth::approval()->verify($this->patientUuid, $approvalUuid, [
-                'status' => 'inactive'
+                'status' => 'inactive',
             ]);
             Session::flash('success', __('care-plan.approval_cancelled'));
             $this->fetchApprovals();

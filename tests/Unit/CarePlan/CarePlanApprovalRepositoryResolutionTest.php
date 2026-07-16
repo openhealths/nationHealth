@@ -50,11 +50,11 @@ class CarePlanApprovalRepositoryResolutionTest extends TestCase
             $lifecycleSource
         );
         $this->assertStringContainsString(
-            'Repository::approval()->syncApprovals($this->carePlan, \'care_plan\')',
+            'app(CarePlanApprovalService::class)->syncForCarePlan($this->carePlan)',
             $showSource
         );
         $this->assertStringContainsString(
-            'Repository::approval()->syncApprovals($this->carePlan, \'care_plan\')',
+            'app(CarePlanApprovalService::class)->syncForCarePlan($this->carePlan)',
             $lifecycleSource
         );
     }

@@ -494,6 +494,9 @@
         @else
             @include('components.signature-modal', ['method' => 'sign'])
         @endif
+        @if($isPolling)
+            <div wire:poll.2s="checkApprovalJobStatus" class="hidden"></div>
+        @endif
         @if($showAuthModal)
             @include('livewire.care-plan.modals.authentication')
         @endif
