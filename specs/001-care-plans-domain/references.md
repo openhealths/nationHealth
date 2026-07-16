@@ -10,6 +10,7 @@
 | Create Care Plan | API-007-005-0001 | https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17571905622/REST+API+Create+Care+Plan+API-007-005-0001 |
 | Create Care Plan (Apiary) | ESOZ Apiary | https://esoz.docs.apiary.io/#reference/clinical-info/care-plan/create-care-plan |
 | Create Care Plan Activity | EH wiki | https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/17052598297/Create+Care+Plan+Activity |
+| Cancel Care Plan | API-007-005-0005 | https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17571676299/REST+API+Cancel+Care+Plan+API-007-005-0005 |
 | Complete Care Plan | API-007-005-0006 | https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17571872867/REST+API+Complete+Care+Plan+API-007-005-0006 |
 | Complete Care Plan Activity | API-007-006-0006 | https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17571905639/REST+API+Complete+Care+Plan+Activity+API-007-006-0006 |
 | Cancel Care Plan Activity | API-007-006-0005 | https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17570759126/REST+API+Cancel+Care+Plan+Activity+API-007-006-0005 |
@@ -50,10 +51,19 @@
 
 - `PATCH .../care_plans/{id}/actions/complete`, scope `care_plan:write`, async.
 - **Complete performs WITHOUT digital signature.**
-- Requires write Approval (author or same managing_organisation employee with write approval).
+- Requires write Approval (author **or** same managing_organisation employee with write approval).
 - `status_reason` from `eHealth/care_plan_complete_reasons`.
 - All activities in **final** status; **at least one** activity `completed`.
 - Else 409: scheduled/in-progress activities OR no completed activity.
+
+### Cancel Care Plan (API-007-005-0005)
+
+- `PATCH .../care_plans/{id}/actions/cancel`, scope `care_plan:write`, async.
+- **Cancel MUST be signed with DS.** Signed content = care plan **without activities**; must equal CBD (see Get Care Plan by ID).
+- `$.status_reason` (`eHealth/care_plan_cancel_reasons`) **must be inside** signed content.
+- Only **author** of the care plan who has **write Approval** may cancel (stricter than complete).
+- Activities: none, or all in final status; else 409 unfinished activities.
+- Mismatch → 422 «Signed content doesn't match with previously created care plan».
 
 ### Approvals (CSI-1323)
 

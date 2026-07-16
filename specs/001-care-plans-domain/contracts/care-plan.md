@@ -15,9 +15,16 @@
 
 **Complete body** (API-007-005-0006): `status_reason` from `care_plan_complete_reasons` — **no digital signature**. Preconditions: write Approval; all activities final; ≥1 activity `completed`.
 
-**Cancel body**: per Cancel Care Plan API + `status_reason` from `care_plan_cancel_reasons` (confirm DS requirement against that API page before coding).
+**Cancel body** (API-007-005-0005):  
+1. `GET .../care_plans/{id}` (Get Care Plan by ID) — **required**  
+2. Clean payload (no activities; strip server-only fields; normalize author)  
+3. Add `status_reason` (`care_plan_cancel_reasons`) into content to sign  
+4. Sign → `PATCH .../actions/cancel` with `signed_data`  
 
-**Canonical docs**: [references.md](../references.md)
+Only **author** + write Approval. All activities final (or none). Fail closed if Get fails.
+
+**Canonical docs**: [references.md](../references.md)  
+**Code reference**: mirror `CarePlanShow::signStatusActivity` (activity already CBD-first); plan cancel currently still local-built — target fix.
 
 **Client**: `App\Classes\eHealth\Api\CarePlan`
 

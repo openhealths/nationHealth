@@ -72,8 +72,23 @@
 - PreQualify path: `POST /api/medication_request_requests/prequalify`
 - care_plan write Approval дозволяє activities + cancel MR + recall/cancel SR based on plan
 
+## R11. CBD-first signed content (Cancel Plan / Cancel Activity)
+
+**Decision**: Canonical pattern for any DS action that requires content match:
+
+1. `getDetails` from eHealth (Care Plan or Activity)
+2. `clean*Payload` — strip `inserted_*`, `updated_*`, `status_history`, `remaining_quantity*`, normalize `author` list→object
+3. Inject `status_reason` (and only allowed delta fields)
+4. Sign snake_case payload
+5. PATCH with `signed_data`
+
+**Reference implementation**: `CarePlanShow::signStatusActivity` (activity cancel) — already CBD-first.  
+**Gap**: `CarePlanShow` plan cancel/complete still builds from **local** model (includes `instantiates_protocol`, local period) → frequent 422. Target: reuse same CBD-first path for Cancel Care Plan; Complete = **no sign**.
+
+**Fallback**: Do not silently fall back to local for plan cancel (activity currently has local fallback — plan cancel should fail closed if Get fails).
+
 ## Open items (non-blocking)
 
-- Cancel Care Plan API page (DS yes/no) — підтвердити перед T062.
 - NotebookLM недоступний без Google login; користувач може експортувати summary у чат за потреби.
 - Create MRR patient-scoped vs global — Apiary UAT.
+- Cancel Care Plan (API-007-005-0005) — resolved: DS required; author-only + write Approval.

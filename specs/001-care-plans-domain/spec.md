@@ -24,6 +24,8 @@
 - Q: Які офіційні джерела є канонічними для імплементації? → A: Confluence API docs + Apiary з [references.md](./references.md) (NotebookLM — лише збірник лінків, без окремого експорту в git).
 - Q: Чи потрібен КЕП для Complete Care Plan? → A: Ні — API-007-005-0006: «Complete performs without DS»; потрібні write Approval + `status_reason` + фінальні activities (усі final, ≥1 completed).
 - Q: Чи створюється план одразу з activities? → A: Ні — Create Care Plan без activities; activities додаються окремим Create Activity (одна на запит, з КЕП + write Approval).
+- Q: Чи потрібен КЕП для Cancel Care Plan? → A: Так — API-007-005-0005: DS обов’язковий; підписується план без activities; `status_reason` у signed content; лише автор + write Approval; activities усі final або відсутні.
+- Q: Звідки брати контент для підпису Cancel Care Plan? → A: Обов’язково `Get Care Plan by ID` з ЕСОЗ, потім підписувати CBD-знімок + `status_reason` (без activities). Патерн як у `CarePlanShow::signStatusActivity` (getDetails → clean → sign). Локальна збірка payload для cancel плану — заборонена як primary path (часта 422 Signed content doesn't match).
 
 ---
 
@@ -183,7 +185,8 @@
 - **FR-013**: МІС MUST відображати статуси плану (`draft`/`new`/`active`/`on-hold`/`completed`/`revoked`/`entered-in-error`/…) і блокувати дії, недоступні для статусу.
 - **FR-014**: МІС MUST зберігати UUID плану в контексті пацієнта і давати пошук/перегляд за ідентифікатором.
 - **FR-015**: Редагування плану в МІС MUST бути дозволене лише у статусах, передбачених Системою (локально — доки статус `new`, якщо так визначено політикою доступу).
-- **FR-016**: Complete плану MUST вимагати `status_reason` з `care_plan_complete_reasons`, write Approval, усі activities у final статусі й ≥1 `completed`; **без КЕП** (API-007-005-0006). Cancel плану MUST відповідати Cancel Care Plan API (причина з довідника; DS — лише якщо вимагає той контракт).
+- **FR-016**: Complete плану MUST вимагати `status_reason` з `care_plan_complete_reasons`, write Approval (автор або працівник того ж managing_organisation з write), усі activities у final статусі й ≥1 `completed`; **без КЕП** (API-007-005-0006). Cancel плану MUST вимагати КЕП (API-007-005-0005), `status_reason` у signed content, збіг контенту з CBD без activities, лише **автор** з write Approval, усі activities final або відсутні.
+- **FR-016a**: Перед Cancel Care Plan МІС MUST виконати `Get Care Plan by ID`, очистити серверні поля (патерн як `cleanActivityPayload` у `CarePlanShow::signStatusActivity`), додати `status_reason`, підписати цей знімок. Локальний rebuild плану для cancel за замовчуванням заборонений; якщо Get fails — блокувати cancel з поясненням (fail closed).
 - **FR-017**: Поля, що є лише локальними (напр. клінічний протокол без підтримки в схемі CBD), MUST зберігатися локально і MUST NOT надсилатися в Систему як невідомі параметри.
 
 #### Approvals (дозволи)

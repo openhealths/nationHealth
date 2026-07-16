@@ -146,9 +146,9 @@
 
 ### Implementation
 
-- [ ] T061 [US6] Complete: прибрати вимогу КЕП; слати `status_reason`; перевірити activities перед викликом
-- [ ] T062 [US6] Cancel: узгодити з Cancel Care Plan API (DS якщо вимагається)
-- [ ] T063 [US6] Блок нових activities після terminal status
+- [ ] T061 [US6] Cancel plan: CBD-first Get Care Plan by ID → cleanCarePlanPayload → inject status_reason → sign (mirror `signStatusActivity`); remove local rebuild / `instantiates_protocol` from cancel payload; fail closed if Get fails
+- [ ] T062 [US6] Complete plan: **no DS** — separate path with status_reason only + activity preconditions (не через signature modal)
+- [ ] T063 [US6] Блок нових activities після terminal status; UI: cancel лише автору з write Approval
 
 **Checkpoint**: US6 done
 
