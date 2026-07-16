@@ -6,6 +6,7 @@
 |----------|------|
 | Product spec | [spec.md](./spec.md) |
 | Official API references | [references.md](./references.md) |
+| Approvals architecture gap | [analysis-approvals-architecture-gap.md](./analysis-approvals-architecture-gap.md) |
 | Constitution | [constitution.md](./constitution.md) |
 | Implementation plan | [plan.md](./plan.md) |
 | Research | [research.md](./research.md) |

@@ -15,6 +15,8 @@
 | Complete Care Plan Activity | API-007-006-0006 | https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17571905639/REST+API+Complete+Care+Plan+Activity+API-007-006-0006 |
 | Cancel Care Plan Activity | API-007-006-0005 | https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17570759126/REST+API+Cancel+Care+Plan+Activity+API-007-006-0005 |
 | Create Approval | CSI-1323 | https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17999298941/AR+RC_+CSI-1323+_Create+approval |
+| Get approvals (MIS sync) | EH wiki | https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/2115600961/Get+approvals |
+| Resend SMS on Approval | EH wiki | https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583403110/Resend+SMS+on+Approval |
 | PreQualify MRR | API-005-044-0001 | https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17570660609/REST+API+PreQualify+Medication+Request+Request+API-005-044-0001 |
 | ePrescription hub | EH wiki | https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/16837083159/ePrescription |
 | Medication Request Requests (Apiary) | under Care Plan ref | https://esoz.docs.apiary.io/#reference/clinical-info/care-plan/create-care-plan (anchor to medication-request-requests) |

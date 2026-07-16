@@ -96,6 +96,14 @@ Do not start US6 ahead of create/approval/activity foundation unless a hotfix is
 
 **Rationale**: Clarify Q5 option B; balances Confluence “Approval required” with practical author workflow.
 
+## R13. Approvals: shared architecture vs Care Plan (2026-07-17)
+
+**Decision**: Converge Care Plan onto shared `ApprovalRepository` / API / jobs; do **not** blindly `use HasApproval` on CarePlan (patient uuid would be wrong). Full write-up: [analysis-approvals-architecture-gap.md](./analysis-approvals-architecture-gap.md).
+
+**Canonical sync API**: [Get approvals](https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/2115600961/Get+approvals) — `GET /api/patients/{id}/approvals`.  
+**Canonical resend**: [Resend SMS on Approval](https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583403110/Resend+SMS+on+Approval).  
+**Working PR baseline**: [#489](https://github.com/openhealths/nationHealth/pull/489) `i267_i365_i367_care_plan_stack`.
+
 ## Open items (non-blocking)
 
 - NotebookLM недоступний без Google login; користувач може експортувати summary у чат за потреби.

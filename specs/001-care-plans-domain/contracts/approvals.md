@@ -2,12 +2,16 @@
 
 | Operation | Method | Path |
 |-----------|--------|------|
-| List | GET | `/api/approvals` |
-| Patient list | GET | `/api/patients/{id}/approvals` |
+| List (global search) | GET | `/api/approvals` |
+| List / sync (canonical) | GET | `/api/patients/{id}/approvals` |
 | Create | POST | `/api/patients/{id}/approvals` |
 | Verify | PATCH | `/api/patients/{id}/approvals/{approvalId}` |
-| Resend | POST | `/api/patients/{id}/approvals/{id}/actions/resend` |
+| Resend | PATCH or POST (confirm UAT) | `/api/patients/{id}/approvals/{id}/actions/resend` |
 | Cancel | PATCH | `/api/approvals/{id}/actions/cancel` |
+
+**Get approvals filters** (prefer server-side): `granted_resource_type=care_plan`, `granted_resources={uuid}`, `granted_to`, `status`, `access_level`, paging.  
+Docs: [Get approvals](https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/2115600961/Get+approvals), [Resend SMS](https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583403110/Resend+SMS+on+Approval).  
+Architecture gap: [analysis-approvals-architecture-gap.md](../analysis-approvals-architecture-gap.md)
 
 ## Create payload (conceptual)
 
@@ -37,8 +41,10 @@ OTP code (or offline docs). Sandbox-only test code must never ship as production
 
 - `GET /api/persons/{uuid}/authentication_methods`
 - Client: `App\Classes\eHealth\Api\Approval`
-- UI: `CarePlanApprovals` Livewire
+- UI: `CarePlanApprovals` Livewire (domain)
+- Shared: `HasApproval` (PatientData), `ApprovalRepository`, `RemoteEHealthLinksProcessing`
 
 ## Scopes
 
-- `approval:create` (and related read scopes as issued by auth)
+- `approval:create`
+- `approval:read` (Get approvals / sync)
