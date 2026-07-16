@@ -561,7 +561,7 @@ class EmployeeIndex extends EmployeeComponent
         $employee = Employee::with(['party'])->find($employeeId);
 
         if (!$employee) {
-            $this->dispatch('flashMessage', ['message' => 'Співробітника не знайдено', 'type' => 'error']);
+            $this->dispatch('flashMessage', ['message' => 'Працівника не знайдено', 'type' => 'error']);
 
             return;
         }

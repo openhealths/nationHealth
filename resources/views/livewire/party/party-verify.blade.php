@@ -178,11 +178,11 @@
                     <div class="form-group group">
                         <select wire:model="reason" id="reason" class="input peer px-4 py-2">
                             <option value="">{{ __('forms.choose_reason') }}</option>
-                            <option value="MANUAL_DECEASED">
-                                {{ __('party_verification.reasons.MANUAL_DECEASED') }}
+                            <option value="MANUAL_CONFIRMED">
+                                {{ __('party_verification.reasons.MANUAL_CONFIRMED') }}
                             </option>
-                            <option value="MANUAL_NO_DEATH_RECORD">
-                                {{ __('party_verification.reasons.MANUAL_NO_DEATH_RECORD') }}
+                            <option value="MANUAL_NOT_CONFIRMED">
+                                {{ __('party_verification.reasons.MANUAL_NOT_CONFIRMED') }}
                             </option>
                         </select>
                         <label for="reason" class="label">{{ __('forms.reason_code') }}</label>

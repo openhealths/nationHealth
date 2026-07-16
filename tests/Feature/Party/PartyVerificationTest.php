@@ -209,7 +209,7 @@ class PartyVerificationTest extends TestCase
             ->with($party->uuid, [
                 'dracs_death' => [
                     'verification_status' => 'VERIFIED',
-                    'verification_reason' => 'MANUAL_NO_DEATH_RECORD',
+                    'verification_reason' => 'MANUAL_NOT_CONFIRMED',
                     'verification_comment' => 'Everything is fine',
                 ]
             ])
@@ -223,7 +223,7 @@ class PartyVerificationTest extends TestCase
             ->assertSet('showUpdateModal', true)
             ->set('status', 'VERIFIED')
             ->assertSet('reason', '') // Assert reactivity resets reason
-            ->set('reason', 'MANUAL_NO_DEATH_RECORD')
+            ->set('reason', 'MANUAL_NOT_CONFIRMED')
             ->set('comment', 'Everything is fine')
             ->call('updateStatus')
             ->assertHasNoErrors();

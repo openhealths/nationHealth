@@ -433,7 +433,7 @@ return [
     'what_was_identified' => 'Що було ідентифіковано',
     'supporting_medical_information' => 'Підтверджуючі медичні дані',
     'medical_records_type' => 'тип медичних записів',
-    'employee_who_created' => 'Співробітник, який створив',
+    'employee_who_created' => 'Працівник, який створив',
     'clinical_impression_search' => 'Пошук клінічних оцінок',
 
     // Auth methods
@@ -587,7 +587,7 @@ return [
         'diagnostic_report_sync_already_running' => 'Синхронізація діагностичних звітів вже запущена. Будь ласка, зачекайте її завершення.',
         'diagnostic_report_sync_resume_started' => 'Відновлення попередньої синхронізації діагностичних звітів розпочато',
         'diagnostic_report_sync_background_dispatch_error' => 'Помилка запуску фонової синхронізації діагностичних звітів',
-        'diagnostic_report_writer_employee_not_found' => 'Не знайдено активного співробітника з роллю лікаря для поточного користувача.',
+        'diagnostic_report_writer_employee_not_found' => 'Не знайдено активного працівника з роллю лікаря для поточного користувача.',
         'diagnostic_report_draft_saved' => 'Чернетку на створення діагностичного звіту успішно збережено.',
         'diagnostic_report_create_request_sent' => 'Заявку на створення діагностичного звіту успішно відправлено.',
         'diagnostic_report_cancel_request_sent' => 'Запит на позначення діагностичного звіту внесеним помилково успішно відправлено.',
@@ -614,7 +614,7 @@ return [
         'care_plan_sync_background_dispatch_error' => 'Помилка запуску фонової синхронізації планів лікування',
         'procedure_saved' => 'Процедуру успішно збережено.',
         'procedure_create_request_sent' => 'Заявку на створення процедури успішно відправлено.',
-        'procedure_writer_employee_not_found' => 'Не знайдено активного співробітника для створення процедури.',
+        'procedure_writer_employee_not_found' => 'Не знайдено активного працівника для створення процедури.',
         'procedures_synced_successfully' => 'Процедури успішно синхронізовані.',
         'procedures_first_page_synced_successfully' => 'Перша сторінка процедур синхронізована, решта обробляється у фоні.',
         'procedure_sync_already_running' => 'Синхронізація процедур вже запущена. Будь ласка, зачекайте її завершення.',
