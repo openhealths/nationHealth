@@ -12,6 +12,7 @@ use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Repositories\CarePlanRepository;
 use App\Repositories\CarePlanActivityRepository;
+use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -885,7 +886,7 @@ trait ManagesCarePlanLifecycle
             app(CarePlanRepository::class)->syncCarePlans(['data' => [$planResponse->getData()]], $this->carePlan->person_id);
 
             // Sync approvals as well!
-            app(\App\Repositories\ApprovalRepository::class)->syncApprovals($this->carePlan, 'care_plan');
+            Repository::approval()->syncApprovals($this->carePlan, 'care_plan');
 
             $this->refreshCarePlan();
             $this->dispatch('refreshApprovals');
