@@ -2,8 +2,10 @@
 
 **Feature Branch**: `testing/esoz-combined-uat` (UAT) / follow-up fix branches for Remaining  
 **Created**: 2026-07-16  
-**Status**: Draft  
-**Input**: ESОЗ tester conclusions 3.1.1, 3.1.5, 3.23 + PRs #462 #474 #476 #480
+**Status**: Draft (superseded for full §3.23 by `specs/002-esoz-3-23-employee-records` on PR #488)  
+**Input**: ESОЗ tester conclusions 3.1.1, 3.1.5, 3.23 + PRs #462 #474 #476 #480  
+
+> **Note**: For TZ §3.23 systematization + remaining gaps on branch `i485_i486_i487_esoz_employee_party_uat`, use **[002-esoz-3-23-employee-records](../002-esoz-3-23-employee-records/spec.md)**. Death reasons `MANUAL_CONFIRMED` / `MANUAL_NOT_CONFIRMED` are DONE there (FR-GAP-001 below is obsolete on #488).
 
 ## User Scenarios & Testing *(mandatory)*
 
