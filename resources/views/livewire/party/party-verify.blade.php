@@ -103,14 +103,9 @@
                 {{ __('forms.back') }}
             </a>
 
-            {{-- The button is only active if it allows canUpdateVerification with PHP --}}
             <button type="button"
                     wire:click="checkAndOpenModal"
-                    @class([
-                        'button-primary-outline' => $this->canUpdateVerification,
-                        'button-disabled' => !$this->canUpdateVerification
-                    ])
-                    @if(!$this->canUpdateVerification) disabled @endif
+                    class="button-primary-outline"
             >
                 {{ __('forms.update_data') }}
             </button>

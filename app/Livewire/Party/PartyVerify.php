@@ -47,6 +47,7 @@ class PartyVerify extends Component
         $this->legalEntity = $legalEntity;
         $this->party = $party;
         $this->loadVerificationDetails();
+        $this->status = 'VERIFIED';
 
         $previous = url()->previous();
         $current = request()->url();
@@ -72,9 +73,8 @@ class PartyVerify extends Component
         // 1. Getting the current death status
         $deathStatus = data_get($this->verificationDetails, 'details.dracs_death.verification_status');
 
-        // 2. Allow the button ONLY if the status is 'NOT_VERIFIED'
-        // All other statuses (VERIFIED, VERIFICATION_NEEDED, etc.) will be false and the button will be gray.
-        return $deathStatus === 'NOT_VERIFIED';
+        // 2. Allow the button if the status is 'NOT_VERIFIED' or 'VERIFICATION_NEEDED'
+        return in_array($deathStatus, ['NOT_VERIFIED', 'VERIFICATION_NEEDED'], true);
     }
 
     /**
@@ -121,11 +121,7 @@ class PartyVerify extends Component
 
     public function checkAndOpenModal(): void
     {
-        if ($this->canUpdateVerification) {
-            $this->showUpdateModal = true;
-            $this->status = 'VERIFIED';
-            $this->verificationStream = 'dracs_death';
-        } else {
+        if (!$this->canUpdateVerification) {
             $message = __('party_verification.update_unavailable_reason')
                 ?? 'Оновлення даних наразі неможливе, оскільки статус не потребує верифікації.';
 
@@ -133,13 +129,20 @@ class PartyVerify extends Component
                 'message' => $message,
                 'type' => 'error'
             ]);
+
+            return;
         }
+
+        $this->status = 'VERIFIED';
+        $this->verificationStream = 'dracs_death';
+        $this->showUpdateModal = true;
     }
 
     public function closeUpdateModal(): void
     {
         $this->showUpdateModal = false;
-        $this->reset(['status', 'reason', 'comment']);
+        $this->reset(['reason', 'comment']);
+        $this->status = 'VERIFIED';
         $this->resetErrorBag();
     }
 

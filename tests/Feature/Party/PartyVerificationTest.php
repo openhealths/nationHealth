@@ -141,6 +141,7 @@ class PartyVerificationTest extends TestCase
             'tax_id' => '1234567890',
             'birth_date' => '1990-01-01',
             'gender' => 'MALE',
+            'verification_status' => 'NOT_VERIFIED',
         ]);
 
         $user = User::create([
