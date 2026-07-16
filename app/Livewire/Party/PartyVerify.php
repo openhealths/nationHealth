@@ -77,10 +77,10 @@ class PartyVerify extends Component
      * Loads and filters verification details for the party from the eHealth API.
      *
      * This method retrieves the party details and strictly filters the verification streams
-     * to include only the allowed directions ('drfo' and 'dracs_death') as required by the
-     * MIS/PIS UI documentation. It handles variations in the API response structure and
-     * updates the $verificationDetails property. In case of an API failure or exception,
-     * the details are safely defaulted to an empty array.
+     * to include only the allowed directions ('drfo', 'dracs_death', 'dms_passport') as required by
+     * the MIS/PIS UI documentation (3.23 п.3.2.2). It handles variations in the API response
+     * structure and updates the $verificationDetails property. In case of an API failure or
+     * exception, the details are safely defaulted to an empty array.
      *
      * @return void
      */
@@ -91,19 +91,19 @@ class PartyVerify extends Component
             $response = EHealth::party()->getDetails($this->party->uuid);
             $data = is_array($response) ? $response : $response->json();
 
-            // We leave ONLY drfo and dracs_death as required by the documentation
-            $allowedStreams = ['drfo', 'dracs_death'];
+            // Streams that trigger warning messages per 3.23 п.3.2.2
+            $allowedStreams = ['drfo', 'dracs_death', 'dms_passport'];
 
             if (!empty($data['data']['details']) && is_array($data['data']['details'])) {
                 $data['data']['details'] = array_filter(
                     $data['data']['details'],
-                    static fn($key) => in_array($key, $allowedStreams, true),
+                    static fn ($key) => in_array($key, $allowedStreams, true),
                     ARRAY_FILTER_USE_KEY
                 );
             } elseif (!empty($data['details']) && is_array($data['details'])) {
                 $data['details'] = array_filter(
                     $data['details'],
-                    static fn($key) => in_array($key, $allowedStreams, true),
+                    static fn ($key) => in_array($key, $allowedStreams, true),
                     ARRAY_FILTER_USE_KEY
                 );
             }
