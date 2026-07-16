@@ -188,11 +188,19 @@ class EmployeeIndex extends EmployeeComponent
                 });
         });
 
-        // 2. Filter: Search Text (Full Name, Case-Insensitive)
+        // 2. Filter: Search Text (Full Name, Case-Insensitive, Order-Independent)
+        // Each word must match any of last/first/second name — "Іван Петренко" and "Петренко Іван" both work.
         if (!empty($this->search)) {
-            $searchTerm = '%' . $this->search . '%';
-            // PostgreSQL specific: ILIKE is case-insensitive
-            $query->whereRaw("CONCAT(last_name, ' ', first_name, ' ', second_name) ILIKE ?", [$searchTerm]);
+            $words = preg_split('/\s+/u', trim($this->search), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+            foreach ($words as $word) {
+                $searchTerm = '%' . $word . '%';
+                $query->where(function (Builder $q) use ($searchTerm) {
+                    $q->where('last_name', 'ILIKE', $searchTerm)
+                        ->orWhere('first_name', 'ILIKE', $searchTerm)
+                        ->orWhere('second_name', 'ILIKE', $searchTerm);
+                });
+            }
         }
 
         // 3. Filter: Email (via Users)
