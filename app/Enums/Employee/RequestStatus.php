@@ -22,7 +22,8 @@ enum RequestStatus: string
             self::NEW => 'Новий',
             self::APPROVED => 'Підтверджено',
             self::REJECTED => 'Відхилено',
-            self::SIGNED => 'Підписано в ЕСОЗ',
+            // Pending before eHealth approval — UI must show «Новий» (п.1.2.1), not «Підписано в ЕСОЗ»
+            self::SIGNED => 'Новий',
             self::EXPIRED => 'Протермінований',
         };
     }

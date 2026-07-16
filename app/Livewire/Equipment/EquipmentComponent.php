@@ -91,7 +91,7 @@ class EquipmentComponent extends Component
             ->first();
 
         if (empty($recorderData)) {
-            abort(403, __('Співробітника з відповідними доступами не знайдено.'));
+            abort(403, __('Працівника з відповідними доступами не знайдено.'));
         }
 
         $this->recorderFullName = $recorderData->fullName;

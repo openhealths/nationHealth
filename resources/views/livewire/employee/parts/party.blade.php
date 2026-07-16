@@ -93,7 +93,7 @@
                     required
                     id="taxId"
                     type="text"
-                    maxlength="10"
+                    :maxlength="noTaxId ? 25 : 10"
                     placeholder=" "
                     class="input peer text-gray-500 @error('form.party.taxId') input-error @enderror"
                     :disabled="noTaxId || $wire.isPersonalDataLocked || $wire.isPartyDataPartiallyLocked"

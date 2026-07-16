@@ -72,7 +72,7 @@ abstract class ContractComponent extends Component
             ->first();
 
         if (empty($contractorData)) {
-            abort(403, __('Співробітника з відповідними доступами не знайдено.'));
+            abort(403, __('Працівника з відповідними доступами не знайдено.'));
         }
 
         $party = $contractorData->party;

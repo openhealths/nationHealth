@@ -181,6 +181,8 @@ class EmployeeForm extends Form
             'party.workingExperience.required' => __('validation.custom.party.working_experience_required'),
             'party.workingExperience.integer' => __('validation.custom.party.working_experience_integer'),
             'party.workingExperience.gt' => __('validation.custom.party.working_experience_gt'),
+            'documents.*.type.in' => __('validation.custom.employee.document_type_not_allowed'),
+            'documents.min' => __('validation.custom.identity_document_required'),
         ];
     }
 
@@ -268,7 +270,25 @@ class EmployeeForm extends Form
             'doctor.educations.*.degree' => ['required', 'string', 'max:255'],
             'doctor.educations.*.speciality' => ['required', 'string', 'max:255'],
 
-            'doctor.specialities' => $specialitiesRules,
+            'doctor.specialities' => array_merge($specialitiesRules, [
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (!is_array($value)) {
+                        return;
+                    }
+
+                    $primaryCount = collect($value)
+                        ->filter(function ($speciality) {
+                            $flag = $speciality['specialityOfficio'] ?? $speciality['speciality_officio'] ?? false;
+
+                            return filter_var($flag, FILTER_VALIDATE_BOOLEAN);
+                        })
+                        ->count();
+
+                    if ($primaryCount > 1) {
+                        $fail(__('errors.ehealth.messages.multiple_primary_specialities'));
+                    }
+                },
+            ]),
             'doctor.specialities.*.speciality' => ['required', 'string', 'max:255'],
             'doctor.specialities.*.specialityOfficio' => ['required', 'boolean'],
             'doctor.specialities.*.level' => ['required', 'string', 'max:255'],

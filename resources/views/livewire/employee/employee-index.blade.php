@@ -27,8 +27,8 @@
 
     $statusOptions = [
         Status::APPROVED->value => __('forms.status.active'),
-        Status::NEW->value => __('forms.draft'),
-        Status::SIGNED->value => __('forms.status.sent'),
+        Status::NEW->value => __('forms.status.new'),
+        Status::SIGNED->value => __('forms.status.new'),
         Status::DISMISSED->value => __('forms.dismissed'),
         Status::REORGANIZED->value => __('forms.reorganized'),
     ];
@@ -384,7 +384,7 @@
                                             <td class="td-input break-words whitespace-nowrap align-middle">
                                                 @php
                                                     $isEmployee = $position instanceof Employee;
-                                                    $employeeStatus = $isEmployee ? $position->status?->value : '';
+                                                    $employeeStatus = $position->status?->value ?? '';
                                                 @endphp
 
                                                 @if($isEmployee)
@@ -396,10 +396,9 @@
                                                         <span class="badge-yellow">{{__('forms.status.reorganized')}}</span>
                                                     @endif
                                                 @else
-                                                    @if($employeeStatus === Status::NEW->value)
-                                                        <span class="badge-red">{{__('forms.status.draft')}}</span>
-                                                    @elseif($employeeStatus === Status::SIGNED->value)
-                                                        <span class="badge-yellow">{{__('forms.status.sent')}}</span>
+                                                    {{-- Employee request after Create Employee Request v2 is NEW (п.3.1.1.4 / 1.2.1) --}}
+                                                    @if(in_array($employeeStatus, [Status::NEW->value, Status::SIGNED->value], true))
+                                                        <span class="badge-yellow">{{__('forms.status.new')}}</span>
                                                     @endif
                                                 @endif
                                             </td>
