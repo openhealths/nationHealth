@@ -31,5 +31,6 @@
 
 ## Notes
 
-- Вставлене користувачем ТЗ (3.2–3.3) здебільшого про декларації/ЕМЗ; у spec відображено як **передумови** + ЕН/approvals. Якщо з’явиться окремий розділ ТЗ «Плани лікування», слід зробити `/speckit-clarify` і доповнити FR.
-- Посилання на конкретні REST path у `contracts/` належать до plan-фази, не до product spec.
+- Вставлене користувачем ТЗ (3.2–3.3) здебільшого про декларації/ЕМЗ; у spec відображено як **передумови** + ЕН/approvals.
+- Clarify session 2026-07-17: 5/5 питань закрито (Cancel CBD-first, Complete UI, visibility, impl order US1–3 first, author Approval policy B).
+- Посилання на REST path / code patterns — у `references.md`, `contracts/`, `research.md` (plan-фаза).

@@ -90,6 +90,12 @@ Do not start US6 ahead of create/approval/activity foundation unless a hotfix is
 
 **Fallback**: Do not silently fall back to local for plan cancel (activity currently has local fallback — plan cancel should fail closed if Get fails).
 
+## R12. Approval for activities (author vs others)
+
+**Decision**: Plan **author** in same LE may create activities without pre-created Approval until eHealth returns 403 → then CTA. Other clinicians always need verified write Approval first.
+
+**Rationale**: Clarify Q5 option B; balances Confluence “Approval required” with practical author workflow.
+
 ## Open items (non-blocking)
 
 - NotebookLM недоступний без Google login; користувач може експортувати summary у чат за потреби.
