@@ -214,30 +214,18 @@ class EmployeeRoleIndex extends Component
 
         // Find an administrative employee role (HR, OWNER, ADMIN) for the current user in this facility
         $user = Auth::user();
-        $adminEmployee = null;
-
-        if ($user && $user->party) {
-            $adminEmployee = $user->party->employees()
-                ->where('legal_entity_id', legalEntity()->id)
-                ->where('status', Status::APPROVED->value)
-                ->whereIn('employee_type', ['HR', 'OWNER', 'ADMIN'])
-                ->get()
-                ->sortBy(fn ($emp) => match ($emp->employee_type) {
-                    'HR' => 1,
-                    'OWNER' => 2,
-                    'ADMIN' => 3,
-                    default => 4,
-                })
-                ->first();
-        }
-
         $ehealthEmployeeRoleService = EHealth::employeeRole();
 
-        if ($adminEmployee) {
-            // Perform the request as MIS on behalf of the administrative role
-            $ehealthEmployeeRoleService->asMis()->withHeaders([
-                'msp_drfo' => $user->party->taxId,
-            ]);
+        // Prefer the user's own token when it already can write employee roles.
+        if ($user && !ehealthHasScope('employee_role:write')) {
+            $adminEmployee = $user->adminEmployeeForMisAction(legalEntity()->id);
+            $party = $user->resolveParty(legalEntity()->id);
+
+            if ($adminEmployee && $party?->taxId) {
+                $ehealthEmployeeRoleService->asMis()->withHeaders([
+                    'msp_drfo' => $party->taxId,
+                ]);
+            }
         }
 
         try {

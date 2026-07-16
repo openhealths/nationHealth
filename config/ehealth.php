@@ -78,6 +78,14 @@ return [
 
     'capitation_contract_max_period_days' => 366,
 
+    /*
+     * Employee types that may enter position as free text instead of POSITION dictionary codes.
+     * Matches ESOZ EMPLOYEE_TYPE_CUSTOM_POSITION_ALLOWED.
+     */
+    'employee_type_custom_position_allowed' => ['ADMIN', 'HR', 'RECEPTIONIST'],
+
+    'reimbursement_contract_max_period_day' => env('EHEALTH_REIMBURSEMENT_CONTRACT_MAX_PERIOD_DAY', 1096),
+
     'rate_limit' => [
         'employee_request' => 29,
         'division_request' => 50,

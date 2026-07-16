@@ -31,9 +31,19 @@ class EmployeePositionAdd extends AbstractEmployeeFormManager
         $this->form->hydrate($this->party);
         $this->form->resetPositionFields();
         $this->pageTitle = __('forms.add_position') . ' - ' . ($party->fullName ?? '');
+
         $users = $party->users()->oldest()->get();
         $this->partyUsers = $users;
-        $this->formEmail = $users->first()?->email;
+
+        $preferredEmail = $this->form->party['email'] ?? null;
+        $this->formEmail = $preferredEmail
+            ?? $users->first(
+                fn ($user) => $user->employees()
+                    ->where('legal_entity_id', $legalEntity->id)
+                    ->where('party_id', $party->id)
+                    ->exists()
+            )?->email
+            ?? $users->first()?->email;
         $this->form->party['email'] = $this->formEmail;
 
     }
