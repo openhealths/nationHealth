@@ -375,11 +375,7 @@ class ContractRequestShow extends Component
     public function render()
     {
         $dictionaryName = $this->contractRequest->type === 'REIMBURSEMENT' ? 'REIMBURSEMENT_CONTRACT_TYPE' : 'CONTRACT_TYPE';
-        try {
-            $idFormName = dictionary()->basics()->byName($dictionaryName)->asCodeDescription()->toArray()[$this->contractRequest->id_form] ?? $this->contractRequest->id_form;
-        } catch (\Throwable) {
-            $idFormName = $this->contractRequest->id_form;
-        }
+        $idFormName = dictionary()->basics()->byName($dictionaryName)->asCodeDescription()->toArray()[$this->contractRequest->id_form] ?? $this->contractRequest->id_form;
 
         return view('livewire.contract-request.contract-request-show', [
             'idFormName' => $idFormName,

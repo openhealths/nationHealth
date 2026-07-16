@@ -98,11 +98,7 @@ class ContractShow extends Component
     public function render(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\View\View
     {
         $dictionaryName = $this->contract->type === 'REIMBURSEMENT' ? 'REIMBURSEMENT_CONTRACT_TYPE' : 'CONTRACT_TYPE';
-        try {
-            $idFormName = dictionary()->basics()->byName($dictionaryName)->asCodeDescription()->toArray()[$this->contract->id_form] ?? $this->contract->id_form;
-        } catch (\Throwable) {
-            $idFormName = $this->contract->id_form;
-        }
+        $idFormName = dictionary()->basics()->byName($dictionaryName)->asCodeDescription()->toArray()[$this->contract->id_form] ?? $this->contract->id_form;
 
         return view('livewire.contract.contract-show', [
             'contract' => $this->contract,
