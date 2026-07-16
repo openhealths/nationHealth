@@ -164,13 +164,20 @@ class EmployeeRole extends Request
             ->pluck('id', 'uuid')
             ->toArray();
 
-        // Map uuid to id
+        // Map uuid to id; skip roles that reference missing local models
         return collect($validated)->map(static function (array $item) use ($employeeMap, $healthcareServiceMap) {
-            $item['employee_id'] = $employeeMap[$item['employee_id']];
-            $item['healthcare_service_id'] = $healthcareServiceMap[$item['healthcare_service_id']];
+            $employeeId = $employeeMap[$item['employee_id']] ?? null;
+            $serviceId = $healthcareServiceMap[$item['healthcare_service_id']] ?? null;
+
+            if ($employeeId === null || $serviceId === null) {
+                return null;
+            }
+
+            $item['employee_id'] = $employeeId;
+            $item['healthcare_service_id'] = $serviceId;
 
             return $item;
-        })->toArray();
+        })->filter()->values()->toArray();
     }
 
     /**
