@@ -27,6 +27,7 @@
 - Q: Чи потрібен КЕП для Cancel Care Plan? → A: Так — API-007-005-0005: DS обов’язковий; підписується план без activities; `status_reason` у signed content; лише автор + write Approval; activities усі final або відсутні.
 - Q: Звідки брати контент для підпису Cancel Care Plan? → A: Обов’язково `Get Care Plan by ID` з ЕСОЗ, потім підписувати CBD-знімок + `status_reason` (без activities). Патерн як у `CarePlanShow::signStatusActivity` (getDetails → clean → sign). Локальна збірка payload для cancel плану — заборонена як primary path (часта 422 Signed content doesn't match).
 - Q: Як оформити Complete в UI? → A: Окремий flow без КЕП (модалка: причина + підтвердження); Cancel — окремо через signature modal з КЕП.
+- Q: Хто бачить кнопку «Скасувати план»? → A: Cancel — лише автор плану; Complete — автор або працівник того ж LE з write Approval.
 
 ---
 
@@ -188,6 +189,7 @@
 - **FR-015**: Редагування плану в МІС MUST бути дозволене лише у статусах, передбачених Системою (локально — доки статус `new`, якщо так визначено політикою доступу).
 - **FR-016**: Complete плану MUST вимагати `status_reason` з `care_plan_complete_reasons`, write Approval (автор або працівник того ж managing_organisation з write), усі activities у final статусі й ≥1 `completed`; **без КЕП** (API-007-005-0006). Cancel плану MUST вимагати КЕП (API-007-005-0005), `status_reason` у signed content, збіг контенту з CBD без activities, лише **автор** з write Approval, усі activities final або відсутні.
 - **FR-016b**: UI MUST розділяти Complete і Cancel: Complete — модалка причини/підтвердження без КЕП; Cancel — signature modal з КЕП після CBD Get.
+- **FR-016c**: Кнопка Cancel плану MUST бути доступна лише автору плану (плюс write Approval). Complete MUST бути доступний автору або іншому працівнику того ж LE з write Approval на цей care_plan.
 - **FR-017**: Поля, що є лише локальними (напр. клінічний протокол без підтримки в схемі CBD), MUST зберігатися локально і MUST NOT надсилатися в Систему як невідомі параметри.
 
 #### Approvals (дозволи)

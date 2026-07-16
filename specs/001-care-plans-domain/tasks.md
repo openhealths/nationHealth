@@ -148,7 +148,7 @@
 
 - [ ] T061 [US6] Cancel plan: CBD-first Get Care Plan by ID → cleanCarePlanPayload → inject status_reason → sign (mirror `signStatusActivity`); remove local rebuild / `instantiates_protocol` from cancel payload; fail closed if Get fails
 - [ ] T062 [US6] Complete plan: **no DS** — separate path with status_reason only + activity preconditions (не через signature modal)
-- [ ] T063 [US6] Блок нових activities після terminal status; UI: cancel лише автору з write Approval
+- [ ] T063 [US6] Блок нових activities після terminal status; UI: Cancel лише автору; Complete — автор або write Approval у тому ж LE
 
 **Checkpoint**: US6 done
 
