@@ -1,8 +1,0 @@
-[2026-07-16 14:39:14] testing.DEBUG: eHealth Request: GET /api/v2/dictionaries {"options":{"query":[]}} 
-[2026-07-16 14:39:29] testing.DEBUG: Role already exists. Skipping roles update.  
-[2026-07-16 14:39:33] testing.DEBUG: eHealth Request: GET /api/v2/dictionaries {"options":{"query":[]}} 
-[2026-07-16 14:39:48] testing.DEBUG: Role already exists. Skipping roles update.  
-[2026-07-16 14:40:53] testing.DEBUG: eHealth Request: GET /api/v2/dictionaries {"options":{"query":[]}} 
-[2026-07-16 14:41:17] testing.DEBUG: Role already exists. Skipping roles update.  
-[2026-07-16 15:01:55] testing.DEBUG: eHealth Request: GET /api/v2/dictionaries {"options":{"query":[]}} 
-[2026-07-16 15:02:08] testing.DEBUG: Role already exists. Skipping roles update.  
