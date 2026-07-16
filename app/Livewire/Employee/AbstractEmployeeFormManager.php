@@ -324,6 +324,8 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     {
         $errorCode = $e->getCode();
         $errorMessage = $e->getMessage();
+        $responseBody = $e->getDetails();
+        $apiErrorMessage = data_get($responseBody, 'error.message', '');
 
         $translatedMessage = match (true) {
             str_contains($errorMessage, 'Forbidden to create OWNER')
@@ -334,6 +336,9 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
 
             $errorCode === 422 && str_contains($errorMessage, 'tax_id')
             => __('errors.ehealth.messages.tax_id_exists'),
+
+            $errorCode === 403 && str_contains($apiErrorMessage, 'Party is not verified')
+            => __('errors.ehealth.messages.party_not_verified'),
 
             default => $errorMessage
         };
