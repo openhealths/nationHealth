@@ -18,6 +18,10 @@
                 >
                     <span class="font-medium whitespace-pre-line">{{ session('success') }}</span>
                 </div>
+
+                @php
+                    session()->forget('success');
+                @endphp
             @endsession
 
             @session('status')

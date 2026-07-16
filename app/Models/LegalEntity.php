@@ -205,7 +205,10 @@ class LegalEntity extends Model
      */
     public function getOwner(): ?object
     {
-        return $this->employees()->whereEmployeeType(Role::OWNER)->first();
+        return $this->employees()
+            ->whereEmployeeType(Role::OWNER)
+            ->whereNotNull('user_id')
+            ->first();
     }
 
     public function healthcareServices(): HasMany

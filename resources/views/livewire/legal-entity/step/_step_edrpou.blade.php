@@ -2,7 +2,7 @@
     use App\Models\LegalEntity;
 
     $hasEdrpouError = $errors->has('legalEntityForm.edrpou');
-
+    $isDetails ??= false;
     if(!empty($isNew)) {
         $legalEntityForm->type = collect($legalEntityTypes)->keys()->first(fn ($k) => $k !== LegalEntity::TYPE_MSP_LIMITED && $k !== legalEntity()?->type->name);
     }
@@ -14,7 +14,7 @@
     x-data="{
         title: '{{ __('forms.edrpou') }}',
         index: 1,
-        isDisabled: @json(!empty(legalEntity()->id) && $isEdit)
+        isDisabled: @json(!empty(legalEntity()->id) && ($isEdit || $isDetails)),
     }"
     x-init="typeof addHeader !== 'undefined' && addHeader(title, index)"
     x-show="activeStep === index || isEdit"

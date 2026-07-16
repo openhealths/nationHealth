@@ -6,13 +6,19 @@ namespace App\Livewire\LegalEntity;
 
 use Log;
 use Exception;
+use App\Models\User;
+use App\Enums\User\Role;
 use Illuminate\Support\Arr;
+use App\Livewire\Actions\Logout;
 use App\Models\Employee\Employee;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Redirect;
 use App\Enums\License\Type as LicenseType;
 use App\Models\LegalEntity as LegalEntityModel;
+use Livewire\Features\SupportRedirects\Redirector;
 
 class EditLegalEntity extends LegalEntity
 {
@@ -163,6 +169,7 @@ class EditLegalEntity extends LegalEntity
         $ownerData['position'] = $owner->position;
         $ownerData['employee_uuid'] = $owner->uuid;
         $ownerData['employee_id'] = $owner->id;
+
         $ownerData['party_id'] = $owner->partyId;
 
         // Return or email user logined (if it has OWNER role) or first email attached to the employee with OWNER role
@@ -185,7 +192,7 @@ class EditLegalEntity extends LegalEntity
         return $this->convertArrayKeysToCamelCase($documents);
     }
 
-    public function updateLegalEntity()
+    public function updateLegalEntity(): RedirectResponse|Redirector|null
     {
         /*
          * This is need by Livewire behavior.
@@ -203,22 +210,38 @@ class EditLegalEntity extends LegalEntity
         }
 
         $this->legalEntityForm->allFieldsValidate();
-        $ownerPartyId = Arr::pull($this->legalEntityForm->owner, 'party_id') ?? null;
 
         if ($this->getErrorBag()->isNotEmpty()) {
             $this->dispatchBrowserEvent('scroll-to-error');
         }
 
-        // TODO: until refactoring
-        if (! $result = $this->signLegalEntity()) {
-            return;
+        if ($this->isOwnerChanged) {
+            try {
+                parent::legalEntityCreate();
+
+                app(Logout::class)(message: __('forms.replace_successful'));
+
+                return Redirect::route('login') ?? null;
+            } catch (Exception $err) {
+                Log::error(__('Change Owner', [], 'en'), ['error' => $err->getMessage()]);
+
+                return null;
+            }
+        }
+
+        try {
+            $result = $this->signLegalEntity();
+        } catch (Exception $err) {
+            Log::error(__('Update Owner\'s data', [], 'en'), ['error' => $err->getMessage()]);
+
+            return null;
         }
 
         $data = $result['request'];
 
         $data['owner']['working_experience'] = $this->legalEntityForm->owner['workingExperience'] ?? null;
         $data['owner']['about_myself'] = $this->legalEntityForm->owner['aboutMyself'] ?? null;
-        $data['owner']['party_id'] = $ownerPartyId;
+        $data['owner']['party_id'] = Arr::pull($this->legalEntityForm->owner, 'party_id') ?? null;
 
         $response = $this->filterUnprovidedFields($result['response'], $data);
 
@@ -251,7 +274,7 @@ class EditLegalEntity extends LegalEntity
             return null;
         }
 
-        return Redirect::route('legal-entity.edit', [legalEntity()])->with('success', __('forms.update_successfull')) ?? null;
+        return Redirect::route('legal-entity.edit', [legalEntity()])->with('success', __('forms.update_successful')) ?? null;
     }
 
     public function render()
