@@ -61,7 +61,7 @@
 
                 @if($showEdit)
                     <li>
-                        @if($isEmployee && !$hasUserLinked)
+                        @if($isEmployee && !$hasUserLinked && !($permissions['employee_admin_hr'] ?? false))
                             <button type="button" wire:click="tryEdit({{ $position->id }})"
                                class="flex w-full items-center gap-2 py-2 px-5 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors text-left">
                                 @icon('edit', 'w-5 h-5') {{ __('forms.edit') }}

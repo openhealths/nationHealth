@@ -11,14 +11,18 @@
         // We cache the hospital ID so as not to call the legalEntity() function 100 times in a loop
         $currentLegalEntityId = legalEntity()->id;
 
-        // Cache access rights with an array
+        $isAdminOrHr = $currentUser->hasAllowedRole([Role::ADMIN, Role::HR]);
+
+       // Cache access rights with an array.
+       // ADMIN/HR are elevated in EmployeePolicy even when eHealth ADMIN scopes omit employee:write/details/deactivate.
        $permissions = [
-        'employee_view' => $currentUser->can('employee:details'),
-        'employee_write' => $currentUser->can('employee:write'),
-        'employee_deactivate' => $currentUser->can('employee:deactivate'),
-        'request_view' => $currentUser->can('employee_request:read'),
-        'request_write' => $currentUser->can('employee_request:write'),
-        'request_delete' => $currentUser->can('employee_request:write'),
+        'employee_view' => $currentUser->can('employee:details') || $isAdminOrHr,
+        'employee_write' => $currentUser->can('employee:write') || $isAdminOrHr,
+        'employee_deactivate' => $currentUser->can('employee:deactivate') || $isAdminOrHr,
+        'employee_admin_hr' => $isAdminOrHr,
+        'request_view' => $currentUser->can('employee_request:read') || $isAdminOrHr,
+        'request_write' => $currentUser->can('employee_request:write') || $isAdminOrHr,
+        'request_delete' => $currentUser->can('employee_request:write') || $isAdminOrHr,
     ];
 
     $statusOptions = [
