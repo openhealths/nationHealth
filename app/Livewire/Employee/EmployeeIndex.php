@@ -67,7 +67,6 @@ class EmployeeIndex extends EmployeeComponent
     public ?int $employeeIdToDeactivate = null;
     public ?string $employeeToDeactivateName = null;
     public bool $isDoctorToDeactivate = false;
-    public string $deactivationEndDate = '';
 
     public ?int $employeeToDismissId = null;
     public ?string $employeeToDismissName = null;
@@ -189,17 +188,11 @@ class EmployeeIndex extends EmployeeComponent
                 });
         });
 
-        // 2. Filter: Search Text (Full Name, Case-Insensitive, Order-Independent)
+        // 2. Filter: Search Text (Full Name, Case-Insensitive)
         if (!empty($this->search)) {
-            $words = array_filter(explode(' ', trim($this->search)));
-            foreach ($words as $word) {
-                $searchTerm = '%' . $word . '%';
-                $query->where(function (Builder $q) use ($searchTerm) {
-                    $q->where('last_name', 'ILIKE', $searchTerm)
-                        ->orWhere('first_name', 'ILIKE', $searchTerm)
-                        ->orWhere('second_name', 'ILIKE', $searchTerm);
-                });
-            }
+            $searchTerm = '%' . $this->search . '%';
+            // PostgreSQL specific: ILIKE is case-insensitive
+            $query->whereRaw("CONCAT(last_name, ' ', first_name, ' ', second_name) ILIKE ?", [$searchTerm]);
         }
 
         // 3. Filter: Email (via Users)
@@ -265,11 +258,6 @@ class EmployeeIndex extends EmployeeComponent
             $this->isDoctorToDeactivate = ($type === Role::DOCTOR->value);
         }
 
-        // Default end_date = today in Kyiv, but allow user to override
-        $startDateStr = isset($employee) ? ($employee->start_date ?? '') : '';
-        $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
-        $this->deactivationEndDate = ($startDateStr && $todayStr < $startDateStr) ? $startDateStr : $todayStr;
-
         $this->showDeactivateModal = true;
     }
 
@@ -305,21 +293,46 @@ class EmployeeIndex extends EmployeeComponent
 
         // eHealth requires: end_date >= start_date.
         $startDateStr = $employee->start_date; // 'Y-m-d' string from DB
+        $endDateStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
 
-        // Use user-provided deactivationEndDate if valid, otherwise default to today in Kyiv
-        $endDateInput = trim($this->deactivationEndDate);
-        $endDateStr = $endDateInput ?: \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
-
-        // If 'end_date' is earlier than 'start_date', clamp to 'start_date'
+        // If 'today' in Kiev is lexicographically earlier than 'start_date', use 'start_date' as the dismissal date
         if ($startDateStr && $endDateStr < $startDateStr) {
             $formattedEndDate = $startDateStr;
         } else {
             $formattedEndDate = $endDateStr;
         }
 
+        // Find an administrative employee role (HR, OWNER, ADMIN) for the current user in this facility
+        $user = Auth::user();
+        $adminEmployee = null;
+
+        if ($user && $user->party) {
+            $adminEmployee = $user->party->employees()
+                ->where('legal_entity_id', $this->legalEntity->id)
+                ->where('status', Status::APPROVED->value)
+                ->whereIn('employee_type', ['HR', 'OWNER', 'ADMIN'])
+                ->get()
+                ->sortBy(fn ($emp) => match ($emp->employee_type) {
+                    'HR' => 1,
+                    'OWNER' => 2,
+                    'ADMIN' => 3,
+                    default => 4,
+                })
+                ->first();
+        }
+
+        $ehealthEmployeeService = EHealth::employee();
+
+        if ($adminEmployee) {
+            // Perform the request as MIS on behalf of the administrative role
+            $ehealthEmployeeService->asMis()->withHeaders([
+                'msp_drfo' => $user->party->taxId,
+            ]);
+        }
+
         try {
             // 2. eHealth API Call using formatted string
-            $response = EHealth::employee()->deactivate($employee->uuid, $formattedEndDate);
+            $response = $ehealthEmployeeService->deactivate($employee->uuid, $formattedEndDate);
 
             if (!empty($response)) {
                 // 3. Updates in the local database
@@ -386,7 +399,6 @@ class EmployeeIndex extends EmployeeComponent
         $this->employeeIdToDeactivate = null;
         $this->employeeToDeactivateName = null;
         $this->isDoctorToDeactivate = false;
-        $this->deactivationEndDate = '';
     }
 
     /**
@@ -560,7 +572,7 @@ class EmployeeIndex extends EmployeeComponent
         $employee = Employee::with(['party'])->find($employeeId);
 
         if (!$employee) {
-            $this->dispatch('flashMessage', ['message' => 'Працівника не знайдено', 'type' => 'error']);
+            $this->dispatch('flashMessage', ['message' => 'Співробітника не знайдено', 'type' => 'error']);
 
             return;
         }
