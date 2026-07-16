@@ -102,12 +102,22 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $this->employeeRequestId = $this->employeeRequest->id;
 
             $this->flashSuccess(__('forms.employee_request_saved_successfully'));
-            $this->dispatch('open-signature-modal');
+            // 3.23.1.4 — review submitted fields before KEP
+            $this->dispatch('open-request-preview-modal');
         } catch (ValidationException $e) {
             $this->handleValidationException($e);
         } catch (Exception $e) {
             $this->handleGeneralException($e);
         }
+    }
+
+    /**
+     * Continue from pre-KEP preview to the signature modal.
+     */
+    public function proceedToSigning(): void
+    {
+        $this->dispatch('close-request-preview-modal');
+        $this->dispatch('open-signature-modal');
     }
 
     public function sign()

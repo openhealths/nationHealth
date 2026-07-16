@@ -122,11 +122,11 @@ As OWNER/HR/ADMIN I can deactivate APPROVED employee with STOPPED (end_date) or 
 
 | FR | TZ | Severity | Gap |
 |----|----|----------|-----|
-| **FR-GAP-323-LOCK-UI** | 3.23.1.7 | Critical | `isCorePositionDataLocked` set in PHP but **never used in Blade** — position / employee_type / start_date editable on update drafts |
-| **FR-GAP-323-DIVISION-LOCK** | 3.23.1.7 | High | `EmployeeEdit` sets `isPositionDataLocked=true` → locks **division** (should stay editable) |
-| **FR-GAP-323-PREVIEW** | 3.23.1.4 | High | No read-only preview of submitted fields before KEP modal |
-| **FR-GAP-323-INVITE-MSG** | 3.23.1.6.1 / 1.9.1 | High | `employees.sign_success` lacks text that System emailed invitation to employee |
-| **FR-GAP-323-SHOW-MEDICAL** | 3.23.3.2.1 | High | Show view professional blocks only for `DOCTOR`, not full `medical_employees` list |
+| **FR-GAP-323-LOCK-UI** | 3.23.1.7 | ~~Critical~~ **FIXED** | Blade uses `isCorePositionDataLocked` for position / employee_type / start_date |
+| **FR-GAP-323-DIVISION-LOCK** | 3.23.1.7 | ~~High~~ **FIXED** | `EmployeeEdit` keeps `isPositionDataLocked=false`; division editable |
+| **FR-GAP-323-PREVIEW** | 3.23.1.4 | ~~High~~ **FIXED** | Pre-KEP preview modal before signature |
+| **FR-GAP-323-INVITE-MSG** | 3.23.1.6.1 / 1.9.1 | ~~High~~ **FIXED** | `employees.sign_success` mentions email invitation |
+| **FR-GAP-323-SHOW-MEDICAL** | 3.23.3.2.1 | ~~High~~ **FIXED** | Show uses `medical_employees` config |
 | **FR-GAP-323-EMP-FILTERS** | 3.23.3.1.1 | Medium | Employees list missing filters: `tax_id`, `verification_status` (+ verification columns) |
 | **FR-GAP-323-REQ-ID** | 3.23.2.1.1 | Medium | Requests list missing request `id` column |
 | **FR-GAP-323-OFFICIO-ONE** | 3.23.1.3.5 | Medium | Validation blocks >1 primary speciality but does **not** require exactly one |

@@ -11,11 +11,11 @@
 
 ## Phase 1 — Critical / High (blocking certification)
 
-- [ ] T010 **FR-GAP-323-LOCK-UI**: Wire `isCorePositionDataLocked` in Blade for position, employee_type, start_date on update drafts
-- [ ] T011 **FR-GAP-323-DIVISION-LOCK**: Keep division editable on EmployeeEdit (do not set `isPositionDataLocked` for division)
-- [ ] T012 **FR-GAP-323-INVITE-MSG**: Success flash must mention automatic email invitation (3.23.1.6.1 / 1.9.1)
-- [ ] T013 **FR-GAP-323-SHOW-MEDICAL**: Show educations/qualifications/specialities/science_degree for all `medical_employees`
-- [ ] T014 **FR-GAP-323-PREVIEW**: Add pre-KEP read-only review of request fields (3.23.1.4)
+- [x] T010 **FR-GAP-323-LOCK-UI**: Wire `isCorePositionDataLocked` in Blade for position, employee_type, start_date on update drafts
+- [x] T011 **FR-GAP-323-DIVISION-LOCK**: Keep division editable on EmployeeEdit (do not set `isPositionDataLocked` for division)
+- [x] T012 **FR-GAP-323-INVITE-MSG**: Success flash must mention automatic email invitation (3.23.1.6.1 / 1.9.1)
+- [x] T013 **FR-GAP-323-SHOW-MEDICAL**: Show educations/qualifications/specialities/science_degree for all `medical_employees`
+- [x] T014 **FR-GAP-323-PREVIEW**: Add pre-KEP read-only review of request fields (3.23.1.4)
 
 ## Phase 2 — Medium
 

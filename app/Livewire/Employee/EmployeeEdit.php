@@ -18,7 +18,6 @@ class EmployeeEdit extends AbstractEmployeeFormManager
 {
     #[Locked]
     public ?int $employeeId = null;
-    public bool $showSignatureModal = false;
     public bool $isLockedDueToSignedRequest = false;
 
     public function mount(LegalEntity $legalEntity, Employee $employee): void
@@ -47,7 +46,8 @@ class EmployeeEdit extends AbstractEmployeeFormManager
             ->exists();
 
         $this->isPersonalDataLocked = $isOwnerParty;
-        $this->isPositionDataLocked = true;
+        // Keep division / professional blocks editable; lock only immutable core fields via applyImmutableFieldLocks().
+        $this->isPositionDataLocked = false;
         $this->loadDivisions($legalEntity);
         $this->applyImmutableFieldLocks();
 
@@ -79,10 +79,19 @@ class EmployeeEdit extends AbstractEmployeeFormManager
     {
         $preparedData = $this->form->getPreparedData();
 
-        // Backend enforcement: ensure tax_id and primary speciality are not modified
+        // Backend enforcement: immutable fields per 3.23.1.7
         if ($this->employee && $this->employee->id) {
+            $preparedData['position'] = $this->employee->position;
+            $preparedData['employee_type'] = $this->employee->employeeType;
+            if ($this->employee->startDate) {
+                $preparedData['start_date'] = \Carbon\Carbon::parse($this->employee->startDate)->format('Y-m-d');
+            }
+
             $preparedData['tax_id'] = $this->employee->party->tax_id;
             $preparedData['no_tax_id'] = $this->employee->party->no_tax_id;
+            if ($this->employee->party->birthDate) {
+                $preparedData['birth_date'] = \Carbon\Carbon::parse($this->employee->party->birthDate)->format('Y-m-d');
+            }
 
             $originalPrimarySpeciality = $this->employee->specialities()
                 ->where('speciality_officio', true)
@@ -92,7 +101,7 @@ class EmployeeEdit extends AbstractEmployeeFormManager
                 $submittedSpecialities = $preparedData['doctor']['specialities'] ?? [];
                 $filteredSpecialities = array_filter(
                     $submittedSpecialities,
-                    fn($spec) => empty($spec['speciality_officio']) && empty($spec['specialityOfficio'])
+                    fn ($spec) => empty($spec['speciality_officio']) && empty($spec['specialityOfficio'])
                 );
 
                 $primarySpecData = [

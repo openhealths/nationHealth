@@ -40,6 +40,7 @@ abstract class EmployeeComponent extends Component
     public ?int $employeeRequestId = null;
     public array $divisions = [];
     public bool $showSignatureModal = false;
+    public bool $showRequestPreviewModal = false;
 
     public ?array $dictionaryNames = [
         'PHONE_TYPE', 'COUNTRY', 'SETTLEMENT_TYPE', 'SPECIALITY_TYPE', 'DIVISION_TYPE',
