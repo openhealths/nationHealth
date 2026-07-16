@@ -59,9 +59,9 @@
 
 ## R9. UI / security
 
-**Decision**: Cancel (якщо з DS) і create/sign — лише через POST/Livewire + signature modal; ніколи GET з паролем КЕП. Complete — **без** signature modal.
+**Decision**: Cancel (DS) — signature modal; Complete — **окрема** confirm-модалка без КЕП (лише `status_reason`). Не ділити один modal для обох дій.
 
-**Rationale**: care_plan_fixes_plan + API-007-005-0006.
+**Rationale**: API-007-005-0006 без DS; UX A з clarify session 2026-07-17.
 
 ## R10. Official Confluence sources (2026-07-17)
 
