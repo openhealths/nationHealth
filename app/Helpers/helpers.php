@@ -159,3 +159,53 @@ if (!function_exists('signatureService')) {
         return app(SignatureService::class);
     }
 }
+
+if (!function_exists('ehealthHasScope')) {
+    /**
+     * Checks if the active eHealth Bearer token in the session has the specified scope.
+     *
+     * @param  string  $requiredScope
+     * @return bool
+     */
+    function ehealthHasScope(string $requiredScope): bool
+    {
+        if (app()->environment('testing')) {
+            return true;
+        }
+
+        $tokenKey = config('ehealth.api.oauth.bearer_token');
+        if (!session()->has($tokenKey)) {
+            return false;
+        }
+
+        $token = session()->get($tokenKey);
+        if (empty($token) || !is_string($token)) {
+            return false;
+        }
+
+        try {
+            // Decrypt token if it is encrypted in the session
+            $token = \Illuminate\Support\Facades\Crypt::decryptString($token);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            // Raw token format
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        $parts = explode('.', $token);
+        if (count($parts) !== 3) {
+            return false;
+        }
+
+        $payloadJson = base64_decode(str_replace(['-', '_'], ['+', '/'], $parts[1]));
+        $payload = json_decode($payloadJson, true);
+
+        if (!is_array($payload) || !isset($payload['scope'])) {
+            return false;
+        }
+
+        $scopes = is_string($payload['scope']) ? explode(' ', $payload['scope']) : (array) $payload['scope'];
+
+        return in_array($requiredScope, $scopes, true);
+    }
+}

@@ -40,6 +40,10 @@ class PartyVerify extends Component
 
     public function mount(LegalEntity $legalEntity, Party $party): void
     {
+        if (!ehealthHasScope('party_verification:read')) {
+            abort(403, __('forms.no_actions_available'));
+        }
+
         $this->legalEntity = $legalEntity;
         $this->party = $party;
         $this->loadVerificationDetails();
@@ -141,6 +145,10 @@ class PartyVerify extends Component
 
     public function updateStatus(): void
     {
+        if (!ehealthHasScope('party_verification:write')) {
+            abort(403, __('forms.no_actions_available'));
+        }
+
         $this->validate([
             'verificationStream' => 'required|string',
             'status' => 'required|string|in:VERIFIED,NOT_VERIFIED',
