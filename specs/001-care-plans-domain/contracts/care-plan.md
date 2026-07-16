@@ -11,9 +11,13 @@
 | Cancel | PATCH | `/api/patients/{personId}/care_plans/{id}/actions/cancel` |
 | Complete | PATCH | `/api/patients/{personId}/care_plans/{id}/actions/complete` |
 
-**Create body**: signed_data (КЕП) over care plan resource. Resource MUST include subject, author, terms_of_service, period, category, intent, addresses. MUST NOT include unknown fields (e.g. local `clinical_protocol` / `instantiates_protocol`).
+**Create body**: `signed_data` (КЕП) over care plan resource. Resource MUST include subject, author, terms_of_service, period, category, intent, addresses, inform_with (as applicable). MUST NOT include unknown fields (e.g. local `clinical_protocol` / `instantiates_protocol`). Plan is created **without** activities (API-007-005-0001).
 
-**Cancel/Complete body**: signed snapshot + `status_reason` from `care_plan_cancel_reasons` / `care_plan_complete_reasons`.
+**Complete body** (API-007-005-0006): `status_reason` from `care_plan_complete_reasons` — **no digital signature**. Preconditions: write Approval; all activities final; ≥1 activity `completed`.
+
+**Cancel body**: per Cancel Care Plan API + `status_reason` from `care_plan_cancel_reasons` (confirm DS requirement against that API page before coding).
+
+**Canonical docs**: [references.md](../references.md)
 
 **Client**: `App\Classes\eHealth\Api\CarePlan`
 

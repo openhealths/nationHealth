@@ -59,11 +59,21 @@
 
 ## R9. UI / security
 
-**Decision**: Cancel/complete лише через POST/Livewire actions + signature modal; ніколи GET з паролем КЕП.
+**Decision**: Cancel (якщо з DS) і create/sign — лише через POST/Livewire + signature modal; ніколи GET з паролем КЕП. Complete — **без** signature modal.
 
-**Rationale**: care_plan_fixes_plan security finding.
+**Rationale**: care_plan_fixes_plan + API-007-005-0006.
+
+## R10. Official Confluence sources (2026-07-17)
+
+**Decision**: Канон — [references.md](./references.md). Ключові корективи vs попередні припущення:
+- Complete Care Plan **without DS**
+- Create Plan **without** activities initially
+- Activity create requires write Approval + DS + one activity/request
+- PreQualify path: `POST /api/medication_request_requests/prequalify`
+- care_plan write Approval дозволяє activities + cancel MR + recall/cancel SR based on plan
 
 ## Open items (non-blocking)
 
-- Точний patient-scoped vs global path для Create MRR — перевірити Apiary на UAT; обидва варіанти задокументувати в contracts.
-- Окремий офіційний розділ ТЗ «Плани лікування» — додати через clarify, коли нададуть текст.
+- Cancel Care Plan API page (DS yes/no) — підтвердити перед T062.
+- NotebookLM недоступний без Google login; користувач може експортувати summary у чат за потреби.
+- Create MRR patient-scoped vs global — Apiary UAT.

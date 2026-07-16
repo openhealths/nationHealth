@@ -5,6 +5,7 @@
 | Artifact | Path |
 |----------|------|
 | Product spec | [spec.md](./spec.md) |
+| Official API references | [references.md](./references.md) |
 | Constitution | [constitution.md](./constitution.md) |
 | Implementation plan | [plan.md](./plan.md) |
 | Research | [research.md](./research.md) |

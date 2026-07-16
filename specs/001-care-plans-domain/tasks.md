@@ -136,17 +136,18 @@
 
 ## Phase 8: User Story 6 — Complete/Cancel plan (P2)
 
-**Goal**: КЕП complete/cancel без signed mismatch  
-**Independent Test**: Обидві дії на active планах
+**Goal**: Complete без КЕП (з preconditions activities); cancel за Cancel API  
+**Independent Test**: Complete з ≥1 completed activity; 409 якщо є scheduled/in-progress
 
 ### Tests
 
-- [ ] T060 [P] [US6] Feature: cancel/complete з synced period+terms
+- [ ] T060 [P] [US6] Feature: complete без DS + activity preconditions
+- [ ] T060b [P] [US6] Feature: cancel path per Cancel Care Plan API
 
 ### Implementation
 
-- [ ] T061 [US6] Payload cancel/complete з актуального CBD/local snapshot
-- [ ] T062 [US6] Причини з довідників; UI статус після success
+- [ ] T061 [US6] Complete: прибрати вимогу КЕП; слати `status_reason`; перевірити activities перед викликом
+- [ ] T062 [US6] Cancel: узгодити з Cancel Care Plan API (DS якщо вимагається)
 - [ ] T063 [US6] Блок нових activities після terminal status
 
 **Checkpoint**: US6 done

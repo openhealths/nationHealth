@@ -4,7 +4,7 @@
 
 | Operation | Method | Path | Notes |
 |-----------|--------|------|-------|
-| PreQualify | POST | patient-scoped prequalify endpoint (API-005-044-0001) | Only `intent=order` |
+| PreQualify | POST | `/api/medication_request_requests/prequalify` (API-005-044-0001) | Sync; only programs in payload; `intent=plan` cannot be qualified |
 | Create | POST | `/api/medication_request_requests` (або patient-scoped еквівалент — перевірити Apiary) | API-005-044-0002 |
 | Sign | PATCH | `/api/medication_request_requests/{id}/actions/sign` | API-005-044-0006 |
 | Reject MRR | PATCH/POST | Reject MRR API-005-044-0007 | NEW → REJECTED |

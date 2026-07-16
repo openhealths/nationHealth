@@ -11,10 +11,19 @@
 | Джерело | Що беремо в цю специфікацію |
 |---------|-----------------------------|
 | п. 3.2 / 3.3 (вставлене ТЗ) | Передумови: пацієнт у реєстрі, працівник/ролі, довідники; робота з ЕМЗ (епізод, пакет взаємодії, діагнози); створення/погашення **ЕН**; доступ через **approval** з рівнем `write`; каталог послуг |
+| Офіційні Confluence / Apiary | Канонічні API-правила Create/Complete Care Plan, Activity, Approval, PreQualify MRR — див. [references.md](./references.md) |
 | Домен Care Plan (ЕСОЗ + поточна МІС) | План лікування, activities (призначення), approvals на план, Service/Device Request, Medication Request |
 | Поза scope цього feature | Повний CRUD декларацій (3.2.1), реорганізація закладу, MedData COVID autofill як окремий модуль, медичні висновки (3.8) |
 
 **Мета**: МІС забезпечує лікарю ПМД (`DOCTOR`) та СМД (`SPECIALIST`) повний життєвий цикл **плану лікування** і похідних документів (призначення → направлення / е-рецепт / призначення виробу) з дотриманням згоди пацієнта.
+
+## Clarifications
+
+### Session 2026-07-17
+
+- Q: Які офіційні джерела є канонічними для імплементації? → A: Confluence API docs + Apiary з [references.md](./references.md) (NotebookLM — лише збірник лінків, без окремого експорту в git).
+- Q: Чи потрібен КЕП для Complete Care Plan? → A: Ні — API-007-005-0006: «Complete performs without DS»; потрібні write Approval + `status_reason` + фінальні activities (усі final, ≥1 completed).
+- Q: Чи створюється план одразу з activities? → A: Ні — Create Care Plan без activities; activities додаються окремим Create Activity (одна на запит, з КЕП + write Approval).
 
 ---
 
@@ -111,17 +120,17 @@
 
 ### User Story 6 — Завершити або скасувати план лікування (Priority: P2)
 
-Лікар на активному плані ініціює complete або cancel з причиною з довідника, підписує КЕП актуальний знімок плану (узгоджений із Системою), бачить новий статус.
+Лікар на активному плані ініціює complete або cancel з причиною з довідника. **Complete** — без КЕП (API-007-005-0006), з write Approval і перевіркою activities. **Cancel** — за контрактом Cancel Care Plan (окремий API; якщо вимагає DS — підпис актуального знімка). Після успіху UI показує новий статус.
 
-**Why this priority**: Закриття клінічного циклу; високий ризик помилок signed content.
+**Why this priority**: Закриття клінічного циклу; complete має жорсткі preconditions по activities.
 
-**Independent Test**: Complete і cancel на різних планах; після дії нові activities/виписки заборонені.
+**Independent Test**: Complete на плані з ≥1 completed activity і без scheduled/in-progress; cancel за окремим контрактом; після terminal status нові activities заборонені.
 
 **Acceptance Scenarios**:
 
-1. **Given** план `active`, **When** complete з `care_plan_complete_reasons` + КЕП, **Then** статус `completed` у Системі й МІС.
-2. **Given** план `active`, **When** cancel з `care_plan_cancel_reasons` + КЕП, **Then** статус відповідає моделі Системи (entered-in-error / revoked за контрактом) і UI відображає причину.
-3. **Given** локальні дані періоду/terms розійшлися з Системою, **When** підпис, **Then** МІС спочатку синхронізує/будує payload з актуального стану, щоб уникнути «Signed content doesn't match».
+1. **Given** план `active`, усі activities у final статусі і ≥1 `completed`, **When** complete з `care_plan_complete_reasons` (без КЕП) і write Approval, **Then** статус `completed` у Системі й МІС.
+2. **Given** план має activity `scheduled` або `in_progress`, **When** complete, **Then** Система/МІС блокує з повідомленням про незавершені призначення (409).
+3. **Given** план `active`, **When** cancel з `care_plan_cancel_reasons` згідно Cancel Care Plan API, **Then** статус відповідає моделі Системи і UI відображає причину.
 4. **Given** помилка Системи, **When** дія не пройшла, **Then** статус плану не «застрягає» локально в суперечливому стані без пояснення.
 
 ---
@@ -174,7 +183,7 @@
 - **FR-013**: МІС MUST відображати статуси плану (`draft`/`new`/`active`/`on-hold`/`completed`/`revoked`/`entered-in-error`/…) і блокувати дії, недоступні для статусу.
 - **FR-014**: МІС MUST зберігати UUID плану в контексті пацієнта і давати пошук/перегляд за ідентифікатором.
 - **FR-015**: Редагування плану в МІС MUST бути дозволене лише у статусах, передбачених Системою (локально — доки статус `new`, якщо так визначено політикою доступу).
-- **FR-016**: Complete і Cancel плану MUST вимагати причину з відповідного довідника і КЕП; після успіху UI відображає новий статус.
+- **FR-016**: Complete плану MUST вимагати `status_reason` з `care_plan_complete_reasons`, write Approval, усі activities у final статусі й ≥1 `completed`; **без КЕП** (API-007-005-0006). Cancel плану MUST відповідати Cancel Care Plan API (причина з довідника; DS — лише якщо вимагає той контракт).
 - **FR-017**: Поля, що є лише локальними (напр. клінічний протокол без підтримки в схемі CBD), MUST зберігатися локально і MUST NOT надсилатися в Систему як невідомі параметри.
 
 #### Approvals (дозволи)
@@ -237,7 +246,7 @@
 - **SC-003**: Успішна виписка ЕН і е-рецепта з підписаної activity проходить E2E на UAT без ручного виправлення payload.
 - **SC-004**: PreQualify для medication (`intent=order`) і device виконується до create у 100% відповідних сценаріїв.
 - **SC-005**: Reject MRR/MR покриває статусні переходи NEW→REJECTED і ACTIVE→REJECTED з довідником причин.
-- **SC-006**: Complete/Cancel плану не дає помилки «Signed content doesn't match» на даних, синхронізованих після create.
+- **SC-006**: Complete плану проходить без КЕП при валідних activities; Cancel (якщо з DS) не дає «Signed content doesn't match» на синхронізованих даних.
 - **SC-007**: Feature-тести домену Care Plan / Approvals / eRx / Referrals зелені в CI (`DB_DATABASE=testing`).
 - **SC-008**: Користувач бачить і може скопіювати/знайти UUID плану та пов’язаних документів у UI пацієнта.
 
