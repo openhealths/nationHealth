@@ -10,7 +10,8 @@ Systematization of Technical Requirements §3.23 against PR [#488](https://githu
 | [research.md](./research.md) | Audit findings |
 | [analyze.md](./analyze.md) | Spec ↔ tasks ↔ code matrix |
 | [checklist.md](./checklist.md) | Spec quality checklist |
-| [quickstart.md](./quickstart.md) | Manual UAT |
+| [quickstart.md](./quickstart.md) | Manual UAT smoke |
+| [uat-algorithm-3-23.md](./uat-algorithm-3-23.md) | Full textual UAT algorithm (A–H) |
 | [contracts/ehealth-acceptance-codes.md](./contracts/ehealth-acceptance-codes.md) | Status / death / deactivate codes |
 
 Spec Kit CLI/bootstrap lives in `.specify/` (gitignored). Only this folder is tracked.
