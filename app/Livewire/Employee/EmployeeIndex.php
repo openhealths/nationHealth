@@ -218,15 +218,27 @@ class EmployeeIndex extends EmployeeComponent
             $query->whereHas('phones', fn ($q) => $q->where('number', 'like', '%' . $this->filter['phone'] . '%'));
         }
 
-        // 5. Filter: tax_id (РНОКПП) — 3.23.3.1.1
-        if (!empty($this->filter['tax_id'])) {
-            $query->where('tax_id', 'ILIKE', '%' . trim($this->filter['tax_id']) . '%');
-        }
+        // 5–6. tax_id / verification_status — 3.23.3.1.1 (OWNER/HR/ADMIN/PHARMACY_OWNER only)
+        if ($this->canViewPartyVerificationMeta()) {
+            if (!empty($this->filter['tax_id'])) {
+                $query->where('tax_id', 'ILIKE', '%' . trim($this->filter['tax_id']) . '%');
+            }
 
-        // 6. Filter: overall party verification_status — 3.23.3.1.1
-        if (!empty($this->filter['verification_status'])) {
-            $query->where('verification_status', $this->filter['verification_status']);
+            if (!empty($this->filter['verification_status'])) {
+                $query->where('verification_status', $this->filter['verification_status']);
+            }
         }
+    }
+
+    /**
+     * Party tax_id / verification_status in list UI — TZ 3.23.3.1 (elevated roles only).
+     */
+    private function canViewPartyVerificationMeta(): bool
+    {
+        $user = Auth::user();
+
+        return $user instanceof User
+            && $user->hasAllowedRole([Role::ADMIN, Role::HR, Role::OWNER, Role::PHARMACY_OWNER]);
     }
 
     /**

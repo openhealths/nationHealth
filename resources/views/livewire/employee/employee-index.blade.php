@@ -172,26 +172,29 @@
                                     />
                                 </div>
                             </div>
-                            <div class="form-row-4">
-                                <div class="form-group group">
-                                    <input wire:model.defer="filter.tax_id" wire:keydown.enter="applyFilters"
-                                           name="filter_tax_id" id="filter_tax_id" class="input peer" placeholder=" "
-                                           autocomplete="off" />
-                                    <label for="filter_tax_id" class="label">{{ __('forms.tax_id') }}</label>
+                            {{-- 3.23.3.1 — tax_id / verification_status only for OWNER/HR/ADMIN/PHARMACY_OWNER --}}
+                            @if($permissions['employee_admin_hr'])
+                                <div class="form-row-4">
+                                    <div class="form-group group">
+                                        <input wire:model.defer="filter.tax_id" wire:keydown.enter="applyFilters"
+                                               name="filter_tax_id" id="filter_tax_id" class="input peer" placeholder=" "
+                                               autocomplete="off" />
+                                        <label for="filter_tax_id" class="label">{{ __('forms.tax_id') }}</label>
+                                    </div>
+                                    <div class="form-group group">
+                                        <select wire:model.defer="filter.verification_status" wire:keydown.enter="applyFilters"
+                                                id="filter_verification_status"
+                                                class="input peer text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                                        >
+                                            <option value="">{{ __('forms.all_verification_statuses') }}</option>
+                                            @foreach(\App\Enums\Party\VerificationStatus::cases() as $verificationStatus)
+                                                <option value="{{ $verificationStatus->value }}">{{ $verificationStatus->label() }}</option>
+                                            @endforeach
+                                        </select>
+                                        <label for="filter_verification_status" class="label">{{ __('party_verification.status') }}</label>
+                                    </div>
                                 </div>
-                                <div class="form-group group">
-                                    <select wire:model.defer="filter.verification_status" wire:keydown.enter="applyFilters"
-                                            id="filter_verification_status"
-                                            class="input peer text-gray-500 dark:bg-gray-800 dark:text-gray-400"
-                                    >
-                                        <option value="">{{ __('forms.all_verification_statuses') }}</option>
-                                        @foreach(\App\Enums\Party\VerificationStatus::cases() as $verificationStatus)
-                                            <option value="{{ $verificationStatus->value }}">{{ $verificationStatus->label() }}</option>
-                                        @endforeach
-                                    </select>
-                                    <label for="filter_verification_status" class="label">{{ __('party_verification.status') }}</label>
-                                </div>
-                            </div>
+                            @endif
                         </div>
                         <div class="mb-9 mt-6 flex flex-col sm:flex-row gap-2 w-full">
                             <button type="submit" class="flex items-center gap-2 button-primary">
@@ -250,21 +253,23 @@
                         wire:key="party-{{ $party->id }}">
                         <legend class="legend">{{ $party->fullName }}</legend>
 
-                        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mt-1 mb-2">
-                            @if($party->tax_id)
-                                <span>{{ __('forms.tax_id') }}: <span class="font-medium text-gray-700 dark:text-gray-200">{{ $party->tax_id }}</span></span>
-                            @endif
-                            @if($party->verification_status)
-                                @php
-                                    $partyVerification = \App\Enums\Party\VerificationStatus::tryFrom($party->verification_status);
-                                @endphp
-                                <span>{{ __('party_verification.status') }}:
-                                    <span class="font-medium text-gray-700 dark:text-gray-200">
-                                        {{ $partyVerification?->label() ?? $party->verification_status }}
+                        @if($permissions['employee_admin_hr'])
+                            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mt-1 mb-2">
+                                @if($party->tax_id)
+                                    <span>{{ __('forms.tax_id') }}: <span class="font-medium text-gray-700 dark:text-gray-200">{{ $party->tax_id }}</span></span>
+                                @endif
+                                @if($party->verification_status)
+                                    @php
+                                        $partyVerification = \App\Enums\Party\VerificationStatus::tryFrom($party->verification_status);
+                                    @endphp
+                                    <span>{{ __('party_verification.status') }}:
+                                        <span class="font-medium text-gray-700 dark:text-gray-200">
+                                            {{ $partyVerification?->label() ?? $party->verification_status }}
+                                        </span>
                                     </span>
-                                </span>
-                            @endif
-                        </div>
+                                @endif
+                            </div>
+                        @endif
 
                         <div
                             class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-700 pb-4">

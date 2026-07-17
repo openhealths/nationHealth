@@ -10,6 +10,7 @@ use App\Livewire\Employee\EmployeeIndex;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -67,6 +68,56 @@ class EmployeeIndexSearchTest extends TestCase
         $ids = $this->searchPartyIds($legalEntity, 'Петренко Марія');
 
         $this->assertCount(0, $ids);
+    }
+
+    #[Test]
+    public function verification_filters_apply_only_for_elevated_roles(): void
+    {
+        [$legalEntity] = $this->createLegalEntityWithParty(
+            firstName: 'Іван',
+            lastName: 'Петренко',
+            secondName: 'Олегович',
+        );
+
+        $component = new EmployeeIndex();
+        $component->search = '';
+        $component->status = [];
+        $component->filter = [
+            'phone' => '',
+            'email' => '',
+            'role' => '',
+            'position' => '',
+            'division_id' => '',
+            'tax_id' => '3461807396',
+            'verification_status' => 'VERIFICATION_NEEDED',
+        ];
+
+        $legalEntityProperty = new \ReflectionProperty(EmployeeIndex::class, 'legalEntity');
+        $legalEntityProperty->setValue($component, $legalEntity);
+
+        $method = new ReflectionMethod(EmployeeIndex::class, 'applyDatabaseFilters');
+
+        $doctor = \Mockery::mock(User::class)->makePartial();
+        $doctor->shouldReceive('hasAllowedRole')
+            ->with([Role::ADMIN, Role::HR, Role::OWNER, Role::PHARMACY_OWNER])
+            ->andReturn(false);
+        \Illuminate\Support\Facades\Auth::setUser($doctor);
+
+        $restrictedQuery = Party::query();
+        $method->invoke($component, $restrictedQuery);
+        $this->assertStringNotContainsString('verification_status', $restrictedQuery->toSql());
+        $this->assertStringNotContainsString('tax_id', $restrictedQuery->toSql());
+
+        $admin = \Mockery::mock(User::class)->makePartial();
+        $admin->shouldReceive('hasAllowedRole')
+            ->with([Role::ADMIN, Role::HR, Role::OWNER, Role::PHARMACY_OWNER])
+            ->andReturn(true);
+        \Illuminate\Support\Facades\Auth::setUser($admin);
+
+        $elevatedQuery = Party::query();
+        $method->invoke($component, $elevatedQuery);
+        $this->assertStringContainsString('verification_status', $elevatedQuery->toSql());
+        $this->assertStringContainsString('tax_id', $elevatedQuery->toSql());
     }
 
     /**

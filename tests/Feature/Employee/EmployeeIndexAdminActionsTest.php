@@ -96,6 +96,33 @@ class EmployeeIndexAdminActionsTest extends TestCase
         $this->assertStringContainsString('tryEdit(' . $employee->id . ')', $html);
     }
 
+    #[Test]
+    public function party_verification_meta_blade_gate_hides_for_non_elevated(): void
+    {
+        $snippet = <<<'BLADE'
+            @if($permissions['employee_admin_hr'])
+                <span data-tax>{{ __('forms.tax_id') }}: {{ $partyTaxId }}</span>
+                <span data-verif>{{ __('party_verification.status') }}: {{ $partyVerificationLabel }}</span>
+            @endif
+        BLADE;
+
+        $elevated = \Illuminate\Support\Facades\Blade::render($snippet, [
+            'permissions' => ['employee_admin_hr' => true],
+            'partyTaxId' => '3461807396',
+            'partyVerificationLabel' => 'Потребує верифікації',
+        ]);
+        $this->assertStringContainsString('3461807396', $elevated);
+        $this->assertStringContainsString('Потребує верифікації', $elevated);
+
+        $restricted = \Illuminate\Support\Facades\Blade::render($snippet, [
+            'permissions' => ['employee_admin_hr' => false],
+            'partyTaxId' => '3461807396',
+            'partyVerificationLabel' => 'Потребує верифікації',
+        ]);
+        $this->assertStringNotContainsString('3461807396', $restricted);
+        $this->assertStringNotContainsString('Потребує верифікації', $restricted);
+    }
+
     /**
      * @return array{0: LegalEntity, 1: Employee}
      */
