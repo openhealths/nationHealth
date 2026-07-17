@@ -41,6 +41,8 @@ class EmployeeForm extends Form
 
     public ?string $knedp = null;
     public ?TemporaryUploadedFile $keyContainerUpload = null;
+    /** Original client filename for UI after modal close/reopen (input value cannot be restored). */
+    public string $keyContainerFileName = '';
     public ?string $password = null;
 
     public array $documents = [];

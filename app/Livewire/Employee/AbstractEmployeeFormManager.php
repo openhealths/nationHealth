@@ -537,7 +537,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
      */
     public function resetSignatureFields(): void
     {
-        $this->form->reset('keyContainerUpload', 'password', 'knedp');
+        $this->form->reset('keyContainerUpload', 'keyContainerFileName', 'password', 'knedp');
     }
 
     /**

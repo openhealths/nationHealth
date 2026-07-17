@@ -90,6 +90,26 @@ class EmployeeCriticalHighGapsTest extends TestCase
     }
 
     #[Test]
+    public function signature_modal_restores_key_file_name_after_reopen(): void
+    {
+        $blade = file_get_contents(
+            resource_path('views/livewire/employee/parts/modals/signature-modal.blade.php')
+        );
+
+        $this->assertNotFalse($blade);
+        $this->assertStringContainsString('keyContainerFileName', $blade);
+        $this->assertStringContainsString('syncFileNameFromWire', $blade);
+        $this->assertStringContainsString(
+            "x-effect=\"if (!showSignatureModal) { if (\$refs.keyContainerUpload) \$refs.keyContainerUpload.value = ''; } else { syncFileNameFromWire(); }\"",
+            $blade
+        );
+        $this->assertTrue(
+            (new \ReflectionClass(\App\Livewire\Employee\Forms\EmployeeForm::class))
+                ->hasProperty('keyContainerFileName')
+        );
+    }
+
+    #[Test]
     public function employee_component_exposes_preview_and_core_lock_flags(): void
     {
         $component = new class extends EmployeeComponent
