@@ -123,6 +123,42 @@ class EmployeeIndexAdminActionsTest extends TestCase
         $this->assertStringNotContainsString('Потребує верифікації', $restricted);
     }
 
+    #[Test]
+    public function party_email_is_plain_text_when_single_and_button_when_multiple(): void
+    {
+        $snippet = <<<'BLADE'
+            @php
+                $emailsCollection = collect($emails)->filter()->unique()->values();
+                $emailCount = $emailsCollection->count();
+                $visibleEmail = $emailsCollection->first();
+            @endphp
+            @if ($visibleEmail)
+                @if ($emailCount === 1)
+                    <span data-single>{{ $visibleEmail }}</span>
+                @else
+                    <button type="button" data-multi>{{ $visibleEmail }} +{{ $emailCount - 1 }}</button>
+                    @foreach ($emailsCollection as $email)
+                        <span data-all>{{ $email }}</span>
+                    @endforeach
+                @endif
+            @endif
+        BLADE;
+
+        $single = \Illuminate\Support\Facades\Blade::render($snippet, [
+            'emails' => ['only@example.com'],
+        ]);
+        $this->assertStringContainsString('data-single', $single);
+        $this->assertStringNotContainsString('data-multi', $single);
+        $this->assertStringNotContainsString('mailto:', $single);
+
+        $multi = \Illuminate\Support\Facades\Blade::render($snippet, [
+            'emails' => ['one@example.com', 'two@example.com'],
+        ]);
+        $this->assertStringContainsString('data-multi', $multi);
+        $this->assertStringContainsString('two@example.com', $multi);
+        $this->assertStringNotContainsString('data-single', $multi);
+    }
+
     /**
      * @return array{0: LegalEntity, 1: Employee}
      */

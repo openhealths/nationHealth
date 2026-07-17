@@ -274,8 +274,7 @@
                         <div
                             class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-700 pb-4">
 
-                            <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500 mt-2"
-                                 x-data="{ showEmails_{{ $party->id }}: false }">
+                            <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500 mt-2">
 
                                 {{-- Phone --}}
                                 @if ($mobilePhone = $party->phones->firstWhere('type', 'MOBILE'))
@@ -290,50 +289,52 @@
                                     </span>
                                 @endif
 
-                                {{-- Email --}}
+                                {{-- Email: 1 = plain text; 2+ = toggle to reveal all --}}
                                 @php
                                     $emailsCollection = $employees
-                                        ->map(fn($emp) => $emp->loadMissing('users')->users?->map(fn($user) => $user->email))
+                                        ->map(fn ($emp) => $emp->loadMissing('users')->users?->map(fn ($user) => $user->email))
                                         ->flatten()
                                         ->filter()
-                                        ->unique();
+                                        ->unique()
+                                        ->values();
 
+                                    $emailCount = $emailsCollection->count();
                                     $visibleEmail = $emailsCollection->first();
-                                    $hiddenEmails = $emailsCollection->slice(1);
-                                    $hiddenCount = $hiddenEmails->count();
                                 @endphp
 
                                 @if ($visibleEmail)
-                                    <span class="flex items-center gap-1.5 min-w-0 relative">
+                                    <span class="flex items-center gap-1.5 min-w-0 relative"
+                                          x-data="{ open: false }">
                                         <svg class="w-6 h-6 text-gray-800 dark:text-white shrink-0" aria-hidden="true"
                                              xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none"
                                              viewBox="0 0 24 24">
                                             <path stroke="currentColor" stroke-linecap="round" stroke-width="2"
                                                   d="m3.5 5.5 7.893 6.036a1 1 0 0 0 1.214 0L20.5 5.5M4 19h16a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1Z" />
                                         </svg>
-                                        <a href="mailto:{{ $visibleEmail }}" class="hover:underline truncate"
-                                           title="{{ $visibleEmail }}">{{ $visibleEmail }}</a>
 
-                                        @if ($hiddenCount > 0)
+                                        @if ($emailCount === 1)
+                                            <span class="truncate cursor-default select-text"
+                                                  title="{{ $visibleEmail }}">{{ $visibleEmail }}</span>
+                                        @else
                                             <button type="button"
-                                                    @click.stop="showEmails_{{ $party->id }} = !showEmails_{{ $party->id }}"
-                                                    class="text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer p-0.5 rounded-full"
-                                                    title="Показати {{ $hiddenCount }} додаткових email"
+                                                    @click.stop="open = !open"
+                                                    class="flex items-center gap-1 min-w-0 truncate text-left text-sm text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
+                                                    title="{{ __('forms.show_all_emails') }}"
+                                                    aria-expanded="false"
+                                                    x-bind:aria-expanded="open.toString()"
                                             >
-                                                +{{ $hiddenCount }}
+                                                <span class="truncate">{{ $visibleEmail }}</span>
+                                                <span class="shrink-0 font-semibold">+{{ $emailCount - 1 }}</span>
                                             </button>
-                                        @endif
 
-                                        @if ($hiddenCount > 0)
-                                            <div x-show="showEmails_{{ $party->id }}"
-                                                 x-on:click.away="showEmails_{{ $party->id }} = false"
+                                            <div x-show="open"
+                                                 x-on:click.away="open = false"
                                                  x-collapse.duration.300ms
                                                  class="flex flex-col gap-y-0.5 absolute bg-white dark:bg-gray-800 z-10 p-2 rounded-md shadow-lg top-full left-0 mt-1 min-w-max border border-gray-200 dark:border-gray-700"
                                                  x-cloak
                                             >
-                                                @foreach ($hiddenEmails as $email)
-                                                    <a href="mailto:{{ $email }}"
-                                                       class="hover:underline text-gray-500 dark:text-gray-400 text-sm">{{ $email }}</a>
+                                                @foreach ($emailsCollection as $email)
+                                                    <span class="text-gray-500 dark:text-gray-400 text-sm">{{ $email }}</span>
                                                 @endforeach
                                             </div>
                                         @endif

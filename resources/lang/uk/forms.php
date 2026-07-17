@@ -211,6 +211,7 @@ return [
     'add_document' => 'Додати документ',
     'remove_document' => 'Видалити документ',
     'email' => 'Email',
+    'show_all_emails' => 'Показати всі email',
     'phones' => 'Телефони',
     'phone' => 'Телефон',
     'phone_type' => 'Тип телефону',
