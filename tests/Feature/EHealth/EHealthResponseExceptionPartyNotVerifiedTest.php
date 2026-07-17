@@ -48,9 +48,9 @@ class EHealthResponseExceptionPartyNotVerifiedTest extends TestCase
     {
         return [
             '403 different message' => [403, 'Access denied. Insufficient permissions.'],
-            '422 party message'     => [422, 'Access denied. Party is not verified'],
-            '200 party message'     => [200, 'Access denied. Party is not verified'],
-            '500 empty message'     => [500, ''],
+            '422 party message' => [422, 'Access denied. Party is not verified'],
+            '200 party message' => [200, 'Access denied. Party is not verified'],
+            '500 empty message' => [500, ''],
         ];
     }
 
@@ -85,14 +85,16 @@ class EHealthResponseExceptionPartyNotVerifiedTest extends TestCase
     }
 
     #[Test]
-    public function handle_respects_caller_provided_flash_message_even_on_403_party_not_verified(): void
+    public function handle_always_flashes_party_not_verified_even_when_caller_provides_flash_message(): void
     {
         $exception = $this->makeException(403, 'Access denied. Party is not verified');
-        $callerMessage = 'Custom override message from caller';
 
-        $exception->handle('Test log message', $callerMessage);
+        $exception->handle('Test log message', 'Custom override message from caller');
 
-        $this->assertEquals($callerMessage, Session::get('error'));
+        $this->assertEquals(
+            __('errors.ehealth.messages.party_not_verified'),
+            Session::get('error')
+        );
     }
 
     // -------------------------------------------------------------------------
