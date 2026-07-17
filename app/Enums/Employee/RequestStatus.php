@@ -38,4 +38,17 @@ enum RequestStatus: string
             self::SIGNED->value,
         ];
     }
+
+    /**
+     * Statuses shown in employee-request list filters (SIGNED is not selectable).
+     *
+     * @return list<self>
+     */
+    public static function filterChoices(): array
+    {
+        return array_values(array_filter(
+            self::cases(),
+            static fn (self $status): bool => $status !== self::SIGNED
+        ));
+    }
 }

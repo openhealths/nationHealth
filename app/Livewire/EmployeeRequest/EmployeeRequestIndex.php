@@ -351,22 +351,7 @@ class EmployeeRequestIndex extends EmployeeComponent
             ->with(['party', 'division', 'revision'])
             ->where('legal_entity_id', legalEntity()->id)
             ->whereHas('revision')
-            ->when($this->search, function ($query) {
-                $searchTerm = '%' . $this->search . '%';
-
-                $query->where(function ($subQuery) use ($searchTerm) {
-                    $subQuery->whereHas('party', function ($q) use ($searchTerm) {
-                        $q->whereRaw("CONCAT(last_name, ' ', first_name, ' ', second_name) ILIKE ?", [$searchTerm]);
-                    })
-                        ->orWhereHas('revision', function ($q) use ($searchTerm) {
-                            $q->whereRaw("
-                        (data->'party'->>'last_name') ILIKE ? OR
-                        (data->'party'->>'first_name') ILIKE ? OR
-                        (data->'party'->>'second_name') ILIKE ?
-                    ", [$searchTerm, $searchTerm, $searchTerm]);
-                        });
-                });
-            })
+            ->when($this->search, fn ($query) => $query->searchByFullName($this->search))
             ->when($this->status, function ($query) {
                 $query->where('status', $this->status);
             })
@@ -378,7 +363,7 @@ class EmployeeRequestIndex extends EmployeeComponent
     {
         return view('livewire.employee-request.employee-request-index', [
             'requests' => $this->requests,
-            'statuses' => RequestStatus::cases(),
+            'statuses' => RequestStatus::filterChoices(),
             'dictionaries' => $this->dictionaries,
         ]);
     }
