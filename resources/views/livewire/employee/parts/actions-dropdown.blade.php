@@ -23,7 +23,11 @@
 
     $showEdit = $canWrite && !$isOwner && ($isEmployee ? $status !== 'DISMISSED' : $isLocalDraftRequest);
 
-    $showSync = $canWrite && ($isEmployee ? !empty($position->uuid) : in_array($status, ['NEW', 'SIGNED', 'APPROVED'], true));
+    $showSync = $canWrite && (
+        $isEmployee
+            ? !empty($position->uuid)
+            : $position->isPendingEhealth()
+    );
     $showDelete = $isRequest && $canWrite && $isLocalDraftRequest;
 
     // We also prohibit the dismissal of the owner through the interface, if necessary

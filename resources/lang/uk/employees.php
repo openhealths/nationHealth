@@ -57,6 +57,14 @@ return [
         'failed' => 'Під час фонової синхронізації працівників сталася помилка.',
         'completed_successfully' => 'Синхронізацію працівників успішно завершено. Оброблено :processed з :total записів.',
         'employee_request_success' => 'Синхронізацію заявки працівника успішно завершено.',
+        'employee_request_still_pending' => 'Заявка ще очікує рішення в ЕСОЗ (статус NEW). Підтвердженого працівника не знайдено.',
+        'employee_request_status_updated' => 'Статус заявки оновлено: :status.',
+        'employee_request_not_pending' => 'Синхронізувати можна лише заявки, надіслані в ЕСОЗ і ще без рішення.',
+        'employee_request_not_found' => 'Заявку не знайдено.',
+        'employee_request_forbidden' => 'Немає дозволу на синхронізацію цієї заявки.',
+        'employee_request_failed' => 'Помилка синхронізації заявки: :error',
+        'session_token_missing' => 'Сесія eHealth закінчилась. Увійдіть знову.',
+        'ehealth_empty_data' => 'ЕСОЗ повернув порожню відповідь для заявки.',
     ],
 
     // draft

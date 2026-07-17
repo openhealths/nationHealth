@@ -64,4 +64,28 @@ class EmployeeRequestPendingStatusTest extends TestCase
         $this->assertFalse($request->isLocalDraft());
         $this->assertFalse($request->isPendingEhealth());
     }
+
+    #[Test]
+    public function only_pending_ehealth_requests_are_eligible_for_individual_sync(): void
+    {
+        $draft = new EmployeeRequest([
+            'status' => RequestStatus::NEW,
+            'uuid' => null,
+            'applied_at' => null,
+        ]);
+        $pending = new EmployeeRequest([
+            'status' => RequestStatus::NEW,
+            'uuid' => '44444444-4444-4444-4444-444444444444',
+            'applied_at' => null,
+        ]);
+        $approved = new EmployeeRequest([
+            'status' => RequestStatus::APPROVED,
+            'uuid' => '55555555-5555-5555-5555-555555555555',
+            'applied_at' => now(),
+        ]);
+
+        $this->assertFalse($draft->isPendingEhealth());
+        $this->assertTrue($pending->isPendingEhealth());
+        $this->assertFalse($approved->isPendingEhealth());
+    }
 }

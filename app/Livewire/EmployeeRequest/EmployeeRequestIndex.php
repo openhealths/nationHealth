@@ -112,64 +112,59 @@ class EmployeeRequestIndex extends EmployeeComponent
     {
         Log::info("[SyncOne] Started for Request ID: {$requestId}");
 
-        $localRequest = EmployeeRequest::with(['revision', 'employee', 'party'])->find($requestId);
+        $localRequest = EmployeeRequest::with(['revision', 'employee', 'party', 'division'])
+            ->where('legal_entity_id', legalEntity()->id)
+            ->find($requestId);
 
-        if (!$localRequest || !$localRequest->uuid) {
-            $this->dispatch('flashMessage', ['message' => 'Request has no UUID.', 'type' => 'error']);
+        if (!$localRequest) {
+            $this->dispatch('flashMessage', [
+                'message' => __('employees.sync.employee_request_not_found'),
+                'type' => 'error',
+            ]);
 
             return;
         }
 
-        $token = session()->get(config('ehealth.api.oauth.bearer_token'));
-        if (!$token) {
-            $this->dispatch('flashMessage', ['message' => 'Session token missing. Please re-login.', 'type' => 'error']);
+        if (Auth::user()->cannot('viewAny', EmployeeRequest::class)) {
+            $this->dispatch('flashMessage', [
+                'message' => __('employees.sync.employee_request_forbidden'),
+                'type' => 'error',
+            ]);
+
+            return;
+        }
+
+        if (!$localRequest->isPendingEhealth()) {
+            $this->dispatch('flashMessage', [
+                'message' => __('employees.sync.employee_request_not_pending'),
+                'type' => 'warning',
+            ]);
 
             return;
         }
 
         try {
-            Log::info("[SyncOne] Fetching Status via User Token for UUID: {$localRequest->uuid}");
+            $result = $processor->syncSinglePendingRequest($localRequest, legalEntity());
 
-            // Call standard getById (User Token)
-            $response = EHealth::employeeRequest()
-                ->withToken($token)
-                ->getDetails($localRequest->uuid);
+            $type = match ($result['outcome']) {
+                EmployeeRequestProcessor::OUTCOME_APPROVED => 'success',
+                EmployeeRequestProcessor::OUTCOME_PENDING,
+                EmployeeRequestProcessor::OUTCOME_REJECTED,
+                EmployeeRequestProcessor::OUTCOME_EXPIRED => 'info',
+                default => 'error',
+            };
 
-            // Expecting 'data' key. Note: User Token response DOES NOT contain 'employee_id'.
-            $remoteData = $response->json('data');
-
-            if (!$remoteData) {
-                $this->dispatch('flashMessage', ['message' => 'eHealth returned empty data.', 'type' => 'warning']);
-
-                return;
-            }
-
-            $remoteStatus = $remoteData['status'] ?? 'UNKNOWN';
-            Log::info("[SyncOne] Remote status: {$remoteStatus}.");
-
-            if ($remoteStatus === 'APPROVED') {
-                // Delegate to Processor. It will search by Tax ID since employee_id is missing.
-                $processor->applyApprovedRequest($localRequest, $remoteData);
-
-                $this->dispatch('flashMessage', [
-                    'message' => __('employees.sync.employee_request_success'),
-                    'type' => 'success'
-                ]);
-
-            } elseif (in_array($remoteStatus, ['REJECTED', 'EXPIRED'])) {
-                $newStatus = ($remoteStatus === 'REJECTED') ? RequestStatus::REJECTED : RequestStatus::EXPIRED;
-                $localRequest->update(['status' => $newStatus, 'applied_at' => now()]);
-
-                $this->dispatch('flashMessage', ['message' => "Status updated to {$remoteStatus}.", 'type' => 'info']);
-            } else {
-                $this->dispatch('flashMessage', ['message' => "Status unchanged: {$remoteStatus}", 'type' => 'info']);
-            }
-
-        } catch (\Exception $e) {
-            Log::error("[SyncOne] ERROR: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             $this->dispatch('flashMessage', [
-                'message' => 'Sync Error: ' . $e->getMessage(),
-                'type' => 'error'
+                'message' => $result['message'],
+                'type' => $type,
+            ]);
+
+            unset($this->requests);
+        } catch (\Exception $e) {
+            Log::error('[SyncOne] ERROR: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            $this->dispatch('flashMessage', [
+                'message' => __('employees.sync.employee_request_failed', ['error' => $e->getMessage()]),
+                'type' => 'error',
             ]);
         }
     }
