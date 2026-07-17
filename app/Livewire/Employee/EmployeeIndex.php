@@ -207,10 +207,12 @@ class EmployeeIndex extends EmployeeComponent
             }
         }
 
-        // 3. Filter: Email (via Users)
+        // 3. Filter: Email (via Users on Party)
         if (!empty($this->filter['email'])) {
-            // ILIKE for emails too
-            $query->whereHas('party.users', fn ($q) => $q->where('email', 'ILIKE', '%' . $this->filter['email'] . '%'));
+            $query->whereHas(
+                'users',
+                fn ($q) => $q->where('email', 'ILIKE', '%' . $this->filter['email'] . '%')
+            );
         }
 
         // 4. Filter: Phone

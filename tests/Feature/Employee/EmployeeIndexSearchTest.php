@@ -120,6 +120,56 @@ class EmployeeIndexSearchTest extends TestCase
         $this->assertStringContainsString('tax_id', $elevatedQuery->toSql());
     }
 
+    #[Test]
+    public function email_filter_scopes_party_users_without_party_relation(): void
+    {
+        [$legalEntity, $party] = $this->createLegalEntityWithParty(
+            firstName: 'Іван',
+            lastName: 'Петренко',
+            secondName: 'Олегович',
+        );
+
+        User::create([
+            'uuid' => (string) Str::uuid(),
+            'email' => 'filter-me@example.com',
+            'password' => bcrypt('password'),
+            'party_id' => $party->id,
+        ]);
+
+        $this->createLegalEntityWithParty(
+            firstName: 'Марія',
+            lastName: 'Коваленко',
+            secondName: 'Іванівна',
+            legalEntity: $legalEntity,
+        );
+
+        $component = new EmployeeIndex();
+        $component->search = '';
+        $component->status = [];
+        $component->filter = [
+            'phone' => '',
+            'email' => 'filter-me',
+            'role' => '',
+            'position' => '',
+            'division_id' => '',
+            'tax_id' => '',
+            'verification_status' => '',
+        ];
+
+        $legalEntityProperty = new \ReflectionProperty(EmployeeIndex::class, 'legalEntity');
+        $legalEntityProperty->setValue($component, $legalEntity);
+
+        $query = Party::query();
+        $method = new ReflectionMethod(EmployeeIndex::class, 'applyDatabaseFilters');
+        $method->invoke($component, $query);
+
+        $ids = $query->pluck('id');
+
+        $this->assertStringContainsString('users', $query->toSql());
+        $this->assertContains($party->id, $ids->all());
+        $this->assertCount(1, $ids);
+    }
+
     /**
      * @return array<string, array{0: string}>
      */
