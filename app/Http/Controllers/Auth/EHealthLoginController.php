@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Auth\EHealth\Services\TokenStorage;
 use App\Classes\eHealth\Exceptions\ApiException;
 use App\Classes\eHealth\Request as EHealthRequest;
+use App\Support\EHealthUnsupportedScopes;
 use Illuminate\Contracts\Validation\Validator as ResponseValidator;
 
 class EHealthLoginController extends Controller
@@ -123,10 +124,10 @@ class EHealthLoginController extends Controller
 
         Session::forget('mis_2fa');
 
-        $ehealthScopes = explode(
+        $ehealthScopes = EHealthUnsupportedScopes::filter(explode(
             ' ',
             trim(data_get($validatedEHealthTokenData, 'details.scope'))
-        );
+        ));
 
         $user->syncPermissions($ehealthScopes);
 
@@ -322,7 +323,9 @@ class EHealthLoginController extends Controller
                         return;
                     }
 
-                    $scopesReceived = explode(' ', $value);
+                    // eHealth may still return obsolete scopes on role tokens
+                    // (e.g. party_verification:read) even though authorize must not request them.
+                    $scopesReceived = EHealthUnsupportedScopes::filter(explode(' ', $value));
                     $scopesAvailable = collect(config('ehealth.roles'))
                         ->flatten()
                         ->unique()

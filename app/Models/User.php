@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Auth;
 use Spatie\Permission\Traits\HasRoles;
 use Eloquence\Behaviours\HasCamelCasing;
 use App\Models\Employee\EmployeeRequest;
+use App\Support\EHealthUnsupportedScopes;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Builder;
 use Spatie\Permission\PermissionRegistrar;
@@ -357,14 +358,10 @@ class User extends Authenticatable implements MustVerifyEmail
     public function getScopes(): string
     {
         // eHealth rejects unknown scopes (e.g. party_verification:read) and auth fails with 500.
-        $unsupported = [
-            'party_verification:read',
-        ];
-
         return $this->getAllPermissions()
             ->pluck('name')
             ->unique()
-            ->reject(fn (string $name) => in_array($name, $unsupported, true))
+            ->reject(fn (string $name) => EHealthUnsupportedScopes::contains($name))
             ->values()
             ->join(' ');
     }
