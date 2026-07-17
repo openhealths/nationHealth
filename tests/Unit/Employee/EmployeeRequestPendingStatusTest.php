@@ -66,26 +66,15 @@ class EmployeeRequestPendingStatusTest extends TestCase
     }
 
     #[Test]
-    public function only_pending_ehealth_requests_are_eligible_for_individual_sync(): void
+    public function filter_choices_exclude_legacy_signed(): void
     {
-        $draft = new EmployeeRequest([
-            'status' => RequestStatus::NEW,
-            'uuid' => null,
-            'applied_at' => null,
-        ]);
-        $pending = new EmployeeRequest([
-            'status' => RequestStatus::NEW,
-            'uuid' => '44444444-4444-4444-4444-444444444444',
-            'applied_at' => null,
-        ]);
-        $approved = new EmployeeRequest([
-            'status' => RequestStatus::APPROVED,
-            'uuid' => '55555555-5555-5555-5555-555555555555',
-            'applied_at' => now(),
-        ]);
+        $values = array_map(
+            static fn (RequestStatus $status): string => $status->value,
+            RequestStatus::filterChoices()
+        );
 
-        $this->assertFalse($draft->isPendingEhealth());
-        $this->assertTrue($pending->isPendingEhealth());
-        $this->assertFalse($approved->isPendingEhealth());
+        $this->assertContains(RequestStatus::NEW->value, $values);
+        $this->assertContains(RequestStatus::APPROVED->value, $values);
+        $this->assertNotContains(RequestStatus::SIGNED->value, $values);
     }
 }
