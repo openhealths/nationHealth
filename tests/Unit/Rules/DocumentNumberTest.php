@@ -40,7 +40,8 @@ class DocumentNumberTest extends TestCase
             'passport latin letters' => ['PASSPORT', 'AA123456', 'Паспорт'],
             'passport with spaces' => ['PASSPORT', 'AA 123456', 'Паспорт'],
             'passport nine digits is national id format' => ['PASSPORT', '123456789', 'Паспорт'],
-            'national id too short' => ['NATIONAL_ID', '12345', '9 цифр'],
+            'national id too short' => ['NATIONAL_ID', '12345', '8 цифр'],
+            'national id nine digits without hyphen' => ['NATIONAL_ID', '123456789', '8 цифр'],
             'refugee wrong format' => ['REFUGEE_CERTIFICATE', '1234567890', 'Посвідчення біженця'],
         ];
     }
@@ -49,7 +50,7 @@ class DocumentNumberTest extends TestCase
     {
         return [
             'passport cyrillic series' => ['PASSPORT', 'АА123456'],
-            'national id' => ['NATIONAL_ID', '123456789'],
+            'national id' => ['NATIONAL_ID', '12345678-12345'],
             'refugee certificate' => ['REFUGEE_CERTIFICATE', 'АА123456'],
             'permanent residence permit' => ['PERMANENT_RESIDENCE_PERMIT', 'АА123456'],
         ];
