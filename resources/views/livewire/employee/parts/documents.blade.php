@@ -7,38 +7,7 @@
                   modalDocument: new Doc(),
                   newDocument: false,
                   item: 0,
-                  dictionary: @js($this->dictionaries['DOCUMENT_TYPE']),
-                  seriesTypes: @js(\App\Support\EmployeeDocumentSeriesNumber::typesRequiringSeries()),
-                  needsSeries(type) {
-                      return this.seriesTypes.includes(type);
-                  },
-                  displayNumber(document) {
-                      if (this.needsSeries(document.type) && document.series) {
-                          return (document.series || '') + (document.number || '');
-                      }
-                      return document.number || '';
-                  },
-                  saveModalDocument() {
-                      const payload = Object.assign({}, this.modalDocument);
-                      if (!this.needsSeries(payload.type)) {
-                          payload.series = '';
-                      }
-                      if (this.newDocument) {
-                          this.documents.push(payload);
-                      } else {
-                          this.documents[this.item] = payload;
-                      }
-                      this.openModal = false;
-                  },
-                  isModalValid() {
-                      if (!(this.modalDocument.type && this.modalDocument.number && this.modalDocument.issuedAt)) {
-                          return false;
-                      }
-                      if (this.needsSeries(this.modalDocument.type) && !this.modalDocument.series) {
-                          return false;
-                      }
-                      return true;
-                  }
+                  dictionary: @js($this->dictionaries['DOCUMENT_TYPE'])
               }"
     >
         <legend class="legend">
@@ -50,9 +19,6 @@
         @enderror
 
         @foreach ($this->form->documents ?? [] as $index => $document)
-            @error("form.documents.{$index}.series")
-            <p class="text-error -mt-2 mb-2">{{ $message }}</p>
-            @enderror
             @error("form.documents.{$index}.number")
             <p class="text-error -mt-2 mb-2">{{ $message }}</p>
             @enderror
@@ -68,7 +34,7 @@
             <thead class="thead-input">
             <tr>
                 <th scope="col" class="td-input">{{ __('forms.document_type') }}</th>
-                <th scope="col" class="td-input">{{ __('forms.serial_and_number') }}</th>
+                <th scope="col" class="td-input">{{ __('forms.number') }} </th>
                 <th scope="col" class="td-input">{{ __('forms.issued_by') }}</th>
                 <th scope="col" class="td-input">{{ __('forms.issued_at') }}</th>
                 <th scope="col" class="td-input">{{ __('forms.actions') }}</th>
@@ -78,7 +44,7 @@
             <template x-for="(document, index) in documents" :key="index">
                 <tr>
                     <td class="td-input" x-text="dictionary[document.type]"></td>
-                    <td class="td-input" x-text="displayNumber(document)"></td>
+                    <td class="td-input" x-text="document.number"></td>
                     <td class="td-input" x-text="document.issuedBy"></td>
                     <td class="td-input" x-text="document.issuedAt"></td>
                     <td class="td-input">
@@ -133,9 +99,9 @@
 
             {{-- Button to trigger the modal --}}
             <button @click="
-                        openModal = true;
-                        newDocument = true;
-                        modalDocument = new Doc();
+                        openModal = true; {{-- Open the Modal --}}
+                        newDocument = true; {{-- We are adding a new document --}}
+                        modalDocument = new Doc(); {{-- Replace the data of the previous document with a new one--}}
                     "
                     @click.prevent
                     class="item-add my-5"
@@ -145,19 +111,21 @@
             </button>
 
             {{-- Modal --}}
-            <template x-teleport="body">
+            <template x-teleport="body"> {{-- This moves the modal at the end of the body tag --}}
                 <div x-show="openModal"
                      style="display: none"
                      @keydown.escape.prevent.stop="openModal = false"
                      role="dialog"
                      aria-modal="true"
                      x-id="['modal-title']"
-                     :aria-labelledby="$id('modal-title')"
+                     :aria-labelledby="$id('modal-title')" {{-- This associates the modal with unique ID --}}
                      class="modal"
                 >
 
+                    {{-- Overlay --}}
                     <div x-show="openModal" x-transition.opacity class="fixed inset-0 bg-black/25"></div>
 
+                    {{-- Panel --}}
                     <div x-show="openModal"
                          x-transition
                          @click="openModal = false"
@@ -168,51 +136,30 @@
                              class="modal-content h-fit w-full max-w-6xl rounded-2xl shadow-lg bg-white"
                         >
 
+                            {{-- Title --}}
                             <h3 class="modal-header" :id="$id('modal-title')">
                                 <span x-text="newDocument ? '{{ __('forms.add_document') }}' : '{{ __('forms.edit') . ' ' . __('forms.document') }}'"></span>
                             </h3>
 
+                            {{-- Content --}}
                             <form>
                                 <div class="form-row-modal">
                                     <div>
                                         <label for="documentType" class="label-modal">{{__('forms.document_type')}}<span class="text-red-600"> *</span></label>
-                                        <select x-model="modalDocument.type"
-                                                @change="if (!needsSeries(modalDocument.type)) { modalDocument.series = ''; }"
-                                                id="documentType" class="input-modal"
+                                        <select x-model="modalDocument.type" id="documentType" class="input-modal"
                                                 type="text" required>
                                             <option value="">{{__('forms.select_document_type')}}</option>
                                             @foreach($this->dictionaries['DOCUMENT_TYPE'] as $typeValue => $typeDescription)
                                                 <option value="{{$typeValue}}">{{$typeDescription}}</option>
                                             @endforeach
                                         </select>
+
                                     </div>
 
-                                    <template x-if="needsSeries(modalDocument.type)">
-                                        <div>
-                                            <label for="documentSeries" class="label-modal">{{__('forms.document_series')}}<span class="text-red-600"> *</span></label>
-                                            <input x-model="modalDocument.series"
-                                                   type="text"
-                                                   name="documentSeries"
-                                                   id="documentSeries"
-                                                   class="input-modal"
-                                                   maxlength="2"
-                                                   placeholder="АА"
-                                                   required>
-                                            <p class="mt-1 text-xs text-gray-500">{{ __('forms.document_series_hint') }}</p>
-                                        </div>
-                                    </template>
-
                                     <div>
-                                        <label for="documentNumber" class="label-modal">
-                                            <span x-text="needsSeries(modalDocument.type) ? '{{ __('forms.document_number_only') }}' : '{{ __('forms.document_number') }}'"></span>
-                                            <span class="text-red-600"> *</span>
-                                        </label>
+                                        <label for="documentNumber" class="label-modal">{{__('forms.document_number')}}<span class="text-red-600"> *</span></label>
                                         <input x-model="modalDocument.number" type="text" name="documentNumber"
-                                               id="documentNumber" class="input-modal" required
-                                               :placeholder="needsSeries(modalDocument.type) ? '123456' : ''">
-                                        <p class="mt-1 text-xs text-gray-500"
-                                           x-show="needsSeries(modalDocument.type)"
-                                           x-cloak>{{ __('forms.document_number_digits_hint') }}</p>
+                                               id="documentNumber" class="input-modal" required>
                                     </div>
 
                                     <div>
@@ -243,10 +190,10 @@
                                         {{__('forms.cancel')}}
                                     </button>
 
-                                    <button @click.prevent="saveModalDocument()"
+                                    <button @click.prevent="newDocument ? documents.push(modalDocument) : documents[item] = modalDocument; openModal = false"
                                             class="button-primary"
-                                            :class="{ 'opacity-50 cursor-not-allowed': !isModalValid() }"
-                                            :disabled="!isModalValid()">
+                                            :class="{ 'opacity-50 cursor-not-allowed': !(modalDocument.type && modalDocument.number && modalDocument.issuedAt) }"
+                                            :disabled="!(modalDocument.type && modalDocument.number && modalDocument.issuedAt)">
                                         {{__('forms.save')}}
                                     </button>
                                 </div>
@@ -266,33 +213,13 @@
      */
     class Doc {
         type = '';
-        series = '';
         number = '';
         issuedBy = '';
         issuedAt = '';
 
-        static seriesTypes = @js(\App\Support\EmployeeDocumentSeriesNumber::typesRequiringSeries());
-
         constructor(obj = null) {
             if (obj) {
                 Object.assign(this, obj);
-                this.splitIfNeeded();
-            }
-        }
-
-        needsSeries() {
-            return Doc.seriesTypes.includes(this.type);
-        }
-
-        splitIfNeeded() {
-            if (!this.needsSeries() || this.series || !this.number) {
-                return;
-            }
-
-            const match = String(this.number).match(/^(.{2})([0-9]+)$/u);
-            if (match) {
-                this.series = match[1];
-                this.number = match[2];
             }
         }
     }

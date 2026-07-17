@@ -27,7 +27,7 @@
 
 ## Phase 3 — Low / polish
 
-- [x] T030 **FR-GAP-323-DOC-SERIES**: Clarify PASSPORT series+number UX vs DocumentNumber rule
+- [x] T030 **FR-GAP-323-DOC-SERIES**: REVERTED / WAIVED — single «Серія/номер» field; format via DocumentNumber rule
 - [x] T031 Align delete-draft modal wording («чернетка») with status labels
 - [x] T032 PHPUnit coverage for T010–T022
 - [ ] T033 Full manual UAT via `quickstart.md`

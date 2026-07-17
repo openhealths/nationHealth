@@ -79,8 +79,8 @@
 1. Заповнити: прізвище*, ім’я*, по батькові (опц.), дата народження*, стать*, email*, телефони* (тип + номер).
 2. **З РНОКПП:** `tax_id` = валідний ІПН; `no_tax_id` = false.
 3. **Без РНОКПП:** `no_tax_id` = true; у `tax_id` — серія/номер документа; додати документ з `EMPLOYEE_IDENTITY_DOCUMENT_TYPES`.
-4. Документ: тип*, номер*, дата видачі*; орган (опц.).
-5. Для **PASSPORT**: окремо **серія** (2 кириличні літери) + **номер** (6 цифр), напр. АА + 123456.
+4. Документ: тип*, серія/номер* (одне поле), дата видачі*; орган (опц.).
+5. Для **PASSPORT**: у полі «Серія/номер документа» ввести комбіноване значення, напр. `АА123456` (2 кириличні літери + 6 цифр).
 6. Негатив: латинська серія `AA123456` → помилка формату UA.  
    □ PASS / □ FAIL  
 7. Негатив: тип «Свідоцтво про народження» відсутній у списку / відхиляється.  
@@ -301,7 +301,7 @@
 | # | Дія | Очікування | Результат |
 |---|-----|------------|-----------|
 | G1 | Створити OWNER як тип працівника | заборонено / приховано | □ |
-| G2 | Латиниця в серії паспорта | помилка DocumentNumber | □ |
+| G2 | Латиниця в серії/номері паспорта (`AA123456`) | помилка DocumentNumber | □ |
 | G3 | Пробіл у номері паспорта | помилка | □ |
 | G4 | MEDICAL тип без освіти | валідація required | □ |
 | G5 | Редагувати pending запит (NEW+uuid) напряму по URL | 403 / deny | □ |
@@ -325,7 +325,6 @@ vendor/bin/sail artisan test --compact \
   tests/Unit/Livewire/Employee/EmployeeFormPreparedDataTest.php \
   tests/Unit/Livewire/Employee/EmployeeDocumentTypesTest.php \
   tests/Unit/Employee/EmployeeRequestPendingStatusTest.php \
-  tests/Unit/Support/EmployeeDocumentSeriesNumberTest.php \
   tests/Unit/Rules/DocumentNumberTest.php \
   tests/Feature/Employee/EmployeeRequestStatusLabelTest.php \
   tests/Feature/Employee/EmployeeIndexAdminActionsTest.php \

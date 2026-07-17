@@ -18,7 +18,7 @@
 - [ ] A1 Create form opens for elevated roles
 - [ ] A2 Draft status «Новий»; no user-editable status field
 - [ ] A3 Position / type / start_date / division filled
-- [ ] A4 Party + identity doc; PASSPORT = series + number fields
+- [ ] A4 Party + identity doc; PASSPORT = single «Серія/номер документа» field
 - [ ] A5 Medical: exactly one primary speciality; two primaries fail
 - [ ] A6 «Завершити та підписати» → **preview modal** → KEP
 - [ ] A7 Success flash mentions **email invitation**

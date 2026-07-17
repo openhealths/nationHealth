@@ -27,7 +27,6 @@ use Illuminate\Validation\Rule;
 use App\Models\Employee\Employee;
 use App\Rules\UniqueEmailInLegalEntity;
 use App\Models\Employee\EmployeeRequest;
-use App\Support\EmployeeDocumentSeriesNumber;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class EmployeeForm extends Form
@@ -165,8 +164,7 @@ class EmployeeForm extends Form
             'form.party.aboutMyself' => __('forms.about_myself'),
             'form.party.phones.*.number' => __('forms.phone_number'),
             'form.party.phones.*.type' => __('forms.phone_type'),
-            'form.documents.*.number' => __('forms.document_number_only'),
-            'form.documents.*.series' => __('forms.document_series'),
+            'form.documents.*.number' => __('forms.document_number'),
             'form.documents.*.type' => __('forms.document_type'),
             'form.documents.*.issuedAt' => __('forms.document_issued_at'),
             'form.documents.*.expirationDate' => __('forms.document_expiration_date'),
@@ -223,38 +221,15 @@ class EmployeeForm extends Form
             ],
 
             'documents.*.type' => ['required', 'string', Rule::in($allowedDocumentTypes)],
-            'documents.*.series' => [
-                'nullable',
-                'string',
-                function ($attribute, $value, $fail) {
-                    $index = explode('.', $attribute)[1];
-                    $documentType = $this->documents[$index]['type'] ?? null;
-
-                    if (!EmployeeDocumentSeriesNumber::requiresSeries($documentType)) {
-                        return;
-                    }
-
-                    if (trim((string) $value) === '') {
-                        $fail(__('validation.custom.employee.document_series_required'));
-                    }
-                },
-            ],
             'documents.*.number' => [
                 'required',
                 'string',
                 function ($attribute, $value, $fail) {
                     $index = explode('.', $attribute)[1];
                     $documentType = $this->documents[$index]['type'] ?? null;
-                    $series = $this->documents[$index]['series'] ?? '';
-                    $combined = EmployeeDocumentSeriesNumber::combine(
-                        is_string($documentType) ? $documentType : null,
-                        is_string($series) ? $series : null,
-                        (string) $value
-                    );
-
                     if ($documentType) {
                         $validator = validator(
-                            ['number' => $combined],
+                            ['number' => $value],
                             ['number' => [new DocumentNumber($documentType)]]
                         );
                         if ($validator->fails()) {
@@ -263,7 +238,7 @@ class EmployeeForm extends Form
                             }
                         }
                     }
-                },
+                }
             ],
             'documents.*.issuedBy' => ['present', 'nullable', 'string'],
             'documents.*.issuedAt' => ['required', new DateFormat(), 'before_or_equal:today'],
@@ -407,14 +382,11 @@ class EmployeeForm extends Form
         // Only overwrite documents if the form is empty
         if ($documents->isNotEmpty() && empty($this->documents)) {
             $this->documents = $documents->map(function ($doc) {
-                $parts = EmployeeDocumentSeriesNumber::split($doc->type, $doc->number);
-
                 return [
                     'type' => $doc->type,
-                    'series' => $parts['series'],
-                    'number' => $parts['number'],
+                    'number' => $doc->number,
                     'issuedBy' => $doc->issuedBy,
-                    'issuedAt' => $doc->issuedAt,
+                    'issuedAt' => $doc->issuedAt
                 ];
             })->toArray();
         }
@@ -556,8 +528,7 @@ class EmployeeForm extends Form
                     $doc['issuedAt'] = convertToAppDateFormat($doc['issuedAt']);
                 }
             }
-            unset($doc);
-            $this->documents = $this->splitDocumentsForForm($docs);
+            $this->documents = $docs;
         }
 
         // --- doctor(specialist) data ---
@@ -643,8 +614,7 @@ class EmployeeForm extends Form
                             $doc['issuedAt'] = convertToAppDateFormat($doc['issuedAt']);
                         }
                     }
-                    unset($doc);
-                    $this->documents = $this->splitDocumentsForForm($docs);
+                    $this->documents = $docs;
                 }
 
                 if (empty($this->party['phones'][0]['number']) && !empty($revisionData['phones'])) {
@@ -652,25 +622,6 @@ class EmployeeForm extends Form
                 }
             }
         }
-    }
-
-    /**
-     * Split combined eHealth document numbers into series + number for the UI.
-     *
-     * @param  list<array<string, mixed>>  $documents
-     * @return list<array<string, mixed>>
-     */
-    private function splitDocumentsForForm(array $documents): array
-    {
-        return array_map(function (array $doc): array {
-            $type = is_string($doc['type'] ?? null) ? $doc['type'] : null;
-            $parts = EmployeeDocumentSeriesNumber::split($type, isset($doc['number']) ? (string) $doc['number'] : '');
-
-            $doc['series'] = $parts['series'];
-            $doc['number'] = $parts['number'];
-
-            return $doc;
-        }, $documents);
     }
 
     /**
@@ -711,10 +662,6 @@ class EmployeeForm extends Form
                 if (isset($doc['issuedAt'])) {
                     $formData['documents'][$key]['issuedAt'] = $toApiDate($doc['issuedAt']);
                 }
-
-                $formData['documents'][$key] = EmployeeDocumentSeriesNumber::normalizeForApi(
-                    $formData['documents'][$key]
-                );
             }
         }
 
