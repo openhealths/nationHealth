@@ -6,7 +6,7 @@ namespace Tests\Feature\Auth;
 
 use App\Http\Controllers\Auth\EHealthLoginController;
 use App\Models\LegalEntity;
-use App\Support\EHealthUnsupportedScopes;
+use App\Support\EHealthKnownScopes;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -31,7 +31,7 @@ class EHealthLoginScopeValidationTest extends TestCase
     }
 
     #[Test]
-    public function token_scope_validation_ignores_obsolete_party_verification_read(): void
+    public function token_scope_validation_ignores_unknown_scopes_when_known_remain(): void
     {
         $legalEntity = $this->createLegalEntity();
 
@@ -41,7 +41,7 @@ class EHealthLoginScopeValidationTest extends TestCase
         $payload = [
             'details' => [
                 'client_id' => $legalEntity->uuid,
-                'scope' => 'employee:read party_verification:read party_verification:details',
+                'scope' => 'employee:read legacy:obsolete:scope party_verification:details',
                 'refresh_token' => 'refresh-token',
             ],
             'user_id' => '11111111-1111-1111-1111-111111111111',
@@ -55,11 +55,11 @@ class EHealthLoginScopeValidationTest extends TestCase
     }
 
     #[Test]
-    public function unsupported_scopes_filter_strips_party_verification_read(): void
+    public function known_scopes_filter_keeps_only_ar_scopes(): void
     {
-        $filtered = EHealthUnsupportedScopes::filter([
+        $filtered = EHealthKnownScopes::filter([
             'employee:read',
-            'party_verification:read',
+            'legacy:obsolete:scope',
             'party_verification:details',
             '',
         ]);
@@ -71,7 +71,7 @@ class EHealthLoginScopeValidationTest extends TestCase
     }
 
     #[Test]
-    public function token_scope_validation_still_rejects_truly_unknown_scopes(): void
+    public function token_scope_validation_rejects_when_no_known_scopes_remain(): void
     {
         $legalEntity = $this->createLegalEntity();
 
@@ -81,7 +81,7 @@ class EHealthLoginScopeValidationTest extends TestCase
         $payload = [
             'details' => [
                 'client_id' => $legalEntity->uuid,
-                'scope' => 'employee:read totally:fake:scope',
+                'scope' => 'totally:fake:scope',
                 'refresh_token' => 'refresh-token',
             ],
             'user_id' => '11111111-1111-1111-1111-111111111111',

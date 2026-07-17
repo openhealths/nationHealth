@@ -24,8 +24,7 @@ class PartyVerificationSync extends EHealthJob
     public const string SCOPE_REQUIRED = 'party_verification:details';
 
     /**
-     * Sync via GET /api/parties/{id}/verification (party_verification:details)
-     * instead of GET /api/parties/verifications (party_verification:read).
+     * Sync via GET /api/parties/{id}/verification (party_verification:details).
      */
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse|null
     {

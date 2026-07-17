@@ -24,8 +24,8 @@ class Party extends EHealthRequest
 
     /**
      * Fetches a paginated list of party verification statuses.
-     * Prefer getDetails() in app code: this list endpoint requires party_verification:read,
-     * while roles typically only have party_verification:details.
+     * Prefer getDetails() in app code: roles use party_verification:details
+     * (GET /api/parties/{id}/verification), not this list endpoint.
      *
      * @param  array  $filters  An array of filters to apply to the query.
      * @param  int  $page

@@ -12,11 +12,11 @@ use Tests\TestCase;
 class UserScopesFilterTest extends TestCase
 {
     #[Test]
-    public function get_scopes_strips_unsupported_party_verification_read(): void
+    public function get_scopes_keeps_only_known_ar_scopes(): void
     {
         $user = Mockery::mock(User::class)->makePartial();
         $user->shouldReceive('getAllPermissions')->andReturn(collect([
-            (object) ['name' => 'party_verification:read'],
+            (object) ['name' => 'legacy:obsolete:scope'],
             (object) ['name' => 'party_verification:details'],
             (object) ['name' => 'party_verification:write'],
             (object) ['name' => 'employee:deactivate'],
@@ -24,7 +24,7 @@ class UserScopesFilterTest extends TestCase
 
         $scopes = $user->getScopes();
 
-        $this->assertStringNotContainsString('party_verification:read', $scopes);
+        $this->assertStringNotContainsString('legacy:obsolete:scope', $scopes);
         $this->assertStringContainsString('party_verification:details', $scopes);
         $this->assertStringContainsString('party_verification:write', $scopes);
         $this->assertStringContainsString('employee:deactivate', $scopes);

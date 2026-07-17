@@ -102,7 +102,6 @@ class PartyVerificationIndex extends Component
 
     /**
      * Enrich current page via GET /api/parties/{id}/verification (party_verification:details).
-     * Replaces GET /api/parties/verifications which requires party_verification:read.
      *
      * @param  Collection<int, array<string, mixed>>  $pageItems
      * @return Collection<int, array<string, mixed>>

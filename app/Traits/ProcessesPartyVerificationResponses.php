@@ -87,7 +87,6 @@ trait ProcessesPartyVerificationResponses
 
     /**
      * Processes GET /api/parties/{id}/verification (party_verification:details).
-     * Replaces list endpoint GET /api/parties/verifications which requires party_verification:read.
      */
     private function processPartyVerificationDetail(
         string $partyUuid,
