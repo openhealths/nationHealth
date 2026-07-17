@@ -21,7 +21,7 @@ class DocumentNumber implements ValidationRule
 
         $isValid = match ($this->type) {
             'PASSPORT' => (bool) preg_match('/^((?![ЫЪЭЁ])([А-ЯҐЇІЄ])){2}[0-9]{6}$/u', (string) $value),
-            'NATIONAL_ID' => (bool) preg_match('/^[0-9]{8}-[0-9]{5}$/u', (string) $value),
+            'NATIONAL_ID' => (bool) preg_match('/^[0-9]{9}$/u', (string) $value),
             'BIRTH_CERTIFICATE' => (bool) preg_match('/^((I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|[0-9А-ЯІЄЇ-]{2,})\-?[А-ЯІЄЇ]{2})?\d{6}$/u', (string) $value),
             'MARRIAGE_CERTIFICATE' => (bool) preg_match('/^((I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|[0-9А-ЯІЄЇ-]{2,})\-?[А-ЯІЄЇ]{2})?\d{6}$/u', (string) $value),
             'COMPLEMENTARY_PROTECTION_CERTIFICATE' => (bool) preg_match('/^((?![ЫЪЭЁ])([А-ЯҐЇІЄ])){2}[0-9]{6}$/u', (string) $value),
