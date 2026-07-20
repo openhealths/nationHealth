@@ -411,7 +411,15 @@ class EmployeeRequest extends EHealthRequest
             'properties' => [
                 'type' => [
                     'type' => 'string',
-                    'enum' => ['PASSPORT', 'NATIONAL_ID', 'BIRTH_CERTIFICATE', 'TEMPORARY_CERTIFICATE'],
+                    'enum' => [
+                        'PASSPORT',
+                        'NATIONAL_ID',
+                        'COMPLEMENTARY_PROTECTION_CERTIFICATE',
+                        'PERMANENT_RESIDENCE_PERMIT',
+                        'REFUGEE_CERTIFICATE',
+                        'TEMPORARY_CERTIFICATE',
+                        'TEMPORARY_PASSPORT',
+                    ],
                 ],
                 'number' => ['type' => 'string'],
             ],
