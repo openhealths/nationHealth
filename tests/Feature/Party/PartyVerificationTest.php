@@ -6,11 +6,14 @@ namespace Tests\Feature\Party;
 
 use App\Classes\eHealth\Api\Party as PartyApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Livewire\Party\PartyVerificationIndex;
+use App\Livewire\Party\PartyVerify;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -46,7 +49,10 @@ class PartyVerificationTest extends TestCase
         );
     }
 
-    public function test_verification_index_renders_and_filters_using_details_scope(): void
+    /**
+     * @return array{legalEntity: LegalEntity, party: Party, user: User}
+     */
+    private function createVerificationFixture(string $verificationStatus = 'NOT_VERIFIED'): array
     {
         $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
             ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
@@ -66,7 +72,7 @@ class PartyVerificationTest extends TestCase
             'tax_id' => '1234567890',
             'birth_date' => '1990-01-01',
             'gender' => 'MALE',
-            'verification_status' => 'NOT_VERIFIED',
+            'verification_status' => $verificationStatus,
         ]);
 
         $user = User::create([
@@ -92,11 +98,31 @@ class PartyVerificationTest extends TestCase
 
         $this->grantPartyVerificationPermissions($user, $legalEntity);
         $this->actingAs($user);
+        $this->instance('legalEntity', $legalEntity);
 
-        session()->put(config('ehealth.api.oauth.bearer_token'), 'test-token');
+        return compact('legalEntity', 'party', 'user');
+    }
+
+    public function test_verification_index_renders_local_data_without_api_calls(): void
+    {
+        ['legalEntity' => $legalEntity, 'party' => $party] = $this->createVerificationFixture('NOT_VERIFIED');
 
         $mockPartyApi = Mockery::mock(PartyApi::class);
-        $mockPartyApi->shouldReceive('withToken')->andReturnSelf();
+        $mockPartyApi->shouldNotReceive('getDetails');
+        $this->instance(PartyApi::class, $mockPartyApi);
+
+        Livewire::test(PartyVerificationIndex::class, ['legalEntity' => $legalEntity])
+            ->assertSee($party->fullName)
+            ->assertSeeHtml('NOT_VERIFIED')
+            ->set('dracsDeathStatus', 'NOT_VERIFIED')
+            ->assertHasNoErrors();
+    }
+
+    public function test_verification_index_sync_fetches_details_from_ehealth(): void
+    {
+        ['legalEntity' => $legalEntity, 'party' => $party] = $this->createVerificationFixture('VERIFICATION_NEEDED');
+
+        $mockPartyApi = Mockery::mock(PartyApi::class);
         $this->instance(PartyApi::class, $mockPartyApi);
 
         $detailPayload = [
@@ -111,124 +137,42 @@ class PartyVerificationTest extends TestCase
         $mockResponse->shouldReceive('json')->andReturn($detailPayload);
 
         $mockPartyApi->shouldReceive('getDetails')
+            ->once()
             ->with($party->uuid)
             ->andReturn($mockResponse);
 
-        Livewire::test(\App\Livewire\Party\PartyVerificationIndex::class, ['legalEntity' => $legalEntity])
-            ->assertSee($party->fullName)
-            ->assertSeeHtml('NOT_VERIFIED')
-            ->set('dracsDeathStatus', 'NOT_VERIFIED')
+        Livewire::test(PartyVerificationIndex::class, ['legalEntity' => $legalEntity])
+            ->call('sync')
             ->assertHasNoErrors();
+
+        $this->assertSame('NOT_VERIFIED', $party->fresh()->verification_status);
+
+        $cached = Cache::get('party_verification_details:' . $party->uuid);
+        $this->assertSame('NOT_VERIFIED', $cached['details']['dracs_death']['verification_status']);
     }
 
-    public function test_verification_index_shows_local_parties_when_details_api_fails(): void
+    public function test_verification_index_sync_keeps_local_data_when_api_fails(): void
     {
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
-
-        $legalEntity = LegalEntity::create([
-            'uuid' => (string) Str::uuid(),
-            'status' => 'ACTIVE',
-            'sync_status' => 'COMPLETED',
-            'legal_entity_type_id' => $typeId,
-            'is_active' => true,
-        ]);
-
-        $party = Party::create([
-            'uuid' => (string) Str::uuid(),
-            'first_name' => 'Admin',
-            'last_name' => 'Local',
-            'tax_id' => '0987654321',
-            'birth_date' => '1985-05-05',
-            'gender' => 'MALE',
-            'verification_status' => 'VERIFICATION_NEEDED',
-        ]);
-
-        $user = User::create([
-            'uuid' => (string) Str::uuid(),
-            'email' => 'admin-verif@example.com',
-            'password' => Hash::make('password'),
-            'party_id' => $party->id,
-        ]);
-
-        $employee = Employee::create([
-            'uuid' => (string) Str::uuid(),
-            'full_name' => 'Admin Local',
-            'employee_type' => \App\Enums\User\Role::ADMIN->value,
-            'status' => \App\Enums\Status::APPROVED->value,
-            'legal_entity_id' => $legalEntity->id,
-            'is_active' => true,
-            'position' => 'Administrator',
-            'start_date' => now()->format('Y-m-d'),
-            'user_id' => $user->id,
-            'party_id' => $party->id,
-        ]);
-        $user->employees()->attach($employee->id);
-
-        $this->grantPartyVerificationPermissions($user, $legalEntity);
-        $this->actingAs($user);
-
-        session()->put(config('ehealth.api.oauth.bearer_token'), 'test-token');
+        ['legalEntity' => $legalEntity, 'party' => $party] = $this->createVerificationFixture('VERIFICATION_NEEDED');
 
         $mockPartyApi = Mockery::mock(PartyApi::class);
-        $mockPartyApi->shouldReceive('withToken')->andReturnSelf();
         $this->instance(PartyApi::class, $mockPartyApi);
 
         $mockPartyApi->shouldReceive('getDetails')
             ->with($party->uuid)
             ->andThrow(new \RuntimeException('API unavailable'));
 
-        Livewire::test(\App\Livewire\Party\PartyVerificationIndex::class, ['legalEntity' => $legalEntity])
+        Livewire::test(PartyVerificationIndex::class, ['legalEntity' => $legalEntity])
+            ->call('sync')
             ->assertSee($party->fullName)
             ->assertSeeHtml('VERIFICATION_NEEDED');
+
+        $this->assertSame('VERIFICATION_NEEDED', $party->fresh()->verification_status);
     }
 
     public function test_party_verify_allows_updating_status(): void
     {
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
-
-        $legalEntity = LegalEntity::create([
-            'uuid' => (string) Str::uuid(),
-            'status' => 'ACTIVE',
-            'sync_status' => 'COMPLETED',
-            'legal_entity_type_id' => $typeId,
-            'is_active' => true,
-        ]);
-
-        $party = Party::create([
-            'uuid' => (string) Str::uuid(),
-            'first_name' => 'John',
-            'last_name' => 'Doe',
-            'tax_id' => '1234567890',
-            'birth_date' => '1990-01-01',
-            'gender' => 'MALE',
-            'verification_status' => 'NOT_VERIFIED',
-        ]);
-
-        $user = User::create([
-            'uuid' => (string) Str::uuid(),
-            'email' => 'hr@example.com',
-            'password' => Hash::make('password'),
-            'party_id' => $party->id,
-        ]);
-
-        $employee = Employee::create([
-            'uuid' => (string) Str::uuid(),
-            'full_name' => 'John Doe',
-            'employee_type' => \App\Enums\User\Role::HR->value,
-            'status' => \App\Enums\Status::APPROVED->value,
-            'legal_entity_id' => $legalEntity->id,
-            'is_active' => true,
-            'position' => 'HR Manager',
-            'start_date' => now()->format('Y-m-d'),
-            'user_id' => $user->id,
-            'party_id' => $party->id,
-        ]);
-        $user->employees()->attach($employee->id);
-
-        $this->grantPartyVerificationPermissions($user, $legalEntity);
-        $this->actingAs($user);
+        ['legalEntity' => $legalEntity, 'party' => $party] = $this->createVerificationFixture('NOT_VERIFIED');
 
         $mockPartyApi = Mockery::mock(PartyApi::class);
         $this->instance(PartyApi::class, $mockPartyApi);
@@ -272,7 +216,7 @@ class PartyVerificationTest extends TestCase
             ->once()
             ->andReturn($updateResponse);
 
-        Livewire::test(\App\Livewire\Party\PartyVerify::class, ['legalEntity' => $legalEntity, 'party' => $party])
+        Livewire::test(PartyVerify::class, ['legalEntity' => $legalEntity, 'party' => $party])
             ->assertSet('canUpdateVerification', true)
             ->call('checkAndOpenModal')
             ->assertSet('showUpdateModal', true)
@@ -292,49 +236,7 @@ class PartyVerificationTest extends TestCase
 
     public function test_party_verify_shows_dms_passport_warning_when_not_verified(): void
     {
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
-
-        $legalEntity = LegalEntity::create([
-            'uuid' => (string) Str::uuid(),
-            'status' => 'ACTIVE',
-            'sync_status' => 'COMPLETED',
-            'legal_entity_type_id' => $typeId,
-            'is_active' => true,
-        ]);
-
-        $party = Party::create([
-            'uuid' => (string) Str::uuid(),
-            'first_name' => 'John',
-            'last_name' => 'Doe',
-            'tax_id' => '1234567890',
-            'birth_date' => '1990-01-01',
-            'gender' => 'MALE',
-        ]);
-
-        $user = User::create([
-            'uuid' => (string) Str::uuid(),
-            'email' => 'hr-dms@example.com',
-            'password' => Hash::make('password'),
-            'party_id' => $party->id,
-        ]);
-
-        $employee = Employee::create([
-            'uuid' => (string) Str::uuid(),
-            'full_name' => 'John Doe',
-            'employee_type' => \App\Enums\User\Role::HR->value,
-            'status' => \App\Enums\Status::APPROVED->value,
-            'legal_entity_id' => $legalEntity->id,
-            'is_active' => true,
-            'position' => 'HR Manager',
-            'start_date' => now()->format('Y-m-d'),
-            'user_id' => $user->id,
-            'party_id' => $party->id,
-        ]);
-        $user->employees()->attach($employee->id);
-
-        $this->grantPartyVerificationPermissions($user, $legalEntity);
-        $this->actingAs($user);
+        ['legalEntity' => $legalEntity, 'party' => $party] = $this->createVerificationFixture();
 
         $mockPartyApi = Mockery::mock(PartyApi::class);
         $this->instance(PartyApi::class, $mockPartyApi);
@@ -363,7 +265,7 @@ class PartyVerificationTest extends TestCase
             ->with($party->uuid)
             ->andReturn($mockResponse);
 
-        Livewire::test(\App\Livewire\Party\PartyVerify::class, ['legalEntity' => $legalEntity, 'party' => $party])
+        Livewire::test(PartyVerify::class, ['legalEntity' => $legalEntity, 'party' => $party])
             ->assertSee('Увага! Персональні дані працівника потребують перевірки:', false)
             ->assertSee('Зазначений паспорт працівника не дійсний за даними ДМС', false)
             ->assertSee('ДПС, ДРАЦСГ або ДМС', false)

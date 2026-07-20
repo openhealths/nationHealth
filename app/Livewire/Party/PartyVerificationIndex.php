@@ -7,9 +7,12 @@ namespace App\Livewire\Party;
 use App\Classes\eHealth\EHealth;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
+use App\Traits\ProcessesPartyVerificationResponses;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -17,11 +20,19 @@ use Throwable;
 
 class PartyVerificationIndex extends Component
 {
+    use AuthorizesRequests;
+    use ProcessesPartyVerificationResponses;
     use WithPagination;
+
+    private const string DETAILS_CACHE_PREFIX = 'party_verification_details:';
+
+    private const int DETAILS_CACHE_TTL_SECONDS = 86400;
 
     public LegalEntity $legalEntity;
 
     public string $dracsDeathStatus = '';
+
+    public bool $isSyncing = false;
 
     public function updatedDracsDeathStatus(): void
     {
@@ -30,10 +41,48 @@ class PartyVerificationIndex extends Component
 
     public function mount(LegalEntity $legalEntity): void
     {
-        if (!Auth::user()?->can('party_verification:details')) {
-            abort(403, __('forms.no_actions_available'));
-        }
         $this->legalEntity = $legalEntity;
+    }
+
+    public function sync(): void
+    {
+        $this->authorize('syncVerification', Party::class);
+
+        if ($this->isSyncing) {
+            return;
+        }
+
+        $this->isSyncing = true;
+
+        try {
+            $parties = Party::query()
+                ->whereHas(
+                    'employees',
+                    fn ($query) => $query->where('legal_entity_id', $this->legalEntity->id)
+                )
+                ->whereNotNull('uuid')
+                ->orderBy('id')
+                ->get();
+
+            foreach ($parties as $party) {
+                try {
+                    $response = EHealth::party()->getDetails($party->uuid);
+
+                    $this->processPartyVerificationDetail($party->uuid, $response, $this->legalEntity);
+                    $this->cacheVerificationDetails($party->uuid, $response);
+                } catch (Throwable $e) {
+                    Log::warning('Failed to fetch party verification details during sync', [
+                        'party_uuid' => $party->uuid,
+                        'error' => $e->getMessage(),
+                        'user_id' => Auth::id(),
+                    ]);
+                }
+            }
+
+            session()->flash('success', __('party_verification.messages.sync_success'));
+        } finally {
+            $this->isSyncing = false;
+        }
     }
 
     public function render(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\View\View
@@ -42,7 +91,7 @@ class PartyVerificationIndex extends Component
 
         if (!empty($this->dracsDeathStatus)) {
             $localItems = $localItems->filter(
-                fn (array $item) => ($item['verification_status'] ?? null) === $this->dracsDeathStatus
+                fn (array $item) => ($item['details']['dracs_death']['verification_status'] ?? null) === $this->dracsDeathStatus
             )->values();
         }
 
@@ -52,11 +101,8 @@ class PartyVerificationIndex extends Component
             ->slice(($this->getPage() - 1) * $perPage, $perPage)
             ->values();
 
-        $token = session()->get(config('ehealth.api.oauth.bearer_token'));
-        $enriched = $this->enrichPageWithDetails($pageItems, $token);
-
         $paginator = new LengthAwarePaginator(
-            $enriched,
+            $pageItems,
             $total,
             $perPage,
             $this->getPage(),
@@ -70,7 +116,7 @@ class PartyVerificationIndex extends Component
 
     /**
      * Local parties for the current legal entity (list source).
-     * Stream statuses are filled later via getDetails (party_verification:details).
+     * Stream statuses come from cache after manual sync, otherwise from local verification_status.
      */
     private function localVerificationItems(): Collection
     {
@@ -84,6 +130,17 @@ class PartyVerificationIndex extends Component
             ->orderBy('first_name')
             ->get()
             ->map(function (Party $party) {
+                $cached = Cache::get(self::DETAILS_CACHE_PREFIX . $party->uuid);
+                if (is_array($cached)) {
+                    return [
+                        'party_id' => $party->uuid,
+                        'party_name' => $party->fullName,
+                        'local_id' => $party->id,
+                        'verification_status' => $cached['verification_status'],
+                        'details' => $cached['details'],
+                    ];
+                }
+
                 $status = $party->verification_status ?: '-';
 
                 return [
@@ -100,59 +157,25 @@ class PartyVerificationIndex extends Component
             ->values();
     }
 
-    /**
-     * Enrich current page via GET /api/parties/{id}/verification (party_verification:details).
-     *
-     * @param  Collection<int, array<string, mixed>>  $pageItems
-     * @return Collection<int, array<string, mixed>>
-     */
-    private function enrichPageWithDetails(Collection $pageItems, ?string $token): Collection
+    private function cacheVerificationDetails(string $partyUuid, mixed $response): void
     {
-        if (empty($token) || $pageItems->isEmpty()) {
-            return $pageItems;
-        }
+        $payload = $response->json();
+        $data = is_array($payload['data'] ?? null) ? $payload['data'] : $payload;
 
-        return $pageItems->map(function (array $item) use ($token) {
-            $uuid = $item['party_id'] ?? null;
-            if (!is_string($uuid) || $uuid === '') {
-                return $item;
-            }
-
-            try {
-                $response = EHealth::party()
-                    ->withToken($token)
-                    ->getDetails($uuid);
-
-                $payload = $response->json();
-                $data = is_array($payload['data'] ?? null) ? $payload['data'] : $payload;
-                $fallback = $item['verification_status'] ?? '-';
-
-                $item['verification_status'] = data_get($data, 'verification_status', $fallback) ?: $fallback;
-                $item['details'] = [
+        Cache::put(
+            self::DETAILS_CACHE_PREFIX . $partyUuid,
+            [
+                'verification_status' => data_get($data, 'verification_status'),
+                'details' => [
                     'drfo' => [
-                        'verification_status' => data_get($data, 'details.drfo.verification_status', $fallback) ?: $fallback,
+                        'verification_status' => data_get($data, 'details.drfo.verification_status'),
                     ],
                     'dracs_death' => [
-                        'verification_status' => data_get($data, 'details.dracs_death.verification_status', $fallback) ?: $fallback,
+                        'verification_status' => data_get($data, 'details.dracs_death.verification_status'),
                     ],
-                ];
-
-                $remoteStatus = data_get($data, 'verification_status');
-                if (is_string($remoteStatus) && $remoteStatus !== '') {
-                    Party::query()
-                        ->where('uuid', $uuid)
-                        ->where('verification_status', '!=', $remoteStatus)
-                        ->update(['verification_status' => $remoteStatus]);
-                }
-            } catch (Throwable $e) {
-                Log::warning('Failed to fetch party verification details', [
-                    'party_uuid' => $uuid,
-                    'error' => $e->getMessage(),
-                    'user_id' => Auth::id(),
-                ]);
-            }
-
-            return $item;
-        })->values();
+                ],
+            ],
+            self::DETAILS_CACHE_TTL_SECONDS
+        );
     }
 }
