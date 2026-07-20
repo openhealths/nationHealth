@@ -87,8 +87,8 @@ class EmployeeEdit extends AbstractEmployeeFormManager
                 $preparedData['start_date'] = \Carbon\Carbon::parse($this->employee->startDate)->format('Y-m-d');
             }
 
-            $preparedData['tax_id'] = $this->employee->party->tax_id;
-            $preparedData['no_tax_id'] = $this->employee->party->no_tax_id;
+            $preparedData['tax_id'] = $this->employee->party->taxId;
+            $preparedData['no_tax_id'] = $this->employee->party->noTaxId;
             if ($this->employee->party->birthDate) {
                 $preparedData['birth_date'] = \Carbon\Carbon::parse($this->employee->party->birthDate)->format('Y-m-d');
             }
