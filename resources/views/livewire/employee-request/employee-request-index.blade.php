@@ -112,11 +112,9 @@
                                     @if($request->isLocalDraft())
                                         <span class="badge-red">{{ __('forms.status.draft') }}</span>
                                     @elseif($request->isPendingEhealth())
-                                        <span class="badge-yellow">{{ __('forms.status.new') }}</span>
-                                    @elseif($request->status == \App\Enums\Employee\RequestStatus::APPROVED)
-                                        <span class="badge-green">{{ $request->status->label() }}</span>
-                                    @else
-                                        <span class="badge-gray">{{ $request->status->label() }}</span>
+                                        <span class="{{ $request->status->color() }}">{{ __('forms.status.new') }}</span>
+                                    @elseif($request->status)
+                                        <span class="{{ $request->status->color() }}">{{ $request->status->label() }}</span>
                                     @endif
                                 </td>
 

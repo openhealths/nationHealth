@@ -28,6 +28,15 @@ enum RequestStatus: string
         };
     }
 
+    public function color(): string
+    {
+        return match ($this) {
+            self::NEW, self::SIGNED => 'badge-yellow',
+            self::APPROVED => 'badge-green',
+            self::REJECTED, self::EXPIRED => 'badge-red',
+        };
+    }
+
     /**
      * Statuses that may still need sync against eHealth after login.
      * NEW covers drafts and submitted-but-unresolved requests; SIGNED is legacy.

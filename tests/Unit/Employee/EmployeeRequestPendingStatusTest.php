@@ -53,11 +53,24 @@ class EmployeeRequestPendingStatusTest extends TestCase
     }
 
     #[Test]
-    public function applied_request_is_neither_draft_nor_pending(): void
+    public function submitted_new_with_applied_at_is_still_pending(): void
     {
         $request = new EmployeeRequest([
             'status' => RequestStatus::NEW,
             'uuid' => '33333333-3333-3333-3333-333333333333',
+            'applied_at' => now(),
+        ]);
+
+        $this->assertFalse($request->isLocalDraft());
+        $this->assertTrue($request->isPendingEhealth());
+    }
+
+    #[Test]
+    public function approved_request_is_neither_draft_nor_pending(): void
+    {
+        $request = new EmployeeRequest([
+            'status' => RequestStatus::APPROVED,
+            'uuid' => '44444444-4444-4444-4444-444444444444',
             'applied_at' => now(),
         ]);
 
