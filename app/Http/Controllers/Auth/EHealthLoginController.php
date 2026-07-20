@@ -26,7 +26,6 @@ use Illuminate\Support\Facades\Validator;
 use App\Auth\EHealth\Services\TokenStorage;
 use App\Classes\eHealth\Exceptions\ApiException;
 use App\Classes\eHealth\Request as EHealthRequest;
-use App\Support\EHealthKnownScopes;
 use Illuminate\Contracts\Validation\Validator as ResponseValidator;
 
 class EHealthLoginController extends Controller
@@ -124,24 +123,21 @@ class EHealthLoginController extends Controller
 
         Session::forget('mis_2fa');
 
-        $ehealthScopes = EHealthKnownScopes::filter(preg_split(
-            '/\s+/',
-            trim(data_get($validatedEHealthTokenData, 'details.scope', ''))
-        ) ?: []);
+        $ehealthScopes = explode(
+            ' ',
+            trim(data_get($validatedEHealthTokenData, 'details.scope'))
+        );
 
-        $user->syncEhealthTokenPermissions($ehealthScopes);
+        $user->syncPermissions($ehealthScopes);
 
         EHealthUserLogin::dispatch($user, $legalEntity, $authUserUUID, $this->isFirstLogin, $loginedGuard);
-
-        // Role is only needed during token exchange / first-login role sync listeners above.
-        Session::forget('first_login_role');
 
         $user->refresh();
 
         if (!$user->party) {
 
             Session::put('selected_legal_entity_uuid', $legalEntity->uuid);
-            $user->syncEhealthTokenPermissions($ehealthScopes);
+            $user->syncPermissions($ehealthScopes);
 
             return Redirect::route('party.verify');
         }
@@ -150,7 +146,7 @@ class EHealthLoginController extends Controller
             Log::info(__('auth.login.success.user_auth', [], 'en'), ['User ID' => $user->id]);
 
             // Respect EHealth scopes
-            $user->syncEhealthTokenPermissions($ehealthScopes);
+            $user->syncPermissions($ehealthScopes);
 
             return Redirect::route('dashboard', [$legalEntity])->with(
                 'success',

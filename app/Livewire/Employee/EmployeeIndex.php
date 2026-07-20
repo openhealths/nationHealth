@@ -303,31 +303,8 @@ class EmployeeIndex extends EmployeeComponent
         }
 
         try {
-            // Prefer the user's own token when it already has employee:deactivate.
-            $user = Auth::user();
-            $ehealthEmployeeService = EHealth::employee();
-            $misApplied = ehealthApplyMisProxy(
-                $ehealthEmployeeService,
-                $user,
-                $this->legalEntity->id,
-                'employee:deactivate'
-            );
-
-            try {
-                $response = $ehealthEmployeeService->deactivate($employee->uuid, $formattedEndDate);
-            } catch (\App\Exceptions\EHealth\EHealthResponseException $e) {
-                if (!$misApplied && $user && ehealthIsMissingScopeError($e, 'employee:deactivate')) {
-                    $retryService = EHealth::employee();
-
-                    if (ehealthApplyMisProxy($retryService, $user, $this->legalEntity->id, 'employee:deactivate', force: true)) {
-                        $response = $retryService->deactivate($employee->uuid, $formattedEndDate);
-                    } else {
-                        throw $e;
-                    }
-                } else {
-                    throw $e;
-                }
-            }
+            // 2. eHealth API Call using formatted string
+            $response = EHealth::employee()->deactivate($employee->uuid, $formattedEndDate);
 
             if (!empty($response)) {
                 // 3. Updates in the local database

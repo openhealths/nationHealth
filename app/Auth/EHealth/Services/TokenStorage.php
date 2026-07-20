@@ -20,8 +20,6 @@ class TokenStorage
 
     protected string $refreshTokenKey = 'refresh_token';
 
-    protected string $scopesKey = 'ehealth_token_scopes';
-
     public function __construct()
     {
         $this->tokenKey = config('ehealth.api.oauth.bearer_token');
@@ -38,13 +36,6 @@ class TokenStorage
         Session::put($this->tokenKey, $tokenData['value']);
         Session::put($this->expiresAtKey, $tokenData['expires_at']);
         Session::put($this->refreshTokenKey, $tokenData['details']['refresh_token']);
-
-        // Opaque eHealth tokens are not JWTs — persist granted scopes from the token response.
-        $scope = data_get($tokenData, 'details.scope');
-        if (is_string($scope) && trim($scope) !== '') {
-            Session::put($this->scopesKey, preg_split('/\s+/', trim($scope)) ?: []);
-        }
-
         Session::save();
     }
 
@@ -61,21 +52,6 @@ class TokenStorage
     public function getRefreshToken(): string
     {
         return Session::get($this->refreshTokenKey);
-    }
-
-    /**
-     * @return list<string>
-     */
-    public function getScopes(): array
-    {
-        $scopes = Session::get($this->scopesKey, []);
-
-        return is_array($scopes) ? array_values(array_filter($scopes, 'is_string')) : [];
-    }
-
-    public function hasScope(string $requiredScope): bool
-    {
-        return in_array($requiredScope, $this->getScopes(), true);
     }
 
     public function getExpiresAt(): Carbon
@@ -95,8 +71,7 @@ class TokenStorage
         Session::forget([
             $this->tokenKey,
             $this->expiresAtKey,
-            $this->refreshTokenKey,
-            $this->scopesKey,
+            $this->refreshTokenKey
         ]);
 
         Session::save();
