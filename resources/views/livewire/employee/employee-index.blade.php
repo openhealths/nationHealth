@@ -433,31 +433,37 @@
                                                 @endif
                                             </td>
 
-                                            <td class="td-input break-words whitespace-nowrap align-middle">
+                                            <td class="td-input overflow-hidden align-middle">
                                                 @php
                                                     $isEmployee = $position instanceof Employee;
                                                     $employeeStatus = $position->status?->value ?? '';
+                                                    $statusEnum = $isEmployee
+                                                        ? Status::tryFrom($employeeStatus)
+                                                        : null;
+                                                    $badgeClass = '!me-0 inline-block w-min whitespace-normal text-left leading-tight';
                                                 @endphp
 
-                                                @if($isEmployee)
-                                                    @if($employeeStatus === Status::APPROVED->value)
-                                                        <span class="badge-green">{{__('forms.status.active')}}</span>
-                                                    @elseif($employeeStatus === Status::STOPPED->value || $employeeStatus === Status::DISMISSED->value)
-                                                        <span class="badge-red">{{__('forms.status.stopped')}}</span>
-                                                    @elseif($employeeStatus === Status::ENTERED_IN_ERROR->value)
-                                                        <span class="badge-red">{{__('forms.status.entered_in_error')}}</span>
-                                                    @elseif($employeeStatus === Status::REORGANIZED->value)
-                                                        <span class="badge-yellow">{{__('forms.status.reorganized')}}</span>
+                                                @if($isEmployee && $statusEnum)
+                                                    @if($statusEnum === Status::APPROVED)
+                                                        <span class="{{ $statusEnum->color() }} {{ $badgeClass }}">{{__('forms.status.active')}}</span>
+                                                    @elseif($statusEnum === Status::STOPPED || $statusEnum === Status::DISMISSED)
+                                                        <span class="{{ $statusEnum->color() }} {{ $badgeClass }}">{{__('forms.status.stopped')}}</span>
+                                                    @elseif($statusEnum === Status::NEW || $statusEnum === Status::SIGNED)
+                                                        <span class="{{ $statusEnum->color() }} {{ $badgeClass }}">{{__('forms.status.new')}}</span>
+                                                    @else
+                                                        <span class="{{ $statusEnum->color() }} {{ $badgeClass }}">{{ $statusEnum->label() }}</span>
                                                     @endif
-                                                @else
+                                                @elseif(!$isEmployee)
                                                     @if($position->isLocalDraft())
-                                                        <span class="badge-red">{{__('forms.status.draft')}}</span>
+                                                        <span class="badge-red {{ $badgeClass }}">{{__('forms.status.draft')}}</span>
                                                     @elseif($position->isPendingEhealth())
-                                                        <span class="badge-yellow">{{__('forms.status.new')}}</span>
+                                                        <span class="badge-yellow {{ $badgeClass }}">{{__('forms.status.new')}}</span>
+                                                    @elseif($position->status)
+                                                        <span class="{{ $position->status->color() }} {{ $badgeClass }}">{{ $position->status->label() }}</span>
                                                     @endif
                                                 @endif
                                             </td>
-                                            <td class="td-input text-center">
+                                            <td class="td-input shrink-0 whitespace-nowrap text-center align-middle">
                                                 @if($position)
                                                     @include('livewire.employee.parts.actions-dropdown', ['position' => $position])
                                                 @endif

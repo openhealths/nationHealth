@@ -26,7 +26,13 @@
          }
      }"
      x-init="if (!Array.isArray(selected)) selected = []"
-     x-effect="$dispatch('open-changed', { open })"
+     x-effect="
+         $dispatch('open-changed', { open });
+         const group = $el.closest('.form-group');
+         if (group) {
+             group.style.zIndex = open ? '50' : '';
+         }
+     "
 >
     @if($label)
         <label for="{{ $elementId }}" class="label mb-1">{{ $label }}</label>
@@ -54,9 +60,9 @@
              x-transition:leave="transition ease-in duration-75"
              x-transition:leave-start="transform scale-100"
              x-transition:leave-end="transform scale-95"
-             class="multiselect-dropdown absolute z-50 mt-2 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-60 overflow-y-auto dark:border-gray-600 dark:bg-gray-800"
+             class="multiselect-dropdown absolute z-50 mt-2 w-full rounded-md border border-gray-200 !bg-white shadow-lg max-h-60 overflow-y-auto dark:border-gray-600 dark:!bg-gray-800"
         >
-            <ul class="space-y-2 bg-white px-3 py-2 text-sm text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+            <ul class="space-y-2 !bg-white px-3 py-2 text-sm text-gray-700 dark:!bg-gray-800 dark:text-gray-200">
                 <template x-for="(optLabel, optValue) in options" :key="optValue">
                     <li>
                         <label class="flex cursor-pointer items-center space-x-2 rounded p-1 hover:bg-gray-50 dark:hover:bg-gray-600">

@@ -118,13 +118,10 @@ class EmployeeRequest extends BaseEmployee
     /**
      * Submitted to eHealth, awaiting APPROVED/REJECTED/EXPIRED.
      * Includes legacy rows that still use local SIGNED status.
+     * Do not gate on applied_at — details sync previously set it for still-NEW rows.
      */
     public function isPendingEhealth(): bool
     {
-        if ($this->applied_at !== null) {
-            return false;
-        }
-
         if ($this->status === RequestStatus::SIGNED) {
             return true;
         }
@@ -140,17 +137,15 @@ class EmployeeRequest extends BaseEmployee
      */
     public function scopePendingEhealth(Builder $query): Builder
     {
-        return $query
-            ->whereNull('applied_at')
-            ->where(function (Builder $inner): void {
-                $inner
-                    ->where('status', RequestStatus::SIGNED)
-                    ->orWhere(function (Builder $newSubmitted): void {
-                        $newSubmitted
-                            ->where('status', RequestStatus::NEW)
-                            ->whereNotNull('uuid');
-                    });
-            });
+        return $query->where(function (Builder $inner): void {
+            $inner
+                ->where('status', RequestStatus::SIGNED)
+                ->orWhere(function (Builder $newSubmitted): void {
+                    $newSubmitted
+                        ->where('status', RequestStatus::NEW)
+                        ->whereNotNull('uuid');
+                });
+        });
     }
 
     /**

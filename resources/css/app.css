@@ -241,17 +241,22 @@ input:-webkit-autofill ~ .label {
 }
 
 .multiselect-dropdown {
-    @apply bg-white dark:bg-gray-800;
-    background-color: #ffffff;
+    @apply !bg-white dark:!bg-gray-800;
+    background-color: #ffffff !important;
 }
 
 .multiselect-dropdown :is(ul, li, label) {
-    @apply bg-white dark:bg-gray-800;
+    @apply !bg-white dark:!bg-gray-800;
 }
 
 :is(.dark .multiselect-dropdown),
 :is(.dark .multiselect-dropdown :is(ul, li, label)) {
-    background-color: rgb(31 41 55); /* gray-800 */
+    background-color: rgb(31 41 55) !important; /* gray-800 */
+}
+
+/* Open multiselect must stack above following .form-group siblings (they use z-0). */
+.form-group:has(.multiselect-dropdown:not([style*="display: none"])) {
+    z-index: 50;
 }
 
 .dropdown-panel button {

@@ -30,7 +30,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
-use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\WithFileUploads;
 use App\Mail\UserCredentialsMail;
@@ -552,55 +551,6 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     public function resetSignatureFields(): void
     {
         $this->form->reset('keyContainerUpload', 'keyContainerFileName', 'password', 'knedp');
-    }
-
-    /**
-     * A computed property that determines if the "no tax ID" mode can be enabled.
-     */
-    #[Computed]
-    public function canEnableNoTaxId(): bool
-    {
-        return array_any(
-            $this->form->documents,
-            fn ($document) => !empty($document['number']) && in_array(
-                $document['type'],
-                ['PASSPORT', 'NATIONAL_ID', 'REFUGEE_CERTIFICATE', 'PERMANENT_RESIDENCE_PERMIT']
-            )
-        );
-
-    }
-
-    /**
-     * Handles the click event on the "no tax ID" checkbox.
-     */
-    public function toggleNoTaxId(): void
-    {
-        if ($this->canEnableNoTaxId) {
-            $this->form->party['noTaxId'] = !$this->form->party['noTaxId'];
-            $this->syncTaxIdFromDocument();
-        } else {
-            $this->flashError(__('forms.no_tax_id_document_required'));
-            $this->dispatch('scroll-to-element', selector: '#section-documents');
-            $this->dispatch('highlight-section', selector: '#section-documents');
-        }
-    }
-
-    /**
-     * Syncs the Tax ID field with the number from a suitable document.
-     */
-    public function syncTaxIdFromDocument(): void
-    {
-        if ($this->form->party['noTaxId'] === false) {
-            return;
-        }
-
-        foreach ($this->form->documents as $document) {
-            if (!empty($document['number']) && in_array($document['type'], ['PASSPORT', 'NATIONAL_ID', 'REFUGEE_CERTIFICATE', 'PERMANENT_RESIDENCE_PERMIT'])) {
-                $this->form->party['taxId'] = $document['number'];
-
-                return;
-            }
-        }
     }
 
     /**
