@@ -33,6 +33,10 @@ GEMINI.md
 .github/skills/
 .vscode/mcp.json
 
-# Spec Kit tooling (local only; feature specs live in specs/)
+# Spec Kit tooling (local only)
 .specify/
 .gemini/
+
+# Personal Spec Kit feature docs (not for upstream; keep local copies)
+/specs/
+/storage/personal/
