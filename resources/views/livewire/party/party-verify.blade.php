@@ -86,12 +86,19 @@
             </table>
         </div>
 
-        {{-- 2. Warning Block --}}
-        @if(data_get($verificationDetails, 'details.dracs_death.verification_status') === 'NOT_VERIFIED')
+        {{-- 2. Warning Block (3.23 п.3.2.2: drfo / dracs_death / dms_passport) --}}
+        @php
+            $warningStreams = collect(['drfo', 'dracs_death', 'dms_passport'])
+                ->filter(fn (string $stream) => data_get($verificationDetails, "details.{$stream}.verification_status") === 'NOT_VERIFIED')
+                ->values();
+        @endphp
+        @if($warningStreams->isNotEmpty())
             <div class="p-4 mt-6 mb-4 text-sm text-red-800 rounded-lg bg-red-50 dark:bg-gray-800 dark:text-red-400" role="alert">
                 <h4 class="font-bold">{{ __('party_verification.warning.header') }}</h4>
                 <ul class="mt-2 list-disc list-inside space-y-1">
-                    <li>{{ __('party_verification.warning.dracs_death') }}</li>
+                    @foreach($warningStreams as $stream)
+                        <li>{{ __('party_verification.warning.' . $stream) }}</li>
+                    @endforeach
                 </ul>
                 <p class="mt-3">{{ __('party_verification.warning.footer') }}</p>
             </div>
