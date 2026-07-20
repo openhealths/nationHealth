@@ -1,5 +1,3 @@
-@use('App\Enums\User\Role')
-
 <div>
     {{-- Header Navigation with shift-content class for alignment --}}
     <x-header-navigation class="breadcrumb-form shift-content">
@@ -37,8 +35,8 @@
             @include('livewire.employee.parts.documents')
             @include('livewire.employee.parts.position')
 
-            {{-- Doctor-specific fields --}}
-            @if ($this->form->employeeType === Role::DOCTOR->value)
+            {{-- Professional data for medical employee types (3.23.3.2.1) --}}
+            @if (in_array($this->form->employeeType, config('ehealth.medical_employees', []), true))
                 <div class="space-y-8">
                     @include('livewire.employee.parts.education')
                     @include('livewire.employee.parts.specialities')

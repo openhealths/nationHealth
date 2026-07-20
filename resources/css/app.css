@@ -240,6 +240,20 @@ input:-webkit-autofill ~ .label {
     @apply absolute left-0 rounded-lg shadow-sm mt-2 z-10 origin-top-left bg-white dark:bg-gray-700 outline-none border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200
 }
 
+.multiselect-dropdown {
+    @apply bg-white dark:bg-gray-800;
+    background-color: #ffffff;
+}
+
+.multiselect-dropdown :is(ul, li, label) {
+    @apply bg-white dark:bg-gray-800;
+}
+
+:is(.dark .multiselect-dropdown),
+:is(.dark .multiselect-dropdown :is(ul, li, label)) {
+    background-color: rgb(31 41 55); /* gray-800 */
+}
+
 .dropdown-panel button {
     @apply p-2 px-2.5 w-full block items-center transition-colors text-left text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600 focus-visible:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed
 }
