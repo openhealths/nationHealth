@@ -129,12 +129,9 @@ class PartyVerify extends Component
     public function checkAndOpenModal(): void
     {
         if (!$this->canUpdateVerification) {
-            $message = __('party_verification.update_unavailable_reason')
-                ?? 'Оновлення даних наразі неможливе, оскільки статус не потребує верифікації.';
-
             $this->dispatch('flashMessage', [
-                'message' => $message,
-                'type' => 'error'
+                'message' => __('party_verification.update_unavailable_reason'),
+                'type' => 'error',
             ]);
 
             return;
@@ -189,24 +186,42 @@ class PartyVerify extends Component
             $this->closeUpdateModal();
 
             $this->dispatch('flashMessage', [
-                'message' => __('forms.data_saved_successfully'),
-                'type' => 'success'
+                'message' => __('party_verification.messages.update_success'),
+                'type' => 'success',
             ]);
 
-        } catch (EHealthResponseException|EHealthValidationException $e) {
-            // We log the details for the developer, but do not display them to the user
+        } catch (EHealthValidationException $e) {
+            Log::error('[PARTY UPDATE VALIDATION ERROR]', [
+                'party_uuid' => $this->party->uuid,
+                'message' => $e->getMessage(),
+                'details' => $e->getDetails(),
+            ]);
+
+            $this->dispatch('flashMessage', [
+                'message' => __('party_verification.messages.update_failed_with_detail', [
+                    'message' => $e->getTranslatedMessage(),
+                ]),
+                'type' => 'error',
+                'persistent' => true,
+            ]);
+
+            $this->dispatch('status-updated-close-modal');
+
+        } catch (EHealthResponseException $e) {
             Log::error('[PARTY UPDATE ERROR]', [
                 'party_uuid' => $this->party->uuid,
                 'message' => $e->getMessage(),
-                'details' => method_exists($e, 'getDetails') ? $e->getDetails() : [],
+                'details' => $e->getDetails(),
             ]);
 
-            // Displaying a general understandable message
-            // Or you can use $e->getFormattedMessage() if you have it well configured
+            $message = $e->isPartyNotVerified()
+                ? __('errors.ehealth.messages.party_not_verified')
+                : __('party_verification.messages.update_failed');
+
             $this->dispatch('flashMessage', [
-                'message' => 'Помилка оновлення в ЕСОЗ: ' . $e->getMessage(),
+                'message' => $message,
                 'type' => 'error',
-                'persistent' => true
+                'persistent' => true,
             ]);
 
             $this->dispatch('status-updated-close-modal');
@@ -214,12 +229,12 @@ class PartyVerify extends Component
         } catch (\Throwable $e) {
             Log::error('[PARTY UPDATE SYSTEM ERROR]', [
                 'party_uuid' => $this->party->uuid,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ]);
 
             $this->dispatch('flashMessage', [
-                'message' => __('errors.generic_error') ?? 'Виникла технічна помилка.',
-                'type' => 'error'
+                'message' => __('party_verification.messages.update_failed_technical'),
+                'type' => 'error',
             ]);
             $this->dispatch('status-updated-close-modal');
         }
