@@ -357,47 +357,14 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Retrieves the scopes assigned to a specific user.
-     *
-     * @return string The concatenated string of user's scopes
+     * OAuth scopes for eHealth authorize: Spatie permissions for the current team only
+     * (already filtered by LegalEntity type). Never merge raw config/ehealth.roles.*.
      */
     public function getScopes(): string
     {
-        $scopeNames = $this->getAllPermissions()->pluck('name');
-
-        $teamId = getPermissionsTeamId();
-
-        if ($teamId) {
-            $scopeNames = $scopeNames->merge($this->getPermissionNamesFromEmployeeTypes($teamId));
-        }
-
-        // Only request scopes defined in AR / config/scopes (eHealth rejects unknown ones).
         return implode(' ', EHealthKnownScopes::filter(
-            $scopeNames->unique()->values()->all()
+            $this->getAllPermissions()->pluck('name')->unique()->values()->all()
         ));
-    }
-
-    /**
-     * OAuth scopes implied by approved employee records when Spatie roles are not synced yet.
-     *
-     * @return Collection<int, string>
-     */
-    protected function getPermissionNamesFromEmployeeTypes(int $legalEntityId): Collection
-    {
-        $employeeTypes = Employee::query()
-            ->where('legal_entity_id', $legalEntityId)
-            ->whereIn('status', [Status::APPROVED->value, Status::REORGANIZED->value])
-            ->where(function (Builder $query): void {
-                $query->where('user_id', $this->id)
-                    ->orWhereHas('users', fn (Builder $userQuery) => $userQuery->where('users.id', $this->id));
-            })
-            ->pluck('employee_type')
-            ->unique()
-            ->filter();
-
-        return $employeeTypes->flatMap(
-            fn (string $type) => (array) config('ehealth.roles.' . $type, [])
-        );
     }
 
     /**
