@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace App\Classes\eHealth\Api;
 
 use App\Models\User;
-use App\Models\Role;
 use App\Models\LegalEntity;
 use App\Classes\eHealth\Request;
 use App\Classes\eHealth\Exceptions\ApiException;
-use App\Support\EHealthKnownScopes;
 use Illuminate\Support\Facades\Session;
+use Spatie\Permission\Models\Role;
 
 class EmployeeApi
 {
@@ -31,24 +30,19 @@ class EmployeeApi
 
         setPermissionsTeamId($legalEntity->id);
 
-        // Prefer the role selected for this login attempt; otherwise use the user's granted scopes.
-        // Do not treat a stale first_login_role from a previous session as authoritative when absent.
         $role = Session::get('first_login_role');
 
-        if (is_string($role) && $role !== '') {
-            $permissions = Role::findByName($role, 'ehealth')
+        if (!$user || $role) {
+            $permissions = Role::where('name', $role)
+                ->whereGuardName('ehealth')
+                ->firstOrFail()
                 ->permissions()
                 ->pluck('name')
-                ->unique()
-                ->values()
-                ->all();
+                ->toArray();
 
-            $scope = implode(' ', EHealthKnownScopes::filter($permissions));
-        } elseif ($user) {
-            $user->unsetRelation('roles')->unsetRelation('permissions');
-            $scope = $user->getScopes();
+            $scope = implode(' ', $permissions);
         } else {
-            throw new ApiException('Cannot exchange eHealth auth code: user and role are missing.');
+            $scope = $user->getScopes();
         }
 
         $data = [

@@ -133,9 +133,6 @@ class EHealthLoginController extends Controller
 
         EHealthUserLogin::dispatch($user, $legalEntity, $authUserUUID, $this->isFirstLogin, $loginedGuard);
 
-        // Role is only needed during token exchange / first-login role sync listeners above.
-        Session::forget('first_login_role');
-
         $user->refresh();
 
         if (!$user->party) {
