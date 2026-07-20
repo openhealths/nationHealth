@@ -281,7 +281,13 @@ class PartyVerificationTest extends TestCase
             ->set('reason', 'MANUAL_NOT_CONFIRMED')
             ->set('comment', 'Everything is fine')
             ->call('updateStatus')
-            ->assertHasNoErrors();
+            ->assertHasNoErrors()
+            ->assertDispatched('flashMessage', function (string $eventName, array $params): bool {
+                $payload = isset($params['message']) ? $params : ($params[0] ?? []);
+
+                return ($payload['message'] ?? null) === __('party_verification.messages.update_success')
+                    && ($payload['type'] ?? null) === 'success';
+            });
     }
 
     public function test_party_verify_shows_dms_passport_warning_when_not_verified(): void

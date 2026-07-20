@@ -48,4 +48,26 @@ class PartyVerificationWarningCopyTest extends TestCase
         $this->assertSame($dracsDeath, __('party_verification.recommendations.dracs_death'));
         $this->assertSame($dmsPassport, __('party_verification.recommendations.dms_passport'));
     }
+
+    #[Test]
+    public function update_flash_messages_are_translated_in_ukrainian(): void
+    {
+        $this->assertSame(
+            'Статус верифікації працівника успішно оновлено.',
+            __('party_verification.messages.update_success')
+        );
+        $this->assertStringContainsString(
+            'Не вдалося оновити статус верифікації в ЕСОЗ',
+            __('party_verification.messages.update_failed')
+        );
+        $this->assertStringContainsString(
+            'технічна помилка',
+            __('party_verification.messages.update_failed_technical')
+        );
+        $this->assertStringContainsString(
+            'не потребує ручного підтвердження',
+            __('party_verification.update_unavailable_reason')
+        );
+        $this->assertSame('Дані успішно збережено', __('forms.data_saved_successfully'));
+    }
 }
