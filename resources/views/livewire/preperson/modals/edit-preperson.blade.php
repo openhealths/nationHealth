@@ -16,7 +16,7 @@
                 {{ __('patients.edit_data') }}
             </h2>
             <p class="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-1">
-                ID {{ $form->person['uuid'] }}
+                ID {{ $form->person['uuid'] ?? '' }}
             </p>
         </div>
 

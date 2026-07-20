@@ -8,7 +8,10 @@
     showMergeSignatureDrawer: false,
     showConsentFormModal: false,
     selectedMergePatient: null,
-    currentMethod: ''
+    currentMethod: '',
+    isEditModalOpen: false,
+    showRegisterDeathModal: false,
+    showRegisterDeathDateModal: false
 }">
     <x-layouts.patient
         :prepersonId="$preperson->id"
@@ -22,4 +25,10 @@
 
         @include('livewire.preperson.parts.preperson-data')
     </x-layouts.patient>
+
+    @include('livewire.preperson.modals.edit-preperson')
+    @include('livewire.preperson.modals.register-death')
+    @include('livewire.preperson.modals.register-death-date')
 </div>
+
+
