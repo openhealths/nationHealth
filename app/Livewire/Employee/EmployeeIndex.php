@@ -371,41 +371,13 @@ class EmployeeIndex extends EmployeeComponent
             $formattedEndDate = $endDateStr;
         }
 
-        // Find an administrative employee role (HR, OWNER, ADMIN) for the current user in this facility
-        $user = Auth::user();
-        $ehealthEmployeeService = EHealth::employee();
-        $misApplied = ehealthApplyMisProxy(
-            $ehealthEmployeeService,
-            $user,
-            $this->legalEntity->id,
-            'employee:deactivate'
-        );
-
         try {
-            $response = $ehealthEmployeeService->deactivate(
+            $response = EHealth::employee()->deactivate(
                 $employee->uuid,
                 $formattedEndDate,
                 $status
             );
-        } catch (\App\Exceptions\EHealth\EHealthResponseException $e) {
-            if (!$misApplied && $user && ehealthIsMissingScopeError($e, 'employee:deactivate')) {
-                $retryService = EHealth::employee();
 
-                if (ehealthApplyMisProxy($retryService, $user, $this->legalEntity->id, 'employee:deactivate', force: true)) {
-                    $response = $retryService->deactivate(
-                        $employee->uuid,
-                        $formattedEndDate,
-                        $status
-                    );
-                } else {
-                    throw $e;
-                }
-            } else {
-                throw $e;
-            }
-        }
-
-        try {
             if (!empty($response)) {
                 // 3. Updates in the local database
                 $employee->update([
