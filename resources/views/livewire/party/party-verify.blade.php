@@ -191,7 +191,9 @@
 
                     {{-- 4. Comment --}}
                     <div class="form-group">
-                        <label for="comment" class="peer appearance-none bg-white">{{ __('forms.comment') }}</label>
+                        <label for="comment" class="mb-1 block text-sm font-medium text-gray-500 dark:text-gray-400">
+                            {{ __('forms.comment') }}
+                        </label>
                         <textarea
                             id="comment"
                             wire:model.defer="comment"
