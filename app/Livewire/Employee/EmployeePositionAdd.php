@@ -10,6 +10,7 @@ use App\Models\Employee\EmployeeRequest;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
 use App\Repositories\Repository;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 
@@ -25,17 +26,22 @@ class EmployeePositionAdd extends AbstractEmployeeFormManager
         $this->loadDictionaries();
         $this->loadDivisions($legalEntity);
         $this->isPersonalDataLocked = true;
-        $party->loadMissing('users');
         $this->party = $party;
         $this->partyId = $party->id;
         $this->form->hydrate($this->party);
         $this->form->resetPositionFields();
         $this->pageTitle = __('forms.add_position') . ' - ' . ($party->fullName ?? '');
-        $users = $party->users()->oldest()->get();
-        $this->partyUsers = $users;
-        $this->formEmail = $users->first()?->email;
-        $this->form->party['email'] = $this->formEmail;
 
+        $users = $party->usersWithEmployeeInLegalEntity($legalEntity->id);
+        $this->partyUsers = $users;
+
+        $preferredEmail = $this->form->party['email'] ?? null;
+        if ($preferredEmail && !$users->contains('email', $preferredEmail)) {
+            $preferredEmail = null;
+        }
+
+        $this->formEmail = $preferredEmail ?? $users->first()?->email;
+        $this->form->party['email'] = $this->formEmail;
     }
 
     public function boot(): void
@@ -61,12 +67,18 @@ class EmployeePositionAdd extends AbstractEmployeeFormManager
         $nestedDataForRevision = $this->mapRevisionData($preparedData);
 
         $employeeRequestData = Arr::only($preparedData, [
-            'position', 'start_date', 'end_date', 'employee_type', 'division_id', 'email'
+            'position', 'start_date', 'end_date', 'employee_type', 'division_id', 'email',
         ]);
 
-        $selectedUser = $this->partyUsers->firstWhere('email', $this->formEmail);
-        $employeeRequestData['user_id'] = $selectedUser?->id;
+        $selectedUser = $this->partyUsers?->firstWhere('email', $this->formEmail);
 
+        if ($this->formEmail && !$selectedUser) {
+            throw ValidationException::withMessages([
+                'formEmail' => __('employees.position_add_email_not_in_legal_entity'),
+            ]);
+        }
+
+        $employeeRequestData['user_id'] = $selectedUser?->id;
         $employeeRequestData['party_id'] = $this->party->id;
 
         if ($this->employeeRequestId) {

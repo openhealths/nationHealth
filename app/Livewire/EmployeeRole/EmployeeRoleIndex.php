@@ -212,8 +212,24 @@ class EmployeeRoleIndex extends Component
             return;
         }
 
+        // Find an administrative employee role (HR, OWNER, ADMIN) for the current user in this facility
+        $user = Auth::user();
+        $ehealthEmployeeRoleService = EHealth::employeeRole();
+
+        // Prefer the user's own token when it already can write employee roles.
+        if ($user && !ehealthHasScope('employee_role:write')) {
+            $adminEmployee = $user->adminEmployeeForMisAction(legalEntity()->id);
+            $party = $user->resolveParty(legalEntity()->id);
+
+            if ($adminEmployee && $party?->taxId) {
+                $ehealthEmployeeRoleService->asMis()->withHeaders([
+                    'msp_drfo' => $party->taxId,
+                ]);
+            }
+        }
+
         try {
-            $response = EHealth::employeeRole()->deactivate($employeeRole->uuid);
+            $response = $ehealthEmployeeRoleService->deactivate($employeeRole->uuid);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle("Error when deactivating $employeeRole->uuid employee role");
 

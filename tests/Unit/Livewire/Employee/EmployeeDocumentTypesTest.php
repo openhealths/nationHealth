@@ -28,10 +28,19 @@ class EmployeeDocumentTypesTest extends TestCase
 
         $validator = Validator::make(
             ['type' => 'BIRTH_CERTIFICATE'],
-            ['type' => ['required', 'string', Rule::in($allowed)]]
+            [
+                'type' => ['required', 'string', Rule::in($allowed)],
+            ],
+            [
+                'type.in' => __('validation.custom.employee.document_type_not_allowed'),
+            ]
         );
 
         $this->assertTrue($validator->fails());
+        $this->assertStringContainsString(
+            'Свідоцтво про народження',
+            $validator->errors()->first('type')
+        );
     }
 
     public function test_filter_employee_document_types_limits_dictionary_to_allowed_types(): void
