@@ -9,6 +9,7 @@ use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -17,6 +18,8 @@ use Livewire\Component;
 
 class PartyVerify extends Component
 {
+    use AuthorizesRequests;
+
     public Party $party;
     public LegalEntity $legalEntity;
 
@@ -40,10 +43,6 @@ class PartyVerify extends Component
 
     public function mount(LegalEntity $legalEntity, Party $party): void
     {
-        if (!auth()->user()?->can('party_verification:details')) {
-            abort(403, __('forms.no_actions_available'));
-        }
-
         $this->legalEntity = $legalEntity;
         $this->party = $party;
         $this->loadVerificationDetails();
@@ -152,9 +151,7 @@ class PartyVerify extends Component
 
     public function updateStatus(): void
     {
-        if (!auth()->user()?->can('party_verification:write')) {
-            abort(403, __('forms.no_actions_available'));
-        }
+        $this->authorize('updateVerification', $this->party);
 
         $this->validate([
             'verificationStream' => 'required|string',
