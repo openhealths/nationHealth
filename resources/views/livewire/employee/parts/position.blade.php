@@ -24,7 +24,7 @@
                     id="employeeType"
                     class="peer input appearance-none bg-white text-gray-500 dark:bg-gray-800 dark:text-gray-400"
                     required
-                    wire:model="form.employeeType"
+                    wire:model.live="form.employeeType"
                     x-model="employeeType"
                     :disabled="$wire.isPositionDataLocked">
                 <option value="" disabled selected hidden>{{ __('forms.role_choose') }}</option>
@@ -44,14 +44,25 @@
 
         {{-- 2. Position: Locked based on component state --}}
         <div class="form-group">
-            <select name="position" id="position" class="peer input appearance-none bg-white text-gray-500 dark:bg-gray-800 dark:text-gray-400" required wire:model="form.position" :disabled="$wire.isPositionDataLocked">>
-                <option value="" disabled selected hidden>{{ __('forms.select_position') }}</option>
-                <div x-show="employeeType && employeeTypePosition[employeeType]" x-cloak>
-                    <template x-for="(positionName, positionKey) in employeeTypePosition[employeeType]" :key="positionKey">
-                        <option :value="positionKey" x-text="positionName"></option>
-                    </template>
-                </div>
-            </select>
+            @if(in_array($this->form->employeeType, config('ehealth.employee_type_custom_position_allowed', []), true))
+                <input type="text"
+                       name="position"
+                       id="position"
+                       class="peer input text-gray-500 dark:text-gray-400"
+                       required
+                       wire:model="form.position"
+                       :disabled="$wire.isPositionDataLocked"
+                       placeholder=" "/>
+            @else
+                <select name="position" id="position" class="peer input appearance-none bg-white text-gray-500 dark:bg-gray-800 dark:text-gray-400" required wire:model="form.position" :disabled="$wire.isPositionDataLocked">>
+                    <option value="" disabled selected hidden>{{ __('forms.select_position') }}</option>
+                    <div x-show="employeeType && employeeTypePosition[employeeType]" x-cloak>
+                        <template x-for="(positionName, positionKey) in employeeTypePosition[employeeType]" :key="positionKey">
+                            <option :value="positionKey" x-text="positionName"></option>
+                        </template>
+                    </div>
+                </select>
+            @endif
             <label for="position" class="label">{{ __('forms.position') }}</label>
             @error('form.position') <p class="text-error">{{ $message }}</p> @enderror
         </div>

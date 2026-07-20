@@ -104,7 +104,7 @@
 
                                 <td class="index-table-td">
                                     @if($request->status == \App\Enums\Employee\RequestStatus::NEW)
-                                        <span class="badge-red">{{ $request->status->label() }}</span>
+                                        <span class="badge-yellow">{{ $request->status->label() }}</span>
                                     @elseif($request->status == \App\Enums\Employee\RequestStatus::SIGNED)
                                         <span class="badge-yellow">{{ $request->status->label() }}</span>
                                     @elseif($request->status == \App\Enums\Employee\RequestStatus::APPROVED)

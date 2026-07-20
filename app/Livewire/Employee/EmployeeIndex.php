@@ -67,6 +67,7 @@ class EmployeeIndex extends EmployeeComponent
     public ?int $employeeIdToDeactivate = null;
     public ?string $employeeToDeactivateName = null;
     public bool $isDoctorToDeactivate = false;
+    public string $deactivationEndDate = '';
 
     public ?int $employeeToDismissId = null;
     public ?string $employeeToDismissName = null;
@@ -188,11 +189,17 @@ class EmployeeIndex extends EmployeeComponent
                 });
         });
 
-        // 2. Filter: Search Text (Full Name, Case-Insensitive)
+        // 2. Filter: Search Text (Full Name, Case-Insensitive, Order-Independent)
         if (!empty($this->search)) {
-            $searchTerm = '%' . $this->search . '%';
-            // PostgreSQL specific: ILIKE is case-insensitive
-            $query->whereRaw("CONCAT(last_name, ' ', first_name, ' ', second_name) ILIKE ?", [$searchTerm]);
+            $words = array_filter(explode(' ', trim($this->search)));
+            foreach ($words as $word) {
+                $searchTerm = '%' . $word . '%';
+                $query->where(function (Builder $q) use ($searchTerm) {
+                    $q->where('last_name', 'ILIKE', $searchTerm)
+                        ->orWhere('first_name', 'ILIKE', $searchTerm)
+                        ->orWhere('second_name', 'ILIKE', $searchTerm);
+                });
+            }
         }
 
         // 3. Filter: Email (via Users)
@@ -258,6 +265,11 @@ class EmployeeIndex extends EmployeeComponent
             $this->isDoctorToDeactivate = ($type === Role::DOCTOR->value);
         }
 
+        // Default end_date = today in Kyiv, but allow user to override
+        $startDateStr = isset($employee) ? ($employee->start_date ?? '') : '';
+        $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
+        $this->deactivationEndDate = ($startDateStr && $todayStr < $startDateStr) ? $startDateStr : $todayStr;
+
         $this->showDeactivateModal = true;
     }
 
@@ -293,9 +305,12 @@ class EmployeeIndex extends EmployeeComponent
 
         // eHealth requires: end_date >= start_date.
         $startDateStr = $employee->start_date; // 'Y-m-d' string from DB
-        $endDateStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
 
-        // If 'today' in Kiev is lexicographically earlier than 'start_date', use 'start_date' as the dismissal date
+        // Use user-provided deactivationEndDate if valid, otherwise default to today in Kyiv
+        $endDateInput = trim($this->deactivationEndDate);
+        $endDateStr = $endDateInput ?: \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
+
+        // If 'end_date' is earlier than 'start_date', clamp to 'start_date'
         if ($startDateStr && $endDateStr < $startDateStr) {
             $formattedEndDate = $startDateStr;
         } else {
@@ -371,6 +386,7 @@ class EmployeeIndex extends EmployeeComponent
         $this->employeeIdToDeactivate = null;
         $this->employeeToDeactivateName = null;
         $this->isDoctorToDeactivate = false;
+        $this->deactivationEndDate = '';
     }
 
     /**
@@ -544,7 +560,7 @@ class EmployeeIndex extends EmployeeComponent
         $employee = Employee::with(['party'])->find($employeeId);
 
         if (!$employee) {
-            $this->dispatch('flashMessage', ['message' => 'Співробітника не знайдено', 'type' => 'error']);
+            $this->dispatch('flashMessage', ['message' => 'Працівника не знайдено', 'type' => 'error']);
 
             return;
         }

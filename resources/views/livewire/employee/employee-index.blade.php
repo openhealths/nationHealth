@@ -23,7 +23,7 @@
 
     $statusOptions = [
         Status::APPROVED->value => __('forms.status.active'),
-        Status::NEW->value => __('forms.status.draft'),
+        Status::NEW->value => __('forms.draft'),
         Status::SIGNED->value => __('forms.status.sent'),
         Status::DISMISSED->value => __('forms.dismissed'),
         Status::REORGANIZED->value => __('forms.reorganized'),

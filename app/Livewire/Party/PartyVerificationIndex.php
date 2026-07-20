@@ -45,15 +45,17 @@ class PartyVerificationIndex extends Component
         // and results in a 422 validation error. Instead, we perform the filtering locally.
         // We always fetch the first page from the API (with default page size 300) to get all entries,
         // then slice the collection locally.
-        $apiResponse = EHealth::party()
-            ->withToken($token)
-            ->getMany([], 1);
+        $items = [];
+        try {
+            $apiResponse = EHealth::party()
+                ->withToken($token)
+                ->getMany([], 1);
 
-        $apiData = $apiResponse->json();
-        $paging = $apiData['paging'] ?? [];
-        $totalFromApi = $paging['total_entries'] ?? 0;
-
-        $items = $apiData['data'] ?? [];
+            $apiData = $apiResponse->json();
+            $items = $apiData['data'] ?? [];
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to fetch party verifications: ' . $e->getMessage());
+        }
 
         $partyUuids = collect($items)->pluck('party_id')->unique()->toArray();
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\User\Role;
 use App\Models\Employee\EmployeeRequest;
 use App\Models\Relations\Party;
 use App\Models\User;
@@ -13,7 +14,7 @@ class EmployeeRequestPolicy
 {
     public function viewAny(User $user): Response
     {
-        return $user->can('employee_request:read')
+        return ($user->can('employee_request:read') || $user->hasAllowedRole([Role::ADMIN, Role::HR]))
             ? Response::allow()
             : Response::deny(__('employees.policy.req.view_any_denied'));
     }
@@ -24,7 +25,7 @@ class EmployeeRequestPolicy
             return Response::denyWithStatus(404);
         }
 
-        return $user->can('employee_request:read')
+        return ($user->can('employee_request:read') || $user->hasAllowedRole([Role::ADMIN, Role::HR]))
             ? Response::allow()
             : Response::deny(__('employees.policy.req.view_denied'));
     }
@@ -37,7 +38,7 @@ class EmployeeRequestPolicy
             }
         }
 
-        return $user->can('employee_request:write')
+        return ($user->can('employee_request:write') || $user->hasAllowedRole([Role::ADMIN, Role::HR]))
             ? Response::allow()
             : Response::deny(__('employees.policy.req.create_denied'));
     }
@@ -52,7 +53,7 @@ class EmployeeRequestPolicy
             return Response::deny(__('employees.policy.req.processed_no_edit'));
         }
 
-        return $user->can('employee_request:write')
+        return ($user->can('employee_request:write') || $user->hasAllowedRole([Role::ADMIN, Role::HR]))
             ? Response::allow()
             : Response::deny(__('employees.policy.req.update_denied'));
     }
@@ -67,7 +68,7 @@ class EmployeeRequestPolicy
             return Response::deny(__('employees.policy.req.processed_no_delete'));
         }
 
-        return $user->can('employee_request:write')
+        return ($user->can('employee_request:write') || $user->hasAllowedRole([Role::ADMIN, Role::HR]))
             ? Response::allow()
             : Response::deny(__('employees.policy.req.delete_denied'));
     }
