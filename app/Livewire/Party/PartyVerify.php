@@ -29,9 +29,9 @@ class PartyVerify extends Component
     public bool $showUpdateModal = false;
 
     #[Validate('required|string|in:VERIFIED,NOT_VERIFIED')]
-    public string $status = '';
+    public string $status = 'VERIFIED';
 
-    #[Validate('required_if:status,NOT_VERIFIED|string|max:255')]
+    #[Validate('required|string|max:255')]
     public string $reason = '';
 
     #[Validate('nullable|string|max:1000')]
@@ -40,9 +40,14 @@ class PartyVerify extends Component
 
     public function mount(LegalEntity $legalEntity, Party $party): void
     {
+        if (!auth()->user()?->can('party_verification:details')) {
+            abort(403, __('forms.no_actions_available'));
+        }
+
         $this->legalEntity = $legalEntity;
         $this->party = $party;
         $this->loadVerificationDetails();
+        $this->status = 'VERIFIED';
 
         $previous = url()->previous();
         $current = request()->url();
@@ -67,20 +72,26 @@ class PartyVerify extends Component
     {
         // 1. Getting the current death status
         $deathStatus = data_get($this->verificationDetails, 'details.dracs_death.verification_status');
+        $deathReason = data_get($this->verificationDetails, 'details.dracs_death.verification_reason');
 
-        // 2. Allow the button ONLY if the status is 'NOT_VERIFIED'
-        // All other statuses (VERIFIED, VERIFICATION_NEEDED, etc.) will be false and the button will be gray.
-        return $deathStatus === 'NOT_VERIFIED';
+        // 2. Allow the button if status is NOT_VERIFIED, VERIFICATION_NEEDED,
+        // or VERIFIED with a manual DRACS reason (ESОЗ acceptance codes).
+        if (in_array($deathStatus, ['NOT_VERIFIED', 'VERIFICATION_NEEDED'], true)) {
+            return true;
+        }
+
+        return $deathStatus === 'VERIFIED'
+            && in_array($deathReason, ['MANUAL_CONFIRMED', 'MANUAL_NOT_CONFIRMED'], true);
     }
 
     /**
      * Loads and filters verification details for the party from the eHealth API.
      *
      * This method retrieves the party details and strictly filters the verification streams
-     * to include only the allowed directions ('drfo' and 'dracs_death') as required by the
-     * MIS/PIS UI documentation. It handles variations in the API response structure and
-     * updates the $verificationDetails property. In case of an API failure or exception,
-     * the details are safely defaulted to an empty array.
+     * to include only the allowed directions ('drfo', 'dracs_death', 'dms_passport') as required by
+     * the MIS/PIS UI documentation (3.23 п.3.2.2). It handles variations in the API response
+     * structure and updates the $verificationDetails property. In case of an API failure or
+     * exception, the details are safely defaulted to an empty array.
      *
      * @return void
      */
@@ -91,19 +102,19 @@ class PartyVerify extends Component
             $response = EHealth::party()->getDetails($this->party->uuid);
             $data = is_array($response) ? $response : $response->json();
 
-            // We leave ONLY drfo and dracs_death as required by the documentation
-            $allowedStreams = ['drfo', 'dracs_death'];
+            // Streams that trigger warning messages per 3.23 п.3.2.2
+            $allowedStreams = ['drfo', 'dracs_death', 'dms_passport'];
 
             if (!empty($data['data']['details']) && is_array($data['data']['details'])) {
                 $data['data']['details'] = array_filter(
                     $data['data']['details'],
-                    static fn($key) => in_array($key, $allowedStreams, true),
+                    static fn ($key) => in_array($key, $allowedStreams, true),
                     ARRAY_FILTER_USE_KEY
                 );
             } elseif (!empty($data['details']) && is_array($data['details'])) {
                 $data['details'] = array_filter(
                     $data['details'],
-                    static fn($key) => in_array($key, $allowedStreams, true),
+                    static fn ($key) => in_array($key, $allowedStreams, true),
                     ARRAY_FILTER_USE_KEY
                 );
             }
@@ -117,9 +128,7 @@ class PartyVerify extends Component
 
     public function checkAndOpenModal(): void
     {
-        if ($this->canUpdateVerification) {
-            $this->showUpdateModal = true;
-        } else {
+        if (!$this->canUpdateVerification) {
             $message = __('party_verification.update_unavailable_reason')
                 ?? 'Оновлення даних наразі неможливе, оскільки статус не потребує верифікації.';
 
@@ -127,18 +136,29 @@ class PartyVerify extends Component
                 'message' => $message,
                 'type' => 'error'
             ]);
+
+            return;
         }
+
+        $this->status = 'VERIFIED';
+        $this->verificationStream = 'dracs_death';
+        $this->showUpdateModal = true;
     }
 
     public function closeUpdateModal(): void
     {
         $this->showUpdateModal = false;
-        $this->reset(['status', 'reason', 'comment']);
+        $this->reset(['reason', 'comment']);
+        $this->status = 'VERIFIED';
         $this->resetErrorBag();
     }
 
     public function updateStatus(): void
     {
+        if (!auth()->user()?->can('party_verification:write')) {
+            abort(403, __('forms.no_actions_available'));
+        }
+
         $this->validate([
             'verificationStream' => 'required|string',
             'status' => 'required|string|in:VERIFIED,NOT_VERIFIED',
@@ -147,24 +167,25 @@ class PartyVerify extends Component
         ]);
 
         try {
-            $data = [
-                'verification_status' => $this->status,
-                'verification_reason' => $this->reason,
-                'verification_comment' => $this->comment,
-            ];
-
             // Wrap the data in the stream key
             $payload = [
                 $this->verificationStream => [
-                    'status' => $this->status,
-                    'reason' => $this->reason,
-                    'comment' => $this->comment,
+                    'verification_status' => $this->status,
+                    'verification_reason' => $this->reason,
+                    'verification_comment' => $this->comment,
                 ]
             ];
 
             EHealth::party()->update($this->party->uuid, $payload);
 
             $this->loadVerificationDetails();
+
+            // Sync the overall status to the local party record
+            $overallStatus = data_get($this->verificationDetails, 'verification_status');
+            if ($overallStatus) {
+                $this->party->update(['verification_status' => $overallStatus]);
+            }
+
             $this->closeUpdateModal();
 
             $this->dispatch('flashMessage', [

@@ -15,8 +15,8 @@ trait ProcessesPartyVerificationResponses
      * Processes party verification statuses using an optimized upsert approach.
      * Updates ONLY the verification_status field.
      *
-     * @param  EHealthResponse  $response   The API response object.
-     * @param  LegalEntity      $legalEntity The legal entity context.
+     * @param  EHealthResponse  $response  The API response object.
+     * @param  LegalEntity  $legalEntity  The legal entity context.
      * @return void
      */
     private function processPartyVerificationResponse(EHealthResponse $response, LegalEntity $legalEntity): void
@@ -81,6 +81,45 @@ trait ProcessesPartyVerificationResponses
                         $userToNotify->notify(new PartyVerificationStatusChanged($party, $newOverallStatus, $legalEntity));
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Processes GET /api/parties/{id}/verification (party_verification:details).
+     */
+    private function processPartyVerificationDetail(
+        string $partyUuid,
+        EHealthResponse $response,
+        LegalEntity $legalEntity
+    ): void {
+        $payload = $response->json();
+        $data = is_array($payload['data'] ?? null) ? $payload['data'] : $payload;
+
+        $verificationStatus = data_get($data, 'verification_status');
+
+        if (!is_string($verificationStatus) || $verificationStatus === '') {
+            return;
+        }
+
+        $party = Party::query()
+            ->where('uuid', $partyUuid)
+            ->with('users')
+            ->first();
+
+        if (!$party) {
+            return;
+        }
+
+        $oldStatus = $party->verification_status;
+
+        if ($oldStatus !== $verificationStatus) {
+            $party->update(['verification_status' => $verificationStatus]);
+        }
+
+        if ($oldStatus === 'VERIFIED' && $verificationStatus !== 'VERIFIED') {
+            foreach ($party->users as $userToNotify) {
+                $userToNotify->notify(new PartyVerificationStatusChanged($party, $verificationStatus, $legalEntity));
             }
         }
     }

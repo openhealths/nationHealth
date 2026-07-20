@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace App\Livewire\Party;
 
 use App\Classes\eHealth\EHealth;
-use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Psr\Container\ContainerExceptionInterface;
-use Psr\Container\NotFoundExceptionInterface;
+use Throwable;
 
 class PartyVerificationIndex extends Component
 {
@@ -29,67 +30,33 @@ class PartyVerificationIndex extends Component
 
     public function mount(LegalEntity $legalEntity): void
     {
+        if (!Auth::user()?->can('party_verification:details')) {
+            abort(403, __('forms.no_actions_available'));
+        }
         $this->legalEntity = $legalEntity;
     }
 
-    /**
-     * @throws ContainerExceptionInterface
-     * @throws NotFoundExceptionInterface
-     * @throws EHealthConnectionException
-     */
     public function render(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\View\View
     {
-        $token = session()->get(config('ehealth.api.oauth.bearer_token'));
-
-        // We do not pass dracs_death_verification_status to the eHealth API as it is not supported
-        // and results in a 422 validation error. Instead, we perform the filtering locally.
-        // We always fetch the first page from the API (with default page size 300) to get all entries,
-        // then slice the collection locally.
-        $apiResponse = EHealth::party()
-            ->withToken($token)
-            ->getMany([], 1);
-
-        $apiData = $apiResponse->json();
-        $paging = $apiData['paging'] ?? [];
-        $totalFromApi = $paging['total_entries'] ?? 0;
-
-        $items = $apiData['data'] ?? [];
-
-        $partyUuids = collect($items)->pluck('party_id')->unique()->toArray();
-
-        $localPartiesObjects = Party::whereIn('uuid', $partyUuids)
-            ->get()
-            ->keyBy('uuid');
-
-        $mergedItems = collect($items)->map(function ($item) use ($localPartiesObjects) {
-            $uuid = $item['party_id'];
-            $localParty = $localPartiesObjects->get($uuid);
-
-            //If it is not found locally, skip (or show it as it is, depends on your logic)
-            if (!$localParty) {
-                return null;
-            }
-
-            $item['party_name'] = $localParty->fullName;
-            $item['local_id'] = $localParty->id;
-
-            return $item;
-        })->filter()->values();
+        $localItems = $this->localVerificationItems();
 
         if (!empty($this->dracsDeathStatus)) {
-            $mergedItems = $mergedItems->filter(function ($item) {
-                return data_get($item, 'details.dracs_death.verification_status') === $this->dracsDeathStatus;
-            })->values();
+            $localItems = $localItems->filter(
+                fn (array $item) => ($item['verification_status'] ?? null) === $this->dracsDeathStatus
+            )->values();
         }
 
         $perPage = 50;
+        $total = $localItems->count();
+        $pageItems = $localItems
+            ->slice(($this->getPage() - 1) * $perPage, $perPage)
+            ->values();
 
-        $total = $mergedItems->count();
-
-        $currentPageItems = $mergedItems->slice(($this->getPage() - 1) * $perPage, $perPage)->values();
+        $token = session()->get(config('ehealth.api.oauth.bearer_token'));
+        $enriched = $this->enrichPageWithDetails($pageItems, $token);
 
         $paginator = new LengthAwarePaginator(
-            $currentPageItems,
+            $enriched,
             $total,
             $perPage,
             $this->getPage(),
@@ -99,5 +66,93 @@ class PartyVerificationIndex extends Component
         return view('livewire.party.party-verification-index', [
             'verifications' => $paginator,
         ]);
+    }
+
+    /**
+     * Local parties for the current legal entity (list source).
+     * Stream statuses are filled later via getDetails (party_verification:details).
+     */
+    private function localVerificationItems(): Collection
+    {
+        return Party::query()
+            ->whereHas(
+                'employees',
+                fn ($query) => $query->where('legal_entity_id', $this->legalEntity->id)
+            )
+            ->whereNotNull('uuid')
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get()
+            ->map(function (Party $party) {
+                $status = $party->verification_status ?: '-';
+
+                return [
+                    'party_id' => $party->uuid,
+                    'party_name' => $party->fullName,
+                    'local_id' => $party->id,
+                    'verification_status' => $status,
+                    'details' => [
+                        'drfo' => ['verification_status' => $status],
+                        'dracs_death' => ['verification_status' => $status],
+                    ],
+                ];
+            })
+            ->values();
+    }
+
+    /**
+     * Enrich current page via GET /api/parties/{id}/verification (party_verification:details).
+     *
+     * @param  Collection<int, array<string, mixed>>  $pageItems
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function enrichPageWithDetails(Collection $pageItems, ?string $token): Collection
+    {
+        if (empty($token) || $pageItems->isEmpty()) {
+            return $pageItems;
+        }
+
+        return $pageItems->map(function (array $item) use ($token) {
+            $uuid = $item['party_id'] ?? null;
+            if (!is_string($uuid) || $uuid === '') {
+                return $item;
+            }
+
+            try {
+                $response = EHealth::party()
+                    ->withToken($token)
+                    ->getDetails($uuid);
+
+                $payload = $response->json();
+                $data = is_array($payload['data'] ?? null) ? $payload['data'] : $payload;
+                $fallback = $item['verification_status'] ?? '-';
+
+                $item['verification_status'] = data_get($data, 'verification_status', $fallback) ?: $fallback;
+                $item['details'] = [
+                    'drfo' => [
+                        'verification_status' => data_get($data, 'details.drfo.verification_status', $fallback) ?: $fallback,
+                    ],
+                    'dracs_death' => [
+                        'verification_status' => data_get($data, 'details.dracs_death.verification_status', $fallback) ?: $fallback,
+                    ],
+                ];
+
+                $remoteStatus = data_get($data, 'verification_status');
+                if (is_string($remoteStatus) && $remoteStatus !== '') {
+                    Party::query()
+                        ->where('uuid', $uuid)
+                        ->where('verification_status', '!=', $remoteStatus)
+                        ->update(['verification_status' => $remoteStatus]);
+                }
+            } catch (Throwable $e) {
+                Log::warning('Failed to fetch party verification details', [
+                    'party_uuid' => $uuid,
+                    'error' => $e->getMessage(),
+                    'user_id' => Auth::id(),
+                ]);
+            }
+
+            return $item;
+        })->values();
     }
 }
