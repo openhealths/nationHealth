@@ -129,7 +129,7 @@ class EHealthLoginController extends Controller
             trim(data_get($validatedEHealthTokenData, 'details.scope', ''))
         ) ?: []);
 
-        $user->syncPermissions($ehealthScopes);
+        $user->syncEhealthTokenPermissions($ehealthScopes);
 
         EHealthUserLogin::dispatch($user, $legalEntity, $authUserUUID, $this->isFirstLogin, $loginedGuard);
 
@@ -138,7 +138,7 @@ class EHealthLoginController extends Controller
         if (!$user->party) {
 
             Session::put('selected_legal_entity_uuid', $legalEntity->uuid);
-            $user->syncPermissions($ehealthScopes);
+            $user->syncEhealthTokenPermissions($ehealthScopes);
 
             return Redirect::route('party.verify');
         }
@@ -147,7 +147,7 @@ class EHealthLoginController extends Controller
             Log::info(__('auth.login.success.user_auth', [], 'en'), ['User ID' => $user->id]);
 
             // Respect EHealth scopes
-            $user->syncPermissions($ehealthScopes);
+            $user->syncEhealthTokenPermissions($ehealthScopes);
 
             return Redirect::route('dashboard', [$legalEntity])->with(
                 'success',

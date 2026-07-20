@@ -120,6 +120,20 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         $this->dispatch('open-signature-modal');
     }
 
+    /**
+     * Human-readable request status for the pre-KEP preview step.
+     */
+    public function previewRequestStatusLabel(): string
+    {
+        $status = $this->employeeRequest?->status ?? RequestStatus::NEW;
+
+        if (!$status instanceof RequestStatus) {
+            $status = RequestStatus::tryFrom((string) $status) ?? RequestStatus::NEW;
+        }
+
+        return $status->label();
+    }
+
     public function sign()
     {
         Log::info('Attempting to sign.');

@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Classes\eHealth\EHealthRequest;
 use App\Classes\eHealth\Services\SchemaService;
+use App\Exceptions\EHealth\EHealthResponseException;
+use App\Models\LegalEntity;
+use App\Models\User;
 use App\Services\Dictionary\DictionaryManager;
 use App\Services\SignatureService;
 use Carbon\CarbonImmutable;
-use App\Models\LegalEntity;
 
 if (!function_exists('removeEmptyKeys')) {
     function removeEmptyKeys(array $array): array
@@ -200,12 +203,78 @@ if (!function_exists('ehealthHasScope')) {
         $payloadJson = base64_decode(str_replace(['-', '_'], ['+', '/'], $parts[1]));
         $payload = json_decode($payloadJson, true);
 
-        if (!is_array($payload) || !isset($payload['scope'])) {
+        if (!is_array($payload)) {
             return false;
         }
 
-        $scopes = is_string($payload['scope']) ? explode(' ', $payload['scope']) : (array) $payload['scope'];
+        $scopes = [];
+
+        foreach (['scope', 'scp'] as $claim) {
+            if (!isset($payload[$claim])) {
+                continue;
+            }
+
+            $claimScopes = is_string($payload[$claim])
+                ? preg_split('/\s+/', trim($payload[$claim])) ?: []
+                : (array) $payload[$claim];
+
+            $scopes = array_merge($scopes, $claimScopes);
+        }
 
         return in_array($requiredScope, $scopes, true);
+    }
+}
+
+if (!function_exists('ehealthIsMissingScopeError')) {
+    /**
+     * Whether an eHealth API error indicates a missing OAuth scope allowance.
+     */
+    function ehealthIsMissingScopeError(EHealthResponseException $exception, string $requiredScope): bool
+    {
+        if ($exception->getCode() !== 403) {
+            return false;
+        }
+
+        $message = $exception->getMessage();
+
+        return str_contains($message, 'Missing allowances')
+            && str_contains($message, $requiredScope);
+    }
+}
+
+if (!function_exists('ehealthApplyMisProxy')) {
+    /**
+     * Route an eHealth request through the MIS token with msp_drfo when the session token
+     * lacks the required scope or when forced after a scope-related 403.
+     *
+     * @return bool True when MIS proxy headers were applied.
+     */
+    function ehealthApplyMisProxy(
+        EHealthRequest $service,
+        ?User $user,
+        int $legalEntityId,
+        string $requiredScope = 'employee:deactivate',
+        bool $force = false,
+    ): bool {
+        if (app()->environment('testing') || !$user) {
+            return false;
+        }
+
+        if (!$force && ehealthHasScope($requiredScope)) {
+            return false;
+        }
+
+        $taxId = $user->resolveParty($legalEntityId)?->taxId
+            ?? $user->adminEmployeeForMisAction($legalEntityId)?->party?->taxId;
+
+        if (!$taxId) {
+            return false;
+        }
+
+        $service->asMis()->withHeaders([
+            'msp_drfo' => $taxId,
+        ]);
+
+        return true;
     }
 }

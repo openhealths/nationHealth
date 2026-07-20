@@ -215,21 +215,27 @@ class EmployeeRoleIndex extends Component
         // Find an administrative employee role (HR, OWNER, ADMIN) for the current user in this facility
         $user = Auth::user();
         $ehealthEmployeeRoleService = EHealth::employeeRole();
-
-        // Prefer the user's own token when it already can write employee roles.
-        if ($user && !ehealthHasScope('employee_role:write')) {
-            $adminEmployee = $user->adminEmployeeForMisAction(legalEntity()->id);
-            $party = $user->resolveParty(legalEntity()->id);
-
-            if ($adminEmployee && $party?->taxId) {
-                $ehealthEmployeeRoleService->asMis()->withHeaders([
-                    'msp_drfo' => $party->taxId,
-                ]);
-            }
-        }
+        $misApplied = ehealthApplyMisProxy(
+            $ehealthEmployeeRoleService,
+            $user,
+            legalEntity()->id,
+            'employee_role:write'
+        );
 
         try {
             $response = $ehealthEmployeeRoleService->deactivate($employeeRole->uuid);
+        } catch (\App\Exceptions\EHealth\EHealthResponseException $e) {
+            if (!$misApplied && $user && ehealthIsMissingScopeError($e, 'employee_role:write')) {
+                $retryService = EHealth::employeeRole();
+
+                if (ehealthApplyMisProxy($retryService, $user, legalEntity()->id, 'employee_role:write', force: true)) {
+                    $response = $retryService->deactivate($employeeRole->uuid);
+                } else {
+                    throw $e;
+                }
+            } else {
+                throw $e;
+            }
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle("Error when deactivating $employeeRole->uuid employee role");
 

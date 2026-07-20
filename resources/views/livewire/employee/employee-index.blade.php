@@ -11,7 +11,13 @@
         // We cache the hospital ID so as not to call the legalEntity() function 100 times in a loop
         $currentLegalEntityId = legalEntity()->id;
 
-        $isElevated = $currentUser->hasAllowedRole([Role::ADMIN, Role::HR, Role::OWNER, Role::PHARMACY_OWNER]);
+        $isElevated = $currentUser->hasAllowedRole([Role::ADMIN, Role::HR, Role::OWNER, Role::PHARMACY_OWNER])
+            || $currentUser->hasRole([
+                Role::ADMIN->value,
+                Role::HR->value,
+                Role::OWNER->value,
+                Role::PHARMACY_OWNER->value,
+            ]);
         $canDeactivateElevated = $isElevated;
 
        // Cache access rights with an array.

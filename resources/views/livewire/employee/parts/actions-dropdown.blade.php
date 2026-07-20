@@ -14,9 +14,6 @@
     $canView = $isEmployee ? ($permissions['employee_view'] ?? false) : ($permissions['request_view'] ?? false);
     $canWrite = $isEmployee ? ($permissions['employee_write'] ?? false) : ($permissions['request_write'] ?? false);
 
-    // User availability condition
-    $hasUserLinked = $isEmployee ? !empty($position->userId) : true;
-
     $showView = $canView;
 
     $isLocalDraftRequest = $isRequest && $position->isLocalDraft();
@@ -67,17 +64,10 @@
 
                 @if($showEdit)
                     <li>
-                        @if($isEmployee && !$hasUserLinked && !($permissions['employee_admin_hr'] ?? false))
-                            <button type="button" wire:click="tryEdit({{ $position->id }})"
-                               class="flex w-full items-center gap-2 py-2 px-5 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors text-left">
-                                @icon('edit', 'w-5 h-5') {{ __('forms.edit') }}
-                            </button>
-                        @else
-                            <a href="{{ $isEmployee ? route('employee.edit', ['legalEntity' => legalEntity()->id, 'employee' => $position->id]) : route('employee-request.edit', ['legalEntity' => legalEntity()->id, 'employee_request' => $position->id]) }}"
-                               class="flex items-center gap-2 py-2 px-5 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
-                                @icon('edit', 'w-5 h-5') {{ __('forms.edit') }}
-                            </a>
-                        @endif
+                        <a href="{{ $isEmployee ? route('employee.edit', ['legalEntity' => legalEntity()->id, 'employee' => $position->id]) : route('employee-request.edit', ['legalEntity' => legalEntity()->id, 'employee_request' => $position->id]) }}"
+                           class="flex items-center gap-2 py-2 px-5 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                            @icon('edit', 'w-5 h-5') {{ __('forms.edit') }}
+                        </a>
                     </li>
                 @endif
 

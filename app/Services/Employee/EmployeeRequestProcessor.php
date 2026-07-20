@@ -538,6 +538,14 @@ class EmployeeRequestProcessor
 
         $users = $employee->party->users()->get();
 
+        if ($users->isEmpty() && $requestUserId) {
+            $requestUser = \App\Models\User::find($requestUserId);
+
+            if ($requestUser) {
+                $users = collect([$requestUser]);
+            }
+        }
+
         if ($users->isEmpty()) {
             return;
         }
@@ -545,6 +553,13 @@ class EmployeeRequestProcessor
         $roleName = $employee->employee_type;
 
         foreach ($users as $user) {
+            $employee->users()->syncWithoutDetaching([$user->id]);
+
+            if (!$user->partyId && $employee->partyId) {
+                $user->partyId = $employee->partyId;
+                $user->save();
+            }
+
             // Assign Role based on Employee Type
             if ($roleName && !$user->hasRole($roleName)) {
                 setPermissionsTeamId($legalEntityId);

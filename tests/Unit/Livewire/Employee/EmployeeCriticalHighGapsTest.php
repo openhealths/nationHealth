@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Livewire\Employee;
 
+use App\Enums\Employee\RequestStatus;
 use App\Livewire\Employee\EmployeeComponent;
 use Illuminate\View\View;
 use PHPUnit\Framework\Attributes\Test;
@@ -87,6 +88,19 @@ class EmployeeCriticalHighGapsTest extends TestCase
             'Перегляд запиту перед підписанням',
             __('forms.employee_request_preview_title')
         );
+    }
+
+    #[Test]
+    public function request_preview_modal_shows_ukrainian_status_label(): void
+    {
+        $blade = file_get_contents(
+            resource_path('views/livewire/employee/parts/modals/request-preview-modal.blade.php')
+        );
+
+        $this->assertNotFalse($blade);
+        $this->assertStringNotContainsString('>NEW<', $blade);
+        $this->assertStringContainsString('previewRequestStatusLabel()', $blade);
+        $this->assertSame('Новий', RequestStatus::NEW->label());
     }
 
     #[Test]

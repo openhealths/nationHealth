@@ -75,7 +75,7 @@ class EmployeeIndexAdminActionsTest extends TestCase
     }
 
     #[Test]
-    public function actions_dropdown_blocks_non_admin_edit_when_employee_has_no_user(): void
+    public function actions_dropdown_allows_edit_when_employee_has_no_user(): void
     {
         [$legalEntity, $employee] = $this->createLegalEntityWithApprovedDoctor();
         $this->instance('legalEntity', $legalEntity);
@@ -93,7 +93,11 @@ class EmployeeIndexAdminActionsTest extends TestCase
             ],
         ])->render();
 
-        $this->assertStringContainsString('tryEdit(' . $employee->id . ')', $html);
+        $this->assertStringContainsString(
+            route('employee.edit', ['legalEntity' => $legalEntity->id, 'employee' => $employee->id]),
+            $html
+        );
+        $this->assertStringNotContainsString('tryEdit', $html);
     }
 
     #[Test]

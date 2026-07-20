@@ -325,11 +325,6 @@ class EmployeeIndex extends EmployeeComponent
         $this->resetPage();
     }
 
-    public function tryEdit(int $employeeId): void
-    {
-        $this->dispatch('flashMessage', ['message' => 'Користувач має підтвердити вхід', 'type' => 'error']);
-    }
-
     public function deactivate(): void
     {
         // 1. Get the employee record from the database
@@ -379,19 +374,12 @@ class EmployeeIndex extends EmployeeComponent
         // Find an administrative employee role (HR, OWNER, ADMIN) for the current user in this facility
         $user = Auth::user();
         $ehealthEmployeeService = EHealth::employee();
-
-        // Prefer the user's own token when it already has employee:deactivate.
-        // Switching to MIS unconditionally can strip a valid OWNER/HR scope and cause 403.
-        if ($user && !ehealthHasScope('employee:deactivate')) {
-            $adminEmployee = $user->adminEmployeeForMisAction($this->legalEntity->id);
-            $party = $user->resolveParty($this->legalEntity->id);
-
-            if ($adminEmployee && $party?->taxId) {
-                $ehealthEmployeeService->asMis()->withHeaders([
-                    'msp_drfo' => $party->taxId,
-                ]);
-            }
-        }
+        $misApplied = ehealthApplyMisProxy(
+            $ehealthEmployeeService,
+            $user,
+            $this->legalEntity->id,
+            'employee:deactivate'
+        );
 
         try {
             $response = $ehealthEmployeeService->deactivate(
@@ -399,7 +387,25 @@ class EmployeeIndex extends EmployeeComponent
                 $formattedEndDate,
                 $status
             );
+        } catch (\App\Exceptions\EHealth\EHealthResponseException $e) {
+            if (!$misApplied && $user && ehealthIsMissingScopeError($e, 'employee:deactivate')) {
+                $retryService = EHealth::employee();
 
+                if (ehealthApplyMisProxy($retryService, $user, $this->legalEntity->id, 'employee:deactivate', force: true)) {
+                    $response = $retryService->deactivate(
+                        $employee->uuid,
+                        $formattedEndDate,
+                        $status
+                    );
+                } else {
+                    throw $e;
+                }
+            } else {
+                throw $e;
+            }
+        }
+
+        try {
             if (!empty($response)) {
                 // 3. Updates in the local database
                 $employee->update([

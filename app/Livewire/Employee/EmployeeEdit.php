@@ -33,13 +33,6 @@ class EmployeeEdit extends AbstractEmployeeFormManager
         $this->employee = $employee;
         $this->employeeId = $employee->id;
 
-        if (is_null($employee->userId) && !auth()->user()->hasAllowedRole([\App\Enums\User\Role::ADMIN, \App\Enums\User\Role::HR])) {
-            session()?->flash('error', 'Користувач має підтвердити вхід');
-            $this->redirectRoute('employee.index', ['legalEntity' => legalEntity()->id]);
-
-            return;
-        }
-
         // Check if the Party of this employee holds the Owner position
         $isOwnerParty = $employee->party->employees()
             ->where('employee_type', \App\Enums\User\Role::OWNER->value)

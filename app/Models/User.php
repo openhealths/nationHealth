@@ -208,7 +208,13 @@ class User extends Authenticatable implements MustVerifyEmail
             ->where('legal_entity_id', $legalEntityId)
             ->with('party')
             ->first()
-            ?->party;
+            ?->party
+            ?? Employee::query()
+                ->where('user_id', $this->id)
+                ->where('legal_entity_id', $legalEntityId)
+                ->with('party')
+                ->first()
+                ?->party;
     }
 
     /**
@@ -357,10 +363,140 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function getScopes(): string
     {
+        $scopeNames = $this->getAllPermissions()->pluck('name');
+
+        $teamId = getPermissionsTeamId();
+
+        if ($teamId) {
+            $scopeNames = $scopeNames->merge($this->getPermissionNamesFromEmployeeTypes($teamId));
+        }
+
         // Only request scopes defined in AR / config/scopes (eHealth rejects unknown ones).
         return implode(' ', EHealthKnownScopes::filter(
-            $this->getAllPermissions()->pluck('name')->unique()->values()->all()
+            $scopeNames->unique()->values()->all()
         ));
+    }
+
+    /**
+     * OAuth scopes implied by approved employee records when Spatie roles are not synced yet.
+     *
+     * @return Collection<int, string>
+     */
+    protected function getPermissionNamesFromEmployeeTypes(int $legalEntityId): Collection
+    {
+        $employeeTypes = Employee::query()
+            ->where('legal_entity_id', $legalEntityId)
+            ->whereIn('status', [Status::APPROVED->value, Status::REORGANIZED->value])
+            ->where(function (Builder $query): void {
+                $query->where('user_id', $this->id)
+                    ->orWhereHas('users', fn (Builder $userQuery) => $userQuery->where('users.id', $this->id));
+            })
+            ->pluck('employee_type')
+            ->unique()
+            ->filter();
+
+        return $employeeTypes->flatMap(
+            fn (string $type) => (array) config('ehealth.roles.' . $type, [])
+        );
+    }
+
+    /**
+     * Store direct permissions granted by eHealth on login without intersecting role permissions.
+     * Scopes are filtered only by the current LegalEntity type whitelist.
+     *
+     * @param  list<string>  $scopes
+     */
+    public function syncEhealthTokenPermissions(array $scopes): static
+    {
+        $incoming = collect(EHealthKnownScopes::filter($scopes))
+            ->filter(fn ($scope) => is_string($scope) && $scope !== '')
+            ->unique()
+            ->values();
+
+        if (!config('permission.teams')) {
+            $this->syncPermissionsParent($incoming->all());
+            app(PermissionRegistrar::class)->forgetCachedPermissions();
+            $this->unsetRelation('permissions');
+
+            return $this;
+        }
+
+        $teamId = getPermissionsTeamId();
+
+        if (!$teamId || $incoming->isEmpty()) {
+            $this->syncPermissionsParent([]);
+            app(PermissionRegistrar::class)->forgetCachedPermissions();
+            $this->unsetRelation('permissions');
+
+            return $this;
+        }
+
+        $allowed = $this->allowedPermissionNamesForCurrentTeam();
+        $filtered = $incoming->intersect($allowed)->values();
+
+        if ($filtered->isEmpty()) {
+            $this->syncPermissionsParent([]);
+            app(PermissionRegistrar::class)->forgetCachedPermissions();
+            $this->unsetRelation('permissions');
+
+            return $this;
+        }
+
+        $permissionModels = Permission::query()
+            ->where('guard_name', Auth::getDefaultDriver())
+            ->whereIn('name', $filtered->all())
+            ->get();
+
+        $this->syncPermissionsParent($permissionModels);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        $this->unsetRelation('permissions');
+
+        return $this;
+    }
+
+    /**
+     * Permission names allowed for the active team's LegalEntity type.
+     *
+     * @return Collection<int, string>
+     */
+    protected function allowedPermissionNamesForCurrentTeam(): Collection
+    {
+        if (!config('permission.teams')) {
+            return Permission::query()->pluck('name')->unique();
+        }
+
+        $teamId = getPermissionsTeamId();
+
+        if (!$teamId) {
+            return collect();
+        }
+
+        $guard = Auth::getDefaultDriver();
+
+        return cache()->memo()->remember(
+            "allowed_permissions:$teamId:$guard",
+            now()->addMinutes(5),
+            function () use ($teamId, $guard) {
+                $typeId = cache()->memo()->remember("le_type:$teamId", now()->addMinutes(5), function () use ($teamId) {
+                    $status = LegalEntity::whereKey($teamId)->value('status') ?? '';
+
+                    if ($status === Status::REORGANIZED->value) {
+                        return LegalEntityType::whereName(LegalEntity::TYPE_MSP_LIMITED)->value('id');
+                    }
+
+                    return LegalEntity::whereKey($teamId)->value('legal_entity_type_id');
+                });
+
+                if (!$typeId) {
+                    return collect();
+                }
+
+                return Permission::whereGuardName($guard)
+                    ->whereHas('legalEntityTypes', fn (Builder $query) => $query->where('legal_entity_type_id', $typeId))
+                    ->pluck('name')
+                    ->unique();
+            }
+        );
     }
 
     /**
@@ -385,30 +521,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
         $guard = Auth::getDefaultDriver();
 
-        $allowedNames = cache()->memo()->remember(
-            "allowed_permissions:$teamId:$guard",
-            now()->addMinutes(5),
-            function () use ($teamId, $guard) {
-                $typeId = cache()->memo()->remember("le_type:$teamId", now()->addMinutes(5), function () use ($teamId) {
-                    $status = LegalEntity::whereKey($teamId)->value('status') ?? '';
-
-                    if ($status === Status::REORGANIZED->value) {
-                        return LegalEntityType::whereName(LegalEntity::TYPE_MSP_LIMITED)->value('id');
-                    }
-
-                    return LegalEntity::whereKey($teamId)->value('legal_entity_type_id');
-                });
-
-                if (!$typeId) {
-                    return collect();
-                }
-
-                return Permission::whereGuardName($guard)
-                    ->whereHas('legalEntityTypes', fn (Builder $query) => $query->where('legal_entity_type_id', $typeId))
-                    ->pluck('name')
-                    ->unique();
-            }
-        );
+        $allowedNames = $this->allowedPermissionNamesForCurrentTeam();
 
         if ($allowedNames->isEmpty()) {
             return $all->where(fn () => false);

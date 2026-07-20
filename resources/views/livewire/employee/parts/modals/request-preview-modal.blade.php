@@ -72,7 +72,7 @@
                         </div>
                         <div>
                             <dt class="font-medium text-gray-500">{{ __('forms.request_status_label') }}</dt>
-                            <dd>NEW</dd>
+                            <dd>{{ $this->previewRequestStatusLabel() }}</dd>
                         </div>
                     </dl>
 
