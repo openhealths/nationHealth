@@ -167,6 +167,9 @@ if (!function_exists('ehealthHasScope')) {
     /**
      * Checks if the active eHealth Bearer token in the session has the specified scope.
      *
+     * eHealth access tokens are opaque (not JWTs). Scopes are persisted from the token
+     * exchange response into the session by TokenStorage. JWT decoding is only a fallback.
+     *
      * @param  string  $requiredScope
      * @return bool
      */
@@ -174,6 +177,12 @@ if (!function_exists('ehealthHasScope')) {
     {
         if (app()->environment('testing')) {
             return true;
+        }
+
+        $tokenStorage = app(\App\Auth\EHealth\Services\TokenStorage::class);
+
+        if ($tokenStorage->getScopes() !== []) {
+            return $tokenStorage->hasScope($requiredScope);
         }
 
         $tokenKey = config('ehealth.api.oauth.bearer_token');
@@ -196,32 +205,36 @@ if (!function_exists('ehealthHasScope')) {
         }
 
         $parts = explode('.', $token);
-        if (count($parts) !== 3) {
-            return false;
-        }
+        if (count($parts) === 3) {
+            $payloadJson = base64_decode(str_replace(['-', '_'], ['+', '/'], $parts[1]));
+            $payload = json_decode($payloadJson, true);
 
-        $payloadJson = base64_decode(str_replace(['-', '_'], ['+', '/'], $parts[1]));
-        $payload = json_decode($payloadJson, true);
+            if (is_array($payload)) {
+                $scopes = [];
 
-        if (!is_array($payload)) {
-            return false;
-        }
+                foreach (['scope', 'scp'] as $claim) {
+                    if (!isset($payload[$claim])) {
+                        continue;
+                    }
 
-        $scopes = [];
+                    $claimScopes = is_string($payload[$claim])
+                        ? preg_split('/\s+/', trim($payload[$claim])) ?: []
+                        : (array) $payload[$claim];
 
-        foreach (['scope', 'scp'] as $claim) {
-            if (!isset($payload[$claim])) {
-                continue;
+                    $scopes = array_merge($scopes, $claimScopes);
+                }
+
+                if ($scopes !== []) {
+                    return in_array($requiredScope, $scopes, true);
+                }
             }
-
-            $claimScopes = is_string($payload[$claim])
-                ? preg_split('/\s+/', trim($payload[$claim])) ?: []
-                : (array) $payload[$claim];
-
-            $scopes = array_merge($scopes, $claimScopes);
         }
 
-        return in_array($requiredScope, $scopes, true);
+        // Existing sessions may lack stored scopes: direct permissions are synced from the
+        // token response at login and mirror what eHealth granted on that bearer token.
+        $user = \Illuminate\Support\Facades\Auth::user();
+
+        return $user instanceof User && $user->hasDirectPermission($requiredScope);
     }
 }
 
