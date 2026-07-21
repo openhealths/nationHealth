@@ -15,12 +15,14 @@ use App\Jobs\EmployeeSync;
 use App\Models\Employee\Employee;
 use App\Models\Employee\EmployeeRequest;
 use App\Models\LegalEntity;
+use App\Models\Relations\Party;
 use App\Models\Role as ModelsRole;
 use App\Models\User;
 use App\Notifications\EmployeeSyncCompleted;
 use App\Notifications\SyncNotification;
 use App\Repositories\Repository;
 use App\Traits\BatchLegalEntityQueries;
+use Carbon\Carbon;
 use Illuminate\Bus\Batch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -200,9 +202,9 @@ class EmployeeIndex extends EmployeeComponent
             foreach ($words as $word) {
                 $searchTerm = '%' . $word . '%';
                 $query->where(function (Builder $q) use ($searchTerm) {
-                    $q->where('last_name', 'ILIKE', $searchTerm)
-                        ->orWhere('first_name', 'ILIKE', $searchTerm)
-                        ->orWhere('second_name', 'ILIKE', $searchTerm);
+                    $q->whereLike('last_name', $searchTerm)
+                        ->orWhereLike('first_name', $searchTerm)
+                        ->orWhereLike('second_name', $searchTerm);
                 });
             }
         }
@@ -211,25 +213,83 @@ class EmployeeIndex extends EmployeeComponent
         if (!empty($this->filter['email'])) {
             $query->whereHas(
                 'users',
-                fn ($q) => $q->where('email', 'ILIKE', '%' . $this->filter['email'] . '%')
+                fn ($q) => $q->whereLike('email', '%' . $this->filter['email'] . '%')
             );
         }
 
         // 4. Filter: Phone
         if (!empty($this->filter['phone'])) {
-            $query->whereHas('phones', fn ($q) => $q->where('number', 'like', '%' . $this->filter['phone'] . '%'));
+            $query->whereHas('phones', fn ($q) => $q->whereLike('number', '%' . $this->filter['phone'] . '%'));
         }
 
         // 5–6. tax_id / verification_status — 3.23.3.1.1 (OWNER/HR/ADMIN/PHARMACY_OWNER only)
         if ($this->canViewPartyVerificationMeta()) {
             if (!empty($this->filter['tax_id'])) {
-                $query->where('tax_id', 'ILIKE', '%' . trim($this->filter['tax_id']) . '%');
+                $query->whereLike('tax_id', '%' . trim($this->filter['tax_id']) . '%');
             }
 
             if (!empty($this->filter['verification_status'])) {
                 $query->where('verification_status', $this->filter['verification_status']);
             }
         }
+    }
+
+    /**
+     * Index ACL flags for the Blade view (keeps authorization off the template).
+     *
+     * @return array{
+     *     employee_view: bool,
+     *     employee_write: bool,
+     *     employee_deactivate: bool,
+     *     employee_admin_hr: bool,
+     *     request_view: bool,
+     *     request_write: bool,
+     *     request_delete: bool
+     * }
+     */
+    #[Computed]
+    public function indexPermissions(): array
+    {
+        $user = Auth::user();
+        $isElevated = $this->canViewPartyVerificationMeta();
+
+        return [
+            'employee_view' => $user->can('employee:details') || $isElevated,
+            'employee_write' => $user->can('employee:write') || $isElevated,
+            'employee_deactivate' => $user->can('employee:deactivate') || $isElevated,
+            'employee_admin_hr' => $isElevated,
+            'request_view' => $user->can('employee_request:read') || $isElevated,
+            'request_write' => $user->can('employee_request:write') || $isElevated,
+            'request_delete' => $user->can('employee_request:write') || $isElevated,
+        ];
+    }
+
+    /**
+     * Whether party personal-data edit is allowed from the employee registry.
+     */
+    public function canEditPartyPersonalData(Party $party): bool
+    {
+        $employees = $party->employees
+            ->where('legal_entity_id', $this->legalEntity->id);
+
+        if ($employees->isEmpty()) {
+            return false;
+        }
+
+        if ($employees->contains(fn (Employee $employee) => $employee->employeeType === Role::OWNER->value)) {
+            return false;
+        }
+
+        $latest = $employees->first();
+
+        if (!$latest) {
+            return false;
+        }
+
+        $status = $latest->status instanceof \UnitEnum ? $latest->status->value : $latest->status;
+
+        return $status !== Status::DISMISSED->value
+            && $status !== Status::STOPPED->value;
     }
 
     /**
@@ -241,6 +301,44 @@ class EmployeeIndex extends EmployeeComponent
 
         return $user instanceof User
             && $user->hasAllowedRole([Role::ADMIN, Role::HR, Role::OWNER, Role::PHARMACY_OWNER]);
+    }
+
+    /**
+     * Normalize Employee startDate (EHealthDateCast → d.m.Y) to Y-m-d for comparisons.
+     */
+    private function employeeStartDateYmd(?Employee $employee): ?string
+    {
+        if (!$employee) {
+            return null;
+        }
+
+        return $this->normalizeDateToYmd($employee->startDate);
+    }
+
+    private function normalizeDateToYmd(?string $date): ?string
+    {
+        if ($date === null || $date === '') {
+            return null;
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            return $date;
+        }
+
+        return Carbon::createFromFormat(config('app.date_format'), $date)?->format('Y-m-d');
+    }
+
+    private function todayYmd(): string
+    {
+        return Carbon::today()->format('Y-m-d');
+    }
+
+    private function defaultDeactivationEndDate(?Employee $employee): string
+    {
+        $today = $this->todayYmd();
+        $startDate = $this->employeeStartDateYmd($employee);
+
+        return ($startDate && $today < $startDate) ? $startDate : $today;
     }
 
     /**
@@ -284,18 +382,15 @@ class EmployeeIndex extends EmployeeComponent
         if ($employee) {
             $this->employeeIdToDeactivate = $id;
 
-            $this->employeeToDeactivateName = $employee->full_name
-                ?? ($employee->last_name . ' ' . $employee->first_name);
+            $this->employeeToDeactivateName = $employee->fullName;
 
-            $type = $employee->employeeType ?? $employee->employee_type ?? '';
+            $type = $employee->employeeType ?? '';
 
             $this->isDoctorToDeactivate = ($type === Role::DOCTOR->value);
         }
 
         $this->deactivationStatus = Status::STOPPED->value;
-        $startDateStr = isset($employee) ? ($employee->start_date ?? '') : '';
-        $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
-        $this->deactivationEndDate = ($startDateStr && $todayStr < $startDateStr) ? $startDateStr : $todayStr;
+        $this->deactivationEndDate = $this->defaultDeactivationEndDate($employee ?? null);
 
         $this->showDeactivateModal = true;
     }
@@ -306,9 +401,7 @@ class EmployeeIndex extends EmployeeComponent
             $this->deactivationEndDate = '';
         } elseif ($this->deactivationEndDate === '' && $this->employeeIdToDeactivate) {
             $employee = Employee::find($this->employeeIdToDeactivate);
-            $startDateStr = $employee?->start_date ?? '';
-            $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
-            $this->deactivationEndDate = ($startDateStr && $todayStr < $startDateStr) ? $startDateStr : $todayStr;
+            $this->deactivationEndDate = $this->defaultDeactivationEndDate($employee);
         }
     }
 
@@ -343,8 +436,8 @@ class EmployeeIndex extends EmployeeComponent
         }
 
         // eHealth: STOPPED requires end_date (>= start_date, <= today); ENTERED_IN_ERROR omits end_date.
-        $startDateStr = $employee->start_date;
-        $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
+        $startDateStr = $this->employeeStartDateYmd($employee);
+        $todayStr = $this->todayYmd();
         $status = in_array($this->deactivationStatus, [Status::STOPPED->value, Status::ENTERED_IN_ERROR->value], true)
             ? $this->deactivationStatus
             : Status::STOPPED->value;
@@ -353,27 +446,23 @@ class EmployeeIndex extends EmployeeComponent
 
         if ($status === Status::STOPPED->value) {
             $endDateInput = trim($this->deactivationEndDate);
-            $endDateStr = $endDateInput !== '' ? $endDateInput : $todayStr;
+            $endDateYmd = $endDateInput !== ''
+                ? ($this->normalizeDateToYmd($endDateInput) ?? $todayStr)
+                : $todayStr;
 
-            if ($startDateStr && $endDateStr < $startDateStr) {
-                $this->dispatch('flashMessage', [
-                    'message' => __('employees.deactivation_end_date_before_start'),
-                    'type' => 'error',
-                ]);
-
-                return;
-            }
-
-            if ($endDateStr > $todayStr) {
-                $this->dispatch('flashMessage', [
-                    'message' => __('employees.deactivation_end_date_in_future'),
-                    'type' => 'error',
-                ]);
+            if ($startDateStr && $endDateYmd < $startDateStr) {
+                Session::flash('error', __('employees.deactivation_end_date_before_start'));
 
                 return;
             }
 
-            $formattedEndDate = $endDateStr;
+            if ($endDateYmd > $todayStr) {
+                Session::flash('error', __('employees.deactivation_end_date_in_future'));
+
+                return;
+            }
+
+            $formattedEndDate = $endDateYmd;
         }
 
         // Find an administrative employee role (HR, OWNER, ADMIN) for the current user in this facility
@@ -412,9 +501,9 @@ class EmployeeIndex extends EmployeeComponent
                 // This handles cases where email might be 'N/A' or user doesn't exist locally
                 $party = $employee->party;
                 $partyEmployees = $party->employees->where('legal_entity_id', $this->legalEntity->id);
-                $employeesWithUser = $partyEmployees->filter(fn (Employee $employee) => $employee->user_id !== null);
+                $employeesWithUser = $partyEmployees->filter(fn (Employee $employee) => $employee->userId !== null);
 
-                $partyUsers = $party->users->whereIn('id', $employeesWithUser->pluck('user_id')); // filter by legal entity id
+                $partyUsers = $party->users->whereIn('id', $employeesWithUser->pluck('userId')); // filter by legal entity id
 
                 // Detach all users from the employee to prevent orphaned relationships
                 $employee->users()->detach();
@@ -424,7 +513,7 @@ class EmployeeIndex extends EmployeeComponent
 
                 // Role from dissmisses employee can attached to multiple users, so we need to loop through all of them
                 foreach ($partyUsers as $user) {
-                    $roleToRemove = $employee->employee_type;
+                    $roleToRemove = $employee->employeeType;
 
                     foreach ($guards as $guard) {
                         if ($user->hasRole($roleToRemove, $guard)) {

@@ -1,5 +1,4 @@
 @use('App\Enums\Status')
-@use('App\Enums\User\Role')
 @use('App\Enums\JobStatus')
 @use('App\Models\Employee\Employee')
 @use('App\Models\Employee\EmployeeRequest')
@@ -7,35 +6,20 @@
 <div>
     <livewire:components.x-message :key="now()->timestamp"/>
     @php
-        $currentUser = auth()->user();
-        // We cache the hospital ID so as not to call the legalEntity() function 100 times in a loop
+        // Cache the hospital ID so as not to call legalEntity() in loops
         $currentLegalEntityId = legalEntity()->id;
+        $permissions = $this->indexPermissions;
 
-        $isElevated = $currentUser->hasAllowedRole([Role::ADMIN, Role::HR, Role::OWNER, Role::PHARMACY_OWNER]);
-        $canDeactivateElevated = $isElevated;
-
-       // Cache access rights with an array.
-       // ADMIN/HR/OWNER/PHARMACY_OWNER are elevated even when eHealth scopes omit employee:write/details/deactivate.
-       $permissions = [
-        'employee_view' => $currentUser->can('employee:details') || $isElevated,
-        'employee_write' => $currentUser->can('employee:write') || $isElevated,
-        'employee_deactivate' => $currentUser->can('employee:deactivate') || $canDeactivateElevated,
-        'employee_admin_hr' => $isElevated,
-        'request_view' => $currentUser->can('employee_request:read') || $isElevated,
-        'request_write' => $currentUser->can('employee_request:write') || $isElevated,
-        'request_delete' => $currentUser->can('employee_request:write') || $isElevated,
-    ];
-
-    $statusOptions = [
-        Status::APPROVED->value => __('forms.status.active'),
-        Status::NEW->value => __('forms.status.new'),
-        // Legacy local SIGNED rows (pre keep-NEW); same UI meaning as submitted NEW
-        Status::SIGNED->value => __('forms.status.new'),
-        Status::STOPPED->value => __('forms.status.stopped'),
-        Status::ENTERED_IN_ERROR->value => __('forms.status.entered_in_error'),
-        Status::DISMISSED->value => __('forms.status.stopped'),
-        Status::REORGANIZED->value => __('forms.reorganized'),
-    ];
+        $statusOptions = [
+            Status::APPROVED->value => __('forms.status.active'),
+            Status::NEW->value => __('forms.status.new'),
+            // Legacy local SIGNED rows (pre keep-NEW); same UI meaning as submitted NEW
+            Status::SIGNED->value => __('forms.status.new'),
+            Status::STOPPED->value => __('forms.status.stopped'),
+            Status::ENTERED_IN_ERROR->value => __('forms.status.entered_in_error'),
+            Status::DISMISSED->value => __('forms.status.stopped'),
+            Status::REORGANIZED->value => __('forms.reorganized'),
+        ];
     @endphp
 
     <x-header-navigation class="items-start" x-data="{ showFilter: false }">
@@ -255,16 +239,16 @@
 
                         @if($permissions['employee_admin_hr'])
                             <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mt-1 mb-2">
-                                @if($party->tax_id)
-                                    <span>{{ __('forms.tax_id') }}: <span class="font-medium text-gray-700 dark:text-gray-200">{{ $party->tax_id }}</span></span>
+                                @if($party->taxId)
+                                    <span>{{ __('forms.tax_id') }}: <span class="font-medium text-gray-700 dark:text-gray-200">{{ $party->taxId }}</span></span>
                                 @endif
-                                @if($party->verification_status)
+                                @if($party->verificationStatus)
                                     @php
-                                        $partyVerification = \App\Enums\Party\VerificationStatus::tryFrom($party->verification_status);
+                                        $partyVerification = \App\Enums\Party\VerificationStatus::tryFrom($party->verificationStatus);
                                     @endphp
                                     <span>{{ __('party_verification.status') }}:
                                         <span class="font-medium text-gray-700 dark:text-gray-200">
-                                            {{ $partyVerification?->label() ?? $party->verification_status }}
+                                            {{ $partyVerification?->label() ?? $party->verificationStatus }}
                                         </span>
                                     </span>
                                 @endif
@@ -344,23 +328,8 @@
 
                             <div class="flex items-center gap-4">
                                 @if($employees->isNotEmpty())
-                                    @php
-                                        // Find the last active employee of this person to check the rights
-                                        $latestEmployee = $employees->first(); // or through the method by which you get a topical position
-
-                                        // Check if ANY of the employee positions for this party is an OWNER
-                                        $isOwner = $employees->contains(fn($emp) => $emp->employeeType === Role::OWNER->value);
-                                        $hasUserLinked = $latestEmployee && !empty($latestEmployee->userId);
-
-                                        // We check the possibility of editing personal data according to your rules:
-                                        // 1. Not the owner 3. Not exempt
-                                        $canEditParty = $latestEmployee
-                                            && !$isOwner
-                                            && $latestEmployee->status !== Status::DISMISSED;
-                                    @endphp
                                     @can('create', EmployeeRequest::class)
-                                        {{-- Edit personal data button --}}
-                                        @if($canEditParty)
+                                        @if($this->canEditPartyPersonalData($party))
                                             <a href="{{ route('party.edit', ['legalEntity' => $currentLegalEntityId, 'party' => $party->id]) }}"
                                                class="cursor-pointer text-blue-600 hover:text-blue-800 flex items-center gap-1">
                                                 @icon('file-lines', 'w-4 h-4 text-blue-600 hover:text-blue-800')
@@ -368,15 +337,13 @@
                                             </a>
                                         @endif
 
-                                        {{-- Add position button (if you want to restrict for owners too) --}}
-
                                         <a href="{{ route('employee-request.position-add', ['legalEntity' => $currentLegalEntityId, 'party' => $party->id]) }}"
                                            class="item-add text-blue-600 hover:text-blue-800 flex items-center gap-1">
                                             <span class="text-xl leading-none">+</span>
                                             <span>{{ __('forms.add_position') }}</span>
                                         </a>
-                                    @endif
-                                @endcan
+                                    @endcan
+                                @endif
                             </div>
                         </div>
 
@@ -402,7 +369,7 @@
                                         @php
                                             $positionEmail = null;
                                             if ($position instanceof Employee) {
-                                                $positionEmail = $party->loadMissing('users')->users->where(fn($user) => $user->id === $position->user_id)->first()?->email ?? null;
+                                                $positionEmail = $party->loadMissing('users')->users->where(fn($user) => $user->id === $position->userId)->first()?->email ?? null;
                                             } else if ($position instanceof EmployeeRequest) {
                                                 $positionEmail = $position->revision->data['party']['email'] ?? null;
                                             }
@@ -412,7 +379,7 @@
                                                 {{ $dictionaries['POSITION'][$position->position] ?? $position->position }}
                                             </td>
                                             <td class="td-input break-words whitespace-normal align-top">
-                                                {{ $dictionaries['EMPLOYEE_TYPE'][$position->employee_type] ?? $position->employee_type }}
+                                                {{ $dictionaries['EMPLOYEE_TYPE'][$position->employeeType] ?? $position->employeeType }}
                                             </td>
                                             <td class="td-input break-words whitespace-normal align-top">
                                                 {{ $position->division->name ?? __('forms.undefined') }}

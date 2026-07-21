@@ -170,6 +170,71 @@ class EmployeeIndexSearchTest extends TestCase
         $this->assertCount(1, $ids);
     }
 
+    #[Test]
+    public function deactivation_end_date_defaults_compare_ymd_against_cast_start_date(): void
+    {
+        [$legalEntity, $party] = $this->createLegalEntityWithParty(
+            firstName: 'Іван',
+            lastName: 'Петренко',
+            secondName: 'Олегович',
+        );
+
+        $employee = Employee::query()->where('party_id', $party->id)->firstOrFail();
+        $employee->update(['start_date' => now()->subDays(10)->format('Y-m-d')]);
+        $employee->refresh();
+
+        $component = new EmployeeIndex();
+        $legalEntityProperty = new \ReflectionProperty(EmployeeIndex::class, 'legalEntity');
+        $legalEntityProperty->setValue($component, $legalEntity);
+
+        $normalize = new ReflectionMethod(EmployeeIndex::class, 'normalizeDateToYmd');
+        $defaultEnd = new ReflectionMethod(EmployeeIndex::class, 'defaultDeactivationEndDate');
+
+        $this->assertSame(
+            now()->subDays(10)->format('Y-m-d'),
+            $normalize->invoke($component, $employee->startDate),
+        );
+        $this->assertSame(
+            now()->format('Y-m-d'),
+            $defaultEnd->invoke($component, $employee),
+        );
+    }
+
+    #[Test]
+    public function name_search_uses_where_like_abstraction(): void
+    {
+        [$legalEntity] = $this->createLegalEntityWithParty(
+            firstName: 'Іван',
+            lastName: 'Петренко',
+            secondName: 'Олегович',
+        );
+
+        $component = new EmployeeIndex();
+        $component->search = 'Петренко';
+        $component->status = [];
+        $component->filter = [
+            'phone' => '',
+            'email' => '',
+            'role' => '',
+            'position' => '',
+            'division_id' => '',
+            'tax_id' => '',
+            'verification_status' => '',
+        ];
+
+        $legalEntityProperty = new \ReflectionProperty(EmployeeIndex::class, 'legalEntity');
+        $legalEntityProperty->setValue($component, $legalEntity);
+
+        $query = Party::query();
+        $method = new ReflectionMethod(EmployeeIndex::class, 'applyDatabaseFilters');
+        $method->invoke($component, $query);
+
+        $sql = strtolower($query->toSql());
+        $this->assertStringContainsString('last_name', $sql);
+        $this->assertStringContainsString('like', $sql);
+        $this->assertStringNotContainsString('concat', $sql);
+    }
+
     /**
      * @return array<string, array{0: string}>
      */
