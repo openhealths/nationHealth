@@ -6,6 +6,7 @@ namespace Tests\Feature\Employee;
 
 use App\Enums\Status;
 use App\Enums\User\Role;
+use App\Livewire\Employee\EmployeeIndex;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
@@ -41,7 +42,7 @@ class EmployeeIndexAdminActionsTest extends TestCase
 
         $admin = Mockery::mock(User::class)->makePartial();
         $admin->shouldReceive('can')->with('employee:write')->andReturn(false);
-        $admin->shouldReceive('hasAllowedRole')->with([Role::ADMIN, Role::HR, Role::OWNER, Role::PHARMACY_OWNER])->andReturn(true);
+        $admin->shouldReceive('hasElevatedEmployeeRole')->andReturn(true);
 
         $response = (new EmployeePolicy())->update($admin, $employee);
 
@@ -98,6 +99,24 @@ class EmployeeIndexAdminActionsTest extends TestCase
             $html
         );
         $this->assertStringNotContainsString('tryEdit', $html);
+    }
+
+    #[Test]
+    public function request_error_message_translates_missing_employee_deactivate_allowance(): void
+    {
+        $component = new EmployeeIndex();
+        $method = new \ReflectionMethod(EmployeeIndex::class, 'translateRequestError');
+        $method->setAccessible(true);
+
+        $translated = $method->invoke(
+            $component,
+            '403: Your scope does not allow to access this resource. Missing allowances: employee:deactivate'
+        );
+
+        $this->assertSame(
+            __('employees.errors.missing_allowance_employee_deactivate'),
+            $translated
+        );
     }
 
     #[Test]

@@ -657,6 +657,19 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Whether the user holds an elevated employee-management role in the current legal entity.
+     *
+     * Mirrors employee registry UI: hasAllowedRole OR assigned Spatie role (3.23.1.1 / 3.23.3).
+     */
+    public function hasElevatedEmployeeRole(): bool
+    {
+        $roles = [Role::ADMIN, Role::HR, Role::OWNER, Role::PHARMACY_OWNER];
+
+        return $this->hasAllowedRole($roles)
+            || $this->hasRole(array_map(static fn (Role $role) => $role->value, $roles));
+    }
+
+    /**
      * Get employee by priority with specific write permission. Example: procedure:write.
      *
      * @param  Role  ...$priorityRoles  Ordered role from most valuable to least

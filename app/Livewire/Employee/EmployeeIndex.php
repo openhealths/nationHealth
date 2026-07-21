@@ -429,7 +429,7 @@ class EmployeeIndex extends EmployeeComponent
 
             $this->dispatch(
                 'flashMessage',
-                ['message' => __('employees.requestError', ['error' => $e->getMessage()]), 'type' => 'error']
+                ['message' => __('employees.requestError', ['error' => $this->translateRequestError($e->getMessage())]), 'type' => 'error']
             );
         }
 
@@ -498,7 +498,7 @@ class EmployeeIndex extends EmployeeComponent
             );
             $this->dispatch(
                 'flashMessage',
-                ['message' => __('employees.requestError', ['error' => $e->getMessage()]), 'type' => 'error']
+                ['message' => __('employees.requestError', ['error' => $this->translateRequestError($e->getMessage())]), 'type' => 'error']
             );
 
             return;
@@ -678,6 +678,15 @@ class EmployeeIndex extends EmployeeComponent
             $this->showDeleteModal = false;
             $this->requestToDeleteId = null;
         }
+    }
+
+    private function translateRequestError(string $error): string
+    {
+        if (str_contains($error, 'Missing allowances: employee:deactivate')) {
+            return __('employees.errors.missing_allowance_employee_deactivate');
+        }
+
+        return $error;
     }
 
     /**
