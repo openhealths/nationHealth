@@ -27,7 +27,7 @@
     $showSync = $canWrite && (
         $isEmployee
             ? !empty($position->uuid)
-            : ($position->isPendingEhealth() || $status === 'APPROVED')
+            : $position->isPendingEhealth()
     );
     $showDelete = $isRequest && auth()->user()->can('delete', $position);
 
