@@ -465,25 +465,8 @@ class EmployeeIndex extends EmployeeComponent
             $formattedEndDate = $endDateYmd;
         }
 
-        // Find an administrative employee role (HR, OWNER, ADMIN) for the current user in this facility
-        $user = Auth::user();
-        $ehealthEmployeeService = EHealth::employee();
-
-        // Prefer the user's own token when it already has employee:deactivate.
-        // Switching to MIS unconditionally can strip a valid OWNER/HR scope and cause 403.
-        if ($user && !ehealthHasScope('employee:deactivate')) {
-            $adminEmployee = $user->adminEmployeeForMisAction($this->legalEntity->id);
-            $party = $user->resolveParty($this->legalEntity->id);
-
-            if ($adminEmployee && $party?->taxId) {
-                $ehealthEmployeeService->asMis()->withHeaders([
-                    'msp_drfo' => $party->taxId,
-                ]);
-            }
-        }
-
         try {
-            $response = $ehealthEmployeeService->deactivate(
+            $response = EHealth::employee()->deactivate(
                 $employee->uuid,
                 $formattedEndDate,
                 $status
