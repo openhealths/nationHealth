@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
- * Drop obsolete party_verification permissions that are not in the AR Scopes model.
- * Allowed: party_verification:details, party_verification:write.
+ * Drop obsolete party_verification permissions not in the AR Scopes model.
+ * Keep only: party_verification:details, party_verification:write.
  */
 return new class extends Migration
 {

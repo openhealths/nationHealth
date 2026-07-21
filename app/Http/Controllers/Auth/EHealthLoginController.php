@@ -124,11 +124,13 @@ class EHealthLoginController extends Controller
 
         Session::forget('mis_2fa');
 
+        // Keep only AR/config scopes; eHealth may still return obsolete grants (e.g. party_verification:read).
         $ehealthScopes = EHealthKnownScopes::filter(preg_split(
             '/\s+/',
             trim(data_get($validatedEHealthTokenData, 'details.scope', ''))
         ) ?: []);
 
+        // Persist token scopes as direct permissions (LE-type whitelist), not role-intersected syncPermissions().
         $user->syncEhealthTokenPermissions($ehealthScopes);
 
         EHealthUserLogin::dispatch($user, $legalEntity, $authUserUUID, $this->isFirstLogin, $loginedGuard);
@@ -136,18 +138,13 @@ class EHealthLoginController extends Controller
         $user->refresh();
 
         if (!$user->party) {
-
             Session::put('selected_legal_entity_uuid', $legalEntity->uuid);
-            $user->syncEhealthTokenPermissions($ehealthScopes);
 
             return Redirect::route('party.verify');
         }
 
         if ($legalEntity) {
             Log::info(__('auth.login.success.user_auth', [], 'en'), ['User ID' => $user->id]);
-
-            // Respect EHealth scopes
-            $user->syncEhealthTokenPermissions($ehealthScopes);
 
             return Redirect::route('dashboard', [$legalEntity])->with(
                 'success',
