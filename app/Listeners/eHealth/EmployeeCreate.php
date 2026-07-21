@@ -258,7 +258,6 @@ class EmployeeCreate
                     [
                         'legal_entity_id' => $legalEntityUuid,
                         'tax_id' => $taxId,
-                        'page_size' => config('ehealth.api.page_size_max'),
                     ]
                 )->validate();
             } catch (Throwable $e) {

@@ -1,17 +1,8 @@
 @use('App\Enums\JobStatus')
 
 <div>
-    {{-- 1. DEFINE PERMISSIONS --}}
     @php
-        $currentUser = auth()->user();
-
-       $permissions = [
-        'request_view'   => $currentUser->can('employee_request:read') || $currentUser->hasAllowedRole([\App\Enums\User\Role::ADMIN, \App\Enums\User\Role::HR, \App\Enums\User\Role::OWNER, \App\Enums\User\Role::PHARMACY_OWNER]),
-        'request_write'  => $currentUser->can('employee_request:write') || $currentUser->hasAllowedRole([\App\Enums\User\Role::ADMIN, \App\Enums\User\Role::HR, \App\Enums\User\Role::OWNER, \App\Enums\User\Role::PHARMACY_OWNER]),
-        'request_delete' => $currentUser->can('employee_request:write') || $currentUser->hasAllowedRole([\App\Enums\User\Role::ADMIN, \App\Enums\User\Role::HR, \App\Enums\User\Role::OWNER, \App\Enums\User\Role::PHARMACY_OWNER]),
-
-        'employee_view' => false, 'employee_write' => false, 'employee_deactivate' => false
-    ];
+        $permissions = $this->indexPermissions;
     @endphp
 
     <x-header-navigation class="items-start">

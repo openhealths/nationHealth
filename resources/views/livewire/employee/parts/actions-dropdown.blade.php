@@ -19,10 +19,17 @@
 
     $showView = $canView;
 
-    $showEdit = $canWrite && !$isOwner && ($isEmployee ? $status !== 'DISMISSED' : $status === 'NEW');
+    // EmployeeRequest edit/delete: Policy (isLocalDraft + scopes). Employee: elevated write rules.
+    $showEdit = $isEmployee
+        ? ($canWrite && !$isOwner && $status !== 'DISMISSED')
+        : ($isRequest && auth()->user()->can('update', $position));
 
-    $showSync = $canWrite && ($isEmployee ? !empty($position->uuid) : in_array($status, ['NEW', 'SIGNED', 'APPROVED']));
-    $showDelete = $isRequest && $canWrite && $status === 'NEW';
+    $showSync = $canWrite && (
+        $isEmployee
+            ? !empty($position->uuid)
+            : ($position->isPendingEhealth() || $status === 'APPROVED')
+    );
+    $showDelete = $isRequest && auth()->user()->can('delete', $position);
 
     // We also prohibit the dismissal of the owner through the interface, if necessary
     $showDismiss = $isEmployee && !$isOwner && $status === 'APPROVED' && ($permissions['employee_deactivate'] ?? false);

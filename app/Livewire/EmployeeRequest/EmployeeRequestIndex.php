@@ -48,6 +48,33 @@ class EmployeeRequestIndex extends EmployeeComponent
 
     private LegalEntity $legalEntity;
 
+    /**
+     * Index ACL flags for the Blade view (authorization lives in EmployeeRequestPolicy).
+     *
+     * @return array{
+     *     request_view: bool,
+     *     request_write: bool,
+     *     request_delete: bool,
+     *     employee_view: bool,
+     *     employee_write: bool,
+     *     employee_deactivate: bool
+     * }
+     */
+    #[Computed]
+    public function indexPermissions(): array
+    {
+        $user = Auth::user();
+
+        return [
+            'request_view' => $user->can('viewAny', EmployeeRequest::class),
+            'request_write' => $user->can('create', EmployeeRequest::class),
+            'request_delete' => $user->can('create', EmployeeRequest::class),
+            'employee_view' => false,
+            'employee_write' => false,
+            'employee_deactivate' => false,
+        ];
+    }
+
     #[Computed]
     public function isSync(): bool
     {
