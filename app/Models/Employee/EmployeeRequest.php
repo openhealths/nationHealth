@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Represents a request to create or modify an employee.
@@ -170,9 +171,9 @@ class EmployeeRequest extends BaseEmployee
                         $term = '%' . $word . '%';
                         $partyQuery->where(function (Builder $nameQuery) use ($term): void {
                             $nameQuery
-                                ->where('last_name', 'ILIKE', $term)
-                                ->orWhere('first_name', 'ILIKE', $term)
-                                ->orWhere('second_name', 'ILIKE', $term);
+                                ->whereLike('last_name', $term)
+                                ->orWhereLike('first_name', $term)
+                                ->orWhereLike('second_name', $term);
                         });
                     }
                 })
@@ -180,10 +181,11 @@ class EmployeeRequest extends BaseEmployee
                     foreach ($words as $word) {
                         $term = '%' . $word . '%';
                         $revisionQuery->where(function (Builder $nameQuery) use ($term): void {
+                            // JSON path is Postgres-specific; whereLike still abstracts case-insensitive matching.
                             $nameQuery
-                                ->whereRaw("(data->'party'->>'last_name') ILIKE ?", [$term])
-                                ->orWhereRaw("(data->'party'->>'first_name') ILIKE ?", [$term])
-                                ->orWhereRaw("(data->'party'->>'second_name') ILIKE ?", [$term]);
+                                ->whereLike(DB::raw("(data->'party'->>'last_name')"), $term)
+                                ->orWhereLike(DB::raw("(data->'party'->>'first_name')"), $term)
+                                ->orWhereLike(DB::raw("(data->'party'->>'second_name')"), $term);
                         });
                     }
                 });

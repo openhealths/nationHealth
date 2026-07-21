@@ -46,27 +46,20 @@ class EmployeeRequestProcessor
 
         $request->loadMissing(['revision', 'employee', 'party', 'division']);
 
-        $token = session()->get(config('ehealth.api.oauth.bearer_token'));
-        if (!$token) {
+        if (!session()->get(config('ehealth.api.oauth.bearer_token'))) {
             return [
                 'outcome' => self::OUTCOME_FAILED,
                 'message' => __('employees.sync.session_token_missing'),
             ];
         }
 
-        $response = EHealth::employeeRequest()
-            ->withToken($token)
-            ->getDetails($request->uuid);
+        $remoteData = EHealth::employeeRequest()
+            ->getDetails($request->uuid)
+            ->validate();
 
-        $remoteData = $response->json('data') ?? [];
-        if ($remoteData === []) {
-            return [
-                'outcome' => self::OUTCOME_FAILED,
-                'message' => __('employees.sync.ehealth_empty_data'),
-            ];
-        }
-
-        $remoteStatus = $remoteData['status'] ?? null;
+        $remoteStatus = $remoteData['status'] instanceof \BackedEnum
+            ? $remoteData['status']->value
+            : $remoteData['status'];
 
         if (in_array($remoteStatus, ['REJECTED', 'EXPIRED'], true)) {
             $newStatus = $remoteStatus === 'REJECTED' ? LocalStatus::REJECTED : LocalStatus::EXPIRED;
@@ -92,7 +85,7 @@ class EmployeeRequestProcessor
         }
 
         if ($remoteEmployee === null && !is_string($employeeUuid)) {
-            if (in_array($remoteStatus, ['NEW', 'SIGNED', null], true)) {
+            if (in_array($remoteStatus, ['NEW', 'SIGNED'], true)) {
                 return [
                     'outcome' => self::OUTCOME_PENDING,
                     'message' => __('employees.sync.employee_request_still_pending'),
@@ -119,7 +112,7 @@ class EmployeeRequestProcessor
         try {
             $this->applyApprovedRequest($request, $applyPayload);
         } catch (\Throwable $e) {
-            if (in_array($remoteStatus, ['NEW', 'SIGNED', null], true)) {
+            if (in_array($remoteStatus, ['NEW', 'SIGNED'], true)) {
                 Log::info('[EmployeeRequestProcessor] Pending request has no APPROVED employee yet.', [
                     'request_id' => $request->id,
                     'remote_status' => $remoteStatus,
