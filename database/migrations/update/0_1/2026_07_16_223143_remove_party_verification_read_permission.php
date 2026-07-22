@@ -3,39 +3,21 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
-use Spatie\Permission\PermissionRegistrar;
 
 /**
- * Drop obsolete party_verification permissions not in the AR Scopes model.
- * Keep only: party_verification:details, party_verification:write.
+ * Previously removed party_verification permissions other than details/write.
+ * eHealth confirmed party_verification:read is a valid scope — destructive body removed.
+ * Restoration is handled by 2026_07_22_103000_restore_party_verification_read_permission.
  */
 return new class extends Migration
 {
     public function up(): void
     {
-        $permissionIds = DB::table('permissions')
-            ->where('name', 'like', 'party_verification:%')
-            ->whereNotIn('name', [
-                'party_verification:details',
-                'party_verification:write',
-            ])
-            ->pluck('id');
-
-        if ($permissionIds->isEmpty()) {
-            return;
-        }
-
-        DB::table('role_has_permissions')->whereIn('permission_id', $permissionIds)->delete();
-        DB::table('model_has_permissions')->whereIn('permission_id', $permissionIds)->delete();
-        DB::table('legal_entity_type_permissions')->whereIn('permission_id', $permissionIds)->delete();
-        DB::table('permissions')->whereIn('id', $permissionIds)->delete();
-
-        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        // No-op: keep migration history for environments that already ran the old body.
     }
 
     public function down(): void
     {
-        // Intentionally empty — obsolete scopes must not be reintroduced.
+        //
     }
 };
