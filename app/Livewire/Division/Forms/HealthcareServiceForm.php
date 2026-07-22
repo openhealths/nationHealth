@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Division\Forms;
 
 use App\Core\Arr;
+use Carbon\CarbonImmutable;
 use App\Enums\Division\Status;
 use App\Enums\License\Type;
 use App\Models\Division;
@@ -63,6 +64,12 @@ class HealthcareServiceForm extends Form
             true
         );
 
+        $isProvidingConditionRequiredForCategory = in_array(
+            $categoryCode,
+            config('ehealth.healthcare_service_providing_condition_field_required_for_categories', []),
+            true
+        );
+
         $isTypeRequiredForCategory = in_array(
             $categoryCode,
             config('ehealth.healthcare_service_type_field_required_for_categories', []),
@@ -88,10 +95,11 @@ class HealthcareServiceForm extends Form
                 $isSpecialityRequiredForCategory ? 'required' : 'prohibited'
             ],
             'providingCondition' => [
-                'required',
+                'nullable',
                 'string',
                 new InDictionary('PROVIDING_CONDITION'),
-                Rule::in(config("ehealth.$providingConditionConfigKey", []))
+                Rule::in(config("ehealth.$providingConditionConfigKey", [])),
+                $isProvidingConditionRequiredForCategory ? 'required' : 'prohibited'
             ],
             'type' => ['array', 'nullable'],
             'type.coding.*.system' => $isTypeRequiredForCategory
@@ -101,7 +109,7 @@ class HealthcareServiceForm extends Form
                 'nullable',
                 'string',
                 $isTypeRequiredForCategory ? 'required' : 'prohibited',
-                new InDictionary([$typeDictionary, 'LEGAL_ENTITY_TYPE_V2'])
+                new InDictionary($typeDictionary)
             ],
             'licenseId' => [
                 'nullable',
@@ -132,11 +140,13 @@ class HealthcareServiceForm extends Form
             'availableTime.*.availableStartTime' => [
                 'nullable',
                 'required_unless:availableTime.*.allDay,true',
+                'prohibited_if:availableTime.*.allDay,true',
                 'date_format:H:i:s'
             ],
             'availableTime.*.availableEndTime' => [
                 'nullable',
                 'required_unless:availableTime.*.allDay,true',
+                'prohibited_if:availableTime.*.allDay,true',
                 'date_format:H:i:s',
                 'after:availableTime.*.availableStartTime'
             ],
@@ -182,6 +192,8 @@ class HealthcareServiceForm extends Form
         return [
             'specialityType.required' => __('healthcare-services.validation.speciality_type.required_if'),
             'specialityType.prohibited' => __('healthcare-services.validation.speciality_type.prohibited_unless'),
+            'providingCondition.required' => __('healthcare-services.validation.providing_condition.required_if'),
+            'providingCondition.prohibited' => __('healthcare-services.validation.providing_condition.prohibited_unless'),
             'type.coding.*.code.required' => __('healthcare-services.validation.type_coding.required_if'),
             'type.coding.*.code.prohibited' => __('healthcare-services.validation.type_coding.prohibited_unless'),
             'licenseId.required' => __('healthcare-services.validation.license_id.required_if'),
@@ -199,6 +211,8 @@ class HealthcareServiceForm extends Form
     {
         $validated = $this->validate();
 
+        $this->validateNotAvailablePeriods();
+
         $this->validateConstraint();
 
         if (empty($validated['type']['coding'][0]['code'])) {
@@ -206,6 +220,49 @@ class HealthcareServiceForm extends Form
         }
 
         return $validated;
+    }
+
+    /**
+     * Do validation for the update flow (mutable fields only).
+     *
+     * @return array
+     * @throws ValidationException
+     */
+    public function doUpdateValidation(): array
+    {
+        $validated = $this->validate($this->rulesForUpdating());
+
+        $this->validateNotAvailablePeriods();
+
+        return $validated;
+    }
+
+    /**
+     * Ensure each not available period ends strictly after it starts.
+     *
+     * @return void
+     * @throws ValidationException
+     */
+    protected function validateNotAvailablePeriods(): void
+    {
+        $format = config('app.date_format') . ' H:i';
+
+        foreach ($this->notAvailable ?? [] as $index => $period) {
+            $during = $period['during'] ?? [];
+
+            if (!isset($during['startDate'], $during['startTime'], $during['endDate'], $during['endTime'])) {
+                continue;
+            }
+
+            $start = CarbonImmutable::createFromFormat('!' . $format, "{$during['startDate']} {$during['startTime']}");
+            $end = CarbonImmutable::createFromFormat('!' . $format, "{$during['endDate']} {$during['endTime']}");
+
+            if ($end->lessThanOrEqualTo($start)) {
+                throw ValidationException::withMessages([
+                    "notAvailable.$index.during.endTime" => __('healthcare-services.validation.not_available.end_after_start')
+                ]);
+            }
+        }
     }
 
     /**

@@ -1,4 +1,5 @@
-@use('App\Enums\Status')
+@use('App\Enums\HealthcareService\Status')
+@use('App\Enums\Status', 'DivisionStatus')
 @use('App\Enums\JobStatus')
 @use('App\Models\HealthcareService')
 
@@ -56,7 +57,7 @@
                         {{-- List Container --}}
                         <div class="overflow-y-auto custom-scrollbar py-1">
                             @foreach($divisions as $division)
-                                @if($division['status'] === Status::ACTIVE->value)
+                                @if($division['status'] === DivisionStatus::ACTIVE->value)
                                     <a href="{{ route('healthcare-service.create', [legalEntity(), $division['id']]) }}"
                                        x-show="'{{ addslashes($division['name']) }}'.toLowerCase().includes(search.toLowerCase())"
                                        class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors whitespace-normal wrap-break-word"
@@ -207,7 +208,7 @@
                                 </td>
 
                                 <td class="index-table-td-actions">
-                                    @if($service->division->status === Status::ACTIVE)
+                                    @if($service->division->status === DivisionStatus::ACTIVE)
                                         <div class="flex justify-center relative">
                                             <div x-data="{
                                                      open: false,

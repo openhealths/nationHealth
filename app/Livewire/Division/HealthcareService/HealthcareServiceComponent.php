@@ -90,6 +90,7 @@ class HealthcareServiceComponent extends Component
 
         return [
             'speciality' => config('ehealth.healthcare_service_speciality_type_field_required_for_categories', []),
+            'providingCondition' => config('ehealth.healthcare_service_providing_condition_field_required_for_categories', []),
             'type' => config('ehealth.healthcare_service_type_field_required_for_categories', []),
             'license' => array_values(
                 array_filter(

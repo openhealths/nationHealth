@@ -467,7 +467,7 @@ return [
         'TEMPORARY_CERTIFICATE', 'TEMPORARY_PASSPORT',
     ],
 
-    // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/17088643146/Configurations+for+Healthcare+services
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20305346763/DRAFT+Config+params+Healthcare+Service+ENT-032
     'healthcare_service_legal_entities_allowed_types' => ['PRIMARY_CARE', 'OUTPATIENT', 'EMERGENCY', 'PHARMACY'],
     'healthcare_service_primary_care_categories' => ['MSP'],
     'healthcare_service_outpatient_categories' => ['MSP', 'PHARMACY_DRUGS'],
@@ -476,7 +476,10 @@ return [
     'healthcare_service_pharmacy_license_type' => 'PHARMACY',
     'healthcare_service_pharmacy_drugs_license_type' => 'PHARMACY_DRUGS',
     'healthcare_service_speciality_type_field_required_for_categories' => ['MSP'],
+    'healthcare_service_providing_condition_field_required_for_categories' => ['MSP'],
     'healthcare_service_type_field_required_for_categories' => ['PHARMACY_DRUGS'],
+
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20213956636/DRAFT+Config+params+Legal+Entity+ENT-035
     'legal_entity_primary_care_providing_conditions' => ['OUTPATIENT'],
     'legal_entity_outpatient_providing_conditions' => ['INPATIENT', 'OUTPATIENT', 'FIELD'],
     'legal_entity_emergency_providing_conditions' => ['FIELD'],

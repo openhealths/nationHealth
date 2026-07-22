@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Division\HealthcareService;
 
-use App\Enums\Status;
+use App\Enums\HealthcareService\Status;
 use App\Models\Division;
 use App\Models\HealthcareService;
 use App\Models\LegalEntity;

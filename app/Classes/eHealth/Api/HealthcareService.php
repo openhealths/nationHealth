@@ -209,7 +209,7 @@ class HealthcareService extends Request
     {
         return [
             'available_time' => 'array',
-            'available_time.*.all_day' => 'required_with:available_time|boolean',
+            'available_time.*.all_day' => 'nullable|boolean',
             'available_time.*.available_end_time' => 'required_if:available_time.*.all_day,false|nullable|string',
             'available_time.*.available_start_time' => 'required_if:available_time.*.all_day,false|nullable|string',
             'available_time.*.days_of_week' => 'required|array',
@@ -234,7 +234,7 @@ class HealthcareService extends Request
             'legal_entity_id' => 'required|string',
             'license_id' => 'nullable|string',
             'licensed_healthcare_service' => 'nullable|array',
-            'licensed_healthcare_service.status' => 'required_with:licensed_healthcare_service|string',
+            'licensed_healthcare_service.status' => 'nullable|string',
             'licensed_healthcare_service.updated_at' => 'required_with:licensed_healthcare_service|string',
             'not_available' => 'array',
             'not_available.*.description' => 'required_with:not_available|string',
@@ -253,6 +253,7 @@ class HealthcareService extends Request
                 'string',
                 new InDictionary('HEALTHCARE_SERVICE_PHARMACY_DRUGS_TYPES')
             ],
+            'type.text' => 'nullable|string',
             'ehealth_updated_at' => 'required|date',
             'ehealth_updated_by' => 'required|uuid'
         ];

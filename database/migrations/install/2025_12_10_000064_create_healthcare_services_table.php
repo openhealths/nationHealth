@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\Status;
+use App\Enums\HealthcareService\Status;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('speciality_type')->nullable();
             $table->string('providing_condition')->nullable();
             $table->string('license_id')->nullable();
-            $table->enum('status', Status::only(['DRAFT', 'ACTIVE', 'INACTIVE']));
+            $table->enum('status', Status::values());
             $table->foreignId('category_id')->constrained('codeable_concepts');
             $table->foreignId('type_id')->nullable()->constrained('codeable_concepts');
             $table->text('comment')->nullable();

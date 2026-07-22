@@ -16,6 +16,7 @@
                       isDisabled: $wire.entangle('isDisabled'),
                       categoryCode: $wire.entangle('form.category.coding.0.code'),
                       specialityType: $wire.entangle('form.specialityType'),
+                      providingCondition: $wire.entangle('form.providingCondition'),
                       typeCode: $wire.entangle('form.type.coding.0.code'),
                       licenseId: $wire.entangle('form.licenseId'),
                       requiredCategories: @js($this->categoryRequiredFields),
@@ -26,6 +27,10 @@
                           this.$watch('categoryCode', () => {
                               if (!this.isRequired('speciality')) {
                                   this.specialityType = '';
+                              }
+
+                              if (!this.isRequired('providingCondition')) {
+                                  this.providingCondition = '';
                               }
 
                               if (!this.isRequired('type')) {
@@ -111,7 +116,10 @@
                     @enderror
                 </div>
 
-                <div class="form-group group">
+                <div class="form-group group"
+                     x-show="isRequired('providingCondition')"
+                     x-cloak
+                >
                     <select wire:model="form.providingCondition"
                             type="text"
                             name="providingCondition"

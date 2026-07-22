@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Enums\Status;
+use App\Enums\HealthcareService\Status;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Attributes\Scope;
