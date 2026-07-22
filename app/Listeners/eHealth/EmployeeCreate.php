@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 use App\Enums\Employee\RequestStatus;
 use App\Enums\Employee\RevisionStatus;
 use App\Models\Employee\EmployeeRequest;
+use App\Services\Employee\EmployeeRequestMatcher;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 
 class EmployeeCreate
@@ -351,8 +352,10 @@ class EmployeeCreate
 
             }
 
-            $datesMatch = Carbon::parse($employeeRequest->startDate)
-                ->isSameDay(Carbon::parse($eHealthDateString));
+            $datesMatch = EmployeeRequestMatcher::datesMatchSameDay(
+                $employeeRequest->startDate,
+                $eHealthDateString
+            );
 
             return $namesMatch && $datesMatch;
         });

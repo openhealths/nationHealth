@@ -12,8 +12,12 @@ use App\Notifications\PartyVerificationStatusChanged;
 trait ProcessesPartyVerificationResponses
 {
     /**
-     * Processes party verification statuses using an optimized upsert approach.
-     * Updates ONLY the verification_status field.
+     * Processes a page of party verification statuses from GET /parties/verifications (list).
+     *
+     * Intentionally kept as the eHealth list-response surface alongside Party::getMany().
+     * Current app call sites (login job, index sync button) use getDetails +
+     * processPartyVerificationDetail() with party_verification:details — they do not call this.
+     * Wire this back only if product returns to list+:read sync.
      *
      * @param  EHealthResponse  $response  The API response object.
      * @param  LegalEntity  $legalEntity  The legal entity context.
