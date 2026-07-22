@@ -26,7 +26,6 @@ use Illuminate\Support\Facades\Validator;
 use App\Auth\EHealth\Services\TokenStorage;
 use App\Classes\eHealth\Exceptions\ApiException;
 use App\Classes\eHealth\Request as EHealthRequest;
-use App\Support\EHealthKnownScopes;
 use Illuminate\Contracts\Validation\Validator as ResponseValidator;
 
 class EHealthLoginController extends Controller
@@ -124,14 +123,12 @@ class EHealthLoginController extends Controller
 
         Session::forget('mis_2fa');
 
-        // Keep only AR/config scopes; eHealth may still return obsolete grants (e.g. party_verification:read).
-        $ehealthScopes = EHealthKnownScopes::filter(preg_split(
-            '/\s+/',
-            trim(data_get($validatedEHealthTokenData, 'details.scope', ''))
-        ) ?: []);
+        $ehealthScopes = explode(
+            ' ',
+            trim(data_get($validatedEHealthTokenData, 'details.scope'))
+        );
 
-        // Persist token scopes as direct permissions (LE-type whitelist), not role-intersected syncPermissions().
-        $user->syncEhealthTokenPermissions($ehealthScopes);
+        $user->syncPermissions($ehealthScopes);
 
         EHealthUserLogin::dispatch($user, $legalEntity, $authUserUUID, $this->isFirstLogin, $loginedGuard);
 
@@ -139,12 +136,16 @@ class EHealthLoginController extends Controller
 
         if (!$user->party) {
             Session::put('selected_legal_entity_uuid', $legalEntity->uuid);
+            $user->syncPermissions($ehealthScopes);
 
             return Redirect::route('party.verify');
         }
 
         if ($legalEntity) {
             Log::info(__('auth.login.success.user_auth', [], 'en'), ['User ID' => $user->id]);
+
+            // Respect EHealth scopes
+            $user->syncPermissions($ehealthScopes);
 
             return Redirect::route('dashboard', [$legalEntity])->with(
                 'success',
@@ -320,15 +321,18 @@ class EHealthLoginController extends Controller
                         return;
                     }
 
-                    // Keep only scopes from AR / config/scopes; ignore legacy grants eHealth may still return.
-                    $scopesReceived = preg_split('/\s+/', trim($value)) ?: [];
-                    $knownScopes = EHealthKnownScopes::filter($scopesReceived);
+                    $scopesReceived = explode(' ', $value);
+                    $scopesAvailable = collect(config('ehealth.roles'))
+                        ->flatten()
+                        ->unique()
+                        ->toArray();
+                    $diff = array_diff($scopesReceived, $scopesAvailable);
 
-                    if ($knownScopes !== []) {
+                    if (empty($diff)) {
                         return;
                     }
 
-                    $fail('The following scopes are unsupported: ' . implode(', ', array_filter($scopesReceived)));
+                    $fail('The following scopes are unsupported: ' . implode(', ', $diff));
                 }
             ],
             'details.refresh_token' => ['required', 'string'],

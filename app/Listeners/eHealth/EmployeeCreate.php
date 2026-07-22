@@ -226,7 +226,7 @@ class EmployeeCreate
         // and employee types are assigned based on the employee records that are just created.
         $user->refresh();
 
-        if ($user->party) {
+        if ($user?->party) {
             Repository::party()->syncUserEmployeesAndRoles($user->party, $event->legalEntity);
         }
     }

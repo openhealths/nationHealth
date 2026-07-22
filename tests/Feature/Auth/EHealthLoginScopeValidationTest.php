@@ -6,7 +6,6 @@ namespace Tests\Feature\Auth;
 
 use App\Http\Controllers\Auth\EHealthLoginController;
 use App\Models\LegalEntity;
-use App\Support\EHealthKnownScopes;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -31,7 +30,7 @@ class EHealthLoginScopeValidationTest extends TestCase
     }
 
     #[Test]
-    public function token_scope_validation_ignores_unknown_scopes_when_known_remain(): void
+    public function token_scope_validation_rejects_any_unsupported_scope(): void
     {
         $legalEntity = $this->createLegalEntity();
 
@@ -51,27 +50,12 @@ class EHealthLoginScopeValidationTest extends TestCase
 
         $validator = $method->invoke($controller, $payload);
 
-        $this->assertFalse($validator->fails(), (string) $validator->errors());
+        $this->assertTrue($validator->fails());
+        $this->assertStringContainsString('legacy:obsolete:scope', $validator->errors()->first('details.scope'));
     }
 
     #[Test]
-    public function known_scopes_filter_keeps_only_ar_scopes(): void
-    {
-        $filtered = EHealthKnownScopes::filter([
-            'employee:read',
-            'legacy:obsolete:scope',
-            'party_verification:details',
-            '',
-        ]);
-
-        $this->assertSame(
-            ['employee:read', 'party_verification:details'],
-            $filtered
-        );
-    }
-
-    #[Test]
-    public function token_scope_validation_rejects_when_no_known_scopes_remain(): void
+    public function token_scope_validation_accepts_only_known_scopes(): void
     {
         $legalEntity = $this->createLegalEntity();
 
@@ -81,7 +65,7 @@ class EHealthLoginScopeValidationTest extends TestCase
         $payload = [
             'details' => [
                 'client_id' => $legalEntity->uuid,
-                'scope' => 'totally:fake:scope',
+                'scope' => 'employee:read party_verification:details',
                 'refresh_token' => 'refresh-token',
             ],
             'user_id' => '11111111-1111-1111-1111-111111111111',
@@ -91,8 +75,7 @@ class EHealthLoginScopeValidationTest extends TestCase
 
         $validator = $method->invoke($controller, $payload);
 
-        $this->assertTrue($validator->fails());
-        $this->assertStringContainsString('totally:fake:scope', $validator->errors()->first('details.scope'));
+        $this->assertFalse($validator->fails(), (string) $validator->errors());
     }
 
     private function createLegalEntity(): LegalEntity

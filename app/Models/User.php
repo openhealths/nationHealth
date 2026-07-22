@@ -19,7 +19,6 @@ use Illuminate\Support\Facades\Auth;
 use Spatie\Permission\Traits\HasRoles;
 use Eloquence\Behaviours\HasCamelCasing;
 use App\Models\Employee\EmployeeRequest;
-use App\Support\EHealthKnownScopes;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Builder;
 use Spatie\Permission\PermissionRegistrar;
@@ -357,68 +356,14 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * OAuth scopes for eHealth authorize: Spatie permissions for the current team only
-     * (already filtered by LegalEntity type). Never merge raw config/ehealth.roles.*.
+     * Retrieves the scopes assigned to a specific user.
+     *
+     * @return string The concatenated string of user's scopes
      */
     public function getScopes(): string
     {
-        return implode(' ', EHealthKnownScopes::filter(
-            $this->getAllPermissions()->pluck('name')->unique()->values()->all()
-        ));
-    }
-
-    /**
-     * Store direct permissions granted by eHealth on login without intersecting role permissions.
-     * Scopes are filtered only by the current LegalEntity type whitelist.
-     *
-     * @param  list<string>  $scopes
-     */
-    public function syncEhealthTokenPermissions(array $scopes): static
-    {
-        $incoming = collect(EHealthKnownScopes::filter($scopes))
-            ->filter(fn ($scope) => is_string($scope) && $scope !== '')
-            ->unique()
-            ->values();
-
-        if (!config('permission.teams')) {
-            $this->syncPermissionsParent($incoming->all());
-            app(PermissionRegistrar::class)->forgetCachedPermissions();
-            $this->unsetRelation('permissions');
-
-            return $this;
-        }
-
-        $teamId = getPermissionsTeamId();
-
-        if (!$teamId || $incoming->isEmpty()) {
-            $this->syncPermissionsParent([]);
-            app(PermissionRegistrar::class)->forgetCachedPermissions();
-            $this->unsetRelation('permissions');
-
-            return $this;
-        }
-
-        $allowed = $this->allowedPermissionNamesForCurrentTeam();
-        $filtered = $incoming->intersect($allowed)->values();
-
-        if ($filtered->isEmpty()) {
-            $this->syncPermissionsParent([]);
-            app(PermissionRegistrar::class)->forgetCachedPermissions();
-            $this->unsetRelation('permissions');
-
-            return $this;
-        }
-
-        $permissionModels = Permission::query()
-            ->where('guard_name', Auth::getDefaultDriver())
-            ->whereIn('name', $filtered->all())
-            ->get();
-
-        $this->syncPermissionsParent($permissionModels);
-        app(PermissionRegistrar::class)->forgetCachedPermissions();
-        $this->unsetRelation('permissions');
-
-        return $this;
+        // Collect all permissions (direct + via roles)
+        return $this->getAllPermissions()->pluck('name')->unique()->join(' ');
     }
 
     /**
