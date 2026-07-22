@@ -81,7 +81,7 @@ class EmployeeRequestProcessor
         $remoteEmployee = null;
 
         if (is_string($taxId) && $taxId !== '') {
-            $remoteEmployee = $this->findRemoteApprovedEmployee($request, $taxId, is_string($employeeUuid) ? $employeeUuid : null);
+            $remoteEmployee = $this->findRemoteApprovedEmployee($request, $taxId);
         }
 
         if ($remoteEmployee === null && !is_string($employeeUuid)) {
@@ -288,15 +288,13 @@ class EmployeeRequestProcessor
     }
 
     /**
-     * Find a matching APPROVED/REORGANIZED employee in eHealth for this request.
+     * Find a matching APPROVED employee in eHealth for this request.
+     * Match: position + employee_type + start_date (same calendar day) + division when set.
      *
      * @return array<string, mixed>|null
      */
-    private function findRemoteApprovedEmployee(
-        EmployeeRequest $request,
-        string $taxId,
-        ?string $preferredUuid = null
-    ): ?array {
+    private function findRemoteApprovedEmployee(EmployeeRequest $request, string $taxId): ?array
+    {
         Log::info("[EmployeeRequestProcessor] Searching eHealth for Employee by TaxID: {$taxId}");
 
         try {
@@ -305,6 +303,7 @@ class EmployeeRequestProcessor
 
             $params = [
                 'tax_id' => $taxId,
+                'status' => 'APPROVED',
                 'legal_entity_id' => legalEntity()->uuid,
                 'page_size' => 50,
             ];
@@ -319,14 +318,7 @@ class EmployeeRequestProcessor
 
             $response = EHealth::employee()->getMany($params);
 
-            $employeesList = collect($response->validate())
-                ->filter(fn (array $remoteEmp): bool => in_array(
-                    $remoteEmp['status'] ?? null,
-                    [Status::APPROVED->value, Status::REORGANIZED->value],
-                    true
-                ))
-                ->values()
-                ->all();
+            $employeesList = $response->validate();
 
             if (empty($employeesList)) {
                 Log::warning(
@@ -334,14 +326,6 @@ class EmployeeRequestProcessor
                 );
 
                 return null;
-            }
-
-            if ($preferredUuid) {
-                foreach ($employeesList as $remoteEmp) {
-                    if (($remoteEmp['uuid'] ?? null) === $preferredUuid) {
-                        return $remoteEmp;
-                    }
-                }
             }
 
             $targetPosition = $request->position;
