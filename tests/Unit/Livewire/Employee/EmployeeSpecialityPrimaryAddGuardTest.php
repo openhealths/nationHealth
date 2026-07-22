@@ -19,5 +19,8 @@ class EmployeeSpecialityPrimaryAddGuardTest extends TestCase
         $this->assertStringContainsString('canMarkAsPrimary()', $blade);
         $this->assertStringContainsString('saveSpeciality()', $blade);
         $this->assertStringContainsString('multiple_primary_specialities', $blade);
+        // Position-add locks personal data but must keep specialities editable (same as education).
+        $this->assertStringContainsString(':disabled="$wire.isPositionDataLocked ?? false"', $blade);
+        $this->assertStringNotContainsString('isPersonalDataLocked', $blade);
     }
 }
