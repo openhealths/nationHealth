@@ -4,22 +4,25 @@ declare(strict_types=1);
 
 namespace App\Listeners;
 
-use App\Classes\eHealth\EHealth;
 use App\Events\EHealthUserLogin;
-use App\Models\Relations\Party;
-use App\Traits\ProcessesPartyVerificationResponses;
+use App\Jobs\PartyVerificationSync;
+use App\Notifications\SyncNotification;
+use Illuminate\Bus\Batch;
 use Illuminate\Contracts\Encryption\DecryptException;
-use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use JsonException;
 use Throwable;
 
+/**
+ * On subsequent logins (max once per 24h per LE), queue party verification sync.
+ * Sync uses GET /api/parties/{id}/verification (party_verification:details) in a background job —
+ * not the list endpoint — so the HTTP login request stays light.
+ */
 class PartyVerificationSyncStatusOnLogin
 {
-    use ProcessesPartyVerificationResponses;
-
     public const string SCOPE_REQUIRED = 'party_verification:details';
 
     private const string CACHE_KEY_PREFIX = 'party_verification_last_run:';
@@ -27,8 +30,6 @@ class PartyVerificationSyncStatusOnLogin
     private const int CACHE_TTL_SECONDS = 86400; // 24 hours
 
     /**
-     * Handle the event using getDetails (party_verification:details) per local party.
-     *
      * @throws JsonException
      */
     public function handle(EHealthUserLogin $event): void
@@ -68,40 +69,27 @@ class PartyVerificationSyncStatusOnLogin
         }
 
         try {
-            Log::info('Starting party verification sync.', ['user_id' => $user->id]);
+            Log::info('Starting party verification sync (queued).', ['user_id' => $user->id]);
 
-            $parties = Party::query()
-                ->whereHas(
-                    'employees',
-                    fn ($query) => $query->where('legal_entity_id', $legalEntity->id)
-                )
-                ->whereNotNull('uuid')
-                ->orderBy('id')
-                ->get();
-
-            foreach ($parties as $party) {
-                try {
-                    $response = EHealth::party()
-                        ->withToken($token)
-                        ->getDetails($party->uuid);
-
-                    $this->processPartyVerificationDetail($party->uuid, $response, $legalEntity);
-                } catch (Throwable $e) {
-                    Log::warning('Party verification sync: failed for party', [
-                        'party_uuid' => $party->uuid,
-                        'user_id' => $user->id,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
+            Bus::batch([new PartyVerificationSync($legalEntity, null, false)])
+                ->name('Party Verification Status Sync')
+                ->withOption('legal_entity_id', $legalEntity->id)
+                ->withOption('token', Crypt::encryptString($token))
+                ->withOption('user', $user)
+                ->then(function (Batch $batch) use ($user) {
+                    $user->notify(new SyncNotification('party_verification', 'completed'));
+                })
+                ->catch(function (Batch $batch, Throwable $e) use ($user) {
+                    $user->notify(new SyncNotification('party_verification', 'failed'));
+                    Log::error('Batch [Party Verification Status Sync] failed.', ['error' => $e->getMessage()]);
+                })
+                ->onQueue('sync')
+                ->dispatch();
 
             Cache::put($cacheKey, true, self::CACHE_TTL_SECONDS);
-        } catch (RequestException $e) {
-            if (!in_array($e->response->status(), [401, 403], true)) {
-                Log::error('Party verification API error.', ['user_id' => $user->id, 'error' => $e->getMessage()]);
-            }
+            $user->notify(new SyncNotification('party_verification', 'started'));
         } catch (Throwable $e) {
-            Log::error('Failed to run party verification sync on login.', [
+            Log::error('Failed to queue party verification sync on login.', [
                 'user_id' => $user->id,
                 'error' => $e->getMessage(),
             ]);
