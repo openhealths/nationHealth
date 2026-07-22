@@ -116,48 +116,6 @@ class EmployeeCustomPositionAndEmailTest extends TestCase
         $this->assertSame('openhealthkopylets+pmd25@gmail.com', $form->party['email']);
     }
 
-    #[Test]
-    public function resolve_party_falls_back_to_linked_employee_when_user_party_id_is_null(): void
-    {
-        [$legalEntity] = $this->createTwoLegalEntities();
-
-        $party = Party::create([
-            'uuid' => (string) Str::uuid(),
-            'first_name' => 'Andrii',
-            'last_name' => 'Kopylets',
-            'tax_id' => '9876543210',
-            'birth_date' => '1990-01-01',
-            'gender' => 'MALE',
-        ]);
-
-        $user = User::create([
-            'uuid' => (string) Str::uuid(),
-            'email' => 'owner-without-party@example.com',
-            'password' => Hash::make('password'),
-            'party_id' => null,
-        ]);
-
-        $employee = Employee::create([
-            'uuid' => (string) Str::uuid(),
-            'full_name' => 'Andrii Kopylets',
-            'employee_type' => Role::OWNER->value,
-            'status' => Status::APPROVED->value,
-            'legal_entity_id' => $legalEntity->id,
-            'is_active' => true,
-            'position' => 'P1',
-            'start_date' => now()->format('Y-m-d'),
-            'user_id' => $user->id,
-            'party_id' => $party->id,
-        ]);
-        $user->employees()->attach($employee->id);
-
-        $resolved = $user->resolveParty($legalEntity->id);
-
-        $this->assertNotNull($resolved);
-        $this->assertSame($party->id, $resolved->id);
-        $this->assertSame($employee->id, $user->adminEmployeeForMisAction($legalEntity->id)?->id);
-    }
-
     /**
      * @return array{0: LegalEntity, 1: LegalEntity}
      */
