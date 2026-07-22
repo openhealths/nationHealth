@@ -25,6 +25,7 @@ class SyncNotification extends Notification
         'license' => 'Синхронізація ліцензій',
         'declaration' => 'Синхронізація декларацій',
         'episode' => 'Синхронізація епізодів',
+        'party_verification' => 'Синхронізація верифікацій працівників',
     ];
 
     /** @var array Sync action statuses mapping with Ukrainian descriptions */
