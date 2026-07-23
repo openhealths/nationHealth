@@ -19,16 +19,16 @@ function attachDateMask(el) {
 
         if (e.inputType === 'deleteContentBackward') {
             const pos = el.selectionStart;
-            const val = el.value;
-            if (pos > 0 && val[pos - 1] === '.') {
+            const endPos = el.selectionEnd;
+            if (pos === endPos && pos > 0 && el.value[pos - 1] === '.') {
                 e.preventDefault();
-                const before = val.substring(0, Math.max(pos - 2, 0));
+                const val = el.value;
+                const before = val.substring(0, pos - 2);
                 const after = val.substring(pos);
-                el.value = before + after;
+                el.value = before + '.' + after.replace(/^\./, '');
                 const newPos = Math.max(pos - 2, 0);
                 el.setSelectionRange(newPos, newPos);
                 el.dispatchEvent(new Event('input', { bubbles: true }));
-                return;
             }
         }
     });
@@ -36,102 +36,141 @@ function attachDateMask(el) {
     el.addEventListener('input', (e) => {
         if (e._fromDateMask || e._fromChangeDate) return;
 
+        const rawVal = el.value;
         const cursorPos = el.selectionStart;
-        const oldVal = el.value;
 
         const isSeparatorInsert = (
             lastInputType === 'insertText' &&
             e.data && /^[.,\/ \-]$/.test(e.data)
         );
 
-        let digits = oldVal.replace(/\D/g, '');
+        let day = '', month = '', year = '';
+        const hasSeparator = rawVal.includes('.') || rawVal.includes('/') || rawVal.includes('-') || rawVal.includes(' ');
 
-        if (isSeparatorInsert && digits.length > 0) {
-            const rawBeforeCursor = oldVal.substring(0, cursorPos);
-            const digitsBeforeCursor = rawBeforeCursor.replace(/\D/g, '').length;
+        if (hasSeparator) {
+            const parts = rawVal.split(/[.,\/ \-]/);
+            day = (parts[0] || '').replace(/\D/g, '');
 
-            if (digitsBeforeCursor === 1) {
-                digits = '0' + digits;
-            } else if (digitsBeforeCursor === 3) {
-                digits = digits.substring(0, 2) + '0' + digits.substring(2);
-            }
-        }
-
-        if (digits.length >= 1) {
-            const d1 = parseInt(digits[0], 10);
-            if (d1 >= 4 && d1 <= 9) digits = '0' + digits;
-        }
-
-        if (digits.length >= 2) {
-            let day = parseInt(digits.substring(0, 2), 10);
-            if (day > 31) day = 31;
-            if (day === 0) day = 1;
-            digits = String(day).padStart(2, '0') + digits.substring(2);
-        }
-
-        if (digits.length >= 3) {
-            const m1 = parseInt(digits[2], 10);
-            if (m1 >= 2 && m1 <= 9) digits = digits.substring(0, 2) + '0' + digits.substring(2);
-        }
-
-        if (digits.length >= 4) {
-            let month = parseInt(digits.substring(2, 4), 10);
-            if (month > 12) month = 12;
-            if (month === 0) month = 1;
-            digits = digits.substring(0, 2) + String(month).padStart(2, '0') + digits.substring(4);
-        }
-
-        digits = digits.substring(0, 8);
-
-        let formatted = '';
-        if (digits.length <= 2) {
-            formatted = digits;
-        } else if (digits.length <= 4) {
-            formatted = digits.substring(0, 2) + '.' + digits.substring(2);
-        } else {
-            formatted = digits.substring(0, 2) + '.' + digits.substring(2, 4) + '.' + digits.substring(4);
-        }
-
-        const rawBefore = oldVal.substring(0, cursorPos);
-        let digitsBefore = rawBefore.replace(/\D/g, '').length;
-
-        if (digits.length > oldVal.replace(/\D/g, '').length) {
-            const padCount = digits.length - oldVal.replace(/\D/g, '').length;
-            if (isSeparatorInsert) {
-                digitsBefore += padCount;
-            } else if (digitsBefore <= 1 && parseInt(oldVal.replace(/\D/g, '')[0], 10) >= 4) {
-                digitsBefore += 1;
-            } else if (digitsBefore >= 3 && digits.length >= 4) {
-                const oldDigits = oldVal.replace(/\D/g, '');
-                if (oldDigits.length >= 3 && parseInt(oldDigits[2], 10) >= 2) {
-                    digitsBefore += 1;
+            if (parts.length > 2) {
+                month = (parts[1] || '').replace(/\D/g, '');
+                year = (parts[2] || '').replace(/\D/g, '');
+            } else if (parts.length === 2) {
+                const p1 = (parts[1] || '').replace(/\D/g, '');
+                if (p1.length > 2) {
+                    month = '';
+                    year = p1;
+                } else {
+                    month = p1;
                 }
             }
+
+            if (isSeparatorInsert) {
+                const rawBeforeCursor = rawVal.substring(0, cursorPos);
+                const sepCount = (rawBeforeCursor.match(/[.,\/ \-]/g) || []).length;
+                if (sepCount === 1 && day.length === 1) {
+                    day = '0' + day;
+                } else if (sepCount === 2 && month.length === 1) {
+                    month = '0' + month;
+                }
+            }
+
+            if (day.length > 2) {
+                const extra = day.substring(2);
+                day = day.substring(0, 2);
+                month = extra + month;
+            }
+            if (month.length > 2) {
+                const extra = month.substring(2);
+                month = month.substring(0, 2);
+                year = extra + year;
+            }
+        } else {
+            const digits = rawVal.replace(/\D/g, '');
+            day = digits.substring(0, 2);
+            month = digits.substring(2, 4);
+            year = digits.substring(4, 8);
         }
 
-        let newCursorPos = 0;
-        let digitCount = 0;
-        for (let i = 0; i < formatted.length; i++) {
-            if (formatted[i] !== '.') digitCount++;
-            newCursorPos = i + 1;
-            if (digitCount >= digitsBefore) break;
+        if (day.length === 2) {
+            const dNum = parseInt(day, 10);
+            if (dNum > 31) day = '31';
+        }
+        if (month.length === 2) {
+            const mNum = parseInt(month, 10);
+            if (mNum > 12) month = '12';
+        }
+        year = year.substring(0, 4);
+
+        let formatted = '';
+        if (day.length > 0) {
+            formatted += day;
+            if (day.length === 2 || hasSeparator || month.length > 0) {
+                formatted += '.';
+            }
+        }
+        if (month.length > 0 || (formatted.endsWith('.') && (year.length > 0 || (hasSeparator && rawVal.split(/[.,\/ \-]/).length > 2)))) {
+            formatted += month;
+            if (month.length === 2 || year.length > 0 || (hasSeparator && rawVal.split(/[.,\/ \-]/).length > 2)) {
+                formatted += '.';
+            }
+        }
+        if (year.length > 0) {
+            formatted += year;
         }
 
-        if (newCursorPos < formatted.length && formatted[newCursorPos] === '.') {
-            newCursorPos++;
+        let newCursor = cursorPos;
+        if (lastInputType === 'insertText' && !isSeparatorInsert) {
+            if (cursorPos === 2 && day.length === 2 && formatted.length >= 3 && formatted[2] === '.') {
+                newCursor = 3;
+            } else if (cursorPos === 5 && month.length === 2 && formatted.length >= 6 && formatted[5] === '.') {
+                newCursor = 6;
+            }
+        }
+
+        if (newCursor > formatted.length) {
+            newCursor = formatted.length;
         }
 
         if (el.value !== formatted) {
             el.value = formatted;
-            el.setSelectionRange(newCursorPos, newCursorPos);
+            el.setSelectionRange(newCursor, newCursor);
             const syntheticEvent = new Event('input', { bubbles: true });
             syntheticEvent._fromDateMask = true;
             el.dispatchEvent(syntheticEvent);
         } else {
-            el.setSelectionRange(newCursorPos, newCursorPos);
+            el.setSelectionRange(newCursor, newCursor);
         }
 
         lastInputType = '';
+    });
+
+    el.addEventListener('blur', () => {
+        const val = el.value;
+        if (!val) return;
+
+        const parts = val.split('.');
+        if (parts.length >= 1 && parts[0]) {
+            let d = parseInt(parts[0], 10);
+            if (!isNaN(d)) {
+                if (d === 0) d = 1;
+                if (d > 31) d = 31;
+                parts[0] = String(d).padStart(2, '0');
+            }
+        }
+        if (parts.length >= 2 && parts[1]) {
+            let m = parseInt(parts[1], 10);
+            if (!isNaN(m)) {
+                if (m === 0) m = 1;
+                if (m > 12) m = 12;
+                parts[1] = String(m).padStart(2, '0');
+            }
+        }
+        const formatted = parts.join('.');
+        if (el.value !== formatted) {
+            el.value = formatted;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
     });
 }
 

@@ -27,7 +27,7 @@
         @vite(['resources/css/app.css'])
     </head>
 
-    <body>
+    <body class="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
         <div class="antialiased bg-white dark:bg-gray-800 min-h-screen">
             <x-forms.loading :global="true" />
 
