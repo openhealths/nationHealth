@@ -110,4 +110,39 @@ class MedicationRequest extends PatientApiBase
     {
         return $this->post(self::URL . "/{$patientId}/medication_requests/{$id}/actions/resend_otp", []);
     }
+
+    /**
+     * Pre-qualify medication request data before creation.
+     *
+     * @param  array  $payload
+     * @return PromiseInterface|EHealthResponse
+     */
+    public function prequalify(array $payload): PromiseInterface|EHealthResponse
+    {
+        return $this->post('/api/medication_request_requests/prequalify', $payload);
+    }
+
+    /**
+     * Reject a Medication Request Request (Відхилення заявки).
+     *
+     * @param  string  $requestId
+     * @return PromiseInterface|EHealthResponse
+     */
+    public function rejectRequest(string $requestId): PromiseInterface|EHealthResponse
+    {
+        return $this->patch("/api/medication_request_requests/{$requestId}/actions/reject", []);
+    }
+
+    /**
+     * Reject a Medication Request (Відхилення рецепту).
+     *
+     * @param  string  $patientId
+     * @param  string  $id
+     * @param  array  $payload Requires reject_reason_code
+     * @return PromiseInterface|EHealthResponse
+     */
+    public function reject(string $patientId, string $id, array $payload): PromiseInterface|EHealthResponse
+    {
+        return $this->patch(self::URL . "/{$patientId}/medication_requests/{$id}/actions/reject", $payload);
+    }
 }

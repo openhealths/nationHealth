@@ -355,6 +355,9 @@ trait ManagesCarePlanEPrescription
             $mapper = new \App\Services\MedicalEvents\Mappers\MedicationRequestMapper();
             $apiPayload = $mapper->toCreateRequestPayload($dbData, $uuids, $this->carePlan->uuid);
 
+            $prequalifyResponse = EHealth::medicationRequest()->prequalify($apiPayload);
+            app(\App\Services\MedicalEvents\EHealthJobResolver::class)->assertPrequalifyValid($prequalifyResponse->getData());
+
             $response = EHealth::medicationRequest()->createRequest($apiPayload);
             $responseData = $response->getData();
 
@@ -378,6 +381,15 @@ trait ManagesCarePlanEPrescription
                 'type' => 'error',
                 'message' => $exception->getTranslatedMessage(),
             ]);
+        } catch (EHealthResponseException $e) {
+            if ($e->getCode() === 403 || $e->response->status() === 403) {
+                Log::warning('CarePlanShow: 403 access denied when submitting ePrescription. Prompting for approval.');
+                $this->dispatch('flashMessage', ['type' => 'warning', 'message' => 'Відсутній доступ до медичних даних. Будь ласка, надішліть запит на доступ пацієнту.']);
+                $this->openMethodSelectionModal();
+            } else {
+                Log::error('CarePlanShow: failed to create ePrescription API error: ' . $e->getMessage());
+                $this->dispatch('flashMessage', ['type' => 'error', 'message' => 'Не вдалося створити заявку на рецепт: ' . $e->getMessage()]);
+            }
         } catch (\Exception $e) {
             Log::error('CarePlanShow: failed to create ePrescription: ' . $e->getMessage());
             $this->dispatch('flashMessage', ['type' => 'error', 'message' => 'Не вдалося створити заявку на рецепт: ' . $e->getMessage()]);
@@ -581,6 +593,36 @@ trait ManagesCarePlanEPrescription
             Log::error('CarePlanShow: failed to cancel prescription: ' . $e->getMessage());
             Session::flash('error', 'Не вдалося скасувати рецепт: ' . $e->getMessage());
             $this->showSignatureModal = false;
+        }
+    }
+
+    public function rejectPrescription(string $requestId): void
+    {
+        $requestRecord = \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::where('uuid', $requestId)->first();
+        if (!$requestRecord) {
+            $this->dispatch('flashMessage', ['type' => 'error', 'message' => 'Рецепт не знайдено']);
+            return;
+        }
+
+        try {
+            if (strtolower((string) $requestRecord->status) === 'new') {
+                EHealth::medicationRequest()->rejectRequest($requestId);
+            } else {
+                EHealth::medicationRequest()->reject($this->carePlan->person->uuid, $requestId, [
+                    'reject_reason_code' => 'patient_left_the_program'
+                ]);
+            }
+
+            $requestRecord->update(['status' => 'rejected']);
+            $this->refreshCarePlan();
+            $this->dispatch('flashMessage', ['type' => 'success', 'message' => 'Електронний рецепт успішно відхилено.']);
+        } catch (EHealthValidationException $e) {
+            $translatedMsg = $e->getTranslatedMessage();
+            Log::error('CarePlanShow: failed to reject prescription validation: ' . $translatedMsg);
+            $this->dispatch('flashMessage', ['type' => 'error', 'message' => $translatedMsg]);
+        } catch (\Exception $e) {
+            Log::error('CarePlanShow: failed to reject prescription: ' . $e->getMessage());
+            $this->dispatch('flashMessage', ['type' => 'error', 'message' => 'Не вдалося відхилити рецепт: ' . $e->getMessage()]);
         }
     }
 

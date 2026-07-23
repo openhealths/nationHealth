@@ -47,6 +47,12 @@
                                 <span class="text-xs">Скасувати</span>
                             </button>
                         @endif
+                        @if(in_array(strtolower($prescription['status']), ['new', 'active']))
+                            <button type="button" class="text-orange-500 hover:text-orange-700 transition-colors flex items-center gap-1" title="Відхилити рецепт" wire:click="rejectPrescription('{{ $prescription['uuid'] }}')" wire:confirm="Ви дійсно бажаєте відхилити цей рецепт?">
+                                @icon('x-circle', 'w-4 h-4')
+                                <span class="text-xs">Відхилити</span>
+                            </button>
+                        @endif
                     </div>
                 </div>
             @endforeach

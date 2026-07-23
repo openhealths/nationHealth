@@ -44,7 +44,7 @@ class ApprovalRepository extends BaseRepository
      *
      * @see https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/2115600961/Get+approvals
      */
-    public function syncApprovals(Model $entity, string $resourceType): void
+    public function syncApprovals(Model $entity, string $resourceType, array $additionalFilters = []): void
     {
         if (empty($entity->uuid)) {
             return;
@@ -60,10 +60,10 @@ class ApprovalRepository extends BaseRepository
                 $patientUuid = $person?->uuid;
             }
 
-            $filters = array_filter([
+            $filters = array_filter(array_merge([
                 'granted_resource_type' => $resourceType,
                 'granted_resources' => $entity->uuid,
-            ], static fn ($value) => $value !== null && $value !== '');
+            ], $additionalFilters), static fn ($value) => $value !== null && $value !== '');
 
             if ($patientUuid) {
                 $response = EHealth::approval()->getPatientApprovals($patientUuid, $filters);
@@ -139,10 +139,20 @@ class ApprovalRepository extends BaseRepository
                 );
             }
 
-            Approval::where('approvable_type', get_class($entity))
+            $inactiveQuery = Approval::where('approvable_type', get_class($entity))
                 ->where('approvable_id', $entity->id)
-                ->whereNotIn('uuid', $syncedUuids)
-                ->update(['status' => 'inactive']);
+                ->whereNotIn('uuid', $syncedUuids);
+
+            if (isset($additionalFilters['granted_to.identifier.value'])) {
+                $identifier = \App\Models\MedicalEvents\Sql\Identifier::where('value', $additionalFilters['granted_to.identifier.value'])->first();
+                if ($identifier) {
+                    $inactiveQuery->where('granted_to_id', $identifier->id);
+                } else {
+                    $inactiveQuery->whereRaw('1 = 0');
+                }
+            }
+
+            $inactiveQuery->update(['status' => 'inactive']);
         } catch (\Exception $e) {
             Log::error('MedicalEvents\\ApprovalRepository syncing failed: '.$e->getMessage());
         }

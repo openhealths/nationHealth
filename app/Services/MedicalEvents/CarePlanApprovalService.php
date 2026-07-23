@@ -135,8 +135,14 @@ class CarePlanApprovalService
 
     public function syncForCarePlan(CarePlan $carePlan): void
     {
+        $employeeUuid = \Illuminate\Support\Facades\Auth::user()?->activeDoctorEmployee()?->uuid;
+        $filters = [];
+        if ($employeeUuid) {
+            $filters['granted_to.identifier.value'] = $employeeUuid;
+        }
+
         // Uses Get approvals filters (granted_resource_type + granted_resources) via syncApprovals.
-        Repository::approval()->syncApprovals($carePlan, 'care_plan');
+        Repository::approval()->syncApprovals($carePlan, 'care_plan', $filters);
     }
 
     /**

@@ -115,7 +115,7 @@ trait ManagesCarePlanLifecycle
             );
 
             // Send to eHealth based on action type
-            $apiMethod = $this->actionType === 'complete' ? 'complete' : 'cancel';
+            $apiMethod = 'cancel'; // complete is now handled separately
 
             $eHealthResponse = EHealth::carePlan()->{$apiMethod}(
                 $this->carePlan->person->uuid,
@@ -262,6 +262,102 @@ trait ManagesCarePlanLifecycle
             Log::error('CarePlanShow: unexpected error: ' . $exception->getMessage());
             Session::flash('error', __('care-plan.unexpected_error'));
             $this->showSignatureModal = false;
+        }
+    }
+
+    public function completePlan(CarePlanRepository $repository): void
+    {
+        $this->validate([
+            'statusReason' => 'required|string'
+        ]);
+
+        if (empty($this->carePlan->uuid)) {
+            Session::flash('error', __('care-plan.care_plan_not_synced'));
+            $this->showSignatureModal = false;
+            return;
+        }
+
+        // Validate all activities are completed/cancelled
+        $hasActiveActivities = $this->carePlan->activities()->whereNotIn('status', [
+            'completed', 'cancelled', 'entered-in-error'
+        ])->exists();
+
+        if ($hasActiveActivities) {
+            Session::flash('error', 'Неможливо завершити план лікування. Всі призначення повинні мати фінальний статус (завершені або скасовані).');
+            return;
+        }
+
+        $statusReasonCodeableConcept = [
+            'coding' => [
+                [
+                    'system' => 'eHealth/care_plan_complete_reasons',
+                    'code' => $this->statusReason,
+                ]
+            ]
+        ];
+
+        try {
+            $eHealthResponse = EHealth::carePlan()->complete(
+                $this->carePlan->person->uuid,
+                $this->carePlan->uuid,
+                [
+                    'status_reason' => $statusReasonCodeableConcept,
+                ]
+            );
+
+            $responseData = $eHealthResponse->getData();
+            $finalResponse = $responseData;
+
+            // Job Polling
+            if (isset($responseData['links'][0]['href']) && str_contains($responseData['links'][0]['href'], '/jobs/')) {
+                $jobId = str_replace('/jobs/', '', $responseData['links'][0]['href']);
+                $jobApi = EHealth::job();
+                $attempts = 0;
+                do {
+                    sleep(2);
+                    $finalResponse = $jobApi->getDetails($jobId)->getData();
+                    $attempts++;
+                } while ($finalResponse['status'] === 'pending' && $attempts < 15);
+            }
+
+            if (($finalResponse['status'] ?? null) === 'failed') {
+                throw new EHealthValidationException($finalResponse);
+            }
+
+            // Extract status
+            $carePlanStatus = $finalResponse['status'] ?? 'completed';
+            if (isset($finalResponse['result']) && is_array($finalResponse['result'])) {
+                $entity = $finalResponse['result'][0] ?? $finalResponse['result'];
+                $carePlanStatus = $entity['status'] ?? $carePlanStatus;
+            }
+
+            // Update local state
+            $repository->updateById($this->carePlan->id, [
+                'status' => $carePlanStatus,
+            ]);
+
+            $this->refreshCarePlan();
+
+            Session::flash('success', __('care-plan.care_plan_updated'));
+            $this->showSignatureModal = false;
+
+        } catch (EHealthConnectionException $exception) {
+            Log::error('CarePlanShow: connection error: ' . $exception->getMessage());
+            Session::flash('error', __('care-plan.connection_error'));
+        } catch (EHealthValidationException|EHealthResponseException $exception) {
+            if (method_exists($exception, 'report')) {
+                $exception->report();
+            }
+            Log::error('CarePlanShow: eHealth error: ' . $exception->getMessage(), [
+                'details' => method_exists($exception, 'getDetails') ? $exception->getDetails() : null
+            ]);
+            $msg = $exception instanceof EHealthValidationException
+                ? $exception->getFormattedMessage()
+                : __('care-plan.ehealth_error_prefix') . $exception->getMessage();
+            Session::flash('error', $msg);
+        } catch (\Throwable $exception) {
+            Log::error('CarePlanShow: unexpected error: ' . $exception->getMessage());
+            Session::flash('error', __('care-plan.unexpected_error'));
         }
     }
 
@@ -764,26 +860,22 @@ trait ManagesCarePlanLifecycle
     {
         // Fetch the original care plan from eHealth GET details endpoint.
         // Signing the exact returned payload ensures cryptographic match with the server database state.
-        $payloadForSign = null;
-
-        try {
-            $planResponse = EHealth::carePlan()->getDetails($this->carePlan->person->uuid, $this->carePlan->uuid);
-            $planData = $planResponse->getData();
-            if (isset($planData['data']) && is_array($planData['data'])) {
-                $planData = $planData['data'];
-            }
-            if ($planData && is_array($planData)) {
-                $payloadForSign = $planData;
-                Log::info('CarePlanShow: fetched care plan from eHealth for signing');
-            }
-        } catch (\Throwable $exception) {
-            Log::warning('CarePlanShow: failed to fetch original care plan from eHealth, falling back to local payload: ' . $exception->getMessage());
+        $planResponse = EHealth::carePlan()->getDetails($this->carePlan->person->uuid, $this->carePlan->uuid);
+        $planData = $planResponse->getData();
+        if (isset($planData['data']) && is_array($planData['data'])) {
+            $planData = $planData['data'];
         }
 
-        if (!$payloadForSign) {
-            $payloadForSign = $this->buildLocalCarePlanStatusChangePayload();
-            Log::info('CarePlanShow: generated local care plan payload for signing');
+        if (!$planData || !is_array($planData)) {
+            throw new \Exception('Не вдалося отримати актуальний стан плану лікування з ЕСОЗ.');
         }
+
+        $payloadForSign = $planData;
+        Log::info('CarePlanShow: fetched care plan from eHealth for signing');
+
+        // Remove local-only fields if they accidentally leaked into the EHealth payload
+        unset($payloadForSign['instantiates_protocol']);
+        unset($payloadForSign['clinical_protocol']);
 
         // Inject transition reason while keeping the current status from eHealth (e.g. active).
         $payloadForSign['status_reason'] = $statusReasonCodeableConcept;

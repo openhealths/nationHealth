@@ -49,12 +49,16 @@ class MedicationRequestLifecycleTest extends TestCase
         // 1. Create Patient
         $this->person = Person::create([
             'uuid' => (string) Str::uuid(),
-            'first_name' => 'Олексій',
-            'last_name' => 'Коваль',
             'birth_date' => '1985-05-15',
             'gender' => 'MALE',
             'patient_signed' => true,
             'process_disclosure_data_consent' => true,
+        ]);
+
+        $this->person->names()->create([
+            'first_name' => 'Олексій',
+            'last_name' => 'Коваль',
+            'language' => 'uk'
         ]);
 
         // 2. Create Encounter & helpers

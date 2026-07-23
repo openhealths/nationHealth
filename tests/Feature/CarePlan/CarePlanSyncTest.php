@@ -45,13 +45,17 @@ class CarePlanSyncTest extends TestCase
 
         $person = new Person();
         $person->uuid = '540d6f4c-1d7c-4a3d-a51b-5e04f981e8d6';
-        $person->first_name = 'John';
-        $person->last_name = 'Doe';
         $person->gender = 'MALE';
         $person->birth_date = '1990-01-01';
         $person->patient_signed = true;
         $person->process_disclosure_data_consent = true;
         $person->save();
+
+        $person->names()->create([
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'language' => 'uk'
+        ]);
 
         // 2. Mock EHealth Response
         $carePlanUuid = 'c0280b2c-686b-4e63-a262-429d4791ea82';

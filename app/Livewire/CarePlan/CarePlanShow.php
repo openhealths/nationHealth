@@ -1995,6 +1995,14 @@ class CarePlanShow extends Component
 
             $this->refreshCarePlan();
             $this->dispatch('refreshApprovals');
+        } catch (EHealthResponseException $e) {
+            if ($e->getCode() === 403 || $e->response->status() === 403) {
+                Log::warning('CarePlanShow: 403 access denied when syncing plan status. Prompting for approval.');
+                $this->dispatch('flashMessage', ['type' => 'warning', 'message' => 'Відсутній доступ до плану лікування. Будь ласка, надішліть запит на доступ пацієнту.']);
+                $this->openMethodSelectionModal();
+            } else {
+                Log::warning('CarePlanShow: failed to sync plan status (eHealth): ' . $e->getMessage());
+            }
         } catch (\Exception $e) {
             Log::warning('CarePlanShow: failed to sync plan status: ' . $e->getMessage());
         }
