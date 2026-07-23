@@ -9,7 +9,7 @@
     </x-header-navigation>
 
     {{-- Main Content Section --}}
-    <x-section class="-mt-8 form shift-content">
+    <x-section class="form shift-content mt-6">
 
         {{-- 1. Verification Details Table --}}
         <div class="relative overflow-x-auto shadow-md sm:rounded-lg">
