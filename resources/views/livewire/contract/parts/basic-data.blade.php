@@ -2,6 +2,8 @@
     @php
         $periodStart = formatDisplayDate($contract->start_date ?? data_get($data, 'start_date'));
         $periodEnd = formatDisplayDate($contract->end_date ?? data_get($data, 'end_date'));
+        $statusReason = $contract->status_reason ?? data_get($data, 'status_reason');
+        $idFormDisplay = $idFormName ?? data_get($data, 'id_form') ?? $contract->id_form ?? null;
     @endphp
     <fieldset class="fieldset">
         <legend class="legend">{{ __('contracts.general_data') }}</legend>
@@ -24,21 +26,19 @@
                     {{ __('contracts.type') }} • {{ __('contracts.id') }}
                 </label>
             </div>
-            @if(!empty($idFormName))
-                <div class="form-group group">
-                    <input id="contract-form"
-                           type="text"
-                           value="{{ $idFormName }}"
-                           class="input peer"
-                           placeholder=" "
-                           disabled
-                           readonly
-                    />
-                    <label for="contract-form" class="label">
-                        {{ __('contracts.id_form_label') }}
-                    </label>
-                </div>
-            @endif
+            <div class="form-group group">
+                <input id="contract-form"
+                       type="text"
+                       value="{{ $idFormDisplay ?: '-' }}"
+                       class="input peer"
+                       placeholder=" "
+                       disabled
+                       readonly
+                />
+                <label for="contract-form" class="label">
+                    {{ __('contracts.id_form_label') }}
+                </label>
+            </div>
         </div>
         <div class="form-row-2">
             @if(isset($data['parent_contract_id']))
@@ -84,13 +84,20 @@
                     {{ __('contracts.period_label') }}
                 </label>
             </div>
-        </div>
-        @if($contract->status_reason || isset($data['status_reason']))
-            <div class="show-alert-warning mt-4">
-                <p class="font-bold">{{ __('contracts.status_reason_label') }}</p>
-                <p>{{ $contract->status_reason ?? $data['status_reason'] }}</p>
+            <div class="form-group group">
+                <input id="contract-status-reason"
+                       type="text"
+                       value="{{ $statusReason ?: '-' }}"
+                       class="input peer"
+                       placeholder=" "
+                       disabled
+                       readonly
+                />
+                <label for="contract-status-reason" class="label">
+                    {{ __('contracts.status_reason_label') }}
+                </label>
             </div>
-        @endif
+        </div>
     </fieldset>
 @else
     @php
@@ -111,11 +118,11 @@
                 >
                     <option value="" selected>{{ __('forms.select') }}</option>
                     @foreach($dictionary as $key => $type)
-                        <option value="{{ $key }}">{{ $type }}</option>
+                        <option value="{{ $key }}">{{ $key }} — {{ $type }}</option>
                     @endforeach
                 </select>
                 <label for="idForm" class="label">
-                    {{ __('forms.type') }}
+                    {{ __('contracts.id_form_label') }}
                 </label>
                 @error('form.idForm')
                     <p class="text-error">{{ $message }}</p>

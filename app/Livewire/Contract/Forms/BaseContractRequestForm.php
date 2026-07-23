@@ -18,7 +18,11 @@ abstract class BaseContractRequestForm extends BaseForm
 
     public string $contractorBase;
 
-    public string $idForm;
+    /**
+     * Dictionary code from CONTRACT_TYPE / REIMBURSEMENT_CONTRACT_TYPE (e.g. PMD_1).
+     * Not the contract type (capitation/reimbursement) and not a UUID.
+     */
+    public string $idForm = '';
 
     public string $startDate;
 
