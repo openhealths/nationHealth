@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Auth\EHealth\Services\TokenStorage;
 use App\Classes\eHealth\Exceptions\ApiException;
 use App\Classes\eHealth\Request as EHealthRequest;
+use App\Support\EHealthKnownScopes;
 use Illuminate\Contracts\Validation\Validator as ResponseValidator;
 
 class EHealthLoginController extends Controller
@@ -123,10 +124,10 @@ class EHealthLoginController extends Controller
 
         Session::forget('mis_2fa');
 
-        $ehealthScopes = explode(
-            ' ',
-            trim(data_get($validatedEHealthTokenData, 'details.scope'))
-        );
+        $ehealthScopes = EHealthKnownScopes::filter(preg_split(
+            '/\s+/',
+            trim(data_get($validatedEHealthTokenData, 'details.scope', ''))
+        ) ?: []);
 
         $user->syncPermissions($ehealthScopes);
 
@@ -322,18 +323,15 @@ class EHealthLoginController extends Controller
                         return;
                     }
 
-                    $scopesReceived = explode(' ', $value);
-                    $scopesAvailable = collect(config('ehealth.roles'))
-                        ->flatten()
-                        ->unique()
-                        ->toArray();
-                    $diff = array_diff($scopesReceived, $scopesAvailable);
+                    // Keep only scopes from AR / config/scopes; ignore legacy grants eHealth may still return.
+                    $scopesReceived = preg_split('/\s+/', trim($value)) ?: [];
+                    $knownScopes = EHealthKnownScopes::filter($scopesReceived);
 
-                    if (empty($diff)) {
+                    if ($knownScopes !== []) {
                         return;
                     }
 
-                    $fail('The following scopes are unsupported: ' . implode(', ', $diff));
+                    $fail('The following scopes are unsupported: ' . implode(', ', array_filter($scopesReceived)));
                 }
             ],
             'details.refresh_token' => ['required', 'string'],

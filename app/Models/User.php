@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Auth;
 use Spatie\Permission\Traits\HasRoles;
 use Eloquence\Behaviours\HasCamelCasing;
 use App\Models\Employee\EmployeeRequest;
+use App\Support\EHealthKnownScopes;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Builder;
 use Spatie\Permission\PermissionRegistrar;
@@ -188,6 +189,54 @@ class User extends Authenticatable implements MustVerifyEmail
             ->first();
     }
 
+    /**
+     * Resolve the party for this user, falling back to a linked employee in the legal entity.
+     */
+    public function resolveParty(?int $legalEntityId = null): ?Party
+    {
+        if ($this->party) {
+            return $this->party;
+        }
+
+        $legalEntityId ??= legalEntity()?->id;
+
+        if (!$legalEntityId) {
+            return null;
+        }
+
+        return $this->employees()
+            ->where('legal_entity_id', $legalEntityId)
+            ->with('party')
+            ->first()
+            ?->party;
+    }
+
+    /**
+     * Find an APPROVED HR/OWNER/ADMIN employee for MIS-proxied eHealth actions in a legal entity.
+     */
+    public function adminEmployeeForMisAction(?int $legalEntityId = null): ?Employee
+    {
+        $legalEntityId ??= legalEntity()?->id;
+        $party = $this->resolveParty($legalEntityId);
+
+        if (!$party || !$legalEntityId) {
+            return null;
+        }
+
+        return $party->employees()
+            ->where('legal_entity_id', $legalEntityId)
+            ->where('status', Status::APPROVED->value)
+            ->whereIn('employee_type', ['HR', 'OWNER', 'ADMIN'])
+            ->get()
+            ->sortBy(fn (Employee $emp) => match ($emp->employee_type) {
+                'HR' => 1,
+                'OWNER' => 2,
+                'ADMIN' => 3,
+                default => 4,
+            })
+            ->first();
+    }
+
     public function employeeRequests(): HasMany
     {
         return $this->hasMany(EmployeeRequest::class);
@@ -308,8 +357,10 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function getScopes(): string
     {
-        // Collect all permissions (direct + via roles)
-        return $this->getAllPermissions()->pluck('name')->unique()->join(' ');
+        // Only request scopes defined in AR / config/scopes (eHealth rejects unknown ones).
+        return implode(' ', EHealthKnownScopes::filter(
+            $this->getAllPermissions()->pluck('name')->unique()->values()->all()
+        ));
     }
 
     /**

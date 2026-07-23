@@ -5,9 +5,14 @@
     </x-header-navigation>
 
     <div
-        x-data="{ showSignatureModal: $wire.entangle('showSignatureModal') }"
+        x-data="{
+            showSignatureModal: $wire.entangle('showSignatureModal'),
+            showRequestPreviewModal: $wire.entangle('showRequestPreviewModal')
+        }"
         x-on:close-signature-modal.window="showSignatureModal = false"
         x-on:open-signature-modal.window="showSignatureModal = true"
+        x-on:close-request-preview-modal.window="showRequestPreviewModal = false"
+        x-on:open-request-preview-modal.window="showRequestPreviewModal = true"
     >
 
         <section class="section-form shift-content">
@@ -71,6 +76,7 @@
             </form>
         </section>
 
+        @include('livewire.employee.parts.modals.request-preview-modal')
         @include('livewire.employee.parts.modals.signature-modal')
         <x-forms.loading/>
 

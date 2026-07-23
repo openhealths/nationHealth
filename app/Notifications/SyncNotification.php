@@ -15,7 +15,7 @@ class SyncNotification extends Notification
     protected const array SYNC_ENTITIES = [
         'legators' => 'Синхронізація залежних закладів',
         'legal_entity' => 'Синхронізація даних медичного закладу',
-        'employee' => 'Синхронізація співробітників',
+        'employee' => 'Синхронізація працівників',
         'employee_request' => 'Синхронізація заявок',
         'division' => 'Синхронізація підрозділів',
         'healthcare_service' => 'Синхронізація послуг',
