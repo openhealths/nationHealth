@@ -32,3 +32,11 @@ GEMINI.md
 .github/copilot-instructions.md
 .github/skills/
 .vscode/mcp.json
+
+# Spec Kit tooling (local only)
+.specify/
+.gemini/
+
+# Personal Spec Kit feature docs (not for upstream; keep local copies)
+/specs/
+/storage/personal/

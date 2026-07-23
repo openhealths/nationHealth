@@ -60,6 +60,8 @@ class EmployeeIndex extends EmployeeComponent
         'role' => '',
         'position' => '',
         'division_id' => '',
+        'tax_id' => '',
+        'verification_status' => '',
     ];
 
     // --- State for Modals ---
@@ -67,6 +69,8 @@ class EmployeeIndex extends EmployeeComponent
     public ?int $employeeIdToDeactivate = null;
     public ?string $employeeToDeactivateName = null;
     public bool $isDoctorToDeactivate = false;
+    public string $deactivationEndDate = '';
+    public string $deactivationStatus = 'STOPPED';
 
     public ?int $employeeToDismissId = null;
     public ?string $employeeToDismissName = null;
@@ -188,23 +192,55 @@ class EmployeeIndex extends EmployeeComponent
                 });
         });
 
-        // 2. Filter: Search Text (Full Name, Case-Insensitive)
+        // 2. Filter: Search Text (Full Name, Case-Insensitive, Order-Independent)
+        // Each word must match any of last/first/second name — "Іван Петренко" and "Петренко Іван" both work.
         if (!empty($this->search)) {
-            $searchTerm = '%' . $this->search . '%';
-            // PostgreSQL specific: ILIKE is case-insensitive
-            $query->whereRaw("CONCAT(last_name, ' ', first_name, ' ', second_name) ILIKE ?", [$searchTerm]);
+            $words = preg_split('/\s+/u', trim($this->search), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+            foreach ($words as $word) {
+                $searchTerm = '%' . $word . '%';
+                $query->where(function (Builder $q) use ($searchTerm) {
+                    $q->where('last_name', 'ILIKE', $searchTerm)
+                        ->orWhere('first_name', 'ILIKE', $searchTerm)
+                        ->orWhere('second_name', 'ILIKE', $searchTerm);
+                });
+            }
         }
 
-        // 3. Filter: Email (via Users)
+        // 3. Filter: Email (via Users on Party)
         if (!empty($this->filter['email'])) {
-            // ILIKE for emails too
-            $query->whereHas('party.users', fn ($q) => $q->where('email', 'ILIKE', '%' . $this->filter['email'] . '%'));
+            $query->whereHas(
+                'users',
+                fn ($q) => $q->where('email', 'ILIKE', '%' . $this->filter['email'] . '%')
+            );
         }
 
         // 4. Filter: Phone
         if (!empty($this->filter['phone'])) {
             $query->whereHas('phones', fn ($q) => $q->where('number', 'like', '%' . $this->filter['phone'] . '%'));
         }
+
+        // 5–6. tax_id / verification_status — 3.23.3.1.1 (OWNER/HR/ADMIN/PHARMACY_OWNER only)
+        if ($this->canViewPartyVerificationMeta()) {
+            if (!empty($this->filter['tax_id'])) {
+                $query->where('tax_id', 'ILIKE', '%' . trim($this->filter['tax_id']) . '%');
+            }
+
+            if (!empty($this->filter['verification_status'])) {
+                $query->where('verification_status', $this->filter['verification_status']);
+            }
+        }
+    }
+
+    /**
+     * Party tax_id / verification_status in list UI — TZ 3.23.3.1 (elevated roles only).
+     */
+    private function canViewPartyVerificationMeta(): bool
+    {
+        $user = Auth::user();
+
+        return $user instanceof User
+            && $user->hasAllowedRole([Role::ADMIN, Role::HR, Role::OWNER, Role::PHARMACY_OWNER]);
     }
 
     /**
@@ -251,14 +287,29 @@ class EmployeeIndex extends EmployeeComponent
             $this->employeeToDeactivateName = $employee->full_name
                 ?? ($employee->last_name . ' ' . $employee->first_name);
 
-            // Logic to determine if the employee is a doctor
-            // Checks both the property/accessor and the position code
             $type = $employee->employeeType ?? $employee->employee_type ?? '';
 
             $this->isDoctorToDeactivate = ($type === Role::DOCTOR->value);
         }
 
+        $this->deactivationStatus = Status::STOPPED->value;
+        $startDateStr = isset($employee) ? ($employee->start_date ?? '') : '';
+        $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
+        $this->deactivationEndDate = ($startDateStr && $todayStr < $startDateStr) ? $startDateStr : $todayStr;
+
         $this->showDeactivateModal = true;
+    }
+
+    public function updatedDeactivationStatus(string $value): void
+    {
+        if ($value === Status::ENTERED_IN_ERROR->value) {
+            $this->deactivationEndDate = '';
+        } elseif ($this->deactivationEndDate === '' && $this->employeeIdToDeactivate) {
+            $employee = Employee::find($this->employeeIdToDeactivate);
+            $startDateStr = $employee?->start_date ?? '';
+            $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
+            $this->deactivationEndDate = ($startDateStr && $todayStr < $startDateStr) ? $startDateStr : $todayStr;
+        }
     }
 
     public function closeModal(): void
@@ -274,11 +325,6 @@ class EmployeeIndex extends EmployeeComponent
         $this->resetPage();
     }
 
-    public function tryEdit(int $employeeId): void
-    {
-        $this->dispatch('flashMessage', ['message' => 'Користувач має підтвердити вхід', 'type' => 'error']);
-    }
-
     public function deactivate(): void
     {
         // 1. Get the employee record from the database
@@ -291,26 +337,53 @@ class EmployeeIndex extends EmployeeComponent
             return;
         }
 
-        // eHealth requires: end_date >= start_date.
-        $startDateStr = $employee->start_date; // 'Y-m-d' string from DB
-        $endDateStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
+        // eHealth: STOPPED requires end_date (>= start_date, <= today); ENTERED_IN_ERROR omits end_date.
+        $startDateStr = $employee->start_date;
+        $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
+        $status = in_array($this->deactivationStatus, [Status::STOPPED->value, Status::ENTERED_IN_ERROR->value], true)
+            ? $this->deactivationStatus
+            : Status::STOPPED->value;
 
-        // If 'today' in Kiev is lexicographically earlier than 'start_date', use 'start_date' as the dismissal date
-        if ($startDateStr && $endDateStr < $startDateStr) {
-            $formattedEndDate = $startDateStr;
-        } else {
+        $formattedEndDate = null;
+
+        if ($status === Status::STOPPED->value) {
+            $endDateInput = trim($this->deactivationEndDate);
+            $endDateStr = $endDateInput !== '' ? $endDateInput : $todayStr;
+
+            if ($startDateStr && $endDateStr < $startDateStr) {
+                $this->dispatch('flashMessage', [
+                    'message' => __('employees.deactivation_end_date_before_start'),
+                    'type' => 'error',
+                ]);
+
+                return;
+            }
+
+            if ($endDateStr > $todayStr) {
+                $this->dispatch('flashMessage', [
+                    'message' => __('employees.deactivation_end_date_in_future'),
+                    'type' => 'error',
+                ]);
+
+                return;
+            }
+
             $formattedEndDate = $endDateStr;
         }
 
         try {
-            // 2. eHealth API Call using formatted string
-            $response = EHealth::employee()->deactivate($employee->uuid, $formattedEndDate);
+            $response = EHealth::employee()->deactivate(
+                $employee->uuid,
+                $formattedEndDate,
+                $status
+            );
 
             if (!empty($response)) {
                 // 3. Updates in the local database
                 $employee->update([
-                    'status' => Status::STOPPED->value,
+                    'status' => $status,
                     'end_date' => $formattedEndDate,
+                    'is_active' => false,
                 ]);
 
                 // 4. Safe User Cleanup: Remove a role from a user (if binding exists)
@@ -356,7 +429,7 @@ class EmployeeIndex extends EmployeeComponent
 
             $this->dispatch(
                 'flashMessage',
-                ['message' => __('employees.requestError', ['error' => $e->getMessage()]), 'type' => 'error']
+                ['message' => __('employees.requestError', ['error' => $this->translateRequestError($e->getMessage())]), 'type' => 'error']
             );
         }
 
@@ -371,6 +444,8 @@ class EmployeeIndex extends EmployeeComponent
         $this->employeeIdToDeactivate = null;
         $this->employeeToDeactivateName = null;
         $this->isDoctorToDeactivate = false;
+        $this->deactivationEndDate = '';
+        $this->deactivationStatus = Status::STOPPED->value;
     }
 
     /**
@@ -423,7 +498,7 @@ class EmployeeIndex extends EmployeeComponent
             );
             $this->dispatch(
                 'flashMessage',
-                ['message' => __('employees.requestError', ['error' => $e->getMessage()]), 'type' => 'error']
+                ['message' => __('employees.requestError', ['error' => $this->translateRequestError($e->getMessage())]), 'type' => 'error']
             );
 
             return;
@@ -544,7 +619,7 @@ class EmployeeIndex extends EmployeeComponent
         $employee = Employee::with(['party'])->find($employeeId);
 
         if (!$employee) {
-            $this->dispatch('flashMessage', ['message' => 'Співробітника не знайдено', 'type' => 'error']);
+            $this->dispatch('flashMessage', ['message' => 'Працівника не знайдено', 'type' => 'error']);
 
             return;
         }
@@ -580,8 +655,8 @@ class EmployeeIndex extends EmployeeComponent
         if ($this->requestToDeleteId) {
             $request = EmployeeRequest::with('revision')->find($this->requestToDeleteId);
 
-            // Make sure the request exists and it's a draft (without UUID)
-            if ($request && !$request->uuid) {
+            // Make sure the request exists and it's a local draft (without UUID)
+            if ($request && $request->isLocalDraft()) {
 
                 // 1. Delete the related revision if it exists
                 if ($request->revision) {
@@ -603,6 +678,15 @@ class EmployeeIndex extends EmployeeComponent
             $this->showDeleteModal = false;
             $this->requestToDeleteId = null;
         }
+    }
+
+    private function translateRequestError(string $error): string
+    {
+        if (str_contains($error, 'Missing allowances: employee:deactivate')) {
+            return __('employees.errors.missing_allowance_employee_deactivate');
+        }
+
+        return $error;
     }
 
     /**

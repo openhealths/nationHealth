@@ -313,28 +313,25 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Override: return all permissions filtered by current team's LegalEntity type
-     * (MSP_LIMITED when status is REORGANIZED). This wraps the original
-     * HasRoles::getAllPermissions and applies a type whitelist intersection.
+     * Permission names allowed for the active team's LegalEntity type.
+     *
+     * @return Collection<int, string>
      */
-    public function getAllPermissions(): Collection
+    protected function allowedPermissionNamesForCurrentTeam(): Collection
     {
-        // Base union of direct + role permissions from Spatie
-        $all = $this->getAllPermissionsParent();
-
         if (!config('permission.teams')) {
-            return $all;
+            return Permission::query()->pluck('name')->unique();
         }
 
         $teamId = getPermissionsTeamId();
 
         if (!$teamId) {
-            return $all;
+            return collect();
         }
 
         $guard = Auth::getDefaultDriver();
 
-        $allowedNames = cache()->memo()->remember(
+        return cache()->memo()->remember(
             "allowed_permissions:$teamId:$guard",
             now()->addMinutes(5),
             function () use ($teamId, $guard) {
@@ -358,6 +355,31 @@ class User extends Authenticatable implements MustVerifyEmail
                     ->unique();
             }
         );
+    }
+
+    /**
+     * Override: return all permissions filtered by current team's LegalEntity type
+     * (MSP_LIMITED when status is REORGANIZED). This wraps the original
+     * HasRoles::getAllPermissions and applies a type whitelist intersection.
+     */
+    public function getAllPermissions(): Collection
+    {
+        // Base union of direct + role permissions from Spatie
+        $all = $this->getAllPermissionsParent();
+
+        if (!config('permission.teams')) {
+            return $all;
+        }
+
+        $teamId = getPermissionsTeamId();
+
+        if (!$teamId) {
+            return $all;
+        }
+
+        $guard = Auth::getDefaultDriver();
+
+        $allowedNames = $this->allowedPermissionNamesForCurrentTeam();
 
         if ($allowedNames->isEmpty()) {
             return $all->where(fn () => false);
@@ -523,6 +545,19 @@ class User extends Authenticatable implements MustVerifyEmail
         return $exactMatch
             ? $names->every(fn ($name) => $allowedRoles->contains($name)) // Return TRUE if user has assigned to ALL of incoming roles
             : $names->contains(fn ($name) => $allowedRoles->contains($name)); // Return TRUE if user is assigned to at least of the ONE of incoming roles
+    }
+
+    /**
+     * Whether the user holds an elevated employee-management role in the current legal entity.
+     *
+     * Mirrors employee registry UI: hasAllowedRole OR assigned Spatie role (3.23.1.1 / 3.23.3).
+     */
+    public function hasElevatedEmployeeRole(): bool
+    {
+        $roles = [Role::ADMIN, Role::HR, Role::OWNER, Role::PHARMACY_OWNER];
+
+        return $this->hasAllowedRole($roles)
+            || $this->hasRole(array_map(static fn (Role $role) => $role->value, $roles));
     }
 
     /**

@@ -176,14 +176,16 @@
                                 </a>
                             </li>
 
-                            <li>
-                                <a href="{{ route('party.verification.index', [legalEntity()]) }}"
-                                   class="submenu-item"
-                                >
-                                    @icon('verifications')
-                                    <span>{{ __('forms.verifications') }}</span>
-                                </a>
-                            </li>
+                            @can('party_verification:details')
+                                <li>
+                                    <a href="{{ route('party.verification.index', [legalEntity()]) }}"
+                                       class="submenu-item"
+                                    >
+                                        @icon('verifications')
+                                        <span>{{ __('forms.verifications') }}</span>
+                                    </a>
+                                </li>
+                            @endcan
                         </ul>
                     </li>
                 @endif

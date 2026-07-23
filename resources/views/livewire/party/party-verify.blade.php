@@ -86,12 +86,19 @@
             </table>
         </div>
 
-        {{-- 2. Warning Block --}}
-        @if(data_get($verificationDetails, 'details.dracs_death.verification_status') === 'NOT_VERIFIED')
+        {{-- 2. Warning Block (3.23 п.3.2.2: drfo / dracs_death / dms_passport) --}}
+        @php
+            $warningStreams = collect(['drfo', 'dracs_death', 'dms_passport'])
+                ->filter(fn (string $stream) => data_get($verificationDetails, "details.{$stream}.verification_status") === 'NOT_VERIFIED')
+                ->values();
+        @endphp
+        @if($warningStreams->isNotEmpty())
             <div class="p-4 mt-6 mb-4 text-sm text-red-800 rounded-lg bg-red-50 dark:bg-gray-800 dark:text-red-400" role="alert">
                 <h4 class="font-bold">{{ __('party_verification.warning.header') }}</h4>
                 <ul class="mt-2 list-disc list-inside space-y-1">
-                    <li>{{ __('party_verification.warning.dracs_death') }}</li>
+                    @foreach($warningStreams as $stream)
+                        <li>{{ __('party_verification.warning.' . $stream) }}</li>
+                    @endforeach
                 </ul>
                 <p class="mt-3">{{ __('party_verification.warning.footer') }}</p>
             </div>
@@ -103,14 +110,9 @@
                 {{ __('forms.back') }}
             </a>
 
-            {{-- The button is only active if it allows canUpdateVerification with PHP --}}
             <button type="button"
                     wire:click="checkAndOpenModal"
-                    @class([
-                        'button-primary-outline' => $this->canUpdateVerification,
-                        'button-disabled' => !$this->canUpdateVerification
-                    ])
-                    @if(!$this->canUpdateVerification) disabled @endif
+                    class="button-primary-outline"
             >
                 {{ __('forms.update_data') }}
             </button>
@@ -165,10 +167,8 @@
 
                     {{-- 2. Status --}}
                     <div class="form-group group">
-                        <select wire:model.live="status" id="status" class="input peer px-4 py-2">
-                            <option value="">{{ __('forms.select_status') }}</option>
+                        <select wire:model.live="status" id="status" class="input peer px-4 py-2" disabled>
                             <option value="VERIFIED">{{ __('party_verification.statuses.VERIFIED') }}</option>
-                            <option value="NOT_VERIFIED">{{ __('party_verification.statuses.NOT_VERIFIED') }}</option>
                         </select>
                         <label for="status" class="label">{{ __('party_verification.status') }}</label>
                         @error('status') <span class="text-red-500 text-sm mt-1">{{ $message }}</span> @enderror
@@ -176,17 +176,14 @@
 
                     {{-- 3. Reason --}}
                     <div class="form-group group">
-                        <select wire:model="reason" id="reason" class="input peer px-4 py-2" @if(empty($status)) disabled @endif>
+                        <select wire:model="reason" id="reason" class="input peer px-4 py-2">
                             <option value="">{{ __('forms.choose_reason') }}</option>
-                            @if($status === 'VERIFIED')
-                                <option value="MANUAL_NOT_CONFIRMED">
-                                    {{ __('party_verification.reasons.MANUAL_NOT_CONFIRMED') }}
-                                </option>
-                            @elseif($status === 'NOT_VERIFIED')
-                                <option value="MANUAL_CONFIRMED">
-                                    {{ __('party_verification.reasons.MANUAL_CONFIRMED') }}
-                                </option>
-                            @endif
+                            <option value="MANUAL_CONFIRMED">
+                                {{ __('party_verification.reasons.MANUAL_CONFIRMED') }}
+                            </option>
+                            <option value="MANUAL_NOT_CONFIRMED">
+                                {{ __('party_verification.reasons.MANUAL_NOT_CONFIRMED') }}
+                            </option>
                         </select>
                         <label for="reason" class="label">{{ __('forms.reason_code') }}</label>
                         @error('reason') <span class="text-red-500 text-sm mt-1">{{ $message }}</span> @enderror
@@ -194,7 +191,9 @@
 
                     {{-- 4. Comment --}}
                     <div class="form-group">
-                        <label for="comment" class="peer appearance-none bg-white">{{ __('forms.comment') }}</label>
+                        <label for="comment" class="mb-1 block text-sm font-medium text-gray-500 dark:text-gray-400">
+                            {{ __('forms.comment') }}
+                        </label>
                         <textarea
                             id="comment"
                             wire:model.defer="comment"

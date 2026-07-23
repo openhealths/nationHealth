@@ -15,7 +15,7 @@ class SyncNotification extends Notification
     protected const array SYNC_ENTITIES = [
         'legators' => 'Синхронізація залежних закладів',
         'legal_entity' => 'Синхронізація даних медичного закладу',
-        'employee' => 'Синхронізація співробітників',
+        'employee' => 'Синхронізація працівників',
         'employee_request' => 'Синхронізація заявок',
         'division' => 'Синхронізація підрозділів',
         'healthcare_service' => 'Синхронізація послуг',
@@ -25,6 +25,7 @@ class SyncNotification extends Notification
         'license' => 'Синхронізація ліцензій',
         'declaration' => 'Синхронізація декларацій',
         'episode' => 'Синхронізація епізодів',
+        'party_verification' => 'Синхронізація верифікацій працівників',
     ];
 
     /** @var array Sync action statuses mapping with Ukrainian descriptions */

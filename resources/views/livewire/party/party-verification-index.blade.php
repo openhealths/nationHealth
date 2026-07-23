@@ -1,8 +1,22 @@
 <div>
-    <x-header-navigation>
+    <x-header-navigation class="items-start">
         <x-slot name="title">
             {{ __('party_verification.verification_list') }}
         </x-slot>
+
+        <div class="mt-3 ml-0 flex flex-col sm:flex-row sm:flex-wrap gap-2 self-start">
+            @can('syncVerification', \App\Models\Relations\Party::class)
+                <button
+                    type="button"
+                    wire:click="{{ !$isSyncing ? 'sync' : '' }}"
+                    @disabled($isSyncing)
+                    class="{{ $isSyncing ? 'button-sync-disabled' : 'button-sync' }} flex items-center gap-2 whitespace-nowrap"
+                >
+                    @icon('refresh', 'w-4 h-4')
+                    {{ __('forms.synchronise_with_eHealth') }}
+                </button>
+            @endcan
+        </div>
     </x-header-navigation>
 
     <div class="flow-root mt-8 shift-content pl-3.5">

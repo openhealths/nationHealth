@@ -23,6 +23,125 @@ use Illuminate\Support\Facades\Log;
 class EmployeeRequestProcessor
 {
     use BatchLegalEntityQueries;
+
+    public const string OUTCOME_APPROVED = 'approved';
+    public const string OUTCOME_REJECTED = 'rejected';
+    public const string OUTCOME_EXPIRED = 'expired';
+    public const string OUTCOME_PENDING = 'pending';
+    public const string OUTCOME_FAILED = 'failed';
+
+    public function __construct(private EmployeeRequestMatcher $matcher)
+    {
+    }
+
+    /**
+     * Sync one pending local employee request against eHealth (same outcome as login EmployeeCreate).
+     *
+     * @return array{outcome: string, message: string}
+     */
+    public function syncSinglePendingRequest(EmployeeRequest $request, LegalEntity $legalEntity): array
+    {
+        if (!$request->isPendingEhealth() || !$request->uuid) {
+            return [
+                'outcome' => self::OUTCOME_FAILED,
+                'message' => __('employees.sync.employee_request_not_pending'),
+            ];
+        }
+
+        $request->loadMissing(['revision', 'employee', 'party', 'division']);
+
+        if (!session()->get(config('ehealth.api.oauth.bearer_token'))) {
+            return [
+                'outcome' => self::OUTCOME_FAILED,
+                'message' => __('employees.sync.session_token_missing'),
+            ];
+        }
+
+        $remoteData = EHealth::employeeRequest()
+            ->getDetails($request->uuid)
+            ->validate();
+
+        $remoteStatus = $remoteData['status'] instanceof \BackedEnum
+            ? $remoteData['status']->value
+            : $remoteData['status'];
+
+        if (in_array($remoteStatus, ['REJECTED', 'EXPIRED'], true)) {
+            $newStatus = $remoteStatus === 'REJECTED' ? LocalStatus::REJECTED : LocalStatus::EXPIRED;
+            $request->update([
+                'status' => $newStatus,
+                'applied_at' => now(),
+            ]);
+            $request->revision?->update(['status' => RevisionStatus::OUTDATED]);
+
+            return [
+                'outcome' => $remoteStatus === 'REJECTED' ? self::OUTCOME_REJECTED : self::OUTCOME_EXPIRED,
+                'message' => __('employees.sync.employee_request_status_updated', ['status' => $remoteStatus]),
+            ];
+        }
+
+        // Prefer employee_id from request details; otherwise search APPROVED employees like EmployeeCreate.
+        $taxId = data_get($request->revision?->data, 'party.tax_id');
+        $employeeUuid = $remoteData['employee_id'] ?? null;
+        $remoteEmployee = null;
+
+        if (is_string($taxId) && $taxId !== '') {
+            $remoteEmployee = $this->matcher->findApprovedForRequest(
+                $request,
+                $taxId,
+                $legalEntity->uuid
+            );
+        }
+
+        if ($remoteEmployee === null && !is_string($employeeUuid)) {
+            if (EmployeeRequestMatcher::isRemoteStillPending($remoteStatus)) {
+                return [
+                    'outcome' => self::OUTCOME_PENDING,
+                    'message' => __('employees.sync.employee_request_still_pending'),
+                ];
+            }
+
+            return [
+                'outcome' => self::OUTCOME_FAILED,
+                'message' => __('employees.sync.no_employees_found'),
+            ];
+        }
+
+        $applyPayload = array_merge($remoteData, $remoteEmployee ?? []);
+        if ($remoteEmployee !== null) {
+            $applyPayload['employee_id'] = $remoteEmployee['uuid'];
+            $applyPayload['status'] = $remoteEmployee['status'] ?? Status::APPROVED->value;
+        } elseif (is_string($employeeUuid)) {
+            $applyPayload['employee_id'] = $employeeUuid;
+            $applyPayload['status'] = Status::APPROVED->value;
+        }
+
+        $applyPayload['legal_entity_id'] = $applyPayload['legal_entity_id'] ?? $legalEntity->uuid;
+
+        try {
+            $this->applyApprovedRequest($request, $applyPayload);
+        } catch (\Throwable $e) {
+            if (EmployeeRequestMatcher::isRemoteStillPending($remoteStatus)) {
+                Log::info('[EmployeeRequestProcessor] Pending request has no APPROVED employee yet.', [
+                    'request_id' => $request->id,
+                    'remote_status' => $remoteStatus,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return [
+                    'outcome' => self::OUTCOME_PENDING,
+                    'message' => __('employees.sync.employee_request_still_pending'),
+                ];
+            }
+
+            throw $e;
+        }
+
+        return [
+            'outcome' => self::OUTCOME_APPROVED,
+            'message' => __('employees.sync.employee_request_success'),
+        ];
+    }
+
     /**
      * Applies data from an APPROVED eHealth request to the local Employee entity.
      * Since the User Token response does not contain the created 'employee_id',
@@ -55,8 +174,10 @@ class EmployeeRequestProcessor
                 throw new \RuntimeException('Cannot apply approved request: Tax ID is missing.');
             }
 
-            // 2. Resolve Employee UUID (The critical step)
-            $employeeUuid = $this->resolveEmployeeUuid($request, $taxId); // <-- Tax ID is now guaranteed to be a string
+            // 2. Resolve Employee UUID (from eHealth request details or Tax ID search)
+            $employeeUuid = $eHealthData['employee_id']
+                ?? $eHealthData['employee_uuid']
+                ?? $this->resolveEmployeeUuid($request, $taxId);
 
             if (!$employeeUuid) {
                 throw new \RuntimeException(
@@ -115,7 +236,7 @@ class EmployeeRequestProcessor
                 $employee->uuid = $employeeUuid; // Ensure UUID is set
                 $employee->legalEntityId = $request->legalEntityId;
                 $employee->userId = $request->userId;
-                $employee->status = $systemOverrides['status'] ?? Status::ACTIVE;
+                $employee->status = $systemOverrides['status'] ?? Status::APPROVED->value;
 
                 if ($request->partyId) {
                     $employee->partyId = $request->partyId;
@@ -148,7 +269,7 @@ class EmployeeRequestProcessor
             );
 
             // 10. Assign Roles to User
-            $this->assignUserRoles($employee, $request->legal_entity_id, $request->user_id);
+            $this->assignUserRoles($employee, $request->legalEntityId, $request->userId);
 
             // 11. Finalize Request Status
             $request->update([
@@ -169,102 +290,9 @@ class EmployeeRequestProcessor
      */
     private function resolveEmployeeUuid(EmployeeRequest $request, string $taxId): ?string
     {
-        Log::info("[EmployeeRequestProcessor] Searching eHealth for Employee by TaxID: {$taxId}");
+        $remote = $this->matcher->findApprovedForRequest($request, $taxId, legalEntity()->uuid);
 
-        try {
-            $divisionUuid = optional($request->division)->uuid;
-
-            $employeeType = $request->employee_type;
-
-            $params = [
-                'tax_id' => $taxId,
-                'status' => 'APPROVED',
-                'legal_entity_id' => legalEntity()->uuid,
-                'page_size' => 50,
-            ];
-
-            if ($divisionUuid) {
-                $params['division_id'] = $divisionUuid;
-            }
-
-            if ($employeeType) {
-                $params['employee_type'] = $employeeType;
-            }
-
-            $response = EHealth::employee()->getMany($params);
-
-            $employeesList = $response->validate();
-
-            if (empty($employeesList)) {
-                Log::warning(
-                    "[EmployeeRequestProcessor] No APPROVED employees found in eHealth for Tax ID: {$taxId} and applied filters."
-                );
-
-                return null;
-            }
-
-            $targetPosition = $request->position;
-            $targetStartDate = $request->start_date; // Local request start date (Y-m-d)
-
-            foreach ($employeesList as $remoteEmp) {
-                if (!isset($remoteEmp['uuid'])) {
-                    Log::warning("[EmployeeRequestProcessor] Skipping remote employee record without 'uuid' key.");
-                    continue;
-                }
-
-                // 1. Check Position Code
-                $posMatch = ($remoteEmp['position'] ?? '') === $targetPosition;
-
-                // 2. Check Employee Type (This should match if filtered in API call, but safe to re-check)
-                $typeMatch = ($remoteEmp['employee_type'] ?? '') === $employeeType;
-
-                // 3. Check Start Date (Requires robust date comparison)
-                $dateMatch = true;
-                if ($targetStartDate && !empty($remoteEmp['start_date'])) {
-                    try {
-                        $remoteDate = Carbon::parse($remoteEmp['start_date']);
-                        $localDate = Carbon::parse($targetStartDate);
-                        $dateMatch = $remoteDate->isSameDay($localDate);
-                    } catch (\Exception $e) {
-                        Log::warning(
-                            "[EmployeeRequestProcessor] Date parsing failed for remote start_date: {$remoteEmp['start_date']}. Skipping date check."
-                        );
-                        $dateMatch = false;
-                    }
-                }
-
-                // 4. Check Division ID (Check only if a division filter was applied)
-                $divisionMatch = true;
-                if ($divisionUuid) {
-                    $remoteDivisionId = $remoteEmp['division_id'] ?? null;
-                    $divisionMatch = $remoteDivisionId === $divisionUuid;
-                }
-
-                if ($posMatch && $typeMatch && $dateMatch && $divisionMatch) {
-                    Log::info("[EmployeeRequestProcessor] Found MATCHING Employee UUID: {$remoteEmp['uuid']}");
-
-                    return $remoteEmp['uuid'];
-                }
-            }
-
-            if (count($employeesList) === 1) {
-                if (isset($employeesList[0]['uuid'])) {
-                    Log::warning(
-                        "[EmployeeRequestProcessor] Fuzzy match: taking the only found employee for this Tax ID."
-                    );
-
-                    return $employeesList[0]['uuid'];
-                }
-            }
-
-        } catch (\Exception $e) {
-            Log::error(
-                "[EmployeeRequestProcessor] Search failed: " . $e->getMessage(),
-                ['exception' => $e, 'tax_id' => $taxId]
-            );
-        }
-
-        return null;
+        return $remote['uuid'] ?? null;
     }
 
     /**
@@ -397,13 +425,28 @@ class EmployeeRequestProcessor
 
         $users = $employee->party->users()->get();
 
+        if ($users->isEmpty() && $requestUserId) {
+            $requestUser = \App\Models\User::find($requestUserId);
+
+            if ($requestUser) {
+                $users = collect([$requestUser]);
+            }
+        }
+
         if ($users->isEmpty()) {
             return;
         }
 
-        $roleName = $employee->employee_type;
+        $roleName = $employee->employeeType;
 
         foreach ($users as $user) {
+            $employee->users()->syncWithoutDetaching([$user->id]);
+
+            if (!$user->partyId && $employee->partyId) {
+                $user->partyId = $employee->partyId;
+                $user->save();
+            }
+
             // Assign Role based on Employee Type
             if ($roleName && !$user->hasRole($roleName)) {
                 setPermissionsTeamId($legalEntityId);

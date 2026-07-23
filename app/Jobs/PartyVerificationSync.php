@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\EHealthJob;
-use App\Classes\eHealth\EHealth;
+use App\Models\Relations\Party;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\ProcessesPartyVerificationResponses;
 use GuzzleHttp\Promise\PromiseInterface;
@@ -20,19 +21,44 @@ class PartyVerificationSync extends EHealthJob
     use ProcessesPartyVerificationResponses;
 
     public const string BATCH_NAME = 'PartyVerificationFullSync';
-    public const string SCOPE_REQUIRED = 'party_verification:read';
+    public const string SCOPE_REQUIRED = 'party_verification:details';
 
     /**
-     * @throws EHealthConnectionException
+     * Sync via GET /api/parties/{id}/verification (party_verification:details).
      */
-    protected function sendRequest(string $token): PromiseInterface|EHealthResponse
+    protected function sendRequest(string $token): PromiseInterface|EHealthResponse|null
     {
-        return EHealth::party()->withToken($token)->getMany(page: $this->page);
+        $parties = Party::query()
+            ->whereHas(
+                'employees',
+                fn ($query) => $query->where('legal_entity_id', $this->legalEntity->id)
+            )
+            ->whereNotNull('uuid')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($parties as $party) {
+            try {
+                $response = EHealth::party()
+                    ->withToken($token)
+                    ->getDetails($party->uuid);
+
+                $this->processPartyVerificationDetail($party->uuid, $response, $this->legalEntity);
+            } catch (Throwable $e) {
+                Log::warning('PartyVerificationSync: failed to fetch details', [
+                    'party_uuid' => $party->uuid,
+                    'legal_entity_id' => $this->legalEntity->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return null;
     }
 
     protected function processResponse(?EHealthResponse $response): void
     {
-        $this->processPartyVerificationResponse($response, $this->legalEntity);
+        // Handled in sendRequest via getDetails per party.
     }
 
     protected function getAdditionalMiddleware(): array
@@ -47,15 +73,13 @@ class PartyVerificationSync extends EHealthJob
     {
         Log::error('Job [PartyVerificationSync] failed.', [
             'legal_entity_id' => $this->legalEntity->id ?? 'unknown',
-            'error' => $exception->getMessage(),
-            'trace' => $exception->getTraceAsString(),
+            'error' => $exception?->getMessage(),
+            'trace' => $exception?->getTraceAsString(),
         ]);
     }
 
     /**
      * Get next entity job if needed.
-     *
-     * @return EHealthJob|null
      */
     protected function getNextEntityJob(): ?EHealthJob
     {

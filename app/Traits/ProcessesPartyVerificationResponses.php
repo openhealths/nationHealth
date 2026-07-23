@@ -12,11 +12,15 @@ use App\Notifications\PartyVerificationStatusChanged;
 trait ProcessesPartyVerificationResponses
 {
     /**
-     * Processes party verification statuses using an optimized upsert approach.
-     * Updates ONLY the verification_status field.
+     * Processes a page of party verification statuses from GET /parties/verifications (list).
      *
-     * @param  EHealthResponse  $response   The API response object.
-     * @param  LegalEntity      $legalEntity The legal entity context.
+     * Intentionally kept as the eHealth list-response surface alongside Party::getMany().
+     * Current app call sites (login job, index sync button) use getDetails +
+     * processPartyVerificationDetail() with party_verification:details — they do not call this.
+     * Wire this back only if product returns to list+:read sync.
+     *
+     * @param  EHealthResponse  $response  The API response object.
+     * @param  LegalEntity  $legalEntity  The legal entity context.
      * @return void
      */
     private function processPartyVerificationResponse(EHealthResponse $response, LegalEntity $legalEntity): void
@@ -81,6 +85,45 @@ trait ProcessesPartyVerificationResponses
                         $userToNotify->notify(new PartyVerificationStatusChanged($party, $newOverallStatus, $legalEntity));
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Processes GET /api/parties/{id}/verification (party_verification:details).
+     */
+    private function processPartyVerificationDetail(
+        string $partyUuid,
+        EHealthResponse $response,
+        LegalEntity $legalEntity
+    ): void {
+        $payload = $response->json();
+        $data = is_array($payload['data'] ?? null) ? $payload['data'] : $payload;
+
+        $verificationStatus = data_get($data, 'verification_status');
+
+        if (!is_string($verificationStatus) || $verificationStatus === '') {
+            return;
+        }
+
+        $party = Party::query()
+            ->where('uuid', $partyUuid)
+            ->with('users')
+            ->first();
+
+        if (!$party) {
+            return;
+        }
+
+        $oldStatus = $party->verification_status;
+
+        if ($oldStatus !== $verificationStatus) {
+            $party->update(['verification_status' => $verificationStatus]);
+        }
+
+        if ($oldStatus === 'VERIFIED' && $verificationStatus !== 'VERIFIED') {
+            foreach ($party->users as $userToNotify) {
+                $userToNotify->notify(new PartyVerificationStatusChanged($party, $verificationStatus, $legalEntity));
             }
         }
     }

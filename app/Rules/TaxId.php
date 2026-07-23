@@ -109,33 +109,45 @@ class TaxId implements ValidationRule, DataAwareRule
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        // Check if the validation is for a passport/national ID.
+        // When no_tax_id=true, tax_id stores an identity document number (not РНОКПП).
         if ($this->noTaxId) {
-            if (empty(array_filter($this->documents, fn (array $doc) => $doc['type'] === 'NATIONAL_ID' || $doc['type'] === 'PASSPORT'))) {
-                // If a no any document of type NATIONAL_ID or PASSPORT exists, raise an error.
-                $fail(__('validation.employee.owner_passport_mandatory_no_tax_id'));
+            $allowedDocumentTypes = [
+                'PASSPORT',
+                'NATIONAL_ID',
+                'REFUGEE_CERTIFICATE',
+                'PERMANENT_RESIDENCE_PERMIT',
+            ];
+
+            $identityDoc = collect($this->documents)->first(
+                fn (array $doc) => in_array($doc['type'] ?? '', $allowedDocumentTypes, true)
+                    && !empty($doc['number'])
+            );
+
+            if (!$identityDoc) {
+                $fail(__('forms.no_tax_id_document_required'));
 
                 return;
             }
 
-            // If the value is a boolean (true/false), we need to fetch the actual document number for validation.
-            if (\is_bool($value)) {
-                $value = collect($this->documents)
-                    ->first(fn (array $doc) => \in_array($doc['type'], ['PASSPORT', 'NATIONAL_ID']))['number'] ?? null;
+            if (is_bool($value)) {
+                $value = $identityDoc['number'];
             }
 
-            // TODO: check if it need to be validated (the same validation used in the document's field)
-            // A national ID can be either 9 digits or 2 Ukrainian letters followed by 6 digits.
-            // The "\\d" correctly escapes the backslash for the regex engine.
-            if (!preg_match('/^([0-9]{9}|[А-ЯЁЇIЄҐ]{2}\\d{6})$/u', $value)) {
-                $fail(__('validation.attributes.errors.invalidNationalId'));
+            $numberValidator = validator(
+                ['number' => $value],
+                ['number' => [new DocumentNumber($identityDoc['type'])]]
+            );
+
+            if ($numberValidator->fails()) {
+                foreach ($numberValidator->errors()->all() as $error) {
+                    $fail($error);
+                }
 
                 return;
             }
 
-            // If the EDRPOU is set and it not in the standard format (10 digits), we need to ensure that it matches the provided value.
-            // TODO: check is it important for OWNER only
-            if ($this->isOwner && !preg_match('/^([0-9]{10})$/', $this->edrpou) && $this->edrpou !== $value) {
+            // Owner LE registration: when EDRPOU is a passport-like value, it must match tax_id.
+            if ($this->isOwner && !preg_match('/^([0-9]{10})$/', (string) $this->edrpou) && $this->edrpou !== $value) {
                 $fail(__('validation.custom.mismatch_edrpou_no_tax_id'));
             }
 

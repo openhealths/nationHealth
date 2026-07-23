@@ -59,6 +59,7 @@ use App\Livewire\License\LicenseView;
 use App\Livewire\Party\PartyEdit;
 use App\Livewire\Party\PartyVerify;
 use App\Livewire\Party\PartyVerificationIndex;
+use App\Models\Relations\Party;
 use App\Models\Declaration;
 use App\Models\Division;
 use App\Models\EmployeeRole;
@@ -194,9 +195,11 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
             });
 
             Route::get('/party-verifications', PartyVerificationIndex::class)
-                ->name('party.verification.index');
+                ->name('party.verification.index')
+                ->can('viewAnyVerification', Party::class);
             Route::get('/party/{party}/verification', PartyVerify::class)
-                ->name('party.verification.show');
+                ->name('party.verification.show')
+                ->can('viewVerification', 'party');
             Route::get('/party/{party}/edit', PartyEdit::class)->name('party.edit');
 
             Route::prefix('employee-role')->name('employee-role.')->group(static function () {

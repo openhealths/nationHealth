@@ -23,13 +23,14 @@ class Party extends EHealthRequest
     protected const string URL = '/api/parties';
 
     /**
-     * Fetches a paginated list of party verification statuses.
-     * Now accepts a token for authentication and attaches a data mapper.
+     * Get list of party verification statuses.
      *
      * @param  array  $filters  An array of filters to apply to the query.
      * @param  int  $page
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException
+     *
+     * @see https://ehealthcoreapi9145v1.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/employees/get-party-verification-statuses-list
      */
     public function getMany(array $filters = [], int $page = 1): PromiseInterface|EHealthResponse
     {
@@ -65,12 +66,14 @@ class Party extends EHealthRequest
     }
 
     /**
-     * Fetches the detailed verification status for a single party.
+     * Get party verification details by party id.
      *
      * @param  string  $uuid  The UUID of the party.
      * @param  array|null  $query  Optional query parameters.
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException
+     *
+     * @see https://ehealthcoreapi9145v1.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/employees/get-party-verification-details
      */
     public function getDetails(string $uuid, ?array $query = null): PromiseInterface|EHealthResponse
     {
