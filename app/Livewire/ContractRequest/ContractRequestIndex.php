@@ -105,6 +105,8 @@ class ContractRequestIndex extends Component
         $token = session()?->get(config('ehealth.api.oauth.bearer_token'));
         $encryptedToken = Crypt::encryptString($token);
 
+        // Read-only sync for 3.1.5: fetch existing requests of both API types.
+        // Creating capitation is disabled; we still list/sync capitation records already in ESOZ.
         $types = ['capitation', 'reimbursement'];
         $batchJobs = [];
         $syncedCount = 0;
