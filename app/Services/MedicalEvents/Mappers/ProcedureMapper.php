@@ -45,20 +45,14 @@ class ProcedureMapper implements FhirMapperContract
                 ->toCodeableConcept(),
         ];
 
-        $hasPerformedPeriod = $status === ProcedureStatus::COMPLETED
-            && !empty($data['performedPeriodStartDate'])
-            && !empty($data['performedPeriodStartTime'])
-            && !empty($data['performedPeriodEndDate'])
-            && !empty($data['performedPeriodEndTime']);
+        if ($status === ProcedureStatus::COMPLETED && ($data['performedType'] ?? null) === 'date_time') {
+            $result['performedDateTime'] = convertToEHealthISO8601($data['performedDate'] . ' ' . $data['performedTime']);
+        }
 
-        if ($hasPerformedPeriod) {
+        if ($status === ProcedureStatus::COMPLETED && ($data['performedType'] ?? null) === 'period') {
             $result['performedPeriod'] = [
-                'start' => convertToEHealthISO8601(
-                    $data['performedPeriodStartDate'] . ' ' . $data['performedPeriodStartTime']
-                ),
-                'end' => convertToEHealthISO8601(
-                    $data['performedPeriodEndDate'] . ' ' . $data['performedPeriodEndTime']
-                ),
+                'start' => convertToEHealthISO8601($data['performedPeriodStartDate'] . ' ' . $data['performedPeriodStartTime']),
+                'end' => convertToEHealthISO8601($data['performedPeriodEndDate'] . ' ' . $data['performedPeriodEndTime']),
             ];
         }
 
@@ -131,7 +125,11 @@ class ProcedureMapper implements FhirMapperContract
         if ($data['primarySource']) {
             $result['performer'] = FhirResource::make()
                 ->coding('eHealth/resources', 'employee')
-                ->toIdentifier($uuids['procedureEmployee'] ?? $uuids['employee']);
+                ->toIdentifier(
+                    $data['performerEmployeeId']
+                    ?? $uuids['procedureEmployee']
+                    ?? $uuids['employee']
+                );
         } else {
             $result['reportOrigin'] = FhirResource::make()
                 ->coding('eHealth/report_origins', $data['reportOriginCode'])
@@ -197,6 +195,9 @@ class ProcedureMapper implements FhirMapperContract
     {
         $detailsMap = $context[0] ?? [];
 
+        $performedDateTime = data_get($data, 'performedDateTime');
+        $performedPeriodStartDate = data_get($data, 'performedPeriodStartDate', '');
+
         return [
             'uuid' => data_get($data, 'uuid'),
             'status' => data_get($data, 'status', ProcedureStatus::COMPLETED->value),
@@ -204,6 +205,7 @@ class ProcedureMapper implements FhirMapperContract
             'codeValue' => data_get($data, 'code.identifier.value', ''),
             'encounterId' => data_get($data, 'encounter.identifier.value', ''),
             'primarySource' => data_get($data, 'primarySource'),
+            'performerEmployeeId' => data_get($data, 'performer.identifier.value', ''),
             'reportOriginCode' => data_get($data, 'reportOrigin.coding.0.code', ''),
             'reportOriginText' => data_get($data, 'reportOrigin.text', ''),
             'divisionId' => data_get($data, 'division.identifier.value', ''),
@@ -211,14 +213,17 @@ class ProcedureMapper implements FhirMapperContract
             'note' => data_get($data, 'note', ''),
             'basedOnIdentifier' => data_get($data, 'basedOn.identifier.value', ''),
             ...PaperReferralMapper::fromFhir($data),
-            'performedPeriodStartDate' => convertToAppDateFormat(data_get($data, 'performedPeriodStartDate')),
-            'performedPeriodStartTime' => data_get($data, 'performedPeriodStartTime')
-                ? CarbonImmutable::parse(data_get($data, 'performedPeriodStartTime'))->format('H:i')
-                : '',
+            'performedType' => match (true) {
+                !empty($performedDateTime) => 'date_time',
+                !empty($performedPeriodStartDate) => 'period',
+                default => '',
+            },
+            'performedDate' => $performedDateTime ? convertToAppDateFormat($performedDateTime) : '',
+            'performedTime' => $performedDateTime ? CarbonImmutable::parse($performedDateTime)->format('H:i') : '',
+            'performedPeriodStartDate' => convertToAppDateFormat($performedPeriodStartDate),
+            'performedPeriodStartTime' => data_get($data, 'performedPeriodStartTime') ? CarbonImmutable::parse(data_get($data, 'performedPeriodStartTime'))->format('H:i') : '',
             'performedPeriodEndDate' => convertToAppDateFormat(data_get($data, 'performedPeriodEndDate')),
-            'performedPeriodEndTime' => data_get($data, 'performedPeriodEndTime')
-                ? CarbonImmutable::parse(data_get($data, 'performedPeriodEndTime'))->format('H:i')
-                : '',
+            'performedPeriodEndTime' => data_get($data, 'performedPeriodEndTime') ? CarbonImmutable::parse(data_get($data, 'performedPeriodEndTime'))->format('H:i') : '',
             'reasonReferences' => array_map(
                 static function (array $reasonReference) use ($detailsMap) {
                     $uuid = data_get($reasonReference, 'identifier.value');

@@ -9,8 +9,10 @@ use App\Classes\Cipher\Api\CipherRequest;
 use App\Core\Arr;
 use App\Enums\Person\ObservationStatus;
 use App\Enums\Status;
+use App\Enums\User\Role;
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Livewire\Procedure\Forms\ProcedureForm as Form;
+use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
 use App\Models\Equipment;
@@ -102,6 +104,13 @@ class ProcedureComponent extends Component
      */
     public array $reasonReferenceResults = [];
 
+    /**
+     * List of employees available as procedure performers.
+     *
+     * @var array
+     */
+    public array $procedureEmployees = [];
+
     public bool $showSignatureModal = false;
 
     #[Locked]
@@ -120,7 +129,8 @@ class ProcedureComponent extends Component
         'eHealth/LOINC/observation_codes',
         'eHealth/ICF/classifiers',
         'eHealth/ICPC2/condition_codes',
-        'eHealth/assistive_products'
+        'eHealth/assistive_products',
+        'POSITION'
     ];
 
     public function boot(): void
@@ -181,6 +191,32 @@ class ProcedureComponent extends Component
             ->filter(static fn (array $equipment) => !empty($equipment['divisionUuid']))
             ->groupBy('divisionUuid')
             ->map(static fn ($items) => $items->values()->toArray())
+            ->toArray();
+
+        $this->procedureEmployees = Employee::query()
+            ->whereLegalEntityId($legalEntity->id)
+            ->whereStatus(Status::APPROVED)
+            ->whereIsActive(true)
+            ->whereIn('employee_type', [
+                Role::DOCTOR->value,
+                Role::SPECIALIST->value,
+                Role::ASSISTANT->value,
+            ])
+            ->select([
+                'uuid',
+                'party_id',
+                'position',
+                'division_uuid',
+            ])
+            ->with('party:id,last_name,first_name,second_name')
+            ->get()
+            ->map(static fn (Employee $employee): array => [
+                'uuid' => $employee->uuid,
+                'name' => $employee->fullName,
+                'position' => $employee->position,
+                'divisionUuid' => $employee->divisionUuid,
+            ])
+            ->values()
             ->toArray();
     }
 

@@ -23,6 +23,7 @@ return new class extends Migration
             $table->foreignId('status_reason_id')->nullable()->constrained('codeable_concepts');
             $table->foreignId('based_on_id')->nullable()->constrained('identifiers');
             $table->foreignId('code_id')->constrained('identifiers');
+            $table->timestamp('performed_date_time')->nullable();
             $table->foreignId('encounter_id')->nullable()->constrained('identifiers');
             $table->foreignId('origin_episode_id')->nullable()->constrained('identifiers');
             $table->foreignId('recorded_by_id')->constrained('identifiers');

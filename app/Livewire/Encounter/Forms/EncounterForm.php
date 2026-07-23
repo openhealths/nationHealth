@@ -899,6 +899,43 @@ class EncounterForm extends BaseForm
                 new InDictionary('eHealth/procedure_categories')
             ],
             'procedures.*.primarySource' => ['required_with:procedures', 'boolean'],
+            'procedures.*.performerEmployeeId' => Rule::forEach(
+                function (mixed $value, string $attribute): array {
+                    $index = (int) explode('.', $attribute)[1];
+                    $procedure = $this->procedures[$index] ?? [];
+
+                    $isPrimarySource = ($procedure['primarySource'] ?? true) === true;
+
+                    $divisionUuid = data_get($procedure, 'divisionId');
+
+                    return [
+                        Rule::requiredIf($isPrimarySource),
+                        Rule::prohibitedIf(!$isPrimarySource),
+                        'nullable',
+                        'uuid',
+                        Rule::exists('employees', 'uuid')->where(
+                            static function ($query) use ($divisionUuid): void {
+                                $query
+                                    ->where('legal_entity_id', legalEntity()->id)
+                                    ->where('status', Status::APPROVED->value)
+                                    ->where('is_active', true)
+                                    ->whereIn('employee_type', [
+                                        Role::DOCTOR->value,
+                                        Role::SPECIALIST->value,
+                                        Role::ASSISTANT->value,
+                                    ]);
+
+                                if (filled($divisionUuid)) {
+                                    $query->where(
+                                        'division_uuid',
+                                        $divisionUuid
+                                    );
+                                }
+                            }
+                        ),
+                    ];
+                }
+            ),
             'procedures.*.reportOriginCode' => Rule::forEach(function (mixed $value, string $attribute) {
                 $index = (int)explode('.', $attribute)[1];
                 $primarySource = $this->procedures[$index]['primarySource'];
@@ -913,58 +950,138 @@ class EncounterForm extends BaseForm
             'procedures.*.reportOriginText' => ['nullable', 'string'],
             'procedures.*.divisionId' => ['nullable', 'uuid'],
             'procedures.*.outcomeCode' => ['nullable', 'string', new InDictionary('eHealth/procedure_outcomes')],
-            'procedures.*.performedPeriodStartDate' => Rule::forEach(function (mixed $value, string $attribute) {
-                $index = (int)explode('.', $attribute)[1];
-                $isCompleted = ($this->procedures[$index]['status'] ?? null) === ProcedureStatus::COMPLETED->value;
+            'procedures.*.performedType' => Rule::forEach(
+                function (mixed $value, string $attribute): array {
+                    $index = (int) explode('.', $attribute)[1];
 
-                return [
-                    Rule::requiredIf($isCompleted),
-                    'nullable',
-                    'date_format:' . config('app.date_format'),
-                    'before_or_equal:today'
-                ];
-            }),
-            'procedures.*.performedPeriodStartTime' => Rule::forEach(function (mixed $value, string $attribute) {
-                $index = (int)explode('.', $attribute)[1];
-                $procedure = $this->procedures[$index] ?? [];
-                $isCompleted = ($procedure['status'] ?? null) === ProcedureStatus::COMPLETED->value;
+                    $isCompleted =
+                        ($this->procedures[$index]['status'] ?? null)
+                        === ProcedureStatus::COMPLETED->value;
 
-                return [
-                    Rule::requiredIf($isCompleted),
-                    'nullable',
-                    'date_format:H:i',
-                    new PastDateTime($procedure['performedPeriodStartDate'] ?? ''),
-                ];
-            }),
-            'procedures.*.performedPeriodEndDate' => Rule::forEach(function (mixed $value, string $attribute) {
-                $index = (int)explode('.', $attribute)[1];
-                $isCompleted = ($this->procedures[$index]['status'] ?? null) === ProcedureStatus::COMPLETED->value;
+                    return [
+                        Rule::requiredIf($isCompleted),
+                        Rule::prohibitedIf(!$isCompleted),
+                        'nullable',
+                        Rule::in(['date_time', 'period']),
+                    ];
+                }
+            ),
 
-                return [
-                    Rule::requiredIf($isCompleted),
-                    'nullable',
-                    'date_format:' . config('app.date_format'),
-                    'before_or_equal:today',
-                    'after_or_equal:procedures.*.performedPeriodStartDate',
-                ];
-            }),
-            'procedures.*.performedPeriodEndTime' => Rule::forEach(function (mixed $value, string $attribute) {
-                $index = (int)explode('.', $attribute)[1];
-                $procedure = $this->procedures[$index] ?? [];
-                $isCompleted = ($procedure['status'] ?? null) === ProcedureStatus::COMPLETED->value;
+            'procedures.*.performedDate' => Rule::forEach(
+                function (mixed $value, string $attribute): array {
+                    $index = (int) explode('.', $attribute)[1];
+                    $procedure = $this->procedures[$index] ?? [];
 
-                return [
-                    Rule::requiredIf($isCompleted),
-                    'nullable',
-                    'date_format:H:i',
-                    new AfterOrEqualDateTime(
-                        $procedure['performedPeriodEndDate'] ?? '',
-                        $procedure['performedPeriodStartDate'] ?? '',
-                        $procedure['performedPeriodStartTime'] ?? '',
-                        'performed_period_start'
-                    ),
-                ];
-            }),
+                    $isDateTime =
+                        ($procedure['status'] ?? null)
+                            === ProcedureStatus::COMPLETED->value
+                        && ($procedure['performedType'] ?? null)
+                            === 'date_time';
+
+                    return [
+                        Rule::requiredIf($isDateTime),
+                        Rule::prohibitedIf(!$isDateTime),
+                        'nullable',
+                        'date_format:' . config('app.date_format'),
+                        'before_or_equal:today',
+                    ];
+                }
+            ),
+
+            'procedures.*.performedTime' => Rule::forEach(
+                function (mixed $value, string $attribute): array {
+                    $index = (int) explode('.', $attribute)[1];
+                    $procedure = $this->procedures[$index] ?? [];
+
+                    $isDateTime = ($procedure['status'] ?? null) === ProcedureStatus::COMPLETED->value && ($procedure['performedType'] ?? null) === 'date_time';
+
+                    return [
+                        Rule::requiredIf($isDateTime),
+                        Rule::prohibitedIf(!$isDateTime),
+                        'nullable',
+                        'date_format:H:i',
+                        new PastDateTime(
+                            $procedure['performedDate'] ?? ''
+                        ),
+                    ];
+                }
+            ),
+
+            'procedures.*.performedPeriodStartDate' => Rule::forEach(
+                function (mixed $value, string $attribute): array {
+                    $index = (int) explode('.', $attribute)[1];
+                    $procedure = $this->procedures[$index] ?? [];
+
+                    $isPeriod = ($procedure['status'] ?? null) === ProcedureStatus::COMPLETED->value && ($procedure['performedType'] ?? null) === 'period';
+
+                    return [
+                        Rule::requiredIf($isPeriod),
+                        Rule::prohibitedIf(!$isPeriod),
+                        'nullable',
+                        'date_format:' . config('app.date_format'),
+                        'before_or_equal:today',
+                    ];
+                }
+            ),
+
+            'procedures.*.performedPeriodStartTime' => Rule::forEach(
+                function (mixed $value, string $attribute): array {
+                    $index = (int) explode('.', $attribute)[1];
+                    $procedure = $this->procedures[$index] ?? [];
+
+                    $isPeriod = ($procedure['status'] ?? null) === ProcedureStatus::COMPLETED->value && ($procedure['performedType'] ?? null) === 'period';
+
+                    return [
+                        Rule::requiredIf($isPeriod),
+                        Rule::prohibitedIf(!$isPeriod),
+                        'nullable',
+                        'date_format:H:i',
+                        new PastDateTime(
+                            $procedure['performedPeriodStartDate'] ?? ''
+                        ),
+                    ];
+                }
+            ),
+
+            'procedures.*.performedPeriodEndDate' => Rule::forEach(
+                function (mixed $value, string $attribute): array {
+                    $index = (int) explode('.', $attribute)[1];
+                    $procedure = $this->procedures[$index] ?? [];
+
+                    $isPeriod = ($procedure['status'] ?? null)  === ProcedureStatus::COMPLETED->value && ($procedure['performedType'] ?? null) === 'period';
+
+                    return [
+                        Rule::requiredIf($isPeriod),
+                        Rule::prohibitedIf(!$isPeriod),
+                        'nullable',
+                        'date_format:' . config('app.date_format'),
+                        'before_or_equal:today',
+                        'after_or_equal:procedures.*.performedPeriodStartDate',
+                    ];
+                }
+            ),
+
+            'procedures.*.performedPeriodEndTime' => Rule::forEach(
+                function (mixed $value, string $attribute): array {
+                    $index = (int) explode('.', $attribute)[1];
+                    $procedure = $this->procedures[$index] ?? [];
+
+                    $isPeriod = ($procedure['status'] ?? null)  === ProcedureStatus::COMPLETED->value && ($procedure['performedType'] ?? null) === 'period';
+
+                    return [
+                        Rule::requiredIf($isPeriod),
+                        Rule::prohibitedIf(!$isPeriod),
+                        'nullable',
+                        'date_format:H:i',
+                        new AfterOrEqualDateTime(
+                            $procedure['performedPeriodEndDate'] ?? '',
+                            $procedure['performedPeriodStartDate'] ?? '',
+                            $procedure['performedPeriodStartTime'] ?? '',
+                            'performed_period_start'
+                        ),
+                    ];
+                }
+            ),
             'procedures.*.note' => ['nullable', 'string'],
             ...$this->paperReferralRules('procedures.*'),
 

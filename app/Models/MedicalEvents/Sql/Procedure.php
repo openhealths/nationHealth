@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
+use App\Casts\EHealthTimestampCast;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use Carbon\CarbonImmutable;
@@ -28,6 +29,7 @@ class Procedure extends Model
         'status_reason_id',
         'based_on_id',
         'code_id',
+        'performed_date_time',
         'encounter_id',
         'origin_episode_id',
         'recorded_by_id',
@@ -61,11 +63,37 @@ class Procedure extends Model
     ];
 
     protected $appends = [
+        'performed_date',
+        'performed_time',
         'performed_period_start_date',
         'performed_period_start_time',
         'performed_period_end_date',
         'performed_period_end_time'
     ];
+
+    protected $casts = [
+        'performed_date_time' => EHealthTimestampCast::class,
+    ];
+
+    protected function performedDate(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => $this->performedDateTime
+                ? convertToAppDateFormat(
+                    $this->performedDateTime
+                ) : '',
+        );
+    }
+
+    protected function performedTime(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => $this->performedDateTime
+                ? CarbonImmutable::parse(
+                    $this->performedDateTime
+                )->format('H:i') : '',
+        );
+    }
 
     protected function performedPeriodStartDate(): Attribute
     {

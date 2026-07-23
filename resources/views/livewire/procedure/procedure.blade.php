@@ -8,6 +8,7 @@
     <form class="form"
           x-data="{
                 modalProcedure: new Procedure(@js($this->form->procedure)),
+                procedureEmployees: @js($procedureEmployees),
 
                 prepareProcedureForSubmit() {
                     this.modalProcedure.usedReferences = this.modalProcedure.usedReferences
@@ -22,6 +23,61 @@
 
                 removeUsedReference(index) {
                     this.modalProcedure.usedReferences.splice(index, 1);
+                },
+
+                setPerformedType(type) {
+                    const now = new Date();
+                    const startTime = new Date(now.getTime() - 15 * 60 * 1000);
+
+                    const toFormattedDate = (date) => {
+                        const [yyyy, mm, dd] = date.toISOString().split('T')[0].split('-');
+
+                        return `${dd}.${mm}.${yyyy}`;
+                    };
+
+                    const timeOptions = {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    };
+
+                    this.modalProcedure.performedType = type;
+
+                    if (type === 'date_time') {
+                        this.modalProcedure.performedDate = toFormattedDate(now);
+                        this.modalProcedure.performedTime =
+                            now.toLocaleTimeString('uk-UA', timeOptions);
+
+                        this.modalProcedure.performedPeriodStartDate = '';
+                        this.modalProcedure.performedPeriodStartTime = '';
+                        this.modalProcedure.performedPeriodEndDate = '';
+                        this.modalProcedure.performedPeriodEndTime = '';
+
+                        return;
+                    }
+
+                    if (type === 'period') {
+                        this.modalProcedure.performedDate = '';
+                        this.modalProcedure.performedTime = '';
+
+                        this.modalProcedure.performedPeriodStartDate =
+                            toFormattedDate(startTime);
+                        this.modalProcedure.performedPeriodStartTime =
+                            startTime.toLocaleTimeString('uk-UA', timeOptions);
+                        this.modalProcedure.performedPeriodEndDate =
+                            toFormattedDate(now);
+                        this.modalProcedure.performedPeriodEndTime =
+                            now.toLocaleTimeString('uk-UA', timeOptions);
+
+                        return;
+                    }
+
+                    this.modalProcedure.performedDate = '';
+                    this.modalProcedure.performedTime = '';
+                    this.modalProcedure.performedPeriodStartDate = '';
+                    this.modalProcedure.performedPeriodStartTime = '';
+                    this.modalProcedure.performedPeriodEndDate = '';
+                    this.modalProcedure.performedPeriodEndTime = '';
                 }
           }"
     >
@@ -108,6 +164,10 @@
             this.performedPeriodStartTime = startTime.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
             this.performedPeriodEndDate = toFormattedDate(now);
             this.performedPeriodEndTime = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
+            this.performerEmployeeId = '';
+            this.performedType = 'period';
+            this.performedDate = '';
+            this.performedTime = '';
 
             if (obj) {
                 Object.assign(this, JSON.parse(JSON.stringify(obj)));

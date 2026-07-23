@@ -12,6 +12,11 @@
         <div class="form-row-2">
             <div class="form-group group">
                 <select x-model="modalProcedure.status"
+                        @change="
+                            modalProcedure.status === 'completed'
+                                ? setPerformedType(modalProcedure.performedType || 'period')
+                                : setPerformedType('');
+                        "
                         id="procedureStatus"
                         class="input-select peer"
                         required
@@ -270,7 +275,10 @@
         <div class="form-row-2">
             <div class="form-group group">
                 <select x-model="modalProcedure.divisionId"
-                    @change="modalProcedure.usedReferences = []"
+                    @change="
+                        modalProcedure.performerEmployeeId = '';
+                        modalProcedure.usedReferences = [];
+                    "
                     @if(count($divisions) === 1)
                         x-init="modalProcedure.divisionId = '{{ $divisions[0]['uuid'] }}';"
                     @endif

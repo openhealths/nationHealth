@@ -68,7 +68,7 @@
                         <div>
                             <div class="record-inner-label">{{ __('patients.created') }}</div>
                             <div class="record-inner-subvalue">
-                                {{ data_get($procedure, 'performedPeriodStartDate', '-') }}
+                                {{ data_get($procedure, 'performedDate') ?: data_get($procedure, 'performedPeriodStartDate', '-') }}
                             </div>
                         </div>
 

@@ -7,6 +7,8 @@ namespace App\Livewire\Procedure\Forms;
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Equipment\Status as EquipmentStatus;
 use App\Enums\Person\ProcedureStatus;
+use App\Enums\Status;
+use App\Enums\User\Role;
 use App\Rules\AfterOrEqualDateTime;
 use App\Rules\InDictionary;
 use App\Rules\PastDateTime;
@@ -43,6 +45,31 @@ class ProcedureForm extends BaseForm
             'procedure.primarySource' => [
                 'required',
                 'boolean',
+            ],
+            'procedure.performerEmployeeId' => [
+                Rule::requiredIf($isPrimarySourceTrue),
+                Rule::prohibitedIf($isPrimarySourceFalse),
+                'nullable',
+                'uuid',
+                Rule::exists('employees', 'uuid')->where(
+                    function ($query): void {
+                        $query
+                            ->where('legal_entity_id', legalEntity()->id)
+                            ->where('status', Status::APPROVED->value)
+                            ->where('is_active', true)
+                            ->whereIn('employee_type', [
+                                Role::DOCTOR->value,
+                                Role::SPECIALIST->value,
+                                Role::ASSISTANT->value,
+                            ]);
+
+                        $divisionUuid = data_get($this->procedure, 'divisionId');
+
+                        if (filled($divisionUuid)) {
+                            $query->where('division_uuid',  $divisionUuid);
+                        }
+                    }
+                ),
             ],
             'procedure.divisionId' => ['nullable', 'uuid'],
             'procedure.outcomeCode' => ['nullable', 'string', new InDictionary('eHealth/procedure_outcomes')],
@@ -103,30 +130,87 @@ class ProcedureForm extends BaseForm
                 'date_format:' . config('app.date_format'),
             ],
             'procedure.paperReferralNote' => ['nullable', 'string', 'max:255'],
-            'procedure.performedPeriodStartDate' => [
+            'procedure.performedType' => [
                 Rule::requiredIf($isCompleted),
+                Rule::prohibitedIf(!$isCompleted),
+                'nullable',
+                Rule::in(['date_time', 'period']),
+            ],
+
+            'procedure.performedDate' => [
+                Rule::requiredIf(
+                    $isCompleted  && data_get($this->procedure, 'performedType')  === 'date_time'
+                ),
+                Rule::prohibitedIf(
+                    !$isCompleted || data_get($this->procedure, 'performedType') !== 'date_time'
+                ),
+                'nullable',
+                'date_format:' . config('app.date_format'),
+                'before_or_equal:today',
+            ],
+
+            'procedure.performedTime' => [
+                Rule::requiredIf(
+                    $isCompleted && data_get($this->procedure, 'performedType') === 'date_time'
+                ),
+                Rule::prohibitedIf(
+                    !$isCompleted || data_get($this->procedure, 'performedType') !== 'date_time'
+                ),
+                'nullable',
+                'date_format:H:i',
+                new PastDateTime(
+                    data_get($this->procedure, 'performedDate', '')
+                ),
+            ],
+
+            'procedure.performedPeriodStartDate' => [
+                Rule::requiredIf(
+                    $isCompleted && data_get($this->procedure, 'performedType') === 'period'
+                ),
+                Rule::prohibitedIf(
+                    !$isCompleted || data_get($this->procedure, 'performedType') !== 'period'
+                ),
                 'nullable',
                 'date_format:' . config('app.date_format'),
                 'before_or_equal:today',
             ],
             'procedure.performedPeriodStartTime' => [
-                Rule::requiredIf($isCompleted),
+                Rule::requiredIf(
+                    $isCompleted && data_get($this->procedure, 'performedType') === 'period'
+                ),
+                Rule::prohibitedIf(
+                    !$isCompleted || data_get($this->procedure, 'performedType') !== 'period'
+                ),
                 'nullable',
                 'date_format:H:i',
-                new PastDateTime(data_get($this->procedure, 'performedPeriodStartDate', '')),
+                new PastDateTime(
+                    data_get($this->procedure, 'performedPeriodStartDate', '')
+                ),
             ],
             'procedure.performedPeriodEndDate' => [
-                Rule::requiredIf($isCompleted),
+                Rule::requiredIf(
+                    $isCompleted && data_get($this->procedure, 'performedType') === 'period'
+                ),
+                Rule::prohibitedIf(
+                    !$isCompleted || data_get($this->procedure, 'performedType') !== 'period'
+                ),
                 'nullable',
                 'date_format:' . config('app.date_format'),
                 'before_or_equal:today',
                 'after_or_equal:procedure.performedPeriodStartDate',
             ],
             'procedure.performedPeriodEndTime' => [
-                Rule::requiredIf($isCompleted),
+                Rule::requiredIf(
+                    $isCompleted && data_get($this->procedure, 'performedType') === 'period'
+                ),
+                Rule::prohibitedIf(
+                    !$isCompleted || data_get($this->procedure, 'performedType') !== 'period'
+                ),
                 'nullable',
                 'date_format:H:i',
-                new PastDateTime(data_get($this->procedure, 'performedPeriodEndDate', '')),
+                new PastDateTime(
+                    data_get($this->procedure, 'performedPeriodEndDate', '')
+                ),
                 new AfterOrEqualDateTime(
                     data_get($this->procedure, 'performedPeriodEndDate', ''),
                     data_get($this->procedure, 'performedPeriodStartDate', ''),

@@ -241,6 +241,13 @@ class EncounterComponent extends Component
     public array $diagnosticReportEmployees = [];
 
     /**
+     * List of employees available as procedure performers.
+     *
+     * @var array
+     */
+    public array $procedureEmployees = [];
+
+    /**
      * List of dictionary names.
      *
      * @var array|string[]
@@ -434,6 +441,15 @@ class EncounterComponent extends Component
                     'divisionUuid' => $employee->divisionUuid,
                 ];
             })
+            ->values()
+            ->toArray();
+
+        $this->procedureEmployees = collect($this->diagnosticReportEmployees)
+            ->whereIn('employeeType', [
+                Role::DOCTOR->value,
+                Role::SPECIALIST->value,
+                Role::ASSISTANT->value,
+            ])
             ->values()
             ->toArray();
 

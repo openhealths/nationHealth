@@ -555,7 +555,7 @@
                                         </div>
                                         <div class="min-w-0">
                                             <div
-                                                class="record-inner-label text-[10px] uppercase">{{ __('patients.note') }}</div>
+                                                class="record-inner-label text-[10px] uppercase">{{ __('patients.notes') }}</div>
                                             <div class="record-inner-value text-[14px] font-semibold break-words">
                                                 {{ data_get($procedure, 'note') ?? '-' }}
                                             </div>

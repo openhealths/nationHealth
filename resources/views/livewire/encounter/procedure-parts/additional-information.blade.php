@@ -31,7 +31,11 @@
         </div>
 
         <div class="flex items-center">
-            <input @change="modalProcedure.primarySource = false"
+            <input 
+                @change="
+                    modalProcedure.primarySource = false;
+                    modalProcedure.performerEmployeeId = '';
+                "
                 x-model.boolean="modalProcedure.primarySource"
                 id="patient"
                 type="radio"
@@ -47,20 +51,51 @@
     </div>
 
     {{-- When the performer is chosen --}}
-    <div x-show="modalProcedure.primarySource === true" class="form-row-2">
+    <div x-show="modalProcedure.primarySource === true" class="form-row-2" x-cloak>
         <div class="form-group group">
-            <input type="text"
-                   name="procedurePerformer"
-                   id="procedurePerformer"
-                   class="input peer"
-                   placeholder=" "
-                   autocomplete="off"
-                   disabled
-                   value="{{ $employeeFullName }}"
+            <select
+                x-model="modalProcedure.performerEmployeeId"
+                id="procedurePerformer"
+                class="input-select peer"
+                :required="modalProcedure.primarySource === true"
             >
+                <option value="">
+                    {{ __('forms.select') }}
+                    {{ mb_strtolower(__('patients.doctor_who_performed')) }}
+                    *
+                </option>
+
+                <template
+                    x-for="
+                        employee in procedureEmployees.filter(
+                            employee =>
+                                !modalProcedure.divisionId
+                                || employee.divisionUuid === modalProcedure.divisionId
+                        )
+                    "
+                    :key="employee.uuid"
+                >
+                    <option
+                        :value="employee.uuid"
+                        :selected="
+                            String(modalProcedure.performerEmployeeId)
+                                === String(employee.uuid)
+                        "
+                        x-text="
+                            `${employee.name} — ${
+                                $wire.dictionaries['POSITION'][employee.position]
+                                ?? employee.position
+                            }`
+                        "
+                    ></option>
+                </template>
+            </select>
             <label for="procedurePerformer" class="label">
                 {{ __('patients.doctor_who_performed') }}
             </label>
+            @error($procedureErrorPath . '.performerEmployeeId')
+                <p class="text-error">{{ $message }}</p>
+            @enderror
         </div>
     </div>
 
@@ -83,8 +118,100 @@
         </div>
     </div>
 
+    {{-- Performed type --}}
+    <div
+        class="form-row-2"
+        x-show="modalProcedure.status === 'completed'"
+        x-cloak
+    >
+        <div class="form-group group">
+            <select
+                x-model="modalProcedure.performedType"
+                @change="setPerformedType($event.target.value)"
+                id="procedurePerformedType"
+                class="input-select peer"
+            >
+                <option value="date_time">
+                    {{ __('patients.procedure_performed_date_time') }}
+                </option>
+
+                <option value="period">
+                    {{ __('patients.procedure_performed_period') }}
+                </option>
+            </select>
+
+            @error($procedureErrorPath . '.performedType')
+                <p class="text-error">{{ $message }}</p>
+            @enderror
+        </div>
+    </div>
+
+    {{-- Performed date and time --}}
+    <div
+        class="form-row-3"
+        x-show="
+            modalProcedure.status === 'completed'
+            && modalProcedure.performedType === 'date_time'
+        "
+        x-cloak
+    >
+        <div class="form-group group">
+            <div class="datepicker-wrapper">
+                <input
+                    x-model="modalProcedure.performedDate"
+                    datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                    type="text"
+                    name="performedDate"
+                    id="procedurePerformedDate"
+                    class="datepicker-input with-leading-icon input peer"
+                    placeholder=" "
+                    autocomplete="off"
+                    :required="
+                        modalProcedure.status === 'completed'
+                        && modalProcedure.performedType === 'date_time'
+                    "
+                >
+
+                <label for="procedurePerformedDate" class="wrapped-label">
+                    {{ __('patients.procedure_performed_date_time') }}
+                </label>
+
+                @error($procedureErrorPath . '.performedDate')
+                    <p class="text-error">{{ $message }}</p>
+                @enderror
+            </div>
+        </div>
+
+        <div
+            class="form-group group !w-1/2"
+            onclick="document.getElementById('procedurePerformedTime').showPicker()"
+        >
+            <div class="relative flex items-center">
+                @icon('mingcute-time-fill', 'svg-input left-2.5')
+
+                <input
+                    x-model="modalProcedure.performedTime"
+                    @input="$event.target.blur()"
+                    type="time"
+                    name="performedTime"
+                    id="procedurePerformedTime"
+                    class="input peer !pl-10"
+                    autocomplete="off"
+                    :required="
+                        modalProcedure.status === 'completed'
+                        && modalProcedure.performedType === 'date_time'
+                    "
+                >
+            </div>
+
+            @error($procedureErrorPath . '.performedTime')
+                <p class="text-error">{{ $message }}</p>
+            @enderror
+        </div>
+    </div>
+
     {{-- Start effective period datetime --}}
-    <div x-show="modalProcedure.status === 'completed'" x-cloak>
+    <div x-show="modalProcedure.status === 'completed' && modalProcedure.performedType === 'period'" x-cloak>
         <div class="form-row-3">
             <div class="form-group group">
                 <div class="datepicker-wrapper">
@@ -95,7 +222,10 @@
                         id="performedPeriodStartDate"
                         class="datepicker-input with-leading-icon input peer"
                         placeholder=" "
-                        required
+                        :required="
+                            modalProcedure.status === 'completed'
+                            && modalProcedure.performedType === 'period'
+                        "
                         autocomplete="off"
                     >
                     <label for="performedPeriodStartDate" class="wrapped-label">
@@ -119,7 +249,10 @@
                         id="performedPeriodStartTime"
                         class="input peer !pl-10"
                         autocomplete="off"
-                        required
+                        :required="
+                            modalProcedure.status === 'completed'
+                            && modalProcedure.performedType === 'period'
+                        "
                     >
                 </div>
 
@@ -131,7 +264,7 @@
     </div>
 
     {{-- End effective period datetime --}}
-    <div x-show="modalProcedure.status === 'completed'" x-cloak>
+    <div x-show="modalProcedure.status === 'completed' && modalProcedure.performedType === 'period'" x-cloak>
         <div class="form-row-3">
             <div class="form-group group">
                 <div class="datepicker-wrapper">
@@ -142,7 +275,10 @@
                         id="performedPeriodEndDate"
                         class="datepicker-input with-leading-icon input peer"
                         placeholder=" "
-                        required
+                        :required="
+                            modalProcedure.status === 'completed'
+                            && modalProcedure.performedType === 'period'
+                        "
                         autocomplete="off"
                     >
                     <label for="performedPeriodEndDate" class="wrapped-label">
@@ -166,7 +302,10 @@
                         id="performedPeriodEndTime"
                         class="input peer !pl-10"
                         autocomplete="off"
-                        required
+                        :required="
+                            modalProcedure.status === 'completed'
+                            && modalProcedure.performedType === 'period'
+                        "
                     >
                 </div>
 
@@ -205,19 +344,6 @@
                 <template x-for="(usedReference, index) in modalProcedure.usedReferences" :key="index">
                     <div class="flex items-end gap-3">
                         <div class="flex-1">
-                            <template x-if="!modalProcedure.divisionId">
-                                <div class="form-group group">
-                                    <input type="text"
-                                        class="input peer"
-                                        placeholder=" "
-                                        disabled
-                                    >
-                                    <label class="label">
-                                        {{ __('equipments.search') }}
-                                    </label>
-                                </div>
-                            </template>
-
                             @foreach($equipmentOptionsByDivision as $divisionUuid => $options)
                                 <div x-show="modalProcedure.divisionId === @js($divisionUuid)" x-cloak>
                                     <x-forms.combobox
@@ -238,7 +364,23 @@
                                 </p>
                             </template>
                         </div>
-
+                        @error($procedureErrorPath . '.usedReferences.*.id')
+                            <p class="text-error mt-2">{{ $message }}</p>
+                        @enderror
+                        <template
+                            x-if="
+                                modalProcedure.divisionId
+                                && !(
+                                    @js($equipmentOptionsByDivision)[
+                                        modalProcedure.divisionId
+                                    ]?.length
+                                )
+                            "
+                        >
+                            <p class="text-error mt-2">
+                                {{ __('equipments.validation.no_equipment_in_division') }}
+                            </p>
+                        </template>
                         <button
                             type="button"
                             @click.prevent="removeUsedReference(index)"
@@ -254,7 +396,23 @@
                 <p class="text-error mt-2">{{ $message }}</p>
             @enderror
 
-            <button type="button" @click.prevent="addUsedReference()" class="item-add mt-4">
+            <button
+                type="button"
+                @click.prevent="addUsedReference()"
+                :disabled="
+                    modalProcedure.divisionId
+                    && !(
+                        @js($equipmentOptionsByDivision)[
+                            modalProcedure.divisionId
+                        ]?.length
+                    )
+                "
+                class="
+                    item-add mt-4
+                    disabled:cursor-not-allowed
+                    disabled:opacity-50
+                "
+            >
                 {{ __('equipments.add') }}
             </button>
         </div>

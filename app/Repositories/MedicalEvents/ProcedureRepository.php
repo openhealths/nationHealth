@@ -82,6 +82,7 @@ class ProcedureRepository extends BaseRepository
                     'status' => $datum['status'],
                     'based_on_id' => $basedOn?->id,
                     'code_id' => $code->id,
+                    'performed_date_time' => $datum['performedDateTime'] ?? null,
                     'encounter_id' => $encounter?->id,
                     'recorded_by_id' => $recordedBy->id,
                     'primary_source' => $datum['primarySource'],
@@ -326,6 +327,7 @@ class ProcedureRepository extends BaseRepository
                     'explanatory_letter' => $data['explanatory_letter'] ?? null,
                     'based_on_id' => $basedOn?->id,
                     'code_id' => $code->id,
+                    'performed_date_time' => $data['performed_date_time'] ?? null,
                     'encounter_id' => $encounter?->id,
                     'origin_episode_id' => $originEpisode?->id,
                     'recorded_by_id' => $recordedBy->id,
@@ -392,7 +394,7 @@ class ProcedureRepository extends BaseRepository
             ->get()
             ->mapWithKeys(fn (Procedure $procedure) => [
                 $procedure->uuid => [
-                    'ehealthInsertedAt' => convertToAppDateFormat($procedure->performedPeriod?->start),
+                    'ehealthInsertedAt' => convertToAppDateFormat($procedure->performedDateTime ?? $procedure->performedPeriod?->start),
                     'codeCode' => $procedure->code?->value,
                     'type' => 'procedure',
                 ],
