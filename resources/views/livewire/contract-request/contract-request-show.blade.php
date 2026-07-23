@@ -1,26 +1,31 @@
-<section class="section-form">
+<section class="section-form w-full max-w-7xl">
     <livewire:components.x-message :key="time()" />
 
-    <x-header-navigation class="breadcrumb-form flex-1 min-w-0">
-        <x-slot name="title">
-            {{ __('contracts.contract_requests') }} {{ $contractRequest->contract_number ?? '---' }}
-        </x-slot>
+    <div class="flex items-center justify-between gap-4 flex-wrap w-full">
+        <x-header-navigation class="breadcrumb-form flex-1 min-w-0">
+            <x-slot name="title">
+                {{ __('contracts.contract_requests') }}
+                @if($contractRequest->contract_number)
+                    № {{ $contractRequest->contract_number }}
+                @endif
+            </x-slot>
 
-        @if(is_object($contractRequest->status) && method_exists($contractRequest->status, 'label'))
-            <span class="{{ $contractRequest->status->color() }} px-3 py-1 rounded-full text-xs font-bold uppercase">
-                {{ $contractRequest->status->label() }}
-            </span>
-        @else
-            <span class="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-xs font-bold uppercase">
-                {{ (string) $contractRequest->status }}
-            </span>
-        @endif
-    </x-header-navigation>
+            @if(is_object($contractRequest->status) && method_exists($contractRequest->status, 'label'))
+                <span class="{{ $contractRequest->status->color() }} px-3 py-1 rounded-full text-xs font-bold uppercase">
+                    {{ $contractRequest->status->label() }}
+                </span>
+            @else
+                <span class="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-xs font-bold uppercase">
+                    {{ (string) $contractRequest->status }}
+                </span>
+            @endif
+        </x-header-navigation>
+    </div>
 
-    <fieldset disabled class="form shift-content space-y-8">
+    <fieldset disabled class="form shift-content space-y-8 mt-6">
         @include('livewire.contract.parts.basic-data', ['contract' => $contractRequest, 'data' => $contractData, 'idFormName' => $idFormName])
         @include('livewire.contract.parts.contractor', ['data' => $contractData])
-        @include('livewire.contract.parts.nhs-customer', ['data' => $contractData])
+        @include('livewire.contract.parts.nhs-customer', ['contract' => $contractRequest, 'data' => $contractData])
         @include('livewire.contract.parts.payment-details', ['contract' => $contractRequest, 'data' => $contractData])
         @include('livewire.contract.parts.divisions', ['contract' => $contractRequest, 'data' => $contractData])
         @include('livewire.contract.parts.medical-programs', [
@@ -36,7 +41,7 @@
 
         @if(!empty($contractRequest->printout_content))
             <fieldset class="fieldset">
-                <legend class="legend">Printout Content</legend>
+                <legend class="legend">{{ __('contracts.printout_content') }}</legend>
                 <div class="show-alert-info overflow-auto max-h-72 text-xs font-mono whitespace-pre-wrap break-all">
                     {{ $contractRequest->printout_content }}
                 </div>
@@ -69,7 +74,6 @@
                     </button>
                 @endif
             @endcan
-
         </div>
     </div>
 

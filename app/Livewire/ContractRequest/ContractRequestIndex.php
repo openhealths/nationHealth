@@ -106,15 +106,11 @@ class ContractRequestIndex extends Component
         $encryptedToken = Crypt::encryptString($token);
 
         $types = ['capitation', 'reimbursement'];
-        $batchJob = null;
+        $batchJobs = [];
         $syncedCount = 0;
         $syncErrors = [];
 
-        foreach ($types as $index => $type) {
-            if ($index === 1 && $batchJob !== null) {
-                break;
-            }
-
+        foreach ($types as $type) {
             try {
                 $response = EHealth::contractRequest()
                     ->withToken($token)
@@ -133,7 +129,7 @@ class ContractRequestIndex extends Component
                 }
 
                 if ($response->isNotLast()) {
-                    $batchJob = new ContractRequestSync(
+                    $batchJobs[] = new ContractRequestSync(
                         legalEntity: $currentLegalEntity,
                         nextEntity: null,
                         isFirstLogin: false,
@@ -148,8 +144,8 @@ class ContractRequestIndex extends Component
             }
         }
 
-        if ($batchJob !== null) {
-            Bus::batch([$batchJob])
+        if ($batchJobs !== []) {
+            Bus::batch($batchJobs)
                 ->withOption('legal_entity_id', $currentLegalEntity->id)
                 ->withOption('token', $encryptedToken)
                 ->withOption('user', $user)

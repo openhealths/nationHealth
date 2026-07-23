@@ -72,15 +72,33 @@ class ContractRequestRepositoryTest extends TestCase
         ]);
     }
 
-    public function test_save_from_ehealth_uses_type_from_payload_when_present(): void
+    public function test_save_from_ehealth_prefers_sync_endpoint_type_over_payload(): void
     {
+        // List/detail payloads sometimes omit or mis-send type; the sync URL is authoritative.
         $payload = $this->eHealthContractRequestPayload([
-            'type' => 'CAPITATION',
+            'type' => 'REIMBURSEMENT',
         ]);
 
-        $contractRequest = $this->repository->saveFromEHealth($payload, 'REIMBURSEMENT');
+        $contractRequest = $this->repository->saveFromEHealth($payload, 'CAPITATION');
 
         $this->assertSame('CAPITATION', $contractRequest->type);
+    }
+
+    public function test_save_from_ehealth_persists_id_form_and_period_dates(): void
+    {
+        $payload = $this->eHealthContractRequestPayload([
+            'id_form' => 'PMD_1',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+            'inserted_at' => '2026-07-15T09:25:01.067981Z',
+        ]);
+
+        $contractRequest = $this->repository->saveFromEHealth($payload, 'CAPITATION');
+
+        $this->assertSame('PMD_1', $contractRequest->idForm);
+        $this->assertSame('2026-01-01', $contractRequest->startDate?->format('Y-m-d'));
+        $this->assertSame('2026-12-31', $contractRequest->endDate?->format('Y-m-d'));
+        $this->assertSame('2026-07-15', $contractRequest->insertedAt?->format('Y-m-d'));
     }
 
     public function test_contract_type_enum_values_match_ehealth(): void

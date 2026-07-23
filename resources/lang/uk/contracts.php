@@ -58,8 +58,12 @@ return [
     'id' => 'ID',
     'parent_contract' => 'Батьківський договір',
     'created_at_label' => 'Дата створення',
+    'updated_at_label' => 'Дата оновлення',
     'period_label' => 'Період дії',
     'id_form_label' => 'Форма договору',
+    'previous_request' => 'Попередня заявка',
+    'issue_city' => 'Місто укладання',
+    'printout_content' => 'Текст договору (printout)',
     'status_reason_label' => 'Причина зміни статусу',
     'id_form' => [
         'REIMBURSEMENT' => [

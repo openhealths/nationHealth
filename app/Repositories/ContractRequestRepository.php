@@ -33,7 +33,8 @@ class ContractRequestRepository
 
         // 3. Set System/Local fields
         $attributes['contractor_legal_entity_id'] = legalEntity()->uuid;
-        $attributes['type'] = strtoupper((string) ($eHealthData['type'] ?? $type));
+        // Prefer the sync endpoint type (capitation/reimbursement). List payloads often omit or mis-send `type`.
+        $attributes['type'] = strtoupper($type);
 
         if (isset($eHealthData['sync_status'])) {
             $attributes['sync_status'] = $eHealthData['sync_status'];

@@ -44,14 +44,22 @@ class ContractShow extends Component
                     'contractor_divisions' => $ehealthData['contractor_divisions'] ?? null,
                     'external_contractors' => $ehealthData['external_contractors'] ?? null,
                     'external_contractor_flag' => $ehealthData['external_contractor_flag'] ?? $this->contract->externalContractorFlag,
-                    'nhs_signer_id' => $ehealthData['nhs_signer']['id'] ?? null,
+                    'nhs_signer_id' => $ehealthData['nhs_signer']['id'] ?? $ehealthData['nhs_signer']['uuid'] ?? null,
                     'nhs_signer_base' => $ehealthData['nhs_signer_base'] ?? null,
                     'nhs_contract_price' => $ehealthData['nhs_contract_price'] ?? null,
                     'nhs_payment_method' => $ehealthData['nhs_payment_method'] ?? null,
                     'medical_programs' => $ehealthData['medical_programs'] ?? $this->contract->medicalPrograms,
                     'id_form' => $ehealthData['id_form'] ?? $this->contract->idForm,
+                    'contract_number' => $ehealthData['contract_number'] ?? $this->contract->contractNumber,
+                    'type' => isset($ehealthData['type'])
+                        ? strtoupper((string) $ehealthData['type'])
+                        : $this->contract->type,
+                    'start_date' => $ehealthData['start_date'] ?? $this->contract->startDate,
+                    'end_date' => $ehealthData['end_date'] ?? $this->contract->endDate,
                     'status_reason' => $ehealthData['status_reason'] ?? $this->contract->statusReason,
-                    'inserted_at' => isset($ehealthData['inserted_at']) ? \Illuminate\Support\Carbon::parse($ehealthData['inserted_at']) : $this->contract->insertedAt,
+                    'inserted_at' => !empty($ehealthData['inserted_at'])
+                        ? \Illuminate\Support\Carbon::parse($ehealthData['inserted_at'])
+                        : $this->contract->insertedAt,
                     'data' => $ehealthData,
                 ]);
 

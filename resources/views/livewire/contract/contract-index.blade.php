@@ -20,12 +20,14 @@
             @endcan
 
             @can('createReimbursement', ContractRequest::class)
-                <a href="{{ route('contract-request.reimbursement.create', [legalEntity()]) }}"
-                   wire:navigate
-                   class="button-primary flex items-center gap-2 whitespace-nowrap">
-                    @icon('plus', 'w-4 h-4')
-                    {{ __('contracts.new') }} ({{ __('contracts.reimbursement') }})
-                </a>
+                @if(legalEntity()?->type?->name === \App\Models\LegalEntity::TYPE_PHARMACY)
+                    <a href="{{ route('contract-request.reimbursement.create', [legalEntity()]) }}"
+                       wire:navigate
+                       class="button-primary flex items-center gap-2 whitespace-nowrap">
+                        @icon('plus', 'w-4 h-4')
+                        {{ __('contracts.new') }} ({{ __('contracts.reimbursement') }})
+                    </a>
+                @endif
             @endcan
 
             @can('sync', Contract::class)
@@ -111,17 +113,25 @@
                                 </td>
                                 <td class="index-table-td">
                                     <span class="badge-yellow">
-                                        {{ $item->type }}
+                                        {{ contractTypeLabel($item->type) }}
                                     </span>
                                 </td>
                                 <td class="index-table-td">
                                     <x-status-badge :status="$item->status"/>
                                 </td>
                                 <td class="index-table-td text-sm text-gray-500">
-                                    {{ $item->start_date?->format(config('app.date_format')) }} - {{ $item->end_date?->format(config('app.date_format')) }}
+                                    @php
+                                        $listStart = $item->start_date?->format(config('app.date_format'))
+                                            ?: formatDisplayDate(data_get($item->data, 'start_date'));
+                                        $listEnd = $item->end_date?->format(config('app.date_format'))
+                                            ?: formatDisplayDate(data_get($item->data, 'end_date'));
+                                    @endphp
+                                    {{ $listStart && $listEnd ? "{$listStart} - {$listEnd}" : ($listStart ?: $listEnd ?: '-') }}
                                 </td>
                                 <td class="index-table-td text-sm text-gray-500">
-                                    {{ $item->inserted_at?->format(config('app.date_format')) ?? $item->created_at?->format(config('app.date_format')) }}
+                                    {{ $item->inserted_at?->format(config('app.date_format'))
+                                        ?? formatDisplayDate(data_get($item->data, 'inserted_at'))
+                                        ?: '-' }}
                                 </td>
 
                                 <td class="index-table-td-actions">

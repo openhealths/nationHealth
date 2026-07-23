@@ -34,4 +34,17 @@ class ContractIdFormLabelTest extends TestCase
     {
         $this->assertSame('UNKNOWN_CODE', contractIdFormLabel('UNKNOWN_CODE', 'REIMBURSEMENT'));
     }
+
+    public function test_contract_type_label_translates_known_types(): void
+    {
+        $this->assertSame('Реімбурсація', contractTypeLabel('REIMBURSEMENT'));
+        $this->assertSame('Капітація', contractTypeLabel('CAPITATION'));
+    }
+
+    public function test_contract_payment_method_label_translates_forward_backward(): void
+    {
+        $this->assertSame('Попередня оплата', contractPaymentMethodLabel('FORWARD'));
+        $this->assertSame('Післяплата', contractPaymentMethodLabel('BACKWARD'));
+        $this->assertSame('-', contractPaymentMethodLabel(null));
+    }
 }

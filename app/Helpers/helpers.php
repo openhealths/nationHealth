@@ -176,6 +176,45 @@ if (!function_exists('contractIdFormLabel')) {
     }
 }
 
+if (!function_exists('contractTypeLabel')) {
+    /**
+     * Human-readable contract type (CAPITATION / REIMBURSEMENT).
+     */
+    function contractTypeLabel(mixed $type): string
+    {
+        $value = strtoupper((string) (is_object($type) && property_exists($type, 'value')
+            ? $type->value
+            : $type));
+
+        if ($value === '') {
+            return __('contracts.missing');
+        }
+
+        $enum = \App\Enums\Contract\Type::tryFrom($value);
+
+        return $enum?->label() ?? (__('contracts.'.strtolower($value)) !== 'contracts.'.strtolower($value)
+            ? __('contracts.'.strtolower($value))
+            : $value);
+    }
+}
+
+if (!function_exists('contractPaymentMethodLabel')) {
+    /**
+     * Localize nhs_payment_method (FORWARD / BACKWARD / …).
+     */
+    function contractPaymentMethodLabel(mixed $paymentMethod): string
+    {
+        if ($paymentMethod === null || $paymentMethod === '') {
+            return '-';
+        }
+
+        $key = 'contracts.payment_methods.'.strtolower((string) $paymentMethod);
+        $translated = __($key);
+
+        return $translated !== $key ? $translated : (string) $paymentMethod;
+    }
+}
+
 if (!function_exists('legalEntity')) {
     function legalEntity(): ?LegalEntity
     {
