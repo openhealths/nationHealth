@@ -59,8 +59,8 @@ return [
     'parent_contract' => 'Батьківський договір',
     'created_at_label' => 'Дата створення',
     'period_label' => 'Період дії',
-    'id_form_label' => 'Форма договору',
-    'status_reason_label' => 'Причина статусу',
+    'id_form_label' => 'Форма договору (id_form)',
+    'status_reason_label' => 'Причина зміни статусу',
     'divisions_places' => 'Місця надання послуг (Підрозділи)',
     'name' => 'Назва',
     'name_label' => 'Назва',
@@ -96,7 +96,7 @@ return [
     'edit' => 'Редагувати',
     'actions' => 'Дії',
     'date_added' => 'Дата додавання',
-    'status_reason' => 'Причина статусу',
+    'status_reason' => 'Причина зміни статусу',
 
     // Types of contracts
     'capitation' => 'Капітація',

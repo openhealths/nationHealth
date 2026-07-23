@@ -317,6 +317,25 @@ class ContractRequestShow extends Component
 
             $ehealthData = $response->getData();
 
+            // DEBUG #522: inspect raw ESOZ getDetails payload (id_form, status_reason, etc.)
+            Log::info('ContractRequestShow ESOZ getDetails', [
+                'uuid' => $this->contractRequest->uuid,
+                'contract_type' => $contractType,
+                'id_form' => $ehealthData['id_form'] ?? null,
+                'status_reason' => $ehealthData['status_reason'] ?? null,
+                'type' => $ehealthData['type'] ?? $ehealthData['contract_type'] ?? null,
+                'keys' => is_array($ehealthData) ? array_keys($ehealthData) : [],
+                'payload' => $ehealthData,
+            ]);
+            dd([
+                'source' => 'ContractRequestShow::syncDetailsFromEHealth',
+                'uuid' => $this->contractRequest->uuid,
+                'contract_type' => $contractType,
+                'id_form' => $ehealthData['id_form'] ?? null,
+                'status_reason' => $ehealthData['status_reason'] ?? null,
+                'ehealth_data' => $ehealthData,
+            ]);
+
             if (empty($ehealthData)) {
                 return;
             }
@@ -332,7 +351,7 @@ class ContractRequestShow extends Component
             }
 
             $this->contractRequest->update([
-                'contractor_base' => $ehealthData['contractor_base'] ?? $this->contractRequest->contractor_base,
+                'contractor_base' => $ehealthData['contractor_base'] ?? $this->contractRequest->contractorBase,
                 'contractor_payment_details' => $ehealthData['contractor_payment_details'] ?? null,
                 'contractor_divisions' => $ehealthData['contractor_divisions'] ?? null,
                 'external_contractors' => $ehealthData['external_contractors'] ?? null,
@@ -340,10 +359,11 @@ class ContractRequestShow extends Component
                 'nhs_signer_base' => $ehealthData['nhs_signer_base'] ?? null,
                 'nhs_contract_price' => $ehealthData['nhs_contract_price'] ?? null,
                 'nhs_payment_method' => $ehealthData['nhs_payment_method'] ?? null,
+                'id_form' => $ehealthData['id_form'] ?? $this->contractRequest->idForm,
                 'status' => $ehealthData['status'] ?? $this->contractRequest->status,
-                'status_reason' => $ehealthData['status_reason'] ?? null,
-                'inserted_at' => isset($ehealthData['inserted_at']) ? \Illuminate\Support\Carbon::parse($ehealthData['inserted_at']) : $this->contractRequest->inserted_at,
-                'printout_content' => $printoutContent ?? $this->contractRequest->printout_content,
+                'status_reason' => $ehealthData['status_reason'] ?? $this->contractRequest->statusReason,
+                'inserted_at' => isset($ehealthData['inserted_at']) ? \Illuminate\Support\Carbon::parse($ehealthData['inserted_at']) : $this->contractRequest->insertedAt,
+                'printout_content' => $printoutContent ?? $this->contractRequest->printoutContent,
                 'data' => $ehealthData,
             ]);
 
@@ -375,7 +395,16 @@ class ContractRequestShow extends Component
     public function render()
     {
         $dictionaryName = $this->contractRequest->type === 'REIMBURSEMENT' ? 'REIMBURSEMENT_CONTRACT_TYPE' : 'CONTRACT_TYPE';
-        $idFormName = dictionary()->basics()->byName($dictionaryName)->asCodeDescription()->toArray()[$this->contractRequest->id_form] ?? $this->contractRequest->id_form;
+        $idFormCode = $this->contractRequest->idForm
+            ?? data_get($this->contractData, 'id_form');
+        $dictionary = dictionary()->basics()->byName($dictionaryName)->asCodeDescription()->toArray();
+        $idFormLabel = is_string($idFormCode) && $idFormCode !== ''
+            ? ($dictionary[$idFormCode] ?? null)
+            : null;
+        // Show dictionary code (e.g. PMD_1); append description when available.
+        $idFormName = is_string($idFormCode) && $idFormCode !== ''
+            ? ($idFormLabel ? "{$idFormCode} — {$idFormLabel}" : $idFormCode)
+            : null;
 
         return view('livewire.contract-request.contract-request-show', [
             'idFormName' => $idFormName,

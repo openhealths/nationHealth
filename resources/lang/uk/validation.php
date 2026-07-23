@@ -615,7 +615,7 @@ return [
         'status' => 'Статус',
         'contractorRmspAmount' => 'Кількість населення, що обслуговується організацією',
         'contractorBase' => 'Організація діє на підставі',
-        'idForm' => 'Тип',
+        'idForm' => 'Форма договору (id_form)',
         'statuteMd5' => 'Статут',
         'additionalDocumentMd5' => 'Додатковий документ',
         'contractorDivisions' => 'Місця надання послуг',

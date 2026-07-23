@@ -114,7 +114,7 @@ abstract class ContractComponent extends Component
                 ),
                 'start_date' => Carbon::parse($dataToSave['startDate']),
                 'end_date' => Carbon::parse($dataToSave['endDate']),
-                'id_form' => $dataToSave['idForm'] ?? 'unknown',
+                'id_form' => $dataToSave['idForm'] ?? null,
                 'type' => $this->getContractType(),
                 'contractor_signed' => false,
             ]);

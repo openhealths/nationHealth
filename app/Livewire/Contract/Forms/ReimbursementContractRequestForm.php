@@ -57,19 +57,22 @@ class ReimbursementContractRequestForm extends BaseContractRequestForm
     public function hydrate(ContractRequest $request): void
     {
         // 1. Base fields
-        $this->contractorLegalEntityId = $request->contractor_legal_entity_id;
-        $this->contractorOwnerId = $request->contractor_owner_id;
-        $this->contractorBase = $request->contractor_base ?? '';
-        $this->contractNumber = $request->contract_number ?? '';
-        $this->idForm = $request->id_form ?? 'GENERAL';
+        $this->contractorLegalEntityId = $request->contractorLegalEntityId;
+        $this->contractorOwnerId = $request->contractorOwnerId;
+        $this->contractorBase = $request->contractorBase ?? '';
+        $this->contractNumber = $request->contractNumber ?? '';
+        // id_form is a CONTRACT_TYPE / REIMBURSEMENT_CONTRACT_TYPE dictionary code (e.g. GENERAL), never a UUID.
+        $this->idForm = $request->idForm
+            ?? data_get($request->data, 'id_form')
+            ?? 'GENERAL';
 
         // 2.Dates (Carbon -> d.m.Y string conversion)
         // We use optional() or check, because dates can be null in drafts
-        $this->startDate = $request->start_date ? $request->start_date->format('d.m.Y') : '';
-        $this->endDate = $request->end_date ? $request->end_date->format('d.m.Y') : '';
+        $this->startDate = $request->startDate ? $request->startDate->format('d.m.Y') : '';
+        $this->endDate = $request->endDate ? $request->endDate->format('d.m.Y') : '';
 
         // 3. Payment details (Mapping from snake_case array in camelCase)
-        $paymentDetails = $request->contractor_payment_details ?? [];
+        $paymentDetails = $request->contractorPaymentDetails ?? [];
         $this->contractorPaymentDetails = [
             'payerAccount' => $paymentDetails['payer_account'] ?? '',
             'bankName' => $paymentDetails['bank_name'] ?? '',
@@ -77,10 +80,10 @@ class ReimbursementContractRequestForm extends BaseContractRequestForm
         ];
 
         // 4. Medical applications (UUID array)
-        $this->medicalPrograms = $request->medical_programs ?? [];
+        $this->medicalPrograms = $request->medicalPrograms ?? [];
 
         // 5.Pre-Enquiry
-        $this->previousRequestId = $request->previous_request_id;
+        $this->previousRequestId = $request->previousRequestId;
 
         // 6.Consent (if the record exists, we assume that there was consent)
         $this->consentText = true;
