@@ -137,6 +137,45 @@ if (!function_exists('dictionary')) {
     }
 }
 
+if (!function_exists('contractIdFormLabel')) {
+    /**
+     * Human-readable label for contract id_form dictionary code (e.g. GENERAL → Загальний реімбурсаційний договір).
+     */
+    function contractIdFormLabel(?string $idFormCode, mixed $contractType = null): ?string
+    {
+        if (!is_string($idFormCode) || $idFormCode === '') {
+            return null;
+        }
+
+        $type = strtoupper((string) (is_object($contractType) && property_exists($contractType, 'value')
+            ? $contractType->value
+            : $contractType));
+
+        $dictionaryName = $type === 'REIMBURSEMENT'
+            ? 'REIMBURSEMENT_CONTRACT_TYPE'
+            : 'CONTRACT_TYPE';
+
+        try {
+            $label = dictionary()->basics()->byName($dictionaryName)->asCodeDescription()->get($idFormCode);
+
+            if (is_string($label) && $label !== '') {
+                return $label;
+            }
+        } catch (\Throwable) {
+            // Fall back to local translations when the eHealth dictionary is unavailable.
+        }
+
+        $langKey = 'contracts.id_form.'.$type.'.'.$idFormCode;
+        $translated = __($langKey);
+
+        if ($translated !== $langKey) {
+            return $translated;
+        }
+
+        return $idFormCode;
+    }
+}
+
 if (!function_exists('legalEntity')) {
     function legalEntity(): ?LegalEntity
     {

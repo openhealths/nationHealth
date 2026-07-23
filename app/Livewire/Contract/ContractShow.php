@@ -37,23 +37,6 @@ class ContractShow extends Component
 
             $ehealthData = $response->getData();
 
-            // DEBUG #522: inspect raw ESOZ getDetails payload (id_form, status_reason, etc.)
-            Log::info('ContractShow ESOZ getDetails', [
-                'uuid' => $this->contract->uuid,
-                'id_form' => $ehealthData['id_form'] ?? null,
-                'status_reason' => $ehealthData['status_reason'] ?? null,
-                'type' => $ehealthData['type'] ?? $ehealthData['contract_type'] ?? null,
-                'keys' => is_array($ehealthData) ? array_keys($ehealthData) : [],
-                'payload' => $ehealthData,
-            ]);
-            dd([
-                'source' => 'ContractShow::syncDetailsFromEHealth',
-                'uuid' => $this->contract->uuid,
-                'id_form' => $ehealthData['id_form'] ?? null,
-                'status_reason' => $ehealthData['status_reason'] ?? null,
-                'ehealth_data' => $ehealthData,
-            ]);
-
             if (!empty($ehealthData)) {
                 $this->contract->update([
                     'contractor_base' => $ehealthData['contractor_base'] ?? $this->contract->contractorBase,
@@ -115,22 +98,14 @@ class ContractShow extends Component
 
     public function render(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\View\View
     {
-        $dictionaryName = $this->contract->type === 'REIMBURSEMENT' ? 'REIMBURSEMENT_CONTRACT_TYPE' : 'CONTRACT_TYPE';
         $idFormCode = $this->contract->idForm
             ?? data_get($this->data, 'id_form');
-        $dictionary = dictionary()->basics()->byName($dictionaryName)->asCodeDescription()->toArray();
-        $idFormLabel = is_string($idFormCode) && $idFormCode !== ''
-            ? ($dictionary[$idFormCode] ?? null)
-            : null;
-        $idFormName = is_string($idFormCode) && $idFormCode !== ''
-            ? ($idFormLabel ? "{$idFormCode} — {$idFormLabel}" : $idFormCode)
-            : null;
 
         return view('livewire.contract.contract-show', [
             'contract' => $this->contract,
             'data' => $this->data,
             'medicalProgramNames' => $this->medicalProgramNames,
-            'idFormName' => $idFormName,
+            'idFormName' => contractIdFormLabel($idFormCode, $this->contract->type),
         ]);
     }
 }

@@ -118,7 +118,7 @@
                 >
                     <option value="" selected>{{ __('forms.select') }}</option>
                     @foreach($dictionary as $key => $type)
-                        <option value="{{ $key }}">{{ $key }} — {{ $type }}</option>
+                        <option value="{{ $key }}">{{ $type }}</option>
                     @endforeach
                 </select>
                 <label for="idForm" class="label">
