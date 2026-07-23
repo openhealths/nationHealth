@@ -33,7 +33,8 @@ class ContractRequestRepository
 
         // 3. Set System/Local fields
         $attributes['contractor_legal_entity_id'] = legalEntity()->uuid;
-        // Prefer the sync endpoint type (capitation/reimbursement). List payloads often omit or mis-send `type`.
+        // List sync calls GET /api/contract_requests/{capitation|reimbursement}; path type is source of truth.
+        // (Create is reimbursement-only for PHARMACY; capitation here is only for reading existing ESOZ records.)
         $attributes['type'] = strtoupper($type);
 
         if (isset($eHealthData['sync_status'])) {

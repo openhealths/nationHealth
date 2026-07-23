@@ -33,11 +33,6 @@ class CapitationContractCreate extends ContractComponent
     {
         $this->baseMount($legalEntity);
 
-        // CONTRACT_TYPE currently has a single code for PMD contracts.
-        if ($this->form->idForm === '') {
-            $this->form->idForm = 'PMD_1';
-        }
-
         $this->legalEntities = LegalEntity::get(['id', 'edr'])->toArray();
 
         $this->divisions = $legalEntity->divisions->where('status', Status::ACTIVE)->toArray();
@@ -101,9 +96,7 @@ class CapitationContractCreate extends ContractComponent
         $mapped = [];
         foreach ($data['externalContractors'] as $item) {
             // Skip empty rows if any
-            if (empty($item['legalEntityId'])) {
-                continue;
-            }
+            if (empty($item['legalEntityId'])) continue;
 
             $mapped[] = [
                 'legal_entity_id' => $item['legalEntityId'],
@@ -120,7 +113,6 @@ class CapitationContractCreate extends ContractComponent
                 ]
             ];
         }
-
         return $mapped;
     }
 

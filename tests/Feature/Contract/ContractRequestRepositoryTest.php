@@ -74,31 +74,34 @@ class ContractRequestRepositoryTest extends TestCase
 
     public function test_save_from_ehealth_prefers_sync_endpoint_type_over_payload(): void
     {
-        // List/detail payloads sometimes omit or mis-send type; the sync URL is authoritative.
+        // GET /api/contract_requests/{contract_type} — path type is authoritative for list sync.
         $payload = $this->eHealthContractRequestPayload([
-            'type' => 'REIMBURSEMENT',
+            'type' => 'CAPITATION',
         ]);
 
-        $contractRequest = $this->repository->saveFromEHealth($payload, 'CAPITATION');
+        $contractRequest = $this->repository->saveFromEHealth($payload, 'REIMBURSEMENT');
 
-        $this->assertSame('CAPITATION', $contractRequest->type);
+        $this->assertSame('REIMBURSEMENT', $contractRequest->type);
     }
 
     public function test_save_from_ehealth_persists_id_form_and_period_dates(): void
     {
         $payload = $this->eHealthContractRequestPayload([
-            'id_form' => 'PMD_1',
+            'id_form' => 'GENERAL',
             'start_date' => '2026-01-01',
             'end_date' => '2026-12-31',
             'inserted_at' => '2026-07-15T09:25:01.067981Z',
+            'status_reason' => null,
         ]);
 
-        $contractRequest = $this->repository->saveFromEHealth($payload, 'CAPITATION');
+        $contractRequest = $this->repository->saveFromEHealth($payload, 'REIMBURSEMENT');
 
-        $this->assertSame('PMD_1', $contractRequest->idForm);
+        $this->assertSame('GENERAL', $contractRequest->idForm);
+        $this->assertSame('REIMBURSEMENT', $contractRequest->type);
         $this->assertSame('2026-01-01', $contractRequest->startDate?->format('Y-m-d'));
         $this->assertSame('2026-12-31', $contractRequest->endDate?->format('Y-m-d'));
         $this->assertSame('2026-07-15', $contractRequest->insertedAt?->format('Y-m-d'));
+        $this->assertNull($contractRequest->statusReason);
     }
 
     public function test_contract_type_enum_values_match_ehealth(): void
