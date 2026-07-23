@@ -15,4 +15,15 @@ enum Status: string
     case SIGNED = 'SIGNED';
     case REJECTED = 'REJECTED';
     case CANCELLED = 'CANCELLED';
+    case EXPIRED = 'EXPIRED';
+
+    /**
+     * Human-readable label for the merge request status.
+     *
+     * @return string
+     */
+    public function label(): string
+    {
+        return __('preperson.statuses.' . $this->name);
+    }
 }
