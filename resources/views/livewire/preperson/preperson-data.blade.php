@@ -1,5 +1,3 @@
-@use('App\Models\MedicalEvents\Sql\Encounter')
-
 <div x-data="{
     showMergePatientDrawer: false,
     showMergeAuthDrawer: false,
@@ -31,6 +29,7 @@
     showRegisterDeathModal: false,
     showRegisterDeathDateModal: false
 }">
+    @use('App\Models\MedicalEvents\Sql\Encounter')
     <x-layouts.patient
         :prepersonId="$preperson->id"
         :patientFullName="$preperson->fullName"

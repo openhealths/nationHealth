@@ -1,11 +1,10 @@
-@use('App\Enums\Preperson\Status')
-@use('App\Models\MergeRequest')
-
-@php
-    $emergencyContact = (array) $preperson->emergencyContact;
-@endphp
-
 <div class="breadcrumb-form p-4 shift-content space-y-6" x-data="{ showCertificate: false }">
+    @use('App\Enums\Preperson\Status')
+    @use('App\Models\MergeRequest')
+
+    @php
+        $emergencyContact = (array) $preperson->emergencyContact;
+    @endphp
     <div
         x-data="{ open: true }"
         class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm"
@@ -345,7 +344,6 @@
                     </div>
                 </div>
             </div>
-        </div>
     @endcan
 
     <div x-data="{ open: true }"
