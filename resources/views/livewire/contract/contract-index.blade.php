@@ -89,35 +89,25 @@
                     <table class="index-table">
                         <thead class="index-table-thead">
                         <tr>
-                            <th class="index-table-th w-[25%]">{{ __('contracts.number_label') }}</th>
-                            <th class="index-table-th w-[15%]">{{ __('contracts.type_label') }}</th>
-                            <th class="index-table-th w-[15%]">{{ __('contracts.status_label') }}</th>
-                            <th class="index-table-th w-[20%]">{{ __('contracts.period') }}</th>
-                            <th class="index-table-th w-[15%]">{{ __('contracts.date_added') }}</th>
+                            <th class="index-table-th">{{ __('contracts.number_label') }}</th>
+                            <th class="index-table-th">{{ __('contracts.type_label') }}</th>
+                            <th class="index-table-th">{{ __('contracts.period') }}</th>
+                            <th class="index-table-th">{{ __('contracts.date_added') }}</th>
+                            <th class="index-table-th">{{ __('contracts.status_label') }}</th>
+                            <th class="index-table-th">{{ __('contracts.status_reason_label') }}</th>
                             <th class="index-table-th w-[10%]"></th>
                         </tr>
                         </thead>
                         <tbody class="index-table-tbody">
                         @foreach($contracts as $item)
                             <tr wire:key="contract-{{ $item->uuid }}">
-                                <td class="index-table-td text-sm text-gray-500 dark:text-gray-400">
-                                    {{-- Display contract_number or translated 'missing' text --}}
+                                <td class="index-table-td text-sm text-gray-900 font-medium">
                                     {{ $item->contract_number ?: __('contracts.missing') }}
-
-                                    {{-- Show status_reason if exists, as required by eHealth TZ --}}
-                                    @if($item->status_reason)
-                                        <div class="text-xs text-red-500 dark:text-red-400 mt-1" title="{{ __('contracts.status_reason') }}">
-                                            {{ str($item->status_reason)->limit(60) }}
-                                        </div>
-                                    @endif
                                 </td>
                                 <td class="index-table-td">
                                     <span class="badge-yellow">
                                         {{ contractTypeLabel($item->type) }}
                                     </span>
-                                </td>
-                                <td class="index-table-td">
-                                    <x-status-badge :status="$item->status"/>
                                 </td>
                                 <td class="index-table-td text-sm text-gray-500">
                                     @php
@@ -132,6 +122,12 @@
                                     {{ $item->inserted_at?->format(config('app.date_format'))
                                         ?? formatDisplayDate(data_get($item->data, 'inserted_at'))
                                         ?: '-' }}
+                                </td>
+                                <td class="index-table-td">
+                                    <x-status-badge :status="$item->status"/>
+                                </td>
+                                <td class="index-table-td text-sm text-gray-500" title="{{ $item->status_reason ?? data_get($item->data, 'status_reason') }}">
+                                    {{ ($item->status_reason ?: data_get($item->data, 'status_reason')) ?: '-' }}
                                 </td>
 
                                 <td class="index-table-td-actions">
