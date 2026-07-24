@@ -24,11 +24,11 @@ return new class extends Migration
             $table->string('birth_country')->nullable();
             $table->string('birth_settlement')->nullable();
             $table->enum('gender', Gender::values());
-            $table->string('email')->unique()->nullable();
+            $table->string('email')->nullable();
             $table->boolean('no_tax_id')->nullable();
             $table->string('tax_id')->nullable();
             $table->string('secret')->nullable();
-            $table->string('unzr')->unique()->nullable();
+            $table->string('unzr')->nullable();
             $table->jsonb('emergency_contact')->nullable();
             $table->boolean('patient_signed')->default(false)->comment("Person's evidence of sign the person request");
             $table->boolean('is_syncing')->default(false)->comment('Indicates whether the person data is currently being synchronized with an eHealth system');
