@@ -569,5 +569,168 @@ class CarePlanLifecycleTest extends TestCase
             'status' => 'cancelled',
         ]);
     }
+
+    public function test_local_persistence_and_payload_formatting_without_instantiates_protocol(): void
+    {
+        $this->actingAs($this->user);
+        $carePlanUuid = (string) Str::uuid();
+
+        $mockCarePlanApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlan::class);
+        $mockApprovalApi = Mockery::mock(\App\Classes\eHealth\Api\Approval::class);
+        $mockPatientApi = Mockery::mock(\App\Classes\eHealth\Api\Person::class);
+        $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class);
+        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
+
+        $this->instance(\App\Classes\eHealth\Api\CarePlan::class, $mockCarePlanApi);
+        $this->instance(\App\Classes\eHealth\Api\Approval::class, $mockApprovalApi);
+        $this->instance(\App\Classes\eHealth\Api\Person::class, $mockPatientApi);
+        $this->instance(\App\Classes\eHealth\Api\Job::class, $mockJobApi);
+        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+
+        $capturedPayload = null;
+        $mockSignatureService->shouldReceive('signData')
+            ->andReturnUsing(function ($payload) use (&$capturedPayload) {
+                $capturedPayload = $payload;
+                return 'mock-base64-signature';
+            });
+        $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
+
+        $cpCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $cpCreateResponse->shouldReceive('getData')->andReturn(['job_id' => 'job-123']);
+        $cpCreateResponse->shouldReceive('getStatusCode')->andReturn(202);
+        $mockCarePlanApi->shouldReceive('create')->andReturn($cpCreateResponse);
+
+        $jobResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $jobResponse->shouldReceive('getData')->andReturn([
+            'status' => 'processed',
+            'id' => $carePlanUuid,
+            'result' => [
+                'id' => $carePlanUuid,
+                'status' => 'active'
+            ]
+        ]);
+        $mockJobApi->shouldReceive('getDetails')->andReturn($jobResponse);
+
+        $authResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $authResponse->shouldReceive('getData')->andReturn([]);
+        $authResponse->shouldReceive('getStatusCode')->andReturn(200);
+        $mockPatientApi->shouldReceive('getAuthMethods')->andReturn($authResponse);
+
+        // 1. Test Save Draft on Create Component
+        Livewire::test(\App\Livewire\CarePlan\CarePlanCreate::class, [
+            'legalEntity' => \App\Models\LegalEntity::first(),
+            'personId' => $this->person->id,
+        ])
+            ->set('form.encounter', $this->encounter->uuid)
+            ->set('form.title', 'Draft Plan')
+            ->set('form.category', '736382003')
+            ->set('form.clinicalProtocol', 'Protocol-123')
+            ->set('form.context', 'context-value')
+            ->set('form.termsOfService', 'PROVIDING_CONDITION')
+            ->set('form.description', 'My Description')
+            ->set('form.note', 'My Note')
+            ->set('form.informWith', 'SMS')
+            ->set('form.periodStart', now()->format('d.m.Y'))
+            ->call('save')
+            ->assertHasNoErrors();
+
+        // Check local draft is persisted with terms_of_service and clinical_protocol
+        $this->assertDatabaseHas('care_plans', [
+            'title' => 'Draft Plan',
+            'status' => 'draft',
+            'clinical_protocol' => 'Protocol-123',
+            'context' => 'context-value',
+            'terms_of_service' => 'PROVIDING_CONDITION',
+            'description' => 'My Description',
+            'note' => 'My Note',
+            'inform_with' => 'SMS',
+        ]);
+
+        $draft = CarePlan::where('title', 'Draft Plan')->firstOrFail();
+
+        // 2. Test Sign on Create Component
+        Livewire::test(\App\Livewire\CarePlan\CarePlanCreate::class, [
+            'legalEntity' => \App\Models\LegalEntity::first(),
+            'personId' => $this->person->id,
+        ])
+            ->set('form.encounter', $this->encounter->uuid)
+            ->set('form.title', 'Signed Plan')
+            ->set('form.category', '736382003')
+            ->set('form.clinicalProtocol', 'Protocol-123')
+            ->set('form.context', 'context-value')
+            ->set('form.termsOfService', 'PROVIDING_CONDITION')
+            ->set('form.description', 'My Description')
+            ->set('form.note', 'My Note')
+            ->set('form.informWith', 'SMS')
+            ->set('form.periodStart', now()->format('d.m.Y'))
+            ->set('form.knedp', '1.2.3.4')
+            ->set('form.password', 'secret')
+            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.jks', 100))
+            ->call('sign')
+            ->assertHasNoErrors();
+
+        // Check payload did NOT contain instantiates_protocol, but did contain inform_with
+        $this->assertNotNull($capturedPayload);
+        $this->assertFalse(array_key_exists('instantiates_protocol', $capturedPayload));
+        $this->assertFalse(array_key_exists('instantiates_protocol', Arr::toSnakeCase($capturedPayload)));
+        $this->assertEquals('SMS', $capturedPayload['inform_with'] ?? null);
+
+        // Check signed Care Plan is in DB with all fields persisted locally
+        $this->assertDatabaseHas('care_plans', [
+            'uuid' => $carePlanUuid,
+            'status' => 'active',
+            'clinical_protocol' => 'Protocol-123',
+            'context' => 'context-value',
+            'terms_of_service' => 'PROVIDING_CONDITION',
+            'description' => 'My Description',
+            'note' => 'My Note',
+            'inform_with' => 'SMS',
+        ]);
+
+        // 3. Test Save Draft on Update Component
+        Livewire::test(\App\Livewire\CarePlan\CarePlanUpdate::class, [
+            'legalEntity' => \App\Models\LegalEntity::first(),
+            'carePlan' => $draft,
+        ])
+            ->set('form.title', 'Updated Draft Plan')
+            ->set('form.termsOfService', 'PROVIDING_CONDITION_NEW')
+            ->set('form.clinicalProtocol', 'Protocol-New')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('care_plans', [
+            'id' => $draft->id,
+            'title' => 'Updated Draft Plan',
+            'terms_of_service' => 'PROVIDING_CONDITION_NEW',
+            'clinical_protocol' => 'Protocol-New',
+        ]);
+
+        // 4. Test Sign on Update Component
+        $capturedPayload = null;
+        Livewire::test(\App\Livewire\CarePlan\CarePlanUpdate::class, [
+            'legalEntity' => \App\Models\LegalEntity::first(),
+            'carePlan' => $draft,
+        ])
+            ->set('form.title', 'Signed Updated Plan')
+            ->set('form.termsOfService', 'PROVIDING_CONDITION_SIGNED')
+            ->set('form.clinicalProtocol', 'Protocol-Signed')
+            ->set('form.knedp', '1.2.3.4')
+            ->set('form.password', 'secret')
+            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.jks', 100))
+            ->call('sign')
+            ->assertHasNoErrors();
+
+        // Check payload did NOT contain instantiates_protocol
+        $this->assertNotNull($capturedPayload);
+        $this->assertFalse(array_key_exists('instantiates_protocol', $capturedPayload));
+
+        // Check updated Care Plan is in DB with all fields updated locally
+        $this->assertDatabaseHas('care_plans', [
+            'id' => $draft->id,
+            'title' => 'Signed Updated Plan',
+            'terms_of_service' => 'PROVIDING_CONDITION_SIGNED',
+            'clinical_protocol' => 'Protocol-Signed',
+        ]);
+    }
 }
 
