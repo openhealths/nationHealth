@@ -1,5 +1,4 @@
 @use('App\Enums\Status')
-@use('App\Enums\User\Role')
 @use('App\Enums\JobStatus')
 @use('App\Models\Employee\Employee')
 @use('App\Models\Employee\EmployeeRequest')
@@ -7,27 +6,20 @@
 <div>
     <livewire:components.x-message :key="now()->timestamp"/>
     @php
-        $currentUser = auth()->user();
-        // We cache the hospital ID so as not to call the legalEntity() function 100 times in a loop
+        // Cache the hospital ID so as not to call legalEntity() in loops
         $currentLegalEntityId = legalEntity()->id;
+        $permissions = $this->indexPermissions;
 
-        // Cache access rights with an array
-       $permissions = [
-        'employee_view' => $currentUser->can('employee:details'),
-        'employee_write' => $currentUser->can('employee:write'),
-        'employee_deactivate' => $currentUser->can('employee:deactivate'),
-        'request_view' => $currentUser->can('employee_request:read'),
-        'request_write' => $currentUser->can('employee_request:write'),
-        'request_delete' => $currentUser->can('employee_request:write'),
-    ];
-
-    $statusOptions = [
-        Status::APPROVED->value => __('forms.status.active'),
-        Status::NEW->value => __('forms.status.draft'),
-        Status::SIGNED->value => __('forms.status.sent'),
-        Status::DISMISSED->value => __('forms.dismissed'),
-        Status::REORGANIZED->value => __('forms.reorganized'),
-    ];
+        $statusOptions = [
+            Status::APPROVED->value => __('forms.status.active'),
+            Status::NEW->value => __('forms.status.new'),
+            // Legacy local SIGNED rows (pre keep-NEW); same UI meaning as submitted NEW
+            Status::SIGNED->value => __('forms.status.new'),
+            Status::STOPPED->value => __('forms.status.stopped'),
+            Status::ENTERED_IN_ERROR->value => __('forms.status.entered_in_error'),
+            Status::DISMISSED->value => __('forms.status.stopped'),
+            Status::REORGANIZED->value => __('forms.reorganized'),
+        ];
     @endphp
 
     <x-header-navigation class="items-start" x-data="{ showFilter: false }">
@@ -164,6 +156,29 @@
                                     />
                                 </div>
                             </div>
+                            {{-- 3.23.3.1 — tax_id / verification_status only for OWNER/HR/ADMIN/PHARMACY_OWNER --}}
+                            @if($permissions['employee_admin_hr'])
+                                <div class="form-row-4">
+                                    <div class="form-group group">
+                                        <input wire:model.defer="filter.tax_id" wire:keydown.enter="applyFilters"
+                                               name="filter_tax_id" id="filter_tax_id" class="input peer" placeholder=" "
+                                               autocomplete="off" />
+                                        <label for="filter_tax_id" class="label">{{ __('forms.tax_id') }}</label>
+                                    </div>
+                                    <div class="form-group group">
+                                        <select wire:model.defer="filter.verification_status" wire:keydown.enter="applyFilters"
+                                                id="filter_verification_status"
+                                                class="input peer text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                                        >
+                                            <option value="">{{ __('forms.all_verification_statuses') }}</option>
+                                            @foreach(\App\Enums\Party\VerificationStatus::cases() as $verificationStatus)
+                                                <option value="{{ $verificationStatus->value }}">{{ $verificationStatus->label() }}</option>
+                                            @endforeach
+                                        </select>
+                                        <label for="filter_verification_status" class="label">{{ __('party_verification.status') }}</label>
+                                    </div>
+                                </div>
+                            @endif
                         </div>
                         <div class="mb-9 mt-6 flex flex-col sm:flex-row gap-2 w-full">
                             <button type="submit" class="flex items-center gap-2 button-primary">
@@ -222,11 +237,28 @@
                         wire:key="party-{{ $party->id }}">
                         <legend class="legend">{{ $party->fullName }}</legend>
 
+                        @if($permissions['employee_admin_hr'])
+                            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mt-1 mb-2">
+                                @if($party->taxId)
+                                    <span>{{ __('forms.tax_id') }}: <span class="font-medium text-gray-700 dark:text-gray-200">{{ $party->taxId }}</span></span>
+                                @endif
+                                @if($party->verificationStatus)
+                                    @php
+                                        $partyVerification = \App\Enums\Party\VerificationStatus::tryFrom($party->verificationStatus);
+                                    @endphp
+                                    <span>{{ __('party_verification.status') }}:
+                                        <span class="font-medium text-gray-700 dark:text-gray-200">
+                                            {{ $partyVerification?->label() ?? $party->verificationStatus }}
+                                        </span>
+                                    </span>
+                                @endif
+                            </div>
+                        @endif
+
                         <div
                             class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-700 pb-4">
 
-                            <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500 mt-2"
-                                 x-data="{ showEmails_{{ $party->id }}: false }">
+                            <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500 mt-2">
 
                                 {{-- Phone --}}
                                 @if ($mobilePhone = $party->phones->firstWhere('type', 'MOBILE'))
@@ -241,50 +273,52 @@
                                     </span>
                                 @endif
 
-                                {{-- Email --}}
+                                {{-- Email: 1 = plain text; 2+ = toggle to reveal all --}}
                                 @php
                                     $emailsCollection = $employees
-                                        ->map(fn($emp) => $emp->loadMissing('users')->users?->map(fn($user) => $user->email))
+                                        ->map(fn ($emp) => $emp->loadMissing('users')->users?->map(fn ($user) => $user->email))
                                         ->flatten()
                                         ->filter()
-                                        ->unique();
+                                        ->unique()
+                                        ->values();
 
+                                    $emailCount = $emailsCollection->count();
                                     $visibleEmail = $emailsCollection->first();
-                                    $hiddenEmails = $emailsCollection->slice(1);
-                                    $hiddenCount = $hiddenEmails->count();
                                 @endphp
 
                                 @if ($visibleEmail)
-                                    <span class="flex items-center gap-1.5 min-w-0 relative">
+                                    <span class="flex items-center gap-1.5 min-w-0 relative"
+                                          x-data="{ open: false }">
                                         <svg class="w-6 h-6 text-gray-800 dark:text-white shrink-0" aria-hidden="true"
                                              xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none"
                                              viewBox="0 0 24 24">
                                             <path stroke="currentColor" stroke-linecap="round" stroke-width="2"
                                                   d="m3.5 5.5 7.893 6.036a1 1 0 0 0 1.214 0L20.5 5.5M4 19h16a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1Z" />
                                         </svg>
-                                        <a href="mailto:{{ $visibleEmail }}" class="hover:underline truncate"
-                                           title="{{ $visibleEmail }}">{{ $visibleEmail }}</a>
 
-                                        @if ($hiddenCount > 0)
+                                        @if ($emailCount === 1)
+                                            <span class="truncate cursor-default select-text"
+                                                  title="{{ $visibleEmail }}">{{ $visibleEmail }}</span>
+                                        @else
                                             <button type="button"
-                                                    @click.stop="showEmails_{{ $party->id }} = !showEmails_{{ $party->id }}"
-                                                    class="text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer p-0.5 rounded-full"
-                                                    title="Показати {{ $hiddenCount }} додаткових email"
+                                                    @click.stop="open = !open"
+                                                    class="flex items-center gap-1 min-w-0 truncate text-left text-sm text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
+                                                    title="{{ __('forms.show_all_emails') }}"
+                                                    aria-expanded="false"
+                                                    x-bind:aria-expanded="open.toString()"
                                             >
-                                                +{{ $hiddenCount }}
+                                                <span class="truncate">{{ $visibleEmail }}</span>
+                                                <span class="shrink-0 font-semibold">+{{ $emailCount - 1 }}</span>
                                             </button>
-                                        @endif
 
-                                        @if ($hiddenCount > 0)
-                                            <div x-show="showEmails_{{ $party->id }}"
-                                                 x-on:click.away="showEmails_{{ $party->id }} = false"
+                                            <div x-show="open"
+                                                 x-on:click.away="open = false"
                                                  x-collapse.duration.300ms
                                                  class="flex flex-col gap-y-0.5 absolute bg-white dark:bg-gray-800 z-10 p-2 rounded-md shadow-lg top-full left-0 mt-1 min-w-max border border-gray-200 dark:border-gray-700"
                                                  x-cloak
                                             >
-                                                @foreach ($hiddenEmails as $email)
-                                                    <a href="mailto:{{ $email }}"
-                                                       class="hover:underline text-gray-500 dark:text-gray-400 text-sm">{{ $email }}</a>
+                                                @foreach ($emailsCollection as $email)
+                                                    <span class="text-gray-500 dark:text-gray-400 text-sm">{{ $email }}</span>
                                                 @endforeach
                                             </div>
                                         @endif
@@ -294,23 +328,8 @@
 
                             <div class="flex items-center gap-4">
                                 @if($employees->isNotEmpty())
-                                    @php
-                                        // Find the last active employee of this person to check the rights
-                                        $latestEmployee = $employees->first(); // or through the method by which you get a topical position
-
-                                        // Check if ANY of the employee positions for this party is an OWNER
-                                        $isOwner = $employees->contains(fn($emp) => $emp->employeeType === Role::OWNER->value);
-                                        $hasUserLinked = $latestEmployee && !empty($latestEmployee->userId);
-
-                                        // We check the possibility of editing personal data according to your rules:
-                                        // 1. Not the owner 3. Not exempt
-                                        $canEditParty = $latestEmployee
-                                            && !$isOwner
-                                            && $latestEmployee->status !== Status::DISMISSED;
-                                    @endphp
                                     @can('create', EmployeeRequest::class)
-                                        {{-- Edit personal data button --}}
-                                        @if($canEditParty)
+                                        @if($this->canEditPartyPersonalData($party))
                                             <a href="{{ route('party.edit', ['legalEntity' => $currentLegalEntityId, 'party' => $party->id]) }}"
                                                class="cursor-pointer text-blue-600 hover:text-blue-800 flex items-center gap-1">
                                                 @icon('file-lines', 'w-4 h-4 text-blue-600 hover:text-blue-800')
@@ -318,15 +337,13 @@
                                             </a>
                                         @endif
 
-                                        {{-- Add position button (if you want to restrict for owners too) --}}
-
                                         <a href="{{ route('employee-request.position-add', ['legalEntity' => $currentLegalEntityId, 'party' => $party->id]) }}"
                                            class="item-add text-blue-600 hover:text-blue-800 flex items-center gap-1">
                                             <span class="text-xl leading-none">+</span>
                                             <span>{{ __('forms.add_position') }}</span>
                                         </a>
-                                    @endif
-                                @endcan
+                                    @endcan
+                                @endif
                             </div>
                         </div>
 
@@ -352,7 +369,7 @@
                                         @php
                                             $positionEmail = null;
                                             if ($position instanceof Employee) {
-                                                $positionEmail = $party->loadMissing('users')->users->where(fn($user) => $user->id === $position->user_id)->first()?->email ?? null;
+                                                $positionEmail = $party->loadMissing('users')->users->where(fn($user) => $user->id === $position->userId)->first()?->email ?? null;
                                             } else if ($position instanceof EmployeeRequest) {
                                                 $positionEmail = $position->revision->data['party']['email'] ?? null;
                                             }
@@ -362,7 +379,7 @@
                                                 {{ $dictionaries['POSITION'][$position->position] ?? $position->position }}
                                             </td>
                                             <td class="td-input break-words whitespace-normal align-top">
-                                                {{ $dictionaries['EMPLOYEE_TYPE'][$position->employee_type] ?? $position->employee_type }}
+                                                {{ $dictionaries['EMPLOYEE_TYPE'][$position->employeeType] ?? $position->employeeType }}
                                             </td>
                                             <td class="td-input break-words whitespace-normal align-top">
                                                 {{ $position->division->name ?? __('forms.undefined') }}
@@ -380,22 +397,24 @@
                                             <td class="td-input break-words whitespace-nowrap align-middle">
                                                 @php
                                                     $isEmployee = $position instanceof Employee;
-                                                    $employeeStatus = $isEmployee ? $position->status?->value : '';
+                                                    $employeeStatus = $position->status?->value ?? '';
                                                 @endphp
 
                                                 @if($isEmployee)
                                                     @if($employeeStatus === Status::APPROVED->value)
                                                         <span class="badge-green">{{__('forms.status.active')}}</span>
-                                                    @elseif($employeeStatus === Status::DISMISSED->value || $employeeStatus === Status::STOPPED->value)
-                                                        <span class="badge-red">{{__('forms.status.dismissed')}}</span>
+                                                    @elseif($employeeStatus === Status::STOPPED->value || $employeeStatus === Status::DISMISSED->value)
+                                                        <span class="badge-red">{{__('forms.status.stopped')}}</span>
+                                                    @elseif($employeeStatus === Status::ENTERED_IN_ERROR->value)
+                                                        <span class="badge-red">{{__('forms.status.entered_in_error')}}</span>
                                                     @elseif($employeeStatus === Status::REORGANIZED->value)
                                                         <span class="badge-yellow">{{__('forms.status.reorganized')}}</span>
                                                     @endif
                                                 @else
-                                                    @if($employeeStatus === Status::NEW->value)
+                                                    @if($position->isLocalDraft())
                                                         <span class="badge-red">{{__('forms.status.draft')}}</span>
-                                                    @elseif($employeeStatus === Status::SIGNED->value)
-                                                        <span class="badge-yellow">{{__('forms.status.sent')}}</span>
+                                                    @elseif($position->isPendingEhealth())
+                                                        <span class="badge-yellow">{{__('forms.status.new')}}</span>
                                                     @endif
                                                 @endif
                                             </td>
