@@ -221,7 +221,7 @@ abstract class EmployeeComponent extends Component
     }
 
     /**
-     * Checks "hanging" requests (SIGNED) for this employee in eHealth.
+     * Checks hanging requests (NEW with uuid, or legacy SIGNED) for this employee in eHealth.
      * If the request in eHealth is already APPROVED/REJECTED, updates the local status.
      *
      * @param  Employee  $employee
@@ -230,9 +230,9 @@ abstract class EmployeeComponent extends Component
      */
     protected function actualizePendingRequests(Employee $employee, string $token): void
     {
-        $pendingRequests = EmployeeRequest::where('employee_id', $employee->id)
-            ->where('status', RequestStatus::SIGNED)
-            ->whereNull('applied_at')
+        $pendingRequests = EmployeeRequest::query()
+            ->where('employee_id', $employee->id)
+            ->pendingEhealth()
             ->get();
 
         if ($pendingRequests->isEmpty()) {

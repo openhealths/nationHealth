@@ -22,14 +22,15 @@ enum RequestStatus: string
             self::NEW => 'Новий',
             self::APPROVED => 'Підтверджено',
             self::REJECTED => 'Відхилено',
-            self::SIGNED => 'Підписано в ЕСОЗ',
+            // Legacy local-only; UI for pending uses isPendingEhealth() → «Новий».
+            self::SIGNED => 'Надіслано',
             self::EXPIRED => 'Протермінований',
         };
     }
 
     /**
-     * Returns an array of statuses pending
-     * final synchronization upon user login.
+     * Statuses that may still need sync against eHealth after login.
+     * NEW covers drafts and submitted-but-unresolved requests; SIGNED is legacy.
      */
     public static function getStatusesForSync(): array
     {

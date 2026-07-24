@@ -19,10 +19,12 @@
 
     $showView = $canView;
 
-    $showEdit = $canWrite && !$isOwner && ($isEmployee ? $status !== 'DISMISSED' : $status === 'NEW');
+    $isLocalDraftRequest = $isRequest && $position->isLocalDraft();
 
-    $showSync = $canWrite && ($isEmployee ? !empty($position->uuid) : in_array($status, ['NEW', 'SIGNED', 'APPROVED']));
-    $showDelete = $isRequest && $canWrite && $status === 'NEW';
+    $showEdit = $canWrite && !$isOwner && ($isEmployee ? $status !== 'DISMISSED' : $isLocalDraftRequest);
+
+    $showSync = $canWrite && ($isEmployee ? !empty($position->uuid) : in_array($status, ['NEW', 'SIGNED', 'APPROVED'], true));
+    $showDelete = $isRequest && $canWrite && $isLocalDraftRequest;
 
     // We also prohibit the dismissal of the owner through the interface, if necessary
     $showDismiss = $isEmployee && !$isOwner && $status === 'APPROVED' && ($permissions['employee_deactivate'] ?? false);

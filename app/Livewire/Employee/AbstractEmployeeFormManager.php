@@ -239,7 +239,8 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
                 'uuid' => $uuid,
                 'legal_entity_uuid' => $legalEntity->uuid,
                 'inserted_at' => Carbon::parse($insertedAt)->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
-                'status' => RequestStatus::SIGNED,
+                // Keep NEW to match eHealth Create Employee Request (list API has no SIGNED).
+                'status' => RequestStatus::NEW,
                 'sync_status' => JobStatus::PARTIAL,
                 'division_id' => $request->division_id,
                 'division_uuid' => Arr::get($eHealthResponse, 'ehealth_response.data.division_id', null),

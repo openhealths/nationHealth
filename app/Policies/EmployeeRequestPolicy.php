@@ -48,7 +48,7 @@ class EmployeeRequestPolicy
             return Response::denyWithStatus(404);
         }
 
-        if ($employeeRequest->status !== \App\Enums\Employee\RequestStatus::NEW) {
+        if (!$employeeRequest->isLocalDraft()) {
             return Response::deny(__('employees.policy.req.processed_no_edit'));
         }
 
@@ -63,7 +63,7 @@ class EmployeeRequestPolicy
             return Response::denyWithStatus(404);
         }
 
-        if ($employeeRequest->status !== \App\Enums\Employee\RequestStatus::NEW) {
+        if (!$employeeRequest->isLocalDraft()) {
             return Response::deny(__('employees.policy.req.processed_no_delete'));
         }
 
