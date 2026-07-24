@@ -78,7 +78,10 @@ class ContractRequestPolicy
             return Response::denyWithStatus(404);
         }
 
-        if (legalEntity()->type->name !== LegalEntity::TYPE_PHARMACY) {
+        $legalEntity = legalEntity();
+
+        // PRIMARY_CARE (ПМД) and other non-pharmacy LEs must not see/submit reimbursement contracts.
+        if ($legalEntity === null || $legalEntity->type?->name !== LegalEntity::TYPE_PHARMACY) {
             return Response::denyWithStatus(404);
         }
 
