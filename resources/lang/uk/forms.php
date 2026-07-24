@@ -123,6 +123,7 @@ return [
     'verifications' => 'Верифікації',
     'comment_NSZU' => 'Коментар НСЗУ',
     'reviewed_NHS' => 'Перевірено НСЗУ',
+    'verified_NHS' => 'Верифіковано НСЗУ',
     'status_in_the_system' => 'Статус закладу в системі',
     'state_of_the_NMP' => 'Стан НМП в ЄДРПОУ',
     'participation_reorganization' => 'Участь закладу у реорганізації',
@@ -395,6 +396,18 @@ return [
             'building' => "Неправильний формат номеру будинка",
             'apartment' => "Неправильний формат номеру квартири",
             'zip' => "Неправильний формат поштового індекса",
+        ]
+    ],
+
+    'edr' => [
+        'status' => [
+            'canceled' => 'Скасовано',
+            'registered' => 'Зареєстровано',
+            'under_dissolution' => 'В стані припинення',
+            'dissolved' => 'Припинено',
+            'bankruptcy_case_initiated' => 'Порушено справу про банкрутство',
+            'bankruptcy_sanation' => 'Порушено справу про банкрутство (санація)',
+            'registered_invalid_certificate' => 'Зареєстровано, свідоцтво про державну реєстрацію недійсне'
         ]
     ]
 ];

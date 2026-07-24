@@ -6,28 +6,9 @@
     $isEdit = $isDetails = true;
 
     $parentLegalEntity = legalEntity()->parentLegalEntity()->first();
-
-    $leStatusMap = [
-        'ACTIVE' => [__('forms.status.active'), 'status-alert-green'],
-        'SUSPENDED' => [__('forms.status.suspended'), 'status-alert-red'],
-        'CLOSED' => [__('forms.status.inactive'), 'status-alert-red'],
-        'REORGANIZED' => [__('forms.status.reorganized'), 'status-alert-red'],
-    ];
-
-    $edrStatus = (string)$le->edr['state'];
-    $edrStatusStyleMap = [
-        '-1' => 'status-alert-red',
-        '1' =>  'status-alert-green',
-        '2' => 'status-alert-yellow',
-        '3' => 'status-alert-red',
-        '4' => 'status-alert-red',
-        '5' => 'status-alert-red',
-        '6' => 'status-alert-red',
-    ];
 @endphp
 
 <div x-data="{ isDisabled: true, isEdit: @json($isEdit), activeStep: 0}">
-
     <livewire:components.x-message :key="now()->timestamp"/>
 
     <x-header-navigation class="items-start" x-data="{ showFilter: false }">
@@ -53,6 +34,15 @@
     </x-header-navigation>
 
     <div class="shift-content pl-3.5">
+        <fieldset class="p-4 sm:p-8 sm:pb-10 mb-16 mt-6 border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 max-w-[1280px]">
+            <legend class="legend">{{ __('forms.status_in_the_system') }}</legend>
+            <div class="{{ $this->statusStyle }} status-alert-full mb-6">
+                    <span class="flex-shrink-0">
+                        @icon('check-circle', 'w-5 h-5 text-green-700 mr-3')
+                    </span>
+                        <span class="ms-1">{{ $this->statusLabel }}</span>
+                </div>
+        </fieldset>
 
         <fieldset class="p-4 sm:p-8 sm:pb-10 mb-16 mt-6 border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 max-w-[1280px]">
             <legend class="legend">{{ __('forms.verification_NSZU') }}</legend>
@@ -61,8 +51,8 @@
                     <table class="table-input w-full table-fixed min-w-[600px] text-sm">
                         <thead class="thead-input">
                         <tr>
-                            <th scope="col" class="px-3 py-3 th-input w-[15%]">{{__('forms.status.label')}}</th>
-                            <th scope="col" class="px-3 py-3 th-input w-[35%]">{{__('forms.reviewed_NHS')}}</th>
+                            <th scope="col" class="px-3 py-3 th-input w-[25%]">{{__('forms.verified_NHS')}}</th>
+                            <th scope="col" class="px-3 py-3 th-input w-[25%]">{{__('forms.reviewed_NHS')}}</th>
                             <th scope="col" class="px-3 py-3 th-input w-[50%]">{{__('forms.comment_NSZU')}}</th>
                         </tr>
                         </thead>
@@ -70,7 +60,7 @@
                         <tr>
                             <td class="td-input break-words whitespace-nowrap align-top">
                                 @if($le->nhs_verified)
-                                    <span class="badge-green">{{__('forms.status.active')}}</span>
+                                    <span class="badge-green">{{__('forms.verified_NHS')}}</span>
                                 @else
                                     <span class="badge-red">{{__('forms.not_verified')}}</span>
                                 @endif
@@ -92,25 +82,15 @@
             </div>
         </fieldset>
 
-        <fieldset class="p-4 sm:p-8 sm:pb-10 mb-16 mt-6 border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 max-w-[1280px]">
-            <legend class="legend">{{ __('forms.status_in_the_system') }}</legend>
-            <div class="{{ $leStatusMap[$le->status][1] ?? 'status-alert-red' }} status-alert-full mb-6">
-                    <span class="flex-shrink-0">
-                        @icon('check-circle', 'w-5 h-5 text-green-700 mr-3')
-                    </span>
-                    <span class="ms-1">{{ $leStatusMap[$le->status][0] ?? __('forms.status.unknown') }}</span>
-                </div>
-        </fieldset>
-
         {{-- E D R --}}
         <fieldset class="p-4 sm:p-8 sm:pb-10 mb-16 mt-6 border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 max-w-[1280px]">
             <legend class="legend">{{ __('forms.state_of_the_NMP') }}</legend>
 
-            <div class="{{ $edrStatusStyleMap[$edrStatus] ?? 'status-alert-red' }} status-alert-full mb-6">
+            <div class="{{ $this->edrStatusStyle }} status-alert-full mb-6">
                 <span class="flex-shrink-0">
                     @icon('check-circle', 'w-5 h-5 text-green-700 mr-3')
                 </span>
-                <span class="ms-1">{{ $edrStatuses[$edrStatus] ?? __('forms.status.unknown') }}</span>
+                <span class="ms-1">{{ $this->edrStatusLabel }}</span>
             </div>
 
             <div class="flex flex-col lg:flex-row lg:gap-x-8">
