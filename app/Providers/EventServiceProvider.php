@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use App\Models\LegalEntity;
 use App\Listeners\LogLockout;
 use App\Events\EHealthUserLogin;
+use App\Events\LegalEntityCreate;
 use Illuminate\Auth\Events\Lockout;
 use App\Events\EhealthUserVerified;
 use App\Listeners\eHealth\EmployeeCreate;
@@ -29,7 +29,7 @@ class EventServiceProvider extends ServiceProvider
         Lockout::class => [
             LogLockout::class
         ],
-        LegalEntity::class => [
+        LegalEntityCreate::class => [
             SendUserCredentialsListener::class
         ],
         EhealthUserVerified::class => [

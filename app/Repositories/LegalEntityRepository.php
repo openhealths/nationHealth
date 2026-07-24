@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Models\User;
 use App\Enums\Status;
+use App\Enums\User\Role;
 use App\Models\LegalEntity;
 use App\Models\LegalEntityType;
+use App\Models\Employee\Employee;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -108,5 +113,48 @@ class LegalEntityRepository
                 ['edrpou', 'name', 'is_active', 'type', 'reason', 'reason_date', 'ehealth_inserted_at', 'inserted_by', 'updated_at'] // fields to update if record exists
             );
         }
+    }
+
+    /**
+     * Handles the owner change process for the legal entity.
+     *
+     * Removes the OWNER and/or REORGANIZATION_OWNER roles from the current authenticated user,
+     * detaches their employee records from the pivot table, and clears the direct user_id
+     * reference on those employee records. Logs out the old owner and redirects to login.
+     *
+     * @return void
+     */
+    public function setNewOwner(User $oldOwner, ?LegalEntity $legalEntity = null): void
+    {
+        $legalEntity ??= legalEntity();
+
+        setPermissionsTeamId($legalEntity->id);
+
+        $partyUsers = User::where('party_id', $oldOwner->party_id)->get();
+        $partyUserIds = $partyUsers->pluck('id');
+
+        Auth::shouldUse('web');
+
+        // Remove the OWNER's roles for all party users via web guard
+        $partyUsers->each->removeRole([Role::OWNER, Role::REORGANIZATION_OWNER]);
+
+        Auth::shouldUse('ehealth');
+
+        // Remove the OWNER's roles for all party users via ehealth guard
+        $partyUsers->each->removeRole([Role::OWNER, Role::REORGANIZATION_OWNER]);
+
+        Employee::where('legal_entity_id', $legalEntity->id)
+            ->whereIn('employee_type', [Role::OWNER->value, Role::REORGANIZATION_OWNER->value])
+            ->where('party_id', $oldOwner->party_id)
+            ->each(fn ($employee) => $employee->users()->detach($partyUserIds));
+
+        // Set the user_id to null for the OWNER's employee record in the employees table
+        // Because the OWNER's employee record is no longer associated with a user
+        Employee::where('legal_entity_id', $legalEntity->id)
+            ->whereIn('employee_type', [Role::OWNER->value, Role::REORGANIZATION_OWNER->value])
+            ->where('party_id', $oldOwner->party_id)
+            ->update(['user_id' => null]);
+
+        Log::info(__('** OWNER CHANGED **', [], 'en'), ['old_owner_id' => $oldOwner->id, 'legal_entity_id' => $legalEntity->id]);
     }
 }

@@ -17,7 +17,7 @@ class Logout
     /**
      * Log the current user out of the application.
      */
-    public function __invoke(bool $redirect = true)
+    public function __invoke(bool $redirect = true, ?string $message = null)
     {
         if (Auth::guard('ehealth')->check()
             && (Session::has(config('ehealth.api.auth_ehealth'))
@@ -44,6 +44,10 @@ class Logout
 
         Session::invalidate();
         Session::regenerateToken();
+
+        if ($message) {
+            Session::put('success', $message);
+        }
 
         $redirectRoute = redirect()->route(App::isLocal() ? 'dev.login' : 'login');
 

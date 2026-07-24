@@ -75,7 +75,7 @@ class LegalEntitiesForms extends Form
     public function rules(): array
     {
         $rules = [
-            'edrpou' => ['required', "regex:/^(\d{9,10}|[А-ЯЁЇІЄҐ]{2}\\d{6})$/u", new UniqueEdrpou($this->type)],
+            'edrpou' => ['required', "regex:/^([0-9]{8,10}|[А-ЯЁЇIЄҐ]{2}\d{6})$/u", new UniqueEdrpou($this->type)],
             'owner.lastName' => ['required', 'min:3', new Name()],
             'owner.firstName' => ['required', 'min:3', new Name()],
             'owner.secondName' => ['nullable', new Name()],
