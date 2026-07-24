@@ -400,7 +400,12 @@
                                         </span>
                                     </td>
                                     <td x-data="{ openDropdown: false }" class="px-4 py-4 text-right relative overflow-visible">
-                                        <div class="flex items-center justify-end">
+                                        <div class="flex items-center justify-end gap-2">
+                                            <a href="{{ route('care-plans.activities.show', [legalEntity(), $carePlan->id, $activity->id]) }}"
+                                               class="text-blue-600 dark:text-blue-400 text-sm hover:underline whitespace-nowrap"
+                                               wire:navigate>
+                                                Переглянути
+                                            </a>
                                             <button @click.stop="openDropdown = !openDropdown" type="button" class="cursor-pointer p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                                                 @icon('dots-vertical', 'w-5 h-5 text-gray-800 dark:text-white')
                                             </button>
@@ -439,6 +444,13 @@
                                                 </div>
                                             @elseif(in_array(strtoupper($activityStatus), ['ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD', 'PROCESSED']))
                                                 <div class="py-1">
+                                                    <a href="{{ route('care-plans.activities.show', [legalEntity(), $carePlan->id, $activity->id]) }}"
+                                                       @click="openDropdown = false"
+                                                       class="text-gray-700 dark:text-gray-200 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600"
+                                                       wire:navigate
+                                                    >
+                                                        Деталі та виписки
+                                                    </a>
                                                     <button type="button" 
                                                             @click="openDropdown = false" 
                                                             wire:click="openSignatureModal('cancel_activity', {{ $activity->id }})" 

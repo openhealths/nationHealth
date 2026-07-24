@@ -140,7 +140,7 @@ class MedicationRequestLifecycleTest extends TestCase
             'kind' => 'medication_request',
             'product_reference' => 'INN-101',
             'quantity' => 60.0,
-            'program' => 'program-affordable-medicines',
+            'program' => 'program-1',
         ]);
     }
 
@@ -241,6 +241,50 @@ class MedicationRequestLifecycleTest extends TestCase
         $this->assertEquals(1.0, $fhir['dosageInstruction'][0]['doseAndRate'][0]['doseQuantity']['value']);
     }
 
+    public function test_create_request_payload_uses_snomed_route_and_object_dose_and_rate(): void
+    {
+        $mapper = new MedicationRequestMapper();
+
+        $payload = $mapper->toCreateRequestPayload(
+            [
+                'medication_id' => 'INN-101',
+                'medication_qty' => 10.0,
+                'started_at' => '2026-06-24',
+                'ended_at' => '2026-07-03',
+                'based_on_uuid' => $this->carePlanActivity->uuid,
+                'dosage_instructions' => [
+                    [
+                        'sequence' => 1,
+                        'text' => '1 tablet daily',
+                        'route' => 'oral',
+                        'dose_and_rate' => [
+                            [
+                                'dose_quantity_value' => 1.0,
+                                'dose_quantity_unit' => 'tab',
+                            ],
+                        ],
+                        'max_dose_per_administration' => 1.0,
+                        'max_dose_per_period' => 1.0,
+                    ],
+                ],
+            ],
+            [
+                'person_uuid' => $this->person->uuid,
+                'employee_uuid' => $this->employee->uuid,
+                'division_uuid' => (string) Str::uuid(),
+            ],
+            $this->carePlanActivity->carePlan->uuid,
+        );
+
+        $dosage = $payload['medication_request_request']['dosage_instruction'][0];
+
+        $this->assertSame('26643006', $dosage['route']['coding'][0]['code']);
+        $this->assertIsArray($dosage['dose_and_rate']);
+        $this->assertFalse(array_is_list($dosage['dose_and_rate']));
+        $this->assertSame('ordered', $dosage['dose_and_rate']['type']['coding'][0]['code']);
+        $this->assertSame(1.0, $dosage['dose_and_rate']['dose_quantity']['value']);
+    }
+
     public function test_mock_api_create_and_sign_lifecycle(): void
     {
         $mockApi = Mockery::mock(MedicationRequestApi::class);
@@ -270,11 +314,11 @@ class MedicationRequestLifecycleTest extends TestCase
         $mockApi->shouldReceive('signRequest')->once()->andReturn($signResponse);
 
         // Call the mocked API and assert
-        $resCreate = app(MedicationRequestApi::class)->createRequest($this->person->uuid, []);
+        $resCreate = app(MedicationRequestApi::class)->createRequest([]);
         $this->assertEquals(201, $resCreate->getStatusCode());
         $this->assertEquals('NEW', $resCreate->getData()['status']);
 
-        $resSign = app(MedicationRequestApi::class)->signRequest($this->person->uuid, $requestId, []);
+        $resSign = app(MedicationRequestApi::class)->signRequest($requestId, []);
         $this->assertEquals(200, $resSign->getStatusCode());
         $this->assertEquals('active', $resSign->getData()['status']);
     }
@@ -313,7 +357,9 @@ class MedicationRequestLifecycleTest extends TestCase
                 ]
             ]
         ]);
+        $programResponse->shouldReceive('getPaging')->andReturn(['total_pages' => 1]);
         $programResponse->shouldReceive('getStatusCode')->andReturn(200);
+        $mockProgramApi->shouldReceive('asMis')->andReturnSelf();
         $mockProgramApi->shouldReceive('getMany')->andReturn($programResponse);
         $this->instance(\App\Classes\eHealth\Api\MedicalProgram::class, $mockProgramApi);
 
@@ -330,8 +376,16 @@ class MedicationRequestLifecycleTest extends TestCase
         $mockPersonApi->shouldReceive('getAuthMethods')->andReturn($personResponse);
         $this->instance(\App\Classes\eHealth\Api\Person::class, $mockPersonApi);
 
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $activityResponse = Mockery::mock(EHealthResponse::class);
+        $activityResponse->shouldReceive('successful')->andReturn(true);
+        $activityResponse->shouldReceive('getData')->andReturn(['id' => $this->carePlanActivity->uuid]);
+        $mockActivityApi->shouldReceive('getDetails')->andReturn($activityResponse);
+        $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
+
         // 2. Fetch the CarePlan
         $carePlan = $this->carePlanActivity->carePlan;
+        $this->actingAs($this->user);
 
         // 3. Test Livewire rendering & initEPrescriptionForm
         Livewire::test(CarePlanActivityShow::class, [

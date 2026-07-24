@@ -8,6 +8,8 @@ use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Repositories\CarePlanActivityRepository;
+use App\Services\MedicalEvents\CarePlanActivityEHealthGuard;
+use App\Services\MedicalEvents\EHealthJobResolver;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -46,25 +48,38 @@ trait ManagesCarePlanEPrescription
             return;
         }
 
+        if ($activity->resolvedKind() !== 'medication_request') {
+            $this->dispatch('flashMessage', [
+                'type' => 'error',
+                'message' => __('care-plan.eprescription_wrong_activity_kind'),
+            ]);
+
+            return;
+        }
+
+        try {
+            app(CarePlanActivityEHealthGuard::class)->assertRegisteredInEHealth($this->carePlan, $activity);
+        } catch (\RuntimeException $exception) {
+            $this->dispatch('flashMessage', ['type' => 'error', 'message' => $exception->getMessage()]);
+
+            return;
+        }
+
         $this->ePrescriptionSelectedProduct = null;
         $this->ePrescriptionWarningMessage = '';
         $this->ePrescriptionPackages = [];
         $this->ePrescriptionMultiples = [];
 
         try {
-            $response = EHealth::drug()->getMany(['innm_id' => $activity->product_reference]);
-            $data = $response->getData();
-            if (!empty($data)) {
-                $this->ePrescriptionSelectedProduct = $data[0];
-                if (!empty($this->ePrescriptionSelectedProduct['packages'])) {
-                    $this->ePrescriptionPackages = $this->ePrescriptionSelectedProduct['packages'];
-                    $minQty = $this->ePrescriptionPackages[0]['package_min_qty'] ?? 1;
-                    $multiples = [];
-                    for ($i = 1; $i <= 10; $i++) {
-                        $multiples[] = $minQty * $i;
-                    }
-                    $this->ePrescriptionMultiples = $multiples;
+            $this->ePrescriptionSelectedProduct = $this->resolveDrugForActivity($activity);
+            if ($this->ePrescriptionSelectedProduct && !empty($this->ePrescriptionSelectedProduct['packages'])) {
+                $this->ePrescriptionPackages = $this->ePrescriptionSelectedProduct['packages'];
+                $minQty = $this->resolveMedicationPackageStep($this->ePrescriptionSelectedProduct);
+                $multiples = [];
+                for ($i = 1; $i <= 10; $i++) {
+                    $multiples[] = $minQty * $i;
                 }
+                $this->ePrescriptionMultiples = $multiples;
             }
         } catch (\Exception $e) {
             Log::warning('CarePlanShow: failed to fetch drug details: ' . $e->getMessage());
@@ -80,16 +95,11 @@ trait ManagesCarePlanEPrescription
         $this->ePrescriptionSelectedProgram = null;
         $this->ePrescriptionSkipTreatmentPeriod = true;
         if (!empty($activity->program)) {
-            try {
-                $response = EHealth::medicalProgram()->getMany(['id' => $activity->program]);
-                $data = $response->getData();
-                if (!empty($data)) {
-                    $this->ePrescriptionSelectedProgram = $data[0];
-                    $settings = $this->ePrescriptionSelectedProgram['settings'] ?? [];
-                    $this->ePrescriptionSkipTreatmentPeriod = filter_var($settings['skip_treatment_period'] ?? true, FILTER_VALIDATE_BOOLEAN);
-                }
-            } catch (\Exception $e) {
-                Log::warning('CarePlanShow: failed to fetch medical program: ' . $e->getMessage());
+            $program = dictionary()->medicalPrograms()->firstWhere('id', $activity->program);
+            if ($program) {
+                $this->ePrescriptionSelectedProgram = $program;
+                $settings = $this->ePrescriptionSelectedProgram['settings'] ?? [];
+                $this->ePrescriptionSkipTreatmentPeriod = filter_var($settings['skip_treatment_period'] ?? true, FILTER_VALIDATE_BOOLEAN);
             }
         }
 
@@ -104,13 +114,57 @@ trait ManagesCarePlanEPrescription
         }
 
         $issuedQty = \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::where('based_on_id', $activity->id)
-            ->whereNotIn('status', ['cancelled', 'rejected', 'declined', 'entered-in-error'])
+            ->whereNotIn('status', \App\Repositories\MedicalEvents\MedicalEventsRequestStatuses::EXCLUDED_FROM_ISSUED_SUM)
             ->sum('medication_qty');
 
-        $activityQty = (float) $activity->quantity;
-        $this->ePrescriptionRemainingQty = max(0.0, $activityQty - $issuedQty);
+        $activityQty = $activity->quantity;
+        $this->ePrescriptionRemainingQty = $activityQty === null
+            ? 1.0
+            : max(0.0, (float) $activityQty - (float) $issuedQty);
+
+        try {
+            $eHealthActivity = EHealth::carePlanActivity()->getDetails(
+                (string) $this->carePlan->person->uuid,
+                (string) $this->carePlan->uuid,
+                (string) $activity->uuid
+            )->getData();
+            $eHealthRemaining = data_get($eHealthActivity, 'detail.remaining_quantity.value');
+            if ($eHealthRemaining !== null) {
+                $this->ePrescriptionRemainingQty = max(0.0, (float) $eHealthRemaining);
+            }
+        } catch (\Exception $e) {
+            Log::warning('CarePlanShow: failed to fetch eHealth activity remaining qty: ' . $e->getMessage());
+        }
+
+        if ($activityQty === null) {
+            $this->ePrescriptionWarningMessage = 'У призначенні плану лікування не вказано кількість. Перевірте дані в ЕСОЗ перед підписанням рецепту.';
+        }
 
         $unit = $this->ePrescriptionSelectedProduct['innm_dosage_form'] ?? 'од.';
+        $packageStep = $this->resolveMedicationPackageStep($this->ePrescriptionSelectedProduct ?? []);
+
+        if ($packageStep > 0 && $this->ePrescriptionRemainingQty > 0 && $this->ePrescriptionRemainingQty < $packageStep) {
+            $message = __('care-plan.medication_remaining_below_packaging', [
+                'remaining' => $this->ePrescriptionRemainingQty,
+                'count' => $packageStep,
+            ]);
+            $this->dispatch('flashMessage', ['type' => 'error', 'message' => $message]);
+
+            return;
+        }
+
+        $defaultQty = !empty($this->ePrescriptionMultiples)
+            ? $this->ePrescriptionMultiples[0]
+            : $packageStep;
+
+        if ($this->ePrescriptionRemainingQty > 0 && $defaultQty > $this->ePrescriptionRemainingQty) {
+            $defaultQty = $this->ePrescriptionRemainingQty;
+            if (!$this->isMedicationQtyDivisible($defaultQty, $this->ePrescriptionSelectedProduct ?? [])) {
+                $defaultQty = $packageStep <= $this->ePrescriptionRemainingQty
+                    ? $packageStep
+                    : $this->ePrescriptionRemainingQty;
+            }
+        }
 
         $this->ePrescriptionForm = [
             'activity_id' => $activity->id,
@@ -118,7 +172,7 @@ trait ManagesCarePlanEPrescription
             'started_at' => now()->format('d.m.Y'),
             'duration' => 10,
             'ended_at' => '',
-            'medication_qty' => !empty($this->ePrescriptionMultiples) ? $this->ePrescriptionMultiples[0] : min($this->ePrescriptionRemainingQty, 10.0),
+            'medication_qty' => $defaultQty,
             'medication_unit' => $unit,
             'signature_text' => '',
             'max_dose_per_period' => (float) $activity->daily_amount ?: 1.0,
@@ -192,6 +246,15 @@ trait ManagesCarePlanEPrescription
 
         $qty = (float) $this->ePrescriptionForm['medication_qty'];
         $maxDosage = (float) ($this->ePrescriptionSelectedProduct['packages'][0]['max_request_dosage'] ?? ($this->ePrescriptionSelectedProduct['max_request_dosage'] ?? 0));
+        $packageStep = $this->resolveMedicationPackageStep($this->ePrescriptionSelectedProduct ?? []);
+
+        if ($packageStep > 0 && !$this->isMedicationQtyDivisible($qty, $this->ePrescriptionSelectedProduct ?? [])) {
+            $message = __('care-plan.medication_qty_packaging', ['count' => $packageStep]);
+            $this->ePrescriptionWarningMessage = $message;
+            $this->dispatch('flashMessage', ['type' => 'error', 'message' => $message]);
+
+            return;
+        }
 
         if ($maxDosage > 0 && $qty > $maxDosage) {
             $unit = $this->ePrescriptionForm['medication_unit'] ?? '';
@@ -200,7 +263,7 @@ trait ManagesCarePlanEPrescription
             return;
         }
 
-        if ($qty > $this->ePrescriptionRemainingQty) {
+        if ($qty > $this->ePrescriptionRemainingQty && $this->ePrescriptionSelectedActivity['quantity'] !== null) {
             $this->ePrescriptionWarningMessage = "Кількість ЛЗ в рецепті ({$qty}) перевищує залишкову кількість у плані лікування ({$this->ePrescriptionRemainingQty}). Виписування неможливе.";
 
             return;
@@ -250,11 +313,13 @@ trait ManagesCarePlanEPrescription
     public function submitEPrescriptionRequest(): void
     {
         try {
+            $employee = Auth::user()?->activeDoctorEmployee();
             $uuids = [
                 'person_uuid' => $this->carePlan->person->uuid,
                 'encounter_uuid' => $this->carePlan->encounter?->uuid ?? null,
-                'employee_uuid' => Auth::user()?->activeDoctorEmployee()?->uuid,
-                'legal_entity_uuid' => Auth::user()?->activeDoctorEmployee()?->legalEntity?->uuid,
+                'employee_uuid' => $employee?->uuid,
+                'legal_entity_uuid' => $employee?->legalEntity?->uuid,
+                'division_uuid' => $employee?->division?->uuid,
             ];
 
             $dbData = [
@@ -271,7 +336,7 @@ trait ManagesCarePlanEPrescription
                         'sequence' => 1,
                         'text' => $this->ePrescriptionForm['signature_text'],
                         'as_needed_boolean' => false,
-                        'route' => 'oral',
+                        'route' => '26643006',
                         'dose_and_rate' => [
                             [
                                 'dose_quantity_value' => (float) $this->ePrescriptionForm['max_dose_per_administration'],
@@ -288,16 +353,9 @@ trait ManagesCarePlanEPrescription
             ];
 
             $mapper = new \App\Services\MedicalEvents\Mappers\MedicationRequestMapper();
-            $fhirPayload = $mapper->toFhir($dbData, $uuids);
+            $apiPayload = $mapper->toCreateRequestPayload($dbData, $uuids, $this->carePlan->uuid);
 
-            $informWithId = explode('|', $this->ePrescriptionForm['inform_with'])[0];
-            $fhirPayload['inform_with'] = [
-                'identifier' => [
-                    'value' => $informWithId
-                ]
-            ];
-
-            $response = EHealth::medicationRequest()->createRequest($this->carePlan->person->uuid, $fhirPayload);
+            $response = EHealth::medicationRequest()->createRequest($apiPayload);
             $responseData = $response->getData();
 
             $dbData['employee_id'] = Auth::user()?->activeDoctorEmployee()?->id;
@@ -314,6 +372,12 @@ trait ManagesCarePlanEPrescription
             $this->ePrescriptionRequestIdToSign = $dbData['uuid'];
             $this->openSignatureModal('sign_eprescription');
 
+        } catch (EHealthValidationException $exception) {
+            $exception->report();
+            $this->dispatch('flashMessage', [
+                'type' => 'error',
+                'message' => $exception->getTranslatedMessage(),
+            ]);
         } catch (\Exception $e) {
             Log::error('CarePlanShow: failed to create ePrescription: ' . $e->getMessage());
             $this->dispatch('flashMessage', ['type' => 'error', 'message' => 'Не вдалося створити заявку на рецепт: ' . $e->getMessage()]);
@@ -382,7 +446,6 @@ trait ManagesCarePlanEPrescription
             );
 
             $eHealthResponse = EHealth::medicationRequest()->signRequest(
-                $this->carePlan->person->uuid,
                 $requestRecord->uuid,
                 [
                     'signed_data' => $signedContent,
@@ -391,20 +454,9 @@ trait ManagesCarePlanEPrescription
             );
 
             $responseData = $eHealthResponse->getData();
-            $finalResponse = $responseData;
+            $finalResponse = app(EHealthJobResolver::class)->resolve($responseData);
 
-            if (isset($responseData['links'][0]['href']) && str_contains($responseData['links'][0]['href'], '/jobs/')) {
-                $jobId = str_replace('/jobs/', '', $responseData['links'][0]['href']);
-                $jobApi = EHealth::job();
-                $attempts = 0;
-                do {
-                    sleep(2);
-                    $finalResponse = $jobApi->getDetails($jobId)->getData();
-                    $attempts++;
-                } while ($finalResponse['status'] === 'pending' && $attempts < 15);
-            }
-
-            if (($finalResponse['status'] ?? null) === 'failed') {
+            if (in_array(strtolower((string) ($finalResponse['status'] ?? '')), ['failed', 'error'], true)) {
                 throw new EHealthValidationException($finalResponse);
             }
 
@@ -433,7 +485,9 @@ trait ManagesCarePlanEPrescription
             $authMethodName = explode('|', $informWithVal)[1] ?? 'OTP';
             $phoneNumber = explode('|', $informWithVal)[2] ?? '';
 
-            if (strtoupper($authMethodName) === 'OTP' || strtoupper($authMethodName) === 'THIRD_PERSON') {
+            if (in_array(strtolower((string) $finalStatus), ['pending', 'processing'], true)) {
+                $successMsg = 'Запит на е-рецепт прийнято в обробку ЕСОЗ. Фінальний статус та номер рецепта з’являться після завершення асинхронної задачі.';
+            } elseif (strtoupper($authMethodName) === 'OTP' || strtoupper($authMethodName) === 'THIRD_PERSON') {
                 $successMsg = "Електронний рецепт № {$requestNumber} створено в електронній системі охорони здоров’я. Номер рецепта та код погашення надіслано в СМС-повідомленні на номер {$phoneNumber}. Не забудьте попередити про це пацієнта! При необхідності роздрукуйте інформаційну пам’ятку пацієнту.";
             } else {
                 $successMsg = "Електронний рецепт № {$requestNumber} створено в електронній системі охорони здоров’я. Код погашення зазначено в друкованій інформаційній пам’ятці. Не забудьте повідомити дані пацієнту та обов`язково роздрукувати інформаційну пам’ятку з кодом погашення!";
@@ -570,5 +624,59 @@ trait ManagesCarePlanEPrescription
             Log::error('CarePlanShow: failed to load printout form: ' . $e->getMessage());
             $this->dispatch('flashMessage', ['type' => 'error', 'message' => 'Не вдалося завантажити форму пам’ятки.']);
         }
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function resolveDrugForActivity(\App\Models\CarePlanActivity $activity): ?array
+    {
+        if (empty($activity->product_reference)) {
+            return null;
+        }
+
+        $filters = ['innm_dosage_id' => $activity->product_reference];
+        if (!empty($activity->program)) {
+            $filters['medical_program_id'] = $activity->program;
+        }
+
+        $data = EHealth::drug()->getMany($filters)->getData();
+        if (!empty($data[0])) {
+            return $data[0];
+        }
+
+        $fallback = EHealth::drug()->getMany(['innm_id' => $activity->product_reference])->getData();
+
+        return $fallback[0] ?? null;
+    }
+
+    protected function resolveMedicationPackageStep(array $drug): float
+    {
+        $packages = $drug['packages'] ?? [];
+        if (!is_array($packages) || empty($packages)) {
+            return 1.0;
+        }
+
+        $package = $packages[0];
+        $minQty = (float) ($package['package_min_qty'] ?? 0);
+        if ($minQty > 0) {
+            return $minQty;
+        }
+
+        $packageQty = (float) ($package['package_qty'] ?? 0);
+
+        return $packageQty > 0 ? $packageQty : 1.0;
+    }
+
+    protected function isMedicationQtyDivisible(float $qty, array $drug): bool
+    {
+        $step = $this->resolveMedicationPackageStep($drug);
+        if ($step <= 0) {
+            return true;
+        }
+
+        $quotient = $qty / $step;
+
+        return abs($quotient - round($quotient)) < 1e-6;
     }
 }

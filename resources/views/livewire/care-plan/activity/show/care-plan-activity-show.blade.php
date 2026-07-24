@@ -6,21 +6,13 @@
     </x-header-navigation>
 
     @php
-        $kindValue = '';
-        if ($activity->kindConcept) {
-            $kindValue = $activity->kindConcept->coding->first()?->code ?? $activity->kindConcept->text ?? '';
-        } elseif (is_array($activity->kind)) {
-            $kindValue = $activity->kind['coding'][0]['code'] ?? $activity->kind['text'] ?? '';
-        } else {
-            $kindValue = $activity->kind ?? '';
-        }
-
+        $resolvedKind = $activity->resolvedKind();
         $activityStatus = is_array($activity->status) ? ($activity->status['coding'][0]['code'] ?? ($activity->status['text'] ?? '')) : $activity->status;
     @endphp
 
     <div x-data="{
-        showEPrescriptionDrawer: @entangle('showEPrescriptionDrawer'),
-        showReferralDrawer: @entangle('showReferralDrawer'),
+        showEPrescriptionDrawer: @entangle('showEPrescriptionDrawer').live,
+        showReferralDrawer: @entangle('showReferralDrawer').live,
     }"
     @close-drawers.window="showEPrescriptionDrawer = false; showReferralDrawer = false;"
     class="form shift-content px-4 space-y-6">
@@ -32,13 +24,13 @@
             </a>
 
             @if(in_array(strtoupper($activityStatus), ['NEW', 'DRAFT']))
-                <a href="{{ route('care-plans.activities.edit', [legalEntity(), $carePlan->id, $activity->id]) }}" class="button-minor" wire:navigate>Редагувати</a>
+                <a href="{{ route('care-plans.show', [legalEntity(), $carePlan->id]) }}" class="button-minor" wire:navigate>Редагувати</a>
                 <button type="button" class="button-primary-outline" wire:click="openSignatureModal('sign_activity', {{ $activity->id }})">Підписати призначення</button>
             @elseif(in_array(strtoupper($activityStatus), ['ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD', 'PROCESSED']))
-                @if(str_contains(strtolower($kindValue), 'medication'))
+                @if($resolvedKind === 'medication_request')
                     <button type="button" class="button-primary" wire:click="initEPrescriptionForm({{ $activity->id }})">Виписати Е-Рецепт</button>
                 @endif
-                @if(str_contains(strtolower($kindValue), 'service_request') || str_contains(strtolower($kindValue), 'device_request'))
+                @if(in_array($resolvedKind, ['service_request', 'device_request'], true))
                     <button type="button" class="button-primary" wire:click="initReferralForm({{ $activity->id }})">Створити направлення</button>
                 @endif
                 <button type="button" class="button-minor" wire:click="openSignatureModal('complete_activity', {{ $activity->id }})">Завершити</button>
