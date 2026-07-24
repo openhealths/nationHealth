@@ -102,12 +102,22 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $this->employeeRequestId = $this->employeeRequest->id;
 
             $this->flashSuccess(__('forms.employee_request_saved_successfully'));
-            $this->dispatch('open-signature-modal');
+            // 3.23.1.4 — review submitted fields before KEP
+            $this->dispatch('open-request-preview-modal');
         } catch (ValidationException $e) {
             $this->handleValidationException($e);
         } catch (Exception $e) {
             $this->handleGeneralException($e);
         }
+    }
+
+    /**
+     * Continue from pre-KEP preview to the signature modal.
+     */
+    public function proceedToSigning(): void
+    {
+        $this->dispatch('close-request-preview-modal');
+        $this->dispatch('open-signature-modal');
     }
 
     public function sign()
@@ -129,10 +139,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $eHealthResponseAsArray = new EHealthEmployeeRequest()->create($signedContent);
 
             if (isset($eHealthResponseAsArray['error'])) {
-
-                throw new EHealthValidationException(
-                    $eHealthResponseAsArray['error']['message'] ?? 'E-Health Validation Failed'
-                );
+                throw new EHealthValidationException($eHealthResponseAsArray);
             }
 
             $validatedData = $eHealthResponseAsArray;
@@ -239,7 +246,8 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
                 'uuid' => $uuid,
                 'legal_entity_uuid' => $legalEntity->uuid,
                 'inserted_at' => Carbon::parse($insertedAt)->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
-                'status' => RequestStatus::SIGNED,
+                // Keep NEW to match eHealth Create Employee Request (list API has no SIGNED).
+                'status' => RequestStatus::NEW,
                 'sync_status' => JobStatus::PARTIAL,
                 'division_id' => $request->division_id,
                 'division_uuid' => Arr::get($eHealthResponse, 'ehealth_response.data.division_id', null),
@@ -261,6 +269,20 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     {
         $employeeChunk = Arr::only($flatData, ['position', 'employee_type', 'start_date', 'end_date', 'division_id']);
         $partyChunk = Arr::only($flatData, ['last_name', 'first_name', 'second_name', 'gender', 'birth_date', 'tax_id', 'no_tax_id', 'email', 'working_experience', 'about_myself']);
+
+        // Backend enforcement: if party data is partially locked, always restore the original tax_id
+        // to prevent accidental or malicious RNOKPP changes via form manipulation.
+        if ($this->isPartyDataPartiallyLocked) {
+            $originalTaxId = $this->employeeRequest?->party?->tax_id
+                ?? $this->employee?->party?->tax_id
+                ?? null;
+
+            if ($originalTaxId !== null) {
+                $partyChunk['tax_id'] = $originalTaxId;
+                $partyChunk['no_tax_id'] = false;
+            }
+        }
+
         $documentsChunk = $flatData['documents'] ?? [];
         $phonesChunk = $flatData['phones'] ?? [];
 
@@ -515,7 +537,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
      */
     public function resetSignatureFields(): void
     {
-        $this->form->reset('keyContainerUpload', 'password', 'knedp');
+        $this->form->reset('keyContainerUpload', 'keyContainerFileName', 'password', 'knedp');
     }
 
     /**
@@ -528,7 +550,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $this->form->documents,
             fn ($document) => !empty($document['number']) && in_array(
                 $document['type'],
-                ['PASSPORT', 'NATIONAL_ID', 'REFUGEE_CERTIFICATE']
+                ['PASSPORT', 'NATIONAL_ID', 'REFUGEE_CERTIFICATE', 'PERMANENT_RESIDENCE_PERMIT']
             )
         );
 
@@ -559,7 +581,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         }
 
         foreach ($this->form->documents as $document) {
-            if (!empty($document['number']) && in_array($document['type'], ['PASSPORT', 'NATIONAL_ID', 'REFUGEE_CERTIFICATE'])) {
+            if (!empty($document['number']) && in_array($document['type'], ['PASSPORT', 'NATIONAL_ID', 'REFUGEE_CERTIFICATE', 'PERMANENT_RESIDENCE_PERMIT'])) {
                 $this->form->party['taxId'] = $document['number'];
 
                 return;
@@ -671,11 +693,13 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     protected function flashSuccess(string $message): void
     {
         session()->flash('success', $message);
+        $this->dispatch('flashMessage', ['message' => $message, 'type' => 'success']);
     }
 
     protected function flashError(string $message): void
     {
         session()->flash('error', $message);
+        $this->dispatch('flashMessage', ['message' => $message, 'type' => 'error']);
     }
 
     private function handleConnectionException(EHealthConnectionException $e): void
