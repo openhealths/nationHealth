@@ -120,8 +120,7 @@ class CarePlanCreate extends BasePatientComponent
 
         $person = Person::find($this->personId);
         if ($person) {
-            $name = $person->primary_name;
-            $this->form->patient = $name ? trim($name->last_name . ' ' . $name->first_name . ' ' . ($name->second_name ?? '')) : '';
+            $this->form->patient = $person->fullName;
             $this->form->medical_number = (string) ((CarePlan::max('id') ?? 0) + 1);
 
             // Load actual authentication methods from eHealth
@@ -929,7 +928,7 @@ class CarePlanCreate extends BasePatientComponent
             // If eHealth did not create approval automatically (e.g. due to missing declaration),
             // we immediately request authentication methods and propose to create approval manually.
             try {
-                $this->authMethods = EHealth::person()->getAuthMethods($this->uuid)->getData();
+                $this->authMethods = EHealth::person()->getAuthMethods($this->patientUuid)->getData();
                 if (!empty($this->authMethods)) {
                     $this->showMethodSelectionModal = true;
                     session()->flash('success', 'План успішно створено. Будь ласка, оберіть метод підтвердження для створення дозволу пацієнта.');

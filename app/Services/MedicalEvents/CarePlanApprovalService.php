@@ -158,6 +158,24 @@ class CarePlanApprovalService
 
         $status = strtoupper((string) ($link->job->status ?? ''));
 
+        if ($status === 'PENDING') {
+            try {
+                $jobUuid = basename($link->href);
+                $response = EHealth::job()->getDetails($jobUuid);
+                $responseData = $response->getData();
+
+                $newStatus = strtoupper($responseData['status'] ?? 'PENDING');
+                if ($newStatus !== 'PENDING') {
+                    $link->job()->update(['status' => $newStatus, 'response_data' => $responseData]);
+                    $link->update(['status' => $newStatus]);
+                    $status = $newStatus;
+                    $link->setRelation('job', $link->job->refresh());
+                }
+            } catch (\Exception $e) {
+                Log::warning('CarePlanApprovalService: Failed to fetch job details from eHealth during polling: ' . $e->getMessage());
+            }
+        }
+
         if ($status === 'FAILED') {
             return new CarePlanApprovalJobStatusResult(
                 CarePlanApprovalJobOutcome::Failed,
@@ -279,13 +297,10 @@ class CarePlanApprovalService
         return is_string($id) || is_numeric($id) ? (string) $id : null;
     }
 
-    /**
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>|null
-     */
     private function extractAuthMethod(array $data): ?array
     {
-        $method = $data['response_data']['authentication_method_current']
+        $method = $data['response']['body']['data']['authentication_method_current']
+            ?? $data['response_data']['authentication_method_current']
             ?? $data['data']['authentication_method_current']
             ?? $data['authentication_method_current']
             ?? $data['urgent']['authentication_method_current']
