@@ -32,3 +32,14 @@ GEMINI.md
 .github/copilot-instructions.md
 .github/skills/
 .vscode/mcp.json
+
+# Local Postgres dumps & agent worktrees (never commit)
+/storage/db-dumps/
+/storage/cli-testing/
+.worktrees/
+
+# Spec Kit install/scaffold (local only) — do not commit
+.specify/
+# Feature specs are tracked under specs/
+# Cursor skills stay under ignored .cursor/ — regenerate via:
+#   specify init --here --force --integration cursor-agent --script sh --ignore-agent-tools
