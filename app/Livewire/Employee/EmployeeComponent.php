@@ -281,4 +281,55 @@ abstract class EmployeeComponent extends Component
             }
         }
     }
+
+    #[Computed]
+    public function canEnableNoTaxId(): bool
+    {
+        return array_any(
+            $this->form->documents,
+            fn ($document) => !empty($document['number']) && in_array(
+                $document['type'],
+                ['PASSPORT', 'NATIONAL_ID', 'REFUGEE_CERTIFICATE', 'PERMANENT_RESIDENCE_PERMIT']
+            )
+        );
+    }
+
+    /**
+     * Handles the click event on the "no tax ID" checkbox.
+     */
+    public function toggleNoTaxId(): void
+    {
+        if ($this->canEnableNoTaxId) {
+            $this->form->party['noTaxId'] = !$this->form->party['noTaxId'];
+            $this->syncTaxIdFromDocument();
+        } else {
+            $this->flashError(__('forms.no_tax_id_document_required'));
+            $this->dispatch('scroll-to-element', selector: '#section-documents');
+            $this->dispatch('highlight-section', selector: '#section-documents');
+        }
+    }
+
+    /**
+     * Syncs the Tax ID field with the number from a suitable document.
+     */
+    public function syncTaxIdFromDocument(): void
+    {
+        if (($this->form->party['noTaxId'] ?? false) === false) {
+            return;
+        }
+
+        foreach ($this->form->documents as $document) {
+            if (!empty($document['number']) && in_array($document['type'], ['PASSPORT', 'NATIONAL_ID', 'REFUGEE_CERTIFICATE', 'PERMANENT_RESIDENCE_PERMIT'])) {
+                $this->form->party['taxId'] = $document['number'];
+
+                return;
+            }
+        }
+    }
+
+    protected function flashError(string $message): void
+    {
+        session()->flash('error', $message);
+        $this->dispatch('flashMessage', ['message' => $message, 'type' => 'error']);
+    }
 }

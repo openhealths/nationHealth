@@ -1,17 +1,8 @@
 @use('App\Enums\JobStatus')
 
 <div>
-    {{-- 1. DEFINE PERMISSIONS --}}
     @php
-        $currentUser = auth()->user();
-
-       $permissions = [
-        'request_view'   => $currentUser->can('employee_request:read'),
-        'request_write'  => $currentUser->can('employee_request:write'),
-        'request_delete' => $currentUser->can('employee_request:write'),
-
-        'employee_view' => false, 'employee_write' => false, 'employee_deactivate' => false
-    ];
+        $permissions = $this->indexPermissions;
     @endphp
 
     <x-header-navigation class="items-start">
@@ -64,17 +55,23 @@
                     <table class="index-table">
                         <thead class="index-table-thead">
                         <tr>
-                            <th class="index-table-th w-[25%]">{{ __('forms.full_name') }}</th>
-                            <th class="index-table-th w-[20%]">{{ __('forms.role') }}</th>
-                            <th class="index-table-th w-[20%]">{{ __('forms.division') }}</th>
-                            <th class="index-table-th w-[15%]">{{ __('forms.created_at') }}</th>
-                            <th class="index-table-th w-[14%]">{{ __('forms.status.label') }}</th>
-                            <th class="index-table-th w-[6%]">{{ __('forms.action') }}</th>
+                            <th class="index-table-th w-[12%]">{{ __('forms.request_id') }}</th>
+                            <th class="index-table-th w-[22%]">{{ __('forms.full_name') }}</th>
+                            <th class="index-table-th w-[16%]">{{ __('forms.role') }}</th>
+                            <th class="index-table-th w-[16%]">{{ __('forms.division') }}</th>
+                            <th class="index-table-th w-[14%]">{{ __('forms.created_at') }}</th>
+                            <th class="index-table-th w-[12%]">{{ __('forms.status.label') }}</th>
+                            <th class="index-table-th w-[8%]">{{ __('forms.action') }}</th>
                         </tr>
                         </thead>
                         <tbody>
                         @foreach($requests as $request)
                             <tr class="index-table-tr">
+                                <td class="index-table-td">
+                                    <span class="font-mono text-xs" title="{{ $request->uuid ?? $request->id }}">
+                                        {{ $request->uuid ?? $request->id }}
+                                    </span>
+                                </td>
                                 <td class="index-table-td-primary">
                                     @php
                                         $data = $request->revision->data ?? [];
@@ -103,14 +100,12 @@
                                 </td>
 
                                 <td class="index-table-td">
-                                    @if($request->status == \App\Enums\Employee\RequestStatus::NEW)
-                                        <span class="badge-red">{{ $request->status->label() }}</span>
-                                    @elseif($request->status == \App\Enums\Employee\RequestStatus::SIGNED)
-                                        <span class="badge-yellow">{{ $request->status->label() }}</span>
-                                    @elseif($request->status == \App\Enums\Employee\RequestStatus::APPROVED)
-                                        <span class="badge-green">{{ $request->status->label() }}</span>
-                                    @else
-                                        <span class="badge-gray">{{ $request->status->label() }}</span>
+                                    @if($request->isLocalDraft())
+                                        <span class="badge-red">{{ __('forms.status.draft') }}</span>
+                                    @elseif($request->isPendingEhealth())
+                                        <span class="{{ $request->status->color() }}">{{ __('forms.status.new') }}</span>
+                                    @elseif($request->status)
+                                        <span class="{{ $request->status->color() }}">{{ $request->status->label() }}</span>
                                     @endif
                                 </td>
 

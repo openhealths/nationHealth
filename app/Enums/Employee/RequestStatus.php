@@ -22,14 +22,24 @@ enum RequestStatus: string
             self::NEW => 'Новий',
             self::APPROVED => 'Підтверджено',
             self::REJECTED => 'Відхилено',
-            self::SIGNED => 'Підписано в ЕСОЗ',
+            // Legacy local-only; UI for pending uses isPendingEhealth() → «Новий».
+            self::SIGNED => 'Надіслано',
             self::EXPIRED => 'Протермінований',
         };
     }
 
+    public function color(): string
+    {
+        return match ($this) {
+            self::NEW, self::SIGNED => 'badge-yellow',
+            self::APPROVED => 'badge-green',
+            self::REJECTED, self::EXPIRED => 'badge-red',
+        };
+    }
+
     /**
-     * Returns an array of statuses pending
-     * final synchronization upon user login.
+     * Statuses that may still need sync against eHealth after login.
+     * NEW covers drafts and submitted-but-unresolved requests; SIGNED is legacy.
      */
     public static function getStatusesForSync(): array
     {
@@ -37,5 +47,18 @@ enum RequestStatus: string
             self::NEW->value,
             self::SIGNED->value,
         ];
+    }
+
+    /**
+     * Statuses shown in employee-request list filters (SIGNED is legacy, not selectable).
+     *
+     * @return list<self>
+     */
+    public static function filterChoices(): array
+    {
+        return array_values(array_filter(
+            self::cases(),
+            static fn (self $status): bool => $status !== self::SIGNED
+        ));
     }
 }
