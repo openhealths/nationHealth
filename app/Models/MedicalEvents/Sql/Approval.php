@@ -184,7 +184,7 @@ class Approval extends Model
             ];
         }
 
-        if ($this->granted_to_type === 'employee') {
+        if (strtolower($this->granted_to_type ?? '') === 'employee') {
             $employee = Employee::where('uuid', $uuid)->with('party', 'specialities')->first();
 
             if ($employee) {
@@ -224,7 +224,7 @@ class Approval extends Model
             }
         }
 
-        if ($this->granted_to_type === 'legal_entity') {
+        if (strtolower($this->granted_to_type ?? '') === 'legal_entity') {
             $legalEntity = \App\Models\LegalEntity::where('uuid', $uuid)->first();
 
             if ($legalEntity) {
