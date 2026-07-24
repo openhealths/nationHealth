@@ -137,7 +137,34 @@ class PrepersonMerge extends Component
         $this->prepersonId = $preperson->id;
         $this->prepersonUuid = $preperson->uuid;
 
+        $this->loadActiveMergeRequest();
+
         $this->getDictionary();
+    }
+
+    /**
+     * Load this preperson's active merge request into state so the doctor can resume it from the merge requests
+     * table without starting a new one: a NEW request resumes at the confirmation step, an APPROVED one resumes
+     * at signing (restoring the consent document persisted on approve).
+     *
+     * @return void
+     */
+    private function loadActiveMergeRequest(): void
+    {
+        $activeMergeRequest = MergeRequest::whereMergePersonId($this->prepersonId)
+            ->whereIn('status', [MergeRequestStatus::NEW->value, MergeRequestStatus::APPROVED->value])
+            ->latest('ehealth_inserted_at')
+            ->first();
+
+        if ($activeMergeRequest === null) {
+            return;
+        }
+
+        $this->mergeRequest = ['uuid' => $activeMergeRequest->uuid];
+
+        if ($activeMergeRequest->status === MergeRequestStatus::APPROVED) {
+            $this->dataToBeSigned = $activeMergeRequest->dataToBeSigned ?? [];
+        }
     }
 
     /**
@@ -261,18 +288,22 @@ class PrepersonMerge extends Component
 
         $mergeRequest = $response->validate();
 
-        $this->storeMasterPersonLocally();
+        $masterPersonId = $this->storeMasterPersonLocally();
 
         try {
             // Cancel any earlier NEW or APPROVED merge requests for this preperson before storing the new one,
             // so only the latest request stays active.
-            MergeRequest::wherePrepersonId($this->prepersonId)
+            MergeRequest::whereMergePersonId($this->prepersonId)
                 ->whereIn('status', [MergeRequestStatus::NEW->value, MergeRequestStatus::APPROVED->value])
-                ->update(['status' => MergeRequestStatus::CANCELLED->value]);
+                ->update([
+                    'status' => MergeRequestStatus::CANCELLED->value,
+                    'data_to_be_signed' => null
+                ]);
 
             MergeRequest::create([
                 ...$mergeRequest,
-                'preperson_id' => $this->prepersonId
+                'master_person_id' => $masterPersonId,
+                'merge_person_id' => $this->prepersonId
             ]);
         } catch (Throwable $exception) {
             Session::flash('error', __('messages.database_error'));
@@ -292,10 +323,10 @@ class PrepersonMerge extends Component
     /**
      * Approve the created merge request with the code the patient received via SMS.
      *
-     * @param  string  $verificationCode
+     * @param  int  $verificationCode
      * @return bool
      */
-    public function approve(string $verificationCode): bool
+    public function approve(int $verificationCode): bool
     {
         if (Auth::user()->cannot('create', MergeRequest::class)) {
             Session::flash('error', __('preperson.policy.approve'));
@@ -306,7 +337,7 @@ class PrepersonMerge extends Component
         try {
             Validator::make(
                 ['verificationCode' => $verificationCode],
-                ['verificationCode' => ['required', 'string', 'size:4']]
+                ['verificationCode' => ['required', 'integer']]
             )->validate();
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
@@ -409,6 +440,7 @@ class PrepersonMerge extends Component
 
             MergeRequest::whereUuid($this->mergeRequest['uuid'])->update([
                 'status' => $validated['status'],
+                'data_to_be_signed' => null,
                 'ehealth_updated_at' => $validated['ehealth_updated_at'],
                 'ehealth_updated_by' => $validated['ehealth_updated_by']
             ]);
@@ -485,6 +517,7 @@ class PrepersonMerge extends Component
             DB::transaction(function () use ($validated): void {
                 MergeRequest::whereUuid($this->mergeRequest['uuid'])->update([
                     'status' => $validated['status'],
+                    'data_to_be_signed' => null,
                     'ehealth_updated_at' => $validated['ehealth_updated_at'],
                     'ehealth_updated_by' => $validated['ehealth_updated_by']
                 ]);
@@ -552,16 +585,16 @@ class PrepersonMerge extends Component
     }
 
     /**
-     * Ensure the chosen identified patient exists in the local persons table.
+     * Ensure the chosen identified patient exists in the local persons table and return its local id.
      *
-     * @return void
+     * @return int|null
      */
-    private function storeMasterPersonLocally(): void
+    private function storeMasterPersonLocally(): ?int
     {
         $patient = collect($this->mergeSearchPatients)->firstWhere('id', $this->selectedPersonId);
 
         if (empty($patient)) {
-            return;
+            return null;
         }
 
         $patient = Arr::toSnakeCase($patient);
@@ -581,8 +614,12 @@ class PrepersonMerge extends Component
                     $person->phones()->createMany($patient['phones']);
                 }
             }
+
+            return $person->id;
         } catch (Throwable $exception) {
             report($exception);
+
+            return null;
         }
     }
 
@@ -608,6 +645,7 @@ class PrepersonMerge extends Component
         try {
             MergeRequest::whereUuid($this->mergeRequest['uuid'])->update([
                 'status' => $validated['status'],
+                'data_to_be_signed' => $this->dataToBeSigned,
                 'ehealth_updated_at' => $validated['ehealth_updated_at'],
                 'ehealth_updated_by' => $validated['ehealth_updated_by']
             ]);

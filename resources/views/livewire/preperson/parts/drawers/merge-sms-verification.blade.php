@@ -22,16 +22,18 @@
     }">
 
         <div class="mt-8 space-y-8">
-            <div
-                class="p-6 rounded-xl bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-700/50 flex gap-3.5">
-                @icon('alert-circle', 'w-5 h-5 text-gray-500 dark:text-gray-400 shrink-0 mt-0.5')
-                <div class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                    {{ __('patients.please_check_patient_number') }}:
-                    <span class="font-semibold text-gray-900 dark:text-white">
-                    {{ data_get($this->selectedAuthMethod, 'phoneNumber') }}
-                </span>
+            @if(data_get($this->selectedAuthMethod, 'phoneNumber'))
+                <div
+                    class="p-6 rounded-xl bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-700/50 flex gap-3.5">
+                    @icon('alert-circle', 'w-5 h-5 text-gray-500 dark:text-gray-400 shrink-0 mt-0.5')
+                    <div class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                        {{ __('patients.please_check_patient_number') }}:
+                        <span class="font-semibold text-gray-900 dark:text-white">
+                            {{ data_get($this->selectedAuthMethod, 'phoneNumber') }}
+                        </span>
+                    </div>
                 </div>
-            </div>
+            @endif
 
             <div class="space-y-6">
                 <h4 class="text-lg font-bold text-gray-900 dark:text-white">
@@ -42,9 +44,11 @@
                     <div class="form-group group !mb-0 max-w-xs flex-1">
                         <input
                             type="text"
+                            inputmode="numeric"
+                            maxlength="4"
                             placeholder=" "
                             class="peer input !py-2.5"
-                            x-model="code"
+                            x-model.number="code"
                             id="mergeSmsCode"
                             autocomplete="off"
                         >
@@ -88,6 +92,7 @@
                 :disabled="!code"
                 @click="$wire.approve(code).then((approved) => {
                     if (approved) {
+                        $wire.$parent.$refresh();
                         showMergeSmsDrawer = false;
                         showMergeFinalConsentDrawer = true;
                     }

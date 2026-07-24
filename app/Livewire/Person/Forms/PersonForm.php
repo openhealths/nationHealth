@@ -310,7 +310,6 @@ class PersonForm extends BaseForm
         ];
 
         $this->normalizeNoTaxIdForForeignDocuments();
-        $this->addForeignTaxIdProhibition($rules);
         $this->validateNoTaxIdFlag();
         $this->addTaxIdUniquenessValidation($rules);
         $this->addNamesLastNameValidation($rules);
@@ -459,7 +458,6 @@ class PersonForm extends BaseForm
         $messages = [
             'person.unzr.required' => __('validation.custom.person.unzr_required_for_national_id'),
             'person.unzr.prohibited' => __('validation.custom.person.unzr_prohibited_for_foreign'),
-            'person.taxId.prohibited' => __('validation.custom.person.tax_id_prohibited_for_foreign'),
             'person.taxId.unique' => __('validation.custom.person.tax_id_already_used'),
             'person.documents.*.issuingCountry.required' => __(
                 'validation.custom.person.issuing_country_required_for_foreign'
@@ -825,7 +823,8 @@ class PersonForm extends BaseForm
     }
 
     /**
-     * When a foreign identity document is present and tax_id is missing, no_tax_id must be null rather than true.
+     * When a foreign identity document is present and tax_id is missing, no_tax_id must be null: the person has no
+     * Ukrainian tax number to refuse, so the flag does not apply.
      *
      * @return void
      */
@@ -842,28 +841,6 @@ class PersonForm extends BaseForm
 
         if ($hasForeignDocument) {
             $this->person['noTaxId'] = null;
-        }
-    }
-
-    /**
-     * When a foreign identity document is present and no_tax_id is null, tax_id must not be filled.
-     *
-     * @param  array  $rules
-     * @return void
-     */
-    private function addForeignTaxIdProhibition(array &$rules): void
-    {
-        if (($this->person['noTaxId'] ?? false) !== null) {
-            return;
-        }
-
-        $foreignTypes = config('ehealth.identity_document_types_foreign');
-
-        $hasForeignDocument = collect($this->person['documents'] ?? [])
-            ->contains(static fn (array $document): bool => in_array($document['type'] ?? null, $foreignTypes, true));
-
-        if ($hasForeignDocument) {
-            $rules['person.taxId'][] = 'prohibited';
         }
     }
 

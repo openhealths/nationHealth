@@ -10,6 +10,7 @@ use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\Preperson\Forms\PrepersonForm as Form;
 use App\Models\LegalEntity;
+use App\Models\MergeRequest;
 use App\Models\Preperson;
 use App\Traits\LogsExceptions;
 use Illuminate\Contracts\View\View;
@@ -194,6 +195,42 @@ class PrepersonData extends Component
     }
 
     /**
+     * Fetch the latest merge requests for this preperson from eHealth and refresh the local records.
+     *
+     * @param  Preperson  $preperson
+     * @return void
+     */
+    public function syncMergeRequests(Preperson $preperson): void
+    {
+        if (Auth::user()->cannot('create', MergeRequest::class)) {
+            Session::flash('error', __('preperson.policy.merge'));
+
+            return;
+        }
+
+        try {
+            $response = EHealth::mergeRequest()->getMergeRequests(['merge_person_id' => $preperson->uuid]);
+            $mergeRequests = $response->map($response->validate(), $preperson->id);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when fetching merge requests');
+
+            return;
+        }
+
+        try {
+            if (!empty($mergeRequests)) {
+                MergeRequest::upsert($mergeRequests, ['uuid'], new MergeRequest()->getFillable());
+            }
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Failed to sync merge requests');
+
+            return;
+        }
+
+        Session::flash('success', __('preperson.messages.merge_requests_synced'));
+    }
+
+    /**
      * Render the preperson data screen.
      *
      * @return View
@@ -202,8 +239,11 @@ class PrepersonData extends Component
     {
         return view('livewire.preperson.preperson-data')
             ->with([
-                'preperson' => Preperson::with(['insertedByUser.party', 'updatedByUser.party'])
-                    ->findOrFail($this->prepersonId)
+                'preperson' => Preperson::with([
+                    'insertedByUser.party',
+                    'updatedByUser.party',
+                    'mergeRequests.masterPerson.names'
+                ])->findOrFail($this->prepersonId)
             ]);
     }
 }

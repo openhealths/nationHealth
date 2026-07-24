@@ -41,6 +41,12 @@ class PersonRequest extends Request
 
         $data = $this->format($data, ['birthDate', 'issuedAt', 'expirationDate', 'activeTo']);
 
+        // no_tax_id is a required property that carries null for foreign documents without a tax_id;
+        // removeEmptyKeys strips that null, so restore the key here to keep it in the payload.
+        if (isset($data['person']) && !array_key_exists('no_tax_id', $data['person'])) {
+            $data['person']['no_tax_id'] = null;
+        }
+
         return $this->post(self::URL_V3, $data);
     }
 
@@ -192,7 +198,7 @@ class PersonRequest extends Request
             'person.gender' => ['required', new InDictionary('GENDER')],
             'person.email' => ['nullable', new Email()],
             'person.unzr' => ['nullable', 'string', 'max:255'],
-            'person.no_tax_id' => ['required', 'boolean:strict'],
+            'person.no_tax_id' => ['present', 'nullable', 'boolean:strict'],
             'person.phones.*.type' => ['required', new InDictionary('PHONE_TYPE')],
             'person.phones.*.number' => ['required', new PhoneNumber()],
             'person.secret' => ['required', 'string', 'max:255'],

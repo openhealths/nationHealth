@@ -32,61 +32,35 @@
     </x-slot>
 
     <div class="breadcrumb-form p-4 shift-content space-y-6">
-        <div class="form-row-3 items-center mt-5">
-            <div
-                class="form-group group relative"
-                x-data="{
-                    openPatientDropdown: false,
-                    selectedPatient: '{{ __('preperson.main_patient') }}',
-                    patientOptions: [
-                        '{{ __('preperson.main_patient') }}'
-                    ]
-                }"
-                @click.outside="openPatientDropdown = false"
-            >
-                <button
-                    type="button"
-                    class="input-select peer text-left w-full flex items-center justify-between"
-                    @click="openPatientDropdown = !openPatientDropdown"
-                >
-                    <span x-text="selectedPatient" class="truncate">
-                        {{ __('preperson.main_patient') }}
-                    </span>
-                </button>
+        @if($personId)
+            <div class="form-row-3 items-center mt-5">
+                <div class="form-group group relative">
+                    <select class="input-select peer w-full">
+                        <option value="" selected>{{ __('forms.select') }}</option>
+                        @foreach($mergedPersons as $externalId)
+                            <option value="{{ $loop->index }}">
+                                {{ __('preperson.merged_patient', ['number' => $externalId]) }}
+                            </option>
+                        @endforeach
+                    </select>
 
-                <label class="label">
-                    {{ __('preperson.electronic_medical_records') }}
-                </label>
+                    <label class="label">
+                        {{ __('preperson.electronic_medical_records') }}
+                    </label>
+                </div>
 
-                <div
-                    x-show="openPatientDropdown"
-                    x-transition
-                    x-cloak
-                    class="dropdown-panel absolute left-0 top-full mt-1 z-50 w-full max-h-60 overflow-y-auto"
-                >
-                    <template x-for="option in patientOptions" :key="option">
-                        <button
-                            type="button"
-                            class="dropdown-button w-full text-left"
-                            :class="selectedPatient === option ? 'font-semibold bg-gray-100 dark:bg-gray-700' : ''"
-                            @click="selectedPatient = option; openPatientDropdown = false;"
-                        >
-                            <span x-text="option"></span>
-                        </button>
-                    </template>
+                <div class="form-group group flex items-center">
+                    <button
+                        type="button"
+                        wire:click="searchMergedPersons"
+                        class="cursor-pointer text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1.5 text-sm font-medium transition-colors"
+                    >
+                        @icon('refresh', 'w-4 h-4')
+                        <span>{{ __('forms.synchronise_with_eHealth') }}</span>
+                    </button>
                 </div>
             </div>
-
-            <div class="form-group group flex items-center">
-                <button
-                    type="button"
-                    class="cursor-pointer text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1.5 text-sm font-medium transition-colors"
-                >
-                    @icon('refresh', 'w-4 h-4')
-                    <span>{{ __('forms.synchronise_with_eHealth') }}</span>
-                </button>
-            </div>
-        </div>
+        @endif
         @php
             $navItems = [
                 ['id' => 'episodes', 'action' => 'getEpisodes', 'syncAction' => 'syncEpisodes', 'label' => __('episodes.plural'), 'icon' => 'book', 'syncEntity' => PatientSummary::ENTITY_TYPE_EPISODE],
@@ -230,5 +204,5 @@
         </div>
     </div>
 
-    <x-forms.loading/>
+    <x-forms.loading />
 </x-layouts.patient>

@@ -10,10 +10,12 @@ use App\Core\Arr;
 use App\Enums\Person\AuthenticationMethod;
 use App\Enums\Person\AuthenticationMethodAction;
 use App\Enums\Person\ConfidantPersonRelationshipRequestStatus;
+use App\Enums\Person\MergedPersonStatus;
 use App\Enums\Person\RelationType;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Models\Preperson;
 use App\Rules\InDictionary;
 use App\Rules\PhoneNumber;
 use App\Rules\TaxId;
@@ -70,7 +72,7 @@ class Person extends Request
      * Also, this endpoint shows all the persons who enter the whole chain of merges to this person.
      *
      * @param  string  $uuid
-     * @param  array{id: string, status?: string, page?: int, page_size?: int}  $query
+     * @param  array{id: string, status?: MergedPersonStatus, page?: int, page_size?: int}  $query
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
@@ -78,6 +80,8 @@ class Person extends Request
      */
     public function searchPersonsMergedPersons(string $uuid, array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator($this->validateMergedPersons(...));
+        $this->setMapper($this->mapMergedPersons(...));
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $query);
@@ -453,6 +457,50 @@ class Person extends Request
         return $this->post(self::URL . "/$id/authentication_method_requests/$requestId/actions/resend_otp", $data);
     }
 
+    protected function validateMergedPersons(EHealthResponse $response): array
+    {
+        $validator = Validator::make(self::replaceEHealthPropNames($response->getData()), [
+            '*.uuid' => ['required', 'uuid'],
+            '*.merge_person_id' => ['required', 'uuid'],
+            '*.person_id' => ['required', 'uuid'],
+            '*.status' => ['required', new Enum(MergedPersonStatus::class)],
+            '*.ehealth_inserted_at' => ['required', 'date'],
+            '*.ehealth_updated_at' => ['required', 'date']
+        ]);
+
+        if ($validator->fails()) {
+            Log::channel('e_health_errors')->error('Validation failed: ' . implode(', ', $validator->errors()->all()));
+        }
+
+        return $validator->validate();
+    }
+
+    /**
+     * Map the validated merged persons into database rows for the merged_persons table, resolving the merged
+     * prepersons to their local ids and stamping the identified patient they belong to. Records whose merged
+     * preperson is not present locally (e.g. part of the merge chain from another legal entity) are skipped.
+     *
+     * @param  array  $mergedPersons
+     * @param  int  $personId
+     * @return array
+     */
+    protected function mapMergedPersons(array $mergedPersons, int $personId): array
+    {
+        $prepersonIds = Preperson::whereIn('uuid', array_column($mergedPersons, 'merge_person_id'))
+            ->pluck('id', 'uuid');
+
+        return collect($mergedPersons)
+            ->filter(static fn (array $mergedPerson): bool => $prepersonIds->has($mergedPerson['merge_person_id']))
+            ->map(static function (array $mergedPerson) use ($personId, $prepersonIds): array {
+                $mergedPerson['person_id'] = $personId;
+                $mergedPerson['merge_person_id'] = $prepersonIds[$mergedPerson['merge_person_id']];
+
+                return $mergedPerson;
+            })
+            ->values()
+            ->toArray();
+    }
+
     protected function validateSearch(EHealthResponse $response): array
     {
         $data = $response->getData();
@@ -801,6 +849,8 @@ class Person extends Request
             $newKey = match ($key) {
                 'id' => 'uuid',
                 'ended_at' => 'ehealth_ended_at',
+                'inserted_at' => 'ehealth_inserted_at',
+                'updated_at' => 'ehealth_updated_at',
                 default => $key
             };
 

@@ -12,6 +12,19 @@
     <div x-data="{ consent: false }">
         <div class="mt-8 space-y-6">
             <div
+                class="p-6 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 flex flex-col gap-4">
+                <div class="flex items-center gap-2">
+                    @icon('alert-circle', 'w-5 h-5 text-blue-600 dark:text-blue-400')
+                    <h4 class="font-bold text-blue-800 dark:text-blue-300 text-sm tracking-wider">
+                        {{ __('preperson.merge.attention') }}
+                    </h4>
+                </div>
+                <p class="text-sm text-blue-755 dark:text-blue-300 leading-relaxed font-medium">
+                    {{ __('preperson.merge.attention_warning_text') }}
+                </p>
+            </div>
+
+            <div
                 class="p-6 rounded-xl bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-700/50 flex gap-3.5">
                 @icon('alert-circle', 'w-5 h-5 text-gray-500 dark:text-gray-400 shrink-0 mt-0.5')
                 <div class="space-y-3.5 text-sm text-gray-755 dark:text-gray-300">

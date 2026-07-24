@@ -76,6 +76,16 @@ class Preperson extends Model
     }
 
     /**
+     * Merge requests raised to attach this preperson's records to an identified patient.
+     *
+     * @return HasMany
+     */
+    public function mergeRequests(): HasMany
+    {
+        return $this->hasMany(MergeRequest::class, 'merge_person_id')->latest('ehealth_inserted_at');
+    }
+
+    /**
      * User who registered the preperson in eHealth, resolved from the inserted_by UUID.
      *
      * @return BelongsTo

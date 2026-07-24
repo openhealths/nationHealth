@@ -7,6 +7,7 @@ namespace App\Livewire\Person\Records;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\JobStatus;
+use App\Enums\Person\MergedPersonStatus;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthResponseException;
@@ -28,6 +29,7 @@ use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Immunization;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\Procedure;
+use App\Models\MergedPerson;
 use App\Repositories\MedicalEvents\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
@@ -99,6 +101,13 @@ class PatientSummary extends BasePatientComponent
     public array $devices;
 
     public array $medicationStatements;
+
+    /**
+     * External ids of the merged prepersons attached to this person.
+     *
+     * @var array
+     */
+    public array $mergedPersons = [];
 
     /**
      * Stores synchronization statuses for all entity types.
@@ -213,6 +222,8 @@ class PatientSummary extends BasePatientComponent
             self::ENTITY_TYPE_CONDITION => legalEntity()->getEntityStatus(LegalEntity::ENTITY_CONDITION),
             self::ENTITY_TYPE_DIAGNOSTIC_REPORT => legalEntity()->getEntityStatus(LegalEntity::ENTITY_DIAGNOSTIC_REPORT),
         ];
+
+        $this->loadMergedPersons();
     }
 
     /**
@@ -661,6 +672,57 @@ class PatientSummary extends BasePatientComponent
         $this->getProcedures();
 
         Session::flash('success', __('patients.messages.procedures_synced_successfully'));
+    }
+
+    /**
+     * Fetch the prepersons merged into this person from eHealth.
+     *
+     * @return void
+     */
+    public function searchMergedPersons(): void
+    {
+        try {
+            $response = EHealth::person()->searchPersonsMergedPersons($this->uuid);
+            $mergedPersons = $response->map($response->validate(), $this->personId);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while getting merged persons');
+
+            return;
+        }
+
+        try {
+            MergedPerson::upsert(
+                $mergedPersons,
+                ['uuid'],
+                new MergedPerson()->getFillable()
+            );
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing merged persons');
+
+            return;
+        }
+
+        $this->loadMergedPersons();
+    }
+
+    /**
+     * Build the dropdown options for the merged prepersons attached to this person from local data.
+     *
+     * @return void
+     */
+    private function loadMergedPersons(): void
+    {
+        if ($this->personId === null) {
+            return;
+        }
+
+        $this->mergedPersons = MergedPerson::wherePersonId($this->personId)
+            ->whereStatus(MergedPersonStatus::MERGED)
+            ->whereNotNull('merge_person_id')
+            ->with('mergePerson:id,external_id')
+            ->get()
+            ->pluck('mergePerson.externalId')
+            ->all();
     }
 
     public function syncMedicationStatements(): void

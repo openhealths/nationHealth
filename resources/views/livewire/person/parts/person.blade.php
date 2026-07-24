@@ -5,10 +5,10 @@
 
     {{-- Using Alpine to dynamically add and remove name groups filled in different languages --}}
     <div x-data="{ names: $wire.entangle('form.person.names') }">
-        
+
         <template x-if="names && names.length > 0">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5 mb-6">
-                
+
                 <div class="form-group group">
                     <input
                         x-model="names[0].firstName"
@@ -32,7 +32,7 @@
                                x-on:change="names[0].noLastName = !hasLastName; if (!hasLastName) names[0].lastName = ''"
                                class="sr-only peer"
                         />
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                         <span class="ml-3 text-sm font-semibold text-gray-900 dark:text-gray-300">
                             {{ __('patients.has_last_name') }}
                         </span>
@@ -192,14 +192,14 @@
                 <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6" :key="'name-group-' + index">
                     <div class="flex items-center justify-between mb-4">
                         <h4 class="text-sm font-semibold text-gray-900 dark:text-white">
-                            {{ __('patients.name') }} №<span x-text="index + 1"></span>
+                            {{ __('forms.first_name') }} №<span x-text="index + 1"></span>
                         </h4>
                         <button @click="names.splice(index, 1)" type="button" class="text-sm text-red-600 hover:text-red-800 font-medium">
                             {{ __('patients.remove_name') }}
                         </button>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5">
-                        
+
                         <div class="form-group group">
                             <input
                                 x-model="name.firstName"
@@ -221,7 +221,7 @@
                                        x-on:change="name.noLastName = !hasLastName; if (!hasLastName) name.lastName = ''"
                                        class="sr-only peer"
                                 />
-                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                                 <span class="ml-3 text-sm font-semibold text-gray-900 dark:text-gray-300">
                                     {{ __('patients.has_last_name') }}
                                 </span>
