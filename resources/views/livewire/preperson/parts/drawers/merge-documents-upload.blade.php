@@ -68,6 +68,7 @@
                 wire:target="sendDocuments"
                 @click="$wire.sendDocuments().then((sent) => {
                     if (sent) {
+                        $wire.$parent.$refresh();
                         showMergeDocumentsDrawer = false;
                         showMergeFinalConsentDrawer = true;
                     }

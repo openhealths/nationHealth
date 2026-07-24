@@ -823,8 +823,8 @@ class PersonForm extends BaseForm
     }
 
     /**
-     * When a foreign identity document is present and tax_id is missing, no_tax_id must be true: the person has no
-     * Ukrainian tax number, and eHealth requires no_tax_id as a boolean.
+     * When a foreign identity document is present and tax_id is missing, no_tax_id must be null: the person has no
+     * Ukrainian tax number to refuse, so the flag does not apply.
      *
      * @return void
      */
@@ -840,7 +840,7 @@ class PersonForm extends BaseForm
             ->contains(static fn (array $document): bool => in_array($document['type'] ?? null, $foreignTypes, true));
 
         if ($hasForeignDocument) {
-            $this->person['noTaxId'] = true;
+            $this->person['noTaxId'] = null;
         }
     }
 

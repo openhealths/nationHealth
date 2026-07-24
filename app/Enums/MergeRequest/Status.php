@@ -26,4 +26,18 @@ enum Status: string
     {
         return __('preperson.statuses.' . $this->name);
     }
+
+    /**
+     * Badge CSS class for the merge request status.
+     *
+     * @return string
+     */
+    public function color(): string
+    {
+        return match ($this) {
+            self::NEW => 'badge-yellow',
+            self::APPROVED, self::SIGNED => 'badge-green',
+            self::REJECTED, self::CANCELLED, self::EXPIRED => 'badge-red'
+        };
+    }
 }

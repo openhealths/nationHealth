@@ -14,22 +14,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasTable('merged_persons')) {
-            Schema::create('merged_persons', static function (Blueprint $table) {
-                $table->id();
-                $table->uuid()->unique()->comment('eHealth identifier of the merged person record');
-                $table->foreignId('person_id')
-                    ->comment('Identified patient the person was merged into')
-                    ->constrained('persons');
-                $table->foreignId('merge_person_id')
-                    ->comment('Preperson that was merged into the identified patient')
-                    ->constrained('prepersons');
-                $table->enum('status', MergedPersonStatus::values());
-                $table->dateTime('ehealth_inserted_at');
-                $table->dateTime('ehealth_updated_at');
-                $table->timestamps();
-            });
-        }
+        Schema::create('merged_persons', static function (Blueprint $table) {
+            $table->id();
+            $table->uuid()->unique()->comment('eHealth identifier of the merged person record');
+            $table->foreignId('person_id')
+                ->comment('Identified patient the person was merged into')
+                ->constrained('persons');
+            $table->foreignId('merge_person_id')
+                ->comment('Preperson that was merged into the identified patient')
+                ->constrained('prepersons');
+            $table->enum('status', MergedPersonStatus::values());
+            $table->dateTime('ehealth_inserted_at');
+            $table->dateTime('ehealth_updated_at');
+            $table->timestamps();
+        });
     }
 
     /**

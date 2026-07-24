@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('birth_settlement');
             $table->enum('gender', ['MALE', 'FEMALE']);
             $table->string('email')->nullable();
-            $table->boolean('no_tax_id');
+            $table->boolean('no_tax_id')->nullable();
             $table->string('tax_id')->nullable();
             $table->string('secret');
             $table->string('unzr')->nullable()->comment('the record number in the demographic register');
