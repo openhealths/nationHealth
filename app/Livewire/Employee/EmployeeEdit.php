@@ -18,7 +18,6 @@ class EmployeeEdit extends AbstractEmployeeFormManager
 {
     #[Locked]
     public ?int $employeeId = null;
-    public bool $showSignatureModal = false;
     public bool $isLockedDueToSignedRequest = false;
 
     public function mount(LegalEntity $legalEntity, Employee $employee): void
@@ -34,7 +33,7 @@ class EmployeeEdit extends AbstractEmployeeFormManager
         $this->employee = $employee;
         $this->employeeId = $employee->id;
 
-        if (is_null($employee->userId)) {
+        if (is_null($employee->userId) && !auth()->user()->hasAllowedRole([\App\Enums\User\Role::ADMIN, \App\Enums\User\Role::HR])) {
             session()?->flash('error', 'Користувач має підтвердити вхід');
             $this->redirectRoute('employee.index', ['legalEntity' => legalEntity()->id]);
 
@@ -47,8 +46,10 @@ class EmployeeEdit extends AbstractEmployeeFormManager
             ->exists();
 
         $this->isPersonalDataLocked = $isOwnerParty;
-        $this->isPositionDataLocked = true;
+        // Keep division / professional blocks editable; lock only immutable core fields via applyImmutableFieldLocks().
+        $this->isPositionDataLocked = false;
         $this->loadDivisions($legalEntity);
+        $this->applyImmutableFieldLocks();
 
         $positionName = $this->dictionaries['POSITION'][$employee->position] ?? $employee->position;
         $this->pageTitle = __('forms.edit_employee') . ' "' . $positionName . '" - ' . ($employee->party->fullName ?? '');
@@ -77,6 +78,54 @@ class EmployeeEdit extends AbstractEmployeeFormManager
     protected function handleDraftPersistence(): EmployeeRequest
     {
         $preparedData = $this->form->getPreparedData();
+
+        // Backend enforcement: immutable fields per 3.23.1.7
+        if ($this->employee && $this->employee->id) {
+            $preparedData['position'] = $this->employee->position;
+            $preparedData['employee_type'] = $this->employee->employeeType;
+            if ($this->employee->startDate) {
+                $preparedData['start_date'] = \Carbon\Carbon::parse($this->employee->startDate)->format('Y-m-d');
+            }
+
+            $preparedData['tax_id'] = $this->employee->party->taxId;
+            $preparedData['no_tax_id'] = $this->employee->party->noTaxId;
+            if ($this->employee->party->birthDate) {
+                $preparedData['birth_date'] = \Carbon\Carbon::parse($this->employee->party->birthDate)->format('Y-m-d');
+            }
+
+            $originalPrimarySpeciality = $this->employee->specialities()
+                ->where('speciality_officio', true)
+                ->first();
+
+            if ($originalPrimarySpeciality) {
+                $submittedSpecialities = $preparedData['doctor']['specialities'] ?? [];
+                $filteredSpecialities = array_filter(
+                    $submittedSpecialities,
+                    fn ($spec) => empty($spec['speciality_officio']) && empty($spec['specialityOfficio'])
+                );
+
+                $primarySpecData = [
+                    'speciality' => $originalPrimarySpeciality->speciality,
+                    'speciality_officio' => true,
+                    'specialityOfficio' => true,
+                    'attestation_name' => $originalPrimarySpeciality->attestation_name,
+                    'attestationName' => $originalPrimarySpeciality->attestation_name,
+                    'attestation_date' => $originalPrimarySpeciality->attestation_date?->format('Y-m-d'),
+                    'attestationDate' => $originalPrimarySpeciality->attestation_date?->format('Y-m-d'),
+                    'certificate_number' => $originalPrimarySpeciality->certificate_number,
+                    'certificateNumber' => $originalPrimarySpeciality->certificate_number,
+                    'level' => $originalPrimarySpeciality->level,
+                ];
+                if ($originalPrimarySpeciality->valid_to_date) {
+                    $primarySpecData['valid_to_date'] = $originalPrimarySpeciality->valid_to_date->format('Y-m-d');
+                    $primarySpecData['validToDate'] = $originalPrimarySpeciality->valid_to_date->format('Y-m-d');
+                }
+
+                $filteredSpecialities[] = $primarySpecData;
+                $preparedData['doctor']['specialities'] = array_values($filteredSpecialities);
+            }
+        }
+
         $nestedDataForRevision = $this->mapRevisionData($preparedData);
         $nestedDataForRevision['employee_uuid'] = $this->employee->uuid;
 

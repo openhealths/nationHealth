@@ -40,6 +40,7 @@ abstract class EmployeeComponent extends Component
     public ?int $employeeRequestId = null;
     public array $divisions = [];
     public bool $showSignatureModal = false;
+    public bool $showRequestPreviewModal = false;
 
     public ?array $dictionaryNames = [
         'PHONE_TYPE', 'COUNTRY', 'SETTLEMENT_TYPE', 'SPECIALITY_TYPE', 'DIVISION_TYPE',
@@ -162,7 +163,7 @@ abstract class EmployeeComponent extends Component
         // 1. Validation
         if (Gate::denies('syncEmployee', $employee)) {
             $this->dispatch('flashMessage', [
-                'message' => 'Синхронізація недоступна для цього співробітника.',
+                'message' => 'Синхронізація недоступна для цього працівника.',
                 'type' => 'error'
             ]);
 
@@ -199,7 +200,7 @@ abstract class EmployeeComponent extends Component
             $this->actualizePendingRequests($employee, $token);
 
             $this->dispatch('flashMessage', [
-                'message' => 'Дані співробітника успішно оновлено з ЕСОЗ',
+                'message' => 'Дані працівника успішно оновлено з ЕСОЗ',
                 'type' => 'success'
             ]);
 
@@ -221,7 +222,7 @@ abstract class EmployeeComponent extends Component
     }
 
     /**
-     * Checks "hanging" requests (SIGNED) for this employee in eHealth.
+     * Checks hanging requests (NEW with uuid, or legacy SIGNED) for this employee in eHealth.
      * If the request in eHealth is already APPROVED/REJECTED, updates the local status.
      *
      * @param  Employee  $employee
@@ -230,9 +231,9 @@ abstract class EmployeeComponent extends Component
      */
     protected function actualizePendingRequests(Employee $employee, string $token): void
     {
-        $pendingRequests = EmployeeRequest::where('employee_id', $employee->id)
-            ->where('status', RequestStatus::SIGNED)
-            ->whereNull('applied_at')
+        $pendingRequests = EmployeeRequest::query()
+            ->where('employee_id', $employee->id)
+            ->pendingEhealth()
             ->get();
 
         if ($pendingRequests->isEmpty()) {
