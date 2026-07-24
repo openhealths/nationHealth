@@ -235,10 +235,10 @@ class CarePlanApprovals extends Component
             $msg = $e instanceof EHealthValidationException
                 ? $e->getFormattedMessage()
                 : 'Помилка від ЕСОЗ: ' . $e->getMessage();
-            Session::flash('error', $msg);
+            $this->addError('verificationCode', $msg);
         } catch (\Exception $e) {
             Log::error('CarePlanApprovals: failed to verify: ' . $e->getMessage());
-            Session::flash('error', __('care-plan.approval_verify_error'));
+            $this->addError('verificationCode', __('care-plan.approval_verify_error'));
         }
     }
 
