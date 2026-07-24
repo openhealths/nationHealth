@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Contract\Forms;
 
+use App\Enums\Contract\IdForm;
 use App\Models\Contracts\ContractRequest;
 use App\Rules\ContractRules\ValidReimbursementPeriod;
 use App\Rules\InDictionary;
@@ -64,7 +65,7 @@ class ReimbursementContractRequestForm extends BaseContractRequestForm
         // id_form is a CONTRACT_TYPE / REIMBURSEMENT_CONTRACT_TYPE dictionary code (e.g. GENERAL), never a UUID.
         $this->idForm = $request->idForm
             ?? data_get($request->data, 'id_form')
-            ?? 'GENERAL';
+            ?? IdForm::GENERAL->value;
 
         // 2.Dates (Carbon -> d.m.Y string conversion)
         // We use optional() or check, because dates can be null in drafts

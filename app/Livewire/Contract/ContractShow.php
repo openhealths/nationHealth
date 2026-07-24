@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Contract;
 
 use App\Classes\eHealth\EHealth;
+use App\Enums\Contract\IdForm;
 use App\Models\Contracts\Contract;
 use App\Models\LegalEntity;
 use Illuminate\Support\Facades\Log;
@@ -113,7 +114,7 @@ class ContractShow extends Component
             'contract' => $this->contract,
             'data' => $this->data,
             'medicalProgramNames' => $this->medicalProgramNames,
-            'idFormName' => contractIdFormLabel($idFormCode, $this->contract->type),
+            'idFormName' => IdForm::resolveLabel($idFormCode, $this->contract->type),
         ]);
     }
 }

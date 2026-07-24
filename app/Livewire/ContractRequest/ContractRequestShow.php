@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\ContractRequest;
 
 use App\Classes\eHealth\EHealth;
+use App\Enums\Contract\IdForm;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\Contract\Forms\ContractRequestSigningForm as SigningForm;
@@ -384,7 +385,7 @@ class ContractRequestShow extends Component
             ?? data_get($this->contractData, 'id_form');
 
         return view('livewire.contract-request.contract-request-show', [
-            'idFormName' => contractIdFormLabel($idFormCode, $this->contractRequest->type),
+            'idFormName' => IdForm::resolveLabel($idFormCode, $this->contractRequest->type),
         ]);
     }
 }

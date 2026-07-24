@@ -1,9 +1,11 @@
+@use('App\Enums\Contract\IdForm')
+@use('App\Enums\Contract\Type')
 @if(isset($contract) && isset($data))
     @php
         $periodStart = formatDisplayDate($contract->start_date ?? data_get($data, 'start_date'));
         $periodEnd = formatDisplayDate($contract->end_date ?? data_get($data, 'end_date'));
         $statusReason = $contract->status_reason ?? data_get($data, 'status_reason');
-        $idFormDisplay = $idFormName ?? contractIdFormLabel(
+        $idFormDisplay = $idFormName ?? IdForm::resolveLabel(
             data_get($data, 'id_form') ?? $contract->id_form,
             $contract->type
         );
@@ -23,7 +25,7 @@
                 <label for="contract-type" class="label">{{ __('contracts.type') }}</label>
                 <input id="contract-type"
                        type="text"
-                       value="{{ contractTypeLabel($contract->type) }}"
+                       value="{{ Type::resolveLabel($contract->type) }}"
                        class="input peer"
                        placeholder=" "
                        disabled
