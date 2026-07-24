@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 return [
+    'ehealth_id' => 'ID ЕСОЗ',
     'doctor_full_name' => 'ПІБ лікаря',
     'doctor' => 'Лікар',
     'doctor_position' => 'Посада лікаря',
