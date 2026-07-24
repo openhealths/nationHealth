@@ -5,6 +5,23 @@
         <h2>{{__('forms.personal_data')}}</h2>
     </legend>
     <div class="form">
+        @if(isset($employee) && filled($employee->party?->uuid))
+            <div class="form-row-3">
+                <div class="form-group group">
+                    <input
+                        value="{{ $employee->party->uuid }}"
+                        type="text"
+                        name="partyUuid"
+                        id="partyUuid"
+                        placeholder=" "
+                        class="peer input font-mono text-gray-500"
+                        disabled
+                        readonly
+                    />
+                    <label for="partyUuid" class="label">{{ __('employees.party_uuid') }}</label>
+                </div>
+            </div>
+        @endif
         <div class="form-row-3">
             <div class="form-group">
                 <input wire:model="form.party.lastName" type="text" name="lastName" id="lastName" class="peer input text-gray-500" placeholder=" " required

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 return [
+    'party_uuid' => 'UUID персони',
     'doctor_full_name' => 'ПІБ лікаря',
     'doctor' => 'Лікар',
     'doctor_position' => 'Посада лікаря',
