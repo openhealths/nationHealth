@@ -45,7 +45,6 @@ class EncounterDiagnose extends Model
         );
     }
 
-
     public function role(): BelongsTo
     {
         return $this->belongsTo(CodeableConcept::class, 'role_id');

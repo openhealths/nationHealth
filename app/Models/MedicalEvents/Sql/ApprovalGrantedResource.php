@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Models\MedicalEvents\Sql;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\MedicalEvents\Sql\Identifier;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ApprovalGrantedResource extends Model

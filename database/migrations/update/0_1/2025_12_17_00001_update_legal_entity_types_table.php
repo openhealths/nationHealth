@@ -61,7 +61,7 @@ return new class extends ExtendedMigration
      */
     protected function doUpdate(): void
     {
-            DB::table('legal_entity_types')
+        DB::table('legal_entity_types')
             ->whereIn('name', array_column(self::PROCEEDED_TYPES, 'name'))
             ->delete();
     }

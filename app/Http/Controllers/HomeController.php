@@ -22,7 +22,6 @@ class HomeController extends Controller
         // If user can create person requests (e.g., register patients) -> redirect to patient list.
         'person_request:write' => 'persons.index',
 
-
         // 2. Priority: HR
         // If user can create/write employee requests -> redirect to employee list.
         'employee_request:write' => 'employee.index',

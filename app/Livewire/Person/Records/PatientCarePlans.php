@@ -11,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Session;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
+use App\Exceptions\EHealth\EHealthResponseException;
 use Throwable;
 
 class PatientCarePlans extends BasePatientComponent
@@ -91,6 +92,18 @@ class PatientCarePlans extends BasePatientComponent
         try {
             $validatedData = $response->validate();
             app(CarePlanRepository::class)->syncCarePlans($validatedData, $this->personId);
+        } catch (EHealthResponseException $exception) {
+            if ($exception->getCode() === 403) {
+                Session::flash('error', 'Доступ до планів лікування в ЕСОЗ обмежено. Будь ласка, отримайте дозвіл (Consent) для перегляду.');
+                $this->loadCarePlans();
+
+                return;
+            }
+
+            Session::flash('error', 'Помилка синхронізації з ЕСОЗ: ' . $exception->getMessage());
+            $this->loadCarePlans();
+
+            return;
         } catch (Throwable $exception) {
             \Illuminate\Support\Facades\Log::error('PersonCarePlans: sync error', [
                 'message' => $exception->getMessage(),

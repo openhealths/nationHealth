@@ -87,15 +87,15 @@ class Employee extends BaseEmployee
             Declaration::class,
             'reorganization_employee_declarations'
         )
-        ->using(ReorganizationEmployeeDeclaration::class)
-        ->withPivot([
-            'legal_entity_uuid',
-            'employee_uuid',
-            'declaration_uuid',
-            'person_uuid',
-            'declaration_number',
-            'authorize_with'
-        ]);
+            ->using(ReorganizationEmployeeDeclaration::class)
+            ->withPivot([
+                'legal_entity_uuid',
+                'employee_uuid',
+                'declaration_uuid',
+                'person_uuid',
+                'declaration_number',
+                'authorize_with'
+            ]);
     }
 
     #[Scope]
@@ -124,13 +124,12 @@ class Employee extends BaseEmployee
     /**
      * Scope to find employees matching the given types, status, user, legal entity, and optionally a party.
      *
-     * @param  Builder    $query
-     * @param  array      $employeeTypes
-     * @param  string     $status
-     * @param  int        $userId
-     * @param  int        $legalEntityId
-     * @param  int|null   $partyId
-     *
+     * @param  Builder  $query
+     * @param  array  $employeeTypes
+     * @param  string  $status
+     * @param  int  $userId
+     * @param  int  $legalEntityId
+     * @param  int|null  $partyId
      * @return void
      */
     public function scopeIdentifyEmployee(Builder $query, array $employeeTypes, string $status, int $userId, int $legalEntityId, ?int $partyId): void
@@ -145,9 +144,8 @@ class Employee extends BaseEmployee
     /**
      * Scope to filter employees by a list of UUIDs.
      *
-     * @param  Builder $query
-     * @param  array   $uuids
-     *
+     * @param  Builder  $query
+     * @param  array  $uuids
      * @return Builder
      */
     public function scopeFilterByUuids(Builder $query, array $uuids): Builder
@@ -213,11 +211,10 @@ class Employee extends BaseEmployee
      *
      * Falls back to the current legal entity and party if not provided.
      *
-     * @param  Builder $query
-     * @param  int|null $legalEntityId
-     * @param  int|null $partyId
-     * @param  Status $status
-     *
+     * @param  Builder  $query
+     * @param  int|null  $legalEntityId
+     * @param  int|null  $partyId
+     * @param  Status  $status
      * @return Builder
      */
     public function scopeGetEmployeesForParty(Builder $query, ?int $legalEntityId = null, ?int $partyId = null, Status $status = Status::APPROVED): Builder
@@ -235,9 +232,8 @@ class Employee extends BaseEmployee
      *
      * Falls back to the current legal entity if not provided.
      *
-     * @param  Builder $query
-     * @param  int|null $legalEntityId
-     *
+     * @param  Builder  $query
+     * @param  int|null  $legalEntityId
      * @return Builder
      */
     public function scopeGetEmployeesViaPivot(Builder $query, ?int $legalEntityId = null): Builder
@@ -254,15 +250,15 @@ class Employee extends BaseEmployee
      *
      * Used to check whether a duplicate employee record already exists before creating a new one.
      *
-     * @param  Builder $query
+     * @param  Builder  $query
      * @param  string  $legalEntityUuid
      * @param  string  $employeeType
      * @param  string  $position
-     * @param  int     $partyId
-     *
+     * @param  int  $partyId
      * @return Builder
      */
-    public function scopeMatchingEmployee(Builder $query, string $legalEntityUuid, string $employeeType, string $position, int $partyId): Builder {
+    public function scopeMatchingEmployee(Builder $query, string $legalEntityUuid, string $employeeType, string $position, int $partyId): Builder
+    {
         return $query
             ->where('legal_entity_uuid', $legalEntityUuid)
             ->where('employee_type', $employeeType)
@@ -275,8 +271,7 @@ class Employee extends BaseEmployee
      *
      * Used to determine employees that should be available to a user based on their effective creation time.
      *
-     * @param string $time The reference time to compare against
-     *
+     * @param  string  $time  The reference time to compare against
      * @return bool
      */
     public function isCreatedAtOrAfter(string $time): bool

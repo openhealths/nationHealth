@@ -34,9 +34,11 @@ class ConditionMapper implements FhirMapperContract
         ];
 
         if ($data['primarySource']) {
-            $result['asserter'] = FhirResource::make()
-                ->coding('eHealth/resources', 'employee')
-                ->toIdentifier($uuids['employee'], $data['asserterText'] ?? '');
+            $result['asserter'] = [
+                FhirResource::make()
+                    ->coding('eHealth/resources', 'employee')
+                    ->toIdentifier($uuids['employee'], $data['asserterText'] ?? '')
+            ];
         } else {
             $result['reportOrigin'] = FhirResource::make()
                 ->coding('eHealth/report_origins', $data['reportOriginCode'])
@@ -109,7 +111,7 @@ class ConditionMapper implements FhirMapperContract
                 ? CarbonImmutable::parse($data['assertedDate'])->format('H:i')
                 : null,
             'severityCode' => data_get($data, 'severity.coding.0.code', ''),
-            'asserterText' => data_get($data, 'asserter.identifier.type.text', ''),
+            'asserterText' => data_get($data, 'asserter.0.identifier.type.text', data_get($data, 'asserter.identifier.type.text', '')),
             'reportOriginCode' => data_get($data, 'reportOrigin.coding.0.code', ''),
             'evidenceCodes' => array_map(
                 static fn (array $code) => [

@@ -746,8 +746,8 @@ abstract class MigrationsCommand extends Command
             $extra = explode(" ", Arr::get($item, 'extra', ""));
 
             $scopes = collect([...$scopes, ...$missed, ...$extra])
-                ->filter(fn($scope) => !empty($scope))
-                ->map(fn($scope) => "'$scope'")
+                ->filter(fn ($scope) => !empty($scope))
+                ->map(fn ($scope) => "'$scope'")
                 ->unique()
                 ->values()
                 ->toArray();
@@ -755,7 +755,7 @@ abstract class MigrationsCommand extends Command
             $config[$typeName] = $scopes;
         }
 
-        $config['CLOSE'] ="];";
+        $config['CLOSE'] = "];";
 
         $this->saveScopesToFile(self::CONFIG_TYPES_SCOPE_PATH, $config);
     }
@@ -808,8 +808,8 @@ abstract class MigrationsCommand extends Command
             $scopes = explode(" ", Arr::get($item, 'scope', ""));
 
             $scopes = collect([...$scopes])
-                ->filter(fn($scope) => !empty($scope))
-                ->map(fn($scope) => "'$scope'")
+                ->filter(fn ($scope) => !empty($scope))
+                ->map(fn ($scope) => "'$scope'")
                 ->unique()
                 ->values()
                 ->toArray();
@@ -817,7 +817,7 @@ abstract class MigrationsCommand extends Command
             $config[$roleName] = $scopes;
         }
 
-        $config['CLOSE'] ="];";
+        $config['CLOSE'] = "];";
 
         $this->saveScopesToFile(self::CONFIG_ROLES_SCOPE_PATH, $config);
     }
@@ -825,11 +825,9 @@ abstract class MigrationsCommand extends Command
     /**
      * Persist generated scopes configuration to a PHP config file.
      *
-     * @param string $path Target config file path.
-     * @param array<string, mixed> $config Prepared scopes configuration data.
-     *
+     * @param  string  $path  Target config file path.
+     * @param  array<string, mixed>  $config  Prepared scopes configuration data.
      * @return void
-     *
      * @throws Exception
      */
     protected function saveScopesToFile(string $path, array $config = []): void

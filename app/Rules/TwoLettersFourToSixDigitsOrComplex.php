@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Rules;
 
 use Closure;
@@ -17,8 +19,10 @@ class TwoLettersFourToSixDigitsOrComplex implements ValidationRule
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        if (!preg_match('/^(((?![ЫЪЭЁ])([А-ЯҐЇІЄ])){2}[0-9]{4,6}|[0-9]{9}|((?![ЫЪЭЁ])([А-ЯҐЇІЄ])){2}[0-9]{5}\\/[0-9]{5})$/u',
-            $value)) {
+        if (!preg_match(
+            '/^(((?![ЫЪЭЁ])([А-ЯҐЇІЄ])){2}[0-9]{4,6}|[0-9]{9}|((?![ЫЪЭЁ])([А-ЯҐЇІЄ])){2}[0-9]{5}\\/[0-9]{5})$/u',
+            $value
+        )) {
             $fail(' :attribute має відповідати формату дві літери кирилицею + від 4 до 6 цифр або 9 цифр або або 2 букви, 5 цифр, слеш, і ще 5 цифр.');
         }
     }

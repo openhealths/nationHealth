@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Rules;
 
 use Closure;
@@ -11,9 +13,9 @@ class Zip implements ValidationRule
     /**
      * Run the validation rule.
      *
-     * @param string $attribute
-     * @param mixed $value
-     * @param Closure(string): PotentiallyTranslatedString $fail
+     * @param  string  $attribute
+     * @param  mixed  $value
+     * @param  Closure(string): PotentiallyTranslatedString  $fail
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {

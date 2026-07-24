@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Events;
 
 use App\Models\User;
@@ -9,8 +11,8 @@ use Illuminate\Queue\SerializesModels;
 class LegalEntityCreate
 {
     use
-        Dispatchable,
-        SerializesModels;
+        Dispatchable;
+    use SerializesModels;
 
     /**
      * Create a new event instance.
@@ -19,5 +21,6 @@ class LegalEntityCreate
         public User $authenticatedUser,
         public User $owner,
         public string $password
-    ) {}
+    ) {
+    }
 }

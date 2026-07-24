@@ -29,7 +29,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table(self::TABLE_NAME, static function (Blueprint $table) {
-            if (! self::isUniqueIndexExists(self::TABLE_NAME, self::INDEX_NAME)) {
+            if (!self::isUniqueIndexExists(self::TABLE_NAME, self::INDEX_NAME)) {
                 $table->unique(
                     ['legal_entity_id', 'inventory_number'],
                     self::INDEX_NAME

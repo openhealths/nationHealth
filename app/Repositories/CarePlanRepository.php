@@ -115,7 +115,6 @@ class CarePlanRepository
                     ['system' => 'eHealth/care_plan_categories', 'code' => $form['category']]
                 ]
             ],
-            'instantiates_protocol' => !empty($form['clinicalProtocol']) ? [['display' => $form['clinicalProtocol']]] : (!empty($form['clinical_protocol']) ? [['display' => $form['clinical_protocol']]] : null),
             'title' => $form['title'],
             'period' => array_filter([
                 'start' => $finalPeriodStart,
@@ -144,10 +143,73 @@ class CarePlanRepository
                 'coding' => [
                     ['system' => 'PROVIDING_CONDITION', 'code' => $form['termsOfService'] ?? $form['terms_of_service']]
                 ]
-            ]
+            ],
+            'inform_with' => $form['informWith'] ?? ($form['inform_with'] ?? null)
         ]);
 
         return $payload;
+    }
+
+    /**
+     * Resolve care plan period bounds as stored in eHealth (UTC).
+     *
+     * @return array{start: ?\Carbon\CarbonInterface, end: ?\Carbon\CarbonInterface}
+     */
+    public function resolveEHealthPeriodBounds(CarePlan $carePlan): array
+    {
+        $carePlan->loadMissing(['effectivePeriod', 'encounter.period']);
+
+        if ($carePlan->effectivePeriod) {
+            $rawStart = $this->periodValueAsUtcString($carePlan->effectivePeriod, 'start');
+            $rawEnd = $this->periodValueAsUtcString($carePlan->effectivePeriod, 'end');
+
+            return [
+                'start' => $rawStart ? \Carbon\Carbon::parse($rawStart, 'UTC') : null,
+                'end' => $rawEnd ? \Carbon\Carbon::parse($rawEnd, 'UTC') : null,
+            ];
+        }
+
+        $periodStartForm = $carePlan->period_start?->format('Y-m-d');
+        $encounterRawStart = $carePlan->encounter?->period?->getRawOriginal('start');
+
+        if ($encounterRawStart && $periodStartForm) {
+            $encounterStart = \Carbon\CarbonImmutable::parse($encounterRawStart, 'UTC');
+            $formStart = \Carbon\CarbonImmutable::parse($periodStartForm, config('app.timezone', 'Europe/Kyiv'))->startOfDay();
+
+            if ($formStart->utc()->lt($encounterStart)) {
+                $start = \Carbon\Carbon::parse($encounterStart->addMinute()->toIso8601ZuluString())->utc();
+            } else {
+                $start = \Carbon\Carbon::parse(convertToEHealthISO8601($periodStartForm . ' 00:00:00'))->utc();
+            }
+        } elseif ($periodStartForm) {
+            $start = \Carbon\Carbon::parse(convertToEHealthISO8601($periodStartForm . ' 00:00:00'))->utc();
+        } else {
+            $start = null;
+        }
+
+        $end = null;
+        if ($carePlan->period_end) {
+            $end = \Carbon\Carbon::parse(
+                convertToEHealthISO8601($carePlan->period_end->format('Y-m-d') . ' 23:59:59')
+            )->utc();
+        }
+
+        return ['start' => $start, 'end' => $end];
+    }
+
+    private function periodValueAsUtcString(\App\Models\MedicalEvents\Sql\Period $period, string $key): ?string
+    {
+        $raw = $period->getRawOriginal($key);
+        if (!empty($raw)) {
+            return (string) $raw;
+        }
+
+        $value = $period->getAttributes()[$key] ?? null;
+        if (empty($value)) {
+            return null;
+        }
+
+        return (string) $value;
     }
 
     public function syncCarePlans(array $validatedData, ?int $personId = null): void
@@ -217,7 +279,8 @@ class CarePlanRepository
                 }
 
                 // Fallback to current user if author not found (to satisfy NOT NULL constraint)
-                $authorId = $author?->id ?? Auth::user()?->getCarePlanWriterEmployee()?->id;
+                $termsOfServiceForFallback = $rawFhir['terms_of_service']['coding'][0]['code'] ?? null;
+                $authorId = $author?->id ?? Auth::user()?->getCarePlanWriterEmployee($termsOfServiceForFallback)?->id;
 
                 $addresses = [];
                 if (isset($rawFhir['addresses']) && is_array($rawFhir['addresses'])) {

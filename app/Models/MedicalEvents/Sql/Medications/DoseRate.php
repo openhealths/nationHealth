@@ -1,11 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models\MedicalEvents\Sql\Medications;
 
 use App\Models\MedicalEvents\Sql\Coding;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 

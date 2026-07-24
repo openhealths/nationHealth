@@ -7,8 +7,13 @@ namespace App\Repositories\MedicalEvents;
 use Throwable;
 use Carbon\Carbon;
 use App\Enums\Status;
+use App\Classes\eHealth\EHealth;
+use App\Models\EhealthJob;
+use App\Models\EhealthLink;
+use App\Models\MedicalEvents\Mongo\Approval as MongoApproval;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Identifier;
@@ -29,6 +34,152 @@ class ApprovalRepository extends BaseRepository
     }
 
     /**
+     * Fetch approvals from eHealth and sync them locally for a given polymorphic entity.
+     *
+     * - Prefers Get approvals filters (`granted_resource_type`, `granted_resources`) when patient uuid is known.
+     * - Still applies a client-side filter as a safety net if the API ignores filters.
+     * - Stores the full raw eHealth JSON in MongoDB (Mongo\Approval).
+     * - Extracts reason_id (FK → identifiers) from the reason object — never writes a raw string.
+     * - Extracts granted_to_id (FK → identifiers) from the granted_to identifier value.
+     *
+     * @see https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/2115600961/Get+approvals
+     */
+    public function syncApprovals(Model $entity, string $resourceType, array $additionalFilters = []): void
+    {
+        if (empty($entity->uuid)) {
+            return;
+        }
+
+        try {
+            $patientUuid = null;
+
+            if (method_exists($entity, 'person') && $entity->person) {
+                $patientUuid = $entity->person->uuid;
+            } elseif (isset($entity->person_id)) {
+                $person = \App\Models\Person\Person::find($entity->person_id);
+                $patientUuid = $person?->uuid;
+            }
+
+            $filters = array_filter(array_merge([
+                'granted_resource_type' => $resourceType,
+                'granted_resources' => $entity->uuid,
+            ], $additionalFilters), static fn ($value) => $value !== null && $value !== '');
+
+            if ($patientUuid) {
+                $response = EHealth::approval()->getPatientApprovals($patientUuid, $filters);
+                $data = $response->getData();
+
+                // Safety net: keep only approvals that reference this specific resource
+                if (!empty($data) && is_array($data)) {
+                    $filteredData = [];
+
+                    foreach ($data as $approvalData) {
+                        $grantedResources = $approvalData['granted_resources'] ?? [];
+
+                        foreach ($grantedResources as $resource) {
+                            $typeCode = $resource['identifier']['type']['coding'][0]['code'] ?? null;
+                            $value = $resource['identifier']['value'] ?? null;
+
+                            if ($typeCode === $resourceType && $value === $entity->uuid) {
+                                $filteredData[] = $approvalData;
+                                break;
+                            }
+                        }
+                    }
+
+                    $data = $filteredData;
+                }
+            } else {
+                $response = EHealth::approval()->getMany($filters);
+                $data = $response->getData();
+            }
+
+            if (empty($data)) {
+                return;
+            }
+
+            $syncedUuids = [];
+            foreach ($data as $approvalData) {
+                // Persist full raw eHealth JSON to MongoDB
+                try {
+                    MongoApproval::updateOrCreate(
+                        ['id' => $approvalData['id']],
+                        $approvalData
+                    );
+                } catch (\Throwable $e) {
+                    Log::warning('MedicalEvents\\ApprovalRepository Mongo sync failed: '.$e->getMessage());
+                }
+
+                $syncedUuids[] = $approvalData['id'];
+
+                // Resolve granted_to → Identifier FK
+                $grantedToValue = $approvalData['granted_to']['identifier']['value'] ?? null;
+                $grantedToCode = $approvalData['granted_to']['identifier']['type']['coding'][0]['code'] ?? 'legal_entity';
+
+                // Resolve reason → Identifier FK (never a raw string)
+                $reasonValue = $approvalData['reason']['value'] ?? null;
+
+                // Resolve created_by → Identifier FK
+                $createdByValue = $approvalData['created_by']['identifier']['value'] ?? null;
+
+                Approval::updateOrCreate(
+                    ['uuid' => $approvalData['id']],
+                    [
+                        'approvable_type' => get_class($entity),
+                        'approvable_id' => $entity->id,
+                        'granted_to_id' => $this->resolveIdentifier($grantedToValue)?->id,
+                        'granted_to_type' => $grantedToCode,
+                        'reason_id' => $this->resolveIdentifier($reasonValue)?->id,
+                        'created_by_id' => $this->resolveIdentifier($createdByValue)?->id,
+                        'status' => $approvalData['status'] ?? ($approvalData['is_verified'] ? 'active' : 'pending'),
+                        'access_level' => $approvalData['access_level'] ?? 'read',
+                        'is_verified' => (bool) ($approvalData['is_verified'] ?? false),
+                        'expires_at' => $approvalData['expires_at'] ?? null,
+                    ]
+                );
+            }
+
+            $inactiveQuery = Approval::where('approvable_type', get_class($entity))
+                ->where('approvable_id', $entity->id)
+                ->whereNotIn('uuid', $syncedUuids);
+
+            if (isset($additionalFilters['granted_to.identifier.value'])) {
+                $identifier = \App\Models\MedicalEvents\Sql\Identifier::where('value', $additionalFilters['granted_to.identifier.value'])->first();
+                if ($identifier) {
+                    $inactiveQuery->where('granted_to_id', $identifier->id);
+                } else {
+                    $inactiveQuery->whereRaw('1 = 0');
+                }
+            }
+
+            $inactiveQuery->update(['status' => 'inactive']);
+        } catch (\Exception $e) {
+            Log::error('MedicalEvents\\ApprovalRepository syncing failed: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Attach an EhealthLink to an Approval after a 202 async response.
+     *
+     * @param  array{href: string}  $link  The link object from the eHealth 202 response.
+     */
+    public function attachEhealthLink(Approval $approval, array $link): EhealthLink
+    {
+        $job = EhealthJob::create([
+            'processing_method' => 'ASYNC',
+            'status' => 'PROCESSING',
+        ]);
+
+        return EhealthLink::create([
+            'linkable_type' => Approval::class,
+            'linkable_id' => $approval->id,
+            'ehealth_job_id' => $job->id,
+            'entity' => 'job',
+            'href' => $link['href'],
+        ]);
+    }
+
+    /**
      * Build a formatted eHealth API request payload for an approval.
      *
      * Iterates over the provided payload data and transforms each entry according
@@ -43,8 +194,7 @@ class ApprovalRepository extends BaseRepository
      * `composition`, `child_resource`, `granted_to`, `created_by`, `person`,
      * `access_level`, `authorize_with`. Unknown keys are silently ignored.
      *
-     * @param array<string, mixed> $payloadData Associative array of entity key → raw data.
-     *
+     * @param  array<string, mixed>  $payloadData  Associative array of entity key → raw data.
      * @return array<string, mixed> Formatted payload ready for the eHealth API.
      *
      * @see https://ehealthmedicaleventsapi.docs.apiary.io/#reference/approvals/create-approval/create-approval
@@ -60,9 +210,9 @@ class ApprovalRepository extends BaseRepository
         }
 
         foreach ($payloadData as $entity => $entityData) {
-             match ($entity) {
+            match ($entity) {
                 'resources' => $payload[$entity] = array_map(fn (array $identifier) => $this->prepareIdentifierToRequest($identifier), $entityData),
-                'resource_types' => $payload[$entity] =array_map(fn (array $codeableConcept) => $this->prepareCodeableConceptToRequest($codeableConcept)['type'], $entityData),
+                'resource_types' => $payload[$entity] = array_map(fn (array $codeableConcept) => $this->prepareCodeableConceptToRequest($codeableConcept)['type'], $entityData),
                 'service_request', 'forbidden_group', 'diagnoses_group', 'service_group', 'patient', 'composition',
                 'child_resource', 'granted_to', 'created_by', 'person' => $payload[$entity] = $this->prepareIdentifierToRequest($entityData),
                 'access_level' => $payload[$entity] = $entityData ?: 'read',
@@ -81,11 +231,9 @@ class ApprovalRepository extends BaseRepository
     /**
      * Create approval model and store its data and relations data to DB.
      *
-     * @param array $data
-     * @param Model $approvableModel
-     *
+     * @param  array  $data
+     * @param  Model  $approvableModel
      * @return Approval
-     *
      * @throws Throwable
      */
     public function create(array $data, Model $approvableModel): ?Approval
@@ -137,7 +285,7 @@ class ApprovalRepository extends BaseRepository
             ]);
 
             if (isset($data['granted_resources'])) {
-                foreach($data['granted_resources'] as $grantedResourceData) {
+                foreach ($data['granted_resources'] as $grantedResourceData) {
                     $identifier = $this->resolveIdentifier(Arr::get($grantedResourceData, 'identifier.value'));
 
                     Repository::codeableConcept()->attach($identifier, $grantedResourceData);
@@ -147,7 +295,7 @@ class ApprovalRepository extends BaseRepository
             }
 
             if (isset($data['granted_resource_types'])) {
-                foreach($data['granted_resource_types'] as $grantedResourceTypeData) {
+                foreach ($data['granted_resource_types'] as $grantedResourceTypeData) {
                     $grantedResourceType = Repository::coding()->store(Arr::get($grantedResourceTypeData, 'coding'));
 
                     $approval->grantedResourceTypes()->create(['codeable_concept_id' => $grantedResourceType->id]);
@@ -163,11 +311,9 @@ class ApprovalRepository extends BaseRepository
     /**
      * Sync approval data and related data by updating or creating.
      *
-     * @param Model $approvalModel
-     * @param array $modelData
-     *
+     * @param  Model  $approvalModel
+     * @param  array  $modelData
      * @return void
-     *
      * @throws Throwable
      */
     public function sync(array $modelData, Model $approvableModel, ?Approval $approvalModel = null): void
@@ -217,21 +363,21 @@ class ApprovalRepository extends BaseRepository
             }
 
             if (isset($modelData['granted_resources'])) {
-                    $this->syncResourceEntity(
-                        $approval,
-                        'grantedResources',
-                        'granted_to_id',
-                        $this->syncIdentifiers($existing, $modelData['granted_resources'] ?? [], 'grantedResourceIdentifiers')
-                    );
+                $this->syncResourceEntity(
+                    $approval,
+                    'grantedResources',
+                    'granted_to_id',
+                    $this->syncIdentifiers($existing, $modelData['granted_resources'] ?? [], 'grantedResourceIdentifiers')
+                );
             }
 
             if (isset($modelData['granted_resource_types'])) {
-                    $this->syncResourceEntity(
-                        $approval,
-                        'grantedResourceTypes',
-                        'codeable_concept_id',
-                        $this->syncCodeableConcepts($existing, $modelData['granted_resource_types'] ?? [], 'grantedResourceTypesIdentifiers')
-                    );
+                $this->syncResourceEntity(
+                    $approval,
+                    'grantedResourceTypes',
+                    'codeable_concept_id',
+                    $this->syncCodeableConcepts($existing, $modelData['granted_resource_types'] ?? [], 'grantedResourceTypesIdentifiers')
+                );
             }
 
             $approval->refresh();
@@ -241,9 +387,8 @@ class ApprovalRepository extends BaseRepository
     /**
      * Get data that is related to the person.
      *
-     * @param  string      $entityUuid  UUID of the entity ('person', 'encounter', 'procedure' etc) (optional)
+     * @param  string  $entityUuid  UUID of the entity ('person', 'encounter', 'procedure' etc) (optional)
      * @param  Model|null  $approvableModel  Specific polymorphic parent model instance.
-     *
      * @return array
      */
     public function get(Model $approvableModel, ?string $entityUuid = null): array
@@ -255,7 +400,7 @@ class ApprovalRepository extends BaseRepository
             : $approvableModel->where('uuid', $entityUuid)->first()?->id;
 
         $query->where('approvable_type', get_class($approvableModel))
-                ->where('approvable_id', $approvableModelId);
+            ->where('approvable_id', $approvableModelId);
 
         return $query->get()->toArray();
     }
@@ -263,8 +408,7 @@ class ApprovalRepository extends BaseRepository
     /**
      * Wrap a raw identifier array into the eHealth FHIR identifier request structure.
      *
-     * @param array{type: array, value: string} $identifier  Raw identifier with `type` (codeable concept) and `value` (UUID).
-     *
+     * @param  array{type: array, value: string}  $identifier  Raw identifier with `type` (codeable concept) and `value` (UUID).
      * @return array{identifier: array{type: array, value: string}}
      */
     protected function prepareIdentifierToRequest(array $identifier): array
@@ -280,8 +424,7 @@ class ApprovalRepository extends BaseRepository
     /**
      * Format a codeable concept array into the eHealth API `type` structure.
      *
-     * @param array{coding: array, text?: string} $codeableConceptData
-     *
+     * @param  array{coding: array, text?: string}  $codeableConceptData
      * @return array{type: array{coding: array, text: string}}
      */
     protected function prepareCodeableConceptToRequest(array $codeableConceptData): array
@@ -297,8 +440,7 @@ class ApprovalRepository extends BaseRepository
      *
      * Falls back to `'eHealth/resources'` as the system when `code` is empty.
      *
-     * @param array<int, array{system: string, code: string}> $codingData
-     *
+     * @param  array<int, array{system: string, code: string}>  $codingData
      * @return array<int, array{system: string, code: string}>
      */
     protected function prepareCodingToRequest(array $codingData): array
@@ -331,11 +473,10 @@ class ApprovalRepository extends BaseRepository
      * $newIds, deletes rows whose attribute value is no longer present, and creates
      * new rows for IDs that are not yet stored.
      *
-     * @param  Model   $model              The parent model that owns the HasMany relation.
-     * @param  string  $relation           The HasMany relation name on $model (e.g. 'grantedResources').
+     * @param  Model  $model  The parent model that owns the HasMany relation.
+     * @param  string  $relation  The HasMany relation name on $model (e.g. 'grantedResources').
      * @param  string  $relationAttribute  The FK column on the child table to compare (e.g. 'granted_to_id').
-     * @param  array   $newIds             Desired set of IDs for $relationAttribute.
-     *
+     * @param  array  $newIds  Desired set of IDs for $relationAttribute.
      * @return void
      */
     protected function syncResourceEntity(Model $model, string $relation, string $relationAttribute, array $newIds): void
@@ -361,8 +502,7 @@ class ApprovalRepository extends BaseRepository
      * have elapsed since the approval was last updated.
      *
      * @param  Approval  $approval
-     *
-     * @return bool  `true` if the code has not yet expired, `false` otherwise.
+     * @return bool `true` if the code has not yet expired, `false` otherwise.
      */
     public function isSmsCodeAlive(Approval $approval): bool
     {

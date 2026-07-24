@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Traits;
 
-use Illuminate\Support\Facades\Session;
-
 /**
  * Trait InteractsWithApprovals
  *
@@ -33,6 +31,19 @@ trait InteractsWithApprovals
      */
     public ?string $approvalId = null;
     public ?string $patientId = null;
+
+    /** Whether we are waiting for an async eHealth approval job to complete. */
+    public bool $isPolling = false;
+
+    /** EhealthLink id being polled (null when not polling). */
+    public ?int $pollingLinkId = null;
+
+    /**
+     * authentication_method_current from eHealth for the pending approval OTP modal.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $currentAuthMethod = null;
 
     /**
      * Validation rules for the verification code.

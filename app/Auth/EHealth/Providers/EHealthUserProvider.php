@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Auth\EHealth\Providers;
 
 use App\Models\User;
@@ -12,11 +14,10 @@ class EHealthUserProvider extends EloquentUserProvider
      * Retrieve a user by their unique identifier.
      * Here an user's uuid acts as an identifier.
      *
-     * @param string $identifier
-     *
+     * @param  string  $identifier
      * @return \Illuminate\Contracts\Auth\Authenticatable|null
      */
-    public function retrieveById($identifier):?User
+    public function retrieveById($identifier): ?User
     {
         return User::where('uuid', $identifier)->first();
     }
@@ -27,7 +28,6 @@ class EHealthUserProvider extends EloquentUserProvider
      *
      * @param  mixed  $identifier
      * @param  string  $token
-     *
      * @return null
      */
     public function retrieveByToken($identifier, $token): null
@@ -41,7 +41,6 @@ class EHealthUserProvider extends EloquentUserProvider
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $user
      * @param  string  $token
-     *
      * @return void
      */
     public function updateRememberToken(Authenticatable $user, $token)
@@ -54,7 +53,6 @@ class EHealthUserProvider extends EloquentUserProvider
      * TODO: check if it really need here
      *
      * @param  array  $credentials
-     *
      * @return \Illuminate\Contracts\Auth\Authenticatable|null
      */
     public function retrieveByCredentials(array $credentials)
@@ -72,7 +70,6 @@ class EHealthUserProvider extends EloquentUserProvider
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $user
      * @param  array  $credentials
-     *
      * @return bool
      */
     public function validateCredentials(Authenticatable $user, array $credentials)

@@ -1,11 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
-use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
 use App\Repositories\CarePlanRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -31,7 +31,7 @@ class CarePlanSyncTest extends TestCase
     public function test_care_plan_and_activities_can_be_synced_and_mapped_to_structured_sql(): void
     {
         // 1. Setup - Create a person & LegalEntity
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id') 
+        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
             ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = \App\Models\LegalEntity::create([
@@ -45,13 +45,17 @@ class CarePlanSyncTest extends TestCase
 
         $person = new Person();
         $person->uuid = '540d6f4c-1d7c-4a3d-a51b-5e04f981e8d6';
-        $person->first_name = 'John';
-        $person->last_name = 'Doe';
         $person->gender = 'MALE';
         $person->birth_date = '1990-01-01';
         $person->patient_signed = true;
         $person->process_disclosure_data_consent = true;
         $person->save();
+
+        $person->names()->create([
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'language' => 'uk'
+        ]);
 
         // 2. Mock EHealth Response
         $carePlanUuid = 'c0280b2c-686b-4e63-a262-429d4791ea82';

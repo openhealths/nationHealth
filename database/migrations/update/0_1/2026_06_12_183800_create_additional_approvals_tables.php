@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     /**
      * Run the migrations.
      */
@@ -18,7 +21,7 @@ return new class extends Migration {
             if (!Schema::hasColumn('approvals', 'authorize_with')) {
                 $table->uuid('authorize_with')->nullable();
             }
-            
+
             if (!Schema::hasColumn('approvals', 'authentication_method_id')) {
                 $table->foreignId('authentication_method_id')->nullable()->constrained('authentication_methods');
             }
@@ -30,7 +33,7 @@ return new class extends Migration {
             if (!Schema::hasColumn('approvals', 'is_verified')) {
                 $table->boolean('is_verified')->default(false);
             }
-            
+
             if (!Schema::hasColumn('approvals', 'expires_at')) {
                 $table->timestamp('expires_at')->nullable();
             }
@@ -72,7 +75,7 @@ return new class extends Migration {
             if (Schema::hasColumn('approvals', 'authorize_with')) {
                 $table->dropColumn('authorize_with');
             }
-            
+
             if (Schema::hasColumn('approvals', 'authentication_method_id')) {
                 $table->dropForeign(['authentication_method_id']);
                 $table->dropColumn('authentication_method_id');
@@ -85,7 +88,7 @@ return new class extends Migration {
             if (Schema::hasColumn('approvals', 'is_verified')) {
                 $table->dropColumn('is_verified');
             }
-            
+
             if (Schema::hasColumn('approvals', 'expires_at')) {
                 $table->dropColumn('expires_at');
             }

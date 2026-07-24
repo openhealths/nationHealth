@@ -1,4 +1,4 @@
-<x-layouts.patient :personId="$personId" :uuid="$uuid" :patientFullName="$patientFullName">
+<x-layouts.patient :personId="$personId" :uuid="$uuid" :patientFullName="$patientFullName" :hideNavigation="$allowsPatientChange">
     <div class="breadcrumb-form p-4 shift-content">
         <div x-data="{ activeSection: 'doctors' }" class="flex flex-col lg:flex-row gap-8 lg:gap-12">
             
@@ -111,11 +111,22 @@
         </div>
     </div>
 
-    @if($showAuthModal)
-        @include('livewire.care-plan.modals.authentication')
+    @include('livewire.care-plan.modals.authentication')
+    @include('livewire.care-plan.modals.method-selection')
+
+    {{-- Async approval job polling — only active when $isPolling is true --}}
+    @if($isPolling)
+    <div wire:poll.2s="checkApprovalJobStatus" class="fixed bottom-6 right-6 z-50">
+        <div class="flex items-center gap-3 bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-700 shadow-lg rounded-xl px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
+            <svg class="animate-spin h-4 w-4 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+            </svg>
+            {{ __('care-plan.approval_processing') }}
+        </div>
+    </div>
     @endif
-    @if($showMethodSelectionModal)
-        @include('livewire.care-plan.modals.method-selection')
-    @endif
+
     <x-signature-modal method="sign" />
 </x-layouts.patient>
+

@@ -243,7 +243,7 @@ class DiagnosticReportRepository extends BaseRepository
             ]);
 
             $ownerColumn = $diagnosticReport->prepersonId !== null ? 'preperson_id' : 'person_id';
-            
+
             Observation::query()
                 ->where($ownerColumn, $diagnosticReport->getAttribute($ownerColumn))
                 ->whereHas('diagnosticReport', fn (Builder $query) => $query->where('value', $diagnosticReport->uuid))

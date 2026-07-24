@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * Checks the birthdate according to the ezdorovya specification: https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583402887/Create+employee+request+v2
  */
@@ -20,7 +22,7 @@ class ExpiryDate implements ValidationRule
      * You can pass the start date to check the expiration date against it.
      * If the start date is not passed, the current date will be used.
      *
-     * @param array $dates // 'startDate' - the date of start
+     * @param  array  $dates  // 'startDate' - the date of start
      */
     public function __construct(string $startDate = '')
     {
@@ -33,7 +35,6 @@ class ExpiryDate implements ValidationRule
      * @param  string  $attribute  The name of the attribute being validated
      * @param  mixed  $value  The value of the attribute being validated
      * @param  Closure(string): PotentiallyTranslatedString  $fail  The callback to invoke if validation fails
-     *
      * @return void
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
 use App\Models\User;
@@ -16,7 +18,7 @@ class ApiTokenPermissionsTest extends TestCase
 
     public function test_api_token_permissions_can_be_updated(): void
     {
-        if (! Features::hasApiFeatures()) {
+        if (!Features::hasApiFeatures()) {
             $this->markTestSkipped('API support is not enabled.');
 
             return;

@@ -15,6 +15,7 @@ use Tests\TestCase;
  * the 403 "Party is not verified" case to EHealthResponseException::handle().
  *
  * Full coverage of the exception behaviour is in:
+ *
  * @see \Tests\Feature\EHealth\EHealthResponseExceptionPartyNotVerifiedTest
  */
 class EmployeePartyNotVerifiedTest extends TestCase

@@ -13,7 +13,6 @@ use Carbon\Carbon;
 use App\Models\User;
 use App\Models\License;
 use Livewire\Component;
-use App\Enums\JobStatus;
 use App\Traits\FormTrait;
 use Illuminate\Support\Str;
 use Livewire\WithFileUploads;
@@ -161,7 +160,7 @@ abstract class LegalEntity extends Component
         $fields = [
             'POSITION' => config('ehealth.employee_type.OWNER.position'),
             // TODO: remove some of the documents not mentioned by docs
-            'DOCUMENT_TYPE' => array_filter(config('ehealth.employee_identity_document_types'), fn($docType) => !\in_array($docType, $excludeFromDocuments))
+            'DOCUMENT_TYPE' => array_filter(config('ehealth.employee_identity_document_types'), fn ($docType) => !\in_array($docType, $excludeFromDocuments))
         ];
 
         // Get dictionaries
@@ -575,7 +574,7 @@ abstract class LegalEntity extends Component
         // If no_tax_id=true its means that taxID should store related document's number
         if (Arr::boolean($data, 'owner.no_tax_id')) {
             $passportNumber = collect(Arr::get($data, 'owner.documents', []))
-                ->first(fn(array $doc) => \in_array($doc['type'], ['PASSPORT', 'NATIONAL_ID']))['number'];
+                ->first(fn (array $doc) => \in_array($doc['type'], ['PASSPORT', 'NATIONAL_ID']))['number'];
 
             Arr::set($data, 'owner.tax_id', $passportNumber);
         }

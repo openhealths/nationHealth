@@ -244,9 +244,21 @@ class Encounter extends PatientApiBase
             ValidationRuleBuilder::identifierCollectionRules('participant'),
             ValidationRuleBuilder::identifierCollectionRules('supporting_info'),
 
-            // Collections of сodeable concept
+            // Collections of сodeable concept. Presence of `actions` (ICPC-2) and `reasons` is
+            // class-dependent, mirroring the create form (EncounterForm): PHC requires `actions`
+            // and prohibits it otherwise, while `reasons` is only mandatory for PHC.
+            // @see https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/18167398401/AH+RC+CSI-1758+Submit+Encounter+Package
             ValidationRuleBuilder::codeableConceptCollectionRules('actions'),
+            [
+                'actions' => [
+                    'nullable',
+                    'array',
+                    'required_if:*.class.code,PHC',
+                    'prohibited_unless:*.class.code,PHC'
+                ]
+            ],
             ValidationRuleBuilder::codeableConceptCollectionRules('reasons'),
+            ['reasons' => ['nullable', 'array', 'required_if:*.class.code,PHC']],
 
             // Coding relationships
             ValidationRuleBuilder::codingRules('class', true),

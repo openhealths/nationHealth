@@ -14,7 +14,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('care_plan_activities', function (Blueprint $table) {
-            if (! Schema::hasColumn('care_plan_activities', 'do_not_perform')) {
+            if (!Schema::hasColumn('care_plan_activities', 'do_not_perform')) {
                 $table->boolean('do_not_perform')->default(false);
             }
         });

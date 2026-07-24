@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models\MedicalEvents\Sql\Medications;
 
 use Eloquence\Behaviours\HasCamelCasing;
@@ -34,7 +36,8 @@ class MedicationRequestRequest extends Model
         'priority',
         'prior_prescription_id',
         'container_dosage',
-        'note'
+        'note',
+        'inform_with'
     ];
 
     public function dosageInstructions(): HasMany

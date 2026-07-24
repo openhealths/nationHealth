@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Enums\JobStatus;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
@@ -14,7 +16,7 @@ return new class extends Migration
     {
         // Set default value for is_active column
         Schema::table('declarations', function (Blueprint $table) {
-            if (! Schema::hasColumn('declarations', 'sync_status')) {
+            if (!Schema::hasColumn('declarations', 'sync_status')) {
                 $table->enum('sync_status', JobStatus::values())->nullable();
 
             }

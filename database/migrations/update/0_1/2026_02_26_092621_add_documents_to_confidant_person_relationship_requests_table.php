@@ -14,7 +14,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('confidant_person_relationship_requests', function (Blueprint $table) {
-            if (! Schema::hasColumn('confidant_person_relationship_requests', 'documents')) {
+            if (!Schema::hasColumn('confidant_person_relationship_requests', 'documents')) {
                 $table->jsonb('documents')->nullable()->after('channel');
             }
         });

@@ -1,13 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Classes\eHealth\Providers;
 
 use App\Classes\eHealth\Services\SchemaService;
 use Illuminate\Contracts\Support\DeferrableProvider;
-use Illuminate\Support\Collection;
 use Illuminate\Support\ServiceProvider;
 
-class SchemaServiceProvider extends ServiceProvider implements DeferrableProvider {
+class SchemaServiceProvider extends ServiceProvider implements DeferrableProvider
+{
     /**
      * Register services.
      */

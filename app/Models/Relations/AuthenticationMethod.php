@@ -47,8 +47,7 @@ class AuthenticationMethod extends Model
      *
      * @param  Builder  $query
      * @param  Model  $authenticatable
-     * @param  string|null $uuid
-     *
+     * @param  string|null  $uuid
      * @return Builder
      */
     #[Scope]

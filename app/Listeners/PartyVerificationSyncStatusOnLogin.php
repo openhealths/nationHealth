@@ -49,6 +49,7 @@ class PartyVerificationSyncStatusOnLogin
 
         if (Cache::has($cacheKey)) {
             Log::info('Party verification sync skipped: Already ran today.', ['legal_entity_id' => $legalEntity->id]);
+
             return;
         }
 
@@ -60,6 +61,7 @@ class PartyVerificationSyncStatusOnLogin
             $token = $event->token;
         } catch (Throwable $e) {
             Log::error('Party verification listener: Token decryption failed.', ['error' => $e->getMessage()]);
+
             return;
         }
 
@@ -70,6 +72,7 @@ class PartyVerificationSyncStatusOnLogin
                 'user_id' => $user->id,
                 'required_scope' => self::SCOPE_REQUIRED
             ]);
+
             return;
         }
 
@@ -118,10 +121,9 @@ class PartyVerificationSyncStatusOnLogin
 
     /**
      * Checks if the JWT token contains the specified scope.
+     *
      * * @param string $token The raw Bearer token (JWT).
-     *
-     * @param string $requiredScope The scope to check for.
-     *
+     * @param  string  $requiredScope  The scope to check for.
      * @return bool
      * @throws JsonException
      */

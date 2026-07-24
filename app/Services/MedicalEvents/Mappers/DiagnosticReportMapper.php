@@ -87,9 +87,10 @@ class DiagnosticReportMapper implements FhirMapperContract
                 ->pluck('id')
                 ->filter()
                 ->unique()
-                ->map(static fn (string $equipmentUuid) => FhirResource::make()
-                    ->coding('eHealth/resources', 'equipment')
-                    ->toIdentifier($equipmentUuid)
+                ->map(
+                    static fn (string $equipmentUuid) => FhirResource::make()
+                        ->coding('eHealth/resources', 'equipment')
+                        ->toIdentifier($equipmentUuid)
                 )
                 ->values()
                 ->toArray();

@@ -14,9 +14,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('confidant_persons', function (Blueprint $table) {
-             if (! Schema::hasColumn('confidant_persons', 'active_to')) {
+            if (!Schema::hasColumn('confidant_persons', 'active_to')) {
                 $table->date('active_to')->nullable()->after('person_request_id');
-             }
+            }
         });
     }
 

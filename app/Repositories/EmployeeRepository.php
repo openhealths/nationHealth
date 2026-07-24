@@ -97,7 +97,7 @@ readonly class EmployeeRepository
      * 3. Joins these aggregated subqueries to the main 'parties' query.
      * 4. Sorts results by the greatest (most recent) timestamp found in either relation.
      *
-     * @param int $legalEntityId
+     * @param  int  $legalEntityId
      * @return Builder
      */
     public function getPartiesWithLatestActivityQuery(int $legalEntityId): Builder
@@ -162,16 +162,16 @@ readonly class EmployeeRepository
             $model->party()->associate($newParty)->save();
 
             // If the model doesn't have a related party but the party already exists, update it and relate - the scenario of a new employee with already created person/party
-        } else if ($partyByUuid && !$model->party) {
+        } elseif ($partyByUuid && !$model->party) {
             $partyByUuid->update($party);
             $model->party()->associate($partyByUuid)->save();
 
             // The model already has a related party, update it and change the UUID - the case when eHealth creates another party, probably merge scenario
-        } else if (!$partyByUuid && $model->party) {
+        } elseif (!$partyByUuid && $model->party) {
             $model->party()->update($party);
 
             // Both the model and the party exist, check if they are the same
-        } else if ($partyByUuid && $model->party) {
+        } elseif ($partyByUuid && $model->party) {
 
             // uuid is the same, just update
             if ($partyByUuid->uuid === $model->party->uuid) {
@@ -181,8 +181,8 @@ readonly class EmployeeRepository
                 $model->party()->update($party);
 
                 Log::warning('Potential party merge scenario detected', [
-                    'model_party_uuid'          => $model->party->uuid,
-                    'ehealth_party_uuid'        => $partyByUuid->uuid,
+                    'model_party_uuid' => $model->party->uuid,
+                    'ehealth_party_uuid' => $partyByUuid->uuid,
                     'updated_with_ehealth_data' => true
                 ]);
             }

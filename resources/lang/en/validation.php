@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
 
     /*
@@ -189,8 +191,8 @@ return [
         'name' => 'name',
         'phone' => 'phone',
         '_token' => 'token CSRF',
-        'form'=> [
-            'edrpou'=>'EDRPOU'
+        'form' => [
+            'edrpou' => 'EDRPOU'
         ],
     ],
 
