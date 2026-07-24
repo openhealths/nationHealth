@@ -20,12 +20,14 @@
             @endcan
 
             @can('createReimbursement', ContractRequest::class)
-                <a href="{{ route('contract-request.reimbursement.create', [legalEntity()]) }}"
-                   wire:navigate
-                   class="button-primary flex items-center gap-2 whitespace-nowrap">
-                    @icon('plus', 'w-4 h-4')
-                    {{ __('contracts.new') }} ({{ __('contracts.reimbursement') }})
-                </a>
+                @if(legalEntity()?->type?->name === \App\Models\LegalEntity::TYPE_PHARMACY)
+                    <a href="{{ route('contract-request.reimbursement.create', [legalEntity()]) }}"
+                       wire:navigate
+                       class="button-primary flex items-center gap-2 whitespace-nowrap">
+                        @icon('plus', 'w-4 h-4')
+                        {{ __('contracts.new') }} ({{ __('contracts.reimbursement') }})
+                    </a>
+                @endif
             @endcan
 
             @can('sync', ContractRequest::class)
@@ -99,11 +101,12 @@
                     <table class="index-table">
                         <thead class="index-table-thead">
                         <tr>
-                            <th class="index-table-th w-[25%]">{{ __('contracts.number_label') }}</th>
-                            <th class="index-table-th w-[15%]">{{ __('contracts.type_label') }}</th>
-                            <th class="index-table-th w-[15%]">{{ __('contracts.status_label') }}</th>
-                            <th class="index-table-th w-[20%]">{{ __('contracts.period') }}</th>
-                            <th class="index-table-th w-[15%]">{{ __('contracts.date_added') }}</th>
+                            <th class="index-table-th">{{ __('contracts.number_label') }}</th>
+                            <th class="index-table-th">{{ __('contracts.type_label') }}</th>
+                            <th class="index-table-th">{{ __('contracts.period') }}</th>
+                            <th class="index-table-th">{{ __('contracts.date_added') }}</th>
+                            <th class="index-table-th">{{ __('contracts.status_label') }}</th>
+                            <th class="index-table-th">{{ __('contracts.status_reason_label') }}</th>
                             <th class="index-table-th w-[10%]"></th>
                         </tr>
                         </thead>
@@ -112,37 +115,33 @@
                             <tr wire:key="contract-{{ $item->uuid }}">
                                 <td class="index-table-td">
                                     <div class="text-sm text-gray-900 font-medium">
-                                        {{-- Display contract_number or translated 'missing' text --}}
                                         {{ $item->contract_number ?: __('contracts.missing') }}
                                     </div>
-
-                                    {{-- Show status_reason if exists, as required by eHealth TZ --}}
-                                    @if($item->status_reason)
-                                        <div class="text-xs text-red-500 mt-1" title="{{ __('contracts.status_reason') }}">
-                                            {{ str($item->status_reason)->limit(60) }}
-                                        </div>
-                                    @endif
                                 </td>
                                 <td class="index-table-td">
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        {{-- Translate the contract type dynamically --}}
-                                        @php
-                                            $displayType = $item->type ? __('contracts.' . strtolower($item->type)) : __('contracts.missing');
-                                            if ($item->type === 'REIMBURSEMENT' && legalEntity()->type->name === \App\Models\LegalEntity::TYPE_PRIMARY_CARE) {
-                                                $displayType = __('contracts.capitation');
-                                            }
-                                        @endphp
-                                        {{ $displayType }}
+                                        {{ Type::resolveLabel($item->type) }}
                                     </span>
+                                </td>
+                                <td class="index-table-td text-sm text-gray-500">
+                                    @php
+                                        $listStart = $item->start_date?->format(config('app.date_format'))
+                                            ?: formatDisplayDate(data_get($item->data, 'start_date'));
+                                        $listEnd = $item->end_date?->format(config('app.date_format'))
+                                            ?: formatDisplayDate(data_get($item->data, 'end_date'));
+                                    @endphp
+                                    {{ $listStart && $listEnd ? "{$listStart} - {$listEnd}" : ($listStart ?: $listEnd ?: '-') }}
+                                </td>
+                                <td class="index-table-td text-sm text-gray-500">
+                                    {{ $item->inserted_at?->format(config('app.date_format'))
+                                        ?? formatDisplayDate(data_get($item->data, 'inserted_at'))
+                                        ?: '-' }}
                                 </td>
                                 <td class="index-table-td">
                                     <x-status-badge :status="$item->status"/>
                                 </td>
-                                <td class="index-table-td text-sm text-gray-500">
-                                    {{ $item->start_date?->format(config('app.date_format')) }} - {{ $item->end_date?->format(config('app.date_format')) }}
-                                </td>
-                                <td class="index-table-td text-sm text-gray-500">
-                                    {{ $item->inserted_at?->format(config('app.date_format')) ?? $item->created_at?->format(config('app.date_format')) }}
+                                <td class="index-table-td text-sm text-gray-500" title="{{ $item->status_reason ?? data_get($item->data, 'status_reason') }}">
+                                    {{ ($item->status_reason ?: data_get($item->data, 'status_reason')) ?: '-' }}
                                 </td>
 
                                 <td class="index-table-td-actions">

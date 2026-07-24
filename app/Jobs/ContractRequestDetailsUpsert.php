@@ -49,16 +49,23 @@ class ContractRequestDetailsUpsert extends EHealthJob
 
         if (!empty($ehealthData)) {
             $this->contractRequestModel->update([
-                'contractor_base' => $ehealthData['contractor_base'] ?? $this->contractRequestModel->contractor_base,
+                'contractor_base' => $ehealthData['contractor_base'] ?? $this->contractRequestModel->contractorBase,
                 'contractor_payment_details' => $ehealthData['contractor_payment_details'] ?? null,
                 'contractor_divisions' => $ehealthData['contractor_divisions'] ?? null,
                 'external_contractors' => $ehealthData['external_contractors'] ?? null,
-                'nhs_signer_id' => $ehealthData['nhs_signer']['id'] ?? null,
+                'nhs_signer_id' => $ehealthData['nhs_signer']['id'] ?? $ehealthData['nhs_signer']['uuid'] ?? null,
                 'nhs_signer_base' => $ehealthData['nhs_signer_base'] ?? null,
                 'nhs_contract_price' => $ehealthData['nhs_contract_price'] ?? null,
                 'nhs_payment_method' => $ehealthData['nhs_payment_method'] ?? null,
+                'id_form' => $ehealthData['id_form'] ?? $this->contractRequestModel->idForm,
+                'contract_number' => $ehealthData['contract_number'] ?? $this->contractRequestModel->contractNumber,
+                'start_date' => $ehealthData['start_date'] ?? $this->contractRequestModel->startDate,
+                'end_date' => $ehealthData['end_date'] ?? $this->contractRequestModel->endDate,
                 'status' => $ehealthData['status'] ?? $this->contractRequestModel->status,
-                'status_reason' => $ehealthData['status_reason'] ?? null,
+                'status_reason' => $ehealthData['status_reason'] ?? $this->contractRequestModel->statusReason,
+                'inserted_at' => !empty($ehealthData['inserted_at'])
+                    ? \Illuminate\Support\Carbon::parse($ehealthData['inserted_at'])
+                    : $this->contractRequestModel->insertedAt,
                 'data' => $ehealthData,
                 'sync_status' => JobStatus::COMPLETED->value,
             ]);

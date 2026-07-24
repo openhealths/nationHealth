@@ -20,4 +20,21 @@ enum Type: string
             self::CAPITATION => __('contracts.capitation'),
         };
     }
+
+    public static function resolveLabel(mixed $type): string
+    {
+        if ($type instanceof self) {
+            return $type->label();
+        }
+
+        $value = strtoupper((string) (is_object($type) && property_exists($type, 'value')
+            ? $type->value
+            : $type));
+
+        if ($value === '') {
+            return __('contracts.missing');
+        }
+
+        return self::tryFrom($value)?->label() ?? $value;
+    }
 }

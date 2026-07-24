@@ -62,7 +62,8 @@ class Contract extends EHealthRequest
             'id_form' => $data['id_form'] ?? null,
             'issue_city' => $data['issue_city'] ?? null,
             'medical_programs' => $data['medical_programs'] ?? [],
-            'inserted_at' => $data['inserted_at'] ?? now(),
+            // Never invent "today" when eHealth omits inserted_at — that caused false creation dates in UI.
+            'inserted_at' => !empty($data['inserted_at']) ? $data['inserted_at'] : null,
             'data' => $data,
         ];
     }

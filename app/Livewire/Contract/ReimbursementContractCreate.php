@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Contract;
 
 use App\Livewire\Contract\Forms\ReimbursementContractRequestForm as Form;
+use App\Enums\Contract\IdForm;
 use App\Models\LegalEntity;
 use App\Repositories\Repository;
 use Carbon\Carbon;
@@ -137,7 +138,7 @@ class ReimbursementContractCreate extends ContractComponent
                 $mrBlankType = $item['mr_blank_type'] ?? null;
 
                 // For psychiatry contracts, allow F-3 programs.
-                if ($idForm === 'PSYCHIATRY') {
+                if ($idForm === IdForm::PSYCHIATRY->value) {
                     return in_array($mrBlankType, ['F-1', 'F-3'], true);
                 }
 
@@ -180,7 +181,7 @@ class ReimbursementContractCreate extends ContractComponent
             'start_date' => Carbon::parse($data['startDate'])->format('Y-m-d'),
             'end_date' => Carbon::parse($data['endDate'])->format('Y-m-d'),
 
-            'id_form' => $data['idForm'] ?? 'GENERAL',
+            'id_form' => $data['idForm'] ?? IdForm::GENERAL->value,
 
             'statute_md5' => $data['statuteMd5'] ?? null,
             'additional_document_md5' => $data['additionalDocumentMd5'] ?? null,

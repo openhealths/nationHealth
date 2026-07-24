@@ -70,14 +70,16 @@ class ContractRequest extends EHealthRequest
             'contract_number' => $data['contract_number'] ?? null,
             'status' => $data['status'],
             'status_reason' => $data['status_reason'] ?? null,
-            'type' => strtoupper((string) ($data['type'] ?? $data['contract_type'] ?? 'REIMBURSEMENT')),
+            'type' => isset($data['type'])
+                ? strtoupper((string) $data['type'])
+                : (isset($data['contract_type']) ? strtoupper((string) $data['contract_type']) : null),
             'id_form' => $data['id_form'] ?? null,
 
-            // Dates
+            // Dates — never invent "today" when eHealth omits inserted_at
             'start_date' => $data['start_date'] ?? null,
             'end_date' => $data['end_date'] ?? null,
-            'inserted_at' => $data['inserted_at'] ?? now(),
-            'updated_at' => $data['updated_at'] ?? now(),
+            'inserted_at' => !empty($data['inserted_at']) ? $data['inserted_at'] : null,
+            'updated_at' => !empty($data['updated_at']) ? $data['updated_at'] : null,
 
             // Signer details and addresses
             'contractor_base' => $data['contractor_base'] ?? null,

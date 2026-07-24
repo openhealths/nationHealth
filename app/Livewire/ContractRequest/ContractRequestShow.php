@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\ContractRequest;
 
 use App\Classes\eHealth\EHealth;
+use App\Enums\Contract\IdForm;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\Contract\Forms\ContractRequestSigningForm as SigningForm;
@@ -332,18 +333,24 @@ class ContractRequestShow extends Component
             }
 
             $this->contractRequest->update([
-                'contractor_base' => $ehealthData['contractor_base'] ?? $this->contractRequest->contractor_base,
+                'contractor_base' => $ehealthData['contractor_base'] ?? $this->contractRequest->contractorBase,
                 'contractor_payment_details' => $ehealthData['contractor_payment_details'] ?? null,
                 'contractor_divisions' => $ehealthData['contractor_divisions'] ?? null,
                 'external_contractors' => $ehealthData['external_contractors'] ?? null,
-                'nhs_signer_id' => $ehealthData['nhs_signer']['id'] ?? null,
+                'nhs_signer_id' => $ehealthData['nhs_signer']['id'] ?? $ehealthData['nhs_signer']['uuid'] ?? null,
                 'nhs_signer_base' => $ehealthData['nhs_signer_base'] ?? null,
                 'nhs_contract_price' => $ehealthData['nhs_contract_price'] ?? null,
                 'nhs_payment_method' => $ehealthData['nhs_payment_method'] ?? null,
+                'id_form' => $ehealthData['id_form'] ?? $this->contractRequest->idForm,
+                'contract_number' => $ehealthData['contract_number'] ?? $this->contractRequest->contractNumber,
+                'start_date' => $ehealthData['start_date'] ?? $this->contractRequest->startDate,
+                'end_date' => $ehealthData['end_date'] ?? $this->contractRequest->endDate,
                 'status' => $ehealthData['status'] ?? $this->contractRequest->status,
-                'status_reason' => $ehealthData['status_reason'] ?? null,
-                'inserted_at' => isset($ehealthData['inserted_at']) ? \Illuminate\Support\Carbon::parse($ehealthData['inserted_at']) : $this->contractRequest->inserted_at,
-                'printout_content' => $printoutContent ?? $this->contractRequest->printout_content,
+                'status_reason' => $ehealthData['status_reason'] ?? $this->contractRequest->statusReason,
+                'inserted_at' => !empty($ehealthData['inserted_at'])
+                    ? \Illuminate\Support\Carbon::parse($ehealthData['inserted_at'])
+                    : $this->contractRequest->insertedAt,
+                'printout_content' => $printoutContent ?? $this->contractRequest->printoutContent,
                 'data' => $ehealthData,
             ]);
 
@@ -374,11 +381,11 @@ class ContractRequestShow extends Component
 
     public function render()
     {
-        $dictionaryName = $this->contractRequest->type === 'REIMBURSEMENT' ? 'REIMBURSEMENT_CONTRACT_TYPE' : 'CONTRACT_TYPE';
-        $idFormName = dictionary()->basics()->byName($dictionaryName)->asCodeDescription()->toArray()[$this->contractRequest->id_form] ?? $this->contractRequest->id_form;
+        $idFormCode = $this->contractRequest->idForm
+            ?? data_get($this->contractData, 'id_form');
 
         return view('livewire.contract-request.contract-request-show', [
-            'idFormName' => $idFormName,
+            'idFormName' => IdForm::resolveLabel($idFormCode, $this->contractRequest->type),
         ]);
     }
 }

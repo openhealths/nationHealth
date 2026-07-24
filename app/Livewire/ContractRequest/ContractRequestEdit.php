@@ -25,7 +25,7 @@ class ContractRequestEdit extends ReimbursementContractCreate
         // 2.Install savedUuid so that createLocally() knows that this update is
         $this->savedUuid = $this->contractRequest->uuid;
 
-        // 3. Call the parent mount to initialize directories
+        // 3. Call the parent mount to initialize dictionaries
         parent::mount($legalEntity);
 
         // 4. Fill out the form with data from the database
