@@ -1,3 +1,4 @@
+@use('App\Enums\Contract\PaymentMethod')
 @php
     $paymentMethod = data_get($data, 'nhs_payment_method')
         ?? (isset($contract) ? ($contract->nhs_payment_method ?? null) : null);
@@ -58,7 +59,7 @@
             <label for="nhs-payment-method" class="label">{{ __('contracts.payment_method_label') }}</label>
             <input id="nhs-payment-method"
                    type="text"
-                   value="{{ contractPaymentMethodLabel($paymentMethod) }}"
+                   value="{{ PaymentMethod::resolveLabel($paymentMethod) }}"
                    class="input peer"
                    placeholder=" "
                    disabled

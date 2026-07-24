@@ -106,7 +106,7 @@
                                 </td>
                                 <td class="index-table-td">
                                     <span class="badge-yellow">
-                                        {{ contractTypeLabel($item->type) }}
+                                        {{ Type::resolveLabel($item->type) }}
                                     </span>
                                 </td>
                                 <td class="index-table-td text-sm text-gray-500">
