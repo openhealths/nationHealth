@@ -47,12 +47,12 @@ class EmployeeShowPartyUuidTest extends TestCase
             'employee' => $employee,
         ])
             ->assertOk()
-            ->assertSee(__('employees.party_uuid'))
+            ->assertSee(__('employees.ehealth_id'))
             ->assertSee($partyUuid);
     }
 
     #[Test]
-    public function employee_show_hides_party_uuid_when_missing(): void
+    public function employee_show_displays_empty_ehealth_id_when_party_uuid_missing(): void
     {
         [$legalEntity, $employee] = $this->createEmployeeWithPartyUuid(withPartyUuid: false);
 
@@ -61,8 +61,8 @@ class EmployeeShowPartyUuidTest extends TestCase
             'employee' => $employee,
         ])
             ->assertOk()
-            ->assertDontSee(__('employees.party_uuid'), false)
-            ->assertDontSee('id="partyUuid"', false);
+            ->assertSee(__('employees.ehealth_id'))
+            ->assertSeeHtml('id="partyUuid"');
     }
 
     #[Test]
@@ -75,7 +75,7 @@ class EmployeeShowPartyUuidTest extends TestCase
             'employee_request' => $employeeRequest,
         ])
             ->assertOk()
-            ->assertSee(__('employees.party_uuid'))
+            ->assertSee(__('employees.ehealth_id'))
             ->assertSee($partyUuid);
     }
 
