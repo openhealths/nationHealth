@@ -6,8 +6,6 @@ namespace App\Classes\eHealth\Api;
 
 use App\Classes\eHealth\EHealthRequest;
 use App\Classes\eHealth\EHealthResponse;
-use App\Classes\eHealth\Exceptions\ApiException;
-use App\Classes\eHealth\Request;
 use App\Core\Arr;
 use GuzzleHttp\Promise\PromiseInterface;
 use App\Exceptions\EHealth\EHealthConnectionException;
@@ -62,17 +60,21 @@ class Employee extends EHealthRequest
      *
      * @param  string  $id  The UUID of the employee.
      * @param  string  $endDate  The end date in 'Y-m-d' format.
-     * @return array
-     * @throws ApiException
+     * @return PromiseInterface|EHealthResponse
+     * @throws EHealthConnectionException|EHealthResponseException
      */
-    public static function deactivate(string $id, string $endDate): array
+    public function deactivate(string $id, ?string $endDate = null, string $status = 'STOPPED'): PromiseInterface|EHealthResponse
     {
         $payload = [
-            'status' => 'STOPPED',
-            'end_date' => $endDate,
+            'status' => $status,
         ];
 
-        return new Request('PATCH', self::URL.'/'.$id.'/actions/deactivate', $payload)->sendRequest();
+        // ENTERED_IN_ERROR must not include end_date (п.4.1.2).
+        if ($status === 'STOPPED' && $endDate !== null && $endDate !== '') {
+            $payload['end_date'] = $endDate;
+        }
+
+        return $this->patch(self::URL . '/' . $id . '/actions/deactivate', $payload);
     }
 
     /**
