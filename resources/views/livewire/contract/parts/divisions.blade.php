@@ -73,7 +73,7 @@
                         </div>
                         <div class="flex items-center space-x-4 justify-start mt-2 md:mt-0">
                             <template x-if="divisions.length > 1">
-                                <button type="button" @click.prevent="divisions.splice(index, 1)" class="item-remove text-error ml-2">
+                                <button type="button" @click.prevent="divisions.splice(index, 1)" class="text-error ml-2 cursor-pointer hover:text-red-800">
                                     @icon('delete', 'w-5 h-5 text-red-600')
                                 </button>
                             </template>

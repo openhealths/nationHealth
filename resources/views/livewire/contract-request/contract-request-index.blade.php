@@ -112,18 +112,18 @@
                         </thead>
                         <tbody class="index-table-tbody">
                         @foreach($contracts as $item)
-                            <tr wire:key="contract-{{ $item->uuid }}">
+                            <tr wire:key="contract-{{ $item->uuid }}" class="index-table-tr">
                                 <td class="index-table-td">
-                                    <div class="text-sm text-gray-900 font-medium">
+                                    <div class="text-sm text-gray-900 dark:text-gray-100 font-medium">
                                         {{ $item->contract_number ?: __('contracts.missing') }}
                                     </div>
                                 </td>
                                 <td class="index-table-td">
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
                                         {{ contractTypeLabel($item->type) }}
                                     </span>
                                 </td>
-                                <td class="index-table-td text-sm text-gray-500">
+                                <td class="index-table-td text-sm text-gray-500 dark:text-gray-400">
                                     @php
                                         $listStart = $item->start_date?->format(config('app.date_format'))
                                             ?: formatDisplayDate(data_get($item->data, 'start_date'));
@@ -132,7 +132,7 @@
                                     @endphp
                                     {{ $listStart && $listEnd ? "{$listStart} - {$listEnd}" : ($listStart ?: $listEnd ?: '-') }}
                                 </td>
-                                <td class="index-table-td text-sm text-gray-500">
+                                <td class="index-table-td text-sm text-gray-500 dark:text-gray-400">
                                     {{ $item->inserted_at?->format(config('app.date_format'))
                                         ?? formatDisplayDate(data_get($item->data, 'inserted_at'))
                                         ?: '-' }}
@@ -140,7 +140,7 @@
                                 <td class="index-table-td">
                                     <x-status-badge :status="$item->status"/>
                                 </td>
-                                <td class="index-table-td text-sm text-gray-500" title="{{ $item->status_reason ?? data_get($item->data, 'status_reason') }}">
+                                <td class="index-table-td text-sm text-gray-500 dark:text-gray-400" title="{{ $item->status_reason ?? data_get($item->data, 'status_reason') }}">
                                     {{ ($item->status_reason ?: data_get($item->data, 'status_reason')) ?: '-' }}
                                 </td>
 
@@ -182,14 +182,14 @@
                                                 x-transition.origin.top.left
                                                 @click.outside="close($refs.button)"
                                                 :id="$id('dropdown-button')"
-                                                class="absolute right-0 mt-2 w-44 rounded-md bg-white shadow-md z-50 border border-gray-100"
+                                                class="absolute right-0 mt-2 w-44 rounded-md bg-white dark:bg-gray-800 shadow-md z-50 border border-gray-100 dark:border-gray-700"
                                             >
                                                 {{-- View action with fixed route parameters --}}
                                                 <a href="{{ route('contract-request.show', ['legalEntity' => legalEntity(), 'contractRequest' => $item->id]) }}"
                                                    wire:navigate
-                                                   class="flex items-center gap-2 w-full rounded-md px-4 py-2.5 text-left text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                                                   class="flex items-center gap-2 w-full rounded-md px-4 py-2.5 text-left text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                                                 >
-                                                    @icon('eye', 'w-5 h-5 text-gray-600')
+                                                    @icon('eye', 'w-5 h-5 text-gray-600 dark:text-gray-300')
                                                     {{ __('contracts.view') }}
                                                 </a>
                                             </div>
