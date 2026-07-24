@@ -105,6 +105,48 @@ class EmployeeRequest extends BaseEmployee
         return $this->morphMany(Speciality::class, 'specialityable');
     }
 
+    /**
+     * Search by full name words against linked party and/or revision.party JSON.
+     * Each word must match at least one name part (same idea as EmployeeIndex).
+     *
+     * @param  Builder<EmployeeRequest>  $query
+     * @return Builder<EmployeeRequest>
+     */
+    public function scopeSearchByFullName(Builder $query, string $search): Builder
+    {
+        $words = preg_split('/\s+/u', trim($search), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        if ($words === []) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $outer) use ($words): void {
+            $outer
+                ->whereHas('party', function (Builder $partyQuery) use ($words): void {
+                    foreach ($words as $word) {
+                        $term = '%' . $word . '%';
+                        $partyQuery->where(function (Builder $nameQuery) use ($term): void {
+                            $nameQuery
+                                ->where('last_name', 'ILIKE', $term)
+                                ->orWhere('first_name', 'ILIKE', $term)
+                                ->orWhere('second_name', 'ILIKE', $term);
+                        });
+                    }
+                })
+                ->orWhereHas('revision', function (Builder $revisionQuery) use ($words): void {
+                    foreach ($words as $word) {
+                        $term = '%' . $word . '%';
+                        $revisionQuery->where(function (Builder $nameQuery) use ($term): void {
+                            $nameQuery
+                                ->whereRaw("(data->'party'->>'last_name') ILIKE ?", [$term])
+                                ->orWhereRaw("(data->'party'->>'first_name') ILIKE ?", [$term])
+                                ->orWhereRaw("(data->'party'->>'second_name') ILIKE ?", [$term]);
+                        });
+                    }
+                });
+        });
+    }
+
     // --- TEMPORARY SCOPES (to be removed after controller refactoring) ---
 
     public function scopeEmployeeInstance(Builder $query, int $userId, string $legalEntityUUID, array $roles, bool $isInclude = false): void
