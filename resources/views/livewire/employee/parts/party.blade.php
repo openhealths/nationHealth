@@ -5,23 +5,6 @@
         <h2>{{__('forms.personal_data')}}</h2>
     </legend>
     <div class="form">
-        @if(isset($employee) && filled($employee->party?->uuid))
-            <div class="form-row-3">
-                <div class="form-group group">
-                    <input
-                        value="{{ $employee->party->uuid }}"
-                        type="text"
-                        name="partyUuid"
-                        id="partyUuid"
-                        placeholder=" "
-                        class="peer input font-mono text-gray-500"
-                        disabled
-                        readonly
-                    />
-                    <label for="partyUuid" class="label">{{ __('employees.party_uuid') }}</label>
-                </div>
-            </div>
-        @endif
         <div class="form-row-3">
             <div class="form-group">
                 <input wire:model="form.party.lastName" type="text" name="lastName" id="lastName" class="peer input text-gray-500" placeholder=" " required
@@ -187,13 +170,28 @@
             </template>
         </div>
 
-        {{-- Email & About Myself --}}
+        {{-- Email & party eHealth ID (show view only) --}}
         <div class="form-row-3">
             <div class="form-group">
                 <input wire:model="form.party.email" type="email" id="email" name="email" class="peer input text-gray-500" placeholder=" "/>
                 <label for="email" class="label">{{ __('forms.email') }}</label>
                 @error('form.party.email') <p class="text-error">{{ $message }}</p> @enderror
             </div>
+            @isset($employee)
+                <div class="form-group group">
+                    <input
+                        value="{{ $employee->party?->uuid ?? '' }}"
+                        type="text"
+                        name="partyUuid"
+                        id="partyUuid"
+                        placeholder=" "
+                        class="peer input text-gray-500"
+                        disabled
+                        readonly
+                    />
+                    <label for="partyUuid" class="label">{{ __('employees.ehealth_id') }}</label>
+                </div>
+            @endisset
         </div>
         <div class="form-row-2">
             <div class="form-group">
