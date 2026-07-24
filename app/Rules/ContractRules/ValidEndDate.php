@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Rules\ContractRules;
 
 use Closure;
@@ -14,7 +16,7 @@ class ValidEndDate implements ValidationRule
     /**
      * Create a new rule instance.
      *
-     * @param string $startDate
+     * @param  string  $startDate
      */
     public function __construct(string $startDate)
     {
@@ -40,6 +42,7 @@ class ValidEndDate implements ValidationRule
 
         if (!preg_match($datePattern, $endDate)) {
             $fail('Атрибут :attribute має бути дійсною датою у форматі ISO 8601.');
+
             return;
         }
 
@@ -49,6 +52,7 @@ class ValidEndDate implements ValidationRule
         // Validate date range
         if ($end->lessThan($start)) {
             $fail('Дата закінчення повинна бути більше або дорівнювати даті початку.');
+
             return;
         }
 
@@ -56,6 +60,7 @@ class ValidEndDate implements ValidationRule
         $periodDays = $end->diffInDays($start);
         if ($periodDays > $this->maxPeriodDays) {
             $fail('Різниця між датами закінчення та початку перевищує дозволені ' . $this->maxPeriodDays . ' днів.');
+
             return;
         }
 
@@ -68,4 +73,3 @@ class ValidEndDate implements ValidationRule
         }
     }
 }
-

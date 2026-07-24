@@ -111,12 +111,8 @@
         </div>
     </div>
 
-    @if($showAuthModal)
-        @include('livewire.care-plan.modals.authentication')
-    @endif
-    @if($showMethodSelectionModal)
-        @include('livewire.care-plan.modals.method-selection')
-    @endif
+    @include('livewire.care-plan.modals.authentication')
+    @include('livewire.care-plan.modals.method-selection')
 
     {{-- Async approval job polling — only active when $isPolling is true --}}
     @if($isPolling)

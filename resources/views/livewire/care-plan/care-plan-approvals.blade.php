@@ -36,10 +36,10 @@
                                 <td class="index-table-td">
                                     <div class="flex flex-col">
                                         <span class="font-medium text-gray-900 dark:text-white">
-                                            {{ $approval['granted_to_details']['name'] ?? '-' }}
+                                            {{ $approval['grantedToDetails']['name'] ?? $approval['granted_to_details']['name'] ?? '-' }}
                                         </span>
                                         <span class="text-xs text-gray-500 dark:text-gray-400">
-                                            {{ $approval['granted_to_details']['description'] ?? '' }}
+                                            {{ $approval['grantedToDetails']['description'] ?? $approval['granted_to_details']['description'] ?? '' }}
                                         </span>
                                     </div>
                                 </td>
@@ -49,7 +49,7 @@
                                     </span>
                                 </td>
                                 <td class="index-table-td">
-                                    {{ isset($approval['created_at']) ? \Carbon\Carbon::parse($approval['created_at'])->format('d.m.Y H:i') : '-' }}
+                                    {{ isset($approval['createdAt']) || isset($approval['created_at']) ? \Carbon\Carbon::parse($approval['createdAt'] ?? $approval['created_at'])->format('d.m.Y H:i') : '-' }}
                                 </td>
                                 <td class="index-table-td-actions">
                                     @if(($approval['status'] ?? '') === 'active')
@@ -171,8 +171,6 @@
         </div>
     </div>
 
-    @if($showAuthModal)
-        @include('livewire.care-plan.modals.authentication')
-    @endif
+    @include('livewire.care-plan.modals.authentication')
 
 </div>

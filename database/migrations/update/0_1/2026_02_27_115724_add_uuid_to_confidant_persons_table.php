@@ -14,7 +14,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('confidant_persons', function (Blueprint $table) {
-            if (! Schema::hasColumn('confidant_persons', 'uuid')) {
+            if (!Schema::hasColumn('confidant_persons', 'uuid')) {
                 $table->uuid()->after('id');
             }
         });

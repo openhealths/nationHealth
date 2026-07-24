@@ -36,7 +36,7 @@ return new class extends Migration
     /**
      * Restrict the diagnostic_reports status column to the given values.
      *
-     * @param array<int, string> $values
+     * @param  array<int, string>  $values
      * @return void
      */
     private function setStatusConstraint(array $values): void

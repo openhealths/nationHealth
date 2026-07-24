@@ -177,7 +177,7 @@ class Approval extends Model
     {
         $uuid = $this->grantedTo?->value;
 
-        if (! $uuid) {
+        if (!$uuid) {
             return [
                 'name' => '-',
                 'description' => $this->granted_to_type ?? '',

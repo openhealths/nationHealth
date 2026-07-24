@@ -1,16 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Classes\eHealth;
 
-use App\Classes\eHealth\Errors\ErrorHandler;
 use App\Classes\eHealth\Exceptions\ApiException;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 
 class ApiRequest
 {
-
-
     private string $method;
 
     private string $url;
@@ -30,11 +28,10 @@ class ApiRequest
         // Retrieve all data from the incoming request
         $data = request()->all();
 
-
         // Check if any data was provided
         if (empty($data)) {
             return response()->json([
-                'status'  => 'error',
+                'status' => 'error',
                 'message' => 'No data provided'
             ], 400); // Return a 400 Bad Request response
         }
@@ -50,7 +47,7 @@ class ApiRequest
         // Validate that both method and URL are provided
         if (empty($this->method) || empty($this->url)) {
             return response()->json([
-                'status'  => 'error',
+                'status' => 'error',
                 'message' => 'Method and URL are required'
             ], 400); // Return a 400 Bad Request response
         }
@@ -66,37 +63,39 @@ class ApiRequest
             if (isset($data['urgent']) && !empty($data['urgent'])) {
                 return response()->json([
                     'status' => 'success',
-                    'data'   => $data
+                    'data' => $data
                 ]);
             }
+
             return response()->json($data, $response->status()); // Return the successful response data
         }
 
         // Handle 401 Unauthorized error
         if ($response->status() === 401) {
             $data = json_decode($response->body(), true);
+
             return response()->json($data, $response->status());
         }
 
         // Handle other types of errors
         if ($response->failed()) {
             $errors = json_decode($response->body(), true);
+
             return response()->json($errors, $response->status());
         }
 
         // Handle unexpected errors
         return response()->json([
-            'status'  => 'error',
+            'status' => 'error',
             'message' => 'An unexpected error occurred'
         ], 500); // Return a 500 Internal Server Error response
     }
-
 
     public function getHeaders(): array
     {
         $headers = [
             'X-Custom-PSK' => config('ehealth.api.token'),
-            'API-key'      => config('ehealth.api.api_key'),
+            'API-key' => config('ehealth.api.api_key'),
         ];
 
         if ($this->isToken) {
@@ -105,11 +104,11 @@ class ApiRequest
 
         return array_merge($headers, $this->headers);
     }
-//
-//    //TODO
-//    private function flashMessage($message, $type)
-//    {
-//        // Виклик події браузера через Livewire
-//        \Livewire\Component::dispatch('flashMessage', ['message' => $message, 'type' => $type]);
-//    }
+    //
+    //    //TODO
+    //    private function flashMessage($message, $type)
+    //    {
+    //        // Виклик події браузера через Livewire
+    //        \Livewire\Component::dispatch('flashMessage', ['message' => $message, 'type' => $type]);
+    //    }
 }

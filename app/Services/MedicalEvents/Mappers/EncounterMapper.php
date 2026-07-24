@@ -125,8 +125,24 @@ class EncounterMapper implements FhirMapperContract
 
         // todo: hospitalization
 
+        $asserterUuids = collect($fhirConditions)
+            ->flatMap(function (array $condition) {
+                $asserter = $condition['asserter'] ?? null;
+                if (!$asserter) {
+                    return [];
+                }
+                if (is_array($asserter) && array_is_list($asserter)) {
+                    return collect($asserter)->pluck('identifier.value');
+                }
+
+                return [data_get($asserter, 'identifier.value')];
+            })
+            ->filter();
+
         $mappedParticipants = collect($data['participant'] ?? [])
             ->pluck('uuid')
+            ->push($uuids['employee'] ?? null)
+            ->concat($asserterUuids)
             ->filter()
             ->unique()
             ->map(fn (string $uuid) => FhirResource::make()

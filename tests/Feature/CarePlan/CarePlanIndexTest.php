@@ -233,12 +233,16 @@ class CarePlanIndexTest extends TestCase
 
         $person = Person::create([
             'uuid' => (string) Str::uuid(),
-            'first_name' => 'Якийсь',
-            'last_name' => 'Пацієнт',
             'birth_date' => '2001-02-23',
             'gender' => 'MALE',
             'patient_signed' => true,
             'process_disclosure_data_consent' => true,
+        ]);
+
+        $person->names()->create([
+            'first_name' => 'Якийсь',
+            'last_name' => 'Пацієнт',
+            'language' => 'uk'
         ]);
 
         $identifierId = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => (string) Str::uuid()])->id;

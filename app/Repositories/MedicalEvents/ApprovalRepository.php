@@ -174,7 +174,7 @@ class ApprovalRepository extends BaseRepository
             'linkable_type' => Approval::class,
             'linkable_id' => $approval->id,
             'ehealth_job_id' => $job->id,
-            'entity' => 'approval',
+            'entity' => 'job',
             'href' => $link['href'],
         ]);
     }

@@ -64,8 +64,8 @@ class ProcedureCreate extends ProcedureComponent
 
     /**
      * Prepared Procedure data in the local database.
-     * 
-     * @param  array $formattedData
+     *
+     * @param  array  $formattedData
      * @return int
      * @throws Throwable
      */
@@ -73,7 +73,7 @@ class ProcedureCreate extends ProcedureComponent
     {
         return DB::transaction(function () use ($formattedData) {
             $this->processReasonReferences($formattedData);
-            
+
             return Repository::procedure()->store([$formattedData], $this->patient());
         });
     }

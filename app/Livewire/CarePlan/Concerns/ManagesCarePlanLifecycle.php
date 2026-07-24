@@ -274,6 +274,7 @@ trait ManagesCarePlanLifecycle
         if (empty($this->carePlan->uuid)) {
             Session::flash('error', __('care-plan.care_plan_not_synced'));
             $this->showSignatureModal = false;
+
             return;
         }
 
@@ -284,6 +285,7 @@ trait ManagesCarePlanLifecycle
 
         if ($hasActiveActivities) {
             Session::flash('error', 'Неможливо завершити план лікування. Всі призначення повинні мати фінальний статус (завершені або скасовані).');
+
             return;
         }
 

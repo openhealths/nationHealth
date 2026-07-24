@@ -15,8 +15,7 @@ class ExtendedMigration extends Migration
      * This method is responsible for storing backup data that can be used
      * to restore the system state if the migration needs to be rolled back.
      *
-     * @param mixed $backupData
-     *
+     * @param  mixed  $backupData
      * @return void
      */
     protected function backup(mixed $backupData): void

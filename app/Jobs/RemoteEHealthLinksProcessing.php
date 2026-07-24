@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use Throwable;
-use App\Core\Arr;
 use App\Core\EHealthJob;
 use App\Enums\JobStatus;
 use App\Models\LegalEntity;
 use App\Models\EhealthLink;
-use App\Models\Person\Person;
 use InvalidArgumentException;
 use App\Classes\eHealth\EHealth;
 use Illuminate\Support\Facades\Log;
@@ -51,12 +49,12 @@ class RemoteEHealthLinksProcessing extends EHealthJob
     {
         $entity = $this->eHealthLink->entity;
 
-        switch($entity) {
+        switch ($entity) {
             case 'job':
                 $jobUuid = basename($this->eHealthLink->href);
 
                 return EHealth::job()->withToken($token)->getDetails($jobUuid);
-            // TODO: fill the entities below with the correct API calls and data processing logic
+                // TODO: fill the entities below with the correct API calls and data processing logic
             case 'encounter':
                 return null;
             case 'condition':
@@ -102,7 +100,7 @@ class RemoteEHealthLinksProcessing extends EHealthJob
     protected function processResponse(?EHealthResponse $response): void
     {
         if (\is_null($response)) {
-           return;
+            return;
         }
 
         $responseData = $response->getData();
@@ -126,12 +124,12 @@ class RemoteEHealthLinksProcessing extends EHealthJob
             }
 
             return;
-        } else if($status === 'pending' && (!$statusCode || $statusCode === 202)) {
+        } elseif ($status === 'pending' && (!$statusCode || $statusCode === 202)) {
             // Handle pending status (it means the request is still being processed)
             $this->release(self::TIME_TO_RETRY); // Release the job back to the queue to be retried after specified time
 
             return; // Exit the method to avoid further processing
-        } else if (strtolower($status) === strtolower(JobStatus::FAILED->value)) {
+        } elseif (strtolower($status) === strtolower(JobStatus::FAILED->value)) {
             if ($this->eHealthLink->linkable_type === Approval::class) {
                 $this->eHealthLink->linkable->update(['status' => JobStatus::FAILED->value]);
             }

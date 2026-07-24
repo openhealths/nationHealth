@@ -23,9 +23,9 @@ class CarePlanUpdate extends CarePlanCreate
 
     public CarePlan $carePlan;
 
-    public function mount(LegalEntity $legalEntity, $personId = null, $encounter = null): void
+    public function mount(LegalEntity $legalEntity, $personId = null, $encounter = null, $carePlan = null): void
     {
-        $carePlan = request()->route('carePlan');
+        $carePlan = $carePlan ?? request()->route('carePlan');
         if (!$carePlan instanceof CarePlan) {
             // Fallback for cases where route binding might not have resolved to model yet
             $carePlan = CarePlan::findOrFail($carePlan);
@@ -59,11 +59,7 @@ class CarePlanUpdate extends CarePlanCreate
         $this->form->keyContainerUpload = null;
         $this->form->password = '';
 
-        // Load patient auth methods
-        $this->authMethods = collect(\App\Enums\Person\AuthenticationMethod::cases())->map(fn ($m) => [
-            'value' => $m->value,
-            'label' => $m->label(),
-        ])->toArray();
+        // Load patient auth methods is handled by parent::mount
 
         // Load encounter diagnoses for UI
         if ($carePlan->encounter) {

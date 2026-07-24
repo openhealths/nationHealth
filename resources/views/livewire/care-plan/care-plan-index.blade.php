@@ -210,7 +210,7 @@
                                 {{ $plan->title }}
                             </div>
                             <div class="text-xs text-gray-500 mt-1.5 dark:text-gray-400">
-                                {{ __('care-plan.patient') }}: {{ $plan->person?->last_name }} {{ $plan->person?->first_name }}
+                                {{ __('care-plan.patient') }}: {{ $plan->person?->fullName }}
                             </div>
                         </div>
 

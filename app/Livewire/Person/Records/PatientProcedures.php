@@ -1,5 +1,5 @@
 <?php
-    
+
 declare(strict_types=1);
 
 namespace App\Livewire\Person\Records;
@@ -36,7 +36,7 @@ use Livewire\WithPagination;
 use Livewire\WithFileUploads;
 use Throwable;
 
-class PatientProcedures extends BasePatientComponent 
+class PatientProcedures extends BasePatientComponent
 {
     use BatchLegalEntityQueries;
     use HandlesSyncBatch;
@@ -130,7 +130,7 @@ class PatientProcedures extends BasePatientComponent
         $this->syncStatus = $status->value;
     }
 
-    public function initializeComponent(): void 
+    public function initializeComponent(): void
     {
         $this->getDictionary();
 
@@ -173,7 +173,7 @@ class PatientProcedures extends BasePatientComponent
         $this->getProcedures($this->buildSearchParams());
     }
 
-    public function sync(): void 
+    public function sync(): void
     {
         if ($this->cannotStartSync('procedure')) {
             return;
@@ -759,7 +759,7 @@ class PatientProcedures extends BasePatientComponent
         );
     }
 
-    protected function filterValidationRules(): array 
+    protected function filterValidationRules(): array
     {
         return [
             'filterCategory' => ['nullable', 'string', 'max:255'],
@@ -774,7 +774,7 @@ class PatientProcedures extends BasePatientComponent
         ];
     }
 
-    public function render(): View 
+    public function render(): View
     {
         return view('livewire.person.records.procedures', [
             'paginatedProcedures' => $this->buildPaginator(),

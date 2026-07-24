@@ -33,26 +33,32 @@ class EmployeeCreate
 
         $employeeRequests = EmployeeRequest::with('revision')
             ->where('email', $user->email)
-            ->where(fn(EloquentBuilder $q) => $q
-                ->where(fn(EloquentBuilder $query) =>
-                    $query->where('status', RequestStatus::SIGNED)
-                )
+            ->where(
+                fn (EloquentBuilder $q) => $q
+                    ->where(
+                        fn (EloquentBuilder $query) =>
+                        $query->where('status', RequestStatus::SIGNED)
+                    )
                 // Sync for requests approved through our system and synced before user's first login
-                ->orWhere(fn(EloquentBuilder $query) =>
-                    $query->where('status', RequestStatus::APPROVED)
-                        ->whereNotNull(['start_date', 'employee_id', 'user_id'])
-                        ->where('user_id', $user->id)
-                        ->whereHas('employee', fn(EloquentBuilder $query) =>
-                            $query->whereNull('user_id')
-                        )
-                )
+                    ->orWhere(
+                        fn (EloquentBuilder $query) =>
+                        $query->where('status', RequestStatus::APPROVED)
+                            ->whereNotNull(['start_date', 'employee_id', 'user_id'])
+                            ->where('user_id', $user->id)
+                            ->whereHas(
+                                'employee',
+                                fn (EloquentBuilder $query) =>
+                                $query->whereNull('user_id')
+                            )
+                    )
                 // Sync for requests that weren't approved through our system, were imported from EHealth
-                ->orWhere(fn(EloquentBuilder $query) =>
-                    $query->where('status', RequestStatus::APPROVED)
-                        ->whereNull('user_id')
-                        ->whereNotNull(['start_date', 'employee_id'])
-                        ->latest('applied_at')
-                )
+                    ->orWhere(
+                        fn (EloquentBuilder $query) =>
+                        $query->where('status', RequestStatus::APPROVED)
+                            ->whereNull('user_id')
+                            ->whereNotNull(['start_date', 'employee_id'])
+                            ->latest('applied_at')
+                    )
             )
             ->orderByDesc('created_at')
             ->get();
@@ -89,7 +95,7 @@ class EmployeeCreate
         // Pass only employees with APPROVED or REORGANIZED status
         $employees = array_filter(
             $employees,
-            fn(array $employee) => in_array($employee['status'], [Status::APPROVED->value, Status::REORGANIZED->value])
+            fn (array $employee) => in_array($employee['status'], [Status::APPROVED->value, Status::REORGANIZED->value])
         );
 
         if (empty($employees)) {
@@ -101,7 +107,7 @@ class EmployeeCreate
             ->whereIn('status', [Status::APPROVED, Status::REORGANIZED])
             ->where('legal_entity_id', $event->legalEntity->id)
             ->whereNotIn('id', $employeeRequests->pluck('employee_id')->filter()->all())
-            ->whereHas('users', fn(EloquentBuilder $query) => $query->where('id', $user->id))
+            ->whereHas('users', fn (EloquentBuilder $query) => $query->where('id', $user->id))
             ->pluck('uuid')
             ->all();
 
@@ -228,21 +234,21 @@ class EmployeeCreate
                     }
 
                     $employeeRequest->startDate = Employee::matchingEmployee(
-                            legalEntityUuid: $employeeRequest->legalEntityUuid,
-                            employeeType: $employeeRequest->employeeType,
-                            position: $employeeRequest->position,
-                            partyId: $party->id,
-                        )
+                        legalEntityUuid: $employeeRequest->legalEntityUuid,
+                        employeeType: $employeeRequest->employeeType,
+                        position: $employeeRequest->position,
+                        partyId: $party->id,
+                    )
                         ->first()
                             ? $employeeRequest->revision->data['employee_request_data']['start_date']
                             : null;
 
                     if (!$employeeRequest->startDate) {
                         return false;
-                    } else {
-                        $namesMatch = true; // If we have found the employee by other parameters and got the start date,
-                                            // we can assume that names match because of the uniqueness of the employee record
                     }
+                    $namesMatch = true; // If we have found the employee by other parameters and got the start date,
+                    // we can assume that names match because of the uniqueness of the employee record
+
                 }
 
                 $datesMatch = Carbon::parse($employeeRequest->startDate)

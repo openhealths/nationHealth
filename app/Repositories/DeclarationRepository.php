@@ -195,7 +195,6 @@ class DeclarationRepository
      *
      * @param  array  $data  The payload containing 'employee' and 'party' sub-arrays with UUID and status fields.
      * @param  LegalEntity  $legalEntity
-     *
      * @return void
      */
     public function storeDataForReorganizedLegalEntity(array $data, LegalEntity $legalEntity): void
@@ -229,7 +228,7 @@ class DeclarationRepository
             'declaration_request_id' => $declarationRequest?->id,
             'declaration_request_uuid' => $declarationRequest?->uuid,
             'authorize_with' => $declarationRequest?->authorizeWith,
-            'updated_at'=> now(),
+            'updated_at' => now(),
         ];
 
         ReorganizationEmployeeDeclaration::updateOrCreate(

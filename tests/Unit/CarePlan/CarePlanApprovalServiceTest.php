@@ -152,7 +152,7 @@ class CarePlanApprovalServiceTest extends TestCase
         $result = app(CarePlanApprovalService::class)->create(
             carePlan: $carePlan,
             patientUuid: 'patient-uuid',
-            employeeUuid: 'employee-uuid',
+            employeeUuid: '77777777-7777-7777-7777-777777777777',
             accessLevel: 'write',
             authorizeWith: 'otp-uuid',
             legalEntity: $legalEntity,

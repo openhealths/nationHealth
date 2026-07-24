@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Medication;
 
 use App\Traits\FormTrait;
@@ -10,7 +12,5 @@ class MedicationRequestCreate
     use FormTrait;
 
     public Form $form;
-
-
 
 }

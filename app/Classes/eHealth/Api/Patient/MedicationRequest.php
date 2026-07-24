@@ -138,7 +138,7 @@ class MedicationRequest extends PatientApiBase
      *
      * @param  string  $patientId
      * @param  string  $id
-     * @param  array  $payload Requires reject_reason_code
+     * @param  array  $payload  Requires reject_reason_code
      * @return PromiseInterface|EHealthResponse
      */
     public function reject(string $patientId, string $id, array $payload): PromiseInterface|EHealthResponse

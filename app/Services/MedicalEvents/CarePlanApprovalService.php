@@ -95,7 +95,7 @@ class CarePlanApprovalService
         $statusCode = $response->getStatusCode();
 
         if ($statusCode === 202) {
-            return $this->handleAsyncCreate($carePlan, $responseData, $legalEntity, $user);
+            return $this->handleAsyncCreate($carePlan, $responseData, $legalEntity, $user, $employeeUuid);
         }
 
         if (!in_array($statusCode, [200, 201], true)) {
@@ -181,7 +181,8 @@ class CarePlanApprovalService
             $link->linkable->update(['uuid' => $realApprovalId]);
         }
 
-        $isVerified = $jobResult['response_data']['is_verified']
+        $isVerified = $jobResult['response']['body']['data']['is_verified']
+            ?? $jobResult['response_data']['is_verified']
             ?? $jobResult['data']['is_verified']
             ?? $jobResult['is_verified']
             ?? $jobResult['urgent']['is_verified']
@@ -209,6 +210,7 @@ class CarePlanApprovalService
         array $responseData,
         ?LegalEntity $legalEntity,
         ?User $user,
+        ?string $grantedToEmployeeUuid = null,
     ): CarePlanApprovalCreateResult {
         $href = $responseData['links'][0]['href'] ?? null;
 
@@ -222,13 +224,21 @@ class CarePlanApprovalService
 
         $approvalUuid = $responseData['id'] ?? (string) Str::uuid();
 
+        $attributes = [
+            'approvable_type' => CarePlan::class,
+            'approvable_id' => $carePlan->id,
+            'status' => 'NEW',
+        ];
+
+        if ($grantedToEmployeeUuid) {
+            $identifier = Repository::identifier()->store($grantedToEmployeeUuid);
+            $attributes['granted_to_id'] = $identifier->id;
+            $attributes['granted_to_type'] = 'employee';
+        }
+
         $localApproval = Approval::firstOrCreate(
             ['uuid' => $approvalUuid],
-            [
-                'approvable_type' => CarePlan::class,
-                'approvable_id' => $carePlan->id,
-                'status' => 'NEW',
-            ]
+            $attributes
         );
 
         $link = Repository::approval()->attachEhealthLink($localApproval, ['href' => $href]);

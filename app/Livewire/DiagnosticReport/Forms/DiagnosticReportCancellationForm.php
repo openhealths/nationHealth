@@ -20,7 +20,7 @@ class DiagnosticReportCancellationForm extends BaseForm
             'explanatoryLetter' => ['nullable', 'string', 'max:255'],
         ];
     }
-    
+
     public function resetCancellationFields(): void
     {
         $this->cancellationReason = '';

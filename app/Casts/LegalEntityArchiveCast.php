@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Casts;
 
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +13,6 @@ class LegalEntityArchiveCast implements CastsAttributes
      * Cast the given value.
      *
      * @param  array<string, mixed>  $attributes
-     *
      * @return array
      */
     public function get(Model $model, string $key, mixed $value, array $attributes): array
@@ -26,7 +27,7 @@ class LegalEntityArchiveCast implements CastsAttributes
 
         foreach ($arrayData as $subArray) {
             foreach ($subArray as $key => $subValue) {
-                $subArray[$key] = $key == 'date'  ? convertToAppDateFormat($subValue) : $subArray[$key];
+                $subArray[$key] = $key === 'date' ? convertToAppDateFormat($subValue) : $subArray[$key];
             }
 
             $arr[] = $subArray;
@@ -39,7 +40,6 @@ class LegalEntityArchiveCast implements CastsAttributes
      * Prepare the given value for storage.
      *
      * @param  array<string, mixed>  $attributes
-     *
      * @return array
      */
     public function set(Model $model, string $key, mixed $value, array $attributes): string
@@ -54,7 +54,7 @@ class LegalEntityArchiveCast implements CastsAttributes
 
         foreach ($arrayData as $subArray) {
             foreach ($subArray as $key => $subValue) {
-                $subArray[$key] = $key == 'date'  ? convertToISO8601($subValue) : $subArray[$key];
+                $subArray[$key] = $key === 'date' ? convertToISO8601($subValue) : $subArray[$key];
             }
 
             $arr[] = $subArray;
@@ -66,15 +66,14 @@ class LegalEntityArchiveCast implements CastsAttributes
     /**
      * Converts the given value data (string with jsons or an array) to an array.
      *
-     * @param array $value The value to be converted.
-     *
+     * @param  array  $value  The value to be converted.
      * @return array The converted array.
      */
     protected function convertValueToArray(array $value): array
     {
         $arr = [];
 
-        foreach($value as $jsonData) {
+        foreach ($value as $jsonData) {
             $arr[] = \is_array($jsonData) ? $jsonData : json_decode($jsonData, true) ?? [];
         }
 

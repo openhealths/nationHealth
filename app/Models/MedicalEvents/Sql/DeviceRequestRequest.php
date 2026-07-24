@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\Person\Person;
 use App\Models\Employee\Employee;
 use App\Models\CarePlanActivity;
-use App\Models\MedicalEvents\Sql\Encounter;
 
 class DeviceRequestRequest extends Model
 {

@@ -601,6 +601,7 @@ trait ManagesCarePlanEPrescription
         $requestRecord = \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::where('uuid', $requestId)->first();
         if (!$requestRecord) {
             $this->dispatch('flashMessage', ['type' => 'error', 'message' => 'Рецепт не знайдено']);
+
             return;
         }
 

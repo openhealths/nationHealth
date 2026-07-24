@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Enums\JobStatus;
 use App\Enums\ResponseStatus;
 use Illuminate\Database\Migrations\Migration;
@@ -18,15 +20,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-          Schema::create('ehealth_jobs', function (Blueprint $table) {
+        Schema::create('ehealth_jobs', function (Blueprint $table) {
             $table->id();
 
             $table->enum('processing_method', ResponseStatus::only(self::VALID_STATUSES))->default(ResponseStatus::ASYNC)->comment('201 - sync, 202 - async processing method code');
             $table->enum('status', JobStatus::values())->nullable();
-            
+
             $table->json('request_data')->nullable()->comment('original request data sent to eHealth API');
             $table->json('response_data')->nullable()->comment('response data received from eHealth API');
-            
+
             $table->timestamp('eta')->nullable()->comment('estimated time of arrival');
             $table->timestamps();
         });

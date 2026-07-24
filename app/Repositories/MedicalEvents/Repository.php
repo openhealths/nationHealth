@@ -91,4 +91,3 @@ final class Repository
         return app(DeviceRequestRequestRepository::class);
     }
 }
-

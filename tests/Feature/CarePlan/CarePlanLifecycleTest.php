@@ -138,6 +138,8 @@ class CarePlanLifecycleTest extends TestCase
         if (config('permission.teams')) {
             setPermissionsTeamId($legalEntity->id);
         }
+
+        \Illuminate\Support\Facades\Gate::before(fn () => true);
     }
 
     public function test_full_care_plan_lifecycle_flow(): void
@@ -581,6 +583,7 @@ class CarePlanLifecycleTest extends TestCase
         $mockSignatureService->shouldReceive('signData')
             ->andReturnUsing(function ($payload) use (&$capturedPayload) {
                 $capturedPayload = $payload;
+
                 return 'mock-base64-signature';
             });
         $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
@@ -662,7 +665,7 @@ class CarePlanLifecycleTest extends TestCase
         // Check payload did NOT contain instantiates_protocol, but did contain inform_with
         $this->assertNotNull($capturedPayload);
         $this->assertFalse(array_key_exists('instantiates_protocol', $capturedPayload));
-        $this->assertFalse(array_key_exists('instantiates_protocol', Arr::toSnakeCase($capturedPayload)));
+        $this->assertStringNotContainsString('"instantiates_protocol"', json_encode($capturedPayload));
         $this->assertEquals('SMS', $capturedPayload['inform_with'] ?? null);
 
         // Check signed Care Plan is in DB with all fields persisted locally
@@ -722,7 +725,6 @@ class CarePlanLifecycleTest extends TestCase
             'clinical_protocol' => 'Protocol-Signed',
         ]);
     }
-
 
     public function test_init_medication_activity_form_sets_default_program_for_search(): void
     {

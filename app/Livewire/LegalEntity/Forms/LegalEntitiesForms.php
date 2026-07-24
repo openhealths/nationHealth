@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\LegalEntity\Forms;
 
 use Carbon\Carbon;
@@ -150,7 +152,7 @@ class LegalEntitiesForms extends Form
             'phones.*.note' => 'nullable|string',
             'accreditation' => 'nullable|array',
             'accreditation.category' => $this->accreditationShow ? 'required|string' : 'nullable',
-            'accreditation.orderNo' =>  $this->accreditationShow ? 'required|string|min:2' : 'nullable|string',
+            'accreditation.orderNo' => $this->accreditationShow ? 'required|string|min:2' : 'nullable|string',
             'accreditation.orderDate' => ['nullable', new DateFormat(), 'before_or_equal:today'],
             'accreditation.issuedDate' => ['nullable', new DateFormat(), 'before_or_equal:today'],
             'accreditation.expiryDate' => ['nullable', new DateFormat(), new ExpiryDate($this->accreditation['issuedDate'] ?? '')],
@@ -174,7 +176,7 @@ class LegalEntitiesForms extends Form
                 "regex:/^(?!.*[ЫЪЭЁыъэё@%&$^#])[А-ЯҐЇІЄа-яґїіє’\'\- ]+$/u",
             ],
             'archive' => 'nullable|array',
-            'archive.*.date'  => ['required_if:archivationShow,true', new DateFormat(), 'before_or_equal:today'],
+            'archive.*.date' => ['required_if:archivationShow,true', new DateFormat(), 'before_or_equal:today'],
             'archive.*.place' => 'required_if:archivationShow,true|string',
         ];
 
@@ -257,7 +259,7 @@ class LegalEntitiesForms extends Form
 
             try {
                 $this->rulesForSignificancy();
-            } catch(ValidationException $e) {
+            } catch (ValidationException $e) {
                 $errors = array_merge($e->errors(), $errors);
             }
 
@@ -266,7 +268,7 @@ class LegalEntitiesForms extends Form
             if (!empty($errors)) {
                 throw ValidationException::withMessages($errors);
             }
-        } catch(ValidationException $err) {
+        } catch (ValidationException $err) {
             $errors = array_merge($err->errors(), $errors);
 
             // Throw an validation error from Division's side
@@ -426,8 +428,7 @@ class LegalEntitiesForms extends Form
     /**
      * Handles updates to the beneficiary value.
      *
-     * @param string $value The updated beneficiary value.
-     *
+     * @param  string  $value  The updated beneficiary value.
      * @return void
      */
     public function onBeneficiaryUpdated(string $value): void
@@ -438,8 +439,7 @@ class LegalEntitiesForms extends Form
     /**
      * Handle updates to the receiver funds code value.
      *
-     * @param string $value The updated receiver funds code.
-     *
+     * @param  string  $value  The updated receiver funds code.
      * @return void
      */
     public function onReceiverFundsCodeUpdated(string $value): void

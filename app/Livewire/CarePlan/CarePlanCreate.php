@@ -120,7 +120,8 @@ class CarePlanCreate extends BasePatientComponent
 
         $person = Person::find($this->personId);
         if ($person) {
-            $this->form->patient = trim($person->last_name . ' ' . $person->first_name . ' ' . ($person->second_name ?? ''));
+            $name = $person->primary_name;
+            $this->form->patient = $name ? trim($name->last_name . ' ' . $name->first_name . ' ' . ($name->second_name ?? '')) : '';
             $this->form->medical_number = (string) ((CarePlan::max('id') ?? 0) + 1);
 
             // Load actual authentication methods from eHealth
@@ -268,19 +269,20 @@ class CarePlanCreate extends BasePatientComponent
         $this->patientSearchResults = Person::query()
             ->where('birth_date', $birthDate)
             ->where(function ($query) use ($firstName, $lastName) {
-                $query->where(function ($query) use ($firstName, $lastName) {
-                    $query->where('first_name', $firstName)
+                $query->whereHas('names', function ($nameQuery) use ($firstName, $lastName) {
+                    $nameQuery->where('first_name', $firstName)
                         ->where('last_name', $lastName);
-                })->orWhere(function ($query) use ($firstName, $lastName) {
-                    $query->where('first_name', $lastName)
+                })->orWhereHas('names', function ($nameQuery) use ($firstName, $lastName) {
+                    $nameQuery->where('first_name', $lastName)
                         ->where('last_name', $firstName);
                 });
             })
-            ->get(['id', 'uuid', 'first_name', 'last_name', 'second_name', 'birth_date'])
+            ->with('names') // Eager load names so fullName works!
+            ->get(['id', 'uuid', 'birth_date'])
             ->map(fn (Person $person) => [
                 'id' => $person->id,
                 'uuid' => $person->uuid,
-                'name' => $person->fullName,
+                'name' => trim(($person->primary_name?->last_name . ' ' . $person->primary_name?->first_name . ' ' . $person->primary_name?->second_name) ?? ''),
                 'birthDate' => $person->birth_date
                     ? \Carbon\Carbon::parse($person->birth_date)->format(config('app.date_format'))
                     : '-',
@@ -513,6 +515,7 @@ class CarePlanCreate extends BasePatientComponent
     public function save(CarePlanRepository $repository): void
     {
         if (Auth::user()?->cannot('create', CarePlan::class)) {
+            throw new \Exception('DEBUG: cannot create care plan. User: ' . Auth::user()?->id . ' has care_plan:write? ' . (Auth::user()?->hasPermissionTo('care_plan:write') ? 'yes' : 'no') . ' roles: ' . json_encode(Auth::user()?->roles?->pluck('name')));
             session()->flash('error', __('care-plan.no_permission_create'));
 
             return;

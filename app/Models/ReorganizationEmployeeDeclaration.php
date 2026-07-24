@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use App\Models\Relations\Party;
@@ -60,23 +62,23 @@ class ReorganizationEmployeeDeclaration extends Pivot
         return $this->belongsTo(LegalEntity::class, 'legal_entity_id');
     }
 
-
     /**
      * Scope to filter records that are connected to the given legal entity
      * through the legators table (i.e. the record's legal_entity_uuid is a legator of the given entity).
      *
-     * @param Builder<static> $query
-     * @param LegalEntity $legalEntity
-     *
+     * @param  Builder<static>  $query
+     * @param  LegalEntity  $legalEntity
      * @return Builder<static>
      */
     #[Scope]
     public function hasConnectionTo(Builder $query, LegalEntity $legalEntity): Builder
     {
-        return $query->whereIn('legal_entity_uuid', fn(QueryBuilder $q) => $q
+        return $query->whereIn(
+            'legal_entity_uuid',
+            fn (QueryBuilder $q) => $q
                 ->select('uuid')
                 ->from('legators')
                 ->where('legal_entity_id', $legalEntity->id)
-            );
+        );
     }
 }
