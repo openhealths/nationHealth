@@ -116,6 +116,8 @@ class HealthcareService extends Model
                 'uuid',
                 'legal_entity_id',
                 'division_id',
+                'category_id',
+                'type_id',
                 'speciality_type',
                 'providing_condition',
                 'ehealth_inserted_at',

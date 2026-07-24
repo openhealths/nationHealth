@@ -35,6 +35,7 @@ return [
     'comment_non_working_hours' => 'Коментар до неробочого часу',
     'non_working_hours' => 'Неробочий час №',
     'service_search' => 'Пошук',
+    'create_service' => 'Створити послугу',
 
      // modals
     'modals' => [

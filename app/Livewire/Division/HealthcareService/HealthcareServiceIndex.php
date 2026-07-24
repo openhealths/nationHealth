@@ -323,7 +323,11 @@ class HealthcareServiceIndex extends Component
     #[Computed]
     public function healthcareServices(): LengthAwarePaginator
     {
-        $query = HealthcareService::filterByLegalEntity(legalEntity()->id);
+        $query = HealthcareService::with([
+            'division',
+            'category.coding',
+            'type.coding',
+        ])->filterByLegalEntity(legalEntity()->id);
 
         // Filters
         if ($this->divisionFilter) {
