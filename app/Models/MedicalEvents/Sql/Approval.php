@@ -132,9 +132,11 @@ class Approval extends Model
     }
 
     #[Scope]
-    protected function isAlive(Builder $query): Builder
+    protected function isAlive(Builder $query, Model $model): Builder
     {
         return $query
+            ->where('approvable_type', $model::class)
+            ->where('approvable_id', $model->getKey())
             ->whereNotNull('expires_at')
             ->where('expires_at', '>', now());
     }
@@ -146,12 +148,12 @@ class Approval extends Model
     }
 
     #[Scope]
-    protected function getByModel(Builder $query, int $personId, string $modelClass): Builder
+    protected function getByModel(Builder $query, Model $model): Builder
     {
-        return $query->whereHas('approvable', function (Builder $query) use ($personId, $modelClass) {
+        return $query->whereHas('approvable', function (Builder $query) use ($model) {
             $query
-                ->where('approvable_type', $modelClass)
-                ->where('approvable_id', $personId);
+                ->where('approvable_type', $model::class)
+                ->where('approvable_id', $model->getKey());
         });
     }
 }

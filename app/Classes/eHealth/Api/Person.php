@@ -102,7 +102,7 @@ class Person extends Request
     {
         $this->setValidator($this->validatePersonalData(...));
 
-        return $this->get(self::URL . '/' . $uuid . '/personal_data');
+        return $this->get(self::URL_V2 . '/' . $uuid . '/personal_data');
     }
 
     /**
@@ -787,14 +787,41 @@ class Person extends Request
             'confidant_person.*.phones.*.number' => ['required', 'string', 'max:255'],
             'confidant_person.*.phones.*.type' => ['required', 'string', new InDictionary('PHONE_TYPE')],
 
+            'confidant_person_relationship' => ['nullable', 'array'],
+            'confidant_person_relationship.*.uuid' => ['required', 'uuid'],
+            'confidant_person_relationship.*.active_to' => ['nullable', 'string'],
+            'confidant_person_relationship.*.documents_relationship' => ['required', 'array', 'min:1'],
+            'confidant_person_relationship.*.documents_relationship.*.issued_by' => ['required', 'string'],
+            'confidant_person_relationship.*.documents_relationship.*.issued_at' => ['required', 'date_format:Y-m-d'],
+            'confidant_person_relationship.*.documents_relationship.*.active_to' => ['nullable', 'date_format:Y-m-d'],
+            'confidant_person_relationship.*.documents_relationship.*.record_type' => ['required', 'string'],
+            'confidant_person_relationship.*.documents_relationship.*.number' => ['required', 'string'],
+            'confidant_person_relationship.*.documents_relationship.*.type' => ['required', 'string', 'nullable', new InDictionary('DOCUMENT_TYPE')],
+            'confidant_person_relationship.*.relationship_verification_details.verification_status' => ['required', 'string'],
+            'confidant_person_relationship.*.relationship_verification_details.verification_reason' => ['required', 'string'],
+            'confidant_person_relationship.*.relationship_verification_details.verification_comment' => ['required', 'string'],
+            'confidant_person_relationship.*.confidant_person.person_id' => ['required', 'uuid'],
+            'confidant_person_relationship.*.confidant_person.name' => ['required', 'string', 'max:255'],
+            'confidant_person_relationship.*.confidant_person.gender' => ['nullable', new InDictionary('GENDER')],
+            'confidant_person_relationship.*.confidant_person.tax_id' => ['nullable', 'string', 'max:255'],
+            'confidant_person_relationship.*.confidant_person.no_tax_id' => ['required', 'boolean:strict'],
+            'confidant_person_relationship.*.confidant_person.unzr' => ['nullable', 'string', 'max:255'],
+            'confidant_person_relationship.*.confidant_person.documents_person' => ['nullable', 'array', 'min:1'],
+            'confidant_person_relationship.*.confidant_person.documents_person.*.type' => ['required', 'string', 'nullable', new InDictionary('DOCUMENT_TYPE')],
+            'confidant_person_relationship.*.confidant_person.documents_person.*.number' => ['required', 'string'],
+            'confidant_person_relationship.*.confidant_person.phones' => ['nullable', 'array'],
+            'confidant_person_relationship.*.confidant_person.phones.*.number' => ['required', 'string', 'max:255'],
+            'confidant_person_relationship.*.confidant_person.phones.*.type' => ['required', 'string', new InDictionary('PHONE_TYPE')],
+
             'death_date' => ['nullable', 'date'],
 
             'documents' => ['required', 'array', 'min:1'],
-            'documents.*.type' => ['required', 'string', 'nullable', new InDictionary('DOCUMENT_TYPE')],
-            'documents.*.number' => ['required', 'string'],
-            'documents.*.issued_by' => ['required', 'string'],
-            'documents.*.issued_at' => ['required', 'date_format:Y-m-d'],
             'documents.*.expiration_date' => ['nullable', 'date_format:Y-m-d'],
+            'documents.*.issued_at' => ['required', 'date_format:Y-m-d'],
+            'documents.*.issued_by' => ['required', 'string'],
+            'documents.*.issuing_country' => ['nullable', new InDictionary('ISSUING_COUNTRY')],
+            'documents.*.number' => ['required', 'string'],
+            'documents.*.type' => ['required', 'string', 'nullable', new InDictionary('DOCUMENT_TYPE')],
 
             'email' => ['nullable', 'email'],
 
@@ -805,15 +832,16 @@ class Person extends Request
             'emergency_contact.phones.*.number' => ['required', 'string', 'max:255'],
             'emergency_contact.phones.*.type' => ['required', 'string', new InDictionary('PHONE_TYPE')],
 
-            'names' => ['required', 'array', 'min:1'],
-            'names.*.language' => ['required', 'string', 'max:255'],
-            'names.*.first_name' => ['required', 'string', 'max:255'],
-            'names.*.last_name' => ['nullable', 'string', 'max:255'],
-            'names.*.second_name' => ['nullable', 'string', 'max:255'],
-            'names.*.no_last_name' => ['required', 'boolean'],
-
             'gender' => ['required', new InDictionary('GENDER')],
             'uuid' => ['required', 'uuid'],
+
+            'names' => ['required', 'array', 'min:1'],
+            'names.*.first_name' => ['required', 'string', 'max:255'],
+            'names.*.last_name' => ['required', 'string', 'max:255'],
+            'names.*.second_name' => ['nullable', 'string', 'max:255'],
+            'names.*.no_last_name' => ['required', 'boolean'],
+            'names.*.language' => ['required', 'string', 'max:255'],
+
             'no_tax_id' => ['required', 'boolean:strict'],
 
             'phones' => ['nullable', 'array'],

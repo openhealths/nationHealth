@@ -524,7 +524,7 @@ class PersonForm extends BaseForm
 
         $messages = [];
 
-        foreach ($this->person['documents'] as $key => $document) {
+        foreach ($this->person['documents'] ?? [] as $key => $document) {
             $type = $document['type'] ?? null;
             $documentType = __('patients.documents.' . $type) ?: $type;
 

@@ -166,6 +166,14 @@ class PersonUpdate extends PersonComponent
             ])->toArray()
         );
 
+
+        $uaOnlyTypes = config('ehealth.document_types_issuing_country_ua_only');
+
+        // Fix cases where the issuing country is not set for document types that require it to be 'UA'
+        foreach ($this->form->person['documents'] as &$document) {
+            $document['issuingCountry'] ??= \in_array($document['type'], $uaOnlyTypes, true) ? 'UA' : '';
+        }
+
         $this->addresses = Arr::get($this->form->person, 'addresses') ?: $this->addresses;
 
         if (empty($this->form->person['phones'])) {
@@ -233,7 +241,8 @@ class PersonUpdate extends PersonComponent
             return;
         }
 
-        $this->form->person['addresses'] = $this->addresses;
+        $this->form->person['addresses'] = [$this->address]; // must be multiple
+        $this->form->person['id'] = $this->uuid;
 
         try {
             $validated = $this->form->validate($this->form->rulesForUpdate());
@@ -247,7 +256,6 @@ class PersonUpdate extends PersonComponent
         }
 
         $validated = array_merge($validated, ['addresses' => $this->form->addresses]);
-        $validated['person']['id'] = $this->uuid;
 
         try {
             // update
