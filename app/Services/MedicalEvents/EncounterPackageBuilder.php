@@ -131,6 +131,7 @@ class EncounterPackageBuilder
             ->toArray();
 
         $encounterData = $data['encounter'];
+        
         $hasPrimarySourceCondition = collect($data['conditions'] ?? [])->contains(
             static fn (array $condition): bool => ($condition['primarySource'] ?? false)
         );
@@ -155,9 +156,13 @@ class EncounterPackageBuilder
             ->unique()
             ->values();
 
-        $encounterData['participant'] = $participantUuids
-            ->map(static fn (string $uuid): array => ['uuid' => $uuid, ])
-            ->toArray();
+        unset($encounterData['participant']);
+
+        if($participantUuids->isNotEmpty()) {
+            $encounterData['participant'] = $participantUuids
+                ->map(static fn (string $uuid): array => ['uuid' => $uuid, ])
+                ->toArray();
+        }
 
         return [
             'encounter' => Fhir::encounter()->toFhir($encounterData, $fhirConditions, $uuids),
