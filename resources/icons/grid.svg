@@ -1,0 +1,33 @@
+<svg aria-hidden="true"
+     xmlns="http://www.w3.org/2000/svg"
+     width="40"
+     height="40"
+     viewBox="0 0 40 40"
+     fill="none"
+>
+    <path stroke="currentColor"
+          stroke-width="4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M16.6667 5H5V16.6667H16.6667V5Z"
+    />
+    <path stroke="currentColor"
+          stroke-width="4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M35 5H23.3333V16.6667H35V5Z"
+    />
+    <path stroke="currentColor"
+          stroke-width="4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M35 23.3333H23.3333V35H35V23.3333Z"
+    />
+    <path stroke="currentColor"
+          stroke-width="4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M16.6667 23.3333H5V35H16.6667V23.3333Z"
+    />
+</svg>
+

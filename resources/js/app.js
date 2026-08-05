@@ -392,7 +392,7 @@ document.addEventListener('livewire:navigated', () => {
 
 import.meta.glob([
     '../images/**'
-]);
+], { eager: true });
 
 import flatpickr from "flatpickr";
 import "flatpickr/dist/flatpickr.css";

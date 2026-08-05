@@ -1,309 +1,659 @@
-<!-- resources/views/home.blade.php -->
 @extends('layouts.base')
 
 @section('title', trans('oh.title'))
 @section('description', trans('oh.description'))
 
 @section('content')
-<section class="bg-meta-10 sm:bg-image-1 bg-right-bottom bg-cover bg-no-repeat flex flex-col items-center justify-center lg:h-90vh h-auto sm:flex-row sm:justify-between md:p-12 p-6 pt-20 pb-20">
-    <div class="container mx-auto max-w-custom flex flex-col sm:flex-row items-center justify-between">
-        <div class="text-left w-full">
-            <h2 class="text-white text-xl sm:text-1xl font-semibold mb-4">{{ trans('Медична інформаційна система') }}</h2>
-            <h1 class="text-white text-4xl sm:text-6xl font-bold mb-10">{{ trans('NATION HEALTH') }}</h1>
-            <p class="text-white text-3lg sm:text-2xl font-semibold mb-9">{{ trans('Перша МІС з відкритим вихідним кодом') }}</p>
-            <a href="#consultation-form" class="bg-orange text-white text-lg font-bold py-3 px-6 rounded-full hover:bg-blue">{{ trans('Зворотній зв\'язок') }}</a>
+<script>
+    if (window.location.hash) {
+        history.replaceState(null, null, window.location.pathname + window.location.search);
+    }
+</script>
+
+<section
+    class="relative flex items-center min-h-screen bg-cover bg-center bg-no-repeat"
+    style="background-image: url('{{ Vite::asset('resources/images/BG 1.png') }}');"
+>
+    <div class="container mx-auto px-6 sm:px-12 lg:px-16 flex flex-col justify-center">
+        <div class="text-left w-full lg:w-3/4 max-w-[896px]">
+            <h1 class="hero-title text-white font-bold uppercase mb-6 text-4xl sm:text-6xl lg:text-7xl leading-tight max-w-4xl tracking-normal">
+                {{ trans('forms.first_mis_without_subscription') }}
+            </h1>
+            <p class="hero-subtitle text-white font-bold uppercase mb-10 text-xl sm:text-3xl lg:text-4xl leading-snug tracking-normal">
+                {{ trans('forms.why_pay_monthly') }}
+            </p>
+            <a
+                href="javascript:void(0)"
+                onclick="document.getElementById('consultation-form')?.scrollIntoView({ behavior: 'smooth' });"
+                class="hero-register-btn inline-flex items-center justify-center text-sm sm:text-base font-medium uppercase tracking-wider cursor-pointer rounded-full border-2 border-white bg-transparent text-white w-64 h-12 transition-all duration-300 hover:bg-white hover:text-[#104475] hover:border-white focus:bg-white focus:text-[#104475] active:bg-white active:text-[#104475]"
+            >
+                {{ trans('forms.register_institution') }}
+            </a>
         </div>
     </div>
 </section>
 
-<!-- services-->
-<section id="services" class="bg-gray-3 pt-20 sm:pt-30 pb-20 sm:pb-30 pl-5 pr-5">
+<section
+    class="relative flex items-center min-h-screen bg-cover bg-no-repeat"
+    style="background-image: url('{{ Vite::asset('resources/images/BG-2.jpg') }}'); background-position: right top;"
+>
+    <div
+        class="container mx-auto px-6 sm:px-12 lg:px-16 flex flex-col justify-center"
+        style="padding-top: 80px; padding-bottom: 140px;"
+    >
+        <div class="text-left w-full lg:w-1/2">
+            <h2
+                class="font-bold uppercase text-[#104475]"
+                style="color: #104475; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; font-size: 48px; font-weight: 700; line-height: 120%; letter-spacing: 0; max-width: 625px; margin-bottom: 32px;"
+            >
+                {{ trans('forms.own_medical') }}<br>
+                {{ trans('forms.informational') }}<br>
+                {{ trans('forms.system') }}
+            </h2>
+            <p
+                class="font-bold uppercase text-[#104475]"
+                style="color: #104475; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; font-size: 38px; font-weight: 700; line-height: 120%; letter-spacing: 0; margin-bottom: 48px;"
+            >
+                {{ trans('forms.for_your_institution') }}
+            </p>
+
+            <ul style="display: flex; flex-direction: column; gap: 48px; width: 100%;">
+                <li class="flex items-center gap-5">
+                    <div
+                        class="flex-shrink-0 rounded-full flex items-center justify-center text-white bg-[#104475]"
+                        style="width: 64px; height: 64px; background-color: #104475;"
+                    >
+                        @icon('carbon_security', 'w-7 h-7 text-white')
+                    </div>
+                    <span
+                        class="text-[#104475] font-semibold"
+                        style="font-size: 20px; line-height: 120%; font-weight: 600; color: #104475; letter-spacing: 0;"
+                    >
+                        {{ trans('forms.full_control_and') }}<br>
+                        {{ trans('forms.data_security') }}
+                    </span>
+                </li>
+                <li class="flex items-center gap-5">
+                    <div
+                        class="flex-shrink-0 rounded-full flex items-center justify-center text-white bg-[#104475]"
+                        style="width: 64px; height: 64px; background-color: #104475;"
+                    >
+                        @icon('streamline_subscription-cashflow', 'w-7 h-7 text-white')
+                    </div>
+                    <span
+                        class="text-[#104475] font-semibold"
+                        style="font-size: 20px; line-height: 120%; font-weight: 600; color: #104475; letter-spacing: 0;"
+                    >
+                        {{ trans('forms.no_monthly') }}<br>
+                        {{ trans('forms.payments_and_subscriptions') }}
+                    </span>
+                </li>
+                <li class="flex items-center gap-5">
+                    <div
+                        class="flex-shrink-0 rounded-full flex items-center justify-center text-white bg-[#104475]"
+                        style="width: 64px; height: 64px; background-color: #104475;"
+                    >
+                        @icon('tdesign_system-2', 'w-7 h-7 text-white')
+                    </div>
+                    <span
+                        class="text-[#104475] font-semibold"
+                        style="font-size: 20px; line-height: 120%; font-weight: 600; color: #104475; letter-spacing: 0;"
+                    >
+                        {{ trans('forms.independence_from') }}<br>
+                        {{ trans('forms.mis_providers') }}
+                    </span>
+                </li>
+                <li class="flex items-center gap-5">
+                    <div
+                        class="flex-shrink-0 rounded-full flex items-center justify-center text-white bg-[#104475]"
+                        style="width: 64px; height: 64px; background-color: #104475;"
+                    >
+                        @icon('bx_customize', 'w-7 h-7 text-white')
+                    </div>
+                    <span
+                        class="text-[#104475] font-semibold"
+                        style="font-size: 20px; line-height: 120%; font-weight: 600; color: #104475; letter-spacing: 0;"
+                    >
+                        {{ trans('forms.system_customization') }}<br>
+                        {{ trans('forms.for_institution_needs') }}
+                    </span>
+                </li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<section
+    id="offers"
+    class="pt-20 sm:pt-30 pb-20 sm:pb-30 pl-5 pr-5 flex items-center bg-cover bg-no-repeat"
+    style="background-image: linear-gradient(rgba(240, 247, 249, 0.8), rgba(240, 247, 249, 0.8)), url('{{ Vite::asset('resources/images/BG-4.jpg') }}'); background-position: center top;"
+>
+    <div class="container mx-auto flex flex-row flex-wrap items-start justify-between gap-8">
+        <div style="flex: 1 1 559px; max-width: 559px; display: flex; flex-direction: column; justify-content: flex-start;">
+            <h2
+                class="uppercase mb-4 text-left font-bold text-[#104475]"
+                style="color: #104475; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; font-size: clamp(32px, 4vw, 48px); font-weight: 700; line-height: 120%; letter-spacing: 0;"
+            >
+                {{ trans('forms.stop') }}<br>
+                {{ trans('forms.overpaying') }}
+            </h2>
+            <div
+                class="mb-10 bg-[#104475]"
+                style="width: 483px; max-width: 100%; height: 4px; background-color: #104475;"
+            ></div>
+
+            <h2
+                class="uppercase mt-10 mb-6 text-left font-bold text-[#104475]"
+                style="color: #104475; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; font-size: clamp(32px, 4vw, 48px); font-weight: 700; line-height: 120%; letter-spacing: 0;"
+            >
+                {{ trans('forms.other_mis') }}
+            </h2>
+
+            <div
+                class="bg-white rounded-xl shadow-sm border-none mb-10 overflow-hidden"
+                style="width: 559px; max-width: 100%; min-height: 272px;"
+            >
+                <table
+                    class="text-left border-none w-full"
+                    style="width: 559px; table-layout: fixed;"
+                >
+                    <thead>
+                        <tr
+                            class="border-none bg-gray-2"
+                            style="height: 50px; background-color: #f9fafb;"
+                        >
+                            <th
+                                class="px-4 text-[12px] font-semibold uppercase tracking-wider align-middle border-none whitespace-nowrap bg-gray-2 text-[#1e1e1e]"
+                                style="width: 225px; background-color: #f9fafb; color: #1e1e1e; font-size: 12px; font-weight: 600; line-height: 150%; letter-spacing: 0; white-space: nowrap;"
+                            >
+                                {{ trans('forms.number_of_medical_workers') }}
+                            </th>
+                            <th
+                                class="px-4 text-[12px] font-semibold uppercase tracking-wider align-middle border-none whitespace-nowrap bg-gray-2 text-[#1e1e1e]"
+                                style="width: 179px; background-color: #f9fafb; color: #1e1e1e; font-size: 12px; font-weight: 600; line-height: 150%; letter-spacing: 0; white-space: nowrap;"
+                            >
+                                {{ trans('forms.cost_per_month') }}
+                            </th>
+                            <th
+                                class="px-4 text-[12px] font-semibold uppercase tracking-wider align-middle border-none whitespace-nowrap bg-gray-2 text-[#1e1e1e]"
+                                style="width: 155px; background-color: #f9fafb; color: #1e1e1e; font-size: 12px; font-weight: 600; line-height: 150%; letter-spacing: 0; white-space: nowrap;"
+                            >
+                                {{ trans('forms.cost_per_year') }}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-[14px] font-medium bg-white text-[#1e1e1e]">
+                        <tr style="height: 54px;">
+                            <td class="px-4 align-middle border-none text-[#1e1e1e]" style="width: 225px; color: #1e1e1e;">30</td>
+                            <td class="px-4 align-middle border-none text-[#1e1e1e]" style="width: 179px; color: #1e1e1e;">18000</td>
+                            <td class="px-4 align-middle border-none text-[#1e1e1e]" style="width: 155px; color: #1e1e1e;">216000</td>
+                        </tr>
+                        <tr style="height: 54px;">
+                            <td class="px-4 align-middle border-none text-[#1e1e1e]" style="width: 225px; color: #1e1e1e;">50</td>
+                            <td class="px-4 align-middle border-none text-[#1e1e1e]" style="width: 179px; color: #1e1e1e;">30000</td>
+                            <td class="px-4 align-middle border-none text-[#1e1e1e]" style="width: 155px; color: #1e1e1e;">360000</td>
+                        </tr>
+                        <tr style="height: 54px;">
+                            <td class="px-4 align-middle border-none text-[#1e1e1e]" style="width: 225px; color: #1e1e1e;">100</td>
+                            <td class="px-4 align-middle border-none text-[#1e1e1e]" style="width: 179px; color: #1e1e1e;">60000</td>
+                            <td class="px-4 align-middle border-none text-[#1e1e1e]" style="width: 155px; color: #1e1e1e;">720000</td>
+                        </tr>
+                        <tr style="height: 54px;">
+                            <td class="px-4 align-middle border-none text-[#1e1e1e]" style="width: 225px; color: #1e1e1e;">200</td>
+                            <td class="px-4 align-middle border-none text-[#1e1e1e]" style="width: 179px; color: #1e1e1e;">120000</td>
+                            <td class="px-4 align-middle border-none text-[#1e1e1e]" style="width: 155px; color: #1e1e1e;">1440000</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div style="flex: 0 0 420px; max-width: 100%; display: flex; flex-direction: column; justify-content: flex-start; padding-top: 0px;">
+            <div
+                class="flex flex-col items-start mb-12"
+                style="width: 361px; max-width: 100%; margin-bottom: 48px;"
+            >
+                <img
+                    src="{{ Vite::asset('resources/images/nation_health_logo.png') }}"
+                    alt="{{ trans('oh.title') }}"
+                    class="object-contain"
+                    style="width: 361px; max-width: 100%;"
+                >
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 48px; width: 100%;">
+                <div class="flex items-start gap-6">
+                    <div
+                        class="rounded-full flex items-center justify-center text-white shrink-0 bg-[#104475]"
+                        style="width: 64px; height: 64px; background-color: #104475;"
+                    >
+                        <span class="text-white text-2xl font-bold leading-none" style="color: #ffffff; font-size: 28px; font-weight: 700; line-height: 1;">1</span>
+                    </div>
+                    <span
+                        class="pt-1.5 text-[#104475] font-medium"
+                        style="color: #104475; font-size: 20px; line-height: 120%; font-weight: 500; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; max-width: 337px;"
+                    >
+                        {{ trans('forms.system_installation_on_server') }}
+                    </span>
+                </div>
+
+                <div class="flex items-start gap-6">
+                    <div
+                        class="rounded-full flex items-center justify-center text-white shrink-0 bg-[#104475]"
+                        style="width: 64px; height: 64px; background-color: #104475;"
+                    >
+                        <span class="text-white text-2xl font-bold leading-none" style="color: #ffffff; font-size: 28px; font-weight: 700; line-height: 1;">2</span>
+                    </div>
+                    <span
+                        class="pt-1.5 text-[#104475] font-medium"
+                        style="color: #104475; font-size: 20px; line-height: 120%; font-weight: 500; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; max-width: 337px;"
+                    >
+                        {{ trans('forms.certification_and_ehealth_connection') }}
+                    </span>
+                </div>
+
+                <div class="flex items-start gap-6">
+                    <div
+                        class="rounded-full flex items-center justify-center text-white shrink-0 bg-[#104475]"
+                        style="width: 64px; height: 64px; background-color: #104475;"
+                    >
+                        @icon('pajamas-repeat', 'w-8 h-8 text-white')
+                    </div>
+                    <div
+                        class="flex flex-col pt-1.5 text-[#104475] font-medium"
+                        style="color: #104475; font-size: 20px; line-height: 120%; font-weight: 500; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; max-width: 337px;"
+                    >
+                        <span>
+                            {{ trans('forms.server_technical_support_and_updates') }}
+                        </span>
+                        <span class="mt-1.5 font-medium text-[#104475]" style="font-size: 20px;">
+                            {{ trans('forms.approx_up_to_120000_uah_year') }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="services" class="bg-white pt-20 sm:pt-30 pb-20 sm:pb-30 pl-5 pr-5">
     <div class="container mx-auto">
-        <h2 class="text-black lg:text-4xl text-3xl font-semibold mb-10">{{ trans('Переваги') }}</h2>
+        <h2
+            class="font-bold uppercase mb-10 text-left text-[#104475]"
+            style="color: #104475; font-size: clamp(32px, 4vw, 48px); line-height: 120%; letter-spacing: 0;"
+        >
+            {{ trans('forms.nation_health_mis_advantages') }}
+        </h2>
 
         <div class="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-y-4 gap-y-10">
-            <!-- card 1 -->
-            <div class="bg-white p-5 rounded-lg shadow-card hover:shadow-lg transition-all">
-                <div class="wrapper-icon flex justify-center items-center bg-gray h-17 w-17 rounded-full mb-3">
-                    <img src="{{ Vite::asset('resources/images/code.svg') }}" alt="{{ trans('Відкритий вихідний код') }}" class="icon w-10 h-10">
+            <div class="bg-white p-6 rounded-lg shadow-card hover:shadow-lg transition-all h-[230px] flex flex-col justify-start">
+                <div
+                    class="mb-4 text-[#104475]"
+                    style="color: #104475;"
+                >
+                    @icon('code', 'w-10 h-10')
                 </div>
 
-                <h3 class="text-black text-lg font-semibold mb-2">
-                    {{ trans('Відкритий вихідний код') }}
-                    <span class="text-meta-10">→</span>
+                <h3
+                    class="text-[20px] font-bold leading-[125%] mb-2 text-[#104475]"
+                    style="color: #104475;"
+                >
+                    {{ trans('forms.open_source_code') }}
                 </h3>
-                <hr class="w-1/5 h-1 text-orange bg-orange mb-5">
-                <p class="text-link text-md font-normal">{{ trans('Перша в Україні та світі медична інформаційна система із відкритим вихідним кодом та відкритою ліцензією GPL version 3') }}</p>
-            </div>
-
-            <!-- card 2 -->
-            <div class="bg-white p-5 rounded-lg shadow-card hover:shadow-lg transition-all">
-                <div class="wrapper-icon flex justify-center items-center bg-gray h-17 w-17 rounded-full mb-3">
-                    <img src="{{ Vite::asset('resources/images/cloud.svg') }}" alt="{{ trans('Хмарні технології') }}" class="icon w-10 h-10">
-                </div>
-
-                <h3 class="text-black text-lg font-semibold mb-2">
-                    {{ trans('Хмарні технології') }}
-                    <span class="text-meta-10">→</span>
-                </h3>
-                <hr class="w-1/5 h-1 text-orange bg-orange mb-5">
-                <p class="text-link text-md font-normal">{{ trans('Цілодобовий доступ з будь якого пристрою з максимальною безпекою') }}</p>
-            </div>
-
-            <!-- card 3 -->
-            <div class="bg-white p-5 rounded-lg shadow-card hover:shadow-lg transition-all">
-                <div class="wrapper-icon flex justify-center items-center bg-gray h-17 w-17 rounded-full mb-3">
-                    <img src="{{ Vite::asset('resources/images/puzzle.svg') }}" alt="{{ trans('Інтеграція з ЕСОЗ') }}" class="icon w-10 h-10">
-                </div>
-
-                <h3 class="text-black text-lg font-semibold mb-2">
-                    {{ trans('Інтеграція з ЕСОЗ') }}
-                    <span class="text-meta-10">→</span>
-                </h3>
-                <hr class="w-1/5 h-1 text-orange bg-orange mb-5">
-                <p class="text-link text-md font-normal">{{ trans('Максимально зручна робота з електронною системою охорони здоровʼя') }}</p>
-            </div>
-
-            <!-- card 4 -->
-            <div class="bg-white p-5 rounded-lg shadow-card hover:shadow-lg transition-all">
-                <div class="wrapper-icon flex justify-center items-center bg-gray h-17 w-17 rounded-full mb-3">
-                    <img src="{{ Vite::asset('resources/images/touch.svg') }}" alt="{{ trans('Інтуїтивний інтерфейс') }}" class="icon w-10 h-10">
-                </div>
-
-                <h3 class="text-black text-lg font-semibold mb-2">
-                    {{ trans('Інтуїтивний інтерфейс') }}
-                    <span class="text-meta-10">→</span>
-                </h3>
-                <hr class="w-1/5 h-1 text-orange bg-orange mb-5">
-                <p class="text-link text-md font-normal">{{ trans('Швидке навчання роботі у системи: тиждень на опанування всіх технічних можливостей') }}</p>
-            </div>
-
-            <!-- card 5 -->
-            <div class="bg-white p-5 rounded-lg shadow-card hover:shadow-lg transition-all">
-                <div class="wrapper-icon flex justify-center items-center bg-gray h-17 w-17 rounded-full mb-3">
-                    <img src="{{ Vite::asset('resources/images/consultant.svg') }}" alt="{{ trans('Людяна служба підтримки') }}" class="icon w-10 h-10">
-                </div>
-
-                <h3 class="text-black text-lg font-semibold mb-2">
-                    {{ trans('Людяна служба підтримки') }}
-                    <span class="text-meta-10">→</span>
-                </h3>
-                <hr class="w-1/5 h-1 text-orange bg-orange mb-5">
-                <p class="text-link text-md font-normal">{{ trans('Завжди з Вами на звʼязку, у чаті або за телефоном, готові вирішити проблеми') }}</p>
-            </div>
-
-            <!-- card 6 -->
-            <div class="bg-white p-5 rounded-lg shadow-card hover:shadow-lg transition-all">
-                <div class="wrapper-icon flex justify-center items-center bg-gray h-17 w-17 rounded-full mb-3">
-                    <img src="{{ Vite::asset('resources/images/cart.svg') }}" alt="{{ trans('Телемедицина') }}" class="icon w-10 h-10">
-                </div>
-
-                <h3 class="text-black text-lg font-semibold mb-2">
-                    {{ trans('Телемедицина') }}
-                    <span class="text-meta-10">→</span>
-                </h3>
-                <hr class="w-1/5 h-1 text-orange bg-orange mb-5">
-                <p class="text-link text-md font-normal">{{ trans('Використання сучасних технологій для комунікації між пацієнтом та лікарем') }}</p>
-            </div>
-
-            <!-- card 7 -->
-            <div class="bg-white p-5 rounded-lg shadow-card hover:shadow-lg transition-all">
-                <div class="wrapper-icon flex justify-center items-center bg-gray h-17 w-17 rounded-full mb-3">
-                    <img src="{{ Vite::asset('resources/images/gpt.svg') }}" alt="{{ trans('Використання ШІ') }}" class="icon w-10 h-10">
-                </div>
-
-                <h3 class="text-black text-lg font-semibold mb-2">
-                    {{ trans('Використання ШІ') }}
-                    <span class="text-meta-10">→</span>
-                </h3>
-                <hr class="w-1/5 h-1 text-orange bg-orange mb-5">
-                <p class="text-link text-md font-normal">{{ trans('Застосування технологій Deep Learning для комфортної роботи лікаря') }}</p>
-            </div>
-
-            <!-- card 8 -->
-            <div class="bg-white p-5 rounded-lg shadow-card hover:shadow-lg transition-all">
-                <div class="wrapper-icon flex justify-center items-center bg-gray h-17 w-17 rounded-full mb-3">
-                    <img src="{{ Vite::asset('resources/images/safe.svg') }}" alt="{{ trans('Безпека та прозорість') }}" class="icon w-10 h-10">
-                </div>
-
-                <h3 class="text-black text-lg font-semibold mb-2">
-                    {{ trans('Безпека та прозорість') }}
-                    <span class="text-meta-10">→</span>
-                </h3>
-                <hr class="w-1/5 h-1 text-orange bg-orange mb-5">
-                <p class="text-link text-md font-normal">{{ trans('Відкритий код перевіряється багатьма розробниками, які виправляють можливі помилки') }}</p>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Автоматизація медичного бізнесу -->
-<section class="lg:h-90vh h-auto bg-meta-10 sm:bg-image-2 bg-right-bottom bg-cover bg-no-repeat flex items-center pt-20 sm:pt-30 pb-20 sm:pb-20 pl-5 pr-5">
-    <div class="md:container mx-auto">
-        <h2 class="text-white text-3xl sm:text-4xl font-semibold mb-20">{{ trans('Автоматизація медичного бізнесу') }}</h2>
-
-        <div class="w-full lg:w-3/5 grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 gap-2 md:gap-y-10">
-            <!-- card 1 -->
-            <div class="bg-transporant flex items-center text-white lg:text-2xl text-2xl">
-                <div class="wrapper-icon bg-white flex justify-center items-center bg-gray lg:h-17 lg:w-17 md:h-11 md:w-11 h-11 w-13 rounded-full">
-                    <img src="{{ Vite::asset('resources/images/cart.svg') }}" alt="{{ trans('Онлайн запис на прийом') }}" class="icon lg:w-10 lg:h-10 w-5 h-5">
-                </div>
-
-                <h3 class="w-full md:w-3/5 font-semibold pl-3">
-                    {{ trans('Онлайн запис на прийом') }}
-                </h3>
-            </div>
-
-            <!-- card 2 -->
-            <div class="bg-transporant flex items-center text-white lg:text-2xl text-2xl">
-                <div class="wrapper-icon bg-white flex justify-center items-center bg-gray lg:h-17 lg:w-17 md:h-11 md:w-11 h-11 w-13 rounded-full">
-                    <img src="{{ Vite::asset('resources/images/health.svg') }}" alt="{{ trans('Управління бізнес-процесами') }}" class="icon lg:w-10 lg:h-10 w-5 h-5">
-                </div>
-
-                <h3 class="w-full md:w-3/5 font-semibold pl-3">
-                    {{ trans('Управління бізнес-процесами') }}
-                </h3>
-            </div>
-
-            <!-- card 3 -->
-            <div class="bg-transporant flex items-center text-white lg:text-2xl text-2xl">
-                <div class="wrapper-icon bg-white flex justify-center items-center bg-gray lg:h-17 lg:w-17 md:h-11 md:w-11 h-11 w-13 rounded-full">
-                    <img src="{{ Vite::asset('resources/images/cv.svg') }}" alt="{{ trans('Електронна медична картка') }}" class="icon lg:w-10 lg:h-10 w-5 h-5">
-                </div>
-
-                <h3 class="w-full md:w-3/5 font-semibold pl-3">
-                    {{ trans('Електронна медична картка') }}
-                </h3>
-            </div>
-
-            <!-- card 4 -->
-            <div class="bg-transporant flex items-center text-white lg:text-2xl text-2xl">
-                <div class="wrapper-icon bg-white flex justify-center items-center bg-gray lg:h-17 lg:w-17 md:h-11 md:w-11 h-11 w-13 rounded-full">
-                    <img src="{{ Vite::asset('resources/images/puzzle.svg') }}" alt="{{ trans('Інтеграція зі сторонніми сервісами') }}" class="icon lg:w-10 lg:h-10 w-5 h-5">
-                </div>
-
-                <h3 class="w-full md:w-3/5 font-semibold pl-3">
-                    {{ trans('Інтеграція зі сторонніми сервісами') }}
-                </h3>
-            </div>
-        </div>
-    </div>
-</section>
-
-{{--<!-- our team --><section class="bg-gray-3 flex items-center justify-center md:py-30 py-15"></section>--}}
-
-<!-- offers -->
-<section id="offers" class="lg:h-90vh lg:h-auto h-auto bg-white flex pt-20 sm:pt-30 pb-20 sm:pb-20 pl-5 pr-5">
-    <div class="md:container mx-auto">
-        <h2 class="text-black text-center text-3xl sm:text-4xl font-bold mb-10">{{ trans('Індивідуальна розробка') }}</h2>
-        <p class="text-link text-center text-3lg sm:text-xl font-semibold mb-15">
-            {{ trans('Створимо інформаційне середовище під ваші потреби') }}
-        </p>
-
-        <div class="w-full grid grid-cols-1 sm:grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-10">
-            <!-- card 1 -->
-            <div class="bg-transporant mb-10">
-                <div class="image bg-cover bg-image-3 bg-no-repeat w-full md:h-60 sm:h-70 h-50 rounded mb-4"></div>
-
-                <h3 class="text-black lg:text-2xl text-xl font-semibold mb-4">
-                    {{ trans('Інтеграція зі сторонніми сервісами') }}
-                </h3>
-                <p class="text-link text-lg font-normal">
-                    {{ trans('Потрібно налаштувати специфічний бізнес-процес чи інтеграцію зі стороннім додатком? Легко! Наша команда розробників готова до складних викликів!') }}
+                <p class="text-[#64748B] text-sm font-normal leading-relaxed">
+                    {{ trans('forms.open_source_description') }}
                 </p>
             </div>
 
-            <!-- card 2 -->
-            <div class="bg-transporant mb-10">
-                <div class="image bg-cover bg-image-4 bg-no-repeat w-full md:h-60 sm:h-70 h-50 rounded mb-4"></div>
+            <div class="bg-white p-6 rounded-lg shadow-card hover:shadow-lg transition-all h-[230px] flex flex-col justify-start">
+                <div
+                    class="mb-4 text-[#104475]"
+                    style="color: #104475;"
+                >
+                    @icon('cloud', 'w-10 h-10')
+                </div>
 
-                <h3 class="text-black lg:text-2xl text-xl font-semibold mb-4">
-                    {{ trans('Гнучка система модулів') }}
+                <h3
+                    class="text-[20px] font-bold leading-[125%] mb-2 text-[#104475]"
+                    style="color: #104475;"
+                >
+                    {{ trans('forms.cloud_technologies') }}
                 </h3>
-                <p class="text-link text-lg font-normal">
-                    {{ trans('Велика бібліотека готових додатків, які дозволяють налаштувати бізнес-процес.') }}
+                <p class="text-[#64748B] text-sm font-normal leading-relaxed">
+                    {{ trans('forms.cloud_technologies_description') }}
                 </p>
             </div>
 
-            <!-- card 3 -->
-            <div class="bg-meta-10 text-white rounded mb-10 p-10">
-                <h3 class="lg:text-3xl text-2xl font-semibold mb-4">
-                    {{ trans('Потрібно більше?') }}
-                </h3>
-                <hr class="w-1/5 h-1 text-icon bg-icon mb-5">
+            <div class="bg-white p-6 rounded-lg shadow-card hover:shadow-lg transition-all h-[230px] flex flex-col justify-start">
+                <div
+                    class="mb-4 text-[#104475]"
+                    style="color: #104475;"
+                >
+                    @icon('codesandbox', 'w-10 h-10')
+                </div>
 
-                <p class="text-sm2 font-bold pb-4">
-                    <span class="text-icon">● </span> {{ trans('Персоналізований підхід') }}
+                <h3
+                    class="text-[20px] font-bold leading-[125%] mb-2 text-[#104475]"
+                    style="color: #104475;"
+                >
+                    {{ trans('forms.ehealth_integration') }}
+                </h3>
+                <p class="text-[#64748B] text-sm font-normal leading-relaxed">
+                    {{ trans('forms.ehealth_integration_description') }}
                 </p>
-                <p class="text-sm2 font-bold border-t border-icon pt-4 pb-4">
-                    <span class="text-icon">● </span> {{ trans('Досвідчена команда розробників') }}
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-card hover:shadow-lg transition-all h-[230px] flex flex-col justify-start">
+                <div
+                    class="mb-4 text-[#104475]"
+                    style="color: #104475;"
+                >
+                    @icon('grid', 'w-10 h-10')
+                </div>
+
+                <h3
+                    class="text-[20px] font-bold leading-[125%] mb-2 text-[#104475]"
+                    style="color: #104475;"
+                >
+                    {{ trans('forms.intuitive_interface') }}
+                </h3>
+                <p class="text-[#64748B] text-sm font-normal leading-relaxed">
+                    {{ trans('forms.intuitive_interface_description') }}
                 </p>
-                <p class="text-sm2 font-bold border-t border-icon pt-4 pb-4">
-                    <span class="text-icon">● </span> {{ trans('Потужна команда бізнес-аналітиків') }}
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-card hover:shadow-lg transition-all h-[230px] flex flex-col justify-start">
+                <div
+                    class="mb-4 text-[#104475]"
+                    style="color: #104475;"
+                >
+                    @icon('message-circle', 'w-10 h-10')
+                </div>
+
+                <h3
+                    class="text-[20px] font-bold leading-[125%] mb-2 text-[#104475]"
+                    style="color: #104475;"
+                >
+                    {{ trans('forms.human_support_service') }}
+                </h3>
+                <p class="text-[#64748B] text-sm font-normal leading-relaxed">
+                    {{ trans('forms.human_support_service_description') }}
                 </p>
-                <p class="text-sm2 font-bold border-t border-icon pt-4 pb-4">
-                    <span class="text-icon">● </span> {{ trans('Допомога із впровадженням та тренуванням персоналу') }}
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-card hover:shadow-lg transition-all h-[230px] flex flex-col justify-start">
+                <div
+                    class="mb-4 text-[#104475]"
+                    style="color: #104475;"
+                >
+                    @icon('server', 'w-10 h-10')
+                </div>
+
+                <h3
+                    class="text-[20px] font-bold leading-[125%] mb-2 text-[#104475]"
+                    style="color: #104475;"
+                >
+                    {{ trans('forms.mis_on_your_server') }}
+                </h3>
+                <p class="text-[#64748B] text-sm font-normal leading-relaxed">
+                    {{ trans('forms.system_installation_on_server') }}
+                </p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-card hover:shadow-lg transition-all h-[230px] flex flex-col justify-start">
+                <div
+                    class="mb-4 text-[#104475]"
+                    style="color: #104475;"
+                >
+                    @icon('cpu', 'w-10 h-10')
+                </div>
+
+                <h3
+                    class="text-[20px] font-bold leading-[125%] mb-2 text-[#104475]"
+                    style="color: #104475;"
+                >
+                    {{ trans('forms.use_of_ai') }}
+                </h3>
+                <p class="text-[#64748B] text-sm font-normal leading-relaxed">
+                    {{ trans('forms.use_of_ai_description') }}
+                </p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-card hover:shadow-lg transition-all h-[230px] flex flex-col justify-start">
+                <div
+                    class="mb-4 text-[#104475]"
+                    style="color: #104475;"
+                >
+                    @icon('shield', 'w-10 h-10')
+                </div>
+
+                <h3
+                    class="text-[20px] font-bold leading-[125%] mb-2 text-[#104475]"
+                    style="color: #104475;"
+                >
+                    {{ trans('forms.security_and_transparency') }}
+                </h3>
+                <p class="text-[#64748B] text-sm font-normal leading-relaxed">
+                    {{ trans('forms.security_and_transparency_description') }}
                 </p>
             </div>
         </div>
     </div>
 </section>
 
-<!-- action block -->
-<section class="bg-meta-10 flex flex-col justify-center lg:h-50vh h-60vh p-6 sm:flex-row sm:justify-between sm:p-12">
-    <div class="container mx-auto max-w-custom flex flex-col sm:flex-row items-center justify-center">
-        <div class="flex flex-col justify-center w-full">
-            <img class="text-center w-20 h-20 mx-auto" src="{{ Vite::asset('resources/images/phone.svg') }}" alt="phone">
-            <h2 class="text-white text-center text-3xl sm:text-4xl font-bold mb-10">{{ trans('Цікавить наш продукт?') }}</h2>
-            <p class="text-white text-center text-3lg sm:text-xl font-semibold">
-                {!! Lang::get('Напишіть нам на :email або дзвоніть :phone', ['email' => '<a class="underline hover:text-orange" href="mailto:' . $email . '">' . $email . '</a>', 'phone' => '<a class="underline hover:text-orange" href="tel:' . $phone . '">' . $phone . '</a>']) !!}
+<section
+    id="custom-development"
+    class="pt-20 sm:pt-30 pb-20 sm:pb-30 pl-5 pr-5 flex items-center bg-cover bg-no-repeat relative"
+    style="background-image: url('{{ Vite::asset('resources/images/BG-6-clean.jpg') }}'); background-position: center center;"
+>
+    <div class="container mx-auto">
+        <h2
+            class="text-white font-bold uppercase text-left"
+            style="color: #ffffff; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; font-size: 48px; font-weight: 700; line-height: 120%; letter-spacing: 0; margin-bottom: 64px;"
+        >
+            {{ trans('forms.custom_development') }}
+        </h2>
+
+        <div
+            class="grid grid-cols-1 lg:grid-cols-3 relative"
+            style="column-gap: 48px; row-gap: 32px; align-items: start;"
+        >
+            @php
+                $offers = [
+                    [
+                        'image' => '4.png',
+                        'imageAlt' => 'forms.mis_integration_alt',
+                        'question' => 'forms.offer_1_question',
+                        'answer' => 'forms.offer_1_answer',
+                    ],
+                    [
+                        'image' => '2.png',
+                        'imageAlt' => 'forms.acquiring_and_fiscalization_alt',
+                        'question' => 'forms.offer_2_question',
+                        'answer' => 'forms.offer_2_answer',
+                    ],
+                    [
+                        'image' => '3.png',
+                        'imageAlt' => 'forms.analytical_reports_alt',
+                        'question' => 'forms.offer_3_question',
+                        'answer' => 'forms.offer_3_answer',
+                    ],
+                ];
+            @endphp
+
+            @foreach ($offers as $i => $offer)
+                <div
+                    class="flex justify-center lg:justify-start"
+                    style="grid-column: {{ $i + 1 }}; grid-row: 1;"
+                >
+                    <div
+                        class="overflow-hidden w-full"
+                        style="max-width: 385px; height: 125px; border-radius: 20px; border: 1px solid #ffffff;"
+                    >
+                        <img
+                            src="{{ Vite::asset('resources/images/' . $offer['image']) }}"
+                            alt="{{ trans($offer['imageAlt']) }}"
+                            class="w-full h-full object-cover"
+                        >
+                    </div>
+                </div>
+            @endforeach
+
+            @foreach ($offers as $i => $offer)
+                <div
+                    class="flex items-start justify-center lg:justify-start gap-3"
+                    style="grid-column: {{ $i + 1 }}; grid-row: 2;"
+                >
+                    <img
+                        src="{{ Vite::asset('resources/images/502.png') }}"
+                        alt="{{ trans('forms.director_of_medical_institution') }}"
+                        class="rounded-full object-cover flex-shrink-0"
+                        style="width: 81px; height: 81px;"
+                    >
+                    <div
+                        class="bg-white p-4 text-black shadow-md w-full"
+                        style="max-width: 292px; border-radius: 0px 20px 20px 20px;"
+                    >
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="font-bold text-gray-900 text-[13px]">
+                                {{ trans('forms.director_of_medical_institution') }}
+                            </span>
+                            <span class="text-gray-400 text-xs font-normal">11:46</span>
+                        </div>
+                        <p class="text-[13px] leading-snug text-gray-800 font-normal">
+                            {!! trans($offer['question']) !!}
+                        </p>
+                    </div>
+                </div>
+            @endforeach
+
+            @foreach ($offers as $i => $offer)
+                <div
+                    class="flex items-end justify-center lg:justify-start gap-3"
+                    style="grid-column: {{ $i + 1 }}; grid-row: 3;"
+                >
+                    <div
+                        class="bg-white p-4 text-black shadow-md w-full"
+                        style="max-width: 292px; border-radius: 20px 0px 20px 20px;"
+                    >
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="font-bold text-[#104475] text-[13px]" style="color: #104475;">
+                                МІС Nation Health
+                            </span>
+                            <span class="text-gray-400 text-xs font-normal">11:48</span>
+                        </div>
+                        <p class="text-[13px] leading-snug text-gray-800 font-normal">
+                            {{ trans($offer['answer']) }}
+                        </p>
+                    </div>
+                    <img
+                        src="{{ Vite::asset('resources/images/logo-152x152.png') }}"
+                        alt="МІС Nation Health"
+                        class="rounded-full object-contain p-3 bg-white flex-shrink-0 shadow-md"
+                        style="width: 81px; height: 81px;"
+                    >
+                </div>
+            @endforeach
+
+            <div
+                class="hidden lg:block"
+                style="position: absolute; left: 33.33%; top: 0; bottom: 0; width: 2px; background-color: #ffffff; z-index: 10;"
+            ></div>
+            <div
+                class="hidden lg:block"
+                style="position: absolute; left: 66.66%; top: 0; bottom: 0; width: 2px; background-color: #ffffff; z-index: 10;"
+            ></div>
+        </div>
+    </div>
+</section>
+
+<section
+    class="pt-20 sm:pt-30 pb-20 sm:pb-30 pl-5 pr-5 flex items-center bg-cover bg-no-repeat"
+    style="background-image: linear-gradient(rgba(240, 247, 249, 0.8), rgba(240, 247, 249, 0.8)), url('{{ Vite::asset('resources/images/BG-4.jpg') }}'); background-position: center top;"
+>
+    <div id="consultation-form" class="container mx-auto flex flex-row flex-wrap items-start justify-between gap-8">
+        <div style="flex: 1 1 500px; max-width: 600px; display: flex; flex-direction: column; justify-content: flex-start;">
+            <h2
+                class="font-bold uppercase text-[#104475]"
+                style="color: #104475; font-family: inherit; font-size: 48px; line-height: 120%; letter-spacing: 0; margin: 0 0 16px 0;"
+            >
+                {{ trans('forms.contact_us') }}
+            </h2>
+            <p style="font-family: inherit; font-size: 20px; line-height: 150%; letter-spacing: 0; color: #6B7280; font-weight: 400; margin: 0;">
+                {{ trans('forms.fill_form_contact_prompt') }}
             </p>
         </div>
-    </div>
-</section>
 
-<!-- contact form -->
-<section class="bg-gray-3 flex items-center justify-center md:py-30 py-15">
-    <div class="container mx-auto w-full lg:w-3/5 flex flex-col sm:flex-row items-center justify-between md:pl-0 pl-5 md:pr-0 pr-5">
-        <div class="bg-white rounded-lg shadow-lg shadow border-link md:p-15 p-5 w-full mx-auto">
-            <h2 class="md:text-4xl text-2xl font-bold text-center mb-4">{{ trans('Зворотній зв\'язок') }}</h2>
-            <p class="text-link font-bold text-center mb-8">{{ trans('Заповніть форму і ми зв\'яжемось із Вами якнайшвидше') }}</p>
+        <div style="flex: 0 0 448px; width: 448px; max-width: 100%; background: #ffffff; border-radius: 8px; padding: 32px; box-shadow: 0 4px 6px 0 rgba(0, 0, 0, 0.05), 0 10px 15px -3px rgba(0, 0, 0, 0.10); display: flex; flex-direction: column; justify-content: center;">
             <form id="consultation-form" method="POST" action="{{ route('send.email') }}">
                 @csrf
-                <div class="mb-4">
-                    <input type="text" name="name" placeholder="{{ trans('Your Name*') }}" class="w-full bg-gray px-4 py-2 border border-transparent rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500" title="{{ trans('Введіть ваше ім\'я') }}">
+                <div style="margin-bottom: 16px;">
+                    <label
+                        for="contact-phone"
+                        style="font-family: inherit; display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #374151;"
+                    >
+                        {{ trans('forms.your_phone_number') }}
+                    </label>
+                    <input
+                        id="contact-phone"
+                        type="tel"
+                        name="phone"
+                        placeholder="+380"
+                        style="font-family: inherit; width: 100%; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 16px; font-size: 14px; color: #374151; background: #F8FAFC; outline: none; box-sizing: border-box;"
+                        title="{{ trans('forms.enter_valid_phone_hint') }}"
+                    >
                 </div>
-                <div class="mb-10">
-                    <input type="text" name="phone" placeholder="{{ trans('Phone number*') }}" class="w-full bg-gray px-4 py-2 border border-transparent rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    title="{{ trans('Введіть дійсний номер телефону щонайменше з 10 цифр') }}">
+                <div style="margin-bottom: 24px;">
+                    <label
+                        for="contact-email"
+                        style="font-family: inherit; display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #374151;"
+                    >
+                        {{ trans('forms.your_email') }}
+                    </label>
+                    <input
+                        id="contact-email"
+                        type="email"
+                        name="email"
+                        placeholder="test@gmail.com"
+                        style="font-family: inherit; width: 100%; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 16px; font-size: 14px; color: #374151; background: #F8FAFC; outline: none; box-sizing: border-box;"
+                    >
                 </div>
-                <button type="submit" class="w-full bg-orange text-white font-semibold py-3 rounded-lg hover:bg-blue focus:outline-none focus:ring-2 focus:ring-orange">
-                    {{ trans('Request a Callback') }}
+                <button
+                    type="submit"
+                    class="bg-[#104475] text-white hover:bg-blue-700"
+                    style="font-family: inherit; width: 100%; background: #104475; color: #fff; font-size: 15px; font-weight: 600; padding: 12px 0; border: none; border-radius: 8px; cursor: pointer; transition: opacity 0.2s;"
+                    onmouseover="this.style.opacity='0.9'"
+                    onmouseout="this.style.opacity='1'"
+                >
+                    {{ trans('forms.send') }}
                 </button>
             </form>
         </div>
     </div>
 </section>
-
 @endsection
 
 @push('modals')
-    <!-- Modal Contact Form successModal -->
     <div id="successModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center hidden ml-3 mr-3">
         <div class="bg-white border-black rounded-lg overflow-hidden shadow-card hover:shadow-lg transform transition-all max-w-lg w-full p-6">
             <div class="text-center">
                 <h3 class="text-lg font-medium text-gray-900">
-                    {{ trans('Повідомлення відправлено успішно')}}
+                    {{ trans('forms.message_sent_successfully') }}
                 </h3>
                 <div class="mt-2">
                     <p class="text-sm text-gray-500">
-                        {{ trans('Дякуємо, що звернулися до нас. Ми отримали ваш електронний лист і незабаром зв’яжемося з вами')}}
+                        {{ trans('forms.thank_you_contact_message') }}
                     </p>
                 </div>
             </div>
             <div class="mt-4">
-                <button id="closeModal" type="button" class="bg-orange inline-flex justify-center w-full rounded-md border border-transparent shadow-sm hover:shadow-lg px-4 py-2 text-base font-medium text-white hover:bg-blue focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange sm:text-sm">
-                    {{ trans('Close')}}
+                <button
+                    id="closeModal"
+                    type="button"
+                    class="bg-[#104475] inline-flex justify-center w-full rounded-md border border-transparent shadow-sm hover:shadow-lg px-4 py-2 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#104475] sm:text-sm"
+                    style="background-color: #104475;"
+                >
+                    {{ trans('forms.close') }}
                 </button>
             </div>
         </div>
@@ -311,5 +661,5 @@
 @endpush
 
 @push('scripts')
-    @vite('resources/js/home.js')
+    @vite(['resources/css/home.css', 'resources/js/home.js'])
 @endpush

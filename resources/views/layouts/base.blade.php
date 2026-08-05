@@ -35,17 +35,45 @@
         <!-- Left-aligned logo -->
         <div class="flex items-center">
             <a href="/" class="text-black text-lg font-bold">
-                <img src="{{ Vite::asset('resources/images/logo.webp') }}" alt="{{ trans('oh.title') }}" width="400" height="150">
+                <img
+                    src="{{ Vite::asset('resources/images/nation_health_logo.png') }}"
+                    alt="{{ trans('oh.title') }}"
+                    width="400"
+                    height="150"
+                >
             </a>
         </div>
 
         <!-- Center-aligned menu (hidden on small screens) -->
-        <nav class="hidden lg:block text-black text-lg font-semibold">
-            <ul class="flex">
-                <li><a href="#services" class="text-link p-4 hover:text-orange hover:underline">{{ trans('Переваги') }}</a></li>
-                <!--<li><a href="#team" class="text-link p-4 hover:text-orange hover:underline">{{ trans('Команда') }}</a></li>-->
-                <li><a href="#offers" class="text-link p-4 hover:text-orange hover:underline">{{ trans('Індивідуальна розробка') }}</a></li>
-                <li><a href="#consultation-form" class="text-link p-4 hover:text-orange hover:underline">{{ trans('Контакти') }}</a></li>
+        <nav class="hidden lg:block">
+            <ul class="flex items-center">
+                <li>
+                    <a
+                        href="#services"
+                        class="p-4 hover:text-orange hover:underline"
+                        style="color: #104475; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; font-size: 18px; font-weight: 700; line-height: 150%;"
+                    >
+                        {{ trans('Переваги') }}
+                    </a>
+                </li>
+                <li>
+                    <a
+                        href="#offers"
+                        class="p-4 hover:text-orange hover:underline"
+                        style="color: #104475; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; font-size: 18px; font-weight: 700; line-height: 150%;"
+                    >
+                        {{ trans('Вартість') }}
+                    </a>
+                </li>
+                <li>
+                    <a
+                        href="#footer"
+                        class="p-4 hover:text-orange hover:underline"
+                        style="color: #104475; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; font-size: 18px; font-weight: 700; line-height: 150%;"
+                    >
+                        {{ trans('Контакти') }}
+                    </a>
+                </li>
             </ul>
         </nav>
 
@@ -62,39 +90,74 @@
             </svg>
         </button>
 
-        <!-- Right-aligned social icons -->
-        <div class="hidden lg:flex items-center">
-            <a href="https://www.facebook.com/openhealthmis" class="text-black mr-4 hover:text-gray-300" aria-label="facebook">
-                @icon('facebook', 'w-10 h-10')
+        <!-- Right-aligned action buttons (Login & Register) -->
+        <div class="hidden lg:flex items-center gap-6">
+            <a
+                href="{{ route('login') }}"
+                class="flex items-center gap-2 hover:opacity-80"
+                style="color: #104475; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; font-size: 18px; font-weight: 700; line-height: 150%;"
+            >
+                @icon('qlementine-icons-use', 'w-[37px] h-[37px]')
+                <span>{{ trans('Вхід') }}</span>
             </a>
-            <a href="https://github.com/openhealths/nationHealth" class="text-black mr-4 hover:text-gray-300" aria-label="github">
-                @icon('github', 'w-10 h-10')
-            </a>
-            <a href="https://www.youtube.com/@NationHealth-mis" class="text-black hover:text-gray-300" aria-label="youtube">
-                @icon('youtube', 'w-10 h-10')
+            <a
+                href="#consultation-form"
+                class="inline-flex items-center justify-center text-white font-medium hover:opacity-90 transition-opacity"
+                style="width: 220px; height: 39px; border-radius: 100px; background-color: #046C4E; color: #ffffff; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; font-size: 14px; font-weight: 700; line-height: 150%; letter-spacing: 0;"
+            >
+                {{ trans('Зареєструвати заклад') }}
             </a>
         </div>
     </div>
 
     <!-- Responsive menu (visible on small screens) -->
-    <div id="responsiveMenu" class="hidden lg:hidden bg-gray-800">
-        <ul class="text-black text-lg font-semibold">
-            <li class="py-2 px-4"><a href="#services" class="text-center text-link block hover:text-orange">{{ trans('Переваги') }}</a></li>
-            <!--<li class="py-2 px-4"><a href="#team" class="text-center text-link block hover:text-orange">{{ trans('Команда') }}</a></li>-->
-            <li class="py-2 px-4"><a href="#offers" class="text-center text-link block hover:text-orange">{{ trans('Індивідуальна розробка') }}</a></li>
-            <li class="py-2 px-4"><a href="#consultation-form" class="text-center text-link block hover:text-orange">{{ trans('Контакти') }}</a></li>
+    <div id="responsiveMenu" class="hidden lg:hidden bg-gray-800 pb-6">
+        <ul>
+            <li class="py-2 px-4">
+                <a
+                    href="#services"
+                    class="text-center block hover:text-orange"
+                    style="color: #104475; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; font-size: 18px; font-weight: 700; line-height: 150%;"
+                >
+                    {{ trans('Переваги') }}
+                </a>
+            </li>
+            <li class="py-2 px-4">
+                <a
+                    href="#offers"
+                    class="text-center block hover:text-orange"
+                    style="color: #104475; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; font-size: 18px; font-weight: 700; line-height: 150%;"
+                >
+                    {{ trans('Вартість') }}
+                </a>
+            </li>
+            <li class="py-2 px-4">
+                <a
+                    href="#footer"
+                    class="text-center block hover:text-orange"
+                    style="color: #104475; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; font-size: 18px; font-weight: 700; line-height: 150%;"
+                >
+                    {{ trans('Контакти') }}
+                </a>
+            </li>
         </ul>
 
-        <!-- Right-aligned social icons -->
-        <div class="flex justify-center text-center items-center mt-8">
-            <a href="https://www.facebook.com/openhealthmis" class="flex justify-center text-black mr-4 hover:text-gray-300" aria-label="facebook">
-                @icon('facebook', 'w-10 h-10')
+        <!-- Right-aligned action buttons for mobile -->
+        <div class="flex flex-col items-center gap-4 mt-6">
+            <a
+                href="{{ route('login') }}"
+                class="flex items-center gap-2 hover:opacity-80"
+                style="color: #104475; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; font-size: 18px; font-weight: 700; line-height: 150%;"
+            >
+                @icon('qlementine-icons-use', 'w-[37px] h-[37px]')
+                <span>{{ trans('Вхід') }}</span>
             </a>
-            <a href="https://github.com/openhealths/nationHealth" class="text-black mr-4 hover:text-gray-300" aria-label="github">
-                @icon('github', 'w-10 h-10')
-            </a>
-            <a href="https://www.youtube.com/@NationHealth-mis" class="text-black hover:text-gray-300" aria-label="youtube">
-                @icon('youtube', 'w-10 h-10')
+            <a
+                href="#consultation-form"
+                class="inline-flex items-center justify-center text-white font-medium hover:opacity-90 transition-opacity"
+                style="width: 220px; height: 39px; border-radius: 100px; background-color: #046C4E; color: #ffffff; font-family: 'e-Ukraine', 'Noto Sans', sans-serif; font-size: 14px; font-weight: 700; line-height: 150%; letter-spacing: 0;"
+            >
+                {{ trans('Зареєструвати заклад') }}
             </a>
         </div>
     </div>
@@ -104,55 +167,76 @@
     @yield('content')
 </main>
 
-<footer class="bg-gray-3 pt-6 sm:pt-5 pb-6 sm:pb-3">
-    <div class="container w-full lg:w-3/5 mx-auto md:text-left text-center text-black">
-        <div class="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-3 gap-3">
-            <div class="p-4">
-                <div class="wrapper-content">
-                    <h3 class="md:text-3xl text-xl font-bold mb-2">
-                        &copy; {{ date('Y') }}
-                        {{ trans('Nation Health') }}
-                    </h3>
-                    <p class="text-meta-10 font-bold">{{ trans('Медична інформаційна система') }}</p>
-                </div>
+<footer id="footer" class="bg-gray-3 py-8 sm:py-10">
+    <div class="container mx-auto px-5 text-black">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+            <div class="text-left">
+                <h3 class="text-xl sm:text-2xl font-bold mb-1">
+                    &copy; {{ date('Y') }} {{ trans('Nation Health') }}
+                </h3>
+                <p class="text-meta-10 font-bold">
+                    {{ trans('Медична інформаційна система') }}
+                </p>
             </div>
-            <div class="p-4 flex justify-center">
-                <div class="wrapper-content">
-                    <h3 class="text-xl font-bold mb-2">{{ trans('Телефонуйте') }}</h3>
-                    <p><a href="tel:{{ $phone }}" class="hover:text-orange hover:underline">{{ $phone }}</a></p>
-                </div>
+
+            <div class="text-center">
+                <h3 class="text-xl font-bold mb-1">
+                    {{ trans('Телефонуйте') }}
+                </h3>
+                <p>
+                    <a
+                        href="tel:{{ $phone ?? '+380506491244' }}"
+                        class="hover:text-orange hover:underline"
+                    >
+                        {{ $phone ?? '+380506491244' }}
+                    </a>
+                </p>
             </div>
-            <div class="p-4 md:flex justify-end hidden">
-                <div class="wrapper-content">
-                    <h3 class="text-xl font-bold mb-2">{{ trans('Пишіть нам') }}</h3>
-                    <p><a href="mailto:{{ $email }}" class="hover:text-orange hover:underline">{{ $email }}</a></p>
-                </div>
+
+            <div class="text-right">
+                <h3 class="text-xl font-bold mb-1">
+                    {{ trans('Пишіть нам') }}
+                </h3>
+                <p>
+                    <a
+                        href="mailto:{{ $email ?? 'v@openhealths.com' }}"
+                        class="hover:text-orange hover:underline"
+                    >
+                        {{ $email ?? 'v@openhealths.com' }}
+                    </a>
+                </p>
             </div>
         </div>
-        <ul class="flex justify-center mt-5">
+
+        <ul class="flex justify-center mt-6">
             <li>
-                <a href="https://www.facebook.com/openhealthmis" class="icon facebook" aria-label="facebook">
+                <a
+                    href="https://www.facebook.com/openhealthmis"
+                    class="icon facebook"
+                    aria-label="facebook"
+                >
                     @icon('facebook', 'w-10 h-10 icon hover:fill-orange')
                 </a>
             </li>
             <li class="ml-4">
-                <a href="https://github.com/openhealths/nationHealth" class="icon github" aria-label="github">
+                <a
+                    href="https://github.com/openhealths/nationHealth"
+                    class="icon github"
+                    aria-label="github"
+                >
                     @icon('github', 'w-10 h-10 icon hover:fill-orange')
                 </a>
             </li>
             <li class="ml-4">
-                <a href="https://www.youtube.com/@NationHealth-mis" class="icon youtube" aria-label="youtube">
+                <a
+                    href="https://www.youtube.com/@NationHealth-mis"
+                    class="icon youtube"
+                    aria-label="youtube"
+                >
                     @icon('youtube', 'w-10 h-10 icon hover:fill-orange')
                 </a>
             </li>
         </ul>
-
-        <div class="md:hidden sm:block grid grid-cols-1 sm:grid-cols-1 md:grid-cols-3 gap-3 mt-4">
-            <div class="p-4">
-                <h3 class="text-xl font-bold mb-2">{{ trans('Пишіть нам') }}</h3>
-                <p><a href="mailto:{{ $email }}" class="hover:text-orange hover:underline">{{ $email }}</a></p>
-            </div>
-        </div>
     </div>
 </footer>
 
