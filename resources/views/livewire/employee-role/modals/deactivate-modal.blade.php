@@ -1,4 +1,4 @@
-<div @deactivate-success.window="show = false">
+<div @deactivate-success.window="show = false" @deactivate-finished.window="show = false">
     <template x-teleport="body">
         <div x-show="show"
              style="display: none"

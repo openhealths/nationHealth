@@ -133,7 +133,7 @@
                                     </span>
                                 </td>
                                 <td class="index-table-td-actions">
-                                    @if($employeeRole->status === Status::ACTIVE)
+                                    @if($employeeRole->status === Status::ACTIVE && $employeeRole->isActive)
                                         <div class="flex justify-center relative">
                                             <div
                                                 x-data="{
