@@ -120,6 +120,74 @@ class EmployeeIndexAdminActionsTest extends TestCase
     }
 
     #[Test]
+    public function request_error_message_translates_invalid_access_token(): void
+    {
+        $component = new EmployeeIndex();
+        $method = new \ReflectionMethod(EmployeeIndex::class, 'translateRequestError');
+        $method->setAccessible(true);
+
+        $translated = $method->invoke(
+            $component,
+            '401: Invalid access token'
+        );
+
+        $this->assertSame(
+            __('employees.errors.invalid_access_token'),
+            $translated
+        );
+    }
+
+    #[Test]
+    public function revoke_local_roles_skips_when_other_approved_same_type_remains(): void
+    {
+        [$legalEntity, $specialistA, $specialistB, $user] = $this->createLegalEntityWithTwoApprovedSpecialists();
+        $this->instance('legalEntity', $legalEntity);
+
+        setPermissionsTeamId($legalEntity->id);
+        $role = \App\Models\Role::findOrCreate(Role::SPECIALIST->value, 'web');
+        $user->assignRole($role);
+
+        $component = new EmployeeIndex();
+        $refLegalEntity = new \ReflectionProperty(EmployeeIndex::class, 'legalEntity');
+        $refLegalEntity->setAccessible(true);
+        $refLegalEntity->setValue($component, $legalEntity);
+
+        $method = new \ReflectionMethod(EmployeeIndex::class, 'revokeLocalRolesAfterDeactivation');
+        $method->setAccessible(true);
+        $method->invoke($component, $specialistA);
+
+        $user->refresh();
+        $this->assertTrue($user->hasRole(Role::SPECIALIST->value, 'web'));
+        $this->assertDatabaseHas('employees', [
+            'id' => $specialistB->id,
+            'status' => Status::APPROVED->value,
+        ]);
+    }
+
+    #[Test]
+    public function revoke_local_roles_removes_role_when_last_approved_same_type(): void
+    {
+        [$legalEntity, $specialist, $user] = $this->createLegalEntityWithSingleApprovedSpecialist();
+        $this->instance('legalEntity', $legalEntity);
+
+        setPermissionsTeamId($legalEntity->id);
+        $role = \App\Models\Role::findOrCreate(Role::SPECIALIST->value, 'web');
+        $user->assignRole($role);
+
+        $component = new EmployeeIndex();
+        $refLegalEntity = new \ReflectionProperty(EmployeeIndex::class, 'legalEntity');
+        $refLegalEntity->setAccessible(true);
+        $refLegalEntity->setValue($component, $legalEntity);
+
+        $method = new \ReflectionMethod(EmployeeIndex::class, 'revokeLocalRolesAfterDeactivation');
+        $method->setAccessible(true);
+        $method->invoke($component, $specialist);
+
+        $user->refresh();
+        $this->assertFalse($user->hasRole(Role::SPECIALIST->value, 'web'));
+    }
+
+    #[Test]
     public function party_verification_meta_blade_gate_hides_for_non_elevated(): void
     {
         $snippet = <<<'BLADE'
@@ -221,5 +289,97 @@ class EmployeeIndexAdminActionsTest extends TestCase
         ]);
 
         return [$legalEntity, $employee];
+    }
+
+    /**
+     * @return array{0: LegalEntity, 1: Employee, 2: Employee, 3: User}
+     */
+    private function createLegalEntityWithTwoApprovedSpecialists(): array
+    {
+        [$legalEntity, $party, $user] = $this->createLegalEntityPartyAndUser();
+
+        $specialistA = Employee::create([
+            'uuid' => (string) Str::uuid(),
+            'employee_type' => Role::SPECIALIST->value,
+            'status' => Status::APPROVED->value,
+            'legal_entity_id' => $legalEntity->id,
+            'is_active' => true,
+            'position' => 'P56',
+            'start_date' => now()->format('Y-m-d'),
+            'user_id' => $user->id,
+            'party_id' => $party->id,
+        ]);
+
+        $specialistB = Employee::create([
+            'uuid' => (string) Str::uuid(),
+            'employee_type' => Role::SPECIALIST->value,
+            'status' => Status::APPROVED->value,
+            'legal_entity_id' => $legalEntity->id,
+            'is_active' => true,
+            'position' => 'P10',
+            'start_date' => now()->format('Y-m-d'),
+            'user_id' => $user->id,
+            'party_id' => $party->id,
+        ]);
+
+        return [$legalEntity, $specialistA, $specialistB, $user];
+    }
+
+    /**
+     * @return array{0: LegalEntity, 1: Employee, 2: User}
+     */
+    private function createLegalEntityWithSingleApprovedSpecialist(): array
+    {
+        [$legalEntity, $party, $user] = $this->createLegalEntityPartyAndUser();
+
+        $specialist = Employee::create([
+            'uuid' => (string) Str::uuid(),
+            'employee_type' => Role::SPECIALIST->value,
+            'status' => Status::APPROVED->value,
+            'legal_entity_id' => $legalEntity->id,
+            'is_active' => true,
+            'position' => 'P56',
+            'start_date' => now()->format('Y-m-d'),
+            'user_id' => $user->id,
+            'party_id' => $party->id,
+        ]);
+
+        return [$legalEntity, $specialist, $user];
+    }
+
+    /**
+     * @return array{0: LegalEntity, 1: Party, 2: User}
+     */
+    private function createLegalEntityPartyAndUser(): array
+    {
+        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'OUTPATIENT')->value('id')
+            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'OUTPATIENT']);
+
+        $legalEntity = LegalEntity::create([
+            'uuid' => (string) Str::uuid(),
+            'status' => 'ACTIVE',
+            'sync_status' => 'COMPLETED',
+            'legal_entity_type_id' => $typeId,
+            'is_active' => true,
+        ]);
+
+        $party = Party::create([
+            'uuid' => (string) Str::uuid(),
+            'first_name' => 'Andriy',
+            'last_name' => 'Kopylets',
+            'tax_id' => '3461807396',
+            'birth_date' => '1990-01-01',
+            'gender' => 'MALE',
+        ]);
+
+        $user = User::create([
+            'uuid' => (string) Str::uuid(),
+            'email' => 'specialist-'.Str::random(8).'@example.com',
+            'password' => bcrypt('password'),
+            'party_id' => $party->id,
+            'email_verified_at' => now(),
+        ]);
+
+        return [$legalEntity, $party, $user];
     }
 }

@@ -49,9 +49,11 @@ class TokenStorage
         return Session::get($this->tokenKey);
     }
 
-    public function getRefreshToken(): string
+    public function getRefreshToken(): ?string
     {
-        return Session::get($this->refreshTokenKey);
+        $token = Session::get($this->refreshTokenKey);
+
+        return is_string($token) && $token !== '' ? $token : null;
     }
 
     public function getExpiresAt(): Carbon
@@ -79,6 +81,11 @@ class TokenStorage
 
     public function refreshBearerToken(): bool
     {
+        $refreshToken = $this->getRefreshToken();
+        if ($refreshToken === null) {
+            return false;
+        }
+
         $legalEntityUuid = Session::get('ehealth_legal_entity_uuid');
 
         $entity = LegalEntity::whereUuid($legalEntityUuid)
@@ -95,7 +102,7 @@ class TokenStorage
             $response = EHealth::auth()->extendTokenLifetime(
                 $entity->clientId,
                 $entity->clientSecret,
-                $this->getRefreshToken()
+                $refreshToken
             );
             $this->store($response->validate());
 

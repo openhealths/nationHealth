@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Employee;
 
 use AllowDynamicProperties;
+use App\Auth\EHealth\Services\TokenStorage;
 use App\Classes\eHealth\EHealth;
 use App\Enums\JobStatus;
 use App\Enums\Status;
@@ -383,32 +384,12 @@ class EmployeeIndex extends EmployeeComponent
                     'is_active' => false,
                 ]);
 
-                // 4. Safe User Cleanup: Remove a role from a user (if binding exists)
-                // This handles cases where email might be 'N/A' or user doesn't exist locally
-                $party = $employee->party;
-                $partyEmployees = $party->employees->where('legal_entity_id', $this->legalEntity->id);
-                $employeesWithUser = $partyEmployees->filter(fn (Employee $employee) => $employee->user_id !== null);
+                // 4. Safe User Cleanup: revoke local role only for this employee's users,
+                // and only when no other approved employee of the same type remains (eHealth revoke rules).
+                $this->revokeLocalRolesAfterDeactivation($employee);
 
-                $partyUsers = $party->users->whereIn('id', $employeesWithUser->pluck('user_id')); // filter by legal entity id
-
-                // Detach all users from the employee to prevent orphaned relationships
-                $employee->users()->detach();
-
-                // Get all specified guards from section 'guards' from file config/auth.php
-                $guards = array_keys((array) config('auth.guards'));
-
-                // Role from dissmisses employee can attached to multiple users, so we need to loop through all of them
-                foreach ($partyUsers as $user) {
-                    $roleToRemove = $employee->employee_type;
-
-                    foreach ($guards as $guard) {
-                        if ($user->hasRole($roleToRemove, $guard)) {
-                            $user->removeRole(
-                                ModelsRole::findByName($roleToRemove, $guard)
-                            );
-                        }
-                    }
-                }
+                // 5. eHealth may invalidate the access token when revoking roles for the same party.
+                $this->recoverEhealthSessionAfterDeactivate($employee);
 
                 $this->dispatch('flashMessage', ['message' => __('employees.dismissalSuccess'), 'type' => 'success']);
             } else {
@@ -443,6 +424,87 @@ class EmployeeIndex extends EmployeeComponent
         $this->isDoctorToDeactivate = false;
         $this->deactivationEndDate = '';
         $this->deactivationStatus = Status::STOPPED->value;
+    }
+
+    /**
+     * Revoke the deactivated employee type from linked users only when it was the last
+     * approved employee of that type for the party in this legal entity.
+     */
+    private function revokeLocalRolesAfterDeactivation(Employee $employee): void
+    {
+        $employeeType = $employee->employeeType;
+        if (!is_string($employeeType) || $employeeType === '') {
+            $employee->users()->detach();
+
+            return;
+        }
+
+        $userIds = $employee->users()
+            ->pluck('users.id')
+            ->when($employee->userId, fn ($ids) => $ids->push($employee->userId))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $employee->users()->detach();
+
+        $hasOtherApprovedSameType = Employee::query()
+            ->where('legal_entity_id', $this->legalEntity->id)
+            ->where('party_id', $employee->partyId)
+            ->where('employee_type', $employeeType)
+            ->whereKeyNot($employee->id)
+            ->where('status', Status::APPROVED->value)
+            ->exists();
+
+        if ($hasOtherApprovedSameType || $userIds->isEmpty()) {
+            return;
+        }
+
+        $guards = array_keys((array) config('auth.guards'));
+
+        foreach (User::query()->whereIn('id', $userIds)->get() as $user) {
+            foreach ($guards as $guard) {
+                if ($user->hasRole($employeeType, $guard)) {
+                    $user->removeRole(ModelsRole::findByName($employeeType, $guard));
+                }
+            }
+        }
+    }
+
+    /**
+     * After same-party deactivation, eHealth may invalidate the current access token
+     * (role revoke). Refresh it so subsequent ESOS calls keep working.
+     */
+    private function recoverEhealthSessionAfterDeactivate(Employee $employee): void
+    {
+        $authUser = Auth::user();
+        $authPartyId = $authUser?->party?->id;
+
+        if (!$authPartyId || $authPartyId !== $employee->partyId) {
+            return;
+        }
+
+        $tokenStorage = app(TokenStorage::class);
+        if (!$tokenStorage->hasBearerToken()) {
+            return;
+        }
+
+        if ($tokenStorage->refreshBearerToken()) {
+            Log::info('Refreshed eHealth token after same-party employee deactivation', [
+                'employee_id' => $employee->id,
+            ]);
+
+            return;
+        }
+
+        Log::warning('Failed to refresh eHealth token after same-party employee deactivation', [
+            'employee_id' => $employee->id,
+        ]);
+
+        $this->dispatch('flashMessage', [
+            'message' => __('employees.errors.ehealth_session_relogin_required'),
+            'type' => 'warning',
+        ]);
     }
 
     /**
@@ -633,6 +695,10 @@ class EmployeeIndex extends EmployeeComponent
     {
         if (str_contains($error, 'Missing allowances: employee:deactivate')) {
             return __('employees.errors.missing_allowance_employee_deactivate');
+        }
+
+        if (str_contains($error, 'Invalid access token')) {
+            return __('employees.errors.invalid_access_token');
         }
 
         return $error;
