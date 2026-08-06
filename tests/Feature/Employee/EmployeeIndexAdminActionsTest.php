@@ -6,6 +6,7 @@ namespace Tests\Feature\Employee;
 
 use App\Enums\Status;
 use App\Enums\User\Role;
+use App\Classes\eHealth\Api\Employee as EmployeeApi;
 use App\Livewire\Employee\EmployeeIndex;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
@@ -138,7 +139,7 @@ class EmployeeIndexAdminActionsTest extends TestCase
     }
 
     #[Test]
-    public function revoke_local_roles_skips_when_other_approved_same_type_remains(): void
+    public function deactivate_keeps_local_role_when_other_approved_same_type_remains(): void
     {
         [$legalEntity, $specialistA, $specialistB, $user] = $this->createLegalEntityWithTwoApprovedSpecialists();
         $this->instance('legalEntity', $legalEntity);
@@ -147,14 +148,13 @@ class EmployeeIndexAdminActionsTest extends TestCase
         $role = \App\Models\Role::findOrCreate(Role::SPECIALIST->value, 'web');
         $user->assignRole($role);
 
-        $component = new EmployeeIndex();
-        $refLegalEntity = new \ReflectionProperty(EmployeeIndex::class, 'legalEntity');
-        $refLegalEntity->setAccessible(true);
-        $refLegalEntity->setValue($component, $legalEntity);
+        $this->mockSuccessfulEmployeeDeactivate();
 
-        $method = new \ReflectionMethod(EmployeeIndex::class, 'revokeLocalRolesAfterDeactivation');
-        $method->setAccessible(true);
-        $method->invoke($component, $specialistA);
+        $component = $this->makeEmployeeIndex($legalEntity);
+        $component->employeeIdToDeactivate = $specialistA->id;
+        $component->deactivationStatus = Status::STOPPED->value;
+        $component->deactivationEndDate = now()->format('Y-m-d');
+        $component->deactivate();
 
         $user->refresh();
         $this->assertTrue($user->hasRole(Role::SPECIALIST->value, 'web'));
@@ -162,10 +162,15 @@ class EmployeeIndexAdminActionsTest extends TestCase
             'id' => $specialistB->id,
             'status' => Status::APPROVED->value,
         ]);
+        $this->assertDatabaseHas('employees', [
+            'id' => $specialistA->id,
+            'status' => Status::STOPPED->value,
+            'is_active' => false,
+        ]);
     }
 
     #[Test]
-    public function revoke_local_roles_removes_role_when_last_approved_same_type(): void
+    public function deactivate_removes_local_role_when_last_approved_same_type(): void
     {
         [$legalEntity, $specialist, $user] = $this->createLegalEntityWithSingleApprovedSpecialist();
         $this->instance('legalEntity', $legalEntity);
@@ -174,17 +179,21 @@ class EmployeeIndexAdminActionsTest extends TestCase
         $role = \App\Models\Role::findOrCreate(Role::SPECIALIST->value, 'web');
         $user->assignRole($role);
 
-        $component = new EmployeeIndex();
-        $refLegalEntity = new \ReflectionProperty(EmployeeIndex::class, 'legalEntity');
-        $refLegalEntity->setAccessible(true);
-        $refLegalEntity->setValue($component, $legalEntity);
+        $this->mockSuccessfulEmployeeDeactivate();
 
-        $method = new \ReflectionMethod(EmployeeIndex::class, 'revokeLocalRolesAfterDeactivation');
-        $method->setAccessible(true);
-        $method->invoke($component, $specialist);
+        $component = $this->makeEmployeeIndex($legalEntity);
+        $component->employeeIdToDeactivate = $specialist->id;
+        $component->deactivationStatus = Status::STOPPED->value;
+        $component->deactivationEndDate = now()->format('Y-m-d');
+        $component->deactivate();
 
         $user->refresh();
         $this->assertFalse($user->hasRole(Role::SPECIALIST->value, 'web'));
+        $this->assertDatabaseHas('employees', [
+            'id' => $specialist->id,
+            'status' => Status::STOPPED->value,
+            'is_active' => false,
+        ]);
     }
 
     #[Test]
@@ -381,5 +390,22 @@ class EmployeeIndexAdminActionsTest extends TestCase
         ]);
 
         return [$legalEntity, $party, $user];
+    }
+
+    private function makeEmployeeIndex(LegalEntity $legalEntity): EmployeeIndex
+    {
+        $component = new EmployeeIndex();
+        $refLegalEntity = new \ReflectionProperty(EmployeeIndex::class, 'legalEntity');
+        $refLegalEntity->setAccessible(true);
+        $refLegalEntity->setValue($component, $legalEntity);
+
+        return $component;
+    }
+
+    private function mockSuccessfulEmployeeDeactivate(): void
+    {
+        $api = Mockery::mock(EmployeeApi::class);
+        $api->shouldReceive('deactivate')->once()->andReturn(['data' => ['status' => 'STOPPED']]);
+        $this->app->instance(EmployeeApi::class, $api);
     }
 }
