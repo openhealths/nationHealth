@@ -7,7 +7,7 @@
         </x-slot>
 
         <div class="mt-3 ml-0 flex flex-col sm:flex-row sm:flex-wrap gap-2 self-start">
-            <a href="{{ route('persons.index', legalEntity()) }}" class="button-primary">
+            <a href="{{ route('care-plans.create', legalEntity()) }}" class="button-primary">
                 + {{ __('care-plan.new_care_plan') }}
             </a>
 
@@ -65,9 +65,12 @@
                     >
                         <option value="">{{ __('forms.select') }}</option>
                         <option value="draft">{{ __('care-plan.status.draft') }}</option>
+                        <option value="new">{{ __('care-plan.status.new') }}</option>
                         <option value="active">{{ __('care-plan.status.active') }}</option>
+                        <option value="on-hold">{{ __('care-plan.status.on-hold') }}</option>
                         <option value="completed">{{ __('care-plan.status.completed') }}</option>
                         <option value="revoked">{{ __('care-plan.status.revoked') }}</option>
+                        <option value="entered-in-error">{{ __('care-plan.status.entered-in-error') }}</option>
                     </select>
                     <label for="filterStatus" class="label">
                         {{ __('forms.status.label') }}
@@ -210,7 +213,7 @@
                                 {{ $plan->title }}
                             </div>
                             <div class="text-xs text-gray-500 mt-1.5 dark:text-gray-400">
-                                {{ __('care-plan.patient') }}: {{ $plan->person?->last_name }} {{ $plan->person?->first_name }}
+                                {{ __('care-plan.patient') }}: {{ $plan->person?->fullName }}
                             </div>
                         </div>
 

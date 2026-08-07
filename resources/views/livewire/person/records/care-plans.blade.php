@@ -82,7 +82,9 @@
                             class="input-select peer w-full"
                     >
                         <option value="">{{ __('forms.select') }} ...</option>
-                        <option value="active">Активний</option>
+                        @foreach(\App\Enums\CarePlanStatus::cases() as $status)
+                            <option value="{{ $status->value }}">{{ $status->label() }}</option>
+                        @endforeach
                     </select>
                     <label for="filterStatus" class="label">
                         Статус
