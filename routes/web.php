@@ -215,7 +215,17 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
                     ->can('view', 'employeeRole');
             });
 
-            // --- Group of Contracts (Already signed/active) ---
+                                    // --- Referrals ---
+            Route::prefix('referrals')->name('referrals.')->group(function () {
+                Route::get('/', \App\Livewire\Referral\ReferralIndex::class)->name('index');
+            });
+
+// --- Medication Requests (ePrescriptions) ---
+            Route::prefix('medication-requests')->name('medication-requests.')->group(function () {
+                Route::get('/', \App\Livewire\MedicationRequest\MedicationRequestIndex::class)->name('index');
+            });
+
+// --- Group of Contracts (Already signed/active) ---
             Route::prefix('contract')->name('contract.')->group(function () {
                 // Main page of existing contracts
                 Route::get('/', ContractIndex::class)->name('index');
@@ -263,6 +273,10 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
             Route::get('/care-plans/{carePlan}', \App\Livewire\CarePlan\CarePlanShow::class)
                 ->whereNumber('carePlan')
                 ->name('care-plans.show');
+            Route::get('/care-plans/{carePlan}/activities/{activity}', \App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow::class)
+                ->whereNumber(['carePlan', 'activity'])
+                ->scopeBindings()
+                ->name('care-plans.activities.show');
             Route::get('/care-plans/{carePlan}/edit', \App\Livewire\CarePlan\CarePlanUpdate::class)
                 ->whereNumber('carePlan')
                 ->name('care-plans.edit');
