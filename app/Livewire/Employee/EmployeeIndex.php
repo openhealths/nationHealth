@@ -247,11 +247,18 @@ class EmployeeIndex extends EmployeeComponent
     {
         // Status Filter
         if (!empty($this->status)) {
-            // Map 'DISMISSED' -> 'STOPPED' for DB query
+            // Map 'DISMISSED' -> 'STOPPED' for DB query (legacy + new status model)
             $dbStatuses = array_map(fn ($s) => $s === 'DISMISSED' ? 'STOPPED' : $s, $this->status);
 
             // Remove non-DB statuses (like 'VERIFIED'/'NOT_VERIFIED' which apply to Party)
             $dbStatuses = array_diff($dbStatuses, ['VERIFIED', 'NOT_VERIFIED']);
+
+            // When filtering by STOPPED, include legacy DISMISSED rows
+            if (in_array('STOPPED', $dbStatuses, true)) {
+                $dbStatuses[] = 'DISMISSED';
+            }
+
+            $dbStatuses = array_values(array_unique($dbStatuses));
 
             if (!empty($dbStatuses)) {
                 $subQuery->whereIn('status', $dbStatuses);
@@ -281,16 +288,15 @@ class EmployeeIndex extends EmployeeComponent
         if ($employee) {
             $this->employeeIdToDeactivate = $id;
 
-            $this->employeeToDeactivateName = $employee->full_name
-                ?? ($employee->last_name . ' ' . $employee->first_name);
+            $this->employeeToDeactivateName = $employee->party?->fullName
+                ?? $employee->fullName
+                ?? '';
 
-            $type = $employee->employeeType ?? $employee->employee_type ?? '';
-
-            $this->isDoctorToDeactivate = ($type === Role::DOCTOR->value);
+            $this->isDoctorToDeactivate = ($employee->employeeType === Role::DOCTOR->value);
         }
 
         $this->deactivationStatus = Status::STOPPED->value;
-        $startDateStr = isset($employee) ? ($employee->start_date ?? '') : '';
+        $startDateStr = isset($employee) ? ($employee->getRawOriginal('start_date') ?? '') : '';
         $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
         $this->deactivationEndDate = ($startDateStr && $todayStr < $startDateStr) ? $startDateStr : $todayStr;
 
@@ -303,7 +309,7 @@ class EmployeeIndex extends EmployeeComponent
             $this->deactivationEndDate = '';
         } elseif ($this->deactivationEndDate === '' && $this->employeeIdToDeactivate) {
             $employee = Employee::find($this->employeeIdToDeactivate);
-            $startDateStr = $employee?->start_date ?? '';
+            $startDateStr = $employee?->getRawOriginal('start_date') ?? '';
             $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
             $this->deactivationEndDate = ($startDateStr && $todayStr < $startDateStr) ? $startDateStr : $todayStr;
         }
@@ -312,7 +318,7 @@ class EmployeeIndex extends EmployeeComponent
     public function closeModal(): void
     {
         $this->showDeactivateModal = false;
-        $this->reset(['employeeToDeactivateId', 'employeeToDeactivateName', 'dismissalMessageType']);
+        $this->reset(['employeeIdToDeactivate', 'employeeToDeactivateName', 'dismissalMessageType']);
     }
 
     public function resetFilters(): void
@@ -335,7 +341,7 @@ class EmployeeIndex extends EmployeeComponent
         }
 
         // eHealth: STOPPED requires end_date (>= start_date, <= today); ENTERED_IN_ERROR omits end_date.
-        $startDateStr = $employee->start_date;
+        $startDateStr = $employee->getRawOriginal('start_date') ?? '';
         $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
         $status = in_array($this->deactivationStatus, [Status::STOPPED->value, Status::ENTERED_IN_ERROR->value], true)
             ? $this->deactivationStatus

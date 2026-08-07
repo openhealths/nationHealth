@@ -47,8 +47,8 @@ class EmployeePolicy
             return Response::deny(__('employees.policy.no_user_linked'));
         }
 
-        // 4.Status check (dismissed cannot be edited)
-        if ($employee->status === Status::DISMISSED) {
+        // 4.Status check (dismissed / stopped / entered in error cannot be edited)
+        if (in_array($employee->status, [Status::DISMISSED, Status::STOPPED, Status::ENTERED_IN_ERROR], true)) {
             return Response::deny(__('employees.policy.emp.dismissed_no_edit'));
         }
 

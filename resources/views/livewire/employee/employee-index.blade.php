@@ -362,7 +362,11 @@
                                         // 1. Not the owner 3. Not exempt
                                         $canEditParty = $latestEmployee
                                             && !$isOwner
-                                            && $latestEmployee->status !== Status::DISMISSED;
+                                            && !in_array($latestEmployee->status, [
+                                                Status::DISMISSED,
+                                                Status::STOPPED,
+                                                Status::ENTERED_IN_ERROR,
+                                            ], true);
                                     @endphp
                                     @can('create', EmployeeRequest::class)
                                         {{-- Edit personal data button --}}

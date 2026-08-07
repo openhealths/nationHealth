@@ -56,10 +56,11 @@ class Employee extends EHealthRequest
     }
 
     /**
-     * Deactivate an employee with 'DISMISSED' status.
+     * Deactivate an employee (STOPPED with end_date, or ENTERED_IN_ERROR without end_date).
      *
      * @param  string  $id  The UUID of the employee.
-     * @param  string  $endDate  The end date in 'Y-m-d' format.
+     * @param  string|null  $endDate  The end date in 'Y-m-d' format (required for STOPPED).
+     * @param  string  $status  Target status: STOPPED or ENTERED_IN_ERROR.
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthResponseException
      */

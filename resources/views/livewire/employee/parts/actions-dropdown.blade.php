@@ -20,7 +20,7 @@
 
     // EmployeeRequest edit/delete: Policy (isLocalDraft + scopes). Employee: elevated write rules.
     $showEdit = $isEmployee
-        ? ($canWrite && !$isOwner && $status !== 'DISMISSED')
+        ? ($canWrite && !$isOwner && !in_array($status, ['DISMISSED', 'STOPPED', 'ENTERED_IN_ERROR'], true))
         : ($isRequest && auth()->user()->can('update', $position));
 
     $showSync = !$linksOnly && $canWrite && (
@@ -84,7 +84,7 @@
                                 wire:click="{{ $showDismiss ? 'showModalDeactivate('.$position->id.')' : 'confirmRequestDeletion('.$position->id.')' }}"
                                 class="flex items-center gap-2 w-full py-2 px-5 text-red-600 hover:bg-gray-100 dark:hover:bg-gray-600 text-left transition-colors">
                             @icon ('close-circle')
-                            <span>{{ $showDismiss ? __('forms.dismiss') : __('forms.delete') }}</span>
+                            <span>{{ $showDismiss ? __('forms.deactivate') : __('forms.delete') }}</span>
                         </button>
                     </li>
                 @endif
