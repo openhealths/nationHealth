@@ -7,9 +7,11 @@ namespace App\Policies;
 use App\Models\User;
 use App\Enums\Status;
 use App\Models\Division;
+use App\Enums\User\Role;
 use App\Models\LegalEntity;
 use App\Models\Employee\Employee;
 use App\Models\HealthcareService;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -26,6 +28,26 @@ class DivisionPolicy
 
         return Response::allow();
     }
+
+    /**
+     * User allowed to synchronize the division(s)
+     */
+    public function sync(User $user): Response
+    {
+        if ($user->cannot('division:read') && $user->cannot('division:details')) {
+            return Response::denyWithStatus(404);
+        }
+
+        if (
+            $user->hasAllowedRole([Role::REORGANIZATION_OWNER, Role::OWNER, Role::ADMIN, Role::HR])
+            && Auth::guard('ehealth')->check()
+        ) {
+            return Response::allow();
+        }
+
+        return Response::allow();
+    }
+
 
     /**
      * User allow to create the Division

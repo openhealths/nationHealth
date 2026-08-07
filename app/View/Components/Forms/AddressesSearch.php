@@ -13,20 +13,23 @@ class AddressesSearch extends Addresses
      * Create a new component instance.
      */
     public function __construct(
-        $address,
-        $districts,
-        $settlements,
-        $streets,
-        $class,
-        $readonly = false,
+        array $address,
+        array $districts,
+        array $settlements,
+        array $streets,
+        string $class,
+        bool $readonly = false,
+        bool $divisionView = false,
         string $property = 'address'
     ) {
-        parent::__construct($address, $districts, $settlements, $streets, $class, $readonly, $property);
+        parent::__construct($address, $districts, $settlements, $streets, $class, $readonly, $divisionView, $property);
     }
 
     public static function getAddressRules(array $address): array
     {
         return [
+            'address.type' => ['required', 'string'],
+            'address.country' => ['required', 'string'],
             'address.area' => ['required', 'string'],
             'address.region' => ['nullable', 'string'],
             'address.settlementType' => ['required', 'string'],

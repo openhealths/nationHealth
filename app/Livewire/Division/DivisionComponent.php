@@ -34,8 +34,7 @@ class DivisionComponent extends Component
     public array $dictionaryNames = [
         'DIVISION_TYPE',
         'SETTLEMENT_TYPE',
-        'PHONE_TYPE',
-        'DIVISION_TYPE'
+        'PHONE_TYPE'
     ];
 
     /**

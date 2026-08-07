@@ -40,7 +40,11 @@ class Division extends Model
         'legal_entity_id',
         'status',
         'dls_id',
-        'dls_verified'
+        'dls_verified',
+        'ehealth_inserted_at',
+        'inserted_by',
+        'ehealth_updated_at',
+        'updated_by'
     ];
 
     protected $casts = [
@@ -199,5 +203,11 @@ class Division extends Model
     public function active(Builder $query): Builder
     {
         return $query->whereStatus(Status::ACTIVE);
+    }
+
+    #[Scope]
+    protected function filterByLegalEntityId(Builder $query, int $legalEntityId): Builder
+    {
+        return $query->where('legal_entity_id', $legalEntityId);
     }
 }

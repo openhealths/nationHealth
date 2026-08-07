@@ -1,6 +1,18 @@
 @use('App\Enums\Status')
 @use('App\Enums\JobStatus')
+@use('App\Enums\Division\Status as DivisionStatus')
 @use('App\Models\{HealthcareService, Division}')
+
+@php
+    $availableTypes = collect($dictionaries['DIVISION_TYPE'])
+        ->filter(fn ($label, $value) => in_array($value, Division::getValidDivisionTypes()))
+        ->toArray();
+
+    $divisionUuids = Division::filterByLegalEntityId(legalEntity()->id)
+        ->whereNotNull('uuid')
+        ->pluck('uuid', 'uuid')
+        ->toArray();
+@endphp
 
 <div x-data="{
          divisionId: 0,
@@ -26,49 +38,98 @@
                 </a>
             @endcan
 
-            <button
-                wire:click="{{ !$this->isSync ? 'sync' : '' }}"
-                class="{{ $this->isSync ? 'button-sync-disabled' : 'button-sync' }} flex items-center gap-2 whitespace-nowrap"
-                {{ $this->isSync ? 'disabled' : '' }}
-            >
-                @icon('refresh', 'w-4 h-4')
-                <span>{{ ($syncStatus === JobStatus::PAUSED->value || $syncStatus === JobStatus::FAILED->value) ? __('forms.sync_retry') : __('forms.synchronise_with_eHealth') }}</span>
-            </button>
+            @can('sync', Division::class)
+                <button
+                    wire:click="{{ !$this->isSync ? 'sync' : '' }}"
+                    class="{{ $this->isSync ? 'button-sync-disabled' : 'button-sync' }} flex items-center gap-2 whitespace-nowrap"
+                    {{ $this->isSync ? 'disabled' : '' }}
+                >
+                    @icon('refresh', 'w-4 h-4')
+                    <span>{{ ($syncStatus === JobStatus::PAUSED->value || $syncStatus === JobStatus::FAILED->value) ? __('forms.sync_retry') : __('forms.synchronise_with_eHealth') }}</span>
+                </button>
+            @endcan
         </div>
 
         <x-slot name="navigation">
-            <div class="form-row-3">
+            <div x-data="{ open: false, search: '' }" class="form-row-3">
                 <div class="flex items-center gap-4 col-span-1">
-                    <div class="form-group group relative w-full">
-                        @icon('search-outline', 'svg-input')
-                        <input wire:model.live.debounce.300ms="divisionForm.search"
-                               type="text"
-                               id="divisionSearch"
-                               placeholder=" "
-                               class="input peer"
-                               autocomplete="off"
+                    <div class="form-group group top-3 grow max-w-xs">
+                        <input type="text"
+                                id="searchByName"
+                                placeholder=" "
+                                class="input peer"
+                                wire:model="searchByName"
+                                autocomplete="off"
                         />
-                        <label for="divisionSearch" class="label">
+                        <label for="searchByName" class="label">
                             {{ __('forms.search_by_name') }}
                         </label>
-                        <button type="button"
-                                class="absolute inset-y-0 end-0 flex items-center pe-1 text-gray-400 hover:text-gray-600"
-                                x-show="$wire.divisionForm.search"
-                                @click="$wire.set('divisionForm.search', '')"
-                        >
-                            @icon('close', 'w-4 h-4')
-                        </button>
                     </div>
-                    <button type="button"
-                            class="p-2.5 text-sm font-medium text-white bg-primary-700 rounded-xl hover:bg-primary-800 focus:ring-4 focus:outline-none focus:ring-primary-300 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800"
+                    <button
+                        class="flex items-center gap-2 button-minor h-11 min-w-max px-4"
+                        @click="showFilter = !showFilter"
                     >
-                        @icon('search-outline', 'w-6 h-6')
+                        @icon('adjustments', 'w-4 h-4')
+                        {{--
+                        <span x-text="showFilter ? '{{ __('forms.additional_search_parameters') }}' : '{{ __('forms.additional_search_parameters') }}'">
+                            {{ __('forms.additional_search_parameters') }}
+                        </span>
+                        --}}
                     </button>
                 </div>
+            </div>
+
+            {{-- Filters --}}
+            <div x-cloak x-show="showFilter" class="shift-content form-group group top-3 grow max-w-xs mt-6 pb-4">
+                <div class="flex flex-col gap-4">
+                    <x-forms.multiselect
+                        bind="typeFilter"
+                        :options="$availableTypes"
+                        label="{{ __('forms.select_type') }}"
+                        placeholder="{{ __('forms.select') }}"
+                    />
+
+                    <x-forms.multiselect
+                        bind="searchByUuid"
+                        :options="$divisionUuids"
+                        label="{{ __('forms.select') }}"
+                        placeholder="{{ __('forms.uuid') }}"
+                    />
+
+                    <x-forms.multiselect
+                        bind="statusFilter"
+                        :options="DivisionStatus::entries()"
+                        label="{{ __('forms.status.label') }}"
+                        placeholder="{{ __('forms.select') }}"
+                    />
+                </div>
+            </div>
+
+            {{-- Filter buttons --}}
+            <div class="mb-9 mt-6 flex flex-col sm:flex-row gap-2 w-full">
+                @can('viewAny', Division::class)
+                    <button
+                        type="button"
+                        wire:click.prevent="search"
+                        class="button-primary"
+                    >
+                        @icon('search', 'w-4 h-4')
+                        <span>{{ __('forms.search') }}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        wire:click="resetFilters"
+                        class="button-primary-outline-red"
+                    >
+                        {{ __('forms.reset_all_filters') }}
+                    </button>
+                @endcan
             </div>
         </x-slot>
     </x-header-navigation>
 
+    {{-- T A B L E --}}
     <div class="flow-root mt-8 shift-content pl-3.5">
         <div class="max-w-screen-xl">
             @if($divisions->isNotEmpty())

@@ -11,6 +11,7 @@ use App\Enums\JobStatus;
 use App\Models\Division;
 use Illuminate\Bus\Batch;
 use App\Jobs\DivisionSync;
+use Illuminate\Support\Str;
 use App\Models\LegalEntity;
 use Livewire\WithPagination;
 use App\Classes\eHealth\EHealth;
@@ -25,6 +26,8 @@ use Illuminate\Support\Facades\Session;
 use App\Notifications\SyncNotification;
 use App\Traits\BatchLegalEntityQueries;
 use App\Livewire\Division\Trait\HasAction;
+use Illuminate\Pagination\LengthAwarePaginator;
+use \App\Enums\Division\Status as DivisionStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 
@@ -42,6 +45,36 @@ class DivisionIndex extends DivisionComponent
      * @var string
      */
     public string $syncStatus = '';
+
+    /**
+     * Search by division name.
+     *
+     * @var string
+     */
+    public string $searchByName = '';
+
+    /**
+     * Search by division uuid(s)
+     *
+     * @var array
+     */
+    public array $searchByUuid = [];
+
+    /**
+     * Default status for multiselect filter
+     *
+     * @var array|string[]
+     */
+    public array $statusFilter = [DivisionStatus::ACTIVE->value];
+
+    /**
+     * Default status for multiselect filter
+     *
+     * @var array|string[]
+     */
+    public array $typeFilter = [];
+
+    public bool $isFiltersApplied = false;
 
     #[Computed]
     public function isSync(): bool
@@ -93,6 +126,84 @@ class DivisionIndex extends DivisionComponent
         $this->setDictionary();
 
         $this->syncStatus = $this->getSyncStatus();
+        $this->typeFilter = Division::getValidDivisionTypes();
+    }
+
+     public function search(): void
+    {
+        $this->resetPage();
+        $this->isFiltersApplied = true;
+    }
+
+    public function resetFilters(): void
+    {
+        $this->searchByName = '';
+        $this->searchByUuid = [];
+        $this->typeFilter = Division::getValidDivisionTypes();
+        $this->statusFilter = [DivisionStatus::ACTIVE->value];
+
+        $this->isFiltersApplied = false;
+
+        $this->resetPage();
+    }
+
+    #[computed]
+    public function divisions(): LengthAwarePaginator
+    {
+        $divisions = collect();
+
+        $divisions = legalEntity()
+            ?->divisions()
+            ->orderBy('uuid')
+            ->get();
+
+        if ($this->isFiltersApplied) {
+            // Filter by type
+            if (!empty($this->typeFilter)) {
+                $divisions = $divisions->filter(
+                    fn (Division $item) => \in_array($item->type, $this->typeFilter, true)
+                );
+            }
+
+            // Filter by status
+            if (!empty($this->statusFilter)) {
+                $divisions = $divisions->filter(function (Division $item) {
+                    return \in_array($item->status->value, $this->statusFilter, true);
+                });
+            }
+
+            // Search name
+            if (!empty($this->searchByName)) {
+                $searchTerm = Str::lower(trim($this->searchByName));
+
+                $divisions = $divisions->filter(function (Division $item) use ($searchTerm) {
+                    $divisionName = Str::lower($item->name);
+
+                    return Str::contains($divisionName, $searchTerm);
+                });
+            }
+
+            // Search by division's uuid
+            if (!empty($this->searchByUuid)) {
+
+                $divisions = $divisions->filter(function (Division $item) {
+                    return in_array($item->uuid, $this->searchByUuid, true);
+                });
+            }
+        }
+
+        // Pagination
+        $perPage = config('pagination.per_page');
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $currentItems = $divisions->slice(($currentPage - 1) * $perPage, $perPage)->values();
+
+        return new LengthAwarePaginator(
+            $currentItems,
+            $divisions->count(),
+            $perPage,
+            $currentPage,
+            ['path' => request()->url()]
+        );
     }
 
     /**
@@ -112,12 +223,12 @@ class DivisionIndex extends DivisionComponent
      * Synchronize all the Divisions with stored on the eHealths side
      *
      * @return void
-     * @throws Exception|EHealthConnectionException
+     * @throws Exception|EHealthResponseException|EHealthValidationException
      */
     public function sync(): void
     {
         if (Auth::user()->cannot('viewAny', Division::class)) {
-            Session::flash('error', 'У вас немає дозволу на синхронізацію місць надання послуг');
+            Session::flash('error', __('divisions.policy.deny.sync'));
 
             return;
         }
@@ -145,7 +256,7 @@ class DivisionIndex extends DivisionComponent
 
         // Try to resume if previous batch failed or was paused
         if ($this->syncStatus === JobStatus::FAILED->value || $this->syncStatus === JobStatus::PAUSED->value) {
-            $this->resumeSyncronization($user, $token);
+            $this->resumeSynchronization($user, $token);
 
             return;
         }
@@ -249,14 +360,6 @@ class DivisionIndex extends DivisionComponent
 
     public function render(): View
     {
-        $perPage = config('pagination.per_page');
-
-        $divisions = legalEntity()
-            ?->divisions()
-            ->orderBy('uuid')
-            ->search($this->divisionForm->search)
-            ->paginate($perPage);
-
-        return view('livewire.division.division-index', compact('divisions'));
+        return view('livewire.division.division-index', ['divisions' => $this->divisions]);
     }
 }

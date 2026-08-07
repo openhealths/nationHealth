@@ -1,5 +1,9 @@
 @php
     natcasesort($dictionaries['STREET_TYPE']);
+
+    $divisionView = isset($divisionView) && $divisionView === true;
+    $addressType = $divisionView ? dictionary()->basics()->byName('ADDRESS_TYPE')->where('code', $address['type'] ?? '')->value('description') : null;
+    $addressCountry = $divisionView ? dictionary()->basics()->byName('COUNTRY')->where('code', $address['country'] ?? '')->value('description') : null;
 @endphp
 
 <div
@@ -12,6 +16,7 @@
             return this.entangledAddress ?? {};
         },
         readonly: {{ $readonly ? 'true' : 'false' }},
+        divisionView: {{ $divisionView ? 'true' : 'false' }},
         selecting: false,
         clearStreet() {
             this.address.building = '';
@@ -71,6 +76,58 @@
     x-init="init()"
     class="{{ $class }}"
 >
+    @if($divisionView)
+         {{-- COUNTRY --}}
+        <div class="form-group group">
+            <input
+                required
+                type="text"
+                placeholder=" "
+                id="addressCountry"
+                class="input peer"
+                value="{{ $addressCountry ?? '-' }}"
+                disabled
+            />
+
+            <label for="addressCountry" class="label z-10">
+                {{ __('forms.country') }}
+            </label>
+        </div>
+
+        {{-- ADDRESS TYPE --}}
+        <div class="form-group group">
+            <input
+                type="text"
+                placeholder=" "
+                id="addressType"
+                class="input peer"
+                value="{{ $addressType ?? '-' }}"
+                disabled
+            />
+
+            <label for="addressType" class="label z-10">
+                {{ __('forms.address_type') }}
+            </label>
+        </div>
+
+        {{-- SETTLEMENT ID --}}
+        <div class="form-group group">
+            <input
+                x-model="address.settlementId"
+                type="text"
+                placeholder=" "
+                id="addressSettlementId"
+                value="{{ $address['settlementId'] ?? '-' }}"
+                class="input peer"
+                disabled
+            />
+
+            <label for="addressSettlementId" class="label z-10">
+                {{ __('forms.settlement_id') }}
+            </label>
+        </div>
+    @endif
+
     {{-- AREA --}}
     <div class="form-group group !z-[28]">
         <select

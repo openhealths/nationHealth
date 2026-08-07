@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\View\Components\Forms;
 
-use App\Classes\eHealth\EHealth;
 use App\Traits\FormTrait;
+use Illuminate\View\Component;
+use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
-use Illuminate\View\Component;
 
 abstract class Addresses extends Component
 {
@@ -23,6 +23,8 @@ abstract class Addresses extends Component
     private static ?array $fetchedRegions = null;
 
     public bool $readonly;
+
+    public bool $divisionView = false;
 
     public array $address = [];
 
@@ -68,9 +70,11 @@ abstract class Addresses extends Component
         $streets,
         $class,
         $readonly = false,
+        $divisionView = false,
         string $property = 'address'
     ) {
         $this->readonly = $readonly;
+        $this->divisionView = $divisionView;
 
         $this->address = $address;
 

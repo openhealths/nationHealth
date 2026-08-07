@@ -23,4 +23,22 @@ enum Status: string
             self::INACTIVE => __('forms.status.non_active')
         };
     }
+
+    /**
+     * Get all enum cases as value => label pairs.
+     *
+     * @return array<string, string>
+     */
+    public static function entries(): array
+    {
+        return collect(self::cases())->mapWithKeys(fn ($case) => [$case->value => $case->label()])->toArray();
+    }
+
+    public function cssClass(): string
+    {
+        return match ($this) {
+            self::ACTIVE => 'status-alert-green',
+            self::INACTIVE => 'status-alert-red'
+        };
+    }
 }

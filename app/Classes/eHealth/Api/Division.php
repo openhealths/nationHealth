@@ -56,6 +56,22 @@ class Division extends Request
     }
 
     /**
+     * Get Division details by UUID
+     *
+     * @param  string  $uuid  The unique identifier of the division.
+     *
+     * @return PromiseInterface|EHealthResponse
+     *
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+     */
+    public function getDetails(string $uuid): PromiseInterface|EHealthResponse
+    {
+        $this->setValidator($this->validateOne(...));
+
+        return parent::get(self::URL . '/' . $uuid);
+    }
+
+    /**
      * Update the Division
      *
      * @param  string  $uuid
@@ -413,6 +429,12 @@ class Division extends Request
             'working_hours.sat' => 'nullable|array',
             'working_hours.sat.*.0' => 'required|string',
             'working_hours.sat.*.1' => 'required|string',
+
+            'ehealth_inserted_at' => 'nullable|date',
+            'inserted_by' => 'nullable|uuid',
+            'ehealth_updated_at' => 'nullable|date',
+            'updated_by' => 'nullable|uuid',
+
         ];
     }
 
@@ -425,16 +447,19 @@ class Division extends Request
         $replaced = [];
 
         foreach ($properties as $name => $value) {
-            switch ($name) {
-                case 'id':
-                    $replaced['uuid'] = $value;
-                    break;
-                case 'legal_entity_id':
-                    $replaced['legal_entity_uuid'] = $value;
-                    break;
-                default:
-                    $replaced[$name] = $value;
-                    break;
+            $newName = match ($name) {
+                'id' => 'uuid',
+                'legal_entity_id' => 'legal_entity_uuid',
+                'inserted_at' => 'ehealth_inserted_at',
+                'updated_at' => 'ehealth_updated_at',
+                default => $name
+            };
+
+            $replaced[$newName] = $value;
+
+            // TODO: remove it if future use shows that it is not needed.
+            if (is_array($value)) {
+                $replaced[$newName] = self::replaceEHealthPropNames($value);
             }
         }
 

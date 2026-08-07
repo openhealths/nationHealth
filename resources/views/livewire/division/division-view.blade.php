@@ -2,16 +2,12 @@
 
 @php
     $action = 'show';
-    // use livewire state for faster UI updates; normalize to string
-    $statusRaw = $divisionForm->division['status'] ?? null;
-    $statusStr = is_string($statusRaw) ? $statusRaw : ($statusRaw?->value ?? null);
 
     $divisionId = $divisionForm->division['id'] ?? null;
 
     // Model may be null if not preloaded; use for policy checks only
     $division = $divisionId ? \App\Models\Division::find($divisionId) : null;
     $divisionType = dictionary()->basics()->byName('DIVISION_TYPE')->where('code', $divisionForm->division['type'])->value('description');
-    $uuid = $divisionForm->division['uuid'];
 @endphp
 
 @extends('livewire.division.template.division')
@@ -21,7 +17,7 @@
 @endsection
 
 @section('additional-buttons')
-    <div wire:key="division-actions-{{ $divisionForm->division['id'] }}-{{ $statusStr ?? 'unknown' }}" class="flex items-center gap-2">
+    <div wire:key="division-actions-{{ $divisionForm->division['id'] }}-{{ $statusLabel }}" class="flex items-center gap-2">
 
         @can('update', $division)
             <a role="button" class="default-button cursor-pointer inline-flex items-center leading-none" href="{{ route('division.edit', [legalEntity(), $divisionForm->division['id']]) }}">

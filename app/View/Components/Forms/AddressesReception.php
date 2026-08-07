@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\View\Components\Forms;
 
 use App\Rules\Zip;
-use Illuminate\Validation\Rule;
 use Illuminate\Contracts\View\View;
 
 class AddressesReception extends Addresses
@@ -13,14 +12,23 @@ class AddressesReception extends Addresses
     /**
      * Create a new component instance.
      */
-    public function __construct($address, $districts, $settlements, $streets, $class, $readonly = false)
-    {
-        parent::__construct($address, $districts, $settlements, $streets, $class, $readonly);
+    public function __construct(
+        array $address,
+        array $districts,
+        array $settlements,
+        array $streets,
+        string $class,
+        bool $readonly = false,
+        bool $divisionView = false
+    ){
+        parent::__construct($address, $districts, $settlements, $streets, $class, $readonly, $divisionView);
     }
 
     public static function getAddressRules(array $address): array
     {
         return [
+            'address.type' => ['required', 'string'],
+            'address.country' => ['required', 'string'],
             'receptionAddress.area' => ['required', 'string'],
             'receptionAddress.region' => ['nullable', 'string'],
             'receptionAddress.settlementType' => ['required', 'string'],

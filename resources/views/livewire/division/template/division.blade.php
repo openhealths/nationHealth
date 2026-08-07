@@ -1,5 +1,7 @@
 @php
+    use App\Models\Division;
     use App\Models\LegalEntity;
+    use App\Enums\Division\Status;
 
     $readonly = $action === 'show';
 
@@ -24,7 +26,7 @@
             actionButtonText: ''
         }"
     >
-        <x-header-navigation x-data="{ showFilter: false }" class=''>
+        <x-header-navigation x-data="{ showFilter: false }" class="items-start">
             <x-slot name='title'>
                 @yield('title')
             </x-slot>
@@ -32,6 +34,20 @@
             <x-slot name="description">
                 @yield('description')
             </x-slot>
+
+            @if($readonly)
+                @can('sync', Division::class)
+                <div class="mt-3 ml-0 flex flex-col sm:flex-row sm:flex-wrap gap-2 self-start">
+                    <button
+                        wire:click="sync"
+                        class="button-sync flex items-center gap-2 whitespace-nowrap"
+                    >
+                        @icon('refresh', 'w-4 h-4')
+                        <span>{{ __('forms.synchronise_with_eHealth') }}</span>
+                    </button>
+                </div>
+                @endcan
+            @endif
         </x-header-navigation>
 
         <div class="form shift-content">
@@ -58,6 +74,22 @@
 
                         @if (!in_array(strtoupper($httpMethod), ['GET', 'POST']))
                             @method($httpMethod)
+                        @endif
+
+                        @if($action === 'show')
+                            <fieldset class="p-4 sm:p-8 sm:pb-10 mb-16 mt-6 border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 max-w-[1280px]">
+                                <legend class="legend">{{ __('forms.status_division') }}</legend>
+                                <div class="{{ $statusStyle }} status-alert-full mb-6">
+                                    <span class="flex-shrink-0">
+                                        @if($division->status->value === Status::ACTIVE->value)
+                                            @icon('check-circle', 'w-5 h-5 text-green-700 mr-3')
+                                        @else
+                                            @icon('alert-circle', 'w-5 h-5 text-red-700 mr-3')
+                                        @endif
+                                    </span>
+                                    <span class="ms-1">{{ $statusLabel }}</span>
+                                </div>
+                            </fieldset>
                         @endif
 
                         <fieldset class="fieldset">
@@ -312,26 +344,101 @@
                                     </div>
                                 </div>
 
-                                <!-- UUID -->
-                                @if ($action === 'show' && $uuid)
+
+                                @if ($action === 'show')
+                                    <!-- DLC -->
                                     <div class="form-row-3">
                                         <div class="form-group">
                                             <input type="text"
-                                                id="uuid"
+                                                id="dlcId"
                                                 placeholder=" "
                                                 class="peer input"
                                                 x-bind:disabled="true"
-                                                name="uuid"
-                                                value="{{ $uuid }}"
+                                                name="dlcId"
+                                                value="{{ $division->dlcId ?? '-' }}"
                                             />
                                             <label
-                                                for="longitude"
+                                                for="dlcId"
                                                 class="label"
                                             >
-                                                {{ __('UUID') }}
+                                                {{ __('divisions.dlc_id') }}
+                                            </label>
+                                        </div>
+                                        <div class="form-group">
+                                            <input type="text"
+                                                id="dlcVerify"
+                                                placeholder=" "
+                                                class="peer input"
+                                                x-bind:disabled="true"
+                                                name="dlcVerify"
+                                                value="{{ $division->dlcVerify ?? '-' }}"
+                                            />
+                                            <label
+                                                for="dlcVerify"
+                                                class="label"
+                                            >
+                                                {{ __('divisions.dlc_verify') }}
                                             </label>
                                         </div>
                                     </div>
+
+                                    <!-- DATE -->
+                                    <div class="form-row-3">
+                                        <div class="form-group">
+                                            <input type="text"
+                                                id="insertedAt"
+                                                placeholder=" "
+                                                class="peer input"
+                                                x-bind:disabled="true"
+                                                name="insertedAt"
+                                                value="{{ $division->ehealthInsertedAt ?? '-' }}"
+                                            />
+                                            <label
+                                                for="insertedAt"
+                                                class="label"
+                                            >
+                                                {{ __('forms.inserted_at') }}
+                                            </label>
+                                        </div>
+                                        <div class="form-group">
+                                            <input type="text"
+                                                id="updatedAt"
+                                                placeholder=" "
+                                                class="peer input"
+                                                x-bind:disabled="true"
+                                                name="updatedAt"
+                                                value="{{ $division->ehealthUpdatedAt ?? '-' }}"
+                                            />
+                                            <label
+                                                for="updatedAt"
+                                                class="label"
+                                            >
+                                                {{ __('forms.updated_at') }}
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- UUID -->
+                                    @if($divisionUuid)
+                                        <div class="form-row-3">
+                                            <div class="form-group">
+                                                <input type="text"
+                                                    id="uuid"
+                                                    placeholder=" "
+                                                    class="peer input"
+                                                    x-bind:disabled="true"
+                                                    name="uuid"
+                                                    value="{{ $divisionUuid }}"
+                                                />
+                                                <label
+                                                    for="uuid"
+                                                    class="label"
+                                                >
+                                                    {{ __('forms.uuid') }}
+                                                </label>
+                                            </div>
+                                        </div>
+                                    @endif
                                 @endif
                             </div>
                         </fieldset>
@@ -350,6 +457,7 @@
                                     :settlements="$settlements"
                                     :streets="$streets"
                                     :readonly="$readonly"
+                                    :divisionView="$readonly"
                                     class="mt-8 form-row-3"
                                 />
 
@@ -376,6 +484,7 @@
                                             :settlements="$receptionSettlements"
                                             :streets="$receptionStreets"
                                             :readonly="$readonly"
+                                            :divisionView="$readonly"
                                             class="mt-8 form-row-3"
                                         />
                                     </div>

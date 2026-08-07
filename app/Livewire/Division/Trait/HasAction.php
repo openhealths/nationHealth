@@ -7,6 +7,7 @@ namespace App\Livewire\Division\Trait;
 use Exception;
 use Throwable;
 use App\Models\Division;
+use App\Enums\Division\Status;
 use App\Classes\eHealth\EHealth;
 use App\Repositories\Repository;
 use Illuminate\Support\Facades\Log;
@@ -59,8 +60,13 @@ trait HasAction
             // Keep a fresh instance on the component if it uses it
             $this->divisionForm->division['status'] = $responseData['status'];
 
-            // Trigger a lightweight re-render
-            $this->dispatch('$refresh');
+            if (property_exists($this, 'statusLabel')) {
+                $this->statusLabel = Status::tryFrom($responseData['status'])?->label() ?? __('forms.unknown');
+            }
+
+            if (property_exists($this, 'statusStyle')) {
+                $this->statusStyle = Status::tryFrom($responseData['status'])?->cssClass() ?? 'status-alert-default';
+            }
         } catch (Exception $err) {
             Log::channel('db_errors')->error(static::class . ':activateDivision:', ['message' => $err->getMessage()]);
 
@@ -112,8 +118,13 @@ trait HasAction
             // Keep a fresh instance on the component if it uses it
             $this->divisionForm->division['status'] = $responseData['status'];
 
-            // Trigger a lightweight re-render
-            $this->dispatch('$refresh');
+            if (property_exists($this, 'statusLabel')) {
+                $this->statusLabel = Status::tryFrom($responseData['status'])?->label() ?? __('forms.unknown');
+            }
+
+            if (property_exists($this, 'statusStyle')) {
+                $this->statusStyle = Status::tryFrom($responseData['status'])?->cssClass() ?? 'status-alert-default';
+            }
         } catch (Exception $err) {
             Log::channel('db_errors')->error(static::class . ':deactivateDivision:', ['message' => $err->getMessage()]);
 
