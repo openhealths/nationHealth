@@ -16,7 +16,9 @@ enum CarePlanStatus: string
     case ON_HOLD = 'on-hold';
     case REVOKED = 'revoked';
     case COMPLETED = 'completed';
+    case TERMINATED = 'terminated';
     case ENTERED_IN_ERROR = 'entered-in-error';
+    case CANCELLED = 'cancelled';
     case UNKNOWN = 'unknown';
 
     public function label(): string
@@ -28,6 +30,8 @@ enum CarePlanStatus: string
             self::ON_HOLD => __('forms.status.on_hold'),
             self::REVOKED => __('forms.status.revoked'),
             self::COMPLETED => __('forms.status.completed'),
+            self::TERMINATED => __('forms.status.terminated') ?? 'Припинено',
+            self::CANCELLED => __('forms.status.cancelled') ?? 'Скасовано',
             self::ENTERED_IN_ERROR => __('forms.status.entered_in_error'),
             self::UNKNOWN => __('forms.status.unknown'),
         };
@@ -43,6 +47,8 @@ enum CarePlanStatus: string
             self::ON_HOLD => 'badge-yellow',
 
             self::REVOKED,
+            self::TERMINATED,
+            self::CANCELLED,
             self::ENTERED_IN_ERROR => 'badge-red',
 
             self::DRAFT,

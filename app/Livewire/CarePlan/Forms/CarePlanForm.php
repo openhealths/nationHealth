@@ -13,7 +13,6 @@ class CarePlanForm extends Form
     public string $author = '';
     public array $coAuthors = [];
     public string $category = '';
-    public string $clinicalProtocol = '';
     public string $context = '';
     public string $title = '';
     public string $intent = 'order';
@@ -37,7 +36,6 @@ class CarePlanForm extends Form
     {
         return [
             'category' => 'required|string',
-            'clinicalProtocol' => 'nullable|string',
             'context' => 'nullable|string',
             'title' => 'required|string',
             'periodStart' => 'required|string',
@@ -71,7 +69,6 @@ class CarePlanForm extends Form
     {
         return [
             'category' => __('care-plan.category'),
-            'clinicalProtocol' => __('care-plan.clinical_protocol'),
             'context' => __('care-plan.context'),
             'title' => __('care-plan.name_care_plan'),
             'periodStart' => __('care-plan.date_and_time_start'),

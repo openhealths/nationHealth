@@ -42,7 +42,7 @@
             <input type="text"
                    class="input peer ps-10 w-full"
                    placeholder="{{ __('care-plan.medication_search_placeholder') }}"
-                   wire:model.live.debounce.400ms="searchQuery"
+                   wire:model="searchQuery"
                    wire:keydown.enter="searchMedications"
             />
         </div>

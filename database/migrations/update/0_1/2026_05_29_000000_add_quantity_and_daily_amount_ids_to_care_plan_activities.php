@@ -14,10 +14,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('care_plan_activities', function (Blueprint $table) {
-            if (! Schema::hasColumn('care_plan_activities', 'quantity_id')) {
+            if (!Schema::hasColumn('care_plan_activities', 'quantity_id')) {
                 $table->foreignId('quantity_id')->nullable()->constrained('quantities')->onDelete('set null');
             }
-            if (! Schema::hasColumn('care_plan_activities', 'daily_amount_id')) {
+            if (!Schema::hasColumn('care_plan_activities', 'daily_amount_id')) {
                 $table->foreignId('daily_amount_id')->nullable()->constrained('quantities')->onDelete('set null');
             }
         });
