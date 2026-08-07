@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Traits;
 
-use Illuminate\Support\Facades\Session;
-
 /**
  * Trait InteractsWithApprovals
  *
@@ -34,14 +32,44 @@ trait InteractsWithApprovals
     public ?string $approvalId = null;
     public ?string $patientId = null;
 
+    /** Whether we are waiting for an async eHealth approval job to complete. */
+    public bool $isPolling = false;
+
+    /** EhealthLink id being polled (null when not polling). */
+    public ?int $pollingLinkId = null;
+
+    /**
+     * authentication_method_current from eHealth for the pending approval OTP modal.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $currentAuthMethod = null;
+
     /**
      * Validation rules for the verification code.
      */
     protected function approvalVerificationRules(): array
     {
+        if ($this->isOfflineAuthMethod()) {
+            return [
+                'verificationCode' => ['nullable'],
+            ];
+        }
+
         return [
             'verificationCode' => ['required', 'string', 'size:4'],
         ];
+    }
+
+    /**
+     * Check if the current authentication method is OFFLINE or document-based (no SMS required).
+     */
+    public function isOfflineAuthMethod(?array $authMethod = null): bool
+    {
+        $method = $authMethod ?? $this->currentAuthMethod;
+        $type = $method['type'] ?? null;
+
+        return $type === 'OFFLINE' || $type === 'THIRD_PERSON' || ($type !== 'OTP' && !is_null($type));
     }
 
     /**

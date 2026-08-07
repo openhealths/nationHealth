@@ -2,20 +2,23 @@
     localEpisodes: $wire.entangle('form.episodes'),
     localMedicalRecords: $wire.entangle('form.medicalRecords'),
 
+    availableEpisodes: @js($availableEpisodes ?? []),
+
     openModal: false,
     openMedicalModal: false,
     searchType: 'ehealth',
     modalTarget: '',
     isNew: true,
     itemIndex: 0,
-    modalForm: { date: '', name: '' },
+    modalForm: { date: '', name: '', uuid: '' },
 
     initAdd(target) {
         this.modalTarget = target;
         this.isNew = true;
         this.modalForm = {
             date: new Date().toISOString().split('T')[0],
-            name: ''
+            name: '',
+            uuid: ''
         };
         this.openModal = true;
     },
@@ -149,18 +152,34 @@
                                        class="input-modal datepicker-input"
                                        autocomplete="off">
                             </div>
-                            <div>
+                            <div x-show="modalTarget === 'episode'">
+                                <label class="label-modal">{{ __('care-plan.episode') }} <span class="text-red-600">*</span></label>
+                                <select x-model="modalForm.uuid" class="input-modal w-full"
+                                    @change="
+                                        let ep = availableEpisodes.find(e => e.uuid === modalForm.uuid);
+                                        if (ep) {
+                                            modalForm.name = ep.name;
+                                            modalForm.date = ep.date;
+                                        }
+                                    ">
+                                    <option value="">{{ __('forms.select') }}</option>
+                                    <template x-for="ep in availableEpisodes" :key="ep.uuid">
+                                        <option :value="ep.uuid" x-text="ep.name + ' (' + ep.date + ')'"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            <div x-show="modalTarget !== 'episode'">
                                 <label class="label-modal">{{ __('care-plan.name_description') }} <span class="text-red-600">*</span></label>
                                 <input type="text" x-model="modalForm.name"
                                        :placeholder="modalTarget === 'episode' ? '{{ __('care-plan.episode_name_placeholder') }}' : '{{ __('care-plan.record_name_placeholder') }}'"
-                                       class="input-modal w-full" required>
+                                       class="input-modal w-full">
                             </div>
                         </div>
                         <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 p-6">
                             <button type="button" @click="openModal = false" class="button-minor">
                                 {{__('forms.cancel')}}
                             </button>
-                            <button type="submit" class="button-primary" :disabled="!modalForm.date || !modalForm.name">
+                            <button type="submit" class="button-primary" :disabled="(modalTarget === 'episode' && !modalForm.uuid) || (modalTarget !== 'episode' && (!modalForm.date || !modalForm.name))">
                                 {{__('forms.save')}}
                             </button>
                         </div>

@@ -14,7 +14,7 @@ class Arr extends BaseArr
         $result = [];
 
         foreach ($array as $key => $value) {
-            $newKey = Str::snake($key);
+            $newKey = is_string($key) ? Str::snake($key) : $key;
 
             if (is_array($value)) {
                 $result[$newKey] = self::toSnakeCase($value);
@@ -96,7 +96,7 @@ class Arr extends BaseArr
                 case 'partyId':
                     $newKey = 'party_uuid';
                     break;
-                // Add other specific mappings here if needed (e.g., 'requestId' to 'request_uuid')
+                    // Add other specific mappings here if needed (e.g., 'requestId' to 'request_uuid')
                 default:
                     // If not explicitly handled above, keep the key as is (it will be snake_cased by snakeKeys later if needed)
                     break;
@@ -111,7 +111,7 @@ class Arr extends BaseArr
     /**
      * Sort an array by key in ascending order recursively.
      *
-     * @param $array
+     * @param  $array
      * @return array
      */
     public static function sortArrayRecursive($array): array
