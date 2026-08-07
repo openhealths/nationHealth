@@ -81,7 +81,7 @@ trait HasApproval
 
         $requestData = Repository::approval()->formatEHealthRequest($payloadData);
 
-        $approval = Approval::getByModel($model->id, get_class($model))
+        $approval = Approval::getByModel($model)
             ->whereStatus(Status::NEW->value)
             ->first() ?? Repository::approval()->create($requestData, $model);
 
@@ -199,7 +199,7 @@ trait HasApproval
 
         $approval = is_a($model, Approval::class)
             ? $model
-            : Approval::getByModel($model->id, get_class($model))
+            : Approval::getByModel($model)
                 ->whereStatus(Status::APPROVED->value)
                 ->whereNotNull('uuid')
                 ->first();
@@ -244,7 +244,7 @@ trait HasApproval
             return false;
         }
 
-        $approval = Approval::getByModel($approvable?->id, get_class($approvable))
+        $approval = Approval::getByModel($approvable)
             ->whereStatus(Status::APPROVED->value)
             ->first();
 
