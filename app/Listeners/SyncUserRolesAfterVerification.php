@@ -24,6 +24,15 @@ class SyncUserRolesAfterVerification
 
         $legalEntity = LegalEntity::find($event->legalEntityId);
 
-        Repository::party()->syncUserEmployeesAndRoles($user->party, $legalEntity);
+        if (!$legalEntity || !$user->party) {
+            return;
+        }
+
+        setPermissionsTeamId($legalEntity->id);
+
+        // Positions synced from eHealth have no owner yet; bind them before assigning roles
+        Repository::employee()->bindOwnerlessEmployeesToUsers($legalEntity);
+
+        Repository::party()->syncUserEmployeesAndRoles($user->party->fresh(), $legalEntity);
     }
 }

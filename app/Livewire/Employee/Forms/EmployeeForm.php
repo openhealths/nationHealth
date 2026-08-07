@@ -430,11 +430,38 @@ class EmployeeForm extends Form
         return $party->users->sortBy('id')->first()?->email;
     }
 
+    /**
+     * Email of the user bound to this employee (user_id / pivot / matching request).
+     * Returns null when the position has no user binding — do not invent a party email.
+     */
+    private function resolveEmployeeBoundEmail(Employee $employee): ?string
+    {
+        if ($employee->userId) {
+            $directUser = User::query()->find($employee->userId);
+            if ($directUser?->email) {
+                return $directUser->email;
+            }
+        }
+
+        $pivotEmail = $employee->users->sortBy('id')->first()?->email;
+        if ($pivotEmail) {
+            return $pivotEmail;
+        }
+
+        return EmployeeRequest::query()
+            ->where('employee_id', $employee->id)
+            ->whereNotNull('email')
+            ->latest('applied_at')
+            ->value('email');
+    }
+
     private function hydrateFromEmployee(Employee $employee): void
     {
-        $employee->loadMissing(['party.phones', 'party.documents', 'educations', 'specialities', 'qualifications', 'scienceDegree']);
+        $employee->loadMissing(['party.phones', 'party.documents', 'educations', 'specialities', 'qualifications', 'scienceDegree', 'users']);
         if ($employee->party) {
             $this->populatePartyData($employee->party);
+            // Prefer email of the user bound to THIS employee, not any party user in the LE
+            $this->party['email'] = $this->resolveEmployeeBoundEmail($employee);
         }
         $this->position = $employee->position;
         $this->employeeType = $employee->employeeType;

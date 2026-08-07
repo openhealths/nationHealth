@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Listeners;
 
 use Throwable;
 use App\Enums\JobStatus;
 use App\Events\EHealthUserLogin;
+use App\Repositories\Repository;
 use Illuminate\Support\Facades\Log;
 use App\Notifications\SyncNotification;
 use App\Traits\BatchLegalEntityQueries;
@@ -13,8 +16,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 
 class OnRegularLoginSyncronization implements ShouldQueue
 {
-    use InteractsWithQueue,
-        BatchLegalEntityQueries;
+    use InteractsWithQueue;
+    use BatchLegalEntityQueries;
 
     protected const string FIRST_LOGIN_BATCH_NAME = 'FirstLoginSync';
 
@@ -36,6 +39,23 @@ class OnRegularLoginSyncronization implements ShouldQueue
         }
 
         echo 'Regular login synchronization checking for ' . 'legalEntity:' . $event->legalEntity->id . PHP_EOL;
+
+        // Give any still-ownerless position an owner and refresh User<->Employee roles on every regular login
+        try {
+            setPermissionsTeamId($event->legalEntity->id);
+
+            Repository::employee()->bindOwnerlessEmployeesToUsers($event->legalEntity);
+
+            if ($event->user->party) {
+                Repository::party()->syncUserEmployeesAndRoles($event->user->party, $event->legalEntity);
+            }
+        } catch (Throwable $exception) {
+            Log::error('Regular login role sync failed', [
+                'legal_entity_id' => $event->legalEntity->id,
+                'user_id' => $event->user->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
 
         // Find all failed batches for this legal entity and retry them
         $failedBatches = $this->findFailedBatchesByLegalEntity($event->legalEntity->id, 'ASC');
@@ -62,8 +82,8 @@ class OnRegularLoginSyncronization implements ShouldQueue
     /**
      * Handle a job failure.
      *
-     * @param EHealthUserLogin $event
-     * @param Throwable $exception
+     * @param  EHealthUserLogin  $event
+     * @param  Throwable  $exception
      * @return void
      */
     public function failed(EHealthUserLogin $event, Throwable $exception): void

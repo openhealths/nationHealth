@@ -408,9 +408,18 @@
                                         @php
                                             $positionEmail = null;
                                             if ($position instanceof Employee) {
-                                                $positionEmail = $party->loadMissing('users')->users->where(fn($user) => $user->id === $position->user_id)->first()?->email ?? null;
+                                                $positionEmail = $position->users->sortBy('id')->first()?->email
+                                                    ?? ($position->user_id
+                                                        ? $party->users->firstWhere('id', $position->user_id)?->email
+                                                        : null)
+                                                    ?? $party->employeeRequests
+                                                        ->where('employee_id', $position->id)
+                                                        ->whereNotNull('email')
+                                                        ->sortByDesc('applied_at')
+                                                        ->first()?->email;
                                             } else if ($position instanceof EmployeeRequest) {
-                                                $positionEmail = $position->revision->data['party']['email'] ?? null;
+                                                $positionEmail = $position->email
+                                                    ?? $position->revision->data['party']['email'] ?? null;
                                             }
                                         @endphp
                                         <tr>

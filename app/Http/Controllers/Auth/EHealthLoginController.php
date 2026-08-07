@@ -121,7 +121,7 @@ class EHealthLoginController extends Controller
 
         Auth::guard($loginedGuard)->login($user);
 
-        Session::forget('mis_2fa');
+        Session::forget(['mis_2fa', 'first_login_role']);
 
         $ehealthScopes = explode(
             ' ',

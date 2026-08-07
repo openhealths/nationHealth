@@ -840,13 +840,6 @@ class User extends Authenticatable implements MustVerifyEmail
             return false;
         }
 
-        // If user is in the "single role login" state with a temporary role, only check direct permissions
-        if (session('first_login_role')) {
-            return $this->getDirectPermissions()
-                ->pluck('name')
-                ->contains($name);
-        }
-
         // Check against filtered union of user's permissions (direct + via roles),
         // already constrained by LegalEntity type and current guard in getAllPermissions()
         return $this->getAllPermissions()->pluck('name')->unique()->contains($name);
