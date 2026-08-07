@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Encounter;
 
-use App\Classes\eHealth\Api\ServiceRequestApi;
+use App\Classes\eHealth\Api\ServiceRequest;
 use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\Exceptions\ApiException as eHealthApiException;
 use App\Core\Arr;
@@ -26,7 +26,6 @@ use App\Models\Icd10;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\Repository;
-use App\Services\Dictionary\Mappers\ImmunizationDictionaryMapper;
 use App\Traits\FormTrait;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Locked;
@@ -41,6 +40,8 @@ class EncounterComponent extends Component
     public Form $form;
 
     public bool $showSignatureModal = false;
+
+    public ?string $actionType = null;
 
     /**
      * Person ID (set when the patient is a person).
@@ -120,6 +121,15 @@ class EncounterComponent extends Component
      * @var string|null
      */
     public ?string $patientUuid = null;
+    public array $availableReferrals = [];
+    public bool $referralsLoaded = false;
+
+    /**
+     * Found the ICD-10 code and description.
+     *
+     * @var array
+     */
+    public array $results;
 
     /**
      * Legal entity type of auth user.
@@ -134,13 +144,6 @@ class EncounterComponent extends Component
      * @var string|null
      */
     protected ?string $employeeType = null;
-
-    /**
-     * Found the ICD-10 code and description.
-     *
-     * @var array
-     */
-    public array $results;
 
     /**
      * List of LOINC observation codes per category.
@@ -276,17 +279,6 @@ class EncounterComponent extends Component
     ];
 
     /**
-     * Vaccine options prepared for search by code, name and target disease.
-     *
-     * @var array<int, array{
-     *     code: string,
-     *     name: string,
-     *     targetDiseases: array<int, array{code: string, name: string}>
-     * }>
-     */
-    public array $vaccineOptions = [];
-
-    /**
      * List of dictionary names.
      *
      * @var array|string[]
@@ -351,8 +343,6 @@ class EncounterComponent extends Component
 
         $this->getDictionary();
 
-        $this->loadVaccineOptions();
-
         $this->dictionaries['eHealth/ICD10_AM/condition_codes'] = $icd10Cache;
 
         $this->observationLoincCodeMap = $observationConfigRepository->loincCodeMap();
@@ -377,6 +367,58 @@ class EncounterComponent extends Component
     }
 
     /**
+     * Fetch all in_progress referrals for the patient from eHealth.
+     * Called from mount() in EncounterCreate/EncounterEdit.
+     */
+    public function loadInProgressReferrals(): void
+    {
+        if ($this->referralsLoaded) {
+            return;
+        }
+
+        try {
+            $patient = $this->patient();
+            // Person UUID is the eHealth patient identifier (not a separate ehealth_id column)
+            $patientUuid = $patient->uuid ?? null;
+            if (!$patientUuid) {
+                return;
+            }
+
+            // searchForServiceRequestsByParams sends GET /api/service_requests
+            // The Request::sendRequest() already returns $data['data'] for successful responses
+            // so the result here IS the array of service requests directly
+            $items = ServiceRequest::searchForServiceRequestsByParams([
+                'patient_id' => $patientUuid,
+                'status' => 'in_progress',
+            ]);
+
+            // If the API returns a wrapped structure, unwrap it
+            if (isset($items['data'])) {
+                $items = $items['data'];
+            }
+
+            if (is_array($items)) {
+                $this->availableReferrals = collect($items)->map(function ($referral) {
+                    $codings = $referral['category']['coding'] ?? [];
+                    $category = $codings[0]['display'] ?? ($codings[0]['code'] ?? 'Направлення');
+                    $requisition = $referral['requisition'] ?? $referral['id'];
+
+                    return [
+                        'id' => $referral['id'],
+                        'requisition' => $requisition,
+                        'category' => $category,
+                    ];
+                })->values()->toArray();
+            }
+
+            $this->referralsLoaded = true;
+        } catch (\Throwable $e) {
+            logger()->error('loadInProgressReferrals failed: ' . $e->getMessage());
+            // Don't show an error toast — just silently leave the dropdown empty
+        }
+    }
+
+    /**
      * Search for referral number.
      *
      * @return void
@@ -385,7 +427,7 @@ class EncounterComponent extends Component
     public function searchForReferralNumber(): void
     {
         $buildSearchRequest = EncounterRequestApi::buildGetServiceRequestList($this->form->referralNumber);
-        ServiceRequestApi::searchForServiceRequestsByParams($buildSearchRequest);
+        ServiceRequest::searchForServiceRequestsByParams($buildSearchRequest);
     }
 
     /**
@@ -881,19 +923,6 @@ class EncounterComponent extends Component
 
             return;
         }
-    }
-
-    /**
-     * Prepare vaccine options for searching by vaccine code, name and target disease.
-     *
-     * @return void
-     */
-    private function loadVaccineOptions(): void
-    {
-        $this->vaccineOptions = app(ImmunizationDictionaryMapper::class)->map(
-            $this->dictionaries['eHealth/vaccine_codes'] ?? [],
-            $this->dictionaries['eHealth/vaccination_target_diseases'] ?? []
-        );
     }
 
     /**

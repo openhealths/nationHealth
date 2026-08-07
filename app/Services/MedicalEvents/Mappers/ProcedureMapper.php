@@ -57,9 +57,11 @@ class ProcedureMapper implements FhirMapperContract
         }
 
         if (!empty($data['basedOnIdentifier'])) {
-            $result['basedOn'] = FhirResource::make()
-                ->coding('eHealth/resources', 'service_request')
-                ->toIdentifier($data['basedOnIdentifier']);
+            $result['basedOn'] = [
+                FhirResource::make()
+                    ->coding('eHealth/resources', 'service_request')
+                    ->toIdentifier($data['basedOnIdentifier'])
+            ];
         }
 
         $paperReferral = PaperReferralMapper::toFhir($data);
@@ -76,9 +78,10 @@ class ProcedureMapper implements FhirMapperContract
         if (!empty($data['reasonReferences'])) {
             $result['reasonReferences'] = collect($data['reasonReferences'])
                 ->filter(fn (array $reasonReference) => !empty($reasonReference['id']) && !empty($reasonReference['type']))
-                ->map(static fn (array $reasonReference) => FhirResource::make()
-                    ->coding('eHealth/resources', $reasonReference['type'])
-                    ->toIdentifier($reasonReference['id'])
+                ->map(
+                    static fn (array $reasonReference) => FhirResource::make()
+                        ->coding('eHealth/resources', $reasonReference['type'])
+                        ->toIdentifier($reasonReference['id'])
                 )
                 ->values()
                 ->toArray();
@@ -99,9 +102,10 @@ class ProcedureMapper implements FhirMapperContract
                 ->pluck('code')
                 ->filter()
                 ->unique()
-                ->map(static fn (string $code) => FhirResource::make()
-                    ->coding('eHealth/assistive_products', $code)
-                    ->toCodeableConcept()
+                ->map(
+                    static fn (string $code) => FhirResource::make()
+                        ->coding('eHealth/assistive_products', $code)
+                        ->toCodeableConcept()
                 )
                 ->values()
                 ->toArray();
@@ -112,9 +116,10 @@ class ProcedureMapper implements FhirMapperContract
                 ->pluck('id')
                 ->filter()
                 ->unique()
-                ->map(static fn (string $equipmentUuid) => FhirResource::make()
-                    ->coding('eHealth/resources', 'equipment')
-                    ->toIdentifier($equipmentUuid)
+                ->map(
+                    static fn (string $equipmentUuid) => FhirResource::make()
+                        ->coding('eHealth/resources', 'equipment')
+                        ->toIdentifier($equipmentUuid)
                 )
                 ->values()
                 ->toArray();
@@ -144,9 +149,10 @@ class ProcedureMapper implements FhirMapperContract
                     ->pluck('id')
                     ->filter()
                     ->unique()
-                    ->map(static fn (string $conditionUuid) => FhirResource::make()
-                        ->coding('eHealth/resources', 'condition')
-                        ->toIdentifier($conditionUuid)
+                    ->map(
+                        static fn (string $conditionUuid) => FhirResource::make()
+                            ->coding('eHealth/resources', 'condition')
+                            ->toIdentifier($conditionUuid)
                     )
                     ->values()
                     ->toArray();
@@ -209,7 +215,7 @@ class ProcedureMapper implements FhirMapperContract
             'divisionId' => data_get($data, 'division.identifier.value', ''),
             'outcomeCode' => data_get($data, 'outcome.coding.0.code', ''),
             'note' => data_get($data, 'note', ''),
-            'basedOnIdentifier' => data_get($data, 'basedOn.identifier.value', ''),
+            'basedOnIdentifier' => data_get($data, 'basedOn.0.identifier.value', data_get($data, 'basedOn.identifier.value', '')),
             ...PaperReferralMapper::fromFhir($data),
             'performedType' => match (true) {
                 !empty($performedDateTime) => 'date_time',

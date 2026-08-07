@@ -1,20 +1,5 @@
 <div class="form-row-2">
     <div class="form-group group">
-        <label for="clinical_protocol" class="label">
-            {{ __('care-plan.clinical_protocol') }}
-        </label>
-        <input type="text"
-               name="clinical_protocol"
-               id="clinical_protocol"
-               class="input peer"
-               wire:model="form.clinicalProtocol"
-        >
-        @error('form.clinicalProtocol')
-        <p class="text-error">{{ $message }}</p>
-        @enderror
-    </div>
-
-    <div class="form-group group">
         <label for="context" class="label">
             {{ __('care-plan.context') }}
         </label>

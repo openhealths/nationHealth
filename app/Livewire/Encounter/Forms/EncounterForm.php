@@ -12,10 +12,10 @@ use App\Enums\Equipment\Status as EquipmentStatus;
 use App\Enums\Person\ConditionVerificationStatus;
 use App\Enums\Person\ProcedureStatus;
 use App\Rules\AfterOrEqualDateTime;
+use App\Rules\AtLeastOneEncounterAction;
 use App\Rules\InDictionary;
 use App\Rules\OnlyOnePrimaryDiagnosis;
 use App\Rules\PastDateTime;
-use App\Services\Dictionary\Mappers\ImmunizationDictionaryMapper;
 use App\Models\Equipment;
 use Carbon\CarbonImmutable;
 use Closure;
@@ -120,7 +120,8 @@ class EncounterForm extends BaseForm
             'encounter.referralNumber' => [
                 Rule::requiredIf(($this->encounter['referralType'] ?? '') === 'electronic'),
                 'nullable',
-                'uuid'
+                'string',
+                'max:255'
             ],
             'encounter.paperReferral' => [
                 Rule::requiredIf(($this->encounter['referralType'] ?? '') === 'paper'),
@@ -235,41 +236,37 @@ class EncounterForm extends BaseForm
                 'date',
                 'before_or_equal:' . (($this->encounter['periodDate'] ?? '') ?: 'today')
             ],
-            'conditions.*.onsetTime' => Rule::forEach(
-                function (mixed $value, string $attribute): array {
-                    $onsetDate = $this->conditions[(int) explode('.', $attribute)[1]]['onsetDate'] ?? '';
+            'conditions.*.onsetTime' => Rule::forEach(function (mixed $value, string $attribute) {
+                $onsetDate = $this->conditions[(int)explode('.', $attribute)[1]]['onsetDate'] ?? '';
 
-                    return [
-                        'required_with:conditions',
-                        'date_format:H:i',
-                        new PastDateTime($onsetDate),
-                        $this->notAfterEncounterEnd($onsetDate)
-                    ];
-                }
-            ),
+                return [
+                    'required_with:conditions',
+                    'date_format:H:i',
+                    new PastDateTime($onsetDate),
+                    $this->notAfterEncounterEnd($onsetDate)
+                ];
+            }),
             'conditions.*.assertedDate' => [
                 'nullable',
                 'before:tomorrow',
                 'date',
                 'date_equals:' . (($this->encounter['periodDate'] ?? '') ?: 'today')
             ],
-            'conditions.*.assertedTime' => Rule::forEach(
-                function (mixed $value, string $attribute): array {
-                    $assertedDate = $this->conditions[(int) explode('.', $attribute)[1]]['assertedDate'] ?? '';
+            'conditions.*.assertedTime' => Rule::forEach(function (mixed $value, string $attribute) {
+                $assertedDate = $this->conditions[(int)explode('.', $attribute)[1]]['assertedDate'] ?? '';
 
-                    return [
-                        'nullable',
-                        'date_format:H:i',
-                        new AfterOrEqualDateTime(
-                            $assertedDate,
-                            $this->encounter['periodDate'] ?? '',
-                            $this->encounter['periodStart'] ?? '',
-                            'encounter_period_start'
-                        ),
-                        $this->notAfterEncounterEnd($assertedDate)
-                    ];
-                }
-            ),
+                return [
+                    'nullable',
+                    'date_format:H:i',
+                    new AfterOrEqualDateTime(
+                        $assertedDate,
+                        $this->encounter['periodDate'] ?? '',
+                        $this->encounter['periodStart'] ?? '',
+                        'encounter_period_start'
+                    ),
+                    $this->notAfterEncounterEnd($assertedDate)
+                ];
+            }),
             'conditions.*.asserterText' => ['nullable', 'string'],
             'conditions.*.stageCode' => [
                 'nullable',
@@ -384,51 +381,12 @@ class EncounterForm extends BaseForm
                 'string',
                 new InDictionary('eHealth/immunization_dosage_units')
             ]),
-            'immunizations.*.doseQuantityUnit' => Rule::forEach(
-                function (mixed $value, string $attribute): array {
-                    $notGiven = $this->immunizations[(int) explode('.', $attribute)[1]]['notGiven'] ?? null;
+            'immunizations.*.doseQuantityUnit' => Rule::forEach(function (mixed $value, string $attribute) {
+                $notGiven = $this->immunizations[(int)explode('.', $attribute)[1]]['notGiven'] ?? null;
 
-                    return [
-                        Rule::requiredIf($notGiven === false),
-                        'nullable',
-                        'string'
-                    ];
-                }
-            ),
-            'immunizations.*.vaccinationProtocols' => [
-                'required',
-                'array',
-
-                function (string $attribute, mixed $value, Closure $fail): void {
-                    if (!is_array($value)) {
-                        return;
-                    }
-
-                    $usedTargetDiseaseCodes = [];
-
-                    foreach ($value as $vaccinationProtocol) {
-                        $targetDiseaseCodes = data_get($vaccinationProtocol, 'targetDiseaseCodes', []);
-
-                        if (!is_array($targetDiseaseCodes)) {
-                            continue;
-                        }
-
-                        foreach ($targetDiseaseCodes as $targetDiseaseCode) {
-                            if (!is_string($targetDiseaseCode) || $targetDiseaseCode === '') {
-                                continue;
-                            }
-
-                            if (isset($usedTargetDiseaseCodes[$targetDiseaseCode])) {
-                                $fail(__('validation.duplicate_target_disease_in_protocol'));
-
-                                return;
-                            }
-
-                            $usedTargetDiseaseCodes[$targetDiseaseCode] = true;
-                        }
-                    }
-                },
-            ],
+                return [Rule::requiredIf($notGiven === false), 'nullable', 'string'];
+            }),
+            'immunizations.*.vaccinationProtocols' => ['required', 'array'],
             'immunizations.*.vaccinationProtocols.*.authorityCode' => [
                 'required_with:immunizations.*.vaccinationProtocols',
                 'string',
@@ -463,27 +421,9 @@ class EncounterForm extends BaseForm
                 'array'
             ],
             'immunizations.*.vaccinationProtocols.*.targetDiseaseCodes.*' => [
-                'bail',
                 'required',
                 'string',
-                new InDictionary('eHealth/vaccination_target_diseases'),
-
-                function (string $attribute, mixed $value, Closure $fail): void {
-                    $attributeParts = explode('.', $attribute);
-                    $immunizationIndex = (int) ($attributeParts[1] ?? 0);
-                    $vaccineCode = data_get($this->immunizations, "{$immunizationIndex}.vaccineCode", '');
-
-                    if (!is_string($vaccineCode) || $vaccineCode === '' || !is_string($value) || $value === '') {
-                        return;
-                    }
-
-                    $isAllowed = app(ImmunizationDictionaryMapper::class)
-                        ->isTargetDiseaseAllowed($vaccineCode,$value);
-
-                    if (!$isAllowed) {
-                        $fail(__('validation.vaccine_target_disease_mismatch'));
-                    }
-                },
+                new InDictionary('eHealth/vaccination_target_diseases')
             ],
 
             'diagnosticReports' => ['nullable', 'array'],
@@ -1056,7 +996,8 @@ class EncounterForm extends BaseForm
                     Rule::requiredIf($isElectronicReferral),
                     Rule::prohibitedIf($isPaperReferral),
                     'nullable',
-                    'uuid',
+                    'string',
+                    'max:255',
                 ];
             }),
 
@@ -1258,8 +1199,26 @@ class EncounterForm extends BaseForm
         $this->addPsychiatryEvidenceValidation($rules);
         $this->addEmployeeTypeConditionsValidation($rules);
         $this->addSpecialityConditionsValidation($rules);
+        $this->addAtLeastOneActionValidation($rules);
 
         return $rules;
+    }
+
+    /**
+     * eHealth rejects the encounter package (asynchronously, after signing) unless it contains
+     * at least one of: action references, diagnostic reports or procedures. Catch this client-side
+     * so the user gets an immediate, understandable error instead of a silently failed async job.
+     *
+     * @param  array  $rules
+     * @return void
+     */
+    private function addAtLeastOneActionValidation(array &$rules): void
+    {
+        $rules['encounter.actionReferences'][] = new AtLeastOneEncounterAction(
+            $this->encounter['classCode'] ?? null,
+            $this->diagnosticReports ?? [],
+            $this->procedures ?? []
+        );
     }
 
     /**
@@ -1276,6 +1235,7 @@ class EncounterForm extends BaseForm
             'encounter.actions.required_if' => __('validation.custom.encounter.actions.required_if'),
             'encounter.actions.prohibited_unless' => __('validation.custom.encounter.actions.prohibited_unless'),
             'encounter.participant.min' => __('validation.custom.encounter.participant.concilium_min'),
+            'conditions.*.verificationStatus.not_in' => __('validation.custom.conditions.verificationStatus.not_in'),
         ];
     }
 
@@ -1556,8 +1516,8 @@ class EncounterForm extends BaseForm
             ->contains(static fn (array $condition): bool => ($condition['primarySource'] ?? false) === true);
 
         $encounterWriterEmployeeUuid = $hasPrimarySourceCondition ? Auth::user()
-                ->getEncounterWriterEmployee($this->encounter['classCode'] ?? null)
-                ?->uuid : null;
+            ->getEncounterWriterEmployee($this->encounter['classCode'] ?? null)
+            ?->uuid : null;
 
         $requiredParticipantUuids = collect($this->procedures ?? [])
             ->concat($this->diagnosticReports ?? [])
