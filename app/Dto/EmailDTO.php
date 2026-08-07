@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Dto;
 
 /**
@@ -27,8 +29,8 @@ class EmailDTO
      *
      * Initializes a new instance of the EmailDTO class with the specified name and phone number.
      *
-     * @param string $name  The name of the sender.
-     * @param string $phone The phone number of the sender.
+     * @param  string  $name  The name of the sender.
+     * @param  string  $phone  The phone number of the sender.
      */
     public function __construct(string $name, string $phone)
     {

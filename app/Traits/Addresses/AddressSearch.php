@@ -1,9 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Traits\Addresses;
 
 use App\Models\Relations\Address;
-use App\Traits\Addresses\BaseAddress;
 use App\View\Components\Forms\AddressesSearch;
 use Illuminate\Validation\ValidationException;
 

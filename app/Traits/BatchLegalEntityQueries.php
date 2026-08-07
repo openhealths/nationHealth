@@ -398,7 +398,6 @@ trait BatchLegalEntityQueries
      *
      * @param  LegalEntity  $legalEntity
      * @param  EHealthJob|null  $nextEntity  The job to be executed after the chain completes (or null)
-     *
      * @return EHealthJob|null The first job in the ConfidantPersonSync chain, or null if there are no confidant_persons
      */
     protected function getConfidantPersonStartJob(LegalEntity $legalEntity, ?EHealthJob $nextEntity): ?EHealthJob
@@ -437,7 +436,6 @@ trait BatchLegalEntityQueries
      *
      * @param  LegalEntity  $legalEntity
      * @param  EHealthJob|null  $nextEntity  The job to be executed after the chain completes (or null)
-     *
      * @return EHealthJob|null The first job in the PersonAuthMethodSync chain, or null if there are no authentication methods
      */
     protected function getPersonAuthMethodStartJob(LegalEntity $legalEntity, ?EHealthJob $nextEntity): ?EHealthJob
@@ -511,8 +509,8 @@ trait BatchLegalEntityQueries
         $previousJob = $nextEntity;
 
         $models = EhealthLink::where('ehealth_job_id', $eHealthJob->id)
-             ->where('status', JobStatus::PENDING->value)
-             ->get();
+            ->where('status', JobStatus::PENDING->value)
+            ->get();
 
         foreach ($models->reverse() as $index => $model) {
             $job = new RemoteEHealthLinksProcessing(

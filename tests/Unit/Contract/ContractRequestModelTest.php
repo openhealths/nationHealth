@@ -7,13 +7,13 @@ namespace Tests\Unit\Contract;
 use App\Enums\JobStatus;
 use App\Models\Contracts\ContractRequest;
 use Carbon\CarbonInterface;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ContractRequestModelTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function migrateFreshUsing(): array
     {

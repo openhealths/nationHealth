@@ -4,39 +4,43 @@
     use App\Models\Person\{Person,PersonRequest};
 @endphp
 
-<aside id="drawer-navigation"
-       class="fixed top-0 left-0 z-40 w-64 h-screen pt-14 transition-transform -translate-x-full bg-white border-r border-gray-200 md:translate-x-0 dark:bg-gray-800 dark:border-gray-700"
-       aria-label="Sidebar"
+<aside
+    id="drawer-navigation"
+    class="fixed top-0 left-0 z-40 h-screen w-64 -translate-x-full border-r border-gray-200 bg-white pt-14 transition-transform md:translate-x-0 dark:border-gray-700 dark:bg-gray-800"
+    aria-label="Sidebar"
 >
-
-    <div class="overflow-y-auto py-5 px-3 h-full bg-white dark:bg-gray-800">
+    <div class="h-full overflow-y-auto bg-white px-3 py-5 dark:bg-gray-800">
         <ul class="space-y-2">
-
-            @if(Auth::user()->can('viewAny', LegalEntity::class) || Auth::user()->can('limitedAction', LegalEntity::class))
+            @if (Auth::user()->can('viewAny', LegalEntity::class) || Auth::user()->can('limitedAction', LegalEntity::class))
                 <li x-data="{ open: false }" class="space-y-2">
-                    <button @click="open = !open"
-                            type="button"
-                            class="menu-item"
-                            aria-controls="dropdown-legal-entity"
-                            :aria-expanded="open"
+                    <button
+                        @click="open = ! open"
+                        type="button"
+                        class="menu-item"
+                        aria-controls="dropdown-legal-entity"
+                        :aria-expanded="open"
                     >
                         @icon('institution')
                         <span>{{ __('forms.institution') }}</span>
 
-                        <svg fill="currentColor" viewBox="0 0 20 20"
-                             xmlns="http://www.w3.org/2000/svg"
-                             :class="{ 'rotate-180': open, 'rotate-0': !open }"
+                        <svg
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                            xmlns="http://www.w3.org/2000/svg"
+                            :class="{ 'rotate-180': open, 'rotate-0': ! open }"
                         >
-                            <path fill-rule="evenodd"
-                                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                                  clip-rule="evenodd"
+                            <path
+                                fill-rule="evenodd"
+                                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                clip-rule="evenodd"
                             ></path>
                         </svg>
                     </button>
 
-                    <ul id="dropdown-legal-entity"
+                    <ul
+                        id="dropdown-legal-entity"
                         x-cloak
-                        class="py-2 space-y-2"
+                        class="space-y-2 py-2"
                         x-show="open"
                         x-transition:enter="transition ease-out duration-100"
                         x-transition:enter-start="transform opacity-0 scale-95"
@@ -45,12 +49,10 @@
                         x-transition:leave-start="transform opacity-100 scale-100"
                         x-transition:leave-end="transform opacity-0 scale-95"
                     >
-                        @if(legalEntity())
+                        @if (legalEntity())
                             @can('access', legalEntity())
                                 <li>
-                                    <a href="{{ route('legal-entity.details', [legalEntity()]) }}"
-                                       class="submenu-item"
-                                    >
+                                    <a href="{{ route('legal-entity.details', [legalEntity()]) }}" class="submenu-item">
                                         @icon('details')
                                         <span>{{ __('forms.details') }}</span>
                                     </a>
@@ -59,11 +61,12 @@
                         @endif
 
                         @if (legalEntity()?->type->name !== LegalEntity::TYPE_MSP_LIMITED)
-                            @if(legalEntity())
+                            @if (legalEntity())
                                 @can('edit', [LegalEntity::class, legalEntity()])
                                     <li>
-                                        <a href="{{ route('legal-entity.edit', [legalEntity()]) }}"
-                                           class="submenu-item"
+                                        <a
+                                            href="{{ route('legal-entity.edit', [legalEntity()]) }}"
+                                            class="submenu-item"
                                         >
                                             @icon('edit2')
                                             <span>{{ __('forms.edit') }}</span>
@@ -74,10 +77,13 @@
 
                             @canany(['create', 'limitedAction'], LegalEntity::class)
                                 <li>
-                                    <a href="{{ legalEntity()
-                                        ? route('legal-entity.create', [legalEntity()->id])
-                                        : route('legal-entity.new.create') }}"
-                                       class="submenu-item"
+                                    <a
+                                        href="{{
+                                            legalEntity()
+                                            ? route('legal-entity.create', [legalEntity()->id])
+                                            : route('legal-entity.new.create')
+                                        }}"
+                                        class="submenu-item"
                                     >
                                         @icon('create')
                                         <span>{{ __('forms.create_legal_entity') }}</span>
@@ -89,12 +95,10 @@
                 </li>
             @endif
 
-            @if(legalEntity() && Auth::user()->cannot('limitedAction', LegalEntity::class))
+            @if (legalEntity() && Auth::user()->cannot('limitedAction', LegalEntity::class))
                 @can('viewAny', Division::class)
                     <li>
-                        <a href="{{ route('division.index', [legalEntity()]) }}"
-                           class="menu-item-simple"
-                        >
+                        <a href="{{ route('division.index', [legalEntity()]) }}" class="menu-item-simple">
                             @icon('divisions')
                             <span>{{ __('forms.divisions') }}</span>
                         </a>
@@ -103,41 +107,46 @@
 
                 @can('viewAny', HealthcareService::class)
                     <li>
-                        <a href="{{ route('healthcare-service.index', [legalEntity()]) }}"
-                           class="menu-item-simple"
-                        >
+                        <a href="{{ route('healthcare-service.index', [legalEntity()]) }}" class="menu-item-simple">
                             @icon('settings')
                             <span>{{ __('forms.services') }}</span>
                         </a>
                     </li>
                 @endcan
 
-                @if(Auth::user()->can('viewAny', Employee::class) || Auth::user()->can('viewAny', EmployeeRequest::class))
-                    <li x-data="{ open: {{ (request()->routeIs('employee.*') || request()->routeIs('party.verification.*')) ? 'true' : 'false' }} }"
-                        class="space-y-2">
-                        <button @click="open = !open"
-                                type="button"
-                                class="menu-item"
-                                aria-controls="dropdown-employees"
-                                :aria-expanded="open"
+                @if (Auth::user()->can('viewAny', Employee::class) || Auth::user()->can('viewAny', EmployeeRequest::class))
+                    <li
+                        x-data="{ open: {{ (request()->routeIs('employee.*') || request()->routeIs('party.verification.*')) ? 'true' : 'false' }} }"
+                        class="space-y-2"
+                    >
+                        <button
+                            @click="open = ! open"
+                            type="button"
+                            class="menu-item"
+                            aria-controls="dropdown-employees"
+                            :aria-expanded="open"
                         >
                             @icon('employees')
                             <span>{{ __('forms.employees') }}</span>
 
-                            <svg fill="currentColor" viewBox="0 0 20 20"
-                                 xmlns="http://www.w3.org/2000/svg"
-                                 :class="{ 'rotate-180': open, 'rotate-0': !open }"
+                            <svg
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                                xmlns="http://www.w3.org/2000/svg"
+                                :class="{ 'rotate-180': open, 'rotate-0': ! open }"
                             >
-                                <path fill-rule="evenodd"
-                                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                                      clip-rule="evenodd"
+                                <path
+                                    fill-rule="evenodd"
+                                    d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                    clip-rule="evenodd"
                                 ></path>
                             </svg>
                         </button>
 
-                        <ul id="dropdown-employees"
+                        <ul
+                            id="dropdown-employees"
                             x-cloak
-                            class="py-2 space-y-2"
+                            class="space-y-2 py-2"
                             x-show="open"
                             x-transition:enter="transition ease-out duration-100"
                             x-transition:enter-start="transform opacity-0 scale-95"
@@ -147,9 +156,7 @@
                             x-transition:leave-end="transform opacity-0 scale-95"
                         >
                             <li>
-                                <a href="{{ route('employee.index', [legalEntity()]) }}"
-                                   class="submenu-item"
-                                >
+                                <a href="{{ route('employee.index', [legalEntity()]) }}" class="submenu-item">
                                     @icon('positions')
                                     <span>{{ __('forms.positions') }}</span>
                                 </a>
@@ -158,19 +165,18 @@
                             {{-- Register of applications --}}
                             @can('viewAny', EmployeeRequest::class)
                                 <li>
-                                    <a href="{{ route('employee-request.index', [legalEntity()]) }}"
-                                       class="submenu-item"
+                                    <a
+                                        href="{{ route('employee-request.index', [legalEntity()]) }}"
+                                        class="submenu-item"
                                     >
-                                        @icon('pencil-clipboard',)
+                                        @icon('pencil-clipboard', )
                                         <span class="ml-3">Реєстр заявок</span>
                                     </a>
                                 </li>
                             @endcan
 
                             <li>
-                                <a href="{{ route('employee-role.index', [legalEntity()]) }}"
-                                   class="submenu-item"
-                                >
+                                <a href="{{ route('employee-role.index', [legalEntity()]) }}" class="submenu-item">
                                     @icon('users-roles')
                                     <span class="ml-3">{{ __('employee-roles.label') }}</span>
                                 </a>
@@ -178,8 +184,9 @@
 
                             @can('party_verification:details')
                                 <li>
-                                    <a href="{{ route('party.verification.index', [legalEntity()]) }}"
-                                       class="submenu-item"
+                                    <a
+                                        href="{{ route('party.verification.index', [legalEntity()]) }}"
+                                        class="submenu-item"
                                     >
                                         @icon('verifications')
                                         <span>{{ __('forms.verifications') }}</span>
@@ -191,32 +198,36 @@
                 @endif
 
                 {{-- Section of Contracts (Dropdown) --}}
-                @if(Auth::user()->can('viewAny', Contract::class) || Auth::user()->can('viewAny', ContractRequest::class))
-                    <li x-data="{ open: {{ request()->routeIs('contract*') ? 'true' : 'false' }} }"
-                        class="space-y-2">
-                        <button @click="open = !open"
-                                type="button"
-                                class="menu-item"
-                                aria-controls="dropdown-contracts"
-                                :aria-expanded="open"
+                @if (Auth::user()->can('viewAny', Contract::class) || Auth::user()->can('viewAny', ContractRequest::class))
+                    <li x-data="{ open: {{ request()->routeIs('contract*') ? 'true' : 'false' }} }" class="space-y-2">
+                        <button
+                            @click="open = ! open"
+                            type="button"
+                            class="menu-item"
+                            aria-controls="dropdown-contracts"
+                            :aria-expanded="open"
                         >
                             @icon('contracts')
                             <span>{{ __('Договори') }}</span>
 
-                            <svg fill="currentColor" viewBox="0 0 20 20"
-                                 xmlns="http://www.w3.org/2000/svg"
-                                 :class="{ 'rotate-180': open, 'rotate-0': !open }"
+                            <svg
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                                xmlns="http://www.w3.org/2000/svg"
+                                :class="{ 'rotate-180': open, 'rotate-0': ! open }"
                             >
-                                <path fill-rule="evenodd"
-                                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                                      clip-rule="evenodd"
+                                <path
+                                    fill-rule="evenodd"
+                                    d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                    clip-rule="evenodd"
                                 ></path>
                             </svg>
                         </button>
 
-                        <ul id="dropdown-contracts"
+                        <ul
+                            id="dropdown-contracts"
                             x-cloak
-                            class="py-2 space-y-2"
+                            class="space-y-2 py-2"
                             x-show="open"
                             x-transition:enter="transition ease-out duration-100"
                             x-transition:enter-start="transform opacity-0 scale-95"
@@ -226,18 +237,14 @@
                             x-transition:leave-end="transform opacity-0 scale-95"
                         >
                             <li>
-                                <a href="{{ route('contract-request.index', [legalEntity()]) }}"
-                                   class="submenu-item"
-                                >
+                                <a href="{{ route('contract-request.index', [legalEntity()]) }}" class="submenu-item">
                                     @icon('hugeicons-contracts')
                                     <span>{{ __('contracts.contract_requests') }}</span>
                                 </a>
                             </li>
 
                             <li>
-                                <a href="{{ route('contract.index', [legalEntity()]) }}"
-                                   class="submenu-item"
-                                >
+                                <a href="{{ route('contract.index', [legalEntity()]) }}" class="submenu-item">
                                     @icon('document-catch-up')
                                     <span>{{ __('contracts.contracts_list') }}</span>
                                 </a>
@@ -248,30 +255,27 @@
 
                 @can('viewAny', License::class)
                     <li>
-                        <a href="{{ route('license.index', [legalEntity()]) }}"
-                           class="menu-item-simple"
-                        >
+                        <a href="{{ route('license.index', [legalEntity()]) }}" class="menu-item-simple">
                             @icon('licenses')
                             <span>{{ __('forms.licenses') }}</span>
                         </a>
                     </li>
                 @endcan
 
-                @if(Auth::user()->can('viewAny', Declaration::class) || Auth::user()->can('viewAny', DeclarationRequest::class))
+                @if (Auth::user()->can('viewAny', Declaration::class) || Auth::user()->can('viewAny', DeclarationRequest::class))
                     <li>
-                        <a href="{{ route('declaration.index', [legalEntity()]) }}"
-                           class="menu-item-simple"
-                        >
+                        <a href="{{ route('declaration.index', [legalEntity()]) }}" class="menu-item-simple">
                             @icon('declaration')
                             <span>{{ __('forms.declarations') }}</span>
                         </a>
                     </li>
                 @endif
 
-                @if(Auth::user()->can('viewAny', Person::class) || Auth::user()->can('viewAny', PersonRequest::class))
+                @if (Auth::user()->can('viewAny', Person::class) || Auth::user()->can('viewAny', PersonRequest::class))
                     <li>
-                        <a href="{{ route('persons.index', [legalEntity()]) }}"
-                           class="menu-item-simple {{ request()->routeIs('persons.*') && !request()->routeIs('persons.preperson', 'persons.care-plans') ? 'menu-item-active' : '' }}"
+                        <a
+                            href="{{ route('persons.index', [legalEntity()]) }}"
+                            class="menu-item-simple {{ request()->routeIs('persons.*') && !request()->routeIs('persons.preperson', 'persons.care-plans') ? 'menu-item-active' : '' }}"
                         >
                             @icon('patients')
                             <span>{{ __('patients.patients') }}</span>
@@ -279,10 +283,11 @@
                     </li>
                 @endif
 
-                @if(Auth::user()->can('viewAny', Preperson::class))
+                @if (Auth::user()->can('viewAny', Preperson::class))
                     <li>
-                        <a href="{{ route('prepersons.index', [legalEntity()]) }}"
-                           class="menu-item-simple {{ request()->routeIs('persons.preperson') ? 'menu-item-active' : '' }}"
+                        <a
+                            href="{{ route('prepersons.index', [legalEntity()]) }}"
+                            class="menu-item-simple {{ request()->routeIs('persons.preperson') ? 'menu-item-active' : '' }}"
                         >
                             @icon('person')
                             <span>{{ __('preperson.label') }}</span>
@@ -291,51 +296,63 @@
                 @endif
 
                 <li>
-                    <a href="{{ route('care-plans.index', [legalEntity()]) }}"
-                       class="menu-item-simple {{ (request()->routeIs('care-plan.*') || request()->routeIs('persons.care-plans')) ? 'menu-item-active' : '' }}"
+                    <a
+                        href="{{ route('care-plans.index', [legalEntity()]) }}"
+                        class="menu-item-simple {{ (request()->routeIs('care-plan.*') || request()->routeIs('persons.care-plans')) ? 'menu-item-active' : '' }}"
                     >
                         @icon('hugeicons-contracts')
                         <span>{{ __('care-plan.care_plan') }}</span>
                     </a>
                 </li>
 
+                <li>
+                    <a
+                        href="{{ route('referrals.index', [legalEntity()]) }}"
+                        class="menu-item-simple {{ request()->routeIs('referrals.*') ? 'menu-item-active' : '' }}"
+                    >
+                        @icon('health-document')
+                        <span>Направлення</span>
+                    </a>
+                </li>
+
                 @can('viewAny', Equipment::class)
                     <li>
-                        <a href="{{ route('equipment.index', [legalEntity()]) }}"
-                           class="menu-item-simple"
-                        >
+                        <a href="{{ route('equipment.index', [legalEntity()]) }}" class="menu-item-simple">
                             @icon('equipment')
                             <span>{{ __('equipments.label') }}</span>
                         </a>
                     </li>
                 @endcan
 
-                <li x-data="{ open: {{ request()->routeIs('dictionaries.*') ? 'true' : 'false' }} }"
-                    class="space-y-2"
-                >
-                    <button @click="open = !open"
-                            type="button"
-                            class="menu-item"
-                            aria-controls="dropdown-dictionaries"
-                            :aria-expanded="open"
+                <li x-data="{ open: {{ request()->routeIs('dictionaries.*') ? 'true' : 'false' }} }" class="space-y-2">
+                    <button
+                        @click="open = ! open"
+                        type="button"
+                        class="menu-item"
+                        aria-controls="dropdown-dictionaries"
+                        :aria-expanded="open"
                     >
                         @icon('library-linear')
                         <span>{{ __('dictionaries.label') }}</span>
 
-                        <svg fill="currentColor" viewBox="0 0 20 20"
-                             xmlns="http://www.w3.org/2000/svg"
-                             :class="{ 'rotate-180': open, 'rotate-0': !open }"
+                        <svg
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                            xmlns="http://www.w3.org/2000/svg"
+                            :class="{ 'rotate-180': open, 'rotate-0': ! open }"
                         >
-                            <path fill-rule="evenodd"
-                                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                                  clip-rule="evenodd"
+                            <path
+                                fill-rule="evenodd"
+                                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                clip-rule="evenodd"
                             ></path>
                         </svg>
                     </button>
 
-                    <ul id="dropdown-dictionaries"
+                    <ul
+                        id="dropdown-dictionaries"
                         x-cloak
-                        class="py-2 space-y-2"
+                        class="space-y-2 py-2"
                         x-show="open"
                         x-transition:enter="transition ease-out duration-100"
                         x-transition:enter-start="transform opacity-0 scale-95"
@@ -345,16 +362,18 @@
                         x-transition:leave-end="transform opacity-0 scale-95"
                     >
                         <li>
-                            <a href="{{ route('dictionaries.medication-programs.index', [legalEntity()]) }}"
-                               class="submenu-item"
+                            <a
+                                href="{{ route('dictionaries.medication-programs.index', [legalEntity()]) }}"
+                                class="submenu-item"
                             >
                                 @icon('boxicons-file')
                                 <span>{{ __('dictionaries.medication_programs.title') }}</span>
                             </a>
                         </li>
                         <li>
-                            <a href="{{ route('dictionaries.service-programs.index', [legalEntity()]) }}"
-                               class="submenu-item"
+                            <a
+                                href="{{ route('dictionaries.service-programs.index', [legalEntity()]) }}"
+                                class="submenu-item"
                             >
                                 @icon('boxicons-file')
                                 <span>{{ __('dictionaries.service_programs.title') }}</span>
@@ -363,8 +382,9 @@
 
                         @can('drugs')
                             <li>
-                                <a href="{{ route('dictionaries.drug-list.index', [legalEntity()]) }}"
-                                   class="submenu-item"
+                                <a
+                                    href="{{ route('dictionaries.drug-list.index', [legalEntity()]) }}"
+                                    class="submenu-item"
                                 >
                                     @icon('boxicons-file')
                                     <span>{{ __('dictionaries.drug_list.title') }}</span>
@@ -373,40 +393,45 @@
                         @endcan
 
                         <li>
-                            <a href="{{ route('dictionaries.service-catalog.index', [legalEntity()]) }}"
-                               class="submenu-item"
+                            <a
+                                href="{{ route('dictionaries.service-catalog.index', [legalEntity()]) }}"
+                                class="submenu-item"
                             >
                                 @icon('boxicons-file')
                                 <span>{{ __('dictionaries.service_catalog.title') }}</span>
                             </a>
                         </li>
                         <li>
-                            <a href="{{ route('dictionaries.condition-diagnose.index', [legalEntity()]) }}"
-                               class="submenu-item"
+                            <a
+                                href="{{ route('dictionaries.condition-diagnose.index', [legalEntity()]) }}"
+                                class="submenu-item"
                             >
                                 @icon('boxicons-file')
                                 <span>{{ __('dictionaries.condition_diagnose.title') }}</span>
                             </a>
                         </li>
                         <li>
-                            <a href="{{ route('dictionaries.forbidden-group.index', [legalEntity()]) }}"
-                               class="submenu-item"
+                            <a
+                                href="{{ route('dictionaries.forbidden-group.index', [legalEntity()]) }}"
+                                class="submenu-item"
                             >
                                 @icon('boxicons-file')
                                 <span>{{ __('dictionaries.forbidden_group.title') }}</span>
                             </a>
                         </li>
                         <li>
-                            <a href="{{ route('dictionaries.medical-device.index', [legalEntity()]) }}"
-                               class="submenu-item"
+                            <a
+                                href="{{ route('dictionaries.medical-device.index', [legalEntity()]) }}"
+                                class="submenu-item"
                             >
                                 @icon('boxicons-file')
                                 <span>{{ __('dictionaries.medical_device.title') }}</span>
                             </a>
                         </li>
                         <li>
-                            <a href="{{ route('dictionaries.device-definition.index', [legalEntity()]) }}"
-                               class="submenu-item"
+                            <a
+                                href="{{ route('dictionaries.device-definition.index', [legalEntity()]) }}"
+                                class="submenu-item"
                             >
                                 @icon('boxicons-file')
                                 <span>{{ __('dictionaries.medical_device.page_title') }}</span>

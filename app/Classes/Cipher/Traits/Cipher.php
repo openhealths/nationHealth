@@ -15,6 +15,7 @@ trait Cipher
 {
     /**
      * КНЕДП.
+     *
      * @var string|null
      */
     public ?string $knedp;

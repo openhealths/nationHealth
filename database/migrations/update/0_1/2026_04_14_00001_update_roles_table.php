@@ -60,7 +60,7 @@ return new class extends ExtendedMigration
         $guards = collect(array_keys((array) config('auth.guards')))->values();
         $permissionsForRole = config('ehealth.roles')[self::NEW_ROLE->value] ?? [];
 
-        foreach($guards as $guard) {
+        foreach ($guards as $guard) {
             $rolesData[] = [
                 'name' => self::NEW_ROLE->value,
                 'guard_name' => $guard,
@@ -83,12 +83,12 @@ return new class extends ExtendedMigration
 
             $legalEntityTypeId = DB::table('legal_entity_types')->where('name', 'MSP_LIMITED')->value('id');
 
-            foreach($roleIds as $roleId) {
+            foreach ($roleIds as $roleId) {
                 $rolesPermissionData = array_merge($rolesPermissionData, Permission::whereIn('name', $permissionsForRole)
                     ->pluck('id', 'name')
-                    ->map(fn($id) => [
+                    ->map(fn ($id) => [
                         'permission_id' => $id,
-                        'role_id'       => $roleId,
+                        'role_id' => $roleId,
                     ])
                     ->values()
                     ->all());
@@ -120,7 +120,7 @@ return new class extends ExtendedMigration
 
         DB::transaction(function () use ($roleIds) {
             // Remove the roles depends on guard
-            foreach($roleIds as $roleId) {
+            foreach ($roleIds as $roleId) {
                 // LegalEntityTypeRole and RoleHasPermission records will be automatically removed due to foreign key constraints
                 DB::table('roles')->where('id', $roleId)->delete();
             }
@@ -130,13 +130,12 @@ return new class extends ExtendedMigration
     /**
      * Add new role to users with OWNER employee role
      *
-     * @param Collection $roleIds
-     *
+     * @param  Collection  $roleIds
      * @return void
      */
     protected function addNewRoleToUsers(Collection $roleIds): void
     {
-        $morphType = (new User)->getMorphClass();
+        $morphType = (new User())->getMorphClass();
 
         DB::table('employee_users')
             ->join('employees', 'employees.id', '=', 'employee_users.employee_id')

@@ -122,9 +122,9 @@ class Request
                 'errors' => $errors
             ]);
 
-            dd('Request error', $errors);
-
-            return (new ErrorHandler())->handleError($errors);
+            $errorResult = (new ErrorHandler())->handleError($errors);
+            $errorMessage = implode(' | ', $errorResult['errors'] ?? ['Unknown API Error']);
+            throw new ApiException($errorMessage, $response->status());
         }
     }
 

@@ -95,6 +95,12 @@ abstract class EHealthRequest extends PendingRequest
             throw new EHealthValidationException($response->json());
         }
 
+        Log::error('eHealth request failed', [
+            'status' => $response->status(),
+            'url' => $url,
+            'body' => $response->body()
+        ]);
+
         throw new EHealthResponseException($response);
     }
 
@@ -106,8 +112,10 @@ abstract class EHealthRequest extends PendingRequest
         if (isset($options['json']) && is_array($options['json'])) {
             $json = $options['json'];
 
-            if (isset($json['signed_content']) && is_string($json['signed_content'])) {
-                $json['signed_content'] = '[base64_signed_content_redacted length=' . strlen($json['signed_content']) . ']';
+            foreach (['signed_content', 'signed_medication_request_request', 'signed_device_request_request', 'signed_data', 'signed_legal_entity_request'] as $signedKey) {
+                if (isset($json[$signedKey]) && is_string($json[$signedKey])) {
+                    $json[$signedKey] = '[base64_signed_content_redacted length=' . strlen($json[$signedKey]) . ']';
+                }
             }
 
             $options['json'] = $json;

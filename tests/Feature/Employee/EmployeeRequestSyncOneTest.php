@@ -13,7 +13,7 @@ use App\Models\LegalEntity;
 use App\Models\Revision;
 use App\Services\Employee\EmployeeRequestMatcher;
 use App\Services\Employee\EmployeeRequestProcessor;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
@@ -21,7 +21,7 @@ use Tests\TestCase;
 
 class EmployeeRequestSyncOneTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function migrateDatabases(): void
     {

@@ -20,14 +20,15 @@ return new class extends Migration
             ->update(['status' => EncounterStatus::FINISHED->value]);
 
         $this->setStatusConstraint(
-            array_filter(EncounterStatus::values(),
+            array_filter(
+                EncounterStatus::values(),
                 static fn (string $value): bool => $value !== EncounterStatus::DRAFT->value
             )
         );
     }
 
     /**
-     * @param array<int, string> $values
+     * @param  array<int, string>  $values
      */
     private function setStatusConstraint(array $values): void
     {

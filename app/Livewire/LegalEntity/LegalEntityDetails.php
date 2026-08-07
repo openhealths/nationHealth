@@ -151,7 +151,8 @@ class LegalEntityDetails extends LegalEntityComponent
      *
      * @return string The label corresponding to the legal entity's status
      */
-    public function getStatusLabelProperty(): string {
+    public function getStatusLabelProperty(): string
+    {
         return States::tryFrom($this->legalEntity->status)?->label() ?? __('forms.unknown');
     }
 
@@ -170,7 +171,8 @@ class LegalEntityDetails extends LegalEntityComponent
      *
      * @return string The label corresponding to the legal entity's EDR status
      */
-    public function getEdrStatusLabelProperty(): string {
+    public function getEdrStatusLabelProperty(): string
+    {
         return EdrStates::tryFrom($this->legalEntity->edr['state'])?->label() ?? __('forms.unknown');
     }
 

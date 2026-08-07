@@ -86,6 +86,13 @@ class EHealthValidationException extends EHealthException
                     $entry = $item['entry'] ?? 'unknow field';
                     $description = $item['rules'][0]['description'] ?? 'no description';
 
+                    if (str_contains($entry, 'product_reference.identifier.value') && str_contains($description, 'Value is not allowed by prescribable_device_codes dictionary configuration')) {
+                        return 'Код медичного виробу: Вибраний код не дозволений поточною конфігурацією словника для призначень в ЕСОЗ';
+                    }
+                    if (str_contains($entry, 'program.identifier.value') && str_contains($description, 'No appropriate participants found for this medical program')) {
+                        return 'Медична програма: Не знайдено відповідних учасників (закладів або підрозділів) для обраної медичної програми';
+                    }
+
                     return "$entry: $description";
                 })
                 ->implode(', ');
@@ -141,13 +148,22 @@ class EHealthValidationException extends EHealthException
             'authored_on' => __('care-plan.ehealth_fields.authored_on'),
             'medical_programs.[0]' => 'Медична програма',
             'medical_programs' => 'Медична програма',
+            'detail.product_reference.identifier.value' => 'Код медичного виробу',
+            'product_reference.identifier.value' => 'Код медичного виробу',
+            'detail.program.identifier.value' => 'Медична програма',
+            'program.identifier.value' => 'Медична програма',
+            'device_definition' => 'Медичний виріб',
+            'prescribable_device_codes' => 'Дозволені медичні вироби для призначення',
         ];
 
         $invalidErrors = Arr::get($this->details, 'error.invalid') ?? Arr::get($this->details, 'invalid') ?? [];
 
-        $errorList = collect($invalidErrors)->map(function ($detail) use ($eHealthFieldTranslations) {
+        $errorList = collect($invalidErrors)->map(function ($detail) use ($eHealthFieldTranslations): ?string {
             $eHealthKey = Arr::get($detail, 'entry') ?? Arr::get($detail, 'param') ?? 'unknown';
             $message = Arr::get($detail, 'rules.0.description') ?? Arr::get($detail, 'msg') ?? '';
+            if (empty($message)) {
+                $message = Arr::get($this->details, 'error.message') ?? Arr::get($this->details, 'message') ?? '';
+            }
             $ruleName = Arr::get($detail, 'rules.0.rule');
 
             if ($eHealthKey === 'status') {
@@ -201,6 +217,14 @@ class EHealthValidationException extends EHealthException
                 $translatedMessage = __('errors.ehealth.messages.authored_on_out_of_range');
             } elseif (str_contains($message, 'Medical program is not allowed for this action')) {
                 $translatedMessage = __('errors.ehealth.messages.medical_program_not_allowed');
+            } elseif (str_contains($message, 'Value is not allowed by prescribable_device_codes dictionary configuration')) {
+                $translatedMessage = 'Вибраний код медичного виробу не дозволений поточною конфігурацією словника для призначень в ЕСОЗ';
+            } elseif (str_contains($message, 'No appropriate participants found for this medical program')) {
+                $translatedMessage = 'Не знайдено відповідних учасників (закладів або підрозділів) для обраної медичної програми';
+            } elseif (str_contains($message, 'Code field of daily_amount object should be equal to denumerator_unit of one of medication\'s innms')) {
+                $translatedMessage = 'Код одиниці добової дози (daily_amount) повинен збігатися з denumerator_unit одного з INNM обраного лікарського засобу';
+            } elseif (str_contains($message, 'Activity can be completed only if it has in_progress status')) {
+                $translatedMessage = 'Призначення може бути виконане тільки якщо воно має статус "В процесі" (in_progress)';
             } elseif (!empty($message)) {
                 $translatedMessage = $message;
             }
@@ -217,14 +241,50 @@ class EHealthValidationException extends EHealthException
             }
 
             if (empty($translatedMessage)) {
-                $translatedMessage = __('errors.ehealth.messages.untranslated_error_message', ['message' => $message ?: __('errors.ehealth.messages.request_error')]);
+                $fallbackMessage = $message ?: (Arr::get($this->details, 'error.message') ?? __('errors.ehealth.messages.request_error'));
+                $translatedMessage = __('errors.ehealth.messages.untranslated_error_message', ['message' => $fallbackMessage]);
+            }
+
+            if ($eHealthKey === 'unknown') {
+                return (string) $translatedMessage;
             }
 
             return "{$translatedKey}: {$translatedMessage}";
         })->filter()->implode("\n");
 
+        if (empty($errorList)) {
+            $mainMessage = Arr::get($this->details, 'error.message') ?? Arr::get($this->details, 'message') ?? '';
+            if (!empty($mainMessage)) {
+                $errorList = (string) $mainMessage;
+            }
+        }
+
         $header = __('errors.ehealth.validation_error_header');
 
         return "{$header}\n{$errorList}";
+    }
+
+    /**
+     * Check if the validation error is a duplicate referral error.
+     *
+     * @return bool
+     */
+    public function isDuplicateReferralError(): bool
+    {
+        $invalidErrors = Arr::get($this->details, 'error.invalid') ?? Arr::get($this->details, 'invalid') ?? [];
+
+        foreach ($invalidErrors as $detail) {
+            $message = Arr::get($detail, 'rules.0.description') ?? Arr::get($detail, 'msg') ?? '';
+            if (str_contains($message, 'already exists') || str_contains($message, 'duplicate')) {
+                return true;
+            }
+        }
+
+        $message = $this->details['error']['message'] ?? '';
+        if (str_contains($message, 'already exists') || str_contains($message, 'duplicate')) {
+            return true;
+        }
+
+        return false;
     }
 }

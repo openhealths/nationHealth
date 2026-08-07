@@ -4,25 +4,27 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Repositories\MedicalEvents\ApprovalRepository;
 use App\Repositories\MedicalEvents\ClinicalImpressionRepository;
 use App\Repositories\MedicalEvents\CodeableConceptRepository;
 use App\Repositories\MedicalEvents\CodingRepository;
 use App\Repositories\MedicalEvents\ConditionRepository;
+use App\Repositories\MedicalEvents\DeviceRequestRequestRepository;
 use App\Repositories\MedicalEvents\DiagnosticReportRepository;
 use App\Repositories\MedicalEvents\EncounterRepository;
 use App\Repositories\MedicalEvents\EpisodeRepository;
 use App\Repositories\MedicalEvents\IdentifierRepository;
 use App\Repositories\MedicalEvents\ImmunizationRepository;
+use App\Repositories\MedicalEvents\MedicationRequestRepository;
 use App\Repositories\MedicalEvents\ObservationRepository;
 use App\Repositories\MedicalEvents\PaperReferralRepository;
 use App\Repositories\MedicalEvents\PeriodRepository;
 use App\Repositories\MedicalEvents\ProcedureRepository;
-use App\Repositories\MedicalEvents\ApprovalRepository;
-use Illuminate\Contracts\Support\DeferrableProvider;
+use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
 use Illuminate\Support\ServiceProvider;
 use RuntimeException;
 
-class MedicalEventsDBServiceProvider extends ServiceProvider implements DeferrableProvider
+class MedicalEventsDBServiceProvider extends ServiceProvider
 {
     /**
      * Register services.
@@ -45,6 +47,17 @@ class MedicalEventsDBServiceProvider extends ServiceProvider implements Deferrab
         $this->bindRepository(PeriodRepository::class);
         $this->bindRepository(ClinicalImpressionRepository::class);
         $this->bindRepository(ApprovalRepository::class);
+        $this->bindRepository(ServiceRequestRequestRepository::class);
+        $this->bindRepository(DeviceRequestRequestRepository::class);
+
+        $this->app->bind(MedicationRequestRepository::class, function () {
+            $driver = config('database.medical_events_db_driver', 'sql');
+            $modelClass = $driver === 'sql'
+                ? \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::class
+                : "App\\Models\\MedicalEvents\\Mongo\\Medications\\MedicationRequestRequest";
+
+            return new MedicationRequestRepository(new $modelClass());
+        });
     }
 
     /**
@@ -92,7 +105,10 @@ class MedicalEventsDBServiceProvider extends ServiceProvider implements Deferrab
             PaperReferralRepository::class,
             PeriodRepository::class,
             ClinicalImpressionRepository::class,
-            ApprovalRepository::class
+            ApprovalRepository::class,
+            MedicationRequestRepository::class,
+            ServiceRequestRequestRepository::class,
+            DeviceRequestRequestRepository::class,
         ];
     }
 }

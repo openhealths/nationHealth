@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
@@ -14,7 +16,8 @@ class DeclarationSyncCompleted extends Notification implements ShouldBroadcast
     public function __construct(
         public string $message,
         public string $status
-    ) {}
+    ) {
+    }
 
     public function via(object $notifiable): array
     {
@@ -34,7 +37,7 @@ class DeclarationSyncCompleted extends Notification implements ShouldBroadcast
         return new BroadcastMessage(
             [
                 'message' => $this->message,
-                'status'  => $this->status,
+                'status' => $this->status,
             ]
         );
     }

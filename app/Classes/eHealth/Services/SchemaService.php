@@ -30,7 +30,7 @@ class SchemaService
     /**
      * Return schema from class.
      *
-     * @param  string $method The method name to call on the class instance
+     * @param  string  $method  The method name to call on the class instance
      * @return self
      * @throws \InvalidArgumentException When the specified method doesn't exist
      */
@@ -172,8 +172,8 @@ class SchemaService
      * If the key exists in the data, keep the value as is.
      * If the key does not exist, set the value to an empty string.
      *
-     * @param Collection $data The data collection to handle.
-     * @param string $key The key to check and update in the data collection.
+     * @param  Collection  $data  The data collection to handle.
+     * @param  string  $key  The key to check and update in the data collection.
      */
     protected function handleDataKey(
         Collection $data,
@@ -192,10 +192,10 @@ class SchemaService
      * Handle a specific property in the data collection.
      * If the key exists in the data, it maps the data based on the provided schema.
      *
-     * @param Collection $data The collection of data to be processed
-     * @param array $property The property to be handled
-     * @param mixed $definitions The definitions to be used for mapping
-     * @param string $key The key to check and process in the data collection
+     * @param  Collection  $data  The collection of data to be processed
+     * @param  array  $property  The property to be handled
+     * @param  mixed  $definitions  The definitions to be used for mapping
+     * @param  string  $key  The key to check and process in the data collection
      * @return void
      */
     protected function handleProperty(Collection $data, array $property, mixed $definitions, string $key): void
@@ -212,10 +212,10 @@ class SchemaService
     /**
      * Handle the $ref property by mapping the data based on the provided schema definitions.
      *
-     * @param Collection $data The data to be processed
-     * @param array $property The property array containing the $ref key
-     * @param mixed $definitions The schema definitions
-     * @param string $key The key to store the processed data
+     * @param  Collection  $data  The data to be processed
+     * @param  array  $property  The property array containing the $ref key
+     * @param  mixed  $definitions  The schema definitions
+     * @param  string  $key  The key to store the processed data
      */
     protected function handleRefProperty(Collection $data, array $property, mixed $definitions, string $key): void
     {
@@ -236,10 +236,10 @@ class SchemaService
     /**
      * Handle the items property by mapping data based on a schema definition.
      *
-     * @param Collection $data The data collection to process
-     * @param array $property The property array containing schema details
-     * @param mixed $definitions The definitions to use for mapping
-     * @param string $key The key to check and process in the data
+     * @param  Collection  $data  The data collection to process
+     * @param  array  $property  The property array containing schema details
+     * @param  mixed  $definitions  The definitions to use for mapping
+     * @param  string  $key  The key to check and process in the data
      */
     protected function handleItemsProperty(
         Collection $data,
@@ -288,7 +288,7 @@ class SchemaService
     /**
      * Removes the specified key from the data and flattens the nested structure.
      *
-     * @param string $key The key to be removed and flattened. Default is 'items'.
+     * @param  string  $key  The key to be removed and flattened. Default is 'items'.
      * @return self
      */
     public function removeItemsKey(string $key = 'items'): self
@@ -301,8 +301,8 @@ class SchemaService
     /**
      * Flattens the items in the collection based on the provided key.
      *
-     * @param Collection $data The collection to flatten
-     * @param string $key The key to use for flattening
+     * @param  Collection  $data  The collection to flatten
+     * @param  string  $key  The key to use for flattening
      * @return Collection The flattened collection
      */
     protected function flattenItemsKey(Collection $data, string $key): Collection
@@ -429,8 +429,8 @@ class SchemaService
     /**
      * Replaces keys in a nested array or collection based on the provided mapping
      *
-     * @param  array|Collection  $data The data array or collection to be processed
-     * @param  array  $replace An array mapping keys to be replaced
+     * @param  array|Collection  $data  The data array or collection to be processed
+     * @param  array  $replace  An array mapping keys to be replaced
      * @return array|Collection The updated data with keys replaced
      */
     public function replaceNestedKeys(array|Collection $data = [], array $replace = []): array|Collection

@@ -66,7 +66,7 @@ class ProcedureForm extends BaseForm
                         $divisionUuid = data_get($this->procedure, 'divisionId');
 
                         if (filled($divisionUuid)) {
-                            $query->where('division_uuid',  $divisionUuid);
+                            $query->where('division_uuid', $divisionUuid);
                         }
                     }
                 ),
@@ -139,7 +139,7 @@ class ProcedureForm extends BaseForm
 
             'procedure.performedDate' => [
                 Rule::requiredIf(
-                    $isCompleted  && data_get($this->procedure, 'performedType')  === 'date_time'
+                    $isCompleted && data_get($this->procedure, 'performedType') === 'date_time'
                 ),
                 Rule::prohibitedIf(
                     !$isCompleted || data_get($this->procedure, 'performedType') !== 'date_time'

@@ -11,7 +11,7 @@ use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -20,7 +20,7 @@ use Tests\TestCase;
 
 class EmployeeIndexSearchTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function migrateDatabases(): void
     {

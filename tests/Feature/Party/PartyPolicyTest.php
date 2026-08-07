@@ -9,7 +9,7 @@ use App\Models\LegalEntity;
 use App\Models\Relations\Party;
 use App\Models\User;
 use App\Policies\PartyPolicy;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Permission;
@@ -17,7 +17,7 @@ use Tests\TestCase;
 
 class PartyPolicyTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function migrateDatabases(): void
     {

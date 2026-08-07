@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\View\Components\Forms;
 
 use App\Rules\Zip;
-use Illuminate\Validation\Rule;
 use Illuminate\Contracts\View\View;
 
 class AddressesReception extends Addresses

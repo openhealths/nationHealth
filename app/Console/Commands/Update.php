@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Console\Commands\MigrationsCommand;
-
 class Update extends MigrationsCommand
 {
     protected string $version = '0_1';

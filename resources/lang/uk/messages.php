@@ -14,6 +14,6 @@ return [
     */
 
     'database_error' => 'Виникла помилка. Зверніться до адміністратора.',
-    'ehealth_error' => 'Помилка eHealth API. Спробуйте пізніше.',
+    'ehealth_error' => 'Помилка eHealth API. Спробуйте пізніше. :message',
     'connection_exception' => "Виникла помилка. Відсутній зв'язок із ЕСОЗ"
 ];

@@ -12,7 +12,7 @@ use App\Models\LegalEntity;
 use App\Models\Relations\Party;
 use App\Models\User;
 use App\Policies\EmployeePolicy;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
@@ -20,7 +20,7 @@ use Tests\TestCase;
 
 class EmployeeIndexAdminActionsTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function migrateDatabases(): void
     {

@@ -429,7 +429,13 @@ return [
         'unknown' => 'Невідомо',
         'stopped' => 'Припинено',
         'entered_in_error' => 'Внесено помилково',
-        'expired' => 'Прострочено'
+        'expired' => 'Прострочено',
+        'completed' => 'Завершено',
+        'on_hold' => 'Призупинено',
+        'on-hold' => 'Призупинено',
+        'cancelled' => 'Скасовано',
+        'revoked' => 'Відкликано',
+        'terminated' => 'Припинено',
     ],
 
     // Reorganization types

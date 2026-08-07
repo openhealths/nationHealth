@@ -4,50 +4,16 @@
     <div x-data="{
             showSignatureModal: $wire.entangle('showSignatureModal'),
             fileName: '{{ __('forms.no_file_chosen') }}',
-            displayFileName() {
-                const stored = $wire.form?.keyContainerFileName;
-                if (stored) {
-                    return stored;
-                }
-                if (this.fileName && !String(this.fileName).startsWith('livewire-file:')) {
-                    return this.fileName;
-                }
-                return '{{ __('forms.no_file_chosen') }}';
-            },
             setFileNameFromInput(event) {
                 const file = event.target.files?.[0];
                 if (file) {
                     this.fileName = file.name;
-                    $wire.set('form.keyContainerFileName', file.name);
                 } else {
                     this.fileName = '{{ __('forms.no_file_chosen') }}';
-                    $wire.set('form.keyContainerFileName', '');
                 }
-            },
-            syncFileNameFromWire() {
-                const stored = $wire.form?.keyContainerFileName;
-                if (stored) {
-                    this.fileName = stored;
-                    return;
-                }
-                const upload = $wire.form?.keyContainerUpload;
-                if (!upload) {
-                    this.fileName = '{{ __('forms.no_file_chosen') }}';
-                    return;
-                }
-                if (typeof upload === 'string') {
-                    if (upload.startsWith('livewire-file:')) {
-                        return;
-                    }
-                    this.fileName = upload.split('/').pop() || this.fileName;
-                    return;
-                }
-                if (upload?.name && !String(upload.name).startsWith('livewire-file:')) {
-                    this.fileName = upload.name;
-                }
-            },
+            }
          }"
-         x-effect="if (!showSignatureModal) { if ($refs.keyContainerUpload) $refs.keyContainerUpload.value = ''; } else { syncFileNameFromWire(); }"
+         x-effect="if (!showSignatureModal) { if ($refs.keyContainerUpload) $refs.keyContainerUpload.value = ''; this.fileName = '{{ __('forms.no_file_chosen') }}'; }"
          x-show="showSignatureModal"
          x-cloak
          role="dialog"
@@ -73,6 +39,19 @@
                                 @yield('custom-fields')
                             @elseif(isset($customFields))
                                 {{ $customFields }}
+                            @elseif(method_exists($this, 'getStatusReasonsProperty') && isset($this->actionType) && in_array($this->actionType, ['cancel_prescription', 'cancel_referral']))
+                                <div>
+                                    <label for="statusReason" class="default-label">{{ __('care-plan.status_reason') }} *</label>
+                                    <select class="input-modal" wire:model="statusReason" name="statusReason" id="statusReason">
+                                        <option value="" selected>{{__('forms.select')}}</option>
+                                        @foreach($this->statusReasons as $code => $description)
+                                            <option value="{{ $code }}" wire:key="reason-{{ $code }}">
+                                                {{ $description }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @error('statusReason') <p class="text-error">{{ $message }}</p> @enderror
+                                </div>
                             @endif
 
                             @if(!empty($agreementText))
@@ -109,7 +88,7 @@
                                     <label for="keyContainerUpload" class="file-input-button">
                                         {{ __('forms.choose_file') }}
                                     </label>
-                                    <span class="file-input-text" x-text="displayFileName()"></span>
+                                    <span class="file-input-text" x-text="fileName"></span>
                                     <input type="file"
                                            wire:model="form.keyContainerUpload"
                                            class="hidden"
@@ -118,7 +97,6 @@
                                            x-ref="keyContainerUpload"
                                            accept=".dat,.pfx,.pk8,.zs2,.jks,.p7s"
                                            @change="setFileNameFromInput($event)"
-                                           x-on:livewire-upload-finish="if ($wire.form?.keyContainerFileName) { fileName = $wire.form.keyContainerFileName; }"
                                     >
                                 </div>
                                 <div wire:loading

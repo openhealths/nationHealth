@@ -24,9 +24,9 @@ use App\Exceptions\EHealth\EHealthValidationException;
 
 class DivisionCreate extends DivisionComponent
 {
-    use WorkTimeUtilities,
-        AddressSearch,
-        ReceptionAddressSearch;
+    use WorkTimeUtilities;
+    use AddressSearch;
+    use ReceptionAddressSearch;
 
     /**
      * Array containing dictionary names only used within the component.

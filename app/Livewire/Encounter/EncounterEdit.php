@@ -23,12 +23,16 @@ use App\Exceptions\EHealth\EHealthException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
+// use App\Livewire\Encounter\Concerns\ManagesEncounterEPrescription;
+// use App\Livewire\Encounter\Concerns\ManagesEncounterReferrals;
 use Livewire\Attributes\Locked;
 use Throwable;
 
 class EncounterEdit extends EncounterComponent
 {
     use HandlesEncounterCancellation;
+    // use ManagesEncounterEPrescription;
+    // use ManagesEncounterReferrals;
 
     #[Locked]
     public int $encounterId;
@@ -113,6 +117,8 @@ class EncounterEdit extends EncounterComponent
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
+            $this->dispatch('flashMessage', ['type' => 'error', 'message' => $exception->validator->errors()->first()]);
+            $this->dispatch('scroll-to-error');
 
             return null;
         }
@@ -155,6 +161,7 @@ class EncounterEdit extends EncounterComponent
             );
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Failed to sync encounter package data');
+            $this->dispatch('flashMessage', ['type' => 'error', 'message' => __('messages.database_error')]);
 
             return null;
         }
@@ -180,12 +187,27 @@ class EncounterEdit extends EncounterComponent
      */
     public function sign(): void
     {
+        if ($this->actionType === 'sign_eprescription') {
+            $this->signEncounterEPrescription();
+
+            return;
+        }
+
+        if ($this->actionType === 'sign_referral') {
+            $this->signEncounterReferral();
+
+            return;
+        }
+
         if ($this->isReadonly) {
             return;
         }
 
         if (Auth::user()->cannot('create', Encounter::class)) {
-            Session::flash('error', __('patients.policy.create_encounter'));
+            $message = __('patients.policy.create_encounter');
+            Session::flash('error', $message);
+            $this->showSignatureModal = false;
+            $this->dispatch('flashMessage', ['type' => 'error', 'message' => $message]);
 
             return;
         }
@@ -195,6 +217,9 @@ class EncounterEdit extends EncounterComponent
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
+            $this->showSignatureModal = false;
+            $this->dispatch('flashMessage', ['type' => 'error', 'message' => $exception->validator->errors()->first()]);
+            $this->dispatch('scroll-to-error');
 
             return;
         }
@@ -217,6 +242,8 @@ class EncounterEdit extends EncounterComponent
             );
         } catch (CipherException|CipherConnectionException $exception) {
             $exception->handle('Error when signing data with Cipher');
+            $this->showSignatureModal = false;
+            $this->dispatch('flashMessage', ['type' => 'error', 'message' => $exception->getMessage()]);
 
             return;
         }
@@ -231,10 +258,79 @@ class EncounterEdit extends EncounterComponent
             ]);
 
             logger()->debug('Job ID to further debug', $resp->getData());
+
+            $jobId = $resp->getData()['job_id'] ?? null;
+            if (!$jobId && isset($resp->getData()['links'][0]['href'])) {
+                $jobId = basename($resp->getData()['links'][0]['href']);
+            }
+
+            if (!$jobId) {
+                throw new \RuntimeException('Не вдалося отримати Job ID від ЕСОЗ.');
+            }
+
+            $jobApi = EHealth::job();
+            $attempts = 0;
+            do {
+                sleep(2);
+                $finalResponse = $jobApi->getDetails($jobId)->getData();
+                $attempts++;
+                $status = strtolower((string) ($finalResponse['status'] ?? ''));
+            } while (in_array($status, ['pending', 'accepted', 'processing'], true) && $attempts < 15);
+
+            if ($status !== 'processed' && $status !== 'active') {
+                $errorHandler = new \App\Classes\eHealth\Errors\ErrorHandler();
+                $errorResult = $errorHandler->handleError($finalResponse);
+                $errorMessages = $errorResult['errors'] ?? [];
+
+                if (empty($errorMessages) || $errorMessages[0] === 'No valid error information provided.') {
+                    $fallbackMsg = data_get($finalResponse, 'error.message')
+                        ?? data_get($finalResponse, 'message')
+                        ?? 'Unknown eHealth Error';
+                    $errorMessages = [$fallbackMsg];
+                }
+
+                $formattedError = implode("\n", $errorMessages);
+                throw new \RuntimeException($formattedError);
+            }
+
+            $encounterUuid = $formattedData['encounter']['id'];
+            $syncData = EHealth::encounter()->getById($this->patientUuid, $encounterUuid)->validate();
+            Repository::encounter()->sync($this->patient(), [$syncData]);
+
+            Session::flash('success', 'Взаємодію успішно підписано та надіслано до ЕСОЗ.');
+            $this->showSignatureModal = false;
+
+            if ($this->prepersonId !== null) {
+                $this->redirectRoute(
+                    'prepersons.encounter.edit',
+                    [legalEntity(), 'preperson' => $this->prepersonId, 'encounterId' => $this->encounterId],
+                    navigate: true
+                );
+            } else {
+                $this->redirectRoute(
+                    'encounter.edit',
+                    [legalEntity(), 'person' => $this->personId, 'encounterId' => $this->encounterId],
+                    navigate: true
+                );
+            }
+
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while submitting encounter');
-
-            return;
+            $this->showSignatureModal = false;
+            $this->dispatch('flashMessage', ['type' => 'error', 'message' => $exception->getMessage()]);
+        } catch (\RuntimeException $exception) {
+            logger()->error('Encounter submission runtime error: ' . $exception->getMessage());
+            Session::flash('error', $exception->getMessage());
+            $this->showSignatureModal = false;
+            $this->dispatch('flashMessage', ['type' => 'error', 'message' => $exception->getMessage()]);
+        } catch (\Throwable $exception) {
+            logger()->error('Encounter submission unexpected error: ' . $exception->getMessage(), [
+                'trace' => $exception->getTraceAsString(),
+            ]);
+            $errorMessage = __('patients.messages.unexpected_error') ?? 'Виникла непередбачувана помилка.';
+            Session::flash('error', $errorMessage);
+            $this->showSignatureModal = false;
+            $this->dispatch('flashMessage', ['type' => 'error', 'message' => $errorMessage]);
         }
 
         Encounter::query()

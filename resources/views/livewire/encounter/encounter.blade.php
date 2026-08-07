@@ -42,24 +42,49 @@
 >
     <x-slot name="headerActions"></x-slot>
 
-    <div class="breadcrumb-form p-4 shift-content">
+    <div class="breadcrumb-form shift-content p-4">
         @php
             $allBlockIds = array_column(array_merge($mainGroups, $footerItems), 'id');
             $initialActiveSections = isset($encounterId) ? [] : $allBlockIds;
         @endphp
-        <div x-data="{
+        <div
+            @scroll-to-error.window="
+                setTimeout(() => {
+                    const errorElement = document.querySelector('.text-error, .is-invalid, [aria-invalid=\'true\']');
+                    if (! errorElement) return;
+                    const block = errorElement.closest('[id^=\'block-\']');
+                    if (block) {
+                        const sectionId = block.id.replace('block-', '');
+                        if (! activeSections.includes(sectionId)) {
+                            activeSections.push(sectionId);
+                        }
+                    }
+                    $nextTick(() => {
+                        errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        const input =
+                            errorElement.previousElementSibling ||
+                            errorElement.closest('div')?.querySelector('input, select, textarea');
+                        if (input && typeof input.focus === 'function') {
+                            input.focus();
+                        }
+                    });
+                }, 50)
+            "
+            x-data="{
                 activeSections: {!! $escapeForAlpineAttribute($initialActiveSections) !!},
                 typeCode: $wire.entangle('form.encounter.typeCode'),
                 coAuthors: $wire.entangle('form.encounter.participant'),
 
                 conditionPerformer: {
-                    uuid: {!! $escapeForAlpineAttribute(
-                        auth()->user()
-                            ->getEncounterWriterEmployee(
-                                data_get($this->form->encounter, 'classCode')
-                            )
-                            ?->uuid
-                    ) !!},
+                    uuid: {!!
+                        $escapeForAlpineAttribute(
+                            auth()->user()
+                                ->getEncounterWriterEmployee(
+                                    data_get($this->form->encounter, 'classCode')
+                                )
+                                ?->uuid
+                        )
+                    !!},
                     name: {!! $escapeForAlpineAttribute($employeeFullName) !!},
                 },
 
@@ -111,7 +136,7 @@
                             sources: Array.isArray(participant?.sources) ? [...participant.sources] : [],
                         }))
                         .map(participant => {
-                            if (!participant.locked || !participant.sources.includes(source)) {
+                            if (! participant.locked || ! participant.sources.includes(source)) {
                                 return participant;
                             }
 
@@ -161,9 +186,9 @@
                         .map(source => this.participantSourceLabels[source])
                         .filter(Boolean);
 
-                    return labels.length
-                        ? `${{!! $escapeForAlpineAttribute(__('patients.coauthor')) !!}} - ${labels.join(', ')}`
-                        : {!! $escapeForAlpineAttribute(__('patients.coauthor')) !!};
+                    const baseLabel = {!! $escapeForAlpineAttribute(__('patients.coauthor')) !!};
+
+                    return labels.length ? baseLabel + ' - ' + labels.join(', ') : baseLabel;
                 },
                 toggle(id) {
                     if (this.activeSections.includes(id)) {
@@ -173,19 +198,19 @@
                     }
                 }
              }"
-             class="flex flex-col lg:flex-row gap-8 lg:gap-12"
+            class="flex flex-col gap-8 lg:flex-row lg:gap-12"
         >
-
             <!-- Main Content -->
             <div class="flex-1 space-y-4">
-                @foreach(array_merge($mainGroups, $footerItems) as $item)
-                    @if(isset($item['view']))
-                        @if($item['id'] === 'observations')
-                            <div x-show="typeCode === 'patient_identity'"
-                                 x-cloak
-                                 class="flex items-start gap-4 p-5 bg-[#e8f1fc] dark:bg-blue-950/40 border border-[#d2e4f9] dark:border-blue-900 rounded-xl mb-4"
+                @foreach (array_merge($mainGroups, $footerItems) as $item)
+                    @if (isset($item['view']))
+                        @if ($item['id'] === 'observations')
+                            <div
+                                x-show="typeCode === 'patient_identity'"
+                                x-cloak
+                                class="mb-4 flex items-start gap-4 rounded-xl border border-[#d2e4f9] bg-[#e8f1fc] p-5 dark:border-blue-900 dark:bg-blue-950/40"
                             >
-                                <span class="shrink-0 text-[#2563eb] dark:text-[#60a5fa] mt-0.5">
+                                <span class="mt-0.5 shrink-0 text-[#2563eb] dark:text-[#60a5fa]">
                                     @icon('info-circle', 'w-5 h-5')
                                 </span>
                                 <div class="flex-1 space-y-1">
@@ -198,25 +223,26 @@
                                 </div>
                             </div>
                         @endif
-                        <div id="block-{{ $item['id'] }}"
-                             class="bg-white dark:bg-gray-800 rounded-xl scroll-mt-16 dark:border-gray-700"
-                             :class="activeSections.includes('{{ $item['id'] }}') ? 'summary-section-active' : 'summary-section-inactive'"
+                        <div
+                            id="block-{{ $item['id'] }}"
+                            class="scroll-mt-16 rounded-xl bg-white dark:border-gray-700 dark:bg-gray-800"
+                            :class="activeSections.includes('{{ $item['id'] }}') ? 'summary-section-active' : 'summary-section-inactive'"
                         >
-                            <button @click="toggle('{{ $item['id'] }}')"
-                                    type="button"
-                                    class="w-full flex items-center justify-between p-5 focus:outline-none"
+                            <button
+                                @click="toggle('{{ $item['id'] }}')"
+                                type="button"
+                                class="flex w-full items-center justify-between p-5 focus:outline-none"
                             >
-                                <div
-                                    class="flex items-center gap-4 text-gray-900 dark:text-gray-100 font-semibold text-[17px]">
-                                    <span
-                                        class="w-6 h-6 flex items-center justify-center shrink-0 text-gray-900 dark:text-gray-100">
+                                <div class="flex items-center gap-4 text-[17px] font-semibold text-gray-900 dark:text-gray-100">
+                                    <span class="flex h-6 w-6 shrink-0 items-center justify-center text-gray-900 dark:text-gray-100">
                                         @icon($item['icon'], 'w-6 h-6')
                                     </span>
                                     <span class="truncate">{{ $item['label'] }}</span>
                                 </div>
 
-                                <div class="shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-300"
-                                     :class="activeSections.includes('{{ $item['id'] }}') ? '' : '-rotate-90'"
+                                <div
+                                    class="shrink-0 text-gray-400 transition-transform duration-300 dark:text-gray-500"
+                                    :class="activeSections.includes('{{ $item['id'] }}') ? '' : '-rotate-90'"
                                 >
                                     @icon('chevron-down', 'w-5 h-5')
                                 </div>
@@ -224,7 +250,7 @@
 
                             <div
                                 x-show="activeSections.includes('{{ $item['id'] }}')"
-                                style="display: none;"
+                                style="display: none"
                                 class="px-5 pb-5"
                             >
                                 {{-- A disabled fieldset disables every control inside it, the record cancellation
@@ -238,31 +264,27 @@
                     @endif
                 @endforeach
 
-                @if($this instanceof EncounterEdit)
+                @if ($this instanceof EncounterEdit)
                     <div class="mt-4">
-                        <fieldset class="fieldset-card p-4 sm:p-8 sm:pb-10 mb-4">
+                        <fieldset class="fieldset-card mb-4 p-4 sm:p-8 sm:pb-10">
                             <legend class="legend">{{ __('forms.status.label') }}</legend>
 
-                            <div class="flex flex-col sm:flex-row sm:items-end gap-6 mb-2">
+                            <div class="mb-2 flex flex-col gap-6 sm:flex-row sm:items-end">
                                 <div class="form-group group flex-1">
-                                    <input type="text"
-                                           id="ehealthStatus"
-                                           class="input peer text-gray-500"
-                                           value="{{ __('forms.status.signed') }}"
-                                           readonly
-                                           placeholder=" "
+                                    <input
+                                        type="text"
+                                        id="ehealthStatus"
+                                        class="input peer text-gray-500"
+                                        value="{{ __('forms.status.signed') }}"
+                                        readonly
+                                        placeholder=" "
                                     />
-                                    <label for="ehealthStatus" class="label">
-                                        {{ __('forms.status.label') }}
-                                    </label>
+                                    <label for="ehealthStatus" class="label"> {{ __('forms.status.label') }} </label>
                                 </div>
 
-                                @unless($isReadonly)
+                                @unless ($isReadonly)
                                     <div class="mb-1">
-                                        <button
-                                            type="button"
-                                            class="button-primary px-8"
-                                        >
+                                        <button type="button" class="button-primary px-8">
                                             {{ __('forms.update') }}
                                         </button>
                                     </div>
@@ -273,17 +295,19 @@
                 @endif
 
                 <!-- Additional Actions -->
-                @if(isset($encounterId) && !$isReadonly)
-                    <div class="pt-10 mt-10 border-t border-gray-100 dark:border-gray-700">
-                        <h3 class="text-[17px] font-bold text-gray-900 dark:text-gray-100 mb-6">
+                @if (isset($encounterId))
+                    <div class="mt-10 border-t border-gray-100 pt-10 dark:border-gray-700">
+                        <h3 class="mb-6 text-[17px] font-bold text-gray-900 dark:text-gray-100">
                             {{ __('patients.additional_actions') }}
                         </h3>
 
                         <div class="space-y-6">
                             <fieldset class="fieldset-card p-5">
                                 <legend class="legend">{{ __('patients.prescriptions') }}</legend>
-                                <button type="button"
-                                        class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors"
+                                <button
+                                    wire:click="openEncounterEPrescriptionDrawer"
+                                    type="button"
+                                    class="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                                 >
                                     @icon('plus', 'w-4 h-4')
                                     <span>{{ __('patients.add_prescription') }}</span>
@@ -292,8 +316,10 @@
 
                             <fieldset class="fieldset-card p-5">
                                 <legend class="legend">{{ __('patients.referrals') }}</legend>
-                                <button type="button"
-                                        class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors"
+                                <button
+                                    wire:click="openEncounterReferralDrawer"
+                                    type="button"
+                                    class="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                                 >
                                     @icon('plus', 'w-4 h-4')
                                     <span>{{ __('patients.add_referral') }}</span>
@@ -302,8 +328,9 @@
 
                             <fieldset class="fieldset-card p-5">
                                 <legend class="legend">{{ __('patients.medical_reports') }}</legend>
-                                <button type="button"
-                                        class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors"
+                                <button
+                                    type="button"
+                                    class="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                                 >
                                     @icon('plus', 'w-4 h-4')
                                     <span>{{ __('patients.add_medical_report') }}</span>
@@ -312,8 +339,9 @@
 
                             <fieldset class="fieldset-card p-5">
                                 <legend class="legend">{{ __('patients.care_plans') }}</legend>
-                                <a href="{{ route('care-plans.create-by-encounter', [legalEntity(), 'encounter' => $encounterId]) }}"
-                                   class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1.5 font-medium text-sm transition-colors"
+                                <a
+                                    href="{{ route('care-plans.create-by-encounter', [legalEntity(), 'encounter' => $encounterId]) }}"
+                                    class="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                                 >
                                     @icon('plus', 'w-4 h-4')
                                     <span>{{ __('patients.add_care_plan') }}</span>
@@ -326,7 +354,7 @@
                 <!-- Actions -->
                 <div class="pt-8">
                     <div class="flex flex-wrap gap-4">
-                        @if($this instanceof EncounterEdit && $this->canBeCancelled)
+                        @if ($this instanceof EncounterEdit && $this->canBeCancelled)
                             <button
                                 wire:click="openPackageCancellation"
                                 type="button"
@@ -344,7 +372,26 @@
                             </button>
                         @endif
 
-                        @unless($isReadonly)
+                        @if ($this instanceof EncounterEdit)
+                            <button
+                                wire:click="openEncounterEPrescriptionDrawer"
+                                type="button"
+                                class="button-primary-outline flex items-center gap-2"
+                            >
+                                @icon('plus', 'w-4 h-4')
+                                <span>Додати рецепт</span>
+                            </button>
+                            <button
+                                wire:click="openEncounterReferralDrawer"
+                                type="button"
+                                class="button-primary-outline flex items-center gap-2"
+                            >
+                                @icon('plus', 'w-4 h-4')
+                                <span>Додати направлення</span>
+                            </button>
+                        @endif
+
+                        @unless ($isReadonly)
                             <button
                                 wire:click.prevent="save"
                                 type="submit"
@@ -354,11 +401,7 @@
                                 {{ __('forms.save') }}
                             </button>
 
-                            <button
-                                type="submit"
-                                @click="$wire.showSignatureModal = true"
-                                class="button-primary"
-                            >
+                            <button type="submit" @click="$wire.showSignatureModal = true" class="button-primary">
                                 {{ __('forms.complete_the_interaction_and_sign') }}
                             </button>
                         @endunless
@@ -367,18 +410,19 @@
             </div>
 
             <!-- Sidebar Navigation (Right) -->
-            <div class="w-full lg:w-75 shrink-0 space-y-6 mt-4 lg:mt-0 sticky top-24 self-start">
+            <div class="sticky top-24 mt-4 w-full shrink-0 space-y-6 self-start lg:mt-0 lg:w-75">
                 <div class="space-y-1">
-                    @foreach($mainGroups as $item)
-                        <button @click="
-                                    if (!activeSections.includes('{{ $item['id'] }}')) toggle('{{ $item['id'] }}');
+                    @foreach ($mainGroups as $item)
+                        <button
+                            @click="
+                                    if (! activeSections.includes('{{ $item['id'] }}')) toggle('{{ $item['id'] }}');
                                     document.getElementById('block-{{ $item['id'] }}').scrollIntoView({ behavior: 'smooth', block: 'start' });
                                 "
-                                type="button"
-                                :class="activeSections.includes('{{ $item['id'] }}') ? 'summary-sidebar-btn-active' : 'summary-sidebar-btn-inactive'"
-                                class="summary-sidebar-btn w-full"
+                            type="button"
+                            :class="activeSections.includes('{{ $item['id'] }}') ? 'summary-sidebar-btn-active' : 'summary-sidebar-btn-inactive'"
+                            class="summary-sidebar-btn w-full"
                         >
-                            <span class="w-5 h-5 flex items-center justify-center shrink-0">
+                            <span class="flex h-5 w-5 shrink-0 items-center justify-center">
                                 @icon($item['icon'], 'w-5 h-5')
                             </span>
                             <span class="truncate">{{ $item['label'] }}</span>
@@ -389,17 +433,22 @@
         </div>
     </div>
 
-    @unless($isReadonly)
+    @unless ($isReadonly)
         <x-signature-modal method="sign" />
     @endunless
 
-    @if($this instanceof EncounterEdit && $this->canBeCancelled)
+    @if ($this instanceof EncounterEdit && $this->canBeCancelled)
         @include('livewire.encounter.encounter-cancellation', [
-            'formPath' => 'cancellationForm',
-            'description' => array_filter($this->selectedRecords)
-                ? __('patients.messages.encounter_records_cancel_modal_description')
-                : __('patients.messages.encounter_cancel_modal_description')
-        ])
+                                                    'formPath' => 'cancellationForm',
+                                                    'description' => array_filter($this->selectedRecords)
+                                                        ? __('patients.messages.encounter_records_cancel_modal_description')
+                                                        : __('patients.messages.encounter_cancel_modal_description')
+                                                ])
+    @endif
+
+    @if ($this instanceof EncounterEdit)
+        @include('livewire.encounter.parts.encounter-eprescription-drawer')
+        @include('livewire.encounter.parts.encounter-referral-drawer')
     @endif
     <livewire:components.x-message :key="time()" />
     <x-forms.loading />

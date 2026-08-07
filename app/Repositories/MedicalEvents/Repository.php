@@ -66,13 +66,28 @@ final class Repository
         return app(ClinicalImpressionRepository::class);
     }
 
+    public static function approval(): ApprovalRepository
+    {
+        return app(ApprovalRepository::class);
+    }
+
     public static function period(): PeriodRepository
     {
         return app(PeriodRepository::class);
     }
 
-    public static function approval(): ApprovalRepository
+    public static function medicationRequest(): MedicationRequestRepository
     {
-        return app(ApprovalRepository::class);
+        return app(MedicationRequestRepository::class);
+    }
+
+    public static function serviceRequest(): ServiceRequestRequestRepository
+    {
+        return app(ServiceRequestRequestRepository::class);
+    }
+
+    public static function deviceRequest(): DeviceRequestRequestRepository
+    {
+        return app(DeviceRequestRequestRepository::class);
     }
 }

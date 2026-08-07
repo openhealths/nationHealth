@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Classes\Cipher\Errors;
 
 use App\Classes\Cipher\Exceptions\ApiException;
@@ -11,8 +13,9 @@ class ErrorHandler
         if (isset($error['message']) && $error['message']) {
             $errorMessages = $error['message'] . ' ' . ($error['failureCause'] ?? 'No description');
         } else {
-            $errorMessages =  "No valid error information provided.";
+            $errorMessages = "No valid error information provided.";
         }
+
         return ['errors' => $errorMessages];
     }
 

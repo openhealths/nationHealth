@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Repositories;
 
 use App\Models\Revision;
@@ -7,9 +9,8 @@ use App\Models\Revision;
 class RevisionRepository
 {
     /**
-     * @param object $model
-     * @param array $educations
-     *
+     * @param  object  $model
+     * @param  array  $educations
      * @return void
      */
     public function saveRevision(object $model, array $revisionData): void
@@ -20,7 +21,7 @@ class RevisionRepository
 
         $revisionParams = [
             'revisionable_type' => get_class($model),
-            'revisionable_id'   => $model->id
+            'revisionable_id' => $model->id
         ];
 
         $revision = Revision::where($revisionParams)->first() ?? $this->createRevision($model);

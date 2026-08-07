@@ -10,14 +10,14 @@ use App\Models\LegalEntity;
 use App\Models\Relations\Party;
 use App\Models\User;
 use App\Policies\ContractRequestPolicy;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ContractRequestPolicyTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function migrateFreshUsing(): array
     {

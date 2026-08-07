@@ -1,98 +1,249 @@
 @use('App\Enums\Person\AuthenticationMethod')
 
-<div x-data="{ showMethodSelectionModal: $wire.entangle('showMethodSelectionModal') }">
+<div
+    x-data="{
+        showMethodSelectionModal: $wire.entangle('showMethodSelectionModal'),
+        authenticationMethods: $wire.entangle('authMethods'),
+    }"
+>
     <template x-teleport="body">
-        <div x-show="showMethodSelectionModal" 
-             style="display: none"
-             @keydown.escape.prevent.stop="showMethodSelectionModal = false"
-             role="dialog"
-             aria-modal="true"
-             class="fixed inset-0 z-[100] overflow-y-auto"
+        <div
+            x-show="showMethodSelectionModal"
+            style="display: none"
+            @keydown.escape.prevent.stop="showMethodSelectionModal = false"
+            role="dialog"
+            aria-modal="true"
+            class="modal"
         >
-            <div x-show="showMethodSelectionModal" 
-                 x-transition:enter="ease-out duration-300"
-                 x-transition:enter-start="opacity-0"
-                 x-transition:enter-end="opacity-100"
-                 x-transition:leave="ease-in duration-200"
-                 x-transition:leave-start="opacity-100"
-                 x-transition:leave-end="opacity-0"
-                 class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"
+            <div
+                x-transition.opacity
+                class="fixed inset-0 bg-black/30 backdrop-blur-sm"
+                @click="showMethodSelectionModal = false"
             ></div>
-
-            <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
-                <div x-show="showMethodSelectionModal"
-                     x-transition:enter="ease-out duration-300"
-                     x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                     x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                     x-transition:leave="ease-in duration-200"
-                     x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                     x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                     @click.stop
-                     class="relative transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl"
+            <div class="modal-wrapper">
+                <div
+                    @click.stop
+                    x-trap.noscroll.inert="showMethodSelectionModal"
+                    class="modal-content mx-auto w-full max-w-4xl rounded-2xl bg-white p-6 shadow-xl sm:p-8 dark:bg-gray-800"
                 >
-                    <div class="px-8 pt-8 pb-4">
-                        <div class="flex items-center justify-between mb-6">
-                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">Активація плану лікування</h3>
-                            <button @click="showMethodSelectionModal = false" class="text-gray-400 hover:text-gray-600 transition-colors">
-                                @icon('x', 'w-6 h-6')
+                    <div>
+                        <div class="mb-8 flex items-center justify-between">
+                            <legend class="legend !mb-0 text-2xl font-bold text-gray-900 dark:text-white">
+                                {{ __('patients.authentication_methods') }}
+                            </legend>
+                        </div>
+
+                        <template x-if="! authenticationMethods || authenticationMethods.length === 0">
+                            <div class="mb-8 rounded-xl border border-red-200 bg-red-100 p-4 dark:border-red-800 dark:bg-red-900/20">
+                                <div class="flex items-center gap-2">
+                                    @icon('alert-circle', 'w-5 h-5 text-red-700 dark:text-red-400')
+                                    <p class="font-semibold text-red-700 dark:text-red-300">
+                                        {{ __('forms.patient_has_no_auth_methods') }}
+                                    </p>
+                                </div>
+                            </div>
+                        </template>
+
+                        <template x-if="authenticationMethods && authenticationMethods.length > 0">
+                            <div class="space-y-4">
+                                <template x-for="(method, methodIndex) in authenticationMethods" :key="methodIndex">
+                                    <div class="fieldset mb-4 space-y-3 rounded-2xl border border-gray-200 bg-white p-5 shadow-none dark:border-gray-700 dark:bg-gray-800">
+                                        <div class="flex items-start justify-between gap-4">
+                                            <div
+                                                class="shrink"
+                                                x-data="{
+                                                    labels: @js(AuthenticationMethod::options()),
+                                                    prefix: '{{ __('forms.authentication') }}'
+                                                }"
+                                            >
+                                                <h3
+                                                    class="text-lg font-bold text-gray-900 dark:text-white"
+                                                    x-text="`${prefix} ${labels[method.type] ?? method.type}`"
+                                                ></h3>
+                                            </div>
+
+                                            <div class="flex items-center gap-4">
+                                                <div x-data="{ open: false }" class="relative">
+                                                    <button
+                                                        @click="open = ! open"
+                                                        type="button"
+                                                        class="cursor-pointer text-sm font-medium whitespace-nowrap text-blue-600 hover:underline"
+                                                    >
+                                                        {{ __('patients.change') }}
+                                                    </button>
+
+                                                    <div
+                                                        x-show="open"
+                                                        @click.away="open = false"
+                                                        x-transition
+                                                        style="display: none"
+                                                        class="absolute right-0 z-50 mt-2 w-64 rounded-lg border border-gray-100 bg-white p-2 shadow-xl dark:border-gray-700 dark:bg-gray-800"
+                                                    >
+                                                        <template x-if="method.type === '{{ AuthenticationMethod::OTP->value }}'">
+                                                            <button
+                                                                type="button"
+                                                                @click="open = false"
+                                                                class="w-full cursor-pointer rounded px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                                                            >
+                                                                {{ __('patients.change_phone_number') }}
+                                                            </button>
+                                                        </template>
+
+                                                        <template x-if="method.type === '{{ AuthenticationMethod::OFFLINE->value }}'">
+                                                            <button
+                                                                type="button"
+                                                                @click="open = false"
+                                                                class="w-full cursor-pointer rounded px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                                                            >
+                                                                {{ __('patients.change_method_to_sms') }}
+                                                            </button>
+                                                        </template>
+
+                                                        <button
+                                                            type="button"
+                                                            @click="open = false"
+                                                            class="w-full cursor-pointer rounded px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                                                        >
+                                                            {{ __('patients.change_method_alias') }}
+                                                        </button>
+
+                                                        <template x-if="method.type === '{{ AuthenticationMethod::THIRD_PERSON->value }}'">
+                                                            <button
+                                                                type="button"
+                                                                @click="open = false"
+                                                                class="w-full cursor-pointer rounded px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                                                            >
+                                                                {{ __('patients.deactivate_method') }}
+                                                            </button>
+                                                        </template>
+                                                    </div>
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    class="button-primary px-6 py-2 whitespace-nowrap"
+                                                    @click="$wire.selectAuthMethod(method.id || method.uuid)"
+                                                >
+                                                    {{ __('forms.select') }}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <template x-if="method.type !== '{{ AuthenticationMethod::THIRD_PERSON->value }}'">
+                                            <div>
+                                                <p class="text-sm text-gray-600 dark:text-gray-300">
+                                                    {{ __('patients.authentication_method_name') }}:
+                                                    <span
+                                                        class="text-gray-900 dark:text-white"
+                                                        x-text="method.alias || '-'"
+                                                    ></span>
+                                                </p>
+                                            </div>
+                                        </template>
+
+                                        <div class="space-y-2">
+                                            <template x-if="method.type === '{{ AuthenticationMethod::OTP->value }}'">
+                                                <div class="space-y-1.5 pt-1">
+                                                    <label class="label-modal !mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+                                                        {{ __('forms.phone_number') }}
+                                                    </label>
+                                                    <div class="max-w-[285px]">
+                                                        <input
+                                                            type="tel"
+                                                            class="input-modal w-full"
+                                                            :value="method.phoneNumber || method.phone_number"
+                                                            readonly
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </template>
+
+                                            <template x-if="method.type === '{{ AuthenticationMethod::OFFLINE->value }}'">
+                                                <div class="pt-1 text-sm text-gray-500 dark:text-gray-400">
+                                                    {{ __('patients.offline_auth_method_description') }}
+                                                </div>
+                                            </template>
+
+                                            <template x-if="method.type === '{{ AuthenticationMethod::THIRD_PERSON->value }}'">
+                                                <div class="space-y-4 pt-1">
+                                                    <div class="form-row-2">
+                                                        <div class="form-group">
+                                                            <label class="label-modal !mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+                                                                {{ __('patients.alias') }}
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                :value="method.alias"
+                                                                class="input-modal"
+                                                                readonly
+                                                            />
+                                                        </div>
+
+                                                        <div class="form-group">
+                                                            <label class="label-modal !mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+                                                                {{ __('patients.ended_at') }}
+                                                            </label>
+                                                            <input
+                                                                :value="method.endedAt || method.ended_at || '-'"
+                                                                type="text"
+                                                                class="input-modal"
+                                                                readonly
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    <template x-if="method.confidantPerson || method.confidant_person">
+                                                        <div class="form-row-2">
+                                                            <div class="form-group">
+                                                                <label class="label-modal !mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+                                                                    {{ __('patients.confidant_full_name') }}
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    :value="(
+                                                                        method.confidantPerson ||
+                                                                        method.confidant_person
+                                                                    )?.name"
+                                                                    class="input-modal"
+                                                                    readonly
+                                                                />
+                                                            </div>
+
+                                                            <div class="form-group">
+                                                                <label class="label-modal !mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+                                                                    {{ __('forms.rnokpp') }}
+                                                                </label>
+                                                                <input
+                                                                    :value="(
+                                                                        method.confidantPerson ||
+                                                                        method.confidant_person
+                                                                    )?.taxId ||
+                                                                    (method.confidantPerson || method.confidant_person)
+                                                                        ?.tax_id"
+                                                                    type="text"
+                                                                    class="input-modal"
+                                                                    readonly
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+
+                        <div class="mt-8 flex justify-start">
+                            <button
+                                @click="showMethodSelectionModal = false"
+                                type="button"
+                                class="button-minor px-6 py-2.5"
+                            >
+                                {{ __('forms.cancel') }}
                             </button>
                         </div>
-                        <p class="text-gray-600 dark:text-gray-400 mb-8">
-                            Оберіть метод підтвердження плану лікування пацієнтом для його активації в ЕСОЗ.
-                        </p>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            @forelse($authMethods as $authMethod)
-                                @php
-                                    $methodType = AuthenticationMethod::tryFrom($authMethod['type']);
-                                    $isOtp = $methodType === AuthenticationMethod::OTP;
-                                @endphp
-                                <button wire:click="selectAuthMethod('{{ $authMethod['id'] ?? $authMethod['uuid'] }}')"
-                                        class="group relative flex flex-col items-center p-8 border-2 border-gray-100 dark:border-gray-700 rounded-2xl hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200 text-center">
-                                    
-                                    <div class="w-20 h-20 flex items-center justify-center rounded-full {{ $isOtp ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600' }} mb-6 group-hover:scale-110 transition-transform">
-                                        @if($isOtp)
-                                            @icon('phone', 'w-10 h-10')
-                                        @else
-                                            @icon('file-text', 'w-10 h-10')
-                                        @endif
-                                    </div>
-                                    
-                                    <div class="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                                        {{ $methodType?->label() ?? $authMethod['type'] }}
-                                    </div>
-                                    
-                                    @if(!empty($authMethod['phone_number']))
-                                        <div class="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                                            {{ $authMethod['phone_number'] }}
-                                        </div>
-                                    @endif
-
-                                    <div class="mt-6 px-6 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm font-bold text-gray-700 dark:text-gray-200 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-all">
-                                        ОБРАТИ ЦЕЙ МЕТОД
-                                    </div>
-                                </button>
-                            @empty
-                                <div class="col-span-2 text-center py-12 bg-red-50 dark:bg-red-900/10 rounded-2xl border-2 border-dashed border-red-200">
-                                    <div class="mb-4 flex justify-center">
-                                        @icon('alert-circle', 'w-16 h-16 text-red-500')
-                                    </div>
-                                    <p class="text-red-600 font-bold text-lg mb-4">У пацієнта не вказано методів автентифікації</p>
-                                    <a href="{{ route('persons.patient-data', [legalEntity(), $this->personId ?? ($carePlan->person_id ?? $personId)]) }}" 
-                                       class="button-primary inline-flex items-center gap-2">
-                                        @icon('plus', 'w-4 h-4')
-                                        Додати метод в дані пацієнта
-                                    </a>
-                                </div>
-                            @endforelse
-                        </div>
-                    </div>
-
-                    <div class="p-8 bg-gray-50 dark:bg-gray-700/30 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
-                        <span class="text-xs text-gray-400 font-medium italic">Дані завантажено з ЕСОЗ</span>
-                        <button @click="showMethodSelectionModal = false" class="button-minor px-8">
-                            {{ __('forms.cancel') }}
-                        </button>
                     </div>
                 </div>
             </div>

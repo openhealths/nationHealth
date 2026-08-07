@@ -15,6 +15,7 @@ return [
     */
 
     // Used not once.
+    'search' => 'Пошук',
     'patients' => 'Пацієнти',
     'patient_legal_representative' => 'Законний представник пацієнта',
     'add_patient' => 'Новий пацієнт',

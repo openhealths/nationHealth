@@ -6,7 +6,7 @@ namespace Tests\Feature\Auth;
 
 use App\Http\Controllers\Auth\EHealthLoginController;
 use App\Models\LegalEntity;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
@@ -15,7 +15,7 @@ use Tests\TestCase;
 
 class EHealthLoginScopeValidationTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function migrateDatabases(): void
     {

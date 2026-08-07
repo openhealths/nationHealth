@@ -24,7 +24,6 @@ class EmployeeRequestActualize
             return;
         }
 
-
         $user = $event->user;
         $legalEntity = $event->legalEntity;
 
