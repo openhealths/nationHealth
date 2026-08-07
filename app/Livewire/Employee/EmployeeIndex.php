@@ -383,29 +383,34 @@ class EmployeeIndex extends EmployeeComponent
                     'is_active' => false,
                 ]);
 
-                // 4. Safe User Cleanup: Remove a role from a user (if binding exists)
-                // This handles cases where email might be 'N/A' or user doesn't exist locally
-                $party = $employee->party;
-                $partyEmployees = $party->employees->where('legal_entity_id', $this->legalEntity->id);
-                $employeesWithUser = $partyEmployees->filter(fn (Employee $employee) => $employee->user_id !== null);
+                // 4. Local cleanup: only this employee's users, and only if this was the last
+                // APPROVED employee of that type for the party (do not strip roles for the whole party).
+                $employeeType = $employee->employeeType;
+                $userIds = collect([$employee->userId])
+                    ->merge($employee->users()->pluck('users.id'))
+                    ->filter()
+                    ->unique()
+                    ->values();
 
-                $partyUsers = $party->users->whereIn('id', $employeesWithUser->pluck('user_id')); // filter by legal entity id
-
-                // Detach all users from the employee to prevent orphaned relationships
                 $employee->users()->detach();
 
-                // Get all specified guards from section 'guards' from file config/auth.php
-                $guards = array_keys((array) config('auth.guards'));
+                $shouldRevokeLocalRole = is_string($employeeType)
+                    && $employeeType !== ''
+                    && $userIds->isNotEmpty()
+                    && !Employee::query()
+                        ->where('legal_entity_id', $this->legalEntity->id)
+                        ->where('party_id', $employee->partyId)
+                        ->where('employee_type', $employeeType)
+                        ->whereKeyNot($employee->id)
+                        ->where('status', Status::APPROVED->value)
+                        ->exists();
 
-                // Role from dissmisses employee can attached to multiple users, so we need to loop through all of them
-                foreach ($partyUsers as $user) {
-                    $roleToRemove = $employee->employee_type;
-
-                    foreach ($guards as $guard) {
-                        if ($user->hasRole($roleToRemove, $guard)) {
-                            $user->removeRole(
-                                ModelsRole::findByName($roleToRemove, $guard)
-                            );
+                if ($shouldRevokeLocalRole) {
+                    foreach (User::query()->whereIn('id', $userIds)->get() as $user) {
+                        foreach (array_keys((array) config('auth.guards')) as $guard) {
+                            if ($user->hasRole($employeeType, $guard)) {
+                                $user->removeRole(ModelsRole::findByName($employeeType, $guard));
+                            }
                         }
                     }
                 }
@@ -633,6 +638,10 @@ class EmployeeIndex extends EmployeeComponent
     {
         if (str_contains($error, 'Missing allowances: employee:deactivate')) {
             return __('employees.errors.missing_allowance_employee_deactivate');
+        }
+
+        if (str_contains($error, 'Invalid access token')) {
+            return __('employees.errors.invalid_access_token');
         }
 
         return $error;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth;
 
+use App\Auth\EHealth\Services\TokenStorage;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -34,6 +35,16 @@ abstract class EHealthRequest extends PendingRequest
 
     protected ?Closure $mapper = null;
 
+    /**
+     * Whether this request may attempt a one-time access-token refresh on 401.
+     */
+    protected bool $allowsTokenRefreshRetry = true;
+
+    /**
+     * Guards against refresh/retry loops on a single request instance.
+     */
+    protected bool $hasAttemptedTokenRefresh = false;
+
     public function __construct(?Factory $factory = null, $middleware = [])
     {
         parent::__construct($factory, $middleware);
@@ -57,11 +68,34 @@ abstract class EHealthRequest extends PendingRequest
     }
 
     /**
+     * Do not attach/retry with the session user access token (auth/token endpoints).
+     */
+    public function withoutUserToken(): static
+    {
+        $headers = $this->options['headers'] ?? [];
+        unset($headers['Authorization'], $headers['authorization']);
+        $this->options['headers'] = $headers;
+
+        return $this;
+    }
+
+    /**
+     * Disable the 401 → refresh → retry path (used by auth/token endpoints).
+     */
+    public function withoutTokenRefreshRetry(): static
+    {
+        $this->allowsTokenRefreshRetry = false;
+
+        return $this;
+    }
+
+    /**
      * Sends an HTTP request to the eHealth API and handles the response.
      *
      * This method overrides the parent send method to provide custom error handling:
      * - Returns the response if it is not an EHealthResponse instance.
      * - Returns the response if it is successful.
+     * - On 401 Invalid access token, attempts one session token refresh and retries.
      * - Throws EHealthValidationException if the response status is 422 (validation error).
      * - Throws EHealthResponseException for all other unsuccessful responses.
      *
@@ -95,7 +129,45 @@ abstract class EHealthRequest extends PendingRequest
             throw new EHealthValidationException($response->json());
         }
 
+        if (
+            $response->status() === 401
+            && $this->allowsTokenRefreshRetry
+            && !$this->hasAttemptedTokenRefresh
+            && $this->isInvalidAccessTokenResponse($response)
+            && $this->attemptSessionTokenRefresh()
+        ) {
+            $this->hasAttemptedTokenRefresh = true;
+
+            $newToken = app(TokenStorage::class)->getBearerToken();
+            if (is_string($newToken) && $newToken !== '') {
+                $this->withToken($newToken);
+            }
+
+            Log::info('Retrying eHealth request after access token refresh', [
+                'method' => $method,
+                'url' => $url,
+            ]);
+
+            return $this->send($method, $url, $options);
+        }
+
         throw new EHealthResponseException($response);
+    }
+
+    protected function isInvalidAccessTokenResponse(EHealthResponse $response): bool
+    {
+        $message = (string) $response->json('error.message', '');
+
+        return str_contains($message, 'Invalid access token');
+    }
+
+    protected function attemptSessionTokenRefresh(): bool
+    {
+        if (!app()->bound('session') || !session()->isStarted()) {
+            return false;
+        }
+
+        return app(TokenStorage::class)->refreshBearerToken();
     }
 
     /**
