@@ -63,9 +63,12 @@ class CarePlan extends Request
 
     /**
      * Cancel a Care Plan.
+     * Note: This requires a Digital Signature (DS).
+     * The payload must contain 'signed_content' which is the Care Plan object (without activities) + status_reason, signed by KEП.
      *
+     * @param  string  $personId
      * @param  string  $id
-     * @param  array  $payload  requires status_reason
+     * @param  array  $payload
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
@@ -76,9 +79,12 @@ class CarePlan extends Request
 
     /**
      * Complete a Care Plan.
+     * Note: This does NOT require a Digital Signature (DS).
+     * The payload just needs to contain 'status_reason'.
      *
+     * @param  string  $personId
      * @param  string  $id
-     * @param  array  $payload  requires status_reason
+     * @param  array  $payload
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */

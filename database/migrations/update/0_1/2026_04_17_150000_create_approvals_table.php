@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     /**
      * Run the migrations.
      */
@@ -14,16 +17,16 @@ return new class extends Migration {
             Schema::create('approvals', function (Blueprint $table) {
                 $table->id();
                 $table->uuid('uuid')->unique();
-                
+
                 // Polymorphic relation
                 $table->morphs('approvable');
-                
+
                 $table->foreignId('granted_to_id')->nullable()->constrained('identifiers');
                 $table->string('granted_to_type')->default('legal_entity');
-                
+
                 $table->foreignId('granted_by_id')->nullable()->constrained('employees');
                 $table->string('status')->index();
-                
+
                 $table->foreignId('reason_id')->nullable()->constrained('identifiers');
 
                 $table->timestamps();
