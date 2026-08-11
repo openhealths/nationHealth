@@ -8,6 +8,8 @@ use App\Models\User;
 use App\Models\LegalEntity;
 use App\Classes\eHealth\Request;
 use App\Classes\eHealth\Exceptions\ApiException;
+use App\Exceptions\EHealth\EHealthValidationException;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Spatie\Permission\Models\Role;
 
@@ -22,6 +24,7 @@ class EmployeeApi
      * @param  string  $legalEntityUUID
      * @return mixed
      * @throws ApiException
+     * @throws EHealthValidationException
      */
     public static function authenticate(string $code, string $legalEntityUUID): mixed
     {
@@ -31,8 +34,12 @@ class EmployeeApi
         setPermissionsTeamId($legalEntity->id);
 
         $role = Session::get('first_login_role');
+        $hasRolesForLegalEntity = $user
+            && $user->roles()->where('roles.guard_name', 'ehealth')->exists();
 
-        if (!$user || $role) {
+        // Use the temporary first-login role only when the user has no roles yet in this LE.
+        // Once roles are synced, always request scopes from assigned roles.
+        if ($role && (!$user || !$hasRolesForLegalEntity)) {
             $permissions = Role::where('name', $role)
                 ->whereGuardName('ehealth')
                 ->firstOrFail()
@@ -42,9 +49,42 @@ class EmployeeApi
 
             $scope = implode(' ', $permissions);
         } else {
-            $scope = $user->getScopes();
+            $scope = $user?->getScopes() ?? '';
         }
 
+        try {
+            return self::requestToken($code, $legalEntity, $scope);
+        } catch (EHealthValidationException $exception) {
+            $grantedScope = self::lastGrantedScope($user);
+
+            if (!self::isScopeRejection($exception) || $grantedScope === '' || $grantedScope === $scope) {
+                throw $exception;
+            }
+
+            // Our roles claim more than eHealth grants this account, and eHealth rejects the
+            // whole request rather than the surplus. Retry with what it granted last time so
+            // the user can still log in.
+            Log::warning('eHealth rejected the requested scopes, retrying with the last granted set.', [
+                'legal_entity_id' => $legalEntity->id,
+                'user_id' => $user?->id,
+                'rejected_scope' => $scope,
+            ]);
+
+            return self::requestToken($code, $legalEntity, $grantedScope);
+        }
+    }
+
+    /**
+     * Exchange the authorization code for a token with the given scope.
+     *
+     * @param  string  $code
+     * @param  LegalEntity  $legalEntity
+     * @param  string  $scope
+     * @return mixed
+     * @throws ApiException
+     */
+    protected static function requestToken(string $code, LegalEntity $legalEntity, string $scope): mixed
+    {
         $data = [
             'token' => [
                 'client_id' => $legalEntity->client_id ?? '',
@@ -57,6 +97,38 @@ class EmployeeApi
         ];
 
         return new Request('POST', config('ehealth.api.oauth.tokens'), $data, false)->sendRequest();
+    }
+
+    /**
+     * Whether eHealth refused the request because of the scopes we asked for.
+     *
+     * @param  EHealthValidationException  $exception
+     * @return bool
+     */
+    protected static function isScopeRejection(EHealthValidationException $exception): bool
+    {
+        $message = mb_strtolower((string) data_get($exception->getDetails(), 'error.message'));
+
+        return str_contains($message, 'scope') && str_contains($message, 'not allowed');
+    }
+
+    /**
+     * Scopes eHealth granted on the previous login, stored as the user's direct permissions.
+     *
+     * @param  User|null  $user
+     * @return string
+     */
+    protected static function lastGrantedScope(?User $user): string
+    {
+        if (!$user) {
+            return '';
+        }
+
+        return $user->permissions()
+            ->where('guard_name', 'ehealth')
+            ->pluck('name')
+            ->unique()
+            ->join(' ');
     }
 
     /**

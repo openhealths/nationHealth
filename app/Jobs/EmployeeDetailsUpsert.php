@@ -93,8 +93,61 @@ class EmployeeDetailsUpsert extends EHealthJob
 
         $startdate = $validatedData['employee']['start_date'] ?? null;
 
-        $employeeEmployeeRequest = EmployeeRequest::where('legal_entity_id', $legalEntityId)
-            ->where("employee_type", $roleName)
+        $employeeEmployeeRequest = $this->resolveEmployeeRequest(
+            $legalEntityId,
+            $roleName,
+            $divisionUuid,
+            $startdate
+        );
+
+        $userID = User::where('email', $employeeEmployeeRequest?->email)->first()?->id;
+
+        $employeeEmployeeRequest?->update(['employee_id' => $this->employee->id]);
+
+        $updateData = [
+            'division_uuid' => $divisionUuid,
+            'division_id' => $divisionId,
+            'user_id' => $this->employee->userId ?? $userID,
+        ];
+
+        if ($employeeEmployeeRequest?->appliedAt) {
+            $updateData['inserted_at'] = Carbon::parse($employeeEmployeeRequest->appliedAt)
+                ->format('Y-m-d H:i:s');
+        } elseif ($ehealthInsertedAt = Arr::get($validatedData, 'employee.inserted_at')) {
+            $updateData['inserted_at'] = Carbon::parse($ehealthInsertedAt)
+                ->setTimezone(config('app.timezone'))
+                ->format('Y-m-d H:i:s');
+        }
+
+        $this->employee->update($updateData);
+
+        if ($this->employee->party) {
+            Repository::party()->syncUserEmployeesAndRoles($this->employee->party, $this->legalEntity);
+        }
+    }
+
+    /**
+     * Prefer an already-linked request, then fall back to type/position/start_date (+ optional email).
+     */
+    protected function resolveEmployeeRequest(
+        int $legalEntityId,
+        string $roleName,
+        ?string $divisionUuid,
+        ?string $startdate
+    ): ?EmployeeRequest {
+        $byEmployeeId = EmployeeRequest::query()
+            ->where('legal_entity_id', $legalEntityId)
+            ->where('employee_id', $this->employee->id)
+            ->latest('applied_at')
+            ->first();
+
+        if ($byEmployeeId) {
+            return $byEmployeeId;
+        }
+
+        return EmployeeRequest::query()
+            ->where('legal_entity_id', $legalEntityId)
+            ->where('employee_type', $roleName)
             ->where('position', $this->employee->position)
             ->when(
                 $divisionUuid === null,
@@ -106,20 +159,8 @@ class EmployeeDetailsUpsert extends EHealthJob
                 fn ($query) => $query->whereNull('start_date'),
                 fn ($query) => $query->where('start_date', $startdate)
             )
-            ->latest('applied_at')->first();
-
-        $userID = User::where('email', $employeeEmployeeRequest?->email)->first()?->id ?? null;
-
-        $employeeEmployeeRequest?->update(['employee_id' => $this->employee->id]);
-
-        $this->employee->update([
-            'division_uuid' => $divisionUuid,
-            'inserted_at' => Carbon::parse($employeeEmployeeRequest?->appliedAt)->format('Y-m-d H:i:s'),
-            'division_id' => $divisionId,
-            'user_id' => $employee->userId ?? $userID
-        ]);
-
-        Repository::party()->syncUserEmployeesAndRoles($this->employee->party, $this->legalEntity);
+            ->latest('applied_at')
+            ->first();
     }
 
     /**
