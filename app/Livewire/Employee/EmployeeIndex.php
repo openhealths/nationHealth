@@ -24,6 +24,7 @@ use App\Livewire\Employee\Concerns\DeletesEmployeeRequestDraft;
 use Illuminate\Bus\Batch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Crypt;
@@ -290,9 +291,9 @@ class EmployeeIndex extends EmployeeComponent
         }
 
         $this->deactivationStatus = Status::STOPPED->value;
-        $startDateStr = isset($employee) ? ($employee->start_date ?? '') : '';
-        $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
-        $this->deactivationEndDate = ($startDateStr && $todayStr < $startDateStr) ? $startDateStr : $todayStr;
+        $this->deactivationEndDate = $this->defaultDeactivationEndDate(
+            isset($employee) ? ($employee->startDate ?? '') : ''
+        );
 
         $this->showDeactivateModal = true;
     }
@@ -303,9 +304,7 @@ class EmployeeIndex extends EmployeeComponent
             $this->deactivationEndDate = '';
         } elseif ($this->deactivationEndDate === '' && $this->employeeIdToDeactivate) {
             $employee = Employee::find($this->employeeIdToDeactivate);
-            $startDateStr = $employee?->start_date ?? '';
-            $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
-            $this->deactivationEndDate = ($startDateStr && $todayStr < $startDateStr) ? $startDateStr : $todayStr;
+            $this->deactivationEndDate = $this->defaultDeactivationEndDate($employee?->startDate ?? '');
         }
     }
 
@@ -335,8 +334,6 @@ class EmployeeIndex extends EmployeeComponent
         }
 
         // eHealth: STOPPED requires end_date (>= start_date, <= today); ENTERED_IN_ERROR omits end_date.
-        $startDateStr = $employee->start_date;
-        $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
         $status = in_array($this->deactivationStatus, [Status::STOPPED->value, Status::ENTERED_IN_ERROR->value], true)
             ? $this->deactivationStatus
             : Status::STOPPED->value;
@@ -344,10 +341,11 @@ class EmployeeIndex extends EmployeeComponent
         $formattedEndDate = null;
 
         if ($status === Status::STOPPED->value) {
-            $endDateInput = trim($this->deactivationEndDate);
-            $endDateStr = $endDateInput !== '' ? $endDateInput : $todayStr;
+            $today = $this->kyivToday();
+            $startDate = $this->parseFlexibleDate($employee->startDate);
+            $endDate = $this->parseFlexibleDate(trim($this->deactivationEndDate)) ?? $today;
 
-            if ($startDateStr && $endDateStr < $startDateStr) {
+            if ($startDate && $endDate->lt($startDate)) {
                 $this->dispatch('flashMessage', [
                     'message' => __('employees.deactivation_end_date_before_start'),
                     'type' => 'error',
@@ -356,7 +354,7 @@ class EmployeeIndex extends EmployeeComponent
                 return;
             }
 
-            if ($endDateStr > $todayStr) {
+            if ($endDate->gt($today)) {
                 $this->dispatch('flashMessage', [
                     'message' => __('employees.deactivation_end_date_in_future'),
                     'type' => 'error',
@@ -365,7 +363,7 @@ class EmployeeIndex extends EmployeeComponent
                 return;
             }
 
-            $formattedEndDate = $endDateStr;
+            $formattedEndDate = $endDate->format('Y-m-d');
         }
 
         try {
@@ -383,37 +381,7 @@ class EmployeeIndex extends EmployeeComponent
                     'is_active' => false,
                 ]);
 
-                // 4. Local cleanup: only this employee's users, and only if this was the last
-                // APPROVED employee of that type for the party (do not strip roles for the whole party).
-                $employeeType = $employee->employeeType;
-                $userIds = collect([$employee->userId])
-                    ->merge($employee->users()->pluck('users.id'))
-                    ->filter()
-                    ->unique()
-                    ->values();
-
-                $employee->users()->detach();
-
-                $shouldRevokeLocalRole = is_string($employeeType)
-                    && $employeeType !== ''
-                    && $userIds->isNotEmpty()
-                    && !Employee::query()
-                        ->where('legal_entity_id', $this->legalEntity->id)
-                        ->where('party_id', $employee->partyId)
-                        ->where('employee_type', $employeeType)
-                        ->whereKeyNot($employee->id)
-                        ->where('status', Status::APPROVED->value)
-                        ->exists();
-
-                if ($shouldRevokeLocalRole) {
-                    foreach (User::query()->whereIn('id', $userIds)->get() as $user) {
-                        foreach (array_keys((array) config('auth.guards')) as $guard) {
-                            if ($user->hasRole($employeeType, $guard)) {
-                                $user->removeRole(ModelsRole::findByName($employeeType, $guard));
-                            }
-                        }
-                    }
-                }
+                $this->cleanupLocalAccessAfterDeactivation($employee);
 
                 $this->dispatch('flashMessage', ['message' => __('employees.dismissalSuccess'), 'type' => 'success']);
             } else {
@@ -448,6 +416,87 @@ class EmployeeIndex extends EmployeeComponent
         $this->isDoctorToDeactivate = false;
         $this->deactivationEndDate = '';
         $this->deactivationStatus = Status::STOPPED->value;
+    }
+
+    /**
+     * Drop this employee's local user bindings and revoke Spatie roles only for users
+     * who no longer have another APPROVED employee of the same type in this legal entity.
+     */
+    private function cleanupLocalAccessAfterDeactivation(Employee $employee): void
+    {
+        $employeeType = $employee->employeeType;
+        $userIds = $employee->linkedUserIds();
+
+        $employee->users()->detach();
+        $employee->update(['user_id' => null]);
+
+        if (!is_string($employeeType) || $employeeType === '' || $userIds->isEmpty()) {
+            return;
+        }
+
+        $guards = array_keys((array) config('auth.guards'));
+
+        foreach (User::query()->whereIn('id', $userIds)->get() as $user) {
+            if ($employee->userHasOtherApprovedOfType((int) $user->id, (int) $this->legalEntity->id)) {
+                continue;
+            }
+
+            foreach ($guards as $guard) {
+                if ($user->hasRole($employeeType, $guard)) {
+                    $user->removeRole(ModelsRole::findByName($employeeType, $guard));
+                }
+            }
+        }
+    }
+
+    private function defaultDeactivationEndDate(mixed $startDateValue): string
+    {
+        $today = $this->kyivToday();
+        $startDate = $this->parseFlexibleDate(is_string($startDateValue) ? $startDateValue : null);
+
+        if ($startDate && $today->lt($startDate)) {
+            return $startDate->format('Y-m-d');
+        }
+
+        return $today->format('Y-m-d');
+    }
+
+    private function kyivToday(): Carbon
+    {
+        return Carbon::now('Europe/Kyiv')->startOfDay();
+    }
+
+    private function parseFlexibleDate(?string $value): ?Carbon
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        $formats = array_unique(['Y-m-d', (string) config('app.date_format')]);
+
+        foreach ($formats as $format) {
+            try {
+                $date = Carbon::createFromFormat($format, $value, 'Europe/Kyiv');
+            } catch (Throwable) {
+                continue;
+            }
+
+            if ($date instanceof Carbon && $date->format($format) === $value) {
+                return $date->startOfDay();
+            }
+        }
+
+        try {
+            return Carbon::parse($value, 'Europe/Kyiv')->startOfDay();
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /**

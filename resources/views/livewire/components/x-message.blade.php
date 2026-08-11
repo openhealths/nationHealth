@@ -1,6 +1,6 @@
 <div>
     @if(session('error') || session('success') || session('status'))
-        <div class="alert-message flex fixed top-[1.5rem] w-auto z-[99999] right-2"
+        <div class="alert-message flex flex-col gap-2 fixed top-[1.5rem] w-auto z-[99999] right-2"
             x-data="message"
             x-show="showAlertMessage"
         >
@@ -13,11 +13,13 @@
             @endsession
 
             @session('success')
-                <div role="alert"
-                    class="p-4 mb-4 text-sm text-green-800 rounded-lg bg-green-50 dark:bg-gray-800 dark:text-green-400"
-                >
-                    <span class="font-medium whitespace-pre-line">{{ session('success') }}</span>
-                </div>
+                @unless(session('error'))
+                    <div role="alert"
+                        class="p-4 mb-4 text-sm text-green-800 rounded-lg bg-green-50 dark:bg-gray-800 dark:text-green-400"
+                    >
+                        <span class="font-medium whitespace-pre-line">{{ session('success') }}</span>
+                    </div>
+                @endunless
 
                 @php
                     session()->forget('success');

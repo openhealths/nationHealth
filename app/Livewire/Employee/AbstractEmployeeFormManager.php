@@ -161,6 +161,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
 
             $this->createLocalUserForEmployeeRequest($requestToSign);
 
+            session()?->forget('error');
             session()?->flash('success', __('employees.sign_success'));
             $this->resetSignatureFields();
             Log::info('Successfully signed and will redirect.');
@@ -663,12 +664,14 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
 
     protected function flashSuccess(string $message): void
     {
+        session()->forget('error');
         session()->flash('success', $message);
         $this->dispatch('flashMessage', ['message' => $message, 'type' => 'success']);
     }
 
     protected function flashError(string $message): void
     {
+        session()->forget('success');
         session()->flash('error', $message);
         $this->dispatch('flashMessage', ['message' => $message, 'type' => 'error']);
     }

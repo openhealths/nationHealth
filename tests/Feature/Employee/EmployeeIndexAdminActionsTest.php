@@ -103,6 +103,18 @@ class EmployeeIndexAdminActionsTest extends TestCase
     }
 
     #[Test]
+    public function flash_view_hides_success_when_error_is_present(): void
+    {
+        session()->flash('success', 'Saved successfully');
+        session()->flash('error', 'Something failed');
+
+        $html = view('livewire.components.x-message')->render();
+
+        $this->assertStringContainsString('Something failed', $html);
+        $this->assertStringNotContainsString('Saved successfully', $html);
+    }
+
+    #[Test]
     public function request_error_message_translates_missing_employee_deactivate_allowance(): void
     {
         $component = new EmployeeIndex();
@@ -166,6 +178,93 @@ class EmployeeIndexAdminActionsTest extends TestCase
             'id' => $specialistA->id,
             'status' => Status::STOPPED->value,
             'is_active' => false,
+        ]);
+    }
+
+    #[Test]
+    public function deactivate_accepts_end_date_after_start_when_cast_uses_app_format(): void
+    {
+        [$legalEntity, $employee] = $this->createLegalEntityWithApprovedDoctor();
+        $employee->update(['start_date' => '2024-06-26']);
+        $this->instance('legalEntity', $legalEntity);
+
+        $this->mockSuccessfulEmployeeDeactivate();
+
+        $component = $this->makeEmployeeIndex($legalEntity);
+        $endDate = now('Europe/Kyiv')->format('Y-m-d');
+        $component->employeeIdToDeactivate = $employee->id;
+        $component->deactivationStatus = Status::STOPPED->value;
+        $component->deactivationEndDate = $endDate;
+        $component->deactivate();
+
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'status' => Status::STOPPED->value,
+            'end_date' => $endDate,
+            'is_active' => false,
+        ]);
+    }
+
+    #[Test]
+    public function deactivate_rejects_end_date_before_start(): void
+    {
+        [$legalEntity, $employee] = $this->createLegalEntityWithApprovedDoctor();
+        $employee->update(['start_date' => '2024-06-26']);
+        $this->instance('legalEntity', $legalEntity);
+
+        $api = Mockery::mock(EmployeeApi::class);
+        $api->shouldNotReceive('deactivate');
+        $this->app->instance(EmployeeApi::class, $api);
+
+        $component = $this->makeEmployeeIndex($legalEntity);
+        $component->employeeIdToDeactivate = $employee->id;
+        $component->deactivationStatus = Status::STOPPED->value;
+        $component->deactivationEndDate = '2024-06-25';
+        $component->deactivate();
+
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'status' => Status::APPROVED->value,
+            'is_active' => true,
+        ]);
+    }
+
+    #[Test]
+    public function deactivate_revokes_role_only_for_dismissed_user_when_same_type_remains_on_another_user(): void
+    {
+        [$legalEntity, $keptEmployee, $dismissedEmployee, $keptUser, $dismissedUser] = $this->createLegalEntityWithTwoHrUsers();
+        $this->instance('legalEntity', $legalEntity);
+
+        setPermissionsTeamId($legalEntity->id);
+        $role = \App\Models\Role::findOrCreate(Role::HR->value, 'web');
+        $keptUser->assignRole($role);
+        $dismissedUser->assignRole($role);
+
+        $dismissedEmployee->users()->attach($dismissedUser->id);
+
+        $this->mockSuccessfulEmployeeDeactivate();
+
+        $component = $this->makeEmployeeIndex($legalEntity);
+        $component->employeeIdToDeactivate = $dismissedEmployee->id;
+        $component->deactivationStatus = Status::STOPPED->value;
+        $component->deactivationEndDate = now()->format('Y-m-d');
+        $component->deactivate();
+
+        $keptUser->refresh();
+        $dismissedUser->refresh();
+        $dismissedEmployee->refresh();
+
+        $this->assertTrue($keptUser->hasRole(Role::HR->value, 'web'));
+        $this->assertFalse($dismissedUser->hasRole(Role::HR->value, 'web'));
+        $this->assertNull($dismissedEmployee->userId);
+        $this->assertDatabaseMissing('employee_users', [
+            'employee_id' => $dismissedEmployee->id,
+            'user_id' => $dismissedUser->id,
+        ]);
+        $this->assertDatabaseHas('employees', [
+            'id' => $keptEmployee->id,
+            'status' => Status::APPROVED->value,
+            'user_id' => $keptUser->id,
         ]);
     }
 
@@ -354,6 +453,48 @@ class EmployeeIndexAdminActionsTest extends TestCase
         ]);
 
         return [$legalEntity, $specialist, $user];
+    }
+
+    /**
+     * @return array{0: LegalEntity, 1: Employee, 2: Employee, 3: User, 4: User}
+     */
+    private function createLegalEntityWithTwoHrUsers(): array
+    {
+        [$legalEntity, $party, $keptUser] = $this->createLegalEntityPartyAndUser();
+
+        $dismissedUser = User::create([
+            'uuid' => (string) Str::uuid(),
+            'email' => 'hr-dismissed-'.Str::random(8).'@example.com',
+            'password' => bcrypt('password'),
+            'party_id' => $party->id,
+            'email_verified_at' => now(),
+        ]);
+
+        $keptEmployee = Employee::create([
+            'uuid' => (string) Str::uuid(),
+            'employee_type' => Role::HR->value,
+            'status' => Status::APPROVED->value,
+            'legal_entity_id' => $legalEntity->id,
+            'is_active' => true,
+            'position' => 'P56',
+            'start_date' => now()->format('Y-m-d'),
+            'user_id' => $keptUser->id,
+            'party_id' => $party->id,
+        ]);
+
+        $dismissedEmployee = Employee::create([
+            'uuid' => (string) Str::uuid(),
+            'employee_type' => Role::HR->value,
+            'status' => Status::APPROVED->value,
+            'legal_entity_id' => $legalEntity->id,
+            'is_active' => true,
+            'position' => 'P10',
+            'start_date' => now()->format('Y-m-d'),
+            'user_id' => $dismissedUser->id,
+            'party_id' => $party->id,
+        ]);
+
+        return [$legalEntity, $keptEmployee, $dismissedEmployee, $keptUser, $dismissedUser];
     }
 
     /**
