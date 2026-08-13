@@ -161,7 +161,6 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
 
             $this->createLocalUserForEmployeeRequest($requestToSign);
 
-            session()?->forget('error');
             session()?->flash('success', __('employees.sign_success'));
             $this->resetSignatureFields();
             Log::info('Successfully signed and will redirect.');
@@ -662,17 +661,19 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         return null;
     }
 
+    /**
+     * Publish through the dispatched event only. Employee pages render both
+     * `components.flash-message` (event) and `components.x-message` (session) at the same
+     * fixed position, so flashing the session too stacks a duplicate toast on top.
+     * Flows that redirect flash the session themselves.
+     */
     protected function flashSuccess(string $message): void
     {
-        session()->forget('error');
-        session()->flash('success', $message);
         $this->dispatch('flashMessage', ['message' => $message, 'type' => 'success']);
     }
 
     protected function flashError(string $message): void
     {
-        session()->forget('success');
-        session()->flash('error', $message);
         $this->dispatch('flashMessage', ['message' => $message, 'type' => 'error']);
     }
 

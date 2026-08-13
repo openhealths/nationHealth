@@ -20,7 +20,7 @@ class FlashMessage extends Component
     public function flashMessage($flash): void
     {
         $this->message = $flash['message'] ?? '';
-        $this->type = $flash['type'];
+        $this->type = $flash['type'] ?? 'success';
         $this->errors = $flash['errors'] ?? [];
     }
 

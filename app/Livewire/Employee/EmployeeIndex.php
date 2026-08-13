@@ -419,8 +419,11 @@ class EmployeeIndex extends EmployeeComponent
     }
 
     /**
-     * Drop this employee's local user bindings and revoke Spatie roles only for users
+     * Drop this employee's pivot bindings and revoke Spatie roles only for users
      * who no longer have another APPROVED employee of the same type in this legal entity.
+     *
+     * `employees.user_id` is kept on purpose: every access path filters it by APPROVED
+     * status, while the employee list still resolves the position email through it.
      */
     private function cleanupLocalAccessAfterDeactivation(Employee $employee): void
     {
@@ -428,7 +431,6 @@ class EmployeeIndex extends EmployeeComponent
         $userIds = $employee->linkedUserIds();
 
         $employee->users()->detach();
-        $employee->update(['user_id' => null]);
 
         if (!is_string($employeeType) || $employeeType === '' || $userIds->isEmpty()) {
             return;

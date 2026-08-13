@@ -13,13 +13,11 @@
             @endsession
 
             @session('success')
-                @unless(session('error'))
-                    <div role="alert"
-                        class="p-4 mb-4 text-sm text-green-800 rounded-lg bg-green-50 dark:bg-gray-800 dark:text-green-400"
-                    >
-                        <span class="font-medium whitespace-pre-line">{{ session('success') }}</span>
-                    </div>
-                @endunless
+                <div role="alert"
+                    class="p-4 mb-4 text-sm text-green-800 rounded-lg bg-green-50 dark:bg-gray-800 dark:text-green-400"
+                >
+                    <span class="font-medium whitespace-pre-line">{{ session('success') }}</span>
+                </div>
 
                 @php
                     session()->forget('success');

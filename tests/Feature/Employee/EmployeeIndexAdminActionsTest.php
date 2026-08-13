@@ -7,6 +7,7 @@ namespace Tests\Feature\Employee;
 use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Classes\eHealth\Api\Employee as EmployeeApi;
+use App\Livewire\Employee\EmployeeCreate;
 use App\Livewire\Employee\EmployeeIndex;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
@@ -103,15 +104,18 @@ class EmployeeIndexAdminActionsTest extends TestCase
     }
 
     #[Test]
-    public function flash_view_hides_success_when_error_is_present(): void
+    public function form_flash_helpers_do_not_also_write_the_session(): void
     {
-        session()->flash('success', 'Saved successfully');
-        session()->flash('error', 'Something failed');
+        $component = new EmployeeCreate();
 
-        $html = view('livewire.components.x-message')->render();
+        foreach (['flashSuccess' => 'Saved successfully', 'flashError' => 'Something failed'] as $helper => $message) {
+            $method = new \ReflectionMethod(EmployeeCreate::class, $helper);
+            $method->setAccessible(true);
+            $method->invoke($component, $message);
+        }
 
-        $this->assertStringContainsString('Something failed', $html);
-        $this->assertStringNotContainsString('Saved successfully', $html);
+        $this->assertFalse(session()->has('success'));
+        $this->assertFalse(session()->has('error'));
     }
 
     #[Test]
@@ -256,7 +260,6 @@ class EmployeeIndexAdminActionsTest extends TestCase
 
         $this->assertTrue($keptUser->hasRole(Role::HR->value, 'web'));
         $this->assertFalse($dismissedUser->hasRole(Role::HR->value, 'web'));
-        $this->assertNull($dismissedEmployee->userId);
         $this->assertDatabaseMissing('employee_users', [
             'employee_id' => $dismissedEmployee->id,
             'user_id' => $dismissedUser->id,
