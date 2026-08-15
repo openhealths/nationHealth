@@ -22,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Employee extends BaseEmployee
 {
@@ -47,23 +47,14 @@ class Employee extends BaseEmployee
         return $this->belongsToMany(User::class, 'employee_users', 'employee_id', 'user_id');
     }
 
-    /**
-     * User ids linked via employees.user_id and the employee_users pivot.
-     *
-     * @return Collection<int, int>
-     */
-    public function linkedUserIds(): Collection
+    public function user(): BelongsTo
     {
-        return collect([$this->userId])
-            ->merge($this->users()->pluck('users.id'))
-            ->filter()
-            ->map(static fn (mixed $id): int => (int) $id)
-            ->unique()
-            ->values();
+        return $this->belongsTo(User::class);
     }
 
     /**
-     * Whether the given user still has another APPROVED employee of this type in the legal entity.
+     * Whether the given user still has another APPROVED employee of this type
+     * in the same party and legal entity.
      */
     public function userHasOtherApprovedOfType(int $userId, int $legalEntityId): bool
     {
@@ -75,6 +66,7 @@ class Employee extends BaseEmployee
 
         return self::query()
             ->where('legal_entity_id', $legalEntityId)
+            ->where('party_id', $this->partyId)
             ->where('employee_type', $employeeType)
             ->whereKeyNot($this->id)
             ->where('status', Status::APPROVED->value)

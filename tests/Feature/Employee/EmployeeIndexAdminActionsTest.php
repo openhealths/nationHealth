@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Employee;
 
+use App\Auth\EHealth\Services\TokenStorage;
 use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Classes\eHealth\Api\Employee as EmployeeApi;
+use App\Classes\eHealth\EHealthResponse;
 use App\Livewire\Employee\EmployeeCreate;
 use App\Livewire\Employee\EmployeeIndex;
 use App\Models\Employee\Employee;
@@ -14,7 +16,9 @@ use App\Models\LegalEntity;
 use App\Models\Relations\Party;
 use App\Models\User;
 use App\Policies\EmployeePolicy;
+use App\Repositories\Repository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
@@ -299,6 +303,97 @@ class EmployeeIndexAdminActionsTest extends TestCase
     }
 
     #[Test]
+    public function deactivate_keeps_other_party_roles_for_the_same_email_user(): void
+    {
+        [$legalEntity, $owner, $specialist, $user] = $this->createLegalEntityWithOwnerAndSpecialist();
+        $this->instance('legalEntity', $legalEntity);
+
+        setPermissionsTeamId($legalEntity->id);
+        $user->assignRole(\App\Models\Role::findOrCreate(Role::OWNER->value, 'web'));
+        $user->assignRole(\App\Models\Role::findOrCreate(Role::SPECIALIST->value, 'web'));
+
+        $this->mockSuccessfulEmployeeDeactivate();
+
+        $component = $this->makeEmployeeIndex($legalEntity);
+        $component->employeeIdToDeactivate = $specialist->id;
+        $component->deactivationStatus = Status::STOPPED->value;
+        $component->deactivationEndDate = now()->format('Y-m-d');
+        $component->deactivate();
+
+        $user->refresh();
+        $this->assertTrue($user->hasRole(Role::OWNER->value, 'web'));
+        $this->assertFalse($user->hasRole(Role::SPECIALIST->value, 'web'));
+        $this->assertDatabaseHas('employees', [
+            'id' => $owner->id,
+            'status' => Status::APPROVED->value,
+            'user_id' => $user->id,
+        ]);
+    }
+
+    #[Test]
+    public function deactivate_refreshes_session_scopes_without_logout_for_same_party_user(): void
+    {
+        [$legalEntity, $owner, $specialist, $user] = $this->createLegalEntityWithOwnerAndSpecialist();
+        $this->instance('legalEntity', $legalEntity);
+        Auth::login($user);
+
+        setPermissionsTeamId($legalEntity->id);
+        $user->assignRole(\App\Models\Role::findOrCreate(Role::OWNER->value, 'web'));
+        $user->assignRole(\App\Models\Role::findOrCreate(Role::SPECIALIST->value, 'web'));
+
+        $tokenStorage = Mockery::mock(TokenStorage::class);
+        $tokenStorage->shouldReceive('refreshBearerToken')->once()->andReturn(true);
+        $this->app->instance(TokenStorage::class, $tokenStorage);
+
+        $this->mockSuccessfulEmployeeDeactivate();
+
+        $component = $this->makeEmployeeIndex($legalEntity);
+        $component->employeeIdToDeactivate = $specialist->id;
+        $component->deactivationStatus = Status::STOPPED->value;
+        $component->deactivationEndDate = now()->format('Y-m-d');
+        $component->deactivate();
+
+        $this->assertTrue(Auth::check());
+        $this->assertTrue(Auth::user()->hasRole(Role::OWNER->value, 'web'));
+        $this->assertFalse(Auth::user()->hasRole(Role::SPECIALIST->value, 'web'));
+        $this->assertDatabaseHas('employees', [
+            'id' => $owner->id,
+            'status' => Status::APPROVED->value,
+        ]);
+    }
+
+    #[Test]
+    public function login_sync_removes_stale_role_for_email_user_without_approved_employee(): void
+    {
+        [$legalEntity, $keptEmployee, $dismissedEmployee, $keptUser, $dismissedUser] = $this->createLegalEntityWithTwoHrUsers();
+        $dismissedEmployee->update(['status' => Status::STOPPED->value, 'is_active' => false]);
+        $dismissedEmployee->users()->attach($dismissedUser->id);
+
+        setPermissionsTeamId($legalEntity->id);
+        $keptUser->assignRole(\App\Models\Role::findOrCreate(Role::HR->value, 'web'));
+        $dismissedUser->assignRole(\App\Models\Role::findOrCreate(Role::HR->value, 'web'));
+
+        Auth::login($dismissedUser);
+
+        Repository::party()->syncUserEmployeesAndRoles($dismissedUser->party, $legalEntity->loadMissing('type'));
+
+        $keptUser->refresh();
+        $dismissedUser->refresh();
+
+        $this->assertTrue($keptUser->hasRole(Role::HR->value, 'web'));
+        $this->assertFalse($dismissedUser->hasRole(Role::HR->value, 'web'));
+        $this->assertDatabaseMissing('employee_users', [
+            'employee_id' => $dismissedEmployee->id,
+            'user_id' => $dismissedUser->id,
+        ]);
+        $this->assertDatabaseHas('employees', [
+            'id' => $keptEmployee->id,
+            'status' => Status::APPROVED->value,
+            'user_id' => $keptUser->id,
+        ]);
+    }
+
+    #[Test]
     public function party_verification_meta_blade_gate_hides_for_non_elevated(): void
     {
         $snippet = <<<'BLADE'
@@ -405,6 +500,40 @@ class EmployeeIndexAdminActionsTest extends TestCase
     /**
      * @return array{0: LegalEntity, 1: Employee, 2: Employee, 3: User}
      */
+    private function createLegalEntityWithOwnerAndSpecialist(): array
+    {
+        [$legalEntity, $party, $user] = $this->createLegalEntityPartyAndUser();
+
+        $owner = Employee::create([
+            'uuid' => (string) Str::uuid(),
+            'employee_type' => Role::OWNER->value,
+            'status' => Status::APPROVED->value,
+            'legal_entity_id' => $legalEntity->id,
+            'is_active' => true,
+            'position' => 'P1',
+            'start_date' => now()->format('Y-m-d'),
+            'user_id' => $user->id,
+            'party_id' => $party->id,
+        ]);
+
+        $specialist = Employee::create([
+            'uuid' => (string) Str::uuid(),
+            'employee_type' => Role::SPECIALIST->value,
+            'status' => Status::APPROVED->value,
+            'legal_entity_id' => $legalEntity->id,
+            'is_active' => true,
+            'position' => 'P56',
+            'start_date' => now()->format('Y-m-d'),
+            'user_id' => $user->id,
+            'party_id' => $party->id,
+        ]);
+
+        return [$legalEntity, $owner, $specialist, $user];
+    }
+
+    /**
+     * @return array{0: LegalEntity, 1: Employee, 2: Employee, 3: User}
+     */
     private function createLegalEntityWithTwoApprovedSpecialists(): array
     {
         [$legalEntity, $party, $user] = $this->createLegalEntityPartyAndUser();
@@ -471,6 +600,7 @@ class EmployeeIndexAdminActionsTest extends TestCase
             'password' => bcrypt('password'),
             'party_id' => $party->id,
             'email_verified_at' => now(),
+            'inserted_at' => now()->subDay(),
         ]);
 
         $keptEmployee = Employee::create([
@@ -531,6 +661,7 @@ class EmployeeIndexAdminActionsTest extends TestCase
             'password' => bcrypt('password'),
             'party_id' => $party->id,
             'email_verified_at' => now(),
+            'inserted_at' => now()->subDay(),
         ]);
 
         return [$legalEntity, $party, $user];
@@ -549,7 +680,7 @@ class EmployeeIndexAdminActionsTest extends TestCase
     private function mockSuccessfulEmployeeDeactivate(): void
     {
         $api = Mockery::mock(EmployeeApi::class);
-        $api->shouldReceive('deactivate')->once()->andReturn(['data' => ['status' => 'STOPPED']]);
+        $api->shouldReceive('deactivate')->once()->andReturn(Mockery::mock(EHealthResponse::class));
         $this->app->instance(EmployeeApi::class, $api);
     }
 }

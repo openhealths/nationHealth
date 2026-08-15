@@ -14,11 +14,11 @@ use App\Exceptions\EHealth\EHealthResponseException;
 use App\Jobs\EmployeeSync;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
-use App\Models\Role as ModelsRole;
 use App\Models\User;
 use App\Notifications\EmployeeSyncCompleted;
 use App\Notifications\SyncNotification;
 use App\Repositories\Repository;
+use App\Services\Employee\RevokeDeactivatedEmployeeAccess;
 use App\Traits\BatchLegalEntityQueries;
 use App\Livewire\Employee\Concerns\DeletesEmployeeRequestDraft;
 use Illuminate\Bus\Batch;
@@ -381,7 +381,7 @@ class EmployeeIndex extends EmployeeComponent
                     'is_active' => false,
                 ]);
 
-                $this->cleanupLocalAccessAfterDeactivation($employee);
+                app(RevokeDeactivatedEmployeeAccess::class)->handle($employee, $this->legalEntity);
 
                 $this->dispatch('flashMessage', ['message' => __('employees.dismissalSuccess'), 'type' => 'success']);
             } else {
@@ -416,39 +416,6 @@ class EmployeeIndex extends EmployeeComponent
         $this->isDoctorToDeactivate = false;
         $this->deactivationEndDate = '';
         $this->deactivationStatus = Status::STOPPED->value;
-    }
-
-    /**
-     * Drop this employee's pivot bindings and revoke Spatie roles only for users
-     * who no longer have another APPROVED employee of the same type in this legal entity.
-     *
-     * `employees.user_id` is kept on purpose: every access path filters it by APPROVED
-     * status, while the employee list still resolves the position email through it.
-     */
-    private function cleanupLocalAccessAfterDeactivation(Employee $employee): void
-    {
-        $employeeType = $employee->employeeType;
-        $userIds = $employee->linkedUserIds();
-
-        $employee->users()->detach();
-
-        if (!is_string($employeeType) || $employeeType === '' || $userIds->isEmpty()) {
-            return;
-        }
-
-        $guards = array_keys((array) config('auth.guards'));
-
-        foreach (User::query()->whereIn('id', $userIds)->get() as $user) {
-            if ($employee->userHasOtherApprovedOfType((int) $user->id, (int) $this->legalEntity->id)) {
-                continue;
-            }
-
-            foreach ($guards as $guard) {
-                if ($user->hasRole($employeeType, $guard)) {
-                    $user->removeRole(ModelsRole::findByName($employeeType, $guard));
-                }
-            }
-        }
     }
 
     private function defaultDeactivationEndDate(mixed $startDateValue): string

@@ -18,7 +18,6 @@ class Auth extends EHealthRequest
 {
     public function login(string $email, string $password): PromiseInterface|EHealthResponse
     {
-        $this->withoutUserToken()->withoutTokenRefreshRetry();
         $this->setValidator($this->validateAccessToken(...));
 
         return $this->post('auth/login', [
@@ -34,7 +33,6 @@ class Auth extends EHealthRequest
 
     public function authorize(string $accessToken, string $scopes, string $legalEntityId): PromiseInterface|EHealthResponse
     {
-        $this->withoutTokenRefreshRetry();
         $this->setValidator($this->validateAuthorize(...));
         $this->withToken($accessToken);
 
@@ -59,7 +57,6 @@ class Auth extends EHealthRequest
      */
     public function logout(string $accessToken): PromiseInterface|EHealthResponse
     {
-        $this->withoutTokenRefreshRetry();
         $this->withToken($accessToken);
 
         return $this->post('auth/logout');
@@ -80,8 +77,6 @@ class Auth extends EHealthRequest
      */
     public function extendTokenLifetime(string $clientId, string $clientSecret, string $refreshToken): PromiseInterface|EHealthResponse
     {
-        // Refresh must not send a (possibly dead) user Bearer token — only client credentials.
-        $this->withoutUserToken()->withoutTokenRefreshRetry();
         $this->setValidator($this->validateExtendTokenLifetime(...));
 
         $data = [

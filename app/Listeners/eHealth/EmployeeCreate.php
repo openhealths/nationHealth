@@ -19,6 +19,7 @@ use App\Events\EHealthUserLogin;
 use App\Repositories\Repository;
 use App\Models\Employee\Employee;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Enums\Employee\RequestStatus;
 use App\Enums\Employee\RevisionStatus;
@@ -162,10 +163,10 @@ class EmployeeCreate
                         if ($currentOwnerUser) {
                             Repository::legalEntity()->setNewOwner($currentOwnerUser, $event->legalEntity);
                         } else {
-                             Log::error('[EmployeeCreate] User not found for current owner.', [
-                                'user_id' => $currOwner->userId,
-                                'legal_entity_uuid' => $event->legalEntity->uuid,
-                                'employee_uuid' => $eHealthEmployee['uuid'] ?? null,
+                            Log::error('[EmployeeCreate] User not found for current owner.', [
+                               'user_id' => $currOwner->userId,
+                               'legal_entity_uuid' => $event->legalEntity->uuid,
+                               'employee_uuid' => $eHealthEmployee['uuid'] ?? null,
                             ]);
 
                             throw new RuntimeException(
@@ -257,7 +258,9 @@ class EmployeeCreate
         // and employee types are assigned based on the employee records that are just created.
         $user->refresh();
 
-        if ($user?->party) {
+        if ($user->party) {
+            setPermissionsTeamId($event->legalEntity->id);
+            Auth::setUser($user);
             Repository::party()->syncUserEmployeesAndRoles($user->party, $event->legalEntity);
         }
     }
