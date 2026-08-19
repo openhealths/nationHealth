@@ -55,7 +55,13 @@ class EHealthResponseException extends EHealthException
             return;
         }
 
-        $message = $flashMessage ?? __('messages.ehealth_error', ['message' => $this->getMessage()]);
+        $extracted = $this->response->json('error.message')
+            ?? $this->response->json('details.errorMessage')
+            ?? $this->response->json('description');
+
+        $message = $flashMessage ?? ($extracted !== null
+            ? $this->response->status() . ': ' . $extracted
+            : __('messages.ehealth_error', ['message' => $this->getMessage()]));
 
         if ($flashMessage === null && $this->response->status() === 409) {
             $raw = $this->response->json('error.message') ?? $this->getMessage();
@@ -119,7 +125,11 @@ class EHealthResponseException extends EHealthException
      */
     protected function extractErrorMessage(Response $response): string
     {
-        $errorMessage = $response->json('error.message') ?? $response->reason();
+        $errorMessage = $response->json('error.message')
+            ?? $response->json('details.errorMessage')
+            ?? $response->json('description')
+            ?? $response->json('message')
+            ?? $response->reason();
 
         if ($errorMessage === 'Invalid signature') {
             return __('forms.invalid_kep_password');

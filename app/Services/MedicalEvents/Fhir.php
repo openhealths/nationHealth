@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\MedicalEvents;
 
 use App\Services\MedicalEvents\Mappers\ClinicalImpressionMapper;
+use App\Services\MedicalEvents\Mappers\CompositionMapper;
 use App\Services\MedicalEvents\Mappers\ConditionMapper;
 use App\Services\MedicalEvents\Mappers\DeviceRequestMapper;
 use App\Services\MedicalEvents\Mappers\DiagnosticReportMapper;
@@ -21,6 +22,11 @@ final class Fhir
     public static function clinicalImpression(): ClinicalImpressionMapper
     {
         return app(ClinicalImpressionMapper::class);
+    }
+
+    public static function composition(): CompositionMapper
+    {
+        return app(CompositionMapper::class);
     }
 
     public static function condition(): ConditionMapper

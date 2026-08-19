@@ -33,6 +33,7 @@ use App\Classes\eHealth\Api\MergeRequest;
 use App\Classes\eHealth\Api\Party;
 use App\Classes\eHealth\Api\Patient;
 use App\Classes\eHealth\Api\Patient\ClinicalImpression;
+use App\Classes\eHealth\Api\Patient\Composition;
 use App\Classes\eHealth\Api\Patient\Condition;
 use App\Classes\eHealth\Api\Patient\DiagnosticReport;
 use App\Classes\eHealth\Api\Patient\Encounter;
@@ -238,6 +239,11 @@ final class EHealth
     public static function clinicalImpression(): ClinicalImpression
     {
         return app(ClinicalImpression::class);
+    }
+
+    public static function composition(): Composition
+    {
+        return app(Composition::class);
     }
 
     public static function immunization(): Immunization
