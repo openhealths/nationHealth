@@ -121,7 +121,7 @@ class DivisionIndex extends DivisionComponent
         unset($this->isSync);
     }
 
-    public function mount(): void
+    public function mount(?LegalEntity $legalEntity = null): void
     {
         $this->setDictionary();
 

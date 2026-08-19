@@ -1,10 +1,10 @@
 <?php
 
 namespace App\Livewire\LegalEntity\Connections;
-
 use App\Models\Client;
 use Livewire\Component;
 use App\Models\Connection;
+use App\Models\LegalEntity;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Computed;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -15,7 +15,7 @@ class LegalEntityConnectionIndex extends Component
     public array $form = [];
     public $legalEntity;
 
-    public function mount($legalEntity = null)
+    public function mount(?LegalEntity $legalEntity = null)
     {
         $this->legalEntity = $legalEntity ?? request()->route('legalEntity');
     }

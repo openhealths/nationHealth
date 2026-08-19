@@ -24,6 +24,21 @@ class ConnectionPolicy
     }
 
     /**
+     * Determine whether the user can view the connection.
+     */
+    public function view(User $user, Connection $connection): Response
+    {
+        if (
+            $user->can('connection:read') &&
+            $user->can('client:read') &&
+            $connection->legalEntityId === legalEntity()->id
+        ) {
+            return Response::allow();
+        }
+
+        return Response::denyWithStatus(404);
+    }
+    /**
      * Determine whether the user can update any connection.
      */
     public function updateConnection(User $user, Connection $connection): Response
