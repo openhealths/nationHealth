@@ -18,8 +18,8 @@
         ['id' => 'procedures', 'label' => __('patients.procedures'), 'icon' => 'settings', 'view' => 'livewire.encounter.parts.procedures', 'holdsCancellableRecords' => true],
         ['id' => 'diagnostic-reports', 'label' => __('patients.diagnostic_reports'), 'icon' => 'activity', 'view' => 'livewire.encounter.parts.diagnostic-reports', 'holdsCancellableRecords' => true],
         ['id' => 'clinical-impressions', 'label' => __('patients.clinical_impressions'), 'icon' => 'check', 'view' => 'livewire.encounter.parts.clinical-impressions', 'holdsCancellableRecords' => true],
-        ['id' => 'devices', 'label' => __('patients.associated_medical_devices'), 'icon' => 'equipment', 'view' => 'livewire.encounter.parts.device', 'holdsCancellableRecords' => true],
-        ['id' => 'device-connections', 'label' => __('patients.medical_device_connections'), 'icon' => 'boxicons-plug-connect-filled', 'view' => 'livewire.encounter.parts.device-association', 'holdsCancellableRecords' => true],
+        ['id' => 'devices', 'label' => __('devices.label'), 'icon' => 'equipment', 'view' => 'livewire.encounter.parts.devices', 'holdsCancellableRecords' => true],
+        ['id' => 'device-association', 'label' => __('patients.medical_device_connections'), 'icon' => 'boxicons-plug-connect-filled', 'view' => 'livewire.encounter.parts.device-association', 'holdsCancellableRecords' => true],
     ];
 
     $footerItems = [];
@@ -425,9 +425,9 @@
                     @foreach ($mainGroups as $item)
                         <button
                             @click="
-                                    if (! activeSections.includes('{{ $item['id'] }}')) toggle('{{ $item['id'] }}');
-                                    document.getElementById('block-{{ $item['id'] }}').scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                "
+                                if (! activeSections.includes('{{ $item['id'] }}')) toggle('{{ $item['id'] }}');
+                                document.getElementById('block-{{ $item['id'] }}').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            "
                             type="button"
                             :class="activeSections.includes('{{ $item['id'] }}') ? 'summary-sidebar-btn-active' : 'summary-sidebar-btn-inactive'"
                             class="summary-sidebar-btn w-full"
@@ -449,11 +449,11 @@
 
     @if ($this instanceof EncounterEdit && $this->canBeCancelled)
         @include('livewire.encounter.encounter-cancellation', [
-                    'formPath' => 'cancellationForm',
-                    'description' => array_filter($this->selectedRecords)
-                        ? __('patients.messages.encounter_records_cancel_modal_description')
-                        : __('patients.messages.encounter_cancel_modal_description')
-                ])
+                                            'formPath' => 'cancellationForm',
+                                            'description' => array_filter($this->selectedRecords)
+                                                ? __('patients.messages.encounter_records_cancel_modal_description')
+                                                : __('patients.messages.encounter_cancel_modal_description')
+                                        ])
     @endif
     <livewire:components.x-message :key="time()" />
     <x-forms.loading />

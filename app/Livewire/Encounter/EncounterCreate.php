@@ -113,7 +113,7 @@ class EncounterCreate extends EncounterComponent
 
             return;
         }
-        
+
         $this->syncEncounterParticipants();
 
         // First validate the encounter data
@@ -251,6 +251,10 @@ class EncounterCreate extends EncounterComponent
                     $this->processReasonReferences($procedure);
                     $this->processComplicationDetails($procedure);
                 }
+            }
+
+            if (isset($formattedData['devices'])) {
+                Repository::device()->store($formattedData['devices'], $this->patient());
             }
 
             if (isset($formattedData['clinicalImpressions'])) {

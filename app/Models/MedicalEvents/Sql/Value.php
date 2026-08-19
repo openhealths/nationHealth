@@ -15,6 +15,7 @@ class Value extends Model
     protected $fillable = [
         'observation_id',
         'observation_component_id',
+        'device_property_id',
         'value_quantity_id',
         'value_ratio_id',
         'value_range_id',
@@ -22,6 +23,7 @@ class Value extends Model
         'value_sampled_data_id',
         'value_string',
         'value_boolean',
+        'value_integer',
         'value_date_time',
         'value_time'
     ];
@@ -30,6 +32,7 @@ class Value extends Model
         'id',
         'observation_id',
         'observation_component_id',
+        'device_property_id',
         'value_quantity_id',
         'value_ratio_id',
         'value_range_id',
@@ -47,6 +50,11 @@ class Value extends Model
     public function observationComponent(): BelongsTo
     {
         return $this->belongsTo(ObservationComponent::class);
+    }
+
+    public function deviceProperty(): BelongsTo
+    {
+        return $this->belongsTo(DeviceProperty::class);
     }
 
     public function valueQuantity(): BelongsTo

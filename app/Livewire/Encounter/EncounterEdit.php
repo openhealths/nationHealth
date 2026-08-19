@@ -83,6 +83,7 @@ class EncounterEdit extends EncounterComponent
         $this->form->diagnosticReports = $package['diagnosticReports'];
         $this->form->observations = $package['observations'];
         $this->form->procedures = $package['procedures'];
+        $this->form->devices = $package['devices'];
         $this->form->clinicalImpressions = $package['clinicalImpressions'];
 
         $this->episodeType = 'existing';
@@ -148,6 +149,7 @@ class EncounterEdit extends EncounterComponent
         $fhirDiagnosticReports = $fhir['diagnosticReports'];
         $fhirObservations = $fhir['observations'];
         $fhirProcedures = $fhir['procedures'];
+        $fhirDevices = $fhir['devices'];
         $fhirClinicalImpressions = $fhir['clinicalImpressions'];
 
         try {
@@ -164,6 +166,7 @@ class EncounterEdit extends EncounterComponent
                 $uuids['encounter']
             );
             Repository::procedure()->sync($this->patient(), array_map($this->fhirToSync(...), $fhirProcedures));
+            Repository::device()->sync($this->patient(), array_map($this->fhirToSync(...), $fhirDevices));
             Repository::clinicalImpression()->sync(
                 $this->patient(),
                 array_map($this->fhirToSync(...), $fhirClinicalImpressions)
@@ -184,6 +187,7 @@ class EncounterEdit extends EncounterComponent
             'diagnosticReports' => $fhirDiagnosticReports,
             'observations' => $fhirObservations,
             'procedures' => $fhirProcedures,
+            'devices' => $fhirDevices,
             'clinicalImpressions' => $fhirClinicalImpressions
         ]);
     }

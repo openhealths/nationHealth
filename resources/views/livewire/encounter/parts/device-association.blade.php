@@ -1,6 +1,6 @@
 <div
     class="p-4 sm:p-8"
-    id="device-connections-section"
+    id="device-association-section"
     x-data="{
         openDeviceConnectionDrawer: false,
         source: 'other',
@@ -147,12 +147,7 @@
         <x-slot name="title">{{ __('patients.new_medical_device_connection') }}</x-slot>
 
         <form>
-            <fieldset
-                @disabled($isReadonly ?? false)
-                @class([
-                                    'pointer-event-none' => $isReadonly ?? false
-                                ])
-            >
+            <fieldset @disabled($isReadonly ?? false) @class(['pointer-event-none' => $isReadonly ?? false ])>
                 <fieldset class="fieldset">
                     <legend class="legend">{{ __('patients.main_info') }}</legend>
 

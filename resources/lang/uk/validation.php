@@ -281,7 +281,8 @@ return [
             ],
             'classCode' => [
                 'episode_type_forbidden' => 'Клас взаємодії :value заборонений для типу вашого епізоду',
-                'legal_entity_forbidden' => 'Клас взаємодії :value заборонений для типу вашого медичного закладу'
+                'legal_entity_forbidden' => 'Клас взаємодії :value заборонений для типу вашого медичного закладу',
+                'no_writer_employee' => 'Ви не можете створювати взаємодії: у вас немає діючого запису працівника в цьому закладі'
             ],
             'typeCode' => [
                 'class_forbidden' => 'Тип взаємодії :value заборонений для вашого класу взаємодії',
@@ -315,6 +316,15 @@ return [
         ],
         'immunizations' => [
             'not_given_by_patient' => 'Зі слів пацієнта можна вносити лише проведену вакцинацію'
+        ],
+        'devices' => [
+            'definition_not_found' => 'Обраний медичний виріб не знайдено',
+            'duplicated_name_type' => 'Для одного виробу не можна вказати дві назви одного типу',
+            'type_not_allowed' => 'Обраний тип медичного виробу недоступний',
+            'property_code_not_allowed' => 'Обрана характеристика медичного виробу недоступна',
+            'property_value_required' => 'Для характеристики медичного виробу треба вказати значення',
+            'property_single_value' => 'Для характеристики медичного виробу можна вказати лише одне значення',
+            'definition_type_mismatch' => 'Тип медичного виробу не збігається з типом обраного виробу з довідника'
         ],
         'conditions' => [
             'codeSystem' => [
@@ -938,6 +948,50 @@ return [
             'effectivePeriodEndTime' => 'час завершення клінічної оцінки',
             'note' => 'опис клінічної оцінки',
             'supportingInfo.*.uuid' => 'допоміжна медична інформація',
+        ],
+
+        'devices.*' => [
+            'status' => 'статус медичного виробу',
+            'typeCode' => 'тип медичного виробу',
+            'names' => 'назви медичного виробу',
+            'names.*.type' => 'тип назви медичного виробу',
+            'names.*.value' => 'назва медичного виробу',
+            'modelNumber' => 'модель медичного виробу',
+            'lotNumber' => 'номер партії медичного виробу',
+            'manufacturer' => 'виробник медичного виробу',
+            'serialNumber' => 'серійний номер медичного виробу',
+            'manufactureDate' => 'дата виробництва медичного виробу',
+            'expirationDate' => 'термін придатності медичного виробу',
+            'note' => 'коментар до медичного виробу',
+            'primarySource' => 'джерело інформації про медичний виріб',
+            'reportOriginCode' => 'посилання на джерело інформації про медичний виріб',
+            'reportOriginText' => 'опис джерела інформації про медичний виріб',
+            'definitionId' => 'модель виробу з довідника',
+            'parentId' => 'батьківський медичний виріб',
+            'properties' => 'додаткові властивості медичного виробу',
+            'properties.*.code' => 'додаткова властивість медичного виробу',
+            'properties.*.valueCodeableConceptSystem' => 'система кодування значення властивості',
+            'properties.*.valueCodeableConceptCode' => 'код значення властивості',
+            'properties.*.valueQuantityValue' => 'значення властивості',
+            'properties.*.valueQuantityComparator' => 'порівняння значення властивості',
+            'properties.*.valueQuantityUnit' => 'одиниця вимірювання значення властивості',
+            'properties.*.valueQuantitySystem' => 'система кодування одиниці вимірювання властивості',
+            'properties.*.valueQuantityCode' => 'код одиниці вимірювання властивості',
+            'properties.*.valueRangeLowValue' => 'нижня межа значення властивості',
+            'properties.*.valueRangeLowUnit' => 'одиниця вимірювання нижньої межі властивості',
+            'properties.*.valueRangeLowSystem' => 'система кодування нижньої межі властивості',
+            'properties.*.valueRangeLowCode' => 'код одиниці вимірювання нижньої межі властивості',
+            'properties.*.valueRangeHighValue' => 'верхня межа значення властивості',
+            'properties.*.valueRangeHighUnit' => 'одиниця вимірювання верхньої межі властивості',
+            'properties.*.valueRangeHighSystem' => 'система кодування верхньої межі властивості',
+            'properties.*.valueRangeHighCode' => 'код одиниці вимірювання верхньої межі властивості',
+            'properties.*.valueBoolean' => 'значення властивості',
+            'properties.*.valueInteger' => 'значення властивості',
+            'properties.*.valueString' => 'значення властивості',
+            'identifiers' => 'зовнішні системи медичного виробу',
+            'identifiers.*.code' => 'зовнішня система',
+            'identifiers.*.text' => 'опис зовнішньої системи',
+            'identifiers.*.value' => 'ідентифікатор зовнішньої системи'
         ],
 
         // Declaration

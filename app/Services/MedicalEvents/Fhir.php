@@ -6,6 +6,7 @@ namespace App\Services\MedicalEvents;
 
 use App\Services\MedicalEvents\Mappers\ClinicalImpressionMapper;
 use App\Services\MedicalEvents\Mappers\ConditionMapper;
+use App\Services\MedicalEvents\Mappers\DeviceMapper;
 use App\Services\MedicalEvents\Mappers\DiagnosticReportMapper;
 use App\Services\MedicalEvents\Mappers\EncounterMapper;
 use App\Services\MedicalEvents\Mappers\EpisodeMapper;
@@ -48,6 +49,11 @@ final class Fhir
     public static function diagnosticReport(): DiagnosticReportMapper
     {
         return app(DiagnosticReportMapper::class);
+    }
+
+    public static function device(): DeviceMapper
+    {
+        return app(DeviceMapper::class);
     }
 
     public static function procedure(): ProcedureMapper
