@@ -5,18 +5,20 @@ declare(strict_types=1);
 namespace App\Livewire\Encounter\Forms;
 
 use App\Core\BaseForm;
-use App\Enums\Status;
-use App\Enums\User\Role;
+use App\Enums\Device\Status as DeviceStatus;
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Equipment\Status as EquipmentStatus;
 use App\Enums\Person\ConditionVerificationStatus;
 use App\Enums\Person\ProcedureStatus;
+use App\Enums\Status;
+use App\Enums\User\Role;
+use App\Models\Equipment;
+use App\Models\MedicalEvents\Sql\Device;
 use App\Rules\AfterOrEqualDateTime;
 use App\Rules\InDictionary;
 use App\Rules\OnlyOnePrimaryDiagnosis;
 use App\Rules\PastDateTime;
 use App\Services\Dictionary\Mappers\ImmunizationDictionaryMapper;
-use App\Models\Equipment;
 use App\Models\Employee\Employee;
 use Carbon\CarbonImmutable;
 use Closure;
@@ -49,6 +51,8 @@ class EncounterForm extends BaseForm
     public array $diagnosticReports;
 
     public array $procedures;
+
+    public array $devices;
 
     public array $clinicalImpressions;
 
@@ -790,7 +794,6 @@ class EncounterForm extends BaseForm
                 'nullable',
                 Rule::in(['date_time', 'period']),
             ],
-
             'diagnosticReports.*.effectiveDate'
                 => Rule::forEach(
                     function (
@@ -840,7 +843,6 @@ class EncounterForm extends BaseForm
                         ];
                     }
                 ),
-
             'diagnosticReports.*.effectivePeriodStartDate' => ['nullable'],
             'diagnosticReports.*.effectivePeriodStartTime' => ['nullable'],
             'diagnosticReports.*.effectivePeriodEndDate' => ['nullable'],
@@ -911,7 +913,6 @@ class EncounterForm extends BaseForm
                 'string',
                 new InDictionary('eHealth/observation_interpretations')
             ],
-
             'observations.*.valueQuantityValue' => ['nullable', 'numeric'],
             'observations.*.valueQuantityComparator' => ['nullable', 'string', Rule::in(['>', '>=', '=', '<=', '<'])],
             'observations.*.valueQuantityUnit' => ['nullable', 'string', new InDictionary('eHealth/ucum/units')],
@@ -1015,7 +1016,6 @@ class EncounterForm extends BaseForm
                     ];
                 }
             ),
-
             'procedures.*.performedDate' => Rule::forEach(
                 function (mixed $value, string $attribute): array {
                     $index = (int) explode('.', $attribute)[1];
@@ -1036,7 +1036,6 @@ class EncounterForm extends BaseForm
                     ];
                 }
             ),
-
             'procedures.*.performedTime' => Rule::forEach(
                 function (mixed $value, string $attribute): array {
                     $index = (int) explode('.', $attribute)[1];
@@ -1055,17 +1054,13 @@ class EncounterForm extends BaseForm
                     ];
                 }
             ),
-
             'procedures.*.performedPeriodStartDate' => ['nullable'],
             'procedures.*.performedPeriodStartTime' => ['nullable'],
             'procedures.*.performedPeriodEndDate' => ['nullable'],
             'procedures.*.performedPeriodEndTime' => ['nullable'],
-
             'procedures.*.note' => ['nullable', 'string'],
             ...$this->paperReferralRules('procedures.*'),
-
             'procedures.*.isReferralAvailable' => ['nullable', 'boolean'],
-
             'procedures.*.referralType' => Rule::forEach(function (mixed $value, string $attribute) {
                 $index = (int)explode('.', $attribute)[1];
                 $procedure = $this->procedures[$index] ?? [];
@@ -1078,7 +1073,6 @@ class EncounterForm extends BaseForm
                     Rule::in(['electronic', 'paper']),
                 ];
             }),
-
             'procedures.*.basedOnIdentifier' => Rule::forEach(function (mixed $value, string $attribute) {
                 $index = (int)explode('.', $attribute)[1];
                 $procedure = $this->procedures[$index] ?? [];
@@ -1093,7 +1087,6 @@ class EncounterForm extends BaseForm
                     'uuid',
                 ];
             }),
-
             'procedures.*.paperReferralRequesterEmployeeName' => Rule::forEach(
                 function (mixed $value, string $attribute) {
                     $index = (int)explode('.', $attribute)[1];
@@ -1111,7 +1104,6 @@ class EncounterForm extends BaseForm
                     ];
                 }
             ),
-
             'procedures.*.paperReferralRequesterLegalEntityEdrpou' => Rule::forEach(
                 function (mixed $value, string $attribute) {
                     $index = (int)explode('.', $attribute)[1];
@@ -1128,7 +1120,6 @@ class EncounterForm extends BaseForm
                     ];
                 }
             ),
-
             'procedures.*.paperReferralRequesterLegalEntityName' => Rule::forEach(
                 function (mixed $value, string $attribute) {
                     $index = (int)explode('.', $attribute)[1];
@@ -1144,7 +1135,6 @@ class EncounterForm extends BaseForm
                     ];
                 }
             ),
-
             'procedures.*.paperReferralServiceRequestDate' => Rule::forEach(function (mixed $value, string $attribute) {
                 $index = (int)explode('.', $attribute)[1];
                 $procedure = $this->procedures[$index] ?? [];
@@ -1186,7 +1176,6 @@ class EncounterForm extends BaseForm
                 'string',
                 new InDictionary(['eHealth/ICPC2/condition_codes', 'eHealth/ICD10_AM/condition_codes'])
             ],
-
             'procedures.*.usedReferences' => ['nullable', 'array'],
             'procedures.*.usedReferences.*.id' => [
                 'nullable',
@@ -1280,6 +1269,201 @@ class EncounterForm extends BaseForm
                 'required_with:clinicalImpressions.*.supportingInfo',
                 'string'
             ],
+
+            'devices' => [
+                'nullable',
+                'array',
+                static function (string $attribute, mixed $value, Closure $fail): void {
+                    if ($value && Auth::user()->cannot('create', Device::class)) {
+                        $fail(__('patients.policy.create_device'));
+                    }
+                }
+            ],
+            // for edit page
+            'devices.*.uuid' => ['nullable', 'uuid'],
+            'devices.*.status' => [
+                'required_with:devices',
+                Rule::in([DeviceStatus::ACTIVE->value, DeviceStatus::INACTIVE->value])
+            ],
+            'devices.*.typeCode' => [
+                'required_with:devices',
+                'string',
+                static function (string $attribute, mixed $value, Closure $fail): void {
+                    $isAllowed = dictionary()->basics()
+                        ->byName('device_definition_classification_type')
+                        ->contains(
+                            static fn (array $classificationType): bool => (string) $classificationType['code'] === $value
+                                && $classificationType['is_active']
+                        );
+
+                    if (!$isAllowed) {
+                        $fail(__('validation.custom.devices.type_not_allowed'));
+                    }
+                }
+            ],
+            'devices.*.names' => [
+                'required_with:devices',
+                'array',
+                'min:1',
+                static function (string $attribute, mixed $value, Closure $fail): void {
+                    $types = array_column((array) $value, 'type');
+
+                    if (count($types) !== count(array_unique($types))) {
+                        $fail(__('validation.custom.devices.duplicated_name_type'));
+                    }
+                }
+            ],
+            'devices.*.names.*.type' => ['required', 'string', new InDictionary('device_name_type')],
+            'devices.*.names.*.value' => ['required', 'string', 'max:255'],
+            'devices.*.modelNumber' => ['nullable', 'string', 'max:255'],
+            'devices.*.lotNumber' => ['nullable', 'string', 'max:255'],
+            'devices.*.manufacturer' => ['nullable', 'string', 'max:255'],
+            'devices.*.serialNumber' => ['nullable', 'string', 'max:255'],
+            'devices.*.manufactureDate' => ['nullable', 'date', 'before:tomorrow'],
+            'devices.*.expirationDate' => ['nullable', 'date'],
+            'devices.*.note' => ['nullable', 'string'],
+            'devices.*.primarySource' => ['required_with:devices', 'boolean'],
+            'devices.*.reportOriginCode' => Rule::forEach(function (mixed $value, string $attribute) {
+                $primarySource = $this->devices[(int) explode('.', $attribute)[1]]['primarySource'];
+
+                return [
+                    Rule::requiredIf($primarySource === false),
+                    $primarySource === true ? 'prohibited' : 'nullable',
+                    'string',
+                    new InDictionary('eHealth/report_origins')
+                ];
+            }),
+            'devices.*.reportOriginText' => ['nullable', 'string'],
+            'devices.*.properties' => ['nullable', 'array'],
+            'devices.*.properties.*' => [
+                'array',
+                static function (string $attribute, mixed $value, Closure $fail): void {
+                    $provided = array_filter(
+                        [
+                            'valueCodeableConceptCode',
+                            'valueQuantityValue',
+                            'valueRangeLowValue',
+                            'valueBoolean',
+                            'valueInteger',
+                            'valueString'
+                        ],
+                        static fn (string $key): bool => ($value[$key] ?? null) !== null
+                    );
+
+                    if ($provided === []) {
+                        $fail(__('validation.custom.devices.property_value_required'));
+
+                        return;
+                    }
+
+                    if (count($provided) > 1) {
+                        $fail(__('validation.custom.devices.property_single_value'));
+                    }
+                }
+            ],
+            'devices.*.properties.*.code' => [
+                'required',
+                'string',
+                new InDictionary('device_properties')
+            ],
+            'devices.*.properties.*.valueCodeableConceptSystem' => [
+                'nullable',
+                'required_with:devices.*.properties.*.valueCodeableConceptCode',
+                'string'
+            ],
+            'devices.*.properties.*.valueCodeableConceptCode' => ['nullable', 'string'],
+            'devices.*.properties.*.valueQuantityValue' => ['nullable', 'numeric'],
+            'devices.*.properties.*.valueQuantityComparator' => [
+                'nullable',
+                'string',
+                Rule::in(['>', '>=', '=', '<=', '<'])
+            ],
+            'devices.*.properties.*.valueQuantityUnit' => [
+                'nullable',
+                'required_with:devices.*.properties.*.valueQuantityValue',
+                'string',
+                new InDictionary('eHealth/ucum/units')
+            ],
+            'devices.*.properties.*.valueQuantitySystem' => ['nullable', 'string'],
+            'devices.*.properties.*.valueQuantityCode' => ['nullable', 'string'],
+            'devices.*.properties.*.valueRangeLowValue' => ['nullable', 'numeric'],
+            'devices.*.properties.*.valueRangeLowUnit' => [
+                'nullable',
+                'required_with:devices.*.properties.*.valueRangeLowValue',
+                'string',
+                new InDictionary('eHealth/ucum/units')
+            ],
+            'devices.*.properties.*.valueRangeLowSystem' => ['nullable', 'string'],
+            'devices.*.properties.*.valueRangeLowCode' => ['nullable', 'string'],
+            'devices.*.properties.*.valueRangeHighValue' => [
+                'nullable',
+                'required_with:devices.*.properties.*.valueRangeLowValue',
+                'numeric',
+                'gte:devices.*.properties.*.valueRangeLowValue'
+            ],
+            'devices.*.properties.*.valueRangeHighUnit' => [
+                'nullable',
+                'required_with:devices.*.properties.*.valueRangeLowValue',
+                'string',
+                new InDictionary('eHealth/ucum/units')
+            ],
+            'devices.*.properties.*.valueRangeHighSystem' => ['nullable', 'string'],
+            'devices.*.properties.*.valueRangeHighCode' => ['nullable', 'string'],
+            'devices.*.properties.*.valueBoolean' => ['nullable', 'boolean'],
+            'devices.*.properties.*.valueInteger' => ['nullable', 'integer'],
+            'devices.*.properties.*.valueString' => ['nullable', 'string', 'max:255'],
+            'devices.*.definitionId' => [
+                'nullable',
+                'uuid',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if (!$value) {
+                        return;
+                    }
+
+                    $deviceDefinition = dictionary()->deviceDefinitions()->firstWhere('id', $value);
+
+                    // The dictionary only holds active definitions, so an inactive one reads as unknown here
+                    if ($deviceDefinition === null) {
+                        $fail(__('validation.custom.devices.definition_not_found'));
+
+                        return;
+                    }
+
+                    $typeCode = $this->devices[(int) explode('.', $attribute)[1]]['typeCode'] ?? '';
+
+                    $matchesType = collect($deviceDefinition['classification_types'])->contains(
+                        static fn (array $classificationType): bool => $classificationType['system'] === 'device_definition_classification_type'
+                            && (string) $classificationType['code'] === $typeCode
+                    );
+
+                    if (!$matchesType) {
+                        $fail(__('validation.custom.devices.definition_type_mismatch'));
+                    }
+                }
+            ],
+            'devices.*.parentId' => ['nullable', 'uuid'],
+            'devices.*.identifiers' => ['nullable', 'array'],
+            // The form always shows one identifier row, so a row left empty is no identifier at all
+            'devices.*.identifiers.*.code' => Rule::forEach(function (mixed $value, string $attribute): array {
+                $parts = explode('.', $attribute);
+                $identifier = $this->devices[(int)$parts[1]]['identifiers'][(int)$parts[3]] ?? [];
+
+                return empty($identifier['value'])
+                    ? []
+                    : ['required', 'string', new InDictionary('external_system')];
+            }),
+            'devices.*.identifiers.*.text' => ['nullable', 'string', 'max:255'],
+            'devices.*.identifiers.*.value' => Rule::forEach(function (mixed $value, string $attribute): array {
+                $parts = explode('.', $attribute);
+                $identifier = $this->devices[(int)$parts[1]]['identifiers'][(int)$parts[3]] ?? [];
+
+                return [
+                    Rule::requiredIf(!empty($identifier['code'])),
+                    'nullable',
+                    'string',
+                    'max:255'
+                ];
+            }),
         ];
 
         $this->addAllowedEncounterClasses($rules);

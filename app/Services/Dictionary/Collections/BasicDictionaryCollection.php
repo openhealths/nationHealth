@@ -39,9 +39,19 @@ class BasicDictionaryCollection extends Collection
     {
         return collect($names)
             ->mapWithKeys(fn (string $name) => [
-                $name => $this->byName($name)->asCodeDescription()
+                $name => $this->byName($name)->onlyActive()->asCodeDescription()
             ])
             ->filter(fn (Collection $dictionary) => $dictionary->isNotEmpty());
+    }
+
+    /**
+     * Keep only the values that are still offered for selection.
+     *
+     * @return self
+     */
+    public function onlyActive(): self
+    {
+        return $this->filter(static fn (array $value): bool => $value['is_active'] ?? true);
     }
 
     /**

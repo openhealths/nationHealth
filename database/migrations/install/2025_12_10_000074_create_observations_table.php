@@ -94,6 +94,7 @@ return new class extends Migration
             $table->foreignId('value_sampled_data_id')->nullable()->constrained('sampled_data')->cascadeOnDelete();
             $table->string('value_string')->nullable();
             $table->boolean('value_boolean')->nullable();
+            $table->integer('value_integer')->nullable();
             $table->timestamp('value_date_time')->nullable();
             $table->time('value_time')->nullable();
             $table->timestamps();

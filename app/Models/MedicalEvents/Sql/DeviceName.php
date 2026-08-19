@@ -4,34 +4,34 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
+use App\Enums\Equipment\Type as DeviceNameType;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Range extends Model
+class DeviceName extends Model
 {
     use HasCamelCasing;
 
     protected $fillable = [
-        'low_id',
-        'high_id'
+        'device_id',
+        'type',
+        'value'
+    ];
+
+    protected $casts = [
+        'type' => DeviceNameType::class
     ];
 
     protected $hidden = [
         'id',
-        'low_id',
-        'high_id',
+        'device_id',
         'created_at',
         'updated_at'
     ];
 
-    public function low(): BelongsTo
+    public function device(): BelongsTo
     {
-        return $this->belongsTo(Quantity::class, 'low_id');
-    }
-
-    public function high(): BelongsTo
-    {
-        return $this->belongsTo(Quantity::class, 'high_id');
+        return $this->belongsTo(Device::class);
     }
 }

@@ -28,6 +28,7 @@ class EncounterPackageLoader
             'diagnosticReports' => $this->loadDiagnosticReports($encounterId),
             'observations' => $this->loadObservations($encounterId),
             'procedures' => $this->loadProcedures($encounterId),
+            'devices' => $this->loadDevices($encounterId),
             'clinicalImpressions' => $this->loadClinicalImpressions($encounterId)
         ];
     }
@@ -152,6 +153,17 @@ class EncounterPackageLoader
 
         return collect($procedures)
             ->map(static fn (array $procedure) => Fhir::procedure()->fromFhir($procedure, $detailsMap))
+            ->toArray();
+    }
+
+    /**
+     * @param  string  $encounterId
+     * @return array
+     */
+    private function loadDevices(string $encounterId): array
+    {
+        return collect(Repository::device()->get($encounterId))
+            ->map(static fn (array $device) => Fhir::device()->fromFhir($device))
             ->toArray();
     }
 
