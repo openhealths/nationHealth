@@ -2,6 +2,7 @@
     use App\Models\{Contracts\Contract,Contracts\ContractRequest,Declaration,DeclarationRequest,Division,Equipment,HealthcareService,LegalEntity,License};
     use App\Models\Employee\{Employee,EmployeeRequest};
     use App\Models\Person\{Person,PersonRequest};
+    use App\Models\Connection\Connection;
 @endphp
 
 <aside
@@ -96,15 +97,16 @@
             @endif
 
             @if (legalEntity() && Auth::user()->cannot('limitedAction', LegalEntity::class))
+                @can('viewAny', Connection::class)
                     <li>
-                        <a href="{{ route('legal-entity-connection.index', [legalEntity()]) }}"
+                        <a href="{{ route('connection.index', [legalEntity()]) }}"
                            class="menu-item-simple {{ request()->routeIs('legal-entity-connection.*') ? 'menu-item-active' : '' }}"
                         >
                             @icon('connection-two-way')
                             <span>{{ __('Зв\'язки МІС та СГуСОЗ') }}</span>
                         </a>
                     </li>
-
+                @endcan
 
                 @can('viewAny', Division::class)
                     <li>
