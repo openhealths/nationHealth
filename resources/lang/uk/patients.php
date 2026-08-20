@@ -747,4 +747,13 @@ return [
     'medical_device_id' => 'ID виробу',
     'connection_date_or_break' => 'Дата встановлення або розірвання зв\'язку',
     'pacemaker' => 'Кардіостимулятор',
+    'dispense_medical_device' => 'Видати медичний виріб',
+    'new_medical_device_dispense' => 'Нова видача медичного виробу',
+    'medical_device_prescription_erequest' => 'Призначення на медичний виріб (е-запит)',
+    'procedure_link' => 'Посилання на процедуру',
+    'dispensing_employee' => 'Працівник, який здійснив видачу',
+    'dispensing_division' => 'МНП видачі',
+    'date_and_time_of_dispense' => 'Дата та час видачі',
+    'quantity_integer' => 'Кількість (ціле число)',
+    'specify_type_or_model_of_medical_device' => 'Вказати тип або конкретну модель медичного виробу',
 ];
