@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Employee extends BaseEmployee
 {
@@ -44,6 +45,36 @@ class Employee extends BaseEmployee
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'employee_users', 'employee_id', 'user_id');
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Whether the given user still has another APPROVED employee of this type
+     * in the same party and legal entity.
+     */
+    public function userHasOtherApprovedOfType(int $userId, int $legalEntityId): bool
+    {
+        $employeeType = $this->employeeType;
+
+        if (!is_string($employeeType) || $employeeType === '') {
+            return false;
+        }
+
+        return self::query()
+            ->where('legal_entity_id', $legalEntityId)
+            ->where('party_id', $this->partyId)
+            ->where('employee_type', $employeeType)
+            ->whereKeyNot($this->id)
+            ->where('status', Status::APPROVED->value)
+            ->where(function (Builder $query) use ($userId) {
+                $query->where('user_id', $userId)
+                    ->orWhereHas('users', static fn (Builder $users) => $users->where('users.id', $userId));
+            })
+            ->exists();
     }
 
     public function declarations(): HasMany

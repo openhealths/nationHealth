@@ -662,15 +662,19 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         return null;
     }
 
+    /**
+     * Publish through the dispatched event only. Employee pages render both
+     * `components.flash-message` (event) and `components.x-message` (session) at the same
+     * fixed position, so flashing the session too stacks a duplicate toast on top.
+     * Flows that redirect flash the session themselves.
+     */
     protected function flashSuccess(string $message): void
     {
-        session()->flash('success', $message);
         $this->dispatch('flashMessage', ['message' => $message, 'type' => 'success']);
     }
 
     protected function flashError(string $message): void
     {
-        session()->flash('error', $message);
         $this->dispatch('flashMessage', ['message' => $message, 'type' => 'error']);
     }
 

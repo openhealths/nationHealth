@@ -14,16 +14,17 @@ use App\Exceptions\EHealth\EHealthResponseException;
 use App\Jobs\EmployeeSync;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
-use App\Models\Role as ModelsRole;
 use App\Models\User;
 use App\Notifications\EmployeeSyncCompleted;
 use App\Notifications\SyncNotification;
 use App\Repositories\Repository;
+use App\Services\Employee\RevokeDeactivatedEmployeeAccess;
 use App\Traits\BatchLegalEntityQueries;
 use App\Livewire\Employee\Concerns\DeletesEmployeeRequestDraft;
 use Illuminate\Bus\Batch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Crypt;
@@ -290,9 +291,9 @@ class EmployeeIndex extends EmployeeComponent
         }
 
         $this->deactivationStatus = Status::STOPPED->value;
-        $startDateStr = isset($employee) ? ($employee->start_date ?? '') : '';
-        $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
-        $this->deactivationEndDate = ($startDateStr && $todayStr < $startDateStr) ? $startDateStr : $todayStr;
+        $this->deactivationEndDate = $this->defaultDeactivationEndDate(
+            isset($employee) ? ($employee->startDate ?? '') : ''
+        );
 
         $this->showDeactivateModal = true;
     }
@@ -303,9 +304,7 @@ class EmployeeIndex extends EmployeeComponent
             $this->deactivationEndDate = '';
         } elseif ($this->deactivationEndDate === '' && $this->employeeIdToDeactivate) {
             $employee = Employee::find($this->employeeIdToDeactivate);
-            $startDateStr = $employee?->start_date ?? '';
-            $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
-            $this->deactivationEndDate = ($startDateStr && $todayStr < $startDateStr) ? $startDateStr : $todayStr;
+            $this->deactivationEndDate = $this->defaultDeactivationEndDate($employee?->startDate ?? '');
         }
     }
 
@@ -335,8 +334,6 @@ class EmployeeIndex extends EmployeeComponent
         }
 
         // eHealth: STOPPED requires end_date (>= start_date, <= today); ENTERED_IN_ERROR omits end_date.
-        $startDateStr = $employee->start_date;
-        $todayStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
         $status = in_array($this->deactivationStatus, [Status::STOPPED->value, Status::ENTERED_IN_ERROR->value], true)
             ? $this->deactivationStatus
             : Status::STOPPED->value;
@@ -344,10 +341,11 @@ class EmployeeIndex extends EmployeeComponent
         $formattedEndDate = null;
 
         if ($status === Status::STOPPED->value) {
-            $endDateInput = trim($this->deactivationEndDate);
-            $endDateStr = $endDateInput !== '' ? $endDateInput : $todayStr;
+            $today = $this->kyivToday();
+            $startDate = $this->parseFlexibleDate($employee->startDate);
+            $endDate = $this->parseFlexibleDate(trim($this->deactivationEndDate)) ?? $today;
 
-            if ($startDateStr && $endDateStr < $startDateStr) {
+            if ($startDate && $endDate->lt($startDate)) {
                 $this->dispatch('flashMessage', [
                     'message' => __('employees.deactivation_end_date_before_start'),
                     'type' => 'error',
@@ -356,7 +354,7 @@ class EmployeeIndex extends EmployeeComponent
                 return;
             }
 
-            if ($endDateStr > $todayStr) {
+            if ($endDate->gt($today)) {
                 $this->dispatch('flashMessage', [
                     'message' => __('employees.deactivation_end_date_in_future'),
                     'type' => 'error',
@@ -365,7 +363,7 @@ class EmployeeIndex extends EmployeeComponent
                 return;
             }
 
-            $formattedEndDate = $endDateStr;
+            $formattedEndDate = $endDate->format('Y-m-d');
         }
 
         try {
@@ -383,32 +381,7 @@ class EmployeeIndex extends EmployeeComponent
                     'is_active' => false,
                 ]);
 
-                // 4. Safe User Cleanup: Remove a role from a user (if binding exists)
-                // This handles cases where email might be 'N/A' or user doesn't exist locally
-                $party = $employee->party;
-                $partyEmployees = $party->employees->where('legal_entity_id', $this->legalEntity->id);
-                $employeesWithUser = $partyEmployees->filter(fn (Employee $employee) => $employee->user_id !== null);
-
-                $partyUsers = $party->users->whereIn('id', $employeesWithUser->pluck('user_id')); // filter by legal entity id
-
-                // Detach all users from the employee to prevent orphaned relationships
-                $employee->users()->detach();
-
-                // Get all specified guards from section 'guards' from file config/auth.php
-                $guards = array_keys((array) config('auth.guards'));
-
-                // Role from dissmisses employee can attached to multiple users, so we need to loop through all of them
-                foreach ($partyUsers as $user) {
-                    $roleToRemove = $employee->employee_type;
-
-                    foreach ($guards as $guard) {
-                        if ($user->hasRole($roleToRemove, $guard)) {
-                            $user->removeRole(
-                                ModelsRole::findByName($roleToRemove, $guard)
-                            );
-                        }
-                    }
-                }
+                app(RevokeDeactivatedEmployeeAccess::class)->handle($employee, $this->legalEntity);
 
                 $this->dispatch('flashMessage', ['message' => __('employees.dismissalSuccess'), 'type' => 'success']);
             } else {
@@ -443,6 +416,56 @@ class EmployeeIndex extends EmployeeComponent
         $this->isDoctorToDeactivate = false;
         $this->deactivationEndDate = '';
         $this->deactivationStatus = Status::STOPPED->value;
+    }
+
+    private function defaultDeactivationEndDate(mixed $startDateValue): string
+    {
+        $today = $this->kyivToday();
+        $startDate = $this->parseFlexibleDate(is_string($startDateValue) ? $startDateValue : null);
+
+        if ($startDate && $today->lt($startDate)) {
+            return $startDate->format('Y-m-d');
+        }
+
+        return $today->format('Y-m-d');
+    }
+
+    private function kyivToday(): Carbon
+    {
+        return Carbon::now('Europe/Kyiv')->startOfDay();
+    }
+
+    private function parseFlexibleDate(?string $value): ?Carbon
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        $formats = array_unique(['Y-m-d', (string) config('app.date_format')]);
+
+        foreach ($formats as $format) {
+            try {
+                $date = Carbon::createFromFormat($format, $value, 'Europe/Kyiv');
+            } catch (Throwable) {
+                continue;
+            }
+
+            if ($date instanceof Carbon && $date->format($format) === $value) {
+                return $date->startOfDay();
+            }
+        }
+
+        try {
+            return Carbon::parse($value, 'Europe/Kyiv')->startOfDay();
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /**
@@ -633,6 +656,10 @@ class EmployeeIndex extends EmployeeComponent
     {
         if (str_contains($error, 'Missing allowances: employee:deactivate')) {
             return __('employees.errors.missing_allowance_employee_deactivate');
+        }
+
+        if (str_contains($error, 'Invalid access token')) {
+            return __('employees.errors.invalid_access_token');
         }
 
         return $error;

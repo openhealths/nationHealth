@@ -1,6 +1,6 @@
 <div>
     @if(session('error') || session('success') || session('status'))
-        <div class="alert-message flex fixed top-[1.5rem] w-auto z-[99999] right-2"
+        <div class="alert-message flex flex-col gap-2 fixed top-[1.5rem] w-auto z-[99999] right-2"
             x-data="message"
             x-show="showAlertMessage"
         >

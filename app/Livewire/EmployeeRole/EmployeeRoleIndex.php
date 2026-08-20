@@ -6,9 +6,11 @@ namespace App\Livewire\EmployeeRole;
 
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
+use App\Exceptions\EHealth\EHealthResponseException;
 use Throwable;
 use App\Models\User;
 use Livewire\Component;
+use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
 use App\Enums\JobStatus;
 use App\Traits\FormTrait;
 use Illuminate\Bus\Batch;
@@ -215,7 +217,18 @@ class EmployeeRoleIndex extends Component
         try {
             $response = EHealth::employeeRole()->deactivate($employeeRole->uuid);
         } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle("Error when deactivating $employeeRole->uuid employee role");
+            $exception->handle(
+                "Error when deactivating $employeeRole->uuid employee role",
+                $this->translateDeactivateError($exception)
+            );
+            $this->dispatch('deactivate-finished');
+
+            if ($this->isAlreadyInactiveConflict($exception)) {
+                $employeeRole->update([
+                    'status' => EmployeeRoleStatus::INACTIVE,
+                    'is_active' => false,
+                ]);
+            }
 
             return;
         }
@@ -224,12 +237,35 @@ class EmployeeRoleIndex extends Component
             Repository::employeeRole()->update($employeeRole, $response->validate());
 
             $this->dispatch('deactivate-success');
+            $this->dispatch('deactivate-finished');
             Session::flash('success', __('employee-roles.success.deactivated'));
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, "Failed to deactivate $employeeRole->uuid employee role");
+            $this->dispatch('deactivate-finished');
 
             return;
         }
+    }
+
+    private function translateDeactivateError(EHealthException|EHealthConnectionException $exception): ?string
+    {
+        if ($this->isAlreadyInactiveConflict($exception)) {
+            return __('employee-roles.errors.already_inactive');
+        }
+
+        return null;
+    }
+
+    private function isAlreadyInactiveConflict(EHealthException|EHealthConnectionException $exception): bool
+    {
+        if (!$exception instanceof EHealthResponseException) {
+            return false;
+        }
+
+        return str_contains(
+            $exception->response->json('error.message', ''),
+            'INACTIVE employee role cannot be DEACTIVATED'
+        );
     }
 
     public function sync(): void
