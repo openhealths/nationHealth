@@ -174,6 +174,13 @@
                             {{ __('patients.procedures') }}
                         </a>
 
+                        <a
+                            href="{{ route("$routePrefix.devices", [legalEntity(), $routeParamKey => $recordId]) }}"
+                            class="summary-tab {{ request()->routeIs("$routePrefix.devices") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                        >
+                            {{ __('care-plan.medical_devices') }}
+                        </a>
+
                         <div class="flex-1"></div>
                     </div>
                 </div>

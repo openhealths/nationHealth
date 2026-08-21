@@ -747,4 +747,9 @@ return [
     'medical_device_id' => 'ID виробу',
     'connection_date_or_break' => 'Дата встановлення або розірвання зв\'язку',
     'pacemaker' => 'Кардіостимулятор',
+
+    'device_type' => 'Тип виробу',
+    'device_manufacturer' => 'Виробник',
+    'device_employee' => 'Працівник',
+    'search_medical_device' => 'Пошук медичного виробу',
 ];
