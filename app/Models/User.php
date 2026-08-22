@@ -497,6 +497,19 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Get employee by priority to be used as the author of a medical conclusion.
+     *
+     * A conclusion may only be issued by a DOCTOR in primary care or a SPECIALIST in
+     * outpatient care (TV 3.8.1.1, 3.8.2.1), so no other role is ever a candidate.
+     *
+     * @return Employee|null
+     */
+    public function getCompositionAuthorEmployee(): ?Employee
+    {
+        return $this->getWriterEmployeeByRolePriority(Role::DOCTOR, Role::SPECIALIST);
+    }
+
+    /**
      * Get main speciality for this user within a legal entity.
      *
      * @param  LegalEntity  $legalEntity
