@@ -29,11 +29,11 @@ class DeviceRequestRequest extends Model
         'device_id',
         'quantity',
         'program_id',
-        'intent',
-        'category',
+        'intent_id',
+        'category_id',
         'based_on_id',
         'context_id',
-        'priority',
+        'priority_id',
         'note',
         'supporting_info'
     ];
@@ -57,11 +57,26 @@ class DeviceRequestRequest extends Model
 
     public function basedOn(): BelongsTo
     {
-        return $this->belongsTo(CarePlanActivity::class, 'based_on_id');
+        return $this->belongsTo(\App\Models\MedicalEvents\Sql\Identifier::class, 'based_on_id');
     }
 
     public function context(): BelongsTo
     {
-        return $this->belongsTo(Encounter::class, 'context_id');
+        return $this->belongsTo(\App\Models\MedicalEvents\Sql\Identifier::class, 'context_id');
+    }
+
+    public function intent(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\MedicalEvents\Sql\Coding::class, 'intent_id');
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\MedicalEvents\Sql\CodeableConcept::class, 'category_id');
+    }
+
+    public function priority(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\MedicalEvents\Sql\CodeableConcept::class, 'priority_id');
     }
 }

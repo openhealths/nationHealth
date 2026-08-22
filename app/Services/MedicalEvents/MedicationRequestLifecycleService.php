@@ -84,9 +84,9 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
             app(ActivityRemainingQuantityGuard::class)->assertCanIssue(
                 (int) $activity->id,
                 (float) ($formData['medication_qty'] ?? 1),
-                function (int $activityId): float {
+                function (int $activityId) use ($activity): float {
                     return (float) MedicationRequestRequest::query()
-                        ->where('based_on_id', $activityId)
+                        ->whereHas('basedOn', fn ($q) => $q->where('value', $activity->uuid))
                         ->whereNotIn('status', ActivityRemainingQuantityGuard::occupyingStatusesExcluded())
                         ->sum('medication_qty');
                 }
@@ -121,9 +121,8 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
             'medication_program_id' => $formData['program_id'] ?? null,
             'intent' => 'order',
             'category' => $formData['category'] ?? 'community',
-            'based_on_id' => $activity ? $activity->id : null,
-            'context_id' => $activeEncounter->id,
             'based_on_uuid' => $activity ? $activity->uuid : null,
+            'context_uuid' => $activeEncounter->uuid,
             'container_dosage' => $formData['container_dosage'] ?? null,
             'note' => $formData['note'] ?? null,
             'dosage_instructions' => [
@@ -180,9 +179,8 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
             'medication_program_id' => $formData['program_id'] ?? null,
             'intent' => 'order',
             'category' => $formData['category'] ?? 'community',
-            'based_on_id' => null,
-            'context_id' => $encounter->id,
             'based_on_uuid' => null,
+            'context_uuid' => $encounter->uuid,
             'container_dosage' => $formData['container_dosage'] ?? null,
             'note' => $formData['note'] ?? null,
             'dosage_instructions' => [
