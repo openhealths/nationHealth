@@ -736,4 +736,5 @@ return [
     'device_manufacturer' => 'Виробник',
     'device_employee' => 'Працівник',
     'search_medical_device' => 'Пошук медичного виробу',
+
 ];

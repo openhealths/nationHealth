@@ -199,6 +199,16 @@
                             {{ __('care-plan.medical_devices') }}
                         </a>
 
+                        {{-- Only primary and outpatient care may issue medical conclusions, so the
+                             tab stays hidden elsewhere rather than leading to a 403. --}}
+                        @can('viewAny', \App\Models\MedicalEvents\Sql\Composition::class)
+                            <a href="{{ route("$routePrefix.compositions", [legalEntity(), $routeParamKey => $recordId]) }}"
+                               class="summary-tab {{ request()->routeIs("$routePrefix.compositions") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                            >
+                                {{ __('compositions.title') }}
+                            </a>
+                        @endcan
+
                         <div class="flex-1"></div>
                     </div>
                 </div>
