@@ -135,7 +135,7 @@ class HealthcareServiceRepository
                 return $item;
             })->values()->all();
 
-            HealthcareService::upsert($prepared, 'uuid', new HealthcareService()->getFillable());
+            HealthcareService::upsert($prepared, 'uuid', (new HealthcareService())->getFillable());
         });
     }
 

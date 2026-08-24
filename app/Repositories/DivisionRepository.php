@@ -32,7 +32,7 @@ class DivisionRepository
             $uspertData = app(DivisionApi::class)->normalizeResponseDataForUpsert($divisionsList, $legalEntity);
 
             // At first save all the Divisions to teh DB
-            Division::upsert($uspertData, uniqueBy: ['uuid'], update: new Division()->getFillable());
+            Division::upsert($uspertData, uniqueBy: ['uuid'], update: (new Division())->getFillable());
 
             $divisionIds = $this->getDivisonListIds($divisionsList);
 

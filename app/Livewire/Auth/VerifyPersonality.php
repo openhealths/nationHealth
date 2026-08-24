@@ -41,7 +41,7 @@ class VerifyPersonality extends Component
         $this->validate();
 
         try {
-            $response = new CipherRequest()->getPersonalData($this->knedp, $this->keyContainerUpload, $this->password);
+            $response = (new CipherRequest())->getPersonalData($this->knedp, $this->keyContainerUpload, $this->password);
         } catch (CipherException|CipherConnectionException $exception) {
             $exception->handle('Error when loading KEP key', 'Сталася помилка під час завантаження ключа');
 

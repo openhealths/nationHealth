@@ -186,7 +186,7 @@ trait HandlesEncounterCancellation
         }
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = (new CipherRequest())->signData(
                 $package,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],

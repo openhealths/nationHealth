@@ -362,7 +362,7 @@ class PatientDiagnosticReports extends BasePatientComponent
         }
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = (new CipherRequest())->signData(
                 $signedPayload,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],

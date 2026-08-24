@@ -23,11 +23,11 @@ class PatientApi
      */
     public static function getConditionsInEpisodeContext(string $patientUuid, string $episodeUuid, array $params): array
     {
-        return new Request(
+        return (new Request(
             HttpRequest::METHOD_GET,
             self::ENDPOINT_PATIENT . "/$patientUuid/episodes/$episodeUuid/conditions",
             $params
-        )->sendRequest();
+        ))->sendRequest();
     }
 
     public function schemaRequest(): array

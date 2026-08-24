@@ -38,7 +38,7 @@ class Logout
         $user = Auth::guard('ehealth')->user() ?? Auth::guard('web')->user();
 
         if ($user instanceof User) {
-            new SessionBinder()->release($user);
+            (new SessionBinder())->release($user);
         }
 
         $sessionId = request()->session()->getId();

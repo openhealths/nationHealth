@@ -441,7 +441,7 @@ abstract class DiagnosticReportComponent extends Component
         }
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = (new CipherRequest())->signData(
                 Arr::toSnakeCase($formattedData),
                 $validatedCipher['knedp'],
                 $validatedCipher['keyContainerUpload'],

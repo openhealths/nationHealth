@@ -20,7 +20,7 @@ class ExtendedMigration extends Migration
      */
     protected function backup(mixed $backupData): void
     {
-        $file = new \ReflectionClass(static::class)->getFileName();
+        $file = (new \ReflectionClass(static::class))->getFileName();
         $migrationName = $file ? pathinfo($file, PATHINFO_FILENAME) : static::class;
 
         $json = json_encode($backupData, JSON_THROW_ON_ERROR);

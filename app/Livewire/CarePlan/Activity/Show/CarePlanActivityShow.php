@@ -25,13 +25,13 @@ class CarePlanActivityShow extends CarePlanComponent
 
     public string $activityProductLabel = '';
 
-    public function mount(CarePlan $carePlan, CarePlanActivity $activity): void
+    public function mount(\App\Models\LegalEntity $legalEntity, CarePlan $carePlan, CarePlanActivity $activity): void
     {
         $this->bootCarePlan($carePlan);
 
         $this->activity = $activity->load(['kindConcept.coding', 'reasonReferences', 'author.party']);
         $this->activityProductLabel = $this->resolveActivityProductLabel($activity);
-        $this->scopeDocumentsToActivity($activity->id);
+        $this->scopeDocumentsToActivity($activity->uuid);
     }
 
     protected function renderCarePlan()

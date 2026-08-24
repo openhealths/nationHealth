@@ -514,7 +514,7 @@ class EncounterComponent extends Component
     protected function flashOutcome(string $type, string $message): void
     {
         session()->flash($type, $message);
-        $this->dispatch('flashMessage', ['message' => $message, 'type' => $type]);
+        
     }
     /**
      * Initialize the component data for the current patient.

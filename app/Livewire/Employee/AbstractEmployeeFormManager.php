@@ -149,7 +149,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $requestToSign = $this->validateAndGetDraft();
             $signedContent = $this->signDataWithCipher($requestToSign);
 
-            $eHealthResponseAsArray = new EHealthEmployeeRequest()->create($signedContent);
+            $eHealthResponseAsArray = (new EHealthEmployeeRequest())->create($signedContent);
 
             if (isset($eHealthResponseAsArray['error'])) {
                 throw new EHealthValidationException($eHealthResponseAsArray);

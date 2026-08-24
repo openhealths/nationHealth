@@ -702,7 +702,7 @@ class PatientSummary extends BasePatientComponent
             MergedPerson::upsert(
                 $mergedPersons,
                 ['uuid'],
-                new MergedPerson()->getFillable()
+                (new MergedPerson())->getFillable()
             );
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing merged persons');

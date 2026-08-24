@@ -135,7 +135,7 @@ class EncounterEdit extends EncounterComponent
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
-            $this->dispatch('flashMessage', ['type' => 'error', 'message' => $exception->validator->errors()->first()]);
+            session()->flash('error', $exception->validator->errors()->first());
             $this->dispatch('scroll-to-error');
 
             return null;
@@ -181,7 +181,7 @@ class EncounterEdit extends EncounterComponent
             );
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Failed to sync encounter package data');
-            $this->dispatch('flashMessage', ['type' => 'error', 'message' => __('messages.database_error')]);
+            session()->flash('error', __('messages.database_error'));
 
             return null;
         }
@@ -228,7 +228,7 @@ class EncounterEdit extends EncounterComponent
             $message = __('patients.policy.create_encounter');
             Session::flash('error', $message);
             $this->showSignatureModal = false;
-            $this->dispatch('flashMessage', ['type' => 'error', 'message' => $message]);
+            session()->flash('error', $message);
 
             return;
         }
@@ -239,7 +239,7 @@ class EncounterEdit extends EncounterComponent
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
             $this->showSignatureModal = false;
-            $this->dispatch('flashMessage', ['type' => 'error', 'message' => $exception->validator->errors()->first()]);
+            session()->flash('error', $exception->validator->errors()->first());
             $this->dispatch('scroll-to-error');
 
             return;
@@ -257,7 +257,7 @@ class EncounterEdit extends EncounterComponent
         unset($formattedData['encounter']['incoming_referral']['display_value']);
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = (new CipherRequest())->signData(
                 $formattedData,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
@@ -267,7 +267,7 @@ class EncounterEdit extends EncounterComponent
         } catch (CipherException|CipherConnectionException $exception) {
             $exception->handle('Error when signing data with Cipher');
             $this->showSignatureModal = false;
-            $this->dispatch('flashMessage', ['type' => 'error', 'message' => session('error') ?? $exception->getMessage()]);
+            session()->flash('error', session('error') ?? $exception->getMessage());
 
             return;
         }
@@ -340,12 +340,12 @@ class EncounterEdit extends EncounterComponent
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while submitting encounter');
             $this->showSignatureModal = false;
-            $this->dispatch('flashMessage', ['type' => 'error', 'message' => session('error') ?? $exception->getMessage()]);
+            session()->flash('error', session('error') ?? $exception->getMessage());
         } catch (\RuntimeException $exception) {
             logger()->error('Encounter submission runtime error: ' . $exception->getMessage());
             Session::flash('error', $exception->getMessage());
             $this->showSignatureModal = false;
-            $this->dispatch('flashMessage', ['type' => 'error', 'message' => session('error') ?? $exception->getMessage()]);
+            session()->flash('error', session('error') ?? $exception->getMessage());
         } catch (\Throwable $exception) {
             logger()->error('Encounter submission unexpected error: ' . $exception->getMessage(), [
                 'trace' => $exception->getTraceAsString(),
@@ -353,7 +353,7 @@ class EncounterEdit extends EncounterComponent
             $errorMessage = __('patients.messages.unexpected_error') ?? 'Виникла непередбачувана помилка.';
             Session::flash('error', $errorMessage);
             $this->showSignatureModal = false;
-            $this->dispatch('flashMessage', ['type' => 'error', 'message' => $errorMessage]);
+            session()->flash('error', $errorMessage);
         }
 
         Encounter::query()

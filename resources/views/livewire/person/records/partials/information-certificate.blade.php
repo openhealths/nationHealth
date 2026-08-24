@@ -24,8 +24,8 @@
                 <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">{{ __('preperson.label_single') }}</p>
 
                 @php
-                    $barcode = new TypeCode128A()->getBarcode(strtoupper($preperson->uuid));
-                    $barcodeHtml = new DynamicHtmlRenderer()->render($barcode);
+                    $barcode = (new TypeCode128A())->getBarcode(strtoupper($preperson->uuid));
+                    $barcodeHtml = (new DynamicHtmlRenderer())->render($barcode);
                 @endphp
 
                 <div class="flex flex-col items-center gap-2 mb-6">

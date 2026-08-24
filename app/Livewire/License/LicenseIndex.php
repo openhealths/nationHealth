@@ -54,7 +54,7 @@ class LicenseIndex extends Component
         $licences = $this->normalizeDate($response->validate());
 
         try {
-            License::upsert($response->map($licences), uniqueBy: ['uuid'], update: new License()->getFillable());
+            License::upsert($response->map($licences), uniqueBy: ['uuid'], update: (new License())->getFillable());
         } catch (Exception $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing licenses with eHealth: ');
 

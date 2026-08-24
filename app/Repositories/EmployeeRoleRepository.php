@@ -45,10 +45,10 @@ class EmployeeRoleRepository
     public function sync(array $items): void
     {
         $rows = array_map(
-            static fn (array $item): array => new EmployeeRole($item)->getAttributes(),
+            static fn (array $item): array => (new EmployeeRole($item))->getAttributes(),
             $items
         );
 
-        EmployeeRole::upsert($rows, 'uuid', new EmployeeRole()->getFillable());
+        EmployeeRole::upsert($rows, 'uuid', (new EmployeeRole())->getFillable());
     }
 }

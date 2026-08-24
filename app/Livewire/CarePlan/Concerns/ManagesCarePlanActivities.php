@@ -497,13 +497,14 @@ trait ManagesCarePlanActivities
                         return;
                     }
                 }
-            } elseif (!empty($this->activityForm['product_reference'])) {
-                $message = 'Не вдалося перевірити одиниці виміру препарату. Будь ласка, знайдіть і оберіть препарат зі списку ще раз.';
-                session()->flash('error', $message);
-                $this->addError('activityForm.quantity_code', $message);
-
-                return;
             }
+        }
+
+        if (str_contains($kindLower, 'device') && empty($this->selectedProduct)) {
+            $message = __('care-plan.device_not_selected_care_plan_activity');
+            session()->flash('error', $message);
+
+            return;
         }
 
         if (str_contains($kindLower, 'device') && !empty($this->selectedProduct)) {

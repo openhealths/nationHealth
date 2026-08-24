@@ -255,7 +255,7 @@ trait ManagesConfidantPersonRelationships
         }
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = (new CipherRequest())->signData(
                 $this->approvedData,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],

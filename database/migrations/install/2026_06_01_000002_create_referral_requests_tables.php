@@ -30,11 +30,11 @@ return new class extends Migration
                 $table->string('service_id'); // Service code or concept
                 $table->decimal('quantity', 15, 2)->default(1);
                 $table->string('program_id')->nullable();
-                $table->string('intent');
-                $table->string('category')->nullable();
-                $table->foreignId('based_on_id')->nullable()->constrained('care_plan_activities');
-                $table->foreignId('context_id')->nullable()->constrained('encounters');
-                $table->string('priority')->nullable();
+                $table->foreignId('intent_id')->nullable()->constrained('codings');
+                $table->foreignId('category_id')->nullable()->constrained('codeable_concepts');
+                $table->foreignId('based_on_id')->nullable()->constrained('identifiers');
+                $table->foreignId('context_id')->nullable()->constrained('identifiers');
+                $table->foreignId('priority_id')->nullable()->constrained('codeable_concepts');
                 $table->text('note')->nullable();
                 $table->text('patient_instruction')->nullable();
                 $table->json('reason_reference')->nullable();
@@ -58,11 +58,11 @@ return new class extends Migration
                 $table->string('device_id'); // Device code or reference
                 $table->decimal('quantity', 15, 2)->default(1);
                 $table->string('program_id')->nullable();
-                $table->string('intent');
-                $table->string('category')->nullable();
-                $table->foreignId('based_on_id')->nullable()->constrained('care_plan_activities');
-                $table->foreignId('context_id')->nullable()->constrained('encounters');
-                $table->string('priority')->nullable();
+                $table->foreignId('intent_id')->nullable()->constrained('codings');
+                $table->foreignId('category_id')->nullable()->constrained('codeable_concepts');
+                $table->foreignId('based_on_id')->nullable()->constrained('identifiers');
+                $table->foreignId('context_id')->nullable()->constrained('identifiers');
+                $table->foreignId('priority_id')->nullable()->constrained('codeable_concepts');
                 $table->text('note')->nullable();
                 $table->text('supporting_info')->nullable();
                 $table->timestamps();

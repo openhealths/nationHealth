@@ -150,7 +150,7 @@ class SignatureService
     {
         return Cache::remember('knedp_certificate_authority', now()->addDays(7), function () {
             try {
-                return new CipherRequest()->getCertificateAuthority()->response['ca'];
+                return (new CipherRequest())->getCertificateAuthority()->response['ca'];
             } catch (ApiException $e) {
                 Log::error("Error fetching certificate authorities from Cipher API: " . $e->getMessage(), ['errors' => $e->getErrors()]);
 

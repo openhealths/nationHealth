@@ -775,7 +775,7 @@ class PersonComponent extends Component
         $personRequestData['patient_signed'] = $this->form->patientSigned;
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = (new CipherRequest())->signData(
                 $personRequestData,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],

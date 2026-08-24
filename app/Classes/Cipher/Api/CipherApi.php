@@ -234,7 +234,7 @@ class CipherApi
      */
     public function getCertificateAuthorityApi(): array
     {
-        $data = new Request('get', '/certificateAuthority/supported', '')->sendRequest();
+        $data = (new Request('get', '/certificateAuthority/supported', ''))->sendRequest();
 
         if ($data === false) {
             throw new \RuntimeException('Failed to fetch data from the API.');

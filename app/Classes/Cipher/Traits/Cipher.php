@@ -55,7 +55,7 @@ trait Cipher
     ): string|array {
         $this->validate($this->rules());
 
-        return new CipherApi()->sendSession(
+        return (new CipherApi())->sendSession(
             json_encode($data),
             $this->password,
             $this->convertFileToBase64(),
@@ -100,7 +100,7 @@ trait Cipher
     public function getCertificateAuthority(): array
     {
         if (!Cache::has('knedp_certificate_authority')) {
-            $data = new Request('get', '/certificateAuthority/supported', '')->sendRequest();
+            $data = (new Request('get', '/certificateAuthority/supported', ''))->sendRequest();
 
             if ($data === false) {
                 throw new RuntimeException('Failed to fetch data from the API.');

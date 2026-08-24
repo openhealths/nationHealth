@@ -43,7 +43,7 @@ class CarePlanShow extends CarePlanComponent
         'product_codeable_concept' => '',
     ];
 
-    public function mount(CarePlan $carePlan): void
+    public function mount(\App\Models\LegalEntity $legalEntity, CarePlan $carePlan): void
     {
         $this->bootCarePlan($carePlan);
 

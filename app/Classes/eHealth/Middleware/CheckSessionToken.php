@@ -105,7 +105,7 @@ class CheckSessionToken
         $user = Auth::guard('ehealth')->user();
 
         if ($user instanceof User) {
-            new SessionBinder()->release($user);
+            (new SessionBinder())->release($user);
         }
 
         Auth::logout();

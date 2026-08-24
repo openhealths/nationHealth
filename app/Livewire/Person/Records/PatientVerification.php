@@ -161,7 +161,7 @@ class PatientVerification extends BasePatientComponent
         ];
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = (new CipherRequest())->signData(
                 $dracsDeath,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],

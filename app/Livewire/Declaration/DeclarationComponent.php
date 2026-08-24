@@ -572,7 +572,7 @@ abstract class DeclarationComponent extends Component
         }
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = (new CipherRequest())->signData(
                 $dataToSign,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],

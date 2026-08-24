@@ -128,7 +128,7 @@ class EHealthLoginController extends Controller
 
         Auth::guard($loginedGuard)->login($user);
 
-        new SessionBinder()->bind($user, $previousBearerToken);
+        (new SessionBinder())->bind($user, $previousBearerToken);
 
         Session::forget('mis_2fa');
 
@@ -290,7 +290,7 @@ class EHealthLoginController extends Controller
 
         // Logout user from the system
         if (Session::has($authEhealth) || Session::has(config('ehealth.api.oauth.bearer_token'))) {
-            new EHealthRequest('POST', config('ehealth.api.oauth.logout'), [])->sendRequest();
+            (new EHealthRequest('POST', config('ehealth.api.oauth.logout'), []))->sendRequest();
 
             // Forget bearer token and other token's data
             app(TokenStorage::class)->clear();

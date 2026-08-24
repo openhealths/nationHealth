@@ -219,7 +219,7 @@ class PrepersonData extends Component
 
         try {
             if (!empty($mergeRequests)) {
-                MergeRequest::upsert($mergeRequests, ['uuid'], new MergeRequest()->getFillable());
+                MergeRequest::upsert($mergeRequests, ['uuid'], (new MergeRequest())->getFillable());
             }
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Failed to sync merge requests');

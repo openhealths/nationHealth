@@ -485,7 +485,7 @@ class PrepersonMerge extends Component
         $dataToSign['patient_signed'] = $this->patientSigned;
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = (new CipherRequest())->signData(
                 $dataToSign,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],

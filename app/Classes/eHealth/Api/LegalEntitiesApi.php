@@ -13,7 +13,7 @@ class LegalEntitiesApi extends Request
 
     public static function _get(array $params = []): array
     {
-        return (array) new Request('GET', self::URL_V2, $params)->sendRequest();
+        return (array) (new Request('GET', self::URL_V2, $params))->sendRequest();
     }
 
     public static function _getById(string $id): array
@@ -22,16 +22,16 @@ class LegalEntitiesApi extends Request
             'legal_entity_id' => $id
         ];
 
-        return (array) new Request('GET', self::URL_V2.'/'.$id, $params)->sendRequest();
+        return (array) (new Request('GET', self::URL_V2.'/'.$id, $params))->sendRequest();
     }
 
     public static function _verify(string $id): array
     {
-        return (array) new Request('PATCH', self::URL.'/'.$id.'/actions/nhs_verify', [])->sendRequest();
+        return (array) (new Request('PATCH', self::URL.'/'.$id.'/actions/nhs_verify', []))->sendRequest();
     }
 
     public static function _createOrUpdate(array $params = []): array
     {
-        return (array) new Request('PUT', self::URL_V2, $params, false)->sendRequest();
+        return (array) (new Request('PUT', self::URL_V2, $params, false))->sendRequest();
     }
 }

@@ -182,7 +182,7 @@ class Login extends Component
         $this->clearLoginAttempts();
         Session::regenerate();
 
-        new SessionBinder()->bind($user);
+        (new SessionBinder())->bind($user);
 
         return Redirect::route('legal-entity.new.create');
     }

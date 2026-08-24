@@ -29,9 +29,9 @@ class VerifyCsrfToken extends Middleware
     #[Override]
     protected function newCookie($request, $config): Cookie
     {
-        return new Cookie(
+        return (new Cookie(
             'XSRF-TOKEN',
-            $request->session()->token(),
+            $request->session())->token(),
             $this->availableAt(60 * $config['lifetime']),
             $config['path'],
             $config['domain'],
