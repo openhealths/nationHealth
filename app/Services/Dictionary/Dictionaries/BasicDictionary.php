@@ -41,7 +41,7 @@ class BasicDictionary implements DictionaryInterface
     public function fetch(int $page = 1): EHealthResponse
     {
         // Basic dictionaries don't support pagination, ignore $page parameter
-        return EHealth::dictionary()->getMany(['value_is_active' => 'true']);
+        return EHealth::dictionary()->getMany();
     }
 
     /**

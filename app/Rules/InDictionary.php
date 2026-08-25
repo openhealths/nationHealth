@@ -57,7 +57,7 @@ class InDictionary implements ValidationRule
                 } elseif ($name === 'eHealth/assistive_products') {
                     self::$dictionaryCache[$name] = dictionary()->basics()
                         ->byName('eHealth/assistive_products')
-                        ->flattenedChildValues(true)
+                        ->flattenedChildValues(true, true)
                         ->keys()
                         ->toArray();
                 } elseif ($name === 'device_definition_classification_type') {

@@ -145,7 +145,7 @@ class ProcedureComponent extends Component
 
         $this->dictionaries['eHealth/assistive_products'] = dictionary()->basics()
             ->byName('eHealth/assistive_products')
-            ->flattenedChildValues(true)
+            ->flattenedChildValues(true, true)
             ->toArray();
     }
 

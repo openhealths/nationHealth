@@ -89,26 +89,27 @@ class BasicDictionaryCollection extends Collection
      * Recursively processes dictionary items and their child values,
      * creating a flat collection of all codes and descriptions including nested child elements.
      *
-     * @param  bool  $onlyLeaf  Keep only values without child values
      * @return Collection
      */
-    public function flattenedChildValues(bool $onlyLeaf = false): Collection
+    public function flattenedChildValues(bool $onlyActive = false, bool $onlyLeaf = false): Collection
     {
-        return $this->flatMap(function (mixed $item) use ($onlyLeaf) {
+        return $this->flatMap(function ($item) use ($onlyActive, $onlyLeaf) {
             if (!is_array($item)) {
                 return collect();
             }
 
-            $collectDescriptions = static function (array $data) use (&$collectDescriptions, $onlyLeaf): Collection {
-                return collect($data)->flatMap(function (array $value, int|string $key) use ($collectDescriptions, $onlyLeaf) {
+            $collectDescriptions = static function (array $data) use (&$collectDescriptions, $onlyActive, $onlyLeaf): Collection {
+                return collect($data)->flatMap(function ($value, $key) use ($collectDescriptions, $onlyActive, $onlyLeaf) {
                     $result = collect();
 
                     $code = is_string($key) ? $key : ($value['code'] ?? null);
+                    $isActive = (bool) ($value['is_active'] ?? true);
                     $hasChildren = !empty($value['child_values']);
 
                     if (
                         $code
                         && isset($value['description'])
+                        && (!$onlyActive || $isActive)
                         && (!$onlyLeaf || !$hasChildren)
                     ) {
                         $result->put($code, $value['description']);
