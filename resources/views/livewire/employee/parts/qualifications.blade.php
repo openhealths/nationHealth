@@ -100,9 +100,11 @@
                                     <button
                                         @click.prevent="
                                             openModal = true;
-                                            item = index;
-                                            modalQualification = new Qualification(qualification);
-                                            newQualification = false;
+                                            if (newQualification !== false || item !== index) {
+                                                item = index;
+                                                modalQualification = new Qualification(qualification);
+                                                newQualification = false;
+                                            }
                                             openDropdown = false;
                                         "
                                         class="dropdown-button"
@@ -131,8 +133,10 @@
             <button
                 @click="
                     openModal = true;
-                    newQualification = true;
-                    modalQualification = new Qualification();
+                    if (newQualification !== true) {
+                        newQualification = true;
+                        modalQualification = new Qualification();
+                    }
                 "
                 @click.prevent
                 class="item-add my-5"
@@ -204,24 +208,11 @@
                                     <div>
                                         <label for="qualificationSpeciality" class="label-modal"
                                             >{{ __('forms.speciality') }} <span class="text-red-600"> *</span></label>
-                                        <select
-                                            x-model="modalQualification.speciality"
+                                        <x-select2
+                                            modelPath="modalQualification.speciality"
+                                            dictionaryName="SPECIALITY_TYPE"
                                             id="qualificationSpeciality"
-                                            class="input-modal"
-                                            required
-                                        >
-                                            <option value="">{{ __('forms.select_speciality') }}</option>
-                                            <template x-if="employeeType && employeeTypeSpecialities[employeeType]">
-                                                <template
-                                                    x-for="
-                                                        (specName, specKey) in employeeTypeSpecialities[employeeType]
-                                                    "
-                                                    :key="specKey"
-                                                >
-                                                    <option :value="specKey" x-text="specName"></option>
-                                                </template>
-                                            </template>
-                                        </select>
+                                        />
                                     </div>
                                     <div>
                                         <label for="qualificationCertificateNumber" class="label-modal"
@@ -292,6 +283,7 @@
                                                 ? qualifications.push({ ...modalQualification })
                                                 : (qualifications[item] = { ...modalQualification });
                                             openModal = false;
+                                            newQualification = null;
                                         "
                                         class="button-primary"
                                         :class="{ 'opacity-50 cursor-not-allowed': ! isModalValid() }"

@@ -42,12 +42,14 @@
                   },
 
                   openAddSpecialityModal() {
-                      this.primaryConflict = false;
-                      this.newSpeciality = true;
-                      this.modalSpeciality = new Speciality();
-                      if (this.hasOtherPrimary()) {
-                          this.modalSpeciality.specialityOfficio = false;
-                          this.primaryConflict = true;
+                      if (this.newSpeciality !== true) {
+                          this.primaryConflict = false;
+                          this.newSpeciality = true;
+                          this.modalSpeciality = new Speciality();
+                          if (this.hasOtherPrimary()) {
+                              this.modalSpeciality.specialityOfficio = false;
+                              this.primaryConflict = true;
+                          }
                       }
                       this.openModal = true;
                   },
@@ -65,6 +67,7 @@
                           this.specialities[this.item] = { ...this.modalSpeciality };
                       }
                       this.openModal = false;
+                      this.newSpeciality = null;
                   },
               }"
         x-init="
@@ -153,10 +156,12 @@
                                     <button
                                         @click.prevent="
                                             openModal = true;
-                                            item = index;
-                                            modalSpeciality = new Speciality(speciality);
-                                            newSpeciality = false;
-                                            primaryConflict = false;
+                                            if (newSpeciality !== false || item !== index) {
+                                                item = index;
+                                                modalSpeciality = new Speciality(speciality);
+                                                newSpeciality = false;
+                                                primaryConflict = false;
+                                            }
                                             openDropdown = false;
                                         "
                                         class="dropdown-button"
@@ -214,24 +219,11 @@
                                 <div>
                                     <label for="specialitySpeciality" class="label-modal"
                                         >{{ __('forms.speciality') }} <span class="text-red-600"> *</span></label>
-                                        <select
-                                            x-model="modalSpeciality.speciality"
+                                        <x-select2
+                                            modelPath="modalSpeciality.speciality"
+                                            dictionaryName="SPECIALITY_TYPE"
                                             id="specialitySpeciality"
-                                            class="input-modal"
-                                            required
-                                        >
-                                            <option value="">{{ __('forms.select_speciality') }}</option>
-                                            <template x-if="employeeType && employeeTypeSpecialities[employeeType]">
-                                                <template
-                                                    x-for="
-                                                        (specName, specKey) in employeeTypeSpecialities[employeeType]
-                                                    "
-                                                    :key="specKey"
-                                                >
-                                                    <option :value="specKey" x-text="specName"></option>
-                                                </template>
-                                            </template>
-                                        </select>
+                                        />
                                     </div>
 
                                     <div class="flex flex-col justify-end">

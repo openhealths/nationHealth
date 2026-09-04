@@ -97,9 +97,11 @@
                                     <button
                                         @click.prevent="
                                             openModal = true;
-                                            item = index;
-                                            modalEducation = new Education(education);
-                                            newEducation = false;
+                                            if (newEducation !== false || item !== index) {
+                                                item = index;
+                                                modalEducation = new Education(education);
+                                                newEducation = false;
+                                            }
                                             openDropdown = false;
                                         "
                                         class="dropdown-button"
@@ -128,8 +130,10 @@
             <button
                 @click="
                     openModal = true;
-                    newEducation = true;
-                    modalEducation = new Education({ country: 'UA' });
+                    if (newEducation !== true) {
+                        newEducation = true;
+                        modalEducation = new Education({ country: 'UA' });
+                    }
                 "
                 @click.prevent
                 class="item-add my-5"
@@ -203,24 +207,11 @@
                                     <div>
                                         <label for="educationSpeciality" class="label-modal"
                                             >{{ __('forms.speciality') }} <span class="text-red-600"> *</span></label>
-                                        <select
-                                            x-model="modalEducation.speciality"
+                                        <x-select2
+                                            modelPath="modalEducation.speciality"
+                                            dictionaryName="SPECIALITY_TYPE"
                                             id="educationSpeciality"
-                                            class="input-modal"
-                                            required
-                                        >
-                                            <option value="">{{ __('forms.select_speciality') }}</option>
-                                            <template x-if="employeeType && employeeTypeSpecialities[employeeType]">
-                                                <template
-                                                    x-for="
-                                                        (specName, specKey) in employeeTypeSpecialities[employeeType]
-                                                    "
-                                                    :key="specKey"
-                                                >
-                                                    <option :value="specKey" x-text="specName"></option>
-                                                </template>
-                                            </template>
-                                        </select>
+                                        />
                                     </div>
                                     <div>
                                         <label for="educationDegree" class="label-modal"

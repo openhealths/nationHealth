@@ -115,9 +115,11 @@
                                         <button
                                             @click.prevent="
                                                 openModal = true;
-                                                item = index;
-                                                modalDocument = new Doc(document);
-                                                newDocument = false;
+                                                if (newDocument !== false || item !== index) {
+                                                    item = index;
+                                                    modalDocument = new Doc(document);
+                                                    newDocument = false;
+                                                }
                                                 openDropdown = false;
                                             "
                                             class="dropdown-button"
@@ -148,8 +150,10 @@
             <button
                 @click="
                         openModal = true; {{-- Open the Modal --}}
-                        newDocument = true; {{-- We are adding a new document --}}
-                        modalDocument = new Doc(); {{-- Replace the data of the previous document with a new one--}}
+                        if (newDocument !== true) {
+                            newDocument = true; {{-- We are adding a new document --}}
+                            modalDocument = new Doc(); {{-- Replace the data of the previous document with a new one--}}
+                        }
                     "
                 @click.prevent
                 class="item-add my-5"
@@ -263,6 +267,7 @@
                                                 ? documents.push({ ...modalDocument })
                                                 : (documents[item] = { ...modalDocument });
                                             openModal = false;
+                                            newDocument = null;
                                         "
                                         class="button-primary"
                                         :class="{

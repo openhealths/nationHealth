@@ -128,6 +128,43 @@
                         this.$watch('modalObservation.categoryCode', () => {
                             this.updateIcfOptions(rawData);
                         });
+                    } else if (dictionaryKey === 'SPECIALITY_TYPE') {
+                        const setSpecialityOptions = () => {
+                            let empType = null;
+                            if (typeof this.employeeType !== 'undefined') {
+                                empType = this.employeeType;
+                            } else if (this.$wire.form?.employeeType) {
+                                empType = this.$wire.form.employeeType;
+                            }
+
+                            const specDict = (empType && this.$wire.employeeTypeSpecialities?.[empType]) 
+                                ? this.$wire.employeeTypeSpecialities[empType] 
+                                : rawData;
+
+                            this.options = Object.entries(specDict).map(([value, label]) => this.makeOption(value, label));
+                            this.buildOptionsMap();
+
+                            const selectedOption = this.optionsMap.get(this.selected);
+                            if (selectedOption) {
+                                this.search = `[${selectedOption.code ?? selectedOption.value}] – ${selectedOption.label}`;
+                            } else if (this.selected) {
+                                this.search = '';
+                            }
+
+                            this.filterOptions();
+                        };
+
+                        setSpecialityOptions();
+
+                        if (typeof this.employeeType !== 'undefined') {
+                            this.$watch('employeeType', (newType, oldType) => {
+                                setSpecialityOptions();
+                                if (oldType !== undefined && newType !== oldType && !this.optionsMap.has(this.selected)) {
+                                    this.selected = '';
+                                    this.search = '';
+                                }
+                            });
+                        }
                     } else if (dictionaryKey === 'custom/services') {
                         const rootPath = modelPath.split('.')[0];
                         const isModalProcedure = rootPath === 'modalProcedure';

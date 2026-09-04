@@ -102,8 +102,10 @@
                                 <button
                                     @click.prevent="
                                         openModal = true;
-                                        isNew = false;
-                                        modalScienceDegree = new ScienceDegree(scienceDegree);
+                                        if (isNew !== false) {
+                                            isNew = false;
+                                            modalScienceDegree = new ScienceDegree(scienceDegree);
+                                        }
                                         openDropdown = false;
                                     "
                                     class="dropdown-button"
@@ -133,8 +135,10 @@
             <div>
                 <button @click.prevent="
                             openModal = true;
-                            isNew = true;
-                            modalScienceDegree = new ScienceDegree({ country: 'UA' });
+                            if (isNew !== true) {
+                                isNew = true;
+                                modalScienceDegree = new ScienceDegree({ country: 'UA' });
+                            }
                         "
                         class="item-add my-5"
                 >
@@ -207,14 +211,11 @@
                                 </div>
                                 <div>
                                     <label for="scienceDegreeSpeciality" class="label-modal">{{ __('forms.speciality') }} <span class="text-red-600"> *</span></label>
-                                    <select x-model="modalScienceDegree.speciality" id="scienceDegreeSpeciality" class="input-modal" required>
-                                        <option value="">{{__('forms.select_speciality')}}</option>
-                                        <template x-if="employeeType && employeeTypeSpecialities[employeeType]">
-                                            <template x-for="(specName, specKey) in employeeTypeSpecialities[employeeType]" :key="specKey">
-                                                <option :value="specKey" x-text="specName"></option>
-                                            </template>
-                                        </template>
-                                    </select>
+                                    <x-select2
+                                        modelPath="modalScienceDegree.speciality"
+                                        dictionaryName="SPECIALITY_TYPE"
+                                        id="scienceDegreeSpeciality"
+                                    />
                                 </div>
                                 <div>
                                     <label for="scienceDegreeDiplomaNumber" class="label-modal">{{ __('forms.diplomaNumber') }}</label>
@@ -225,7 +226,7 @@
                             <p class="text-sm text-gray-400 mb-2">{{ __('forms.form_required_note') }}</p>
                             <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 pt-6">
                                 <button type="button" @click="openModal = false" class="button-minor">{{ __('forms.cancel') }}</button>
-                                <button @click.prevent="scienceDegree = { ...modalScienceDegree }; openModal = false;"
+                                <button @click.prevent="scienceDegree = { ...modalScienceDegree }; openModal = false; isNew = null;"
                                         class="button-primary"
                                         :class="{ 'opacity-50 cursor-not-allowed': !isModalValid() }"
                                         :disabled="!isModalValid()">
