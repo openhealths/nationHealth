@@ -32,6 +32,23 @@ class DiagnosticReportForm extends BaseForm
         'imaging',
     ];
 
+    /**
+     * Name the fields of a diagnostic report and of its observations the way the form labels them.
+     *
+     * @return array
+     */
+    public function validationAttributes(): array
+    {
+        return [
+            ...collect(__('diagnostic-reports.attributes'))
+                ->mapWithKeys(static fn (string $name, string $field): array => ["diagnosticReport.$field" => $name])
+                ->all(),
+            ...collect(__('observations.attributes'))
+                ->mapWithKeys(static fn (string $name, string $field): array => ["observations.*.$field" => $name])
+                ->all()
+        ];
+    }
+
     protected function rules(): array
     {
         $isReferralAvailable = data_get($this->diagnosticReport, 'isReferralAvailable') === true;
@@ -44,44 +61,38 @@ class DiagnosticReportForm extends BaseForm
             'diagnosticReport.referralType' => [
                 Rule::requiredIf($isReferralAvailable),
                 'nullable',
-                Rule::in(['electronic', 'paper']),
+                Rule::in(['electronic', 'paper'])
             ],
             'diagnosticReport.basedOnIdentifier' => [
                 Rule::requiredIf($isElectronicReferral),
                 Rule::prohibitedIf($isPaperReferral),
                 'nullable',
-                'uuid',
+                'uuid'
             ],
             'diagnosticReport.primarySource' => [
                 'required',
                 'boolean:strict',
-                Rule::in([true]),
+                Rule::in([true])
             ],
             'diagnosticReport.categoryCode' => [
                 'required',
                 'string',
                 new InDictionary('eHealth/diagnostic_report_categories'),
                 function (string $attribute, mixed $value, Closure $fail): void {
-                    $employeeType = Auth::user()
-                        ?->getDiagnosticReportWriterEmployee()
-                        ?->employeeType;
+                    $employeeType = Auth::user()->getDiagnosticReportWriterEmployee()?->employeeType;
 
                     if (
                         $employeeType === Role::LABORANT->value
                         && !in_array($value, self::LABORANT_ALLOWED_CATEGORIES, true)
                     ) {
-                        $fail(__('validation.custom.diagnosticReport.categoryCode.laborant_category'));
+                        $fail(__('diagnostic-reports.validation.laborant_category'));
                     }
-                },
+                }
             ],
             'diagnosticReport.codeValue' => [
                 'required',
                 'uuid',
-                function (
-                    string $attribute,
-                    mixed $value,
-                    Closure $fail
-                ): void {
+                function (string $attribute, mixed $value, Closure $fail): void {
                     $categoryCode = data_get($this->diagnosticReport, 'categoryCode');
 
                     $service = dictionary()
@@ -92,13 +103,11 @@ class DiagnosticReportForm extends BaseForm
                     if ($service === null || data_get($service, 'category') !== $categoryCode) {
                         $fail(
                             __('validation.exists', [
-                                'attribute' => __(
-                                    'validation.attributes.diagnosticReport.codeValue'
-                                ),
+                                'attribute' => __('diagnostic-reports.attributes.codeValue'),
                             ])
                         );
                     }
-                },
+                }
             ],
             'diagnosticReport.paperReferralRequisition' => ['nullable', 'string', 'max:255'],
             'diagnosticReport.paperReferralRequesterEmployeeName' => [
@@ -108,7 +117,7 @@ class DiagnosticReportForm extends BaseForm
                 ),
                 'nullable',
                 'string',
-                'max:255',
+                'max:255'
             ],
             'diagnosticReport.paperReferralRequesterLegalEntityEdrpou' => [
                 Rule::requiredIf(
@@ -116,12 +125,12 @@ class DiagnosticReportForm extends BaseForm
                     && data_get($this->diagnosticReport, 'referralType') === 'paper'
                 ),
                 'nullable',
-                'digits_between:8,10',
+                'digits_between:8,10'
             ],
             'diagnosticReport.paperReferralRequesterLegalEntityName' => [
                 'nullable',
                 'string',
-                'max:255',
+                'max:255'
             ],
             'diagnosticReport.paperReferralServiceRequestDate' => [
                 Rule::requiredIf(
@@ -129,107 +138,71 @@ class DiagnosticReportForm extends BaseForm
                     && data_get($this->diagnosticReport, 'referralType') === 'paper'
                 ),
                 'nullable',
-                'date_format:' . config('app.date_format'),
+                'date_format:' . config('app.date_format')
             ],
             'diagnosticReport.paperReferralNote' => ['nullable', 'string', 'max:255'],
             'diagnosticReport.effectiveType' => [
                 'nullable',
-                Rule::in(['date_time', 'period']),
+                Rule::in(['date_time', 'period'])
             ],
 
             'diagnosticReport.effectiveDate' => [
-                Rule::requiredIf(
-                    $effectiveType === 'date_time'
-                ),
-                Rule::prohibitedIf(
-                    $effectiveType !== 'date_time'
-                ),
+                Rule::requiredIf($effectiveType === 'date_time'),
+                Rule::prohibitedIf($effectiveType !== 'date_time'),
                 'nullable',
                 'date_format:' . config('app.date_format'),
-                'before_or_equal:today',
+                'before_or_equal:today'
             ],
 
             'diagnosticReport.effectiveTime' => [
-                Rule::requiredIf(
-                    $effectiveType === 'date_time'
-                ),
-                Rule::prohibitedIf(
-                    $effectiveType !== 'date_time'
-                ),
+                Rule::requiredIf($effectiveType === 'date_time'),
+                Rule::prohibitedIf($effectiveType !== 'date_time'),
                 'nullable',
                 'date_format:H:i',
-                new PastDateTime(
-                    data_get($this->diagnosticReport, 'effectiveDate', '')
-                ),
+                new PastDateTime(data_get($this->diagnosticReport, 'effectiveDate', '')),
             ],
 
             'diagnosticReport.effectivePeriodStartDate' => [
-                Rule::requiredIf(
-                    $effectiveType === 'period'
-                ),
-                Rule::prohibitedIf(
-                    $effectiveType !== 'period'
-                ),
+                Rule::requiredIf($effectiveType === 'period'),
+                Rule::prohibitedIf($effectiveType !== 'period'),
                 'nullable',
                 'date_format:' . config('app.date_format'),
-                'before_or_equal:today',
+                'before_or_equal:today'
             ],
 
             'diagnosticReport.effectivePeriodStartTime' => [
-                Rule::requiredIf(
-                    $effectiveType === 'period'
-                ),
-                Rule::prohibitedIf(
-                    $effectiveType !== 'period'
-                ),
+                Rule::requiredIf($effectiveType === 'period'),
+                Rule::prohibitedIf($effectiveType !== 'period'),
                 'nullable',
                 'date_format:H:i',
-                new PastDateTime(
-                    data_get($this->diagnosticReport, 'effectivePeriodStartDate', '')
-                ),
+                new PastDateTime(data_get($this->diagnosticReport, 'effectivePeriodStartDate', ''))
             ],
 
             'diagnosticReport.effectivePeriodEndDate' => [
-                Rule::prohibitedIf(
-                    $effectiveType !== 'period'
-                ),
+                Rule::prohibitedIf($effectiveType !== 'period'),
                 Rule::requiredIf(
-                    $effectiveType === 'period'
-                    && !empty(
-                        data_get($this->diagnosticReport, 'effectivePeriodEndTime')
-                    )
+                    $effectiveType === 'period' && !empty(data_get($this->diagnosticReport, 'effectivePeriodEndTime'))
                 ),
                 'nullable',
                 'date_format:' . config('app.date_format'),
                 'before_or_equal:today',
-                'after_or_equal:diagnosticReport.effectivePeriodStartDate',
+                'after_or_equal:diagnosticReport.effectivePeriodStartDate'
             ],
 
             'diagnosticReport.effectivePeriodEndTime' => [
-                Rule::prohibitedIf(
-                    $effectiveType !== 'period'
-                ),
+                Rule::prohibitedIf($effectiveType !== 'period'),
                 Rule::requiredIf(
-                    $effectiveType === 'period'
-                    && !empty(
-                        data_get($this->diagnosticReport, 'effectivePeriodEndDate')
-                    )
+                    $effectiveType === 'period' && !empty(data_get($this->diagnosticReport, 'effectivePeriodEndDate'))
                 ),
                 'nullable',
                 'date_format:H:i',
-                new PastDateTime(
-                    data_get($this->diagnosticReport, 'effectivePeriodEndDate', '')
-                ),
+                new PastDateTime(data_get($this->diagnosticReport, 'effectivePeriodEndDate', '')),
                 new AfterOrEqualDateTime(
                     data_get($this->diagnosticReport, 'effectivePeriodEndDate', ''),
                     data_get($this->diagnosticReport, 'effectivePeriodStartDate', ''),
                     data_get($this->diagnosticReport, 'effectivePeriodStartTime', '')
                 ),
-                function (
-                    string $attribute,
-                    mixed $value,
-                    Closure $fail
-                ): void {
+                function (string $attribute, mixed $value, Closure $fail): void {
                     $issuedDate = data_get($this->diagnosticReport, 'issuedDate');
                     $issuedTime = data_get($this->diagnosticReport, 'issuedTime');
                     $endDate = data_get($this->diagnosticReport, 'effectivePeriodEndDate');
@@ -291,53 +264,27 @@ class DiagnosticReportForm extends BaseForm
                 'distinct',
 
                 Rule::exists('equipments', 'uuid')
-                    ->where(
-                        'legal_entity_id',
-                        legalEntity()->id
-                    )
-                    ->where(
-                        'status',
-                        EquipmentStatus::ACTIVE->value
-                    )
-                    ->where(
-                        'availability_status',
-                        AvailabilityStatus::AVAILABLE->value
-                    ),
+                    ->where('legal_entity_id', legalEntity()->id)
+                    ->where('status', EquipmentStatus::ACTIVE->value)
+                    ->where('availability_status', AvailabilityStatus::AVAILABLE->value),
 
-                function (
-                    string $attribute,
-                    mixed $value,
-                    Closure $fail
-                ): void {
+                function (string $attribute, mixed $value, Closure $fail): void {
                     if (!$value) {
                         return;
                     }
 
-                    $divisionUuid = data_get(
-                        $this->diagnosticReport,
-                        'divisionId'
-                    );
+                    $divisionUuid = data_get($this->diagnosticReport, 'divisionId');
 
                     if (!$divisionUuid) {
                         return;
                     }
 
-                    $belongsToDivision = Equipment::query()
-                        ->where('uuid', $value)
-                        ->whereHas(
-                            'division',
-                            static fn ($query) =>
-                                $query->where(
-                                    'uuid',
-                                    $divisionUuid
-                                )
-                        )
+                    $belongsToDivision = Equipment::whereUuid($value)
+                        ->whereHas('division', static fn ($query) => $query->where('uuid', $divisionUuid))
                         ->exists();
 
                     if (!$belongsToDivision) {
-                        $fail(
-                            __('equipments.validation.not_belongs_to_division')
-                        );
+                        $fail(__('equipments.validation.not_belongs_to_division'));
                     }
                 },
             ],
@@ -346,15 +293,14 @@ class DiagnosticReportForm extends BaseForm
                 'required_without:diagnosticReport.resultsInterpreterEmployeeId',
                 'nullable',
                 'array',
-                'min:1',
+                'min:1'
             ],
             'diagnosticReport.performerEmployeeIds.*' => [
                 'required',
                 'uuid',
                 'distinct',
                 function (string $attribute, mixed $value, Closure $fail): void {
-                    $employee = Employee::query()
-                        ->where('uuid', $value)
+                    $employee = Employee::whereUuid($value)
                         ->first([
                             'uuid',
                             'legal_entity_id',
@@ -363,35 +309,32 @@ class DiagnosticReportForm extends BaseForm
                         ]);
 
                     if ($employee === null) {
-                        $fail(__('validation.custom.diagnosticReport.performer.employee_not_found'));
+                        $fail(__('diagnostic-reports.validation.performer_employee_not_found'));
 
                         return;
                     }
 
                     if ($employee->legalEntityId !== legalEntity()->id) {
-                        $fail(__('validation.custom.diagnosticReport.performer.employee_wrong_legal_entity', ['employee' => $value,]));
+                        $fail(__('diagnostic-reports.validation.performer_wrong_legal_entity', ['employee' => $value,]));
 
                         return;
                     }
 
                     if ($employee->status !== Status::APPROVED) {
-                        $fail(__('validation.custom.diagnosticReport.performer.employee_invalid_status'));
+                        $fail(__('diagnostic-reports.validation.performer_invalid_status'));
 
                         return;
                     }
 
                     if (!in_array($employee->employeeType, [Role::DOCTOR->value, Role::SPECIALIST->value, Role::ASSISTANT->value, Role::LABORANT->value,], true)) {
-                        $fail(__('validation.custom.diagnosticReport.performer.employee_invalid_type'));
+                        $fail(__('diagnostic-reports.validation.performer_employee_invalid_type'));
                     }
                 },
             ],
             'diagnosticReport.resultsInterpreterEmployeeId' => [
                 Rule::requiredIf(
                     in_array(
-                        data_get(
-                            $this->diagnosticReport,
-                            'categoryCode'
-                        ),
+                        data_get($this->diagnosticReport, 'categoryCode'),
                         self::RESULTS_INTERPRETER_REQUIRED_CATEGORIES,
                         true
                     )
@@ -399,21 +342,14 @@ class DiagnosticReportForm extends BaseForm
                 'nullable',
                 'uuid',
                 Rule::exists('employees', 'uuid')->where(
-                    static fn ($query) => $query
-                        ->where(
-                            'legal_entity_id',
-                            legalEntity()->id
-                        )
-                        ->where(
-                            'status',
-                            Status::APPROVED->value
-                        )
+                    static fn ($query) => $query->where('legal_entity_id', legalEntity()->id)
+                        ->where('status', Status::APPROVED->value)
                         ->where('is_active', true)
                         ->whereIn('employee_type', [
                             Role::DOCTOR->value,
                             Role::SPECIALIST->value,
                         ])
-                ),
+                )
             ],
 
             'observations' => ['nullable', 'array'],
@@ -497,7 +433,7 @@ class DiagnosticReportForm extends BaseForm
             'observations.*.components.*.interpretationCode' => [
                 'nullable',
                 'string',
-                new InDictionary('eHealth/observation_interpretations'),
+                new InDictionary('eHealth/observation_interpretations')
             ],
         ];
     }

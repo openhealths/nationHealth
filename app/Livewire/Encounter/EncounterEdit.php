@@ -84,11 +84,11 @@ class EncounterEdit extends EncounterComponent
         }
 
         $this->form->encounter = $package['encounter'];
-        $this->form->conditions = $package['conditions'];
-        $this->form->immunizations = $package['immunizations'];
-        $this->form->diagnosticReports = $package['diagnosticReports'];
-        $this->form->observations = $package['observations'];
-        $this->form->procedures = $package['procedures'];
+        $this->conditionForm->conditions = $package['conditions'];
+        $this->immunizationForm->immunizations = $package['immunizations'];
+        $this->diagnosticReportForm->diagnosticReports = $package['diagnosticReports'];
+        $this->observationForm->observations = $package['observations'];
+        $this->procedureForm->procedures = $package['procedures'];
         $this->deviceForm->devices = $package['devices'];
         $this->detectedIssueForm->detectedIssues = $package['detectedIssues'];
         $this->deviceAssociationForm->deviceAssociations = $package['deviceAssociations'];
@@ -278,9 +278,6 @@ class EncounterEdit extends EncounterComponent
         unset($formattedData['encounter']['incoming_referral']['display_value']);
 
         try {
-            $this->validateObservationPerformers($formattedData);
-            $this->validateProcedurePerformers($formattedData);
-            $this->validateDiagnosticReportPerformers($formattedData);
             $this->validateEncounterPerformer($formattedData);
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());

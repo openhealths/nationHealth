@@ -5,24 +5,15 @@ declare(strict_types=1);
 namespace App\Livewire\Encounter\Forms;
 
 use App\Core\BaseForm;
-use App\Enums\Equipment\AvailabilityStatus;
-use App\Enums\Equipment\Status as EquipmentStatus;
-use App\Enums\Person\ConditionVerificationStatus;
-use App\Enums\Person\ProcedureStatus;
 use App\Enums\Status;
-use App\Enums\User\Role;
-use App\Models\Equipment;
-use App\Rules\AfterOrEqualDateTime;
 use App\Rules\InDictionary;
 use App\Rules\OnlyOnePrimaryDiagnosis;
 use App\Rules\PastDateTime;
-use App\Services\Dictionary\Mappers\ImmunizationDictionaryMapper;
 use App\Models\Employee\Employee;
-use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\RequiredIf;
+use Illuminate\Validation\Rules\In;
 
 class EncounterForm extends BaseForm
 {
@@ -40,25 +31,11 @@ class EncounterForm extends BaseForm
 
     public array $episode = ['id' => '', 'typeCode' => '', 'name' => ''];
 
-    public array $conditions;
-
-    public array $immunizations;
-
-    public array $observations;
-
-    public array $diagnosticReports;
-
-    public array $procedures;
-
     protected function rules(): array
     {
-        $conditionUuids = collect($this->conditions ?? [])
-            ->pluck('uuid')
-            ->filter()
-            ->values()
-            ->toArray();
+        $conditions = $this->component->conditionForm->conditions;
 
-        $rules = [
+        return [
             'encounter.periodDate' => ['required', 'date', 'before_or_equal:today'],
             'encounter.periodStart' => [
                 'required',
@@ -71,8 +48,20 @@ class EncounterForm extends BaseForm
                 'after:encounter.periodStart',
                 new PastDateTime($this->encounter['periodDate']),
             ],
-            'encounter.classCode' => ['required', 'string', new InDictionary('eHealth/encounter_classes')],
-            'encounter.typeCode' => ['required', 'string', new InDictionary('eHealth/encounter_types')],
+            'encounter.classCode' => [
+                'required',
+                'string',
+                new InDictionary('eHealth/encounter_classes'),
+                $this->classAllowedForEpisodeType(),
+                $this->classAllowedForLegalEntity()
+            ],
+            'encounter.typeCode' => [
+                'required',
+                'string',
+                new InDictionary('eHealth/encounter_types'),
+                $this->typeAllowedForClassAndRole(),
+                $this->patientIdentityObservationCodes()
+            ],
             'encounter.priorityCode' => [
                 Rule::requiredIf(
                     ($this->encounter['classCode'] ?? '') === 'INPATIENT'
@@ -88,12 +77,13 @@ class EncounterForm extends BaseForm
                 'required_unless:encounter.typeCode,intervention',
                 Rule::when(
                     ($this->encounter['typeCode'] ?? '') !== 'intervention',
-                    new OnlyOnePrimaryDiagnosis($this->encounter['classCode'] ?? null, $this->conditions ?? [])
+                    new OnlyOnePrimaryDiagnosis($this->encounter['classCode'] ?? null, $conditions)
                 ),
                 'array'
             ],
             'encounter.diagnoses.*.roleCode' => [
-                'required_with:conditions',
+                // The conditions live in their own form, so this cannot lean on required_with
+                Rule::requiredIf($conditions !== []),
                 'string',
                 new InDictionary('eHealth/diagnosis_roles')
             ],
@@ -149,20 +139,29 @@ class EncounterForm extends BaseForm
             ],
             'encounter.paperReferral.note' => ['nullable', 'string', 'max:1000'],
             'encounter.prescriptions' => ['nullable', 'string', 'max:3000'],
-            'encounter.actionReferences' => ['nullable', 'array'],
-            'encounter.actionReferences.*.uuid' => ['nullable', 'uuid'],
+            'encounter.actionReferences' => ['nullable', 'array', $this->encounterHasActivity()],
+            'encounter.actionReferences.*.uuid' => [
+                'nullable',
+                'uuid',
+                $this->actionReferenceIsAllowedService()
+            ],
             'encounter.participant' => [
                 'nullable',
                 'array',
                 Rule::when(($this->encounter['typeCode'] ?? '') === 'concilium', ['min:2'])
             ],
-            'encounter.participant.*.uuid' => ['nullable', 'uuid', 'distinct:strict',],
+            'encounter.participant.*.uuid' => [
+                'nullable',
+                'uuid',
+                'distinct:strict',
+                $this->participantEmployeeAllowed()
+            ],
             'encounter.supportingInfo' => ['nullable', 'array'],
             'encounter.supportingInfo.*.uuid' => ['required_with:encounter.supportingInfo', 'uuid'],
             'encounter.supportingInfo.*.type' => [
                 'required_with:encounter.supportingInfo',
                 'string',
-                'in:condition,observation,diagnostic_report'
+                Rule::in(['condition', 'observation', 'diagnostic_report'])
             ],
             'encounter.supportingInfo.*.code' => ['nullable', 'string'],
             'encounter.supportingInfo.*.name' => ['nullable', 'string'],
@@ -180,1042 +179,16 @@ class EncounterForm extends BaseForm
                 'string',
                 new InDictionary('eHealth/episode_types'),
                 'required_without:episode.id',
-                Rule::prohibitedIf(!empty($this->episode['id']))
+                Rule::prohibitedIf(!empty($this->episode['id'])),
+                $this->episodeTypeAllowedForLegalEntityAndEmployee()
             ],
             'episode.name' => [
                 'nullable',
                 'string',
                 'required_without:episode.id',
                 Rule::prohibitedIf(!empty($this->episode['id']))
-            ],
-
-            'conditions' => ['nullable', 'array'],
-            // for edit page
-            'conditions.*.uuid' => ['nullable', 'uuid'],
-            'conditions.*.primarySource' => ['required_with:conditions', 'boolean'],
-            'conditions.*.reportOriginCode' => ['nullable', 'string', 'required_if:conditions.*.primarySource,false'],
-            'conditions.*.codeCode' => [
-                'required_with:conditions',
-                'string',
-                new InDictionary(['eHealth/ICPC2/condition_codes', 'eHealth/ICD10_AM/condition_codes'])
-            ],
-            'conditions.*.codeSystem' => [
-                'required_with:conditions',
-                'string',
-                'in:eHealth/ICPC2/condition_codes,eHealth/ICD10_AM/condition_codes'
-            ],
-            'conditions.*.clinicalStatus' => [
-                'required_with:conditions',
-                'string',
-                new InDictionary('eHealth/condition_clinical_statuses')
-            ],
-            'conditions.*.verificationStatus' => Rule::forEach(function (mixed $value, string $attribute): array {
-                $rules = [
-                    'required_with:conditions',
-                    'string',
-                    new InDictionary('eHealth/condition_verification_statuses')
-                ];
-
-                // A condition the encounter lists among its diagnoses has to stay active
-                if (isset($this->encounter['diagnoses'][(int)explode('.', $attribute)[1]])) {
-                    $rules[] = Rule::notIn([ConditionVerificationStatus::ENTERED_IN_ERROR->value]);
-                }
-
-                return $rules;
-            }),
-            'conditions.*.severityCode' => [
-                'nullable',
-                'string',
-                new InDictionary('eHealth/condition_severities')
-            ],
-            'conditions.*.bodySites.*.code' => ['nullable', 'string', new InDictionary('eHealth/body_sites')],
-            'conditions.*.onsetDate' => [
-                'required_with:conditions',
-                'before:tomorrow',
-                'date',
-                'before_or_equal:' . (($this->encounter['periodDate'] ?? '') ?: 'today')
-            ],
-            'conditions.*.onsetTime' => Rule::forEach(
-                function (mixed $value, string $attribute): array {
-                    $onsetDate = $this->conditions[(int) explode('.', $attribute)[1]]['onsetDate'] ?? '';
-
-                    return [
-                        'required_with:conditions',
-                        'date_format:H:i',
-                        new PastDateTime($onsetDate),
-                        $this->notAfterEncounterEnd($onsetDate)
-                    ];
-                }
-            ),
-            'conditions.*.assertedDate' => [
-                'nullable',
-                'before:tomorrow',
-                'date',
-                'date_equals:' . (($this->encounter['periodDate'] ?? '') ?: 'today')
-            ],
-            'conditions.*.assertedTime' => Rule::forEach(
-                function (mixed $value, string $attribute): array {
-                    $assertedDate = $this->conditions[(int) explode('.', $attribute)[1]]['assertedDate'] ?? '';
-
-                    return [
-                        'nullable',
-                        'date_format:H:i',
-                        new AfterOrEqualDateTime(
-                            $assertedDate,
-                            $this->encounter['periodDate'] ?? '',
-                            $this->encounter['periodStart'] ?? '',
-                            'encounter_period_start'
-                        ),
-                        $this->notAfterEncounterEnd($assertedDate)
-                    ];
-                }
-            ),
-            'conditions.*.asserterText' => ['nullable', 'string'],
-            'conditions.*.stageCode' => [
-                'nullable',
-                'string',
-                new InDictionary('eHealth/condition_stages')
-            ],
-            'conditions.*.evidenceCodes.*.code' => [
-                'nullable',
-                'string',
-                new InDictionary('eHealth/ICPC2/reasons')
-            ],
-            'conditions.*.evidenceDetails.*.id' => ['nullable', 'uuid'],
-            'conditions.*.evidenceDetails.*.type' => ['nullable', 'string', 'in:observation,condition'],
-
-            'immunizations' => ['nullable', 'array'],
-            // for edit page
-            'immunizations.*.uuid' => ['nullable', 'uuid'],
-            'immunizations.*.primarySource' => ['required_with:immunizations', 'boolean'],
-            'immunizations.*.notGiven' => [
-                'required_with:immunizations',
-                'boolean',
-                function (string $attribute, mixed $value, Closure $fail): void {
-                    $primarySource = $this->immunizations[(int)explode('.', $attribute)[1]]['primarySource'] ?? null;
-
-                    if ($value === true && $primarySource === false) {
-                        $fail(__('validation.custom.immunizations.not_given_by_patient'));
-                    }
-                }
-            ],
-            'immunizations.*.vaccineCode' => [
-                'required_with:immunizations',
-                'string',
-                new InDictionary('eHealth/vaccine_codes')
-            ],
-            'immunizations.*.date' => ['required_with:immunizations', 'before:tomorrow', 'date'],
-            'immunizations.*.time' => Rule::forEach(fn (mixed $value, string $attribute) => [
-                'required_with:immunizations',
-                'date_format:H:i',
-                new PastDateTime($this->immunizations[(int)explode('.', $attribute)[1]]['date'])
-            ]),
-            'immunizations.*.reasons' => Rule::forEach(function (mixed $value, string $attribute) {
-                $index = (int)explode('.', $attribute)[1];
-                $notGiven = $this->immunizations[$index]['notGiven'] ?? null;
-
-                return ['array', Rule::requiredIf($notGiven === false), Rule::prohibitedIf($notGiven === true)];
-            }),
-            'immunizations.*.reasons.*.code' => [
-                'required',
-                'string',
-                new InDictionary('eHealth/reason_explanations')
-            ],
-            'immunizations.*.reasonNotGivenCode' => Rule::forEach(function (mixed $value, string $attribute) {
-                $index = (int)explode('.', $attribute)[1];
-                $notGiven = $this->immunizations[$index]['notGiven'] ?? null;
-
-                return [
-                    Rule::requiredIf($notGiven === true),
-                    $notGiven === false ? 'prohibited' : 'nullable',
-                    'string',
-                    new InDictionary('eHealth/reason_not_given_explanations')
-                ];
-            }),
-            'immunizations.*.reportOriginCode' => Rule::forEach(function (mixed $value, string $attribute) {
-                $index = (int)explode('.', $attribute)[1];
-                $primarySource = $this->immunizations[$index]['primarySource'] ?? null;
-
-                return [
-                    Rule::requiredIf($primarySource === false),
-                    $primarySource === true ? 'prohibited' : 'nullable',
-                    'string',
-                    new InDictionary('eHealth/immunization_report_origins')
-                ];
-            }),
-            'immunizations.*.reportOriginText' => ['nullable', 'string', 'max:255'],
-            'immunizations.*.manufacturer' => Rule::forEach(fn (mixed $value, string $attribute) => [
-                $this->requiredIfGivenByPerformer($attribute),
-                'nullable',
-                'string',
-                'max:255'
-            ]),
-            'immunizations.*.lotNumber' => Rule::forEach(fn (mixed $value, string $attribute) => [
-                $this->requiredIfGivenByPerformer($attribute),
-                'nullable',
-                'string',
-                'max:255'
-            ]),
-            'immunizations.*.expirationDate' => Rule::forEach(fn (mixed $value, string $attribute) => [
-                $this->requiredIfGivenByPerformer($attribute),
-                'nullable',
-                'date'
-            ]),
-            'immunizations.*.siteCode' => Rule::forEach(fn (mixed $value, string $attribute) => [
-                $this->requiredIfGivenByPerformer($attribute),
-                'nullable',
-                'string',
-                new InDictionary('eHealth/immunization_body_sites')
-            ]),
-            'immunizations.*.routeCode' => Rule::forEach(fn (mixed $value, string $attribute) => [
-                $this->requiredIfGivenByPerformer($attribute),
-                'nullable',
-                'string',
-                new InDictionary('eHealth/vaccination_routes')
-            ]),
-            'immunizations.*.doseQuantityValue' => Rule::forEach(function (mixed $value, string $attribute) {
-                $notGiven = $this->immunizations[(int)explode('.', $attribute)[1]]['notGiven'] ?? null;
-
-                return [Rule::requiredIf($notGiven === false), 'nullable', 'numeric', 'min:0'];
-            }),
-            'immunizations.*.doseQuantityCode' => Rule::forEach(fn (mixed $value, string $attribute) => [
-                $this->requiredIfGivenByPerformer($attribute),
-                'nullable',
-                'string',
-                new InDictionary('eHealth/immunization_dosage_units')
-            ]),
-            'immunizations.*.doseQuantityUnit' => Rule::forEach(
-                function (mixed $value, string $attribute): array {
-                    $notGiven = $this->immunizations[(int) explode('.', $attribute)[1]]['notGiven'] ?? null;
-
-                    return [
-                        Rule::requiredIf($notGiven === false),
-                        'nullable',
-                        'string'
-                    ];
-                }
-            ),
-            'immunizations.*.vaccinationProtocols' => [
-                'required',
-                'array',
-
-                function (string $attribute, mixed $value, Closure $fail): void {
-                    if (!is_array($value)) {
-                        return;
-                    }
-
-                    $usedTargetDiseaseCodes = [];
-
-                    foreach ($value as $vaccinationProtocol) {
-                        $targetDiseaseCodes = data_get($vaccinationProtocol, 'targetDiseaseCodes', []);
-
-                        if (!is_array($targetDiseaseCodes)) {
-                            continue;
-                        }
-
-                        foreach ($targetDiseaseCodes as $targetDiseaseCode) {
-                            if (!is_string($targetDiseaseCode) || $targetDiseaseCode === '') {
-                                continue;
-                            }
-
-                            if (isset($usedTargetDiseaseCodes[$targetDiseaseCode])) {
-                                $fail(__('immunizations.duplicate_target_disease_in_protocol'));
-
-                                return;
-                            }
-
-                            $usedTargetDiseaseCodes[$targetDiseaseCode] = true;
-                        }
-                    }
-                },
-            ],
-            'immunizations.*.vaccinationProtocols.*.authorityCode' => [
-                'required_with:immunizations.*.vaccinationProtocols',
-                'string',
-                new InDictionary('eHealth/vaccination_authorities')
-            ],
-            'immunizations.*.vaccinationProtocols.*.doseSequence' => Rule::forEach(
-                fn (mixed $value, string $attribute) => [
-                    'nullable',
-                    'integer',
-                    'min:1',
-                    $this->requiredIfProtocolFieldsMandatory($attribute)
-                ]
-            ),
-            'immunizations.*.vaccinationProtocols.*.series' => Rule::forEach(
-                fn (mixed $value, string $attribute) => [
-                    'nullable',
-                    'string',
-                    $this->requiredIfProtocolFieldsMandatory($attribute)
-                ]
-            ),
-            'immunizations.*.vaccinationProtocols.*.seriesDoses' => Rule::forEach(
-                fn (mixed $value, string $attribute) => [
-                    'nullable',
-                    'integer',
-                    'min:1',
-                    $this->requiredIfProtocolFieldsMandatory($attribute)
-                ]
-            ),
-            'immunizations.*.vaccinationProtocols.*.description' => ['nullable', 'string'],
-            'immunizations.*.vaccinationProtocols.*.targetDiseaseCodes' => [
-                'required_with:immunizations.*.vaccinationProtocols',
-                'array'
-            ],
-            'immunizations.*.vaccinationProtocols.*.targetDiseaseCodes.*' => [
-                'bail',
-                'required',
-                'string',
-                new InDictionary('eHealth/vaccination_target_diseases'),
-
-                function (string $attribute, mixed $value, Closure $fail): void {
-                    $attributeParts = explode('.', $attribute);
-                    $immunizationIndex = (int) ($attributeParts[1] ?? 0);
-                    $vaccineCode = data_get($this->immunizations, "{$immunizationIndex}.vaccineCode", '');
-
-                    if (!is_string($vaccineCode) || $vaccineCode === '' || !is_string($value) || $value === '') {
-                        return;
-                    }
-
-                    $isAllowed = app(ImmunizationDictionaryMapper::class)
-                        ->isTargetDiseaseAllowed($vaccineCode, $value);
-
-                    if (!$isAllowed) {
-                        $fail(__('immunizations.vaccine_target_disease_mismatch'));
-                    }
-                },
-            ],
-
-            'diagnosticReports' => ['nullable', 'array'],
-            // for edit page
-            'diagnosticReports.*.uuid' => ['nullable', 'uuid'],
-            'diagnosticReports.*.categoryCode' => [
-                'required_with:diagnosticReports',
-                'string',
-                new InDictionary('eHealth/diagnostic_report_categories')
-            ],
-            'diagnosticReports.*.codeValue' => [
-                'required_with:diagnosticReports',
-                'uuid',
-                function (
-                    string $attribute,
-                    mixed $value,
-                    Closure $fail
-                ): void {
-                    $index = (int) explode('.', $attribute)[1];
-
-                    $categoryCode = data_get(
-                        $this->diagnosticReports,
-                        $index . '.categoryCode'
-                    );
-
-                    $service = dictionary()
-                        ->services()
-                        ->flattened()
-                        ->firstWhere('id', $value);
-
-                    if (
-                        $service === null
-                        || data_get($service, 'category') !== $categoryCode
-                    ) {
-                        $fail(
-                            __('validation.exists', [
-                                'attribute' => __(
-                                    'validation.attributes.diagnosticReports.*.codeValue'
-                                ),
-                            ])
-                        );
-                    }
-                },
-            ],
-            'diagnosticReports.*.primarySource' => ['required_with:diagnosticReports', 'boolean'],
-            'diagnosticReports.*.reportOriginCode' => [
-                'required_if:diagnosticReports.*.primarySource,false',
-                'prohibited_if:diagnosticReports.*.primarySource,true',
-                'string',
-                new InDictionary('eHealth/report_origins')
-            ],
-            'diagnosticReports.*.reportOriginText' => ['nullable', 'string'],
-            ...$this->paperReferralRules('diagnosticReports.*'),
-            'diagnosticReports.*.isReferralAvailable' => [
-                'nullable',
-                'boolean',
-            ],
-
-            'diagnosticReports.*.referralType' => Rule::forEach(
-                function (mixed $value, string $attribute): array {
-                    $index = (int) explode('.', $attribute)[1];
-                    $diagnosticReport = $this->diagnosticReports[$index] ?? [];
-
-                    return [
-                        Rule::requiredIf(($diagnosticReport['isReferralAvailable'] ?? false) === true),
-                        'nullable',
-                        Rule::in(['electronic', 'paper']),
-                    ];
-                }
-            ),
-
-            'diagnosticReports.*.basedOnIdentifier' => Rule::forEach(
-                function (mixed $value, string $attribute): array {
-                    $index = (int) explode('.', $attribute)[1];
-                    $diagnosticReport = $this->diagnosticReports[$index] ?? [];
-                    $isElectronic = ($diagnosticReport['referralType'] ?? null) === 'electronic';
-                    $isPaper = ($diagnosticReport['referralType'] ?? null) === 'paper';
-
-                    return [
-                        Rule::requiredIf($isElectronic),
-                        Rule::prohibitedIf($isPaper),
-                        'nullable',
-                        'uuid',
-                    ];
-                }
-            ),
-            'diagnosticReports.*.conclusionCode' => [
-                'nullable',
-                'string',
-                new InDictionary('eHealth/ICD10_AM/condition_codes')
-            ],
-            'diagnosticReports.*.conclusion' => [
-                'nullable',
-                'string',
-                'max:3000',
-            ],
-            'diagnosticReports.*.usedReferences' => ['nullable', 'array'],
-            'diagnosticReports.*.usedReferences.*.id' => [
-                'nullable',
-                'uuid',
-                'distinct',
-
-                Rule::exists('equipments', 'uuid')
-                    ->where(
-                        'legal_entity_id',
-                        legalEntity()->id
-                    )
-                    ->where(
-                        'status',
-                        EquipmentStatus::ACTIVE->value
-                    )
-                    ->where(
-                        'availability_status',
-                        AvailabilityStatus::AVAILABLE->value
-                    ),
-
-                function (
-                    string $attribute,
-                    mixed $value,
-                    Closure $fail
-                ): void {
-                    if (!$value) {
-                        return;
-                    }
-
-                    $divisionUuid = data_get($this->encounter, 'divisionId');
-
-                    if (!$divisionUuid) {
-                        return;
-                    }
-
-                    $belongsToDivision = Equipment::query()
-                        ->where('uuid', $value)
-                        ->whereHas(
-                            'division',
-                            static fn ($query) =>
-                                $query->where(
-                                    'uuid',
-                                    $divisionUuid
-                                )
-                        )
-                        ->exists();
-
-                    if (!$belongsToDivision) {
-                        $fail(
-                            __('equipments.validation.not_belongs_to_division')
-                        );
-                    }
-                },
-            ],
-            'diagnosticReports.*.divisionId' => [
-                'nullable',
-                'uuid',
-                Rule::in([
-                    data_get($this->encounter, 'divisionId'),
-                ]),
-            ],
-            'diagnosticReports.*.performerEmployeeIds' => [
-                'nullable',
-                'array',
-                static function (
-                    string $attribute,
-                    mixed $value,
-                    Closure $fail
-                ): void {
-                    $employeeIds = array_values(array_filter((array) $value));
-
-                    if (count($employeeIds) !== count(array_unique($employeeIds))) {
-                        $fail(__('validation.distinct', ['attribute' => __('validation.attributes.diagnosticReports.*.performerEmployeeIds.*'),]));
-                    }
-                },
-            ],
-
-            'diagnosticReports.*.performerEmployeeIds.*' => [
-                'required',
-                'uuid',
-                function (string $attribute, mixed $value, Closure $fail): void {
-                    $employee = Employee::query()
-                        ->where('uuid', $value)
-                        ->first([
-                            'uuid',
-                            'legal_entity_id',
-                            'status',
-                            'employee_type',
-                        ]);
-
-                    if ($employee === null) {
-                        $fail(__('validation.custom.diagnosticReport.performer.employee_not_found'));
-
-                        return;
-                    }
-
-                    if ($employee->legalEntityId !== legalEntity()->id) {
-                        $fail(__('validation.custom.diagnosticReport.performer.employee_wrong_legal_entity', ['employee' => $value,]));
-
-                        return;
-                    }
-
-                    if ($employee->status !== Status::APPROVED) {
-                        $fail(__('validation.custom.diagnosticReport.performer.employee_invalid_status'));
-
-                        return;
-                    }
-
-                    if (!in_array($employee->employeeType, config('ehealth.encounter_package_allowed_diagnostic_report_performer_employee_types', []), true)) {
-                        $fail(__('validation.custom.diagnosticReport.performer.employee_invalid_type'));
-                    }
-                },
-            ],
-            'diagnosticReports.*.resultsInterpreterEmployeeId'
-                => Rule::forEach(
-                    function (
-                        mixed $value,
-                        string $attribute
-                    ): array {
-                        $index = (int) explode('.', $attribute)[1];
-
-                        $categoryCode = data_get(
-                            $this->diagnosticReports[$index] ?? [],
-                            'categoryCode'
-                        );
-
-                        return [
-                            Rule::requiredIf(
-                                in_array(
-                                    $categoryCode,
-                                    [
-                                        'diagnostic_procedure',
-                                        'imaging',
-                                    ],
-                                    true
-                                )
-                            ),
-                            'nullable',
-                            'uuid',
-                            Rule::exists('employees', 'uuid')->where(
-                                static fn ($query) => $query
-                                    ->where(
-                                        'legal_entity_id',
-                                        legalEntity()->id
-                                    )
-                                    ->where(
-                                        'status',
-                                        Status::APPROVED->value
-                                    )
-                                    ->where('is_active', true)
-                                    ->whereIn('employee_type', [
-                                        Role::DOCTOR->value,
-                                        Role::SPECIALIST->value,
-                                    ])
-                            ),
-                        ];
-                    }
-                ),
-            'diagnosticReports.*.issuedDate' => [
-                'required_with:diagnosticReports',
-                'date_format:' . config('app.date_format'),
-                'before_or_equal:today'
-            ],
-            'diagnosticReports.*.issuedTime' => Rule::forEach(
-                function (mixed $value, string $attribute): array {
-                    $index = (int) explode('.', $attribute)[1];
-                    $diagnosticReport = $this->diagnosticReports[$index] ?? [];
-                    $issuedDate = $diagnosticReport['issuedDate'] ?? '';
-                    $effectiveType = $diagnosticReport['effectiveType'] ?? null;
-
-                    return [
-                        'required_with:diagnosticReports',
-                        'date_format:H:i',
-                        new PastDateTime($issuedDate),
-                        function (string $attribute, mixed $value, Closure $fail) use ($issuedDate, $effectiveType): void {
-                            $periodDate = $this->encounter['periodDate'] ?? '';
-                            $periodStart = $this->encounter['periodStart'] ?? '';
-                            $periodEnd = $this->encounter['periodEnd'] ?? '';
-
-                            if (empty($issuedDate) || empty($value) || empty($periodDate) || empty($periodStart) || empty($periodEnd)) {
-                                return;
-                            }
-
-                            try {
-                                $format = config('app.date_format') . ' H:i';
-                                $issued = CarbonImmutable::createFromFormat($format, $issuedDate . ' ' . $value);
-                                $encounterStart = CarbonImmutable::createFromFormat($format, $periodDate . ' ' . $periodStart);
-                                $encounterEnd = CarbonImmutable::createFromFormat($format, $periodDate . ' ' . $periodEnd);
-                            } catch (\Throwable) {
-                                return;
-                            }
-
-                            if ($issued->lessThan($encounterStart) || $issued->greaterThan($encounterEnd)) {
-                                $fail(__('diagnostic-reports.issued_outside_encounter_period'));
-
-                                return;
-                            }
-
-                            if ($effectiveType === 'period' && $encounterEnd->greaterThan($issued)) {
-                                $fail(__('validation.after_or_equal', ['date' => __('validation.attributes.encounter_period_end'),]));
-                            }
-                        },
-                    ];
-                }
-            ),
-            'diagnosticReports.*.effectiveType' => [
-                'nullable',
-                Rule::in(['date_time', 'period']),
-            ],
-            'diagnosticReports.*.effectiveDate'
-                => Rule::forEach(
-                    function (
-                        mixed $value,
-                        string $attribute
-                    ): array {
-                        $index = (int) explode('.', $attribute)[1];
-
-                        $report = $this->diagnosticReports[$index] ?? [];
-
-                        $isDateTime =
-                            ($report['effectiveType'] ?? null)
-                            === 'date_time';
-
-                        return [
-                            Rule::requiredIf($isDateTime),
-                            Rule::prohibitedIf(!$isDateTime),
-                            'nullable',
-                            'date_format:' . config('app.date_format'),
-                            'before_or_equal:today',
-                        ];
-                    }
-                ),
-
-            'diagnosticReports.*.effectiveTime'
-                => Rule::forEach(
-                    function (
-                        mixed $value,
-                        string $attribute
-                    ): array {
-                        $index = (int) explode('.', $attribute)[1];
-
-                        $report = $this->diagnosticReports[$index] ?? [];
-
-                        $isDateTime =
-                            ($report['effectiveType'] ?? null)
-                            === 'date_time';
-
-                        return [
-                            Rule::requiredIf($isDateTime),
-                            Rule::prohibitedIf(!$isDateTime),
-                            'nullable',
-                            'date_format:H:i',
-                            new PastDateTime(
-                                $report['effectiveDate'] ?? ''
-                            ),
-                        ];
-                    }
-                ),
-            'diagnosticReports.*.effectivePeriodStartDate' => ['nullable'],
-            'diagnosticReports.*.effectivePeriodStartTime' => ['nullable'],
-            'diagnosticReports.*.effectivePeriodEndDate' => ['nullable'],
-            'diagnosticReports.*.effectivePeriodEndTime' => ['nullable'],
-
-            'observations' => ['nullable', 'array'],
-            // for edit page
-            'observations.*.uuid' => ['nullable', 'uuid'],
-            'observations.*.categorySystem' => ['required_with:observations', 'string'],
-            'observations.*.categoryCode' => [
-                'required_with:observations',
-                'string',
-                new InDictionary(['eHealth/observation_categories', 'eHealth/ICF/observation_categories'])
-            ],
-            'observations.*.codeSystem' => ['required_with:observations', 'string'],
-            'observations.*.codeCode' => [
-                'required_with:observations',
-                'string',
-                new InDictionary(
-                    ['eHealth/LOINC/observation_codes', 'eHealth/custom/observation_codes', 'eHealth/ICF/classifiers']
-                )
-            ],
-            'observations.*.effectiveDate' => ['nullable', 'date', 'before_or_equal:now'],
-            'observations.*.effectiveTime' => ['nullable', 'date_format:H:i'],
-            'observations.*.issuedDate' => ['required_with:observations', 'date', 'before_or_equal:today'],
-            'observations.*.issuedTime' => Rule::forEach(fn (mixed $value, string $attribute) => [
-                'required_with:observations',
-                'date_format:H:i',
-                new PastDateTime($this->observations[(int)explode('.', $attribute)[1]]['issuedDate'] ?? '')
-            ]),
-            'observations.*.primarySource' => ['required_with:observations', 'boolean'],
-            'observations.*.reportOriginCode' => Rule::forEach(function (mixed $value, string $attribute) {
-                $index = (int)explode('.', $attribute)[1];
-                $primarySource = $this->observations[$index]['primarySource'];
-
-                return [
-                    Rule::requiredIf($primarySource === false),
-                    $primarySource === true ? 'prohibited' : 'nullable',
-                    'string',
-                    new InDictionary('eHealth/report_origins')
-                ];
-            }),
-            'observations.*.interpretationCode' => [
-                'nullable',
-                'string',
-                new InDictionary('eHealth/observation_interpretations')
-            ],
-            'observations.*.comment' => ['nullable', 'string'],
-            'observations.*.bodySiteCode' => [
-                'nullable',
-                'string',
-                new InDictionary('eHealth/body_sites')
-            ],
-            'observations.*.methodCode' => [
-                'nullable',
-                'string',
-                new InDictionary('eHealth/observation_methods')
-            ],
-            'observations.*.reactionOn' => ['nullable', 'uuid'],
-            'observations.*.dictionaryName' => ['nullable', 'string'],
-            'observations.*.components' => ['nullable', 'array'],
-            'observations.*.components.*.codeCode' => ['nullable', 'string'],
-            'observations.*.components.*.codeSystem' => ['nullable', 'string'],
-            'observations.*.components.*.valueCode' => ['nullable', 'string'],
-            'observations.*.components.*.valueSystem' => ['nullable', 'string'],
-            'observations.*.components.*.interpretationCode' => [
-                'nullable',
-                'string',
-                new InDictionary('eHealth/observation_interpretations')
-            ],
-            'observations.*.valueQuantityValue' => ['nullable', 'numeric'],
-            'observations.*.valueQuantityComparator' => ['nullable', 'string', Rule::in(['>', '>=', '=', '<=', '<'])],
-            'observations.*.valueQuantityUnit' => ['nullable', 'string', new InDictionary('eHealth/ucum/units')],
-            'observations.*.valueQuantitySystem' => [
-                'required_with:observations.*.valueQuantityValue',
-                'string'
-            ],
-            'observations.*.valueQuantityCode' => [
-                'required_with:observations.*.valueQuantityValue',
-                'string'
-            ],
-            'observations.*.valueCodeableConcept' => ['nullable', 'string'],
-            'observations.*.valueString' => ['nullable', 'string'],
-            'observations.*.valueBoolean' => ['nullable', 'boolean'],
-            'observations.*.valueDate' => ['nullable', 'date', 'before_or_equal:now'],
-            'observations.*.valueTime' => ['nullable', 'date_format:H:i'],
-            'observations.*.valueSampledDataData' => ['nullable', 'string'],
-            'observations.*.valueSampledDataOrigin' => ['nullable', 'numeric'],
-            'observations.*.valueSampledDataPeriod' => ['nullable', 'numeric'],
-            'observations.*.valueSampledDataFactor' => ['nullable', 'numeric'],
-            'observations.*.valueSampledDataLowerLimit' => ['nullable', 'numeric'],
-            'observations.*.valueSampledDataUpperLimit' => ['nullable', 'numeric'],
-            'observations.*.valueSampledDataDimensions' => ['nullable', 'numeric'],
-            'observations.*.valueRange' => ['nullable', 'array'],
-            'observations.*.valueRange.low' => ['nullable', 'array'],
-            'observations.*.valueRange.high' => ['nullable', 'array'],
-            'observations.*.valueRatio' => ['nullable', 'array'],
-            'observations.*.valueRatio.numerator' => ['nullable', 'array'],
-            'observations.*.valueRatio.denominator' => ['nullable', 'array'],
-
-            'procedures' => ['nullable', 'array'],
-            // for edit page
-            'procedures.*.uuid' => ['nullable', 'uuid'],
-            'procedures.*.status' => [
-                'required_with:procedures',
-                Rule::in([
-                    ProcedureStatus::COMPLETED->value,
-                    ProcedureStatus::NOT_DONE->value,
-                ])
-            ],
-            'procedures.*.codeValue' => ['required_with:procedures', 'uuid', 'max:255'],
-            'procedures.*.categoryCode' => [
-                'required_with:procedures',
-                'string',
-                new InDictionary('eHealth/procedure_categories')
-            ],
-            'procedures.*.primarySource' => ['required_with:procedures', 'boolean'],
-            'procedures.*.performerEmployeeId' => Rule::forEach(
-                function (mixed $value, string $attribute): array {
-                    $index = (int) explode('.', $attribute)[1];
-                    $procedure = $this->procedures[$index] ?? [];
-
-                    $isPrimarySource = ($procedure['primarySource'] ?? true) === true;
-
-                    return [
-                        Rule::requiredIf($isPrimarySource),
-                        Rule::prohibitedIf(!$isPrimarySource),
-                        'nullable',
-                        'uuid',
-                        Rule::exists('employees', 'uuid')->where(
-                            static fn ($query) => $query
-                                ->where('legal_entity_id', legalEntity()->id)
-                                ->where('status', Status::APPROVED->value)
-                                ->where('is_active', true)
-                                ->whereIn('employee_type', config('ehealth.encounter_package_allowed_procedure_performer_employee_types', []))
-                        ),
-                    ];
-                }
-            ),
-            'procedures.*.reportOriginCode' => Rule::forEach(function (mixed $value, string $attribute) {
-                $index = (int)explode('.', $attribute)[1];
-                $primarySource = $this->procedures[$index]['primarySource'];
-
-                return [
-                    Rule::requiredIf($primarySource === false),
-                    $primarySource === true ? 'prohibited' : 'nullable',
-                    'string',
-                    new InDictionary('eHealth/report_origins')
-                ];
-            }),
-            'procedures.*.reportOriginText' => ['nullable', 'string'],
-            'procedures.*.divisionId' => ['nullable', 'uuid'],
-            'procedures.*.outcomeCode' => ['nullable', 'string', new InDictionary('eHealth/procedure_outcomes')],
-            'procedures.*.performedType' => Rule::forEach(
-                function (mixed $value, string $attribute): array {
-                    $index = (int) explode('.', $attribute)[1];
-
-                    $isCompleted =
-                        ($this->procedures[$index]['status'] ?? null)
-                        === ProcedureStatus::COMPLETED->value;
-
-                    return [
-                        Rule::requiredIf($isCompleted),
-                        Rule::prohibitedIf(!$isCompleted),
-                        'nullable',
-                        Rule::in(['date_time', 'period']),
-                    ];
-                }
-            ),
-            'procedures.*.performedDate' => Rule::forEach(
-                function (mixed $value, string $attribute): array {
-                    $index = (int) explode('.', $attribute)[1];
-                    $procedure = $this->procedures[$index] ?? [];
-
-                    $isDateTime =
-                        ($procedure['status'] ?? null)
-                            === ProcedureStatus::COMPLETED->value
-                        && ($procedure['performedType'] ?? null)
-                            === 'date_time';
-
-                    return [
-                        Rule::requiredIf($isDateTime),
-                        Rule::prohibitedIf(!$isDateTime),
-                        'nullable',
-                        'date_format:' . config('app.date_format'),
-                        'before_or_equal:today',
-                    ];
-                }
-            ),
-            'procedures.*.performedTime' => Rule::forEach(
-                function (mixed $value, string $attribute): array {
-                    $index = (int) explode('.', $attribute)[1];
-                    $procedure = $this->procedures[$index] ?? [];
-
-                    $isDateTime = ($procedure['status'] ?? null) === ProcedureStatus::COMPLETED->value && ($procedure['performedType'] ?? null) === 'date_time';
-
-                    return [
-                        Rule::requiredIf($isDateTime),
-                        Rule::prohibitedIf(!$isDateTime),
-                        'nullable',
-                        'date_format:H:i',
-                        new PastDateTime(
-                            $procedure['performedDate'] ?? ''
-                        ),
-                    ];
-                }
-            ),
-            'procedures.*.performedPeriodStartDate' => ['nullable'],
-            'procedures.*.performedPeriodStartTime' => ['nullable'],
-            'procedures.*.performedPeriodEndDate' => ['nullable'],
-            'procedures.*.performedPeriodEndTime' => ['nullable'],
-            'procedures.*.note' => ['nullable', 'string'],
-            ...$this->paperReferralRules('procedures.*'),
-            'procedures.*.isReferralAvailable' => ['nullable', 'boolean'],
-            'procedures.*.referralType' => Rule::forEach(function (mixed $value, string $attribute) {
-                $index = (int)explode('.', $attribute)[1];
-                $procedure = $this->procedures[$index] ?? [];
-
-                $isReferralAvailable = ($procedure['isReferralAvailable'] ?? false) === true;
-
-                return [
-                    Rule::requiredIf($isReferralAvailable),
-                    'nullable',
-                    Rule::in(['electronic', 'paper']),
-                ];
-            }),
-            'procedures.*.basedOnIdentifier' => Rule::forEach(function (mixed $value, string $attribute) {
-                $index = (int)explode('.', $attribute)[1];
-                $procedure = $this->procedures[$index] ?? [];
-
-                $isElectronicReferral = ($procedure['referralType'] ?? '') === 'electronic';
-                $isPaperReferral = ($procedure['referralType'] ?? '') === 'paper';
-
-                return [
-                    Rule::requiredIf($isElectronicReferral),
-                    Rule::prohibitedIf($isPaperReferral),
-                    'nullable',
-                    'string',
-                    'max:255',
-                ];
-            }),
-            'procedures.*.paperReferralRequesterEmployeeName' => Rule::forEach(
-                function (mixed $value, string $attribute) {
-                    $index = (int)explode('.', $attribute)[1];
-                    $procedure = $this->procedures[$index] ?? [];
-
-                    $isPaperReferral = ($procedure['referralType'] ?? '') === 'paper';
-                    $isElectronicReferral = ($procedure['referralType'] ?? '') === 'electronic';
-
-                    return [
-                        Rule::requiredIf($isPaperReferral),
-                        Rule::prohibitedIf($isElectronicReferral),
-                        'nullable',
-                        'string',
-                        'max:255',
-                    ];
-                }
-            ),
-            'procedures.*.paperReferralRequesterLegalEntityEdrpou' => Rule::forEach(
-                function (mixed $value, string $attribute) {
-                    $index = (int)explode('.', $attribute)[1];
-                    $procedure = $this->procedures[$index] ?? [];
-
-                    $isPaperReferral = ($procedure['referralType'] ?? '') === 'paper';
-                    $isElectronicReferral = ($procedure['referralType'] ?? '') === 'electronic';
-
-                    return [
-                        Rule::requiredIf($isPaperReferral),
-                        Rule::prohibitedIf($isElectronicReferral),
-                        'nullable',
-                        'digits_between:8,10',
-                    ];
-                }
-            ),
-            'procedures.*.paperReferralRequesterLegalEntityName' => Rule::forEach(
-                function (mixed $value, string $attribute) {
-                    $index = (int)explode('.', $attribute)[1];
-                    $procedure = $this->procedures[$index] ?? [];
-
-                    $isElectronicReferral = ($procedure['referralType'] ?? '') === 'electronic';
-
-                    return [
-                        Rule::prohibitedIf($isElectronicReferral),
-                        'nullable',
-                        'string',
-                        'max:255',
-                    ];
-                }
-            ),
-            'procedures.*.paperReferralServiceRequestDate' => Rule::forEach(function (mixed $value, string $attribute) {
-                $index = (int)explode('.', $attribute)[1];
-                $procedure = $this->procedures[$index] ?? [];
-
-                $isPaperReferral = ($procedure['referralType'] ?? '') === 'paper';
-                $isElectronicReferral = ($procedure['referralType'] ?? '') === 'electronic';
-
-                return [
-                    Rule::requiredIf($isPaperReferral),
-                    Rule::prohibitedIf($isElectronicReferral),
-                    'nullable',
-                    'date_format:' . config('app.date_format'),
-                ];
-            }),
-            'procedures.*.usedCodes' => ['nullable', 'array'],
-            'procedures.*.usedCodes.*.code' => [
-                'required',
-                Rule::in(
-                    dictionary()->basics()
-                        ->byName('eHealth/assistive_products')
-                        ->flattenedChildValues(true)
-                        ->keys()
-                        ->map(static fn (int|string $code) => (string)$code)
-                        ->values()
-                        ->toArray()
-                ),
-            ],
-            'procedures.*.reasonReferences' => ['nullable', 'array'],
-            'procedures.*.reasonReferences.*.id' => ['nullable', 'uuid'],
-            'procedures.*.reasonReferences.*.type' => ['nullable', 'string', 'in:observation,condition'],
-            'procedures.*.reasonReferences.*.codeCode' => Rule::forEach(
-                fn (mixed $value, string $attribute) => $this->reasonReferenceCodeRule($attribute)
-            ),
-            'procedures.*.complicationDetails' => ['nullable', 'array'],
-            'procedures.*.complicationDetails.*.id' => ['nullable', 'uuid', Rule::in($conditionUuids)],
-            'procedures.*.complicationDetails.*.type' => ['nullable', 'string', 'in:condition'],
-            'procedures.*.complicationDetails.*.codeCode' => [
-                'nullable',
-                'string',
-                new InDictionary(['eHealth/ICPC2/condition_codes', 'eHealth/ICD10_AM/condition_codes'])
-            ],
-            'procedures.*.usedReferences' => ['nullable', 'array'],
-            'procedures.*.usedReferences.*.id' => [
-                'nullable',
-                'uuid',
-                'distinct',
-                Rule::exists('equipments', 'uuid')
-                    ->where('legal_entity_id', legalEntity()->id)
-                    ->where('status', EquipmentStatus::ACTIVE->value)
-                    ->where('availability_status', AvailabilityStatus::AVAILABLE->value),
-
-                function (string $attribute, mixed $value, Closure $fail): void {
-                    if (!$value) {
-                        return;
-                    }
-
-                    $index = (int)explode('.', $attribute)[1];
-                    $divisionUuid = data_get($this->procedures[$index] ?? [], 'divisionId');
-
-                    if (!$divisionUuid) {
-                        return;
-                    }
-
-                    $belongsToDivision = Equipment::query()
-                        ->where('uuid', $value)
-                        ->whereHas('division', static fn ($query) => $query->where('uuid', $divisionUuid))
-                        ->exists();
-
-                    if (!$belongsToDivision) {
-                        $fail(__('equipments.validation.not_belongs_to_division'));
-                    }
-                },
-            ],
+            ]
         ];
-
-        $this->addAllowedEncounterClasses($rules);
-        $this->addAllowedEncounterTypes($rules);
-        $this->addEncounterActivityValidation($rules);
-        $this->addActionReferenceValidation($rules);
-        $this->addPatientIdentityObservationValidation($rules);
-        $this->addAllowedEpisodeCareManagerEmployeeTypes($rules);
-        $this->addAllowedConditionCodes($rules);
-        $this->addPsychiatryEvidenceValidation($rules);
-        $this->addParticipantEmployeeValidation($rules);
-        $this->addConditionAsserterValidation($rules);
-        $this->addEmployeeTypeConditionsValidation($rules);
-        $this->addSpecialityConditionsValidation($rules);
-
-        return $rules;
     }
 
     /**
@@ -1237,31 +210,28 @@ class EncounterForm extends BaseForm
     }
 
     /**
-     * Add allowed values for episode type code.
+     * The episode type has to be allowed both for the legal entity and for the employee writing the encounter.
      *
-     * @param  array  $rules
-     * @return void
+     * @return In
      */
-    private function addAllowedEpisodeCareManagerEmployeeTypes(array &$rules): void
+    private function episodeTypeAllowedForLegalEntityAndEmployee(): In
     {
-        $allowedValues = array_intersect(
+        return Rule::in(array_intersect(
             config('ehealth.legal_entity_episode_types')[legalEntity()->type->name],
             config('ehealth.employee_episode_types')[Auth::user()->getEncounterWriterEmployee()->employeeType]
-        );
-        $rules['episode.typeCode'][] = 'in:' . implode(',', $allowedValues);
+        ));
     }
 
     /**
-     * Add allowed values for encounter classes.
+     * The encounter class has to be allowed for the type of the episode the encounter belongs to.
      *
-     * @param  array  $rules
-     * @return void
+     * @return Closure
      */
-    private function addAllowedEncounterClasses(array &$rules): void
+    private function classAllowedForEpisodeType(): Closure
     {
         $encounterClassLabels = $this->component->dictionaries['eHealth/encounter_classes'];
 
-        $rules['encounter.classCode'][] = function (string $attribute, mixed $value, Closure $fail) use (
+        return function (string $attribute, mixed $value, Closure $fail) use (
             $encounterClassLabels
         ): void {
             $episodeTypeCode = $this->episode['typeCode'] ?? null;
@@ -1282,11 +252,22 @@ class EncounterForm extends BaseForm
                 ]));
             }
         };
+    }
 
-        $rules['encounter.classCode'][] = static function (string $attribute, mixed $value, Closure $fail) use (
+    /**
+     * The encounter class has to be allowed for the type of the legal entity.
+     *
+     * @return Closure
+     */
+    private function classAllowedForLegalEntity(): Closure
+    {
+        $encounterClassLabels = $this->component->dictionaries['eHealth/encounter_classes'];
+
+        return static function (string $attribute, mixed $value, Closure $fail) use (
             $encounterClassLabels
         ): void {
             $allowed = config('ehealth.legal_entity_encounter_classes.' . legalEntity()->type->name, []);
+
             if (!in_array($value, $allowed, true)) {
                 $fail(__('validation.custom.encounter.classCode.legal_entity_forbidden', [
                     'value' => $encounterClassLabels[$value]
@@ -1296,14 +277,13 @@ class EncounterForm extends BaseForm
     }
 
     /**
-     * Add allowed values for encounter types.
+     * The encounter type has to be allowed both for the encounter class and for the user's role.
      *
-     * @param  array  $rules
-     * @return void
+     * @return Closure
      */
-    private function addAllowedEncounterTypes(array &$rules): void
+    private function typeAllowedForClassAndRole(): Closure
     {
-        $rules['encounter.typeCode'][] = function (string $attribute, mixed $value, Closure $fail): void {
+        return function (string $attribute, mixed $value, Closure $fail): void {
             $classCode = $this->encounter['classCode'] ?? null;
 
             if (empty($classCode)) {
@@ -1329,20 +309,18 @@ class EncounterForm extends BaseForm
     }
 
     /**
-     * Validate encounter participant employees.
+     * A participant has to be an approved employee of this legal entity, allowed for the encounter type.
      *
-     * @param  array  $rules
-     * @return void
+     * @return Closure
      */
-    private function addParticipantEmployeeValidation(array &$rules): void
+    private function participantEmployeeAllowed(): Closure
     {
-        $rules['encounter.participant.*.uuid'][] = function (string $attribute, mixed $value, Closure $fail): void {
+        return function (string $attribute, mixed $value, Closure $fail): void {
             if (empty($value)) {
                 return;
             }
 
-            $employee = Employee::query()
-                ->where('uuid', $value)
+            $employee = Employee::whereUuid($value)
                 ->first([
                     'uuid',
                     'legal_entity_id',
@@ -1368,9 +346,7 @@ class EncounterForm extends BaseForm
                 return;
             }
 
-            $allowedEmployeeTypes = config(
-                'ehealth.encounter_package_allowed_encounter_participant_employee_types'
-            );
+            $allowedEmployeeTypes = config('ehealth.encounter_package_allowed_encounter_participant_employee_types');
 
             if (!in_array($employee->employeeType, $allowedEmployeeTypes, true)) {
                 $fail(__('validation.custom.encounter.participant.employee_invalid_type'));
@@ -1393,14 +369,14 @@ class EncounterForm extends BaseForm
     }
 
     /**
-     * Validate the presence of encounter activity (counselling action references, diagnostic reports or procedures) depending on the encounter class and type.
+     * The encounter has to carry some activity — a counselling action reference, a diagnostic report
+     * or a procedure — depending on its class and type.
      *
-     * @param  array  $rules
-     * @return void
+     * @return Closure
      */
-    private function addEncounterActivityValidation(array &$rules): void
+    private function encounterHasActivity(): Closure
     {
-        $rules['encounter.actionReferences'][] = function (string $attribute, mixed $value, Closure $fail): void {
+        return function (string $attribute, mixed $value, Closure $fail): void {
             $type = $this->encounter['typeCode'] ?? null;
 
             if ($type === 'patient_identity') {
@@ -1436,8 +412,8 @@ class EncounterForm extends BaseForm
 
             if (
                 !$hasCounsellingReference
-                && empty($this->diagnosticReports)
-                && empty($this->procedures)
+                && empty($this->component->diagnosticReportForm->diagnosticReports)
+                && empty($this->component->procedureForm->procedures)
             ) {
                 $fail(__('validation.custom.encounter.actionReferences.required_activity'));
             }
@@ -1445,20 +421,18 @@ class EncounterForm extends BaseForm
     }
 
     /**
-     * Validate observation codes for "patient_identity" encounters: every
-     * mandatory code must be present and only allowed codes may be used.
+     * A "patient_identity" encounter carries every mandatory observation code and no code beyond the allowed ones.
      *
-     * @param  array  $rules
-     * @return void
+     * @return Closure
      */
-    private function addPatientIdentityObservationValidation(array &$rules): void
+    private function patientIdentityObservationCodes(): Closure
     {
-        if (($this->encounter['typeCode'] ?? null) !== 'patient_identity') {
-            return;
-        }
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($value !== 'patient_identity') {
+                return;
+            }
 
-        $rules['encounter.typeCode'][] = function (string $attribute, mixed $value, Closure $fail): void {
-            $codes = collect($this->observations ?? [])
+            $codes = collect($this->component->observationForm->observations)
                 ->pluck('codeCode')
                 ->filter()
                 ->all();
@@ -1482,19 +456,18 @@ class EncounterForm extends BaseForm
     }
 
     /**
-     * Validate that each action reference points to a service and not to a service group, and that the
-     * service belongs to the "counselling" category when the encounter class is AMB.
+     * An action reference points to a service and not to a service group, and the service belongs to the
+     * "counselling" category when the encounter class is AMB.
      *
-     * @param  array  $rules
-     * @return void
+     * @return Closure
      */
-    private function addActionReferenceValidation(array &$rules): void
+    private function actionReferenceIsAllowedService(): Closure
     {
         $isAmbulatory = ($this->encounter['classCode'] ?? null) === 'AMB';
 
         $serviceCategories = dictionary()->services()->flattened()->pluck('category', 'id');
 
-        $rules['encounter.actionReferences.*.uuid'][] = static function (
+        return static function (
             string $attribute,
             mixed $value,
             Closure $fail
@@ -1518,69 +491,16 @@ class EncounterForm extends BaseForm
         };
     }
 
-    /**
-     * Add condition code system validation based on encounter class.
-     *
-     * @param  array  $rules
-     * @return void
-     */
-    private function addAllowedConditionCodes(array &$rules): void
-    {
-        $rules['conditions.*.codeSystem'][] = function (string $attribute, mixed $value, Closure $fail): void {
-            $classCode = $this->encounter['classCode'] ?? null;
-            if (empty($classCode) || $classCode === 'PHC') {
-                return;
-            }
-
-            if ($value !== 'eHealth/ICD10_AM/condition_codes') {
-                $fail(__('validation.custom.conditions.codeSystem.class_forbidden'));
-            }
-        };
-    }
-
-    /**
-     * Validate that conditions requiring a psychiatry evidence reference have a valid condition evidence attached.
-     *
-     * @param  array  $rules
-     * @return void
-     */
-    private function addPsychiatryEvidenceValidation(array &$rules): void
-    {
-        $rules['conditions.*'][] = static function (string $attribute, mixed $value, Closure $fail): void {
-            $codeCode = data_get($value, 'codeCode');
-            $psychiatryCodes = config('ehealth.psychiatry_icpc2_diagnoses_evidence_check', []);
-
-            if (!in_array($codeCode, $psychiatryCodes, true)) {
-                return;
-            }
-
-            $evidenceDetails = collect(data_get($value, 'evidenceDetails', []));
-            $conditionEvidence = $evidenceDetails->firstWhere('type', '=', 'condition');
-
-            if (!$conditionEvidence) {
-                $fail(__('validation.custom.conditions.psychiatry_evidence_required', ['code' => $codeCode]));
-
-                return;
-            }
-
-            $allowedCodes = config('ehealth.icd10am_speciality_conditions_allowed.PSYCHIATRY', []);
-
-            if (!in_array(data_get($conditionEvidence, 'codeCode'), $allowedCodes, true)) {
-                $fail(__('validation.custom.conditions.psychiatry_evidence_code_forbidden', ['code' => $codeCode]));
-            }
-        };
-    }
-
     public function syncParticipants(): void
     {
         $encounterWriterEmployeeUuid = Auth::user()
             ->getEncounterWriterEmployee($this->encounter['classCode'] ?? null)?->uuid;
 
-        $procedurePerformerUuids = collect($this->procedures ?? [])
+        $procedurePerformerUuids = collect($this->component->procedureForm->procedures)
             ->filter(static fn (array $procedure): bool => ($procedure['primarySource'] ?? false) === true && !empty($procedure['performerEmployeeId']))
             ->pluck('performerEmployeeId');
 
-        $diagnosticReportPerformerUuids = collect($this->diagnosticReports ?? [])
+        $diagnosticReportPerformerUuids = collect($this->component->diagnosticReportForm->diagnosticReports)
             ->filter(static fn (array $diagnosticReport): bool => ($diagnosticReport['primarySource'] ?? false) === true)
             ->flatMap(
                 static fn (array $diagnosticReport): array => array_filter([
@@ -1643,253 +563,5 @@ class EncounterForm extends BaseForm
         }
 
         $this->encounter['participant'] = $participants->toArray();
-    }
-
-    /**
-     * Validate condition asserter employee.
-     *
-     * @param  array  $rules
-     * @return void
-     */
-    private function addConditionAsserterValidation(array &$rules): void
-    {
-        $rules['conditions.*'][] = function (
-            string $attribute,
-            mixed $value,
-            Closure $fail
-        ): void {
-            if (data_get($value, 'primarySource') !== true) {
-                return;
-            }
-
-            $asserter = Auth::user()->getEncounterWriterEmployee($this->encounter['classCode'] ?? null);
-
-            if ($asserter === null) {
-                $fail(__('validation.custom.conditions.asserter_employee_not_found'));
-
-                return;
-            }
-
-            $allowedEmployeeTypes = config('ehealth.encounter_package_allowed_condition_asserter_employee_types', []);
-
-            if (!in_array($asserter->employeeType, $allowedEmployeeTypes, true)) {
-                $fail(__('validation.custom.conditions.asserter_employee_invalid_type'));
-
-                return;
-            }
-
-            $participantUuids = collect(
-                $this->encounter['participant'] ?? []
-            )
-                ->pluck('uuid')
-                ->filter();
-
-            if (!$participantUuids->contains($asserter->uuid)) {
-                $fail(__('validation.custom.conditions.asserter_employee_not_participant'));
-            }
-        };
-    }
-
-    /**
-     * Validate that ASSISTANT and MED_COORDINATOR employees only use their allowed condition codes.
-     *
-     * @param  array  $rules
-     * @return void
-     */
-    private function addEmployeeTypeConditionsValidation(array &$rules): void
-    {
-        $rules['conditions.*'][] = function (
-            string $attribute,
-            mixed $value,
-            Closure $fail
-        ): void {
-            if (data_get($value, 'primarySource') !== true) {
-                return;
-            }
-
-            $asserter = Auth::user()->getEncounterWriterEmployee($this->encounter['classCode'] ?? null);
-
-            if ($asserter === null) {
-                return;
-            }
-
-            $employeeType = $asserter->employeeType;
-
-            if (in_array($employeeType, [Role::DOCTOR->value, Role::SPECIALIST->value,], true)) {
-                return;
-            }
-
-            if (!in_array($employeeType, [Role::ASSISTANT->value, Role::MED_COORDINATOR->value, ], true)) {
-                $fail(__('validation.custom.conditions.employee_type_code_forbidden', ['code' => data_get($value, 'codeCode'), ]));
-
-                return;
-            }
-
-            $allowedByCodeSystem = config("ehealth.employee_type_conditions_allowed.$employeeType", []);
-            $codeSystem = data_get($value, 'codeSystem');
-            $codeCode = data_get($value, 'codeCode');
-            $allowedCodes = $allowedByCodeSystem[$codeSystem] ?? [];
-
-            if (!in_array($codeCode, $allowedCodes, true)) {
-                $fail(__('validation.custom.conditions.employee_type_code_forbidden', ['code' => $codeCode, ]));
-            }
-        };
-    }
-
-    /**
-     * Validate that the asserter's officio speciality is allowed to set the given ICD10_AM condition code.
-     * Only applies when primarySource is true and codeSystem is eHealth/ICD10_AM/condition_codes.
-     *
-     * @param  array  $rules
-     * @return void
-     */
-    private function addSpecialityConditionsValidation(array &$rules): void
-    {
-        $rules['conditions.*'][] = function (
-            string $attribute,
-            mixed $value,
-            Closure $fail
-        ): void {
-            if (data_get($value, 'primarySource') !== true) {
-                return;
-            }
-
-            if (data_get($value, 'codeSystem') !== 'eHealth/ICD10_AM/condition_codes') {
-                return;
-            }
-
-            $asserter = Auth::user()->getEncounterWriterEmployee($this->encounter['classCode'] ?? null);
-
-            if ($asserter === null) {
-                return;
-            }
-
-            $specialities = $asserter
-                ->loadMissing('specialities')
-                ->specialities
-                ->where('speciality_officio', true);
-
-            $codeCode = data_get($value, 'codeCode');
-
-            $hasAllowedSpeciality = $specialities->contains(
-                static function ($speciality) use ($codeCode): bool {
-                    $allowedCodes = config("ehealth.icd10am_speciality_conditions_allowed.$speciality->speciality");
-
-                    return is_array($allowedCodes) && in_array($codeCode, $allowedCodes, true);
-                }
-            );
-
-            if (!$hasAllowedSpeciality) {
-                $fail(__('validation.custom.conditions.speciality_condition_code_forbidden', ['code' => $codeCode, ]));
-            }
-        };
-    }
-
-    /**
-     * Rules for paper referral data.
-     *
-     * @param  string  $prefix  e.g. 'diagnosticReports.*' or 'procedures.*'
-     * @return array
-     */
-    private function paperReferralRules(string $prefix): array
-    {
-        return [
-            "$prefix.paperReferralRequisition" => ['nullable', 'string', 'max:255'],
-            "$prefix.paperReferralRequesterEmployeeName" => ['nullable', 'string', 'max:255'],
-            "$prefix.paperReferralRequesterLegalEntityEdrpou" => ['nullable', 'digits_between:8,10'],
-            "$prefix.paperReferralRequesterLegalEntityName" => ['nullable', 'string', 'max:255'],
-            "$prefix.paperReferralServiceRequestDate" => ['nullable', 'date_format:' . config('app.date_format')],
-            "$prefix.paperReferralNote" => ['nullable', 'string']
-        ];
-    }
-
-    /**
-     * @param  string  $attribute  e.g. procedures.0.reasonReferences.1.codeCode
-     * @return array
-     */
-    private function reasonReferenceCodeRule(string $attribute): array
-    {
-        $parts = explode('.', $attribute);
-        $type = $this->procedures[(int)$parts[1]]['reasonReferences'][(int)$parts[3]]['type'] ?? null;
-
-        $dictionaries = match ($type) {
-            'observation' => ['eHealth/LOINC/observation_codes', 'eHealth/ICF/classifiers'],
-            'condition' => ['eHealth/ICPC2/condition_codes', 'eHealth/ICD10_AM/condition_codes'],
-            default => [
-                'eHealth/LOINC/observation_codes',
-                'eHealth/ICF/classifiers',
-                'eHealth/ICPC2/condition_codes',
-                'eHealth/ICD10_AM/condition_codes',
-            ],
-        };
-
-        return ['nullable', 'string', new InDictionary($dictionaries)];
-    }
-
-    /**
-     * Fail when the given date combined with the validated time is later than the encounter period end.
-     *
-     * @param  string  $date  Date portion of the validated datetime, e.g. 03.08.2026
-     * @return Closure
-     */
-    private function notAfterEncounterEnd(string $date): Closure
-    {
-        return function (string $attribute, mixed $value, Closure $fail) use ($date): void {
-            if (
-                empty($date)
-                || empty($value)
-                || empty($this->encounter['periodDate'])
-                || empty($this->encounter['periodEnd'])
-            ) {
-                return;
-            }
-
-            $format = config('app.date_format') . ' H:i';
-            $datetime = CarbonImmutable::createFromFormat($format, $date . ' ' . $value);
-            $periodEnd = CarbonImmutable::createFromFormat(
-                $format,
-                $this->encounter['periodDate'] . ' ' . $this->encounter['periodEnd']
-            );
-
-            if ($datetime->greaterThan($periodEnd)) {
-                $fail(__('validation.before_or_equal', [
-                    'date' => __('validation.attributes.encounter_period_end')
-                ]));
-            }
-        };
-    }
-
-    /**
-     * Required if the immunization was performed by the author and the vaccine was given.
-     *
-     * @param  string  $attribute  e.g. immunizations.0.manufacturer
-     * @return RequiredIf
-     */
-    private function requiredIfGivenByPerformer(string $attribute): RequiredIf
-    {
-        $immunization = $this->immunizations[(int)explode('.', $attribute)[1]] ?? [];
-
-        return Rule::requiredIf(
-            ($immunization['primarySource'] ?? null) === true && ($immunization['notGiven'] ?? null) === false
-        );
-    }
-
-    /**
-     * Required if the immunization is from a primary source or the protocol authority is MoH.
-     *
-     * @param  string  $attribute  e.g. immunizations.0.vaccinationProtocols.1.doseSequence
-     * @return RequiredIf
-     */
-    private function requiredIfProtocolFieldsMandatory(string $attribute): RequiredIf
-    {
-        $parts = explode('.', $attribute);
-        $immunizationIndex = (int)$parts[1];
-        $protocolIndex = (int)$parts[3];
-
-        $immunization = $this->immunizations[$immunizationIndex] ?? [];
-        $authorityCode = $immunization['vaccinationProtocols'][$protocolIndex]['authorityCode'] ?? null;
-        $primarySource = $immunization['primarySource'] ?? null;
-
-        return Rule::requiredIf($authorityCode === 'MoH' || $primarySource === true);
     }
 }

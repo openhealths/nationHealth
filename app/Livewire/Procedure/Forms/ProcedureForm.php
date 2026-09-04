@@ -21,6 +21,18 @@ class ProcedureForm extends BaseForm
 {
     public array $procedure = [];
 
+    /**
+     * Name the fields of a procedure the way the form labels them.
+     *
+     * @return array
+     */
+    public function validationAttributes(): array
+    {
+        return collect(__('procedures.attributes'))
+            ->mapWithKeys(static fn (string $name, string $field): array => ["procedure.$field" => $name])
+            ->all();
+    }
+
     protected function rules(): array
     {
         $isCompleted = data_get($this->procedure, 'status') === ProcedureStatus::COMPLETED->value;
@@ -130,79 +142,49 @@ class ProcedureForm extends BaseForm
             ],
 
             'procedure.performedDate' => [
-                Rule::requiredIf(
-                    $isCompleted  && data_get($this->procedure, 'performedType')  === 'date_time'
-                ),
-                Rule::prohibitedIf(
-                    !$isCompleted || data_get($this->procedure, 'performedType') !== 'date_time'
-                ),
+                Rule::requiredIf($isCompleted && data_get($this->procedure, 'performedType') === 'date_time'),
+                Rule::prohibitedIf(!$isCompleted || data_get($this->procedure, 'performedType') !== 'date_time'),
                 'nullable',
                 'date_format:' . config('app.date_format'),
                 'before_or_equal:today',
             ],
 
             'procedure.performedTime' => [
-                Rule::requiredIf(
-                    $isCompleted && data_get($this->procedure, 'performedType') === 'date_time'
-                ),
-                Rule::prohibitedIf(
-                    !$isCompleted || data_get($this->procedure, 'performedType') !== 'date_time'
-                ),
+                Rule::requiredIf($isCompleted && data_get($this->procedure, 'performedType') === 'date_time'),
+                Rule::prohibitedIf(!$isCompleted || data_get($this->procedure, 'performedType') !== 'date_time'),
                 'nullable',
                 'date_format:H:i',
-                new PastDateTime(
-                    data_get($this->procedure, 'performedDate', '')
-                ),
+                new PastDateTime(data_get($this->procedure, 'performedDate', ''))
             ],
 
             'procedure.performedPeriodStartDate' => [
-                Rule::requiredIf(
-                    $isCompleted && data_get($this->procedure, 'performedType') === 'period'
-                ),
-                Rule::prohibitedIf(
-                    !$isCompleted || data_get($this->procedure, 'performedType') !== 'period'
-                ),
+                Rule::requiredIf($isCompleted && data_get($this->procedure, 'performedType') === 'period'),
+                Rule::prohibitedIf(!$isCompleted || data_get($this->procedure, 'performedType') !== 'period'),
                 'nullable',
                 'date_format:' . config('app.date_format'),
                 'before_or_equal:today',
             ],
             'procedure.performedPeriodStartTime' => [
-                Rule::requiredIf(
-                    $isCompleted && data_get($this->procedure, 'performedType') === 'period'
-                ),
-                Rule::prohibitedIf(
-                    !$isCompleted || data_get($this->procedure, 'performedType') !== 'period'
-                ),
+                Rule::requiredIf($isCompleted && data_get($this->procedure, 'performedType') === 'period'),
+                Rule::prohibitedIf(!$isCompleted || data_get($this->procedure, 'performedType') !== 'period'),
                 'nullable',
                 'date_format:H:i',
-                new PastDateTime(
-                    data_get($this->procedure, 'performedPeriodStartDate', '')
-                ),
+                new PastDateTime(data_get($this->procedure, 'performedPeriodStartDate', '')),
             ],
             'procedure.performedPeriodEndDate' => [
-                Rule::requiredIf(
-                    $isCompleted && data_get($this->procedure, 'performedType') === 'period'
-                ),
-                Rule::prohibitedIf(
-                    !$isCompleted || data_get($this->procedure, 'performedType') !== 'period'
-                ),
+                Rule::requiredIf($isCompleted && data_get($this->procedure, 'performedType') === 'period'),
+                Rule::prohibitedIf(!$isCompleted || data_get($this->procedure, 'performedType') !== 'period'),
                 'nullable',
                 'date_format:' . config('app.date_format'),
                 'before_or_equal:today',
                 'after_or_equal:procedure.performedPeriodStartDate',
             ],
             'procedure.performedPeriodEndTime' => [
-                Rule::requiredIf(
-                    $isCompleted && data_get($this->procedure, 'performedType') === 'period'
-                ),
-                Rule::prohibitedIf(
-                    !$isCompleted || data_get($this->procedure, 'performedType') !== 'period'
-                ),
+                Rule::requiredIf($isCompleted && data_get($this->procedure, 'performedType') === 'period'),
+                Rule::prohibitedIf(!$isCompleted || data_get($this->procedure, 'performedType') !== 'period'),
                 'nullable',
                 'date_format:H:i',
-                new PastDateTime(
-                    data_get($this->procedure, 'performedPeriodEndDate', '')
-                ),
+                new PastDateTime(data_get($this->procedure, 'performedPeriodEndDate', '')),
                 new AfterOrEqualDateTime(
                     data_get($this->procedure, 'performedPeriodEndDate', ''),
                     data_get($this->procedure, 'performedPeriodStartDate', ''),
@@ -214,17 +196,7 @@ class ProcedureForm extends BaseForm
             'procedure.reasonReferences.*.type' => ['nullable', 'string', Rule::in(['condition', 'observation'])],
 
             'procedure.usedCodes' => ['nullable', 'array'],
-            'procedure.usedCodes.*.code' => [
-                'required',
-                Rule::in(
-                    dictionary()->basics()
-                        ->byName('eHealth/assistive_products')
-                        ->flattenedChildValues(true)
-                        ->keys()
-                        ->values()
-                        ->toArray()
-                ),
-            ],
+            'procedure.usedCodes.*.code' => ['required', new InDictionary('eHealth/assistive_products')],
 
             'procedure.usedReferences' => ['nullable', 'array'],
             'procedure.usedReferences.*.id' => [
@@ -247,8 +219,7 @@ class ProcedureForm extends BaseForm
                         return;
                     }
 
-                    $belongsToDivision = Equipment::query()
-                        ->where('uuid', $value)
+                    $belongsToDivision = Equipment::whereUuid($value)
                         ->whereHas('division', static fn ($query) => $query->where('uuid', $divisionUuid))
                         ->exists();
 

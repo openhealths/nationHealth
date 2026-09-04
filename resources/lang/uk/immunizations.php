@@ -62,5 +62,40 @@ return [
         'sync_already_running' => 'Синхронізація вакцинацій вже запущена. Будь ласка, зачекайте її завершення.',
         'sync_resume_started' => 'Відновлення попередньої синхронізації вакцинацій розпочато',
         'sync_background_dispatch_error' => 'Помилка запуску фонової синхронізації вакцинацій'
+    ],
+
+    // Custom messages for validation rules
+    'validation' => [
+        'not_given_by_patient' => 'Зі слів пацієнта можна вносити лише проведену вакцинацію'
+    ],
+
+    // Field names for :attribute in validation messages
+    'attributes' => [
+        'primarySource' => 'джерело інформації вакцинації',
+        'notGiven' => 'чи була проведена вакцинація',
+        'vaccineCode' => 'код та назва вакцини',
+        'date' => 'дата вакцинації',
+        'time' => 'час вакцинації',
+        'reasons' => 'причини проведення вакцинації',
+        'reasons.*.code' => 'причина проведення вакцинації',
+        'reasonNotGivenCode' => 'причина не проведення вакцинації',
+        'reportOriginCode' => 'посилання на джерело інформації вакцинації',
+        'reportOriginText' => 'опис джерела інформації вакцинації',
+        'manufacturer' => 'виробник вакцини',
+        'lotNumber' => 'серія вакцини',
+        'expirationDate' => 'дата закінчення придатності вакцини',
+        'siteCode' => 'частина тіла вакцини',
+        'routeCode' => 'шлях введення вакцини',
+        'doseQuantityValue' => 'кількість введеної вакцини',
+        'doseQuantityCode' => 'одиниця виміру вакцини',
+        'doseQuantityUnit' => 'назва одиниці виміру вакцини',
+        'vaccinationProtocols' => 'протоколи імунізації',
+        'vaccinationProtocols.*.authorityCode' => 'автор протоколу імунізації',
+        'vaccinationProtocols.*.doseSequence' => 'порядковий номер дози імунізації',
+        'vaccinationProtocols.*.series' => 'етап імунізації',
+        'vaccinationProtocols.*.seriesDoses' => 'кількість доз по протоколу імунізації',
+        'vaccinationProtocols.*.description' => 'опис протоколу імунізації',
+        'vaccinationProtocols.*.targetDiseaseCodes' => 'протидія загрозам імунізації',
+        'vaccinationProtocols.*.targetDiseaseCodes.*' => 'код протидії загрозам імунізації'
     ]
 ];

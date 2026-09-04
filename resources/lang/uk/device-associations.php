@@ -47,6 +47,9 @@ return [
         'associationDate' => "Дата встановлення або розірвання зв'язку",
         'bodySiteCode' => 'Анатомічна ділянка',
         'bodySiteText' => 'Коментар до анатомічної ділянки',
-        'reportOriginCode' => 'Посилання на джерело'
+        'recorded' => "Дата внесення зв'язку",
+        'primarySource' => 'Джерело інформації',
+        'reportOriginCode' => 'Посилання на джерело',
+        'reportOriginText' => 'Опис джерела'
     ]
 ];

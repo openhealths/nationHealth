@@ -93,7 +93,7 @@ class EncounterCreate extends EncounterComponent
                         }
                         $validated['procedures'][$index]['basedOnIdentifier'] = $uuid;
                     } catch (\Exception $e) {
-                        $this->addError("form.procedures.{$index}.basedOnIdentifier", $e->getMessage());
+                        $this->addError("procedureForm.procedures.{$index}.basedOnIdentifier", $e->getMessage());
                         throw $e;
                     }
                 }
@@ -243,18 +243,6 @@ class EncounterCreate extends EncounterComponent
 
         // Remove display_value from incoming_referral before sending to eHealth (schema rejects it)
         unset($formattedData['encounter']['incoming_referral']['display_value']);
-
-        try {
-            $this->validateProcedurePerformers($formattedData);
-            $this->validateObservationPerformers($formattedData);
-            $this->validateDiagnosticReportPerformers($formattedData);
-        } catch (ValidationException $exception) {
-            Session::flash('error', $exception->validator->errors()->first());
-
-            $this->setErrorBag($exception->validator->getMessageBag());
-
-            return;
-        }
 
         try {
             $this->validateEncounterPerformer($formattedData);

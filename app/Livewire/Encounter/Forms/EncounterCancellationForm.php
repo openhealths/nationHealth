@@ -55,8 +55,8 @@ class EncounterCancellationForm extends BaseForm
     public function validationAttributes(): array
     {
         return [
-            'cancellationReason' => __('encounters.messages.cancel_reason_label'),
-            'explanatoryLetter' => __('encounters.messages.cancel_explanation_label')
+            'cancellationReason' => __('medical-events.cancel_modal.reason_label'),
+            'explanatoryLetter' => __('medical-events.cancel_modal.explanation_label')
         ];
     }
 }

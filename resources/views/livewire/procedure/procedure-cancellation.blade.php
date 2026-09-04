@@ -23,11 +23,11 @@
                 >
                     <div class="p-8 md:p-12">
                         <h3 class="max-w-5xl text-2xl leading-tight font-bold text-gray-900 md:text-3xl dark:text-gray-100">
-                            {{ __('procedures.messages.cancel_modal_title') }}
+                            {{ __('medical-events.cancel_modal.title') }}
                         </h3>
 
                         <p class="mt-12 max-w-5xl text-xl leading-relaxed text-gray-700 md:text-2xl dark:text-gray-200">
-                            {{ __('procedures.messages.cancel_modal_description') }}
+                            {{ __('procedures.cancel_modal_description') }}
                         </p>
 
                         <div class="mt-12 max-w-5xl">
@@ -35,7 +35,7 @@
                                 for="cancellationReason"
                                 class="mb-4 block text-sm font-medium text-gray-700 dark:text-gray-200"
                             >
-                                {{ __('procedures.messages.cancel_reason_label') }} *
+                                {{ __('medical-events.cancel_modal.reason_label') }} *
                             </label>
 
                             <select
@@ -44,7 +44,7 @@
                                 name="statusReason"
                                 id="statusReason"
                             >
-                                <option value="">{{ __('procedures.messages.cancel_reason_placeholder') }}</option>
+                                <option value="">{{ __('medical-events.cancel_modal.reason_placeholder') }}</option>
 
                                 @foreach (data_get($this->dictionaries, 'eHealth/procedure_status_reasons', []) as $code => $label)
                                     <option value="{{ $code }}" wire:key="procedure-cancel-reason-{{ $code }}">
@@ -63,7 +63,7 @@
                                 for="explanatoryLetter"
                                 class="mb-4 block text-base font-semibold text-gray-700 dark:text-gray-200"
                             >
-                                {{ __('procedures.messages.cancel_explanation_label') }} *
+                                {{ __('medical-events.cancel_modal.explanation_label') }} *
                             </label>
 
                             <textarea
@@ -98,7 +98,7 @@
                                 class="rounded-lg bg-red-600 px-8 py-3 font-semibold text-white transition-colors hover:bg-red-700"
                             >
                                 <span wire:loading.remove wire:target="proceedToSignature">
-                                    {{ __('procedures.messages.cancel_confirm_button') }}
+                                    {{ __('medical-events.cancel_modal.confirm_button') }}
                                 </span>
 
                                 <span wire:loading wire:target="proceedToSignature">

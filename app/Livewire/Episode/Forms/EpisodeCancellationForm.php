@@ -43,8 +43,8 @@ class EpisodeCancellationForm extends Form
     public function validationAttributes(): array
     {
         return [
-            'cancellationReason' => __('episodes.cancel_reason_label'),
-            'explanatoryLetter' => __('episodes.cancel_explanation_label')
+            'cancellationReason' => __('medical-events.cancel_modal.reason_label'),
+            'explanatoryLetter' => __('medical-events.cancel_modal.explanation_label')
         ];
     }
 }

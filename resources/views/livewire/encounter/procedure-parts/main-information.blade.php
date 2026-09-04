@@ -1,7 +1,7 @@
 @php
     use App\Enums\Person\ProcedureStatus;
 
-    $procedureErrorPath = $context === 'encounter' ? 'form.procedures.*' : 'form.procedure';
+    $procedureErrorPath = $context === 'encounter' ? 'procedureForm.procedures.*' : 'form.procedure';
 @endphp
 
 <fieldset class="fieldset">
@@ -82,7 +82,7 @@
                             <option value="paper">{{ __('patients.paper') }}</option>
                         </select>
 
-                        @error('form.procedures.referralType')
+                        @error('procedureForm.procedures.*.referralType')
                             <p class="text-error">{{ $message }}</p>
                         @enderror
                     </div>

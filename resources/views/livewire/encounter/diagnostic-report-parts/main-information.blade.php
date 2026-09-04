@@ -2,7 +2,7 @@
     $diagnosticReportErrorPath = $diagnosticReportErrorPath
         ?? (($context ?? null) === 'diagnostic-report'
             ? 'form.diagnosticReport'
-            : 'form.diagnosticReports.*');
+            : 'diagnosticReportForm.diagnosticReports.*');
 @endphp
 
 <fieldset class="fieldset">

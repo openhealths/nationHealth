@@ -1,5 +1,5 @@
 @php
-    $procedureErrorPath = $context === 'encounter' ? 'form.procedures.*' : 'form.procedure';
+    $procedureErrorPath = $context === 'encounter' ? 'procedureForm.procedures.*' : 'form.procedure';
 @endphp
 
 <fieldset class="fieldset">

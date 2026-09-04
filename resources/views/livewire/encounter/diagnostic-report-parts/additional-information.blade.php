@@ -2,7 +2,7 @@
     $diagnosticReportErrorPath = $diagnosticReportErrorPath
         ?? (($context ?? null) === 'diagnostic-report'
             ? 'form.diagnosticReport'
-            : 'form.diagnosticReports.*');
+            : 'diagnosticReportForm.diagnosticReports.*');
     $isEncounterContext = $isEncounterContext ?? false;
     $diagnosticReportEmployeeOptions = $isEncounterContext ? $diagnosticReportEmployees : $employees;
 @endphp

@@ -501,17 +501,18 @@
 
     @if ($this instanceof EncounterEdit && $this->canBeCancelled)
         @include('livewire.encounter.encounter-cancellation', [
-                                    'formPath' => 'cancellationForm',
-                                    'description' => array_filter($this->selectedRecords)
-                                        ? __('encounters.messages.records_cancel_modal_description')
-                                        : __('encounters.messages.cancel_modal_description')
-                                ])
+            'formPath' => 'cancellationForm',
+            'description' => array_filter($this->selectedRecords)
+                ? __('encounters.records_cancel_modal_description')
+                : __('encounters.cancel_modal_description')
+        ])
     @endif
 
     @if ($this instanceof EncounterEdit)
         @include('livewire.encounter.parts.encounter-eprescription-drawer')
         @include('livewire.encounter.parts.encounter-referral-drawer')
     @endif
+
     <livewire:components.x-message :listen-async="true" :key="time()" />
     <x-forms.loading />
 </x-layouts.patient>

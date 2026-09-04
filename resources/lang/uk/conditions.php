@@ -59,5 +59,39 @@ return [
         'sync_already_running' => 'Синхронізація станів вже запущена. Будь ласка, зачекайте її завершення.',
         'sync_resume_started' => 'Відновлення попередньої синхронізації станів розпочато',
         'sync_background_dispatch_error' => 'Помилка запуску фонової синхронізації станів'
+    ],
+
+    // Custom messages for validation rules
+    'validation' => [
+        'code_system_class_forbidden' => "Для класу взаємодії 'Амбулаторна медична допомога' та 'Стаціонарна медична допомога' дозволена лише система eHealth/ICD10_AM/condition_codes",
+        'verification_status_not_in' => 'Діагноз, який додано до взаємодії, не може бути позначений внесеним помилково',
+        'psychiatry_evidence_required' => 'Для коду діагнозу :code необхідно вказати стан як доказ',
+        'psychiatry_evidence_code_forbidden' => 'Стан не може бути використаний як доказ для коду діагнозу :code',
+        'employee_type_code_forbidden' => 'Встановлювач діагнозу не має необхідного типу працівника для встановлення коду :code.',
+        'speciality_condition_code_forbidden' => 'Встановлювач діагнозу не має необхідної спеціальності для встановлення коду :code.',
+        'asserter_employee_not_found' => 'Працівника, вказаного як встановлювача діагнозу, не знайдено.',
+        'asserter_employee_invalid_type' => 'Тип працівника не дозволений як встановлювач діагнозу.',
+        'asserter_employee_not_participant' => 'Працівник, вказаний як встановлювач діагнозу, має бути учасником взаємодії.'
+    ],
+
+    // Field names for :attribute in validation messages
+    'attributes' => [
+        'primarySource' => 'первинне джерело діагнозу',
+        'reportOriginCode' => 'джерело інформації діагнозу',
+        'codeCode' => 'джерело інформації діагнозу',
+        'codeSystem' => 'код стану діагнозу',
+        'clinicalStatus' => 'клінічний статус діагнозу',
+        'verificationStatus' => 'статус верифікації діагнозу',
+        'severityCode' => 'ступінь тяжкості стану діагнозу',
+        'stageCode' => 'стадія стану діагнозу',
+        'bodySites.*.code' => 'частина тіла діагнозу',
+        'onsetDate' => 'дата початку діагнозу',
+        'onsetTime' => 'час початку діагнозу',
+        'assertedDate' => 'дата внесення діагнозу',
+        'assertedTime' => 'час внесення діагнозу',
+        'asserterText' => 'коментар встановлювача діагнозу',
+        'evidenceCodes.*.code' => 'стани доказів діагнозу',
+        'evidenceDetails.*.id' => 'доказ діагнозу',
+        'evidenceDetails.*.type' => 'тип доказу діагнозу'
     ]
 ];

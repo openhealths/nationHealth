@@ -4,7 +4,7 @@
     class="p-4 sm:p-8"
     id="conditions-section"
     x-data="{
-        conditions: $wire.entangle('form.conditions'),
+        conditions: $wire.entangle('conditionForm.conditions'),
         diagnoses: $wire.entangle('form.encounter.diagnoses'),
         encounter: $wire.entangle('form.encounter'),
         showPrimaryWarning: false,

@@ -3,7 +3,7 @@
     id="diagnostic-reports-section"
     x-on:encounter-division-changed.window="divisionId = $event.detail.divisionId"
     x-data="{
-         diagnosticReports: $wire.entangle('form.diagnosticReports'),
+         diagnosticReports: $wire.entangle('diagnosticReportForm.diagnosticReports'),
          selectedRecords: $wire.entangle('selectedRecords.diagnosticReports'),
          cancelledRecords: $wire.cancelledRecords.diagnosticReports,
          canCancelRecords: {{ ($canCancelRecords ?? false) ? 'true' : 'false' }},
