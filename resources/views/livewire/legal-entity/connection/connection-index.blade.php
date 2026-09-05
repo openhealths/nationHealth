@@ -122,7 +122,7 @@
                                                 :id="$id('dropdown-button')"
                                                 class="absolute right-0 mt-2 w-48 rounded-md bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-md z-50"
                                             >
-                                                <a href="#" class="flex items-center gap-2 w-full first-of-type:rounded-t-md px-4 py-2.5 text-left text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                                <a href="{{ route('connection.show', [legalEntity(), $connection]) }}" class="flex items-center gap-2 w-full first-of-type:rounded-t-md px-4 py-2.5 text-left text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">
                                                     @icon('eye', 'w-5 h-5 text-gray-600 dark:text-gray-300') {{ __('legal-entity-connection.btn_view_details') }}
                                                 </a>
                                                 @can('updateSecret', $connection)

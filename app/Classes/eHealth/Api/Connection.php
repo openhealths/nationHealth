@@ -48,6 +48,22 @@ class Connection extends Request
     }
 
     /**
+     * Get the list of client connections associated with the configured eHealth connection.
+     *
+     * @return PromiseInterface|EHealthResponse
+     *
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+     */
+    public function getClientConnections(string $uuid): PromiseInterface|EHealthResponse
+    {
+        $this->setValidator($this->validateClientConnections(...));
+
+        $this->setDefaultPageSize();
+
+        return parent::get(self::URL . '/' . $uuid . '/connections');
+    }
+
+    /**
      * validate get Clients input,
      * see: https://ehealthmisapi1.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/manage-client-configuration/get-clients
      */
@@ -122,6 +138,32 @@ class Connection extends Request
             'ehealth_inserted_at' => 'nullable|date',
             'ehealth_updated_at' => 'nullable|date'
         ];
+    }
+
+
+
+     protected function validateClientConnections(EHealthResponse $response): array
+    {
+        $data = $response->getData();
+
+        $replaced = self::replaceEHealthPropNames($data);
+
+
+        $validator = Validator::make($replaced, [
+            '*.uuid' => ['required', 'uuid'],
+            '*.client_uuid' => ['required', 'uuid'],
+            '*.consumer_uuid' => ['required', 'uuid'],
+            '*.redirect_uri' => ['required', 'string'],
+            '*.secret' => ['nullable', 'string'],
+            '*.ehealth_inserted_at' => 'nullable|date',
+            '*.ehealth_updated_at' => 'nullable|date'
+        ]);
+
+        if ($validator->fails()) {
+            Log::channel('e_health_errors')->error('Validation failed: ' . implode(', ', $validator->errors()->all()));
+        }
+
+        return $validator->validate();
     }
 
     /**

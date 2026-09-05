@@ -71,6 +71,8 @@ use App\Models\HealthcareService;
 use App\Models\LegalEntity;
 use App\Models\License;
 use Illuminate\Support\Facades\Route;
+use App\Livewire\LegalEntity\Connections\LegalEntityConnectionIndex;
+use App\Livewire\LegalEntity\Connections\LegalEntityConnectionShow;
 
 /*
 |--------------------------------------------------------------------------
@@ -148,8 +150,10 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
                 ->can('viewAny', LegalEntity::class)
                 ->name('legal-entity.details');
 
-            Route::get('/connection', \App\Livewire\LegalEntity\Connections\LegalEntityConnectionIndex::class)->name('legal-entity-connection.index');
-            Route::get('/connection/{id}', \App\Livewire\LegalEntity\Connections\LegalEntityConnectionShow::class)->name('legal-entity-connection.show');
+            Route::prefix('connection')->name('connection.')->middleware(['permission:connection:read|client:read'])->group(function () {
+                Route::get('/', LegalEntityConnectionIndex::class)->name('index');
+                Route::get('/{connection}', LegalEntityConnectionShow::class)->name('show');
+            });
 
             Route::get('/healthcare-service', HealthcareServiceIndex::class)
                 ->name('healthcare-service.index')
