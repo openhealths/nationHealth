@@ -1,19 +1,22 @@
 @use('App\Enums\Person\AuthStep')
 
 <div>
-    <legend class="legend mb-8 text-2xl font-bold">{{ __('patients.enter_new_phone') }}</legend>
+    <legend class="legend mb-8 text-2xl font-bold">{{ __('patients.confirm_new_phone') }}</legend>
 
     <div class="form-row-3">
         <div class="form-group">
-            <input type="tel"
-                   placeholder=" "
-                   class="peer input @error('newPhoneNumber') input-error @enderror"
-                   wire:model="newPhoneNumber"
-                   x-mask="+380999999999"
+            <input
+                type="tel"
+                placeholder=" "
+                class="peer input @error('form.phoneNumber') input-error @enderror"
+                value="{{ $form->phoneNumber }}"
+                readonly
             />
             <label class="label">{{ __('forms.phone') }}</label>
 
-            @error('newPhoneNumber') <p class="text-error">{{ $message }} </p>@enderror
+            @error('form.phoneNumber')
+                <p class="text-error">{{ $message }}</p>
+            @enderror
         </div>
     </div>
 
@@ -22,8 +25,6 @@
             {{ __('forms.back') }}
         </button>
 
-        <button type="button" wire:click="updatePhoneNumber" class="button-primary">
-            {{ __('forms.confirm') }}
-        </button>
+        <button type="button" wire:click="updatePhoneNumber" class="button-primary">{{ __('forms.confirm') }}</button>
     </div>
 </div>

@@ -45,4 +45,14 @@ class DeviceDefinition extends Request
 
         return $this->get(self::URL, $mergedQuery);
     }
+
+    /**
+     * Get a single device definition by its UUID.
+     *
+     * @see https://ehealthmisapi1.docs.apiary.io/#reference/public.-devices/get-device-definitions-v2/get-device-definitions-v2
+     */
+    public function getById(string $id): PromiseInterface|EHealthResponse
+    {
+        return $this->get(self::URL . '/' . $id);
+    }
 }

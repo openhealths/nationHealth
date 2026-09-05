@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use App\Enums\LegalEntity\ReorganizationTypes;
 use App\Models\Relations\Party;
 use App\Models\Employee\Employee;
 use Eloquence\Behaviours\HasCamelCasing;
@@ -60,23 +63,27 @@ class ReorganizationEmployeeDeclaration extends Pivot
         return $this->belongsTo(LegalEntity::class, 'legal_entity_id');
     }
 
-
     /**
      * Scope to filter records that are connected to the given legal entity
      * through the legators table (i.e. the record's legal_entity_uuid is a legator of the given entity).
      *
-     * @param Builder<static> $query
-     * @param LegalEntity $legalEntity
+     * Only an active relationship of a reorganization type that allows to resign a declaration counts.
      *
+     * @param  Builder<static>  $query
+     * @param  LegalEntity  $legalEntity
      * @return Builder<static>
      */
     #[Scope]
     public function hasConnectionTo(Builder $query, LegalEntity $legalEntity): Builder
     {
-        return $query->whereIn('legal_entity_uuid', fn(QueryBuilder $q) => $q
+        return $query->whereIn(
+            'legal_entity_uuid',
+            static fn (QueryBuilder $subQuery) => $subQuery
                 ->select('uuid')
                 ->from('legators')
                 ->where('legal_entity_id', $legalEntity->id)
-            );
+                ->where('is_active', true)
+                ->whereIn('type', ReorganizationTypes::only(['ACCESSION', 'MERGING', 'DIVIDING', 'SEPARATING']))
+        );
     }
 }

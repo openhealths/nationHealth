@@ -145,7 +145,7 @@ class ProcedureComponent extends Component
 
         $this->dictionaries['eHealth/assistive_products'] = dictionary()->basics()
             ->byName('eHealth/assistive_products')
-            ->flattenedChildValues(true, true)
+            ->flattenedChildValues(true)
             ->toArray();
     }
 
@@ -254,7 +254,7 @@ class ProcedureComponent extends Component
             return;
         }
 
-        Session::flash('success', __('patients.messages.procedure_saved'));
+        Session::flash('success', __('procedures.messages.saved'));
 
         if ($this->prepersonId !== null) {
             $this->redirectRoute(
@@ -300,6 +300,7 @@ class ProcedureComponent extends Component
             );
         } catch (CipherException|CipherConnectionException $exception) {
             $exception->handle('Error when signing procedure with Cipher');
+            Session::flash('error-modal', $exception->getMessage());
 
             return;
         }
@@ -311,7 +312,7 @@ class ProcedureComponent extends Component
 
             $procedureId = $this->persist($formattedData);
 
-            Session::flash('success', __('patients.messages.procedure_create_request_sent'));
+            Session::flash('success', __('procedures.messages.create_request_sent'));
 
             if ($this->prepersonId !== null) {
                 $this->redirectRoute(
@@ -330,10 +331,12 @@ class ProcedureComponent extends Component
             );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when signing procedure');
+            Session::flash('error-modal', $exception->getMessage());
 
             return;
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while saving procedure');
+            Session::flash('error-modal', $exception->getMessage());
 
             return;
         }

@@ -131,6 +131,28 @@ return [
         'msp_approved' => 'Погоджена зі сторони закладу',
         'signed' => 'Завершена',
         'active' => 'Діючий',
+        'verified' => 'Діючий',
+        'suspended' => 'Призупинений',
+        'expired' => 'Протермінований',
+    ],
+
+    'request_status' => [
+        'draft' => 'Чернетка',
+        'new' => 'Нова',
+        'in_process' => 'Обробляється',
+        'approved' => 'Підтверджена',
+        'declined' => 'Відмінена',
+        'terminated' => 'Припинена',
+        'pending_nhs_sign' => 'Очікує на підпис НСЗУ',
+        'nhs_signed' => 'Підписана зі сторони НСЗУ',
+        'msp_approved' => 'Погоджена зі сторони закладу',
+        'signed' => 'Завершена',
+    ],
+
+    'contract_status' => [
+        'verified' => 'Діючий',
+        'active' => 'Діючий',
+        'terminated' => 'Розірваний',
         'suspended' => 'Призупинений',
         'expired' => 'Протермінований',
     ],

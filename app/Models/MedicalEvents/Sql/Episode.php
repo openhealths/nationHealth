@@ -156,6 +156,27 @@ class Episode extends Model
             : $query->wherePersonId($patient->id);
     }
 
+    /**
+     * Filter out the episodes known to be managed by another legal entity.
+     * The short episode endpoint does not return a managing organization, so those episodes are kept:
+     * without it there is nothing to tell them apart from the ones of the current legal entity.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    #[Scope]
+    protected function forLegalEntity(Builder $query): Builder
+    {
+        return $query->where(
+            static fn (Builder $episode): Builder => $episode
+                ->whereNull('managing_organization_id')
+                ->orWhereHas(
+                    'managingOrganization',
+                    static fn (Builder $identifier): Builder => $identifier->whereValue(legalEntity()->uuid)
+                )
+        );
+    }
+
     #[Scope]
     protected function withRelationships(Builder $query): Builder
     {

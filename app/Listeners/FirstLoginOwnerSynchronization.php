@@ -4,25 +4,26 @@ declare(strict_types=1);
 
 namespace App\Listeners;
 
-use Throwable;
-use App\Enums\User\Role;
 use App\Enums\JobStatus;
-use App\Jobs\EmployeeSync;
-use App\Jobs\DivisionSync;
-use App\Jobs\EquipmentSync;
-use App\Models\LegalEntity;
-use App\Jobs\LegalEntitySync;
-use App\Jobs\DeclarationsSync;
-use App\Jobs\EmployeeRoleSync;
+use App\Enums\User\Role;
 use App\Events\EHealthUserLogin;
-use App\Jobs\PartyVerificationSync;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Auth;
+use App\Jobs\DeclarationsSync;
+use App\Jobs\DivisionSync;
 use App\Jobs\EmployeeRequestsSyncAll;
+use App\Jobs\EmployeeRoleSync;
+use App\Jobs\EmployeeSync;
+use App\Jobs\EquipmentSync;
+use App\Jobs\LegalEntitySync;
+use App\Jobs\PartyVerificationSync;
+use App\Models\LegalEntity;
 use App\Notifications\SyncNotification;
-use Illuminate\Queue\InteractsWithQueue;
+use App\Services\Party\PartyVerificationBulkAccess;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class FirstLoginOwnerSynchronization implements ShouldQueue
 {
@@ -87,13 +88,17 @@ class FirstLoginOwnerSynchronization implements ShouldQueue
             isFirstLogin: true
         );
 
-        $nextJob = new EmployeeSync(
-            legalEntity: $event->legalEntity,
-            nextEntity: $nextJob,
-            isFirstLogin: true
-        );
+        // Run after EmployeeSync so parties already exist locally for cache updates.
+        if (PartyVerificationBulkAccess::canBulkSync($event->scopes)) {
+            $nextJob = new PartyVerificationSync(
+                legalEntity: $event->legalEntity,
+                nextEntity: $nextJob,
+                isFirstLogin: true
+            );
+            PartyVerificationBulkAccess::markSynced($event->legalEntity);
+        }
 
-        $nextJob = new PartyVerificationSync(
+        $nextJob = new EmployeeSync(
             legalEntity: $event->legalEntity,
             nextEntity: $nextJob,
             isFirstLogin: true

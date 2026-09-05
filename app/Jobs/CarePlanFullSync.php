@@ -21,7 +21,7 @@ class CarePlanFullSync extends EHealthJob
 
     public const string ENTITY = LegalEntity::ENTITY_CARE_PLAN;
 
-    public string $queue = 'care-plans';
+    public $queue = 'care-plans';
 
     protected ?string $patientUuid = null;
     protected ?int $personId = null;

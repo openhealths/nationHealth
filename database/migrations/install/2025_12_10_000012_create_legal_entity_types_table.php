@@ -16,6 +16,7 @@ return new class extends Migration
     {
         Schema::create('legal_entity_types', function (Blueprint $table) {
             $table->id();
+            $table->uuid()->nullable()->comment('Legal Entity Type UUID at the eHealth side');
             $table->string('name')->unique();
             $table->string('localized_name')->nullable();
             $table->timestamps();

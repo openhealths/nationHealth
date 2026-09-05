@@ -79,7 +79,7 @@ class ClinicalImpression extends PatientApiBase
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $this->format($query, ['effective_date_from', 'effective_date_to']));
-        
+
         return $this->get(self::URL . "/$patientId/clinical_impressions", $mergedQuery);
     }
 

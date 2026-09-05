@@ -10,7 +10,7 @@ use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
 use App\Repositories\ContractRepository;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -19,7 +19,7 @@ use Tests\TestCase;
  */
 class ContractRepositoryTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function migrateFreshUsing(): array
     {
@@ -67,6 +67,18 @@ class ContractRepositoryTest extends TestCase
         $this->assertDatabaseHas('contracts', [
             'uuid' => $eHealthData['id'],
             'status' => 'ACTIVE',
+        ]);
+    }
+
+    public function test_save_from_ehealth_persists_verified_status(): void
+    {
+        $eHealthData = array_merge($this->eHealthContractPayload(), ['status' => 'VERIFIED']);
+
+        $this->repository->saveFromEHealth($eHealthData);
+
+        $this->assertDatabaseHas('contracts', [
+            'uuid' => $eHealthData['id'],
+            'status' => 'VERIFIED',
         ]);
     }
 

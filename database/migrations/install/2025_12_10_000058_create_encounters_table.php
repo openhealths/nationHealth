@@ -20,7 +20,7 @@ return new class extends Migration
             $table->foreignId('person_id')->nullable()->constrained('persons');
             $table->foreignId('preperson_id')->nullable()->constrained('prepersons');
             $table->enum('status', EncounterStatus::values());
-            $table->string('cancellation_reason')->nullable();
+            $table->foreignId('cancellation_reason_id')->nullable()->constrained('codeable_concepts');
             $table->string('explanatory_letter')->nullable();
             $table->text('prescriptions')->nullable();
             $table->foreignId('visit_id')->nullable()->constrained('identifiers');

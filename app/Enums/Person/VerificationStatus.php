@@ -6,6 +6,9 @@ namespace App\Enums\Person;
 
 use App\Traits\EnumUtils;
 
+/**
+ * see https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/18422661631/PERSON_VERIFICATION_STATUSES
+ */
 enum VerificationStatus: string
 {
     use EnumUtils;
@@ -20,12 +23,12 @@ enum VerificationStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::CHANGES_NEEDED => __('patients.status.changes_needed'),
-            self::IN_REVIEW => __('patients.status.in_review'),
-            self::NOT_VERIFIED => __('patients.status.not_verified'),
-            self::VERIFICATION_NEEDED => __('patients.status.verification_needed'),
-            self::VERIFICATION_NOT_NEEDED => __('patients.status.verification_not_needed'),
-            self::VERIFIED => __('patients.status.verified')
+            self::CHANGES_NEEDED => __('patient-verifications.statuses.changes_needed'),
+            self::IN_REVIEW => __('patient-verifications.statuses.in_review'),
+            self::NOT_VERIFIED => __('patient-verifications.statuses.not_verified'),
+            self::VERIFICATION_NEEDED => __('patient-verifications.statuses.verification_needed'),
+            self::VERIFICATION_NOT_NEEDED => __('patient-verifications.statuses.verification_not_needed'),
+            self::VERIFIED => __('patient-verifications.statuses.verified')
         };
     }
 

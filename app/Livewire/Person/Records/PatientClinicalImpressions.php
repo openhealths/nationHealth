@@ -115,12 +115,12 @@ class PatientClinicalImpressions extends BasePatientComponent
 
     public function sync(): void
     {
-        if ($this->cannotStartSync('clinicalImpression')) {
+        if ($this->cannotStartSync('clinical_impression')) {
             return;
         }
 
-        if ($this->shouldResumeSync('clinicalImpression')) {
-            $this->handleResumeLogic('clinicalImpression');
+        if ($this->shouldResumeSync('clinical_impression')) {
+            $this->handleResumeLogic('clinical_impression');
 
             return;
         }
@@ -141,16 +141,15 @@ class PatientClinicalImpressions extends BasePatientComponent
             Repository::clinicalImpression()->sync($this->patient(), $validatedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing clinical impressions');
-            Session::flash('error', __('patients.messages.clinical_impression_sync_database_error'));
 
             return;
         }
 
         if ($response->isNotLast()) {
-            $this->dispatchRemainingPages('clinicalImpression');
+            $this->dispatchRemainingPages('clinical_impression');
         } else {
             legalEntity()->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_CLINICAL_IMPRESSION);
-            Session::flash('success', __('patients.messages.clinical_impressions_synced_successfully'));
+            Session::flash('success', __('clinical-impressions.messages.synced_successfully'));
         }
 
         $this->loadFilterOptions();

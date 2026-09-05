@@ -10,12 +10,13 @@
             <div>
                 <label for="comment" class="label-modal">{{ __('forms.comment') }}</label>
                 <div>
-                    <textarea wire:model="form.comment"
-                              rows="4"
-                              id="comment"
-                              name="comment"
-                              class="textarea"
-                              placeholder="{{ __('forms.write_comment_here') }}"
+                    <textarea
+                        wire:model="form.comment"
+                        rows="4"
+                        id="comment"
+                        name="comment"
+                        class="textarea"
+                        placeholder="{{ __('forms.write_comment_here') }}"
                     ></textarea>
                 </div>
             </div>
@@ -24,18 +25,14 @@
         @include('livewire.division.healthcare-service.parts.working-hours')
     </fieldset>
 
-    <div class="flex justify-start gap-4 mt-10">
-        <a href="{{ url()->previous() }}" type="button" class="button-minor">
-            {{ __('forms.back') }}
-        </a>
+    <div class="mt-10 flex justify-start gap-4">
+        <a href="{{ url()->previous() }}" type="button" class="button-minor"> {{ __('forms.back') }} </a>
 
-        @if($canUpdate)
-            <button wire:click.prevent="update" type="submit" class="button-primary">
-                {{ __('forms.update') }}
-            </button>
+        @if ($canUpdate)
+            <button wire:click.prevent="update" type="submit" class="button-primary">{{ __('forms.update') }}</button>
         @endif
     </div>
 
-    <x-forms.loading/>
-    <livewire:components.x-message :key="now()->timestamp"/>
+    <x-forms.loading />
+    <livewire:components.x-message :key="now()->timestamp" />
 </section>

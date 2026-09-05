@@ -6,6 +6,7 @@ namespace App\Livewire\CarePlan;
 
 use App\Classes\eHealth\EHealth;
 use App\Repositories\CarePlanRepository;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use App\Models\Declaration;
@@ -16,7 +17,6 @@ use App\Repositories\DeclarationRepository;
 
 class CarePlanIndex extends Component
 {
-    public $carePlans = [];
     public string $searchRequisition = '';
 
     public string $filterName = '';
@@ -27,15 +27,6 @@ class CarePlanIndex extends Component
     public string $filterIsPartOf = '';
     public string $filterIncludes = '';
     public bool $showAdditionalParams = false;
-
-    public function mount(CarePlanRepository $repository): void
-    {
-        $legalEntity = legalEntity();
-
-        if ($legalEntity) {
-            $this->carePlans = $repository->getByLegalEntity($legalEntity->id);
-        }
-    }
 
     public function search(): void
     {
@@ -70,9 +61,11 @@ class CarePlanIndex extends Component
             $data = $response->validate();
 
             // Sync with local DB if found
-            app(CarePlanRepository::class)->syncCarePlans($data);
-
-            $this->mount(app(CarePlanRepository::class));
+            app(CarePlanRepository::class)->syncCarePlans(
+                $data,
+                null,
+                Auth::user()?->getCarePlanWriterEmployee()?->id
+            );
         } catch (\Throwable $e) {
             Log::error('CarePlan search error: ' . $e->getMessage());
             session()->flash('error', __('care-plan.search_error') . ': ' . $e->getMessage());
@@ -147,10 +140,13 @@ class CarePlanIndex extends Component
             }
 
             if (!empty($allValidatedData)) {
-                app(CarePlanRepository::class)->syncCarePlans($allValidatedData);
+                app(CarePlanRepository::class)->syncCarePlans(
+                    $allValidatedData,
+                    null,
+                    Auth::user()?->getCarePlanWriterEmployee()?->id
+                );
             }
 
-            $this->mount(app(CarePlanRepository::class));
             session()->flash('success', __('care-plan.sync_success'));
         } catch (\Throwable $e) {
             Log::error('CarePlan index sync error: ' . $e->getMessage());
@@ -160,6 +156,40 @@ class CarePlanIndex extends Component
 
     public function render()
     {
-        return view('livewire.care-plan.care-plan-index');
+        $legalEntity = legalEntity();
+        $carePlans = collect();
+
+        if ($legalEntity) {
+            $query = \App\Models\CarePlan::where('legal_entity_id', $legalEntity->id)
+                ->with(['person', 'person.names', 'author.party', 'encounter.episode', 'encounter.diagnoses.condition', 'encounterIdentifier']);
+
+            if (!empty($this->filterStatus)) {
+                $query->whereRaw('LOWER(care_plans.status) = LOWER(?)', [$this->filterStatus]);
+            }
+
+            if (!empty($this->filterStartDateRange)) {
+                $query->whereDate('period_start', '>=', \Carbon\Carbon::parse($this->filterStartDateRange));
+            }
+
+            if (!empty($this->filterEndDateRange)) {
+                $query->whereDate('period_end', '<=', \Carbon\Carbon::parse($this->filterEndDateRange));
+            }
+
+            if (!empty($this->filterEncounterId)) {
+                $query->where('encounter_id', 'like', "%{$this->filterEncounterId}%");
+            }
+
+            // Requisition search uses searchByRequisition which syncs with API,
+            // but we can also filter locally by requisition.
+            if (!empty($this->searchRequisition)) {
+                $query->where('requisition', 'like', "%{$this->searchRequisition}%");
+            }
+
+            $carePlans = $query->latest()->get();
+        }
+
+        return view('livewire.care-plan.care-plan-index', [
+            'carePlans' => $carePlans,
+        ]);
     }
 }

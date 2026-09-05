@@ -59,14 +59,14 @@ class EHealthResponse extends Response
     /**
      * Map (transform) the validated response data.
      */
-    public function map(array $validated, ... $params): array
+    public function map(array $validated, ...$params): array
     {
         if (is_null($this->mapper)) {
             throw new RuntimeException('Mapper is not implemented for this response.');
         }
 
         return count($params)
-            ? call_user_func($this->mapper, $validated, ... $params)
+            ? call_user_func($this->mapper, $validated, ...$params)
             : call_user_func($this->mapper, $validated);
     }
 

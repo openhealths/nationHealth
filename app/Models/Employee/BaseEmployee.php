@@ -7,7 +7,6 @@ namespace App\Models\Employee;
 use App\Casts\EHealthDateCast;
 use App\Enums\JobStatus;
 use App\Models\Division;
-use App\Models\User;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
 use App\Traits\SyncsMorphManyRelations;

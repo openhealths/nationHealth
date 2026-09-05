@@ -98,6 +98,26 @@ class Procedure extends PatientApiBase
     }
 
     /**
+     * Get a list of summary info about procedures.
+     *
+     * @param  string  $patientId
+     * @param  array{code?: string, page?: int, page_size?: int}  $query
+     * @return PromiseInterface|EHealthResponse
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+     *
+     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/patient-summary/get-procedures
+     */
+    public function getSummary(string $patientId, array $query = []): PromiseInterface|EHealthResponse
+    {
+        $this->setValidator($this->validateProcedures(...));
+        $this->setDefaultPageSize();
+
+        $mergedQuery = array_merge($this->options['query'], $query ?? []);
+
+        return $this->get(self::URL . "/$patientId/summary/procedures", $mergedQuery);
+    }
+
+    /**
      * Validate a single procedure from eHealth API response.
      *
      * @param  EHealthResponse  $response

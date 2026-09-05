@@ -16,6 +16,8 @@ class EmployeeCreate extends AbstractEmployeeFormManager
 {
     public function mount(LegalEntity $legalEntity): void
     {
+        $this->authorize('create', EmployeeRequest::class);
+
         $this->loadDictionaries();
         $this->loadDivisions($legalEntity);
         $this->isPersonalDataLocked = false;

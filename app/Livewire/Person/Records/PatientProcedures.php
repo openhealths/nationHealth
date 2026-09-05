@@ -1,5 +1,5 @@
 <?php
-    
+
 declare(strict_types=1);
 
 namespace App\Livewire\Person\Records;
@@ -13,7 +13,6 @@ use App\Exceptions\EHealth\EHealthException;
 use App\Jobs\ProcedureSync;
 use App\Models\Equipment;
 use App\Models\LegalEntity;
-use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Repositories\MedicalEvents\Repository;
@@ -29,14 +28,16 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
 use Livewire\WithFileUploads;
 use Throwable;
 
-class PatientProcedures extends BasePatientComponent 
+class PatientProcedures extends BasePatientComponent
 {
     use BatchLegalEntityQueries;
     use HandlesSyncBatch;
@@ -51,27 +52,26 @@ class PatientProcedures extends BasePatientComponent
 
     public ?string $procedureUuid = null;
 
-    public ?int $procedureId = null;
-
     public bool $showAdditionalParams = false;
 
-    public bool $fromDb = true;
+    public array $episodes = [];
 
-    public array $procedures = [];
+    public array $usedReferences = [];
 
-    public array $filterEpisodeOptions = [];
+    public array $basedOnRequests = [];
 
-    public array $filterUsedReferenceOptions = [];
+    public array $services = [];
 
-    public array $filterBasedOnOptions = [];
+    public array $encounters = [];
 
-    public array $filterCodeOptions = [];
+    public array $originEpisodes = [];
 
-    public array $filterEncounterOptions = [];
-
-    public array $filterOriginEpisodeOptions = [];
-
-    public array $filterDeviceOptions = [];
+    /**
+     * Stays empty until devices are supported in the project.
+     *
+     * @var array
+     */
+    public array $devices = [];
 
     public string $filterCategory = '';
 
@@ -91,11 +91,7 @@ class PatientProcedures extends BasePatientComponent
 
     public string $filterDeviceId = '';
 
-    public int $totalEntries = 0;
-
     public string $syncStatus = '';
-
-    public int $pageSize = 10;
 
     protected array $dictionaryNames = [
         'eHealth/procedure_status_reasons',
@@ -130,26 +126,46 @@ class PatientProcedures extends BasePatientComponent
         $this->syncStatus = $status->value;
     }
 
-    public function initializeComponent(): void 
+    protected function initializeComponent(): void
     {
         $this->getDictionary();
 
-        $this->dictionaries['custom/services'] = dictionary()->services()->flattened()->toArray();
+        $this->syncStatus = legalEntity()->getEntityStatus(LegalEntity::ENTITY_PROCEDURE) ?? '';
 
-        $this->getFilters();
+        $this->loadFilterOptions();
+    }
 
-        $this->getProceduresFromDb();
+    /**
+     * Narrow the service list down to the picked category and drop the service that no longer belongs to it.
+     *
+     * @return void
+     */
+    public function updatedFilterCategory(): void
+    {
+        $this->filterCode = '';
+
+        $this->getServices();
+    }
+
+    /**
+     * Procedures for the current page, either from the eHealth search or from the local database.
+     *
+     * @return LengthAwarePaginator
+     */
+    #[Computed]
+    public function paginatedProcedures(): LengthAwarePaginator
+    {
+        return $this->isSearching
+            ? $this->searchProceduresFromEHealth()
+            : $this->paginateLocalProcedures();
     }
 
     public function search(): void
     {
         $this->validate($this->filterValidationRules());
 
-        $this->fromDb = false;
-
+        $this->isSearching = true;
         $this->resetPage();
-
-        $this->getProcedures($this->buildSearchParams());
     }
 
     public function resetFilters(): void
@@ -164,22 +180,19 @@ class PatientProcedures extends BasePatientComponent
             'filterEncounterId',
             'filterOriginEpisodeId',
             'filterDeviceId',
+            'isSearching'
         ]);
 
+        $this->getServices();
+
         $this->resetPage();
-
-        $this->fromDb = false;
-
-        $this->getProcedures($this->buildSearchParams());
     }
 
-    public function sync(): void 
+    public function sync(): void
     {
         if ($this->cannotStartSync('procedure')) {
             return;
         }
-
-        $this->fromDb = false;
 
         if ($this->shouldResumeSync('procedure')) {
             $this->handleResumeLogic('procedure');
@@ -190,7 +203,7 @@ class PatientProcedures extends BasePatientComponent
         try {
             $response = EHealth::procedure()->getBySearchParams(
                 $this->uuid,
-                $this->buildSearchParams(),
+                ['managing_organization_id' => legalEntity()->uuid]
             );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while synchronizing procedure');
@@ -211,12 +224,13 @@ class PatientProcedures extends BasePatientComponent
             $this->dispatchRemainingPages('procedure');
         } else {
             legalEntity()->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_PROCEDURE);
-            Session::flash('success', __('patients.messages.procedure_synced_successfully'));
+            Session::flash('success', __('procedures.messages.synced_successfully'));
         }
 
-        $this->getProcedures($this->buildSearchParams());
+        $this->loadFilterOptions();
 
-        $this->getFilters();
+        $this->isSearching = false;
+        $this->resetPage();
     }
 
     public function openProcedureView(string $procedureUuid): void
@@ -260,7 +274,6 @@ class PatientProcedures extends BasePatientComponent
 
         $this->resetCancellationState();
 
-        $this->procedureId = $procedure->id;
         $this->procedureUuid = $procedure->uuid;
         $this->showCancellationModal = true;
     }
@@ -273,7 +286,7 @@ class PatientProcedures extends BasePatientComponent
     public function proceedToSignature(): void
     {
         if ($this->procedureUuid === null) {
-            Session::flash('error', __('patients.messages.procedure_not_found'));
+            Session::flash('error', __('procedures.messages.not_found'));
 
             return;
         }
@@ -310,7 +323,7 @@ class PatientProcedures extends BasePatientComponent
     public function cancelSelectedProcedure(): void
     {
         if ($this->procedureUuid === null) {
-            Session::flash('error', __('patients.messages.procedure_not_found'));
+            Session::flash('error', __('procedures.messages.not_found'));
 
             return;
         }
@@ -347,7 +360,7 @@ class PatientProcedures extends BasePatientComponent
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle(
                 'Error while building procedure cancellation package',
-                __('patients.messages.procedure_cancel_package_prepare_error')
+                __('procedures.messages.cancel_package_prepare_error')
             );
 
             return;
@@ -364,7 +377,7 @@ class PatientProcedures extends BasePatientComponent
         } catch (CipherException|CipherConnectionException $exception) {
             $exception->handle(
                 'Error while signing procedure cancellation package',
-                __('patients.messages.procedure_cancel_package_sign_error')
+                __('procedures.messages.cancel_package_sign_error')
             );
 
             return;
@@ -392,7 +405,7 @@ class PatientProcedures extends BasePatientComponent
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle(
                 'Error while sending procedure cancellation package',
-                __('patients.messages.procedure_cancel_package_request_error')
+                __('procedures.messages.cancel_package_request_error')
             );
 
             return;
@@ -400,23 +413,21 @@ class PatientProcedures extends BasePatientComponent
             $this->handleDatabaseErrors(
                 $exception,
                 'Error while saving procedure cancellation status',
-                __('patients.messages.procedure_cancel_package_save_error')
+                __('procedures.messages.cancel_package_save_error')
             );
 
             return;
         }
 
         $this->resetCancellationState();
-        $this->fromDb = true;
-        $this->getProceduresFromDb();
 
-        Session::flash('success', __('patients.messages.procedure_cancel_request_sent'));
+        Session::flash('success', __('procedures.messages.cancel_request_sent'));
     }
 
     private function findProcedureForAction(string $procedureUuid): ?Procedure
     {
         if (blank($procedureUuid)) {
-            Session::flash('error', __('patients.messages.procedure_not_found'));
+            Session::flash('error', __('procedures.messages.not_found'));
 
             return null;
         }
@@ -424,7 +435,7 @@ class PatientProcedures extends BasePatientComponent
         try {
             return Repository::procedure()->findByUuid($procedureUuid);
         } catch (ModelNotFoundException) {
-            Session::flash('error', __('patients.messages.procedure_not_found_in_db'));
+            Session::flash('error', __('procedures.messages.not_found_in_db'));
 
             return null;
         }
@@ -433,15 +444,15 @@ class PatientProcedures extends BasePatientComponent
     private function getCancellationForbiddenMessage(Procedure $procedure): ?string
     {
         if ($procedure->status === ProcedureStatus::ENTERED_IN_ERROR->value) {
-            return __('patients.messages.procedure_already_entered_in_error');
+            return __('procedures.messages.already_entered_in_error');
         }
 
         if ($procedure->encounter_id !== null) {
-            return __('patients.messages.procedure_with_encounter_cannot_be_cancelled_separately');
+            return __('procedures.messages.with_encounter_cannot_be_cancelled_separately');
         }
 
         if (Auth::user()?->cannot('cancel', $procedure)) {
-            return __('patients.policy.cancel_procedure');
+            return __('procedures.policy.cancel');
         }
 
         return null;
@@ -469,7 +480,6 @@ class PatientProcedures extends BasePatientComponent
         $this->showCancellationModal = false;
         $this->showSignatureModal = false;
         $this->procedureUuid = null;
-        $this->procedureId = null;
         $this->form->resetCancellationFields();
         $this->form->resetSigningFields();
 
@@ -477,68 +487,73 @@ class PatientProcedures extends BasePatientComponent
         $this->resetValidation();
     }
 
-    public function getProcedures(array $params = []): void
+    /**
+     * Paginate locally stored (synced) procedures straight from the database.
+     *
+     * @return LengthAwarePaginator
+     */
+    protected function paginateLocalProcedures(): LengthAwarePaginator
     {
+        $paginator = Procedure::forPatient($this->patient())
+            ->withAllRelations()
+            ->latest()
+            ->paginate(config('pagination.per_page'));
+
+        $paginator->setCollection(
+            collect($this->formatDatesForDisplay(
+                $paginator
+                    ->getCollection()
+                    ->map(static function (Procedure $procedure): array {
+                        $data = Arr::toCamelCase($procedure->toArray());
+                        $data['createdAt'] = $procedure->created_at?->toDateTimeString();
+
+                        return $data;
+                    })
+                    ->toArray()
+            ))
+        );
+
+        return $paginator;
+    }
+
+    /**
+     * Fetch a single page of procedures from the eHealth API for the active search filters.
+     *
+     * @return LengthAwarePaginator
+     */
+    protected function searchProceduresFromEHealth(): LengthAwarePaginator
+    {
+        $perPage = config('pagination.per_page');
+        $page = $this->getPage();
+
         try {
-            $response = EHealth::procedure()->getBySearchParams($this->uuid, $params);
-
-            $validatedData = $response->validate();
-
-            $paging = $response->getPaging();
-            $this->totalEntries = $paging['total_entries'] ?? 0;
-            $this->pageSize = $paging['page_size'] ?? 10;
-
-            $this->procedures = Arr::toCamelCase($validatedData);
+            $response = EHealth::procedure()->getBySearchParams($this->uuid, $this->buildSearchParams());
+            $procedures = Arr::toCamelCase($response->validate());
+            $total = $response->getPaging()['total_entries'];
         } catch (EHealthException|EHealthConnectionException $exception) {
-            $this->procedures = [];
-
             $exception->handle('Error while loading procedures');
-        }
-    }
-
-    public function getProceduresFromDb(): void
-    {
-        $paginator = Repository::procedure()->getPaginatedByPatient(
-            $this->patient(),
-            $this->getPage(),
-            $this->pageSize
-        );
-
-        $this->totalEntries = $paginator->total();
-        $this->pageSize = $paginator->perPage();
-
-        $this->procedures = $this->formatDatesForDisplay(
-            $paginator
-                ->getCollection()
-                ->map(function (Procedure $procedure) {
-                    $data = Arr::toCamelCase($procedure->toArray());
-                    $data['id'] = $procedure->id;
-                    $data['createdAt'] = $procedure->created_at?->toDateTimeString();
-
-                    return $data;
-                })
-                ->toArray()
-        );
-    }
-
-    public function updatedPage(): void
-    {
-        if ($this->fromDb) {
-            $this->getProceduresFromDb();
-
-            return;
+            $procedures = [];
+            $total = 0;
         }
 
-        $this->getProcedures($this->buildSearchParams());
+        return new LengthAwarePaginator(collect($procedures), $total, $perPage, $page, [
+            'path' => LengthAwarePaginator::resolveCurrentPath()
+        ]);
     }
 
-    private function getFilters(): void
+    /**
+     * Load the dropdown options the user can filter procedures by.
+     *
+     * @return void
+     */
+    private function loadFilterOptions(): void
     {
         $this->getServices();
 
-        $this->getEpisodesFromDb();
+        $this->episodes = Repository::episode()->getByPersonId($this->patient());
+        $this->originEpisodes = $this->episodes;
 
-        $this->getEncountersFromDb();
+        $this->encounters = Repository::encounter()->getByPersonId($this->patient());
 
         $this->getUsedReferencesFromDb();
 
@@ -547,108 +562,19 @@ class PatientProcedures extends BasePatientComponent
         $this->getDevicesFromDb();
     }
 
-    private function getEpisodes(): void
-    {
-        try {
-            $response = EHealth::episode()->getBySearchParams(
-                $this->uuid,
-                [
-                    'managing_organization_id' => legalEntity()?->uuid,
-                    'page_size' => 100,
-                ]
-            );
-
-            $validatedData = $response->validate();
-
-            $options = collect($validatedData)
-                ->map(function (array $episode) {
-                    $episodeId = data_get($episode, 'uuid');
-
-                    if (!$episodeId) {
-                        return null;
-                    }
-
-                    return [
-                        'value' => $episodeId,
-                        'label' => data_get($episode, 'name') ?: $episodeId,
-                        'description' => $episodeId,
-                    ];
-                })
-                ->filter()
-                ->unique('value')
-                ->sortBy('label')
-                ->values()
-                ->toArray();
-
-            $this->filterEpisodeOptions = $options;
-            $this->filterOriginEpisodeOptions = $options;
-        } catch (EHealthException|EHealthConnectionException $exception) {
-            $this->filterEpisodeOptions = [];
-            $this->filterOriginEpisodeOptions = [];
-
-            $exception->handle('Error while loading episodes');
-        }
-    }
-
-    private function getEpisodesFromDb(): void
-    {
-        $options = Episode::forPatient($this->patient())
-            ->get()
-            ->map(function (Episode $episode) {
-                if (!$episode->uuid) {
-                    return null;
-                }
-
-                return [
-                    'value' => $episode->uuid,
-                    'label' => $episode->name ?: $episode->uuid,
-                    'description' => $episode->uuid,
-                ];
-            })
-            ->filter()
-            ->unique('value')
-            ->sortBy('label')
-            ->values()
-            ->toArray();
-
-        $this->filterEpisodeOptions = $options;
-        $this->filterOriginEpisodeOptions = $options;
-    }
-
-    private function getEncounters(): void
-    {
-        try {
-            $response = EHealth::encounter()->getBySearchParams(
-                $this->uuid,
-                [
-                    'managing_organization_id' => legalEntity()?->uuid,
-                    'page_size' => 100,
-                ]
-            );
-
-            $validatedData = $response->validate();
-
-            $this->filterEncounterOptions = Arr::toCamelCase($validatedData);
-        } catch (EHealthException|EHealthConnectionException $exception) {
-            $this->filterEncounterOptions = [];
-
-            $exception->handle('Error while loading encounters');
-        }
-    }
-
-    private function getEncountersFromDb(): void
-    {
-        $this->filterEncounterOptions = Arr::toCamelCase(
-            $this->formatDatesForDisplay(
-                Repository::encounter()->getByPersonId($this->patient())
-            )
-        );
-    }
-
+    /**
+     * Build the service options for the code combobox, limited to the picked category when there is one.
+     *
+     * @return void
+     */
     private function getServices(): void
     {
-        $this->filterCodeOptions = collect(dictionary()->services()->flattened()->toArray())
-            ->map(function (array $service) {
+        $this->services = collect(dictionary()->services()->flattened()->toArray())
+            ->when(
+                $this->filterCategory !== '',
+                fn (Collection $services): Collection => $services->where('category', $this->filterCategory)
+            )
+            ->map(static function (array $service): ?array {
                 $serviceId = data_get($service, 'id');
 
                 if (!$serviceId) {
@@ -659,76 +585,74 @@ class PatientProcedures extends BasePatientComponent
                 $serviceName = data_get($service, 'name') ?: $serviceId;
 
                 return [
-                    'value' => $serviceId,
-                    'label' => $serviceCode
+                    'id' => $serviceId,
+                    'name' => $serviceCode
                         ? $serviceCode . ' | ' . $serviceName
-                        : $serviceName,
-                    'description' => $serviceId,
+                        : $serviceName
                 ];
             })
             ->filter()
-            ->unique('value')
-            ->sortBy('label')
+            ->unique('id')
+            ->sortBy('name')
             ->values()
             ->toArray();
     }
 
+    /**
+     * Build the used reference options, labelled by the equipment name when it is known locally.
+     *
+     * @return void
+     */
     private function getUsedReferencesFromDb(): void
     {
         $usedReferences = Procedure::with('usedReferences')
             ->forPatient($this->patient())
             ->get()
-            ->flatMap(fn (Procedure $procedure) => $procedure->usedReferences);
+            ->flatMap(static fn (Procedure $procedure) => $procedure->usedReferences);
 
         $equipmentNames = Equipment::with('names')
             ->whereIn('uuid', $usedReferences->pluck('value'))
             ->get()
             ->pluck('names.0.name', 'uuid');
 
-        $this->filterUsedReferenceOptions = $usedReferences
-            ->filter(fn (?Identifier $identifier) => $identifier?->value)
-            ->map(fn (Identifier $identifier) => [
-                'value' => $identifier->value,
-                'label' => ($equipmentNames[$identifier->value] ?? $identifier->display_value ?? '-') . ' | ' . $identifier->value,
-                'description' => $identifier->value,
+        $this->usedReferences = $usedReferences
+            ->filter(static fn (?Identifier $identifier): bool => (bool) $identifier?->value)
+            ->map(static fn (Identifier $identifier): array => [
+                'uuid' => $identifier->value,
+                'name' => ($equipmentNames[$identifier->value] ?? $identifier->displayValue ?? '-')
+                    . ' | ' . $identifier->value
             ])
-            ->unique('value')
-            ->sortBy('label')
+            ->unique('uuid')
+            ->sortBy('name')
             ->values()
             ->toArray();
     }
 
+    /**
+     * Build the service request options out of the referrals the stored procedures were based on.
+     *
+     * @return void
+     */
     private function getBasedOnFromDb(): void
     {
-        $procedures = Procedure::with('basedOn.type.coding')
+        $this->basedOnRequests = Procedure::with('basedOn')
             ->forPatient($this->patient())
-            ->get();
-
-        $this->filterBasedOnOptions = $this->getIdentifierOptions(
-            $procedures->pluck('basedOn')->filter()
-        );
+            ->get()
+            ->pluck('basedOn')
+            ->filter(static fn (?Identifier $basedOn): bool => (bool) $basedOn?->value)
+            ->map(static fn (Identifier $basedOn): array => [
+                'uuid' => $basedOn->value,
+                'name' => $basedOn->displayValue ?: $basedOn->value
+            ])
+            ->unique('uuid')
+            ->sortBy('name')
+            ->values()
+            ->toArray();
     }
 
     private function getDevicesFromDb(): void
     {
         //TODO implement device_id filter options
-    }
-
-    private function getIdentifierOptions(iterable $identifiers): array
-    {
-        return collect($identifiers)
-            ->filter(fn (?Identifier $identifier) => $identifier?->value)
-            ->map(function (Identifier $identifier) {
-                return [
-                    'value' => $identifier->value,
-                    'label' => $identifier->display_value ?: $identifier->value,
-                    'description' => $identifier->value,
-                ];
-            })
-            ->unique('value')
-            ->sortBy('label')
-            ->values()
-            ->toArray();
     }
 
     private function buildSearchParams(): array
@@ -739,27 +663,16 @@ class PatientProcedures extends BasePatientComponent
             'used_reference_id' => $this->filterUsedReferenceId ?: null,
             'based_on' => $this->filterBasedOn ?: null,
             'code' => $this->filterCode ?: null,
-            'managing_organization_id' => legalEntity()?->uuid,
+            'managing_organization_id' => legalEntity()->uuid,
             'encounter_id' => $this->filterEncounterId ?: null,
             'origin_episode_id' => $this->filterOriginEpisodeId ?: null,
             'device_id' => $this->filterDeviceId ?: null,
             'page' => $this->getPage(),
-            'page_size' => $this->pageSize,
-        ], static fn ($value) => $value !== null && $value !== '');
+            'page_size' => config('pagination.per_page')
+        ], static fn (mixed $value): bool => $value !== null && $value !== '');
     }
 
-    private function buildPaginator(): LengthAwarePaginator
-    {
-        return new LengthAwarePaginator(
-            $this->procedures,
-            $this->totalEntries,
-            $this->pageSize,
-            $this->getPage(),
-            ['path' => request()->url()]
-        );
-    }
-
-    protected function filterValidationRules(): array 
+    protected function filterValidationRules(): array
     {
         return [
             'filterCategory' => ['nullable', 'string', 'max:255'],
@@ -774,10 +687,8 @@ class PatientProcedures extends BasePatientComponent
         ];
     }
 
-    public function render(): View 
+    public function render(): View
     {
-        return view('livewire.person.records.procedures', [
-            'paginatedProcedures' => $this->buildPaginator(),
-        ]);
+        return view('livewire.person.records.procedures');
     }
 }

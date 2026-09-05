@@ -8,12 +8,12 @@
     $hasLimit = $limit && count($this->conditions) > $limit;
 @endphp
 
-<div @if($hasLimit) x-data="{ limit: {{ $limit }} }" @endif>
-    @foreach($this->conditions as $index => $condition)
-        <div class="record-inner-card" @if($hasLimit) x-show="limit > {{ $index }}" @endif>
+<div @if ($hasLimit) x-data="{ limit: {{ $limit }} }" @endif>
+    @foreach ($this->conditions as $index => $condition)
+        <div class="record-inner-card" @if ($hasLimit) x-show="limit > {{ $index }}" @endif>
             <div class="record-inner-header">
                 <div class="record-inner-checkbox-col">
-                    <input type="checkbox" class="default-checkbox w-5 h-5">
+                    <input type="checkbox" class="default-checkbox h-5 w-5" />
                 </div>
 
                 @php
@@ -23,19 +23,15 @@
                     $codeLabel = $this->dictionaries[$system][$code] ?? $code;
                 @endphp
                 <div class="record-inner-column flex-1">
-                    <div class="record-inner-label">{{ __('patients.code_and_name') }}</div>
-                    <div class="record-inner-value text-[16px]">
-                        {{ $code }} - {{ $codeLabel }}
-                    </div>
+                    <div class="record-inner-label">{{ __('medical-events.code_and_name') }}</div>
+                    <div class="record-inner-value text-[16px]">{{ $code }} - {{ $codeLabel }}</div>
                 </div>
 
-                <div class="record-inner-column-bordered w-full md:w-36 shrink-0">
+                <div class="record-inner-column-bordered w-full shrink-0 md:w-36">
                     <div class="record-inner-label">{{ __('patients.status_clinical') }}</div>
                     <div>
                         @php($status = ConditionClinicalStatus::from(data_get($condition, 'clinicalStatus')))
-                        <span @class([$status->color()])>
-                            {{ $status->label() ?? '-' }}
-                        </span>
+                        <span @class([$status->color()])> {{ $status->label() ?? '-' }} </span>
                     </div>
                 </div>
 
@@ -48,8 +44,7 @@
 
             <div class="record-inner-body">
                 <div class="record-inner-grid-container">
-                    <div
-                        class="grid grid-cols-2 xl:grid-cols-4 gap-y-4 gap-x-4 w-full [&>div]:min-w-0 [&_.record-inner-subvalue]:break-words">
+                    <div class="[&>div]:min-w-0 [&_.record-inner-subvalue]:break-words grid w-full grid-cols-2 gap-x-4 gap-y-4 xl:grid-cols-4">
                         <div>
                             <div class="record-inner-label">{{ __('forms.type') }}</div>
                             <div class="record-inner-subvalue">
@@ -83,7 +78,7 @@
                             </div>
                         </div>
                         <div>
-                            <div class="record-inner-label">{{ __('patients.severity') }}</div>
+                            <div class="record-inner-label">{{ __('conditions.severity') }}</div>
                             <div class="record-inner-subvalue">
                                 {{ data_get($this->dictionaries, 'eHealth/condition_severities.' . data_get($condition, 'severity.coding.0.code'), '-') }}
                             </div>
@@ -109,14 +104,9 @@
         </div>
     @endforeach
 
-    @if($hasLimit)
-        <div x-show="limit < {{ count($this->conditions) }}" class="flex justify-start mt-4">
-            <button type="button"
-                    @click="limit += 5"
-                    class="item-add"
-            >
-                {{ __('patients.show_more') }}
-            </button>
+    @if ($hasLimit)
+        <div x-show="limit < {{ count($this->conditions) }}" class="mt-4 flex justify-start">
+            <button type="button" @click="limit += 5" class="item-add">{{ __('patients.show_more') }}</button>
         </div>
     @endif
 </div>

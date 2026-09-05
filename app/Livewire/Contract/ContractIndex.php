@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Contract;
 
 use App\Classes\eHealth\EHealth;
-use App\Enums\Contract\Type;
+use App\Enums\Contract\ContractStatus;
 use App\Enums\JobStatus;
 use App\Jobs\ContractSync;
 use App\Models\Contracts\Contract;
@@ -28,36 +28,33 @@ class ContractIndex extends Component
     use WithPagination;
 
     public array $typeFilter = [];
+    public array $statusFilter = [];
+    public array $pendingStatusFilter = [];
+    public array $pendingTypeFilter = [];
     public bool $isFiltersApplied = false;
     public string $search = '';
+    public int $filterVersion = 0;
 
-    public function mount(): void
+    public function applyFilters(): void
     {
-        $this->typeFilter = array_column(Type::cases(), 'value');
-    }
-
-    public function updatingSearch(): void
-    {
-        $this->resetPage();
-        $this->isFiltersApplied = true;
-    }
-
-    public function updatedTypeFilter(): void
-    {
-        $this->resetPage();
-        $this->isFiltersApplied = true;
-    }
-
-    public function search(): void
-    {
+        $this->statusFilter = $this->pendingStatusFilter;
+        $this->typeFilter = $this->pendingTypeFilter;
         $this->resetPage();
         $this->isFiltersApplied = true;
     }
 
     public function resetFilters(): void
     {
-        $this->reset(['search', 'typeFilter', 'isFiltersApplied']);
-        $this->typeFilter = array_column(Type::cases(), 'value');
+        $this->reset([
+            'search',
+            'typeFilter',
+            'statusFilter',
+            'pendingStatusFilter',
+            'pendingTypeFilter',
+            'isFiltersApplied',
+        ]);
+        $this->filterVersion++;
+        $this->resetPage();
     }
 
     public function sync(): void
@@ -125,6 +122,9 @@ class ContractIndex extends Component
     {
         $contracts = Contract::query()
             ->where('legal_entity_id', legalEntity()->id)
+            ->when($this->statusFilter, function ($query) {
+                $query->whereIn('status', ContractStatus::expandFilterValues($this->statusFilter));
+            })
             ->when($this->typeFilter, function ($query) {
                 $query->whereIn('type', $this->typeFilter);
             })

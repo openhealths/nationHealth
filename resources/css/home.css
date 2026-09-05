@@ -1,11 +1,4 @@
-* {
-    color: rgb(125, 125, 125);
-}
-
 #responsiveMenu {
-    position: absolute;
-    top: 100%;
-    left: 0;
     width: 100%;
 }
 
@@ -15,4 +8,40 @@
 
 #header {
     transition: transform 0.3s ease;
+}
+
+.hero-title {
+    font-family: 'e-Ukraine', 'Noto Sans', sans-serif;
+    font-size: clamp(40px, 6vw, 80px);
+    font-weight: 700;
+    line-height: 120%;
+    letter-spacing: 0;
+    max-width: 896px;
+}
+
+.hero-subtitle {
+    font-family: 'e-Ukraine', 'Noto Sans', sans-serif;
+    font-size: clamp(22px, 3vw, 36px);
+    font-weight: 700;
+    line-height: 120%;
+    letter-spacing: 0;
+}
+
+.hero-register-btn {
+    width: 257px;
+    height: 50px;
+    border-radius: 100px;
+    border: 2px solid #ffffff !important;
+    background-color: transparent !important;
+    color: #ffffff !important;
+    transition: all 0.3s ease-in-out !important;
+}
+
+.hero-register-btn:hover,
+.hero-register-btn:focus,
+.hero-register-btn:active {
+    background-color: #ffffff !important;
+    color: #104475 !important;
+    border-color: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(255, 255, 255, 0.4);
 }

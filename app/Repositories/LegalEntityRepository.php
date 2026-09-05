@@ -125,13 +125,15 @@ class LegalEntityRepository
      *
      * @return void
      */
-    public function setNewOwner(User $oldOwner, ?LegalEntity $legalEntity = null): void
+    public function disableOldOwner(User $oldOwner, ?LegalEntity $legalEntity = null): void
     {
         $legalEntity ??= legalEntity();
 
         setPermissionsTeamId($legalEntity->id);
 
         $partyUsers = User::where('party_id', $oldOwner->party_id)->get();
+        $partyUsers->loadMissing(['roles', 'permissions', 'party']);
+
         $partyUserIds = $partyUsers->pluck('id');
 
         Auth::shouldUse('web');
@@ -147,7 +149,6 @@ class LegalEntityRepository
         Employee::where('legal_entity_id', $legalEntity->id)
             ->whereIn('employee_type', [Role::OWNER->value, Role::REORGANIZATION_OWNER->value])
             ->where('party_id', $oldOwner->party_id)
-            ->where('user_id', $oldOwner->id)
             ->each(fn ($employee) => $employee->users()->detach($partyUserIds));
 
         // Set the employee status to STOPPED for the OWNER's employee record in the employees table
@@ -155,6 +156,7 @@ class LegalEntityRepository
         Employee::where('legal_entity_id', $legalEntity->id)
             ->whereIn('employee_type', [Role::OWNER->value, Role::REORGANIZATION_OWNER->value])
             ->where('party_id', $oldOwner->party_id)
+            ->where('user_id', $oldOwner->id)
             ->update(['status' => Status::STOPPED->value]);
 
         Log::info(__('** OWNER CHANGED **', [], 'en'), ['old_owner_id' => $oldOwner->id, 'legal_entity_id' => $legalEntity->id]);

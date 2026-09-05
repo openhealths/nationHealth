@@ -15,7 +15,9 @@ return new class extends Migration
     {
         Schema::create('identifiers', static function (Blueprint $table) {
             $table->id();
-            $table->uuid('value')->index();
+            // Most identifiers reference another eHealth resource by UUID, but some carry a free-form value,
+            // such as the identifier a medical device is given in an external system
+            $table->string('value')->index();
             $table->string('display_value')->nullable();
             $table->timestamps();
         });

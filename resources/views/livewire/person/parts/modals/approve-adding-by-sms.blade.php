@@ -35,7 +35,7 @@
 
         <div class="pt-4">
             <h3 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">
-                {{ __('patients.code_SMS') }}
+                {{ __('patients.code_sms') }}
             </h3>
 
             <div class="form-row-4 flex items-end gap-4" style="display: flex; align-items: flex-end;">
@@ -46,7 +46,7 @@
                            wire:model="smsCode"
                            id="smsCode"
                     />
-                    <label class="label" for="smsCode">{{ __('patients.confirmation_code') }}</label>
+                    <label class="label" for="smsCode">{{ __('forms.confirmation_code_from_SMS') }}</label>
                 </div>
 
                 <div x-data="{
@@ -87,7 +87,7 @@
         </button>
 
         <button type="button" wire:click="submitSmsMethod" class="button-primary">
-            {{ __('patients.confirm') }}
+            {{ __('forms.confirm') }}
         </button>
     </div>
 </div>

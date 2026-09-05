@@ -108,6 +108,16 @@ class ContractApiTest extends TestCase
         $this->assertSame('ACTIVE', $mapped['status']);
     }
 
+    public function test_map_create_preserves_verified_status(): void
+    {
+        $data = $this->eHealthContractPayload();
+        $data['status'] = 'VERIFIED';
+
+        $mapped = $this->api->mapCreate($data);
+
+        $this->assertSame('VERIFIED', $mapped['status']);
+    }
+
     public function test_replace_ehealth_prop_names_renames_id_to_uuid(): void
     {
         $input = ['id' => 'abc-123', 'status' => 'ACTIVE'];

@@ -132,6 +132,15 @@ class SignatureService
             throw new \RuntimeException(__('Please upload a KEP file.'));
         }
 
+        $allowedExtensions = ['dat', 'pfx', 'pk8', 'zs2', 'jks', 'p7s'];
+
+        if (!in_array(strtolower($keyFile->getClientOriginalExtension()), $allowedExtensions, true)) {
+            throw new RuntimeException(__('validation.extensions', [
+                'attribute' => __('forms.key_container'),
+                'values' => implode(', ', $allowedExtensions),
+            ]));
+        }
+
         $fileContents = file_get_contents($keyFile->getRealPath());
 
         if ($fileContents === false) {

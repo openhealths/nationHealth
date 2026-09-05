@@ -122,13 +122,14 @@ class DictionaryManager
     }
 
     /**
-     * Get device definitions dictionary collection.
+     * Get device definitions dictionary collection, limited to the definitions still in use.
      *
      * @return DeviceDefinitionCollection Collection with device definition data
      */
     public function deviceDefinitions(): DeviceDefinitionCollection
     {
-        return DeviceDefinitionCollection::make($this->get(DeviceDefinitionDictionary::KEY));
+        return DeviceDefinitionCollection::make($this->get(DeviceDefinitionDictionary::KEY))
+            ->where('is_active', true);
     }
 
     /**
@@ -182,7 +183,9 @@ class DictionaryManager
                 }
 
                 $response = $dictionary->fetch();
-                $freshData = $response->getData();
+                $freshData = $dictionary instanceof BasicDictionary
+                    ? BasicDictionary::prune($response->getData())
+                    : $response->getData();
                 $paging = $response->getPaging();
                 $totalPages = $paging['total_pages'] ?? 1;
 

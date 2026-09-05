@@ -4,92 +4,98 @@
 <x-layouts.patient :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName">
     <x-slot name="headerActions">
         @can('create', Encounter::class)
-            <a href="{{ $prepersonId
-                ? route('prepersons.encounter.create', [legalEntity(), 'preperson' => $prepersonId])
-                : route('encounter.create', [legalEntity(), 'person' => $personId]) }}"
-               class="flex items-center gap-2 button-primary px-5 py-2 text-sm shadow-sm"
+            <a
+                href="{{
+                    $prepersonId
+                    ? route('prepersons.encounter.create', [legalEntity(), 'preperson' => $prepersonId])
+                    : route('encounter.create', [legalEntity(), 'person' => $personId])
+                }}"
+                class="button-primary flex items-center gap-2 px-5 py-2 text-sm shadow-sm"
             >
                 @icon('plus', 'w-4 h-4')
                 {{ __('patients.start_interacting') }}
             </a>
         @endcan
 
-        <button type="button"
-                class="button-primary-outline whitespace-nowrap px-5 py-2 text-sm"
-        >
+        <button type="button" class="button-primary-outline px-5 py-2 text-sm whitespace-nowrap">
             {{ __('patients.data_access') }}
         </button>
 
-        <button wire:click.prevent="sync"
-                type="button"
-                class="button-sync flex items-center gap-2 whitespace-nowrap px-5 py-2 text-sm shadow-sm"
+        <button
+            wire:click.prevent="sync"
+            type="button"
+            class="button-sync flex items-center gap-2 px-5 py-2 text-sm whitespace-nowrap shadow-sm"
         >
             @icon('refresh', 'w-4 h-4')
             {{ __('forms.synchronise_with_eHealth') }}
         </button>
     </x-slot>
 
-    <div class="breadcrumb-form p-4 shift-content">
-        <div class="w-full mt-6" x-data="{ showAdditionalParams: $wire.entangle('showAdditionalParams') }">
+    <div class="breadcrumb-form shift-content p-4">
+        <div class="mt-6 w-full" x-data="{ showAdditionalParams: $wire.entangle('showAdditionalParams') }">
             <div class="mb-4 flex items-center gap-1 font-semibold text-gray-900 dark:text-gray-100">
                 @icon('search-outline', 'w-4.5 h-4.5')
-                <p>{{ __('patients.immunization_search') }}</p>
+                <p>{{ __('immunizations.search') }}</p>
             </div>
 
             <div class="form-row-3 mb-6" x-data="{ filterCode: $wire.entangle('filterCode') }">
-                <x-select2 modelPath="filterCode"
-                           dictionaryName="eHealth/vaccine_codes"
-                           id="filterCode"
-                           class="input-select peer w-full"
+                <x-select2
+                    modelPath="filterCode"
+                    dictionaryName="eHealth/vaccine_codes"
+                    id="filterCode"
+                    class="input-select peer w-full"
                 />
             </div>
 
             <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <div class="flex flex-wrap gap-2">
-                    <button type="button"
-                            wire:click="search"
-                            class="flex items-center gap-2 button-primary px-5 py-2.5 text-sm shadow-sm"
+                    <button
+                        type="button"
+                        wire:click="search"
+                        class="button-primary flex items-center gap-2 px-5 py-2.5 text-sm shadow-sm"
                     >
                         @icon('search', 'w-4 h-4')
                         <span>{{ __('forms.search') }}</span>
                     </button>
 
-                    <button type="button"
-                            wire:click="resetFilters"
-                            class="button-primary-outline-red px-5 py-2.5 text-sm"
+                    <button
+                        type="button"
+                        wire:click="resetFilters"
+                        class="button-primary-outline-red px-5 py-2.5 text-sm"
                     >
                         {{ __('patients.reset_filters') }}
                     </button>
 
-                    <button type="button"
-                            class="flex items-center gap-2 button-minor px-5 py-2.5 text-sm whitespace-nowrap"
-                            @click.prevent="showAdditionalParams = !showAdditionalParams"
+                    <button
+                        type="button"
+                        class="button-minor flex items-center gap-2 px-5 py-2.5 text-sm whitespace-nowrap"
+                        @click.prevent="showAdditionalParams = ! showAdditionalParams"
                     >
                         @icon('adjustments', 'w-4 h-4 text-gray-500')
                         <span>{{ __('forms.additional_search_parameters') }}</span>
                     </button>
                 </div>
 
-                <div class="relative"
-                     x-data="{ openGroupActions: false }"
-                     @click.outside="openGroupActions = false"
-                >
-                    <button type="button"
-                            @click="openGroupActions = !openGroupActions"
-                            class="button-primary-outline px-5 py-2.5 text-sm"
+                <div class="relative" x-data="{ openGroupActions: false }" @click.outside="openGroupActions = false">
+                    <button
+                        type="button"
+                        @click="openGroupActions = ! openGroupActions"
+                        class="button-primary-outline px-5 py-2.5 text-sm"
                     >
                         {{ __('patients.group_actions') }}
                     </button>
 
-                    <div x-show="openGroupActions"
-                         x-transition
-                         x-cloak
-                         class="absolute right-0 top-full mt-2 z-10 w-60 bg-white rounded-lg shadow-lg border border-gray-200 dark:bg-gray-700 dark:border-gray-600 overflow-hidden"
+                    <div
+                        x-show="openGroupActions"
+                        x-transition
+                        x-cloak
+                        class="absolute top-full right-0 z-10 mt-2 w-60 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-700"
                     >
                         <div class="py-1">
-                            <button type="button"
-                                    @click="openGroupActions = false"
-                                    class="dropdown-button !flex items-center gap-2.5 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-left"
+                            <button
+                                type="button"
+                                @click="openGroupActions = false"
+                                class="dropdown-button !flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
                             >
                                 <span class="text-gray-500">
                                     @icon('close', 'w-4 h-4')
@@ -104,143 +110,154 @@
             <div x-show="showAdditionalParams" x-transition x-cloak wire:key="immunization-search-filters" class="mb-8">
                 <div class="form-row-3 mb-6">
                     <div class="form-group group">
-                        <div class="datepicker-wrapper"
-                             x-data="{
-                                 from: $wire.entangle('filterDateFrom'),
-                                 to: $wire.entangle('filterDateTo'),
-                                 rangeText: ''
-                             }"
-                             x-init="
-                                 if (from && to) rangeText = from + ' — ' + to;
-                                 $watch('from', val => { if (!val) { rangeText = ''; const fp = $el.querySelector('input')._flatpickr; if (fp) fp.clear(); } });
-                                 $watch('to', val => { if (!val) { rangeText = ''; const fp = $el.querySelector('input')._flatpickr; if (fp) fp.clear(); } });
-                             "
+                        <div
+                            class="datepicker-wrapper"
+                            x-data="{
+                                from: $wire.entangle('filterDateFrom'),
+                                to: $wire.entangle('filterDateTo'),
+                                rangeText: '',
+                            }"
+                            x-init="
+                                if (from && to) rangeText = from + ' — ' + to;
+                                $watch('from', (val) => {
+                                    if (! val) {
+                                        rangeText = '';
+                                        const fp = $el.querySelector('input')._flatpickr;
+                                        if (fp) fp.clear();
+                                    }
+                                });
+                                $watch('to', (val) => {
+                                    if (! val) {
+                                        rangeText = '';
+                                        const fp = $el.querySelector('input')._flatpickr;
+                                        if (fp) fp.clear();
+                                    }
+                                });
+                            "
                         >
-                            <input x-model="rangeText"
-                                   @change="
-                                       const parts = $event.target.value.split(' — ');
-                                       if (parts.length === 2) {
-                                           from = parts[0];
-                                           to = parts[1];
-                                       } else if (!$event.target.value) {
-                                           from = '';
-                                           to = '';
-                                       }
-                                   "
-                                   type="text"
-                                   class="daterangepicker-uk with-leading-icon input peer w-full"
-                                   placeholder=" "
-                                   autocomplete="off"
+                            <input
+                                x-model="rangeText"
+                                @change="
+                                    const parts = $event.target.value.split(' — ');
+                                    if (parts.length === 2) {
+                                        from = parts[0];
+                                        to = parts[1];
+                                    } else if (! $event.target.value) {
+                                        from = '';
+                                        to = '';
+                                    }
+                                "
+                                type="text"
+                                class="daterangepicker-uk with-leading-icon input peer w-full"
+                                placeholder=" "
+                                autocomplete="off"
                             />
 
-                            <label class="wrapped-label">
-                                {{ __('patients.filter_date_range') }}
-                            </label>
+                            <label class="wrapped-label"> {{ __('patients.filter_date_range') }} </label>
                         </div>
                     </div>
 
-                    <x-forms.combobox :options="$episodes"
-                                      bind="filterEpisodeId"
-                                      bindValue="uuid"
-                                      bindParam="name"
-                                      :label="__('episodes.plural')"
+                    <x-forms.combobox
+                        :options="$episodes"
+                        bind="filterEpisodeId"
+                        bindValue="uuid"
+                        bindParam="name"
+                        :label="__('episodes.plural')"
                     />
 
-                    <x-forms.combobox :options="$encounters"
-                                      bind="filterEncounterId"
-                                      bindValue="uuid"
-                                      bindParam="uuid"
-                                      :label="__('patients.encounters')"
+                    <x-forms.combobox
+                        :options="$encounters"
+                        bind="filterEncounterId"
+                        bindValue="uuid"
+                        bindParam="name"
+                        :label="__('encounters.plural')"
                     />
                 </div>
             </div>
 
             <div class="space-y-4">
-                @forelse($this->paginatedImmunizations->items() as $immunization)
+                @forelse ($this->paginatedImmunizations->items() as $immunization)
                     <div class="record-inner-card">
                         <div class="record-inner-header">
                             <div class="record-inner-checkbox-col">
-                                <input type="checkbox" class="default-checkbox w-5 h-5">
+                                <input type="checkbox" class="default-checkbox h-5 w-5" />
                             </div>
 
-                            <div class="record-inner-column !pl-4 flex-1">
-                                <div class="record-inner-label">
-                                    {{ __('patients.vaccine') }}
-                                </div>
+                            <div class="record-inner-column flex-1 !pl-4">
+                                <div class="record-inner-label">{{ __('immunizations.vaccine') }}</div>
 
-                                <div
-                                    class="record-inner-value text-[17px] font-semibold text-gray-900 dark:text-gray-100">
+                                <div class="record-inner-value text-[17px] font-semibold text-gray-900 dark:text-gray-100">
                                     {{ $this->dictionaryLabel($immunization, 'vaccineCode') }}
                                 </div>
                             </div>
 
-                            <div class="record-inner-column-bordered w-full md:w-45 shrink-0">
-                                <div class="record-inner-label">
-                                    {{ __('forms.status.label') }}
-                                </div>
+                            <div class="record-inner-column-bordered w-full shrink-0 md:w-45">
+                                <div class="record-inner-label">{{ __('forms.status.label') }}</div>
 
                                 <div>
                                     @php($status = ImmunizationStatus::from(data_get($immunization, 'status')))
-                                    <span @class([$status->color()])>
-                                        {{ $status->label() }}
-                                    </span>
+                                    <span @class([$status->color()])> {{ $status->label() }} </span>
                                 </div>
                             </div>
 
-                            <div
-                                class="record-inner-action-col border-l border-gray-200 dark:border-gray-700 w-16 flex items-center justify-center shrink-0 h-full relative">
-                                <div x-data="{
-                                         open: false,
-                                         toggle() {
-                                             if (this.open) {
-                                                 return this.close();
-                                             }
-                                             this.$refs.button.focus();
-                                             this.open = true;
-                                         },
-                                         close(focusAfter) {
-                                             if (!this.open) {
-                                                 return;
-                                             }
-                                             this.open = false;
-                                             focusAfter && focusAfter.focus();
-                                         }
-                                     }"
-                                     @keydown.escape.prevent.stop="close($refs.button)"
-                                     @focusin.window="!$refs.panel.contains($event.target) && close()"
-                                     x-id="['dropdown-button']"
-                                     class="relative"
+                            <div class="record-inner-action-col relative flex h-full w-16 shrink-0 items-center justify-center border-l border-gray-200 dark:border-gray-700">
+                                <div
+                                    x-data="{
+                                        open: false,
+                                        toggle() {
+                                            if (this.open) {
+                                                return this.close();
+                                            }
+                                            this.$refs.button.focus();
+                                            this.open = true;
+                                        },
+                                        close(focusAfter) {
+                                            if (! this.open) {
+                                                return;
+                                            }
+                                            this.open = false;
+                                            focusAfter && focusAfter.focus();
+                                        },
+                                    }"
+                                    @keydown.escape.prevent.stop="close($refs.button)"
+                                    @focusin.window="! $refs.panel.contains($event.target) && close()"
+                                    x-id="['dropdown-button']"
+                                    class="relative"
                                 >
-                                    <button @click="toggle()"
-                                            x-ref="button"
-                                            :aria-expanded="open"
-                                            :aria-controls="$id('dropdown-button')"
-                                            type="button"
-                                            class="record-inner-action-btn cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 p-2 rounded-lg"
+                                    <button
+                                        @click="toggle()"
+                                        x-ref="button"
+                                        :aria-expanded="open"
+                                        :aria-controls="$id('dropdown-button')"
+                                        type="button"
+                                        class="record-inner-action-btn cursor-pointer rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
                                     >
                                         @icon('edit-user-outline', 'w-6 h-6 text-gray-700 dark:text-gray-300')
                                     </button>
 
-                                    <div x-show="open"
-                                         x-cloak
-                                         x-ref="panel"
-                                         x-transition.origin.top.right
-                                         @click.outside="close($refs.button)"
-                                         :id="$id('dropdown-button')"
-                                         class="absolute right-0 mt-2 w-56 rounded-md bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-lg z-50 py-1"
+                                    <div
+                                        x-show="open"
+                                        x-cloak
+                                        x-ref="panel"
+                                        x-transition.origin.top.right
+                                        @click.outside="close($refs.button)"
+                                        :id="$id('dropdown-button')"
+                                        class="absolute right-0 z-50 mt-2 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-700"
                                     >
-                                        <button @click="close($refs.button)"
-                                                class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                                        <button
+                                            @click="close($refs.button)"
+                                            class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
                                         >
                                             @icon('eye', 'w-5 h-5 text-gray-500')
                                             {{ __('patients.view_details') }}
                                         </button>
 
-                                        <button @click="close($refs.button)"
-                                                class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                                        <button
+                                            @click="close($refs.button)"
+                                            class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
                                         >
                                             @icon('alert-circle', 'w-5 h-5 text-gray-500')
-                                            {{ __('patients.status.entered_in_error') }}
+                                            {{ __('immunizations.status.entered_in_error') }}
                                         </button>
                                     </div>
                                 </div>
@@ -249,8 +266,8 @@
 
                         <div class="record-inner-body">
                             <div class="record-inner-grid-container">
-                                <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-3">
-                                    <div class="space-y-2.5 min-w-0">
+                                <div class="grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-4">
+                                    <div class="min-w-0 space-y-2.5">
                                         <div class="min-w-0">
                                             <div class="record-inner-label text-[10px]">
                                                 {{ __('patients.dosage') }}
@@ -263,7 +280,7 @@
 
                                         <div class="min-w-0">
                                             <div class="record-inner-label text-[10px]">
-                                                {{ __('patients.manufacturer_and_lot_number') }}
+                                                {{ __('immunizations.manufacturer_and_lot_number') }}
                                             </div>
 
                                             <div class="record-inner-value text-[14px] font-semibold wrap-break-word">
@@ -273,7 +290,7 @@
 
                                         <div class="min-w-0">
                                             <div class="record-inner-label text-[10px]">
-                                                {{ __('patients.performer') }}
+                                                {{ __('medical-events.performer') }}
                                             </div>
 
                                             <div class="record-inner-value text-[14px] font-semibold wrap-break-word">
@@ -282,10 +299,10 @@
                                         </div>
                                     </div>
 
-                                    <div class="space-y-2.5 min-w-0">
+                                    <div class="min-w-0 space-y-2.5">
                                         <div class="min-w-0">
                                             <div class="record-inner-label text-[10px]">
-                                                {{ __('patients.route') }}
+                                                {{ __('immunizations.route') }}
                                             </div>
 
                                             <div class="record-inner-value text-[14px] font-semibold wrap-break-word">
@@ -314,7 +331,7 @@
                                         </div>
                                     </div>
 
-                                    <div class="space-y-2.5 min-w-0">
+                                    <div class="min-w-0 space-y-2.5">
                                         <div class="min-w-0">
                                             <div class="record-inner-label text-[10px]">
                                                 {{ __('patients.reason') }}
@@ -327,7 +344,7 @@
 
                                         <div class="min-w-0">
                                             <div class="record-inner-label text-[10px]">
-                                                {{ __('patients.was_performed') }}
+                                                {{ __('immunizations.was_performed') }}
                                             </div>
 
                                             <div class="record-inner-value text-[14px] font-semibold">
@@ -336,10 +353,10 @@
                                         </div>
                                     </div>
 
-                                    <div class="space-y-2.5 min-w-0">
+                                    <div class="min-w-0 space-y-2.5">
                                         <div class="min-w-0">
                                             <div class="record-inner-label text-[10px]">
-                                                {{ __('patients.reactions') }}
+                                                {{ __('immunizations.reactions') }}
                                             </div>
 
                                             <div class="record-inner-value text-[14px]">
@@ -349,7 +366,7 @@
 
                                         <div class="min-w-0">
                                             <div class="record-inner-label text-[10px]">
-                                                {{ __('patients.date_time_performed') }}
+                                                {{ __('immunizations.date_time_performed') }}
                                             </div>
 
                                             <div class="record-inner-value text-[14px] font-semibold">
@@ -359,36 +376,34 @@
                                     </div>
                                 </div>
 
-                                <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700/50">
-                                    <div class="record-inner-label font-bold text-gray-900 dark:text-gray-100 mb-2">
-                                        {{ __('patients.vaccination_protocol') }}:
+                                <div class="mt-4 border-t border-gray-100 pt-4 dark:border-gray-700/50">
+                                    <div class="record-inner-label mb-2 font-bold text-gray-900 dark:text-gray-100">
+                                        {{ __('immunizations.vaccination_protocol') }}:
                                     </div>
 
                                     @php($protocol = data_get($immunization, 'vaccinationProtocols.0'))
 
-                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-3">
+                                    <div class="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
                                         <ul class="space-y-2.5">
                                             <li class="flex items-start gap-1.5 text-[13px] leading-tight">
-                                                <span class="w-1 h-1 rounded-full bg-gray-400 mt-1.5 shrink-0"></span>
+                                                <span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray-400"></span>
                                                 <div class="min-w-0">
-                                                    <div class="text-gray-500 dark:text-gray-400 text-[10px] mb-0">
-                                                        {{ __('patients.target_diseases') }}:
+                                                    <div class="mb-0 text-[10px] text-gray-500 dark:text-gray-400">
+                                                        {{ __('immunizations.target_diseases') }}:
                                                     </div>
-                                                    <div
-                                                        class="text-gray-800 dark:text-gray-200 font-semibold wrap-break-word">
+                                                    <div class="font-semibold wrap-break-word text-gray-800 dark:text-gray-200">
                                                         {{ $this->dictionaryLabel($protocol, 'targetDiseases.0') }}
                                                     </div>
                                                 </div>
                                             </li>
 
                                             <li class="flex items-start gap-1.5 text-[13px] leading-tight">
-                                                <span class="w-1 h-1 rounded-full bg-gray-400 mt-1.5 shrink-0"></span>
+                                                <span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray-400"></span>
                                                 <div class="min-w-0">
-                                                    <div class="text-gray-500 dark:text-gray-400 text-[10px] mb-0">
-                                                        {{ __('patients.protocol_author') }}:
+                                                    <div class="mb-0 text-[10px] text-gray-500 dark:text-gray-400">
+                                                        {{ __('immunizations.protocol_author') }}:
                                                     </div>
-                                                    <div
-                                                        class="text-gray-800 dark:text-gray-200 font-semibold uppercase tracking-wide text-[11px] wrap-break-word">
+                                                    <div class="text-[11px] font-semibold tracking-wide wrap-break-word text-gray-800 uppercase dark:text-gray-200">
                                                         {{ $this->dictionaryLabel($protocol, 'authority') }}
                                                     </div>
                                                 </div>
@@ -397,24 +412,24 @@
 
                                         <ul class="space-y-2.5">
                                             <li class="flex items-start gap-1.5 text-[13px] leading-tight">
-                                                <span class="w-1 h-1 rounded-full bg-gray-400 mt-1.5 shrink-0"></span>
+                                                <span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray-400"></span>
                                                 <div class="min-w-0">
-                                                    <div class="text-gray-500 dark:text-gray-400 text-[10px] mb-0">
-                                                        {{ __('patients.dose_sequence') }}:
+                                                    <div class="mb-0 text-[10px] text-gray-500 dark:text-gray-400">
+                                                        {{ __('immunizations.dose_sequence') }}:
                                                     </div>
-                                                    <div class="text-gray-800 dark:text-gray-200 font-semibold">
+                                                    <div class="font-semibold text-gray-800 dark:text-gray-200">
                                                         {{ data_get($protocol, 'doseSequence') ?? '-' }}
                                                     </div>
                                                 </div>
                                             </li>
 
                                             <li class="flex items-start gap-1.5 text-[13px] leading-tight">
-                                                <span class="w-1 h-1 rounded-full bg-gray-400 mt-1.5 shrink-0"></span>
+                                                <span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray-400"></span>
                                                 <div class="min-w-0">
-                                                    <div class="text-gray-500 dark:text-gray-400 text-[10px] mb-0">
-                                                        {{ __('patients.immunization_series') }}:
+                                                    <div class="mb-0 text-[10px] text-gray-500 dark:text-gray-400">
+                                                        {{ __('immunizations.series') }}:
                                                     </div>
-                                                    <div class="text-gray-800 dark:text-gray-200 font-semibold">
+                                                    <div class="font-semibold text-gray-800 dark:text-gray-200">
                                                         {{ data_get($protocol, 'series') ?? '-' }}
                                                     </div>
                                                 </div>
@@ -423,25 +438,24 @@
 
                                         <ul class="space-y-2.5">
                                             <li class="flex items-start gap-1.5 text-[13px] leading-tight">
-                                                <span class="w-1 h-1 rounded-full bg-gray-400 mt-1.5 shrink-0"></span>
+                                                <span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray-400"></span>
                                                 <div class="min-w-0">
-                                                    <div class="text-gray-500 dark:text-gray-400 text-[10px] mb-0">
-                                                        {{ __('patients.series_of_doses_by_protocol') }}:
+                                                    <div class="mb-0 text-[10px] text-gray-500 dark:text-gray-400">
+                                                        {{ __('immunizations.series_of_doses_by_protocol') }}:
                                                     </div>
-                                                    <div class="text-gray-800 dark:text-gray-200 font-semibold">
+                                                    <div class="font-semibold text-gray-800 dark:text-gray-200">
                                                         {{ data_get($protocol, 'seriesDoses') ?? '-' }}
                                                     </div>
                                                 </div>
                                             </li>
 
                                             <li class="flex items-start gap-1.5 text-[13px] leading-tight">
-                                                <span class="w-1 h-1 rounded-full bg-gray-400 mt-1.5 shrink-0"></span>
+                                                <span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray-400"></span>
                                                 <div class="min-w-0">
-                                                    <div class="text-gray-500 dark:text-gray-400 text-[10px] mb-0">
-                                                        {{ __('patients.protocol_description') }}:
+                                                    <div class="mb-0 text-[10px] text-gray-500 dark:text-gray-400">
+                                                        {{ __('immunizations.protocol_description') }}:
                                                     </div>
-                                                    <div
-                                                        class="text-gray-800 dark:text-gray-200 font-semibold wrap-break-word">
+                                                    <div class="font-semibold wrap-break-word text-gray-800 dark:text-gray-200">
                                                         {{ data_get($protocol, 'description') ?? '-' }}
                                                     </div>
                                                 </div>
@@ -453,19 +467,13 @@
 
                             <div class="record-inner-id-col">
                                 <div class="min-w-0">
-                                    <div class="record-inner-label">
-                                        {{ __('patients.ehealth_id') }}
-                                    </div>
+                                    <div class="record-inner-label">{{ __('patients.ehealth_id') }}</div>
 
-                                    <div class="record-inner-id-value">
-                                        {{ data_get($immunization, 'uuid', '—') }}
-                                    </div>
+                                    <div class="record-inner-id-value">{{ data_get($immunization, 'uuid', '—') }}</div>
                                 </div>
 
                                 <div class="min-w-0">
-                                    <div class="record-inner-label">
-                                        {{ __('patients.medical_record_id') }}
-                                    </div>
+                                    <div class="record-inner-label">{{ __('patients.medical_record_id') }}</div>
 
                                     <div class="record-inner-id-value">
                                         {{ data_get($immunization, 'context.identifier.value', '—') }}
@@ -478,9 +486,7 @@
                     <x-nothing-found :description="null" />
                 @endforelse
             </div>
-            <div class="mt-8">
-                {{ $this->paginatedImmunizations->links() }}
-            </div>
+            <div class="mt-8">{{ $this->paginatedImmunizations->links() }}</div>
         </div>
     </div>
 

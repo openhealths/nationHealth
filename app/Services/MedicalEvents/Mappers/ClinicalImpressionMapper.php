@@ -24,7 +24,7 @@ class ClinicalImpressionMapper implements FhirMapperContract
 
         $result = [
             'id' => $data['uuid'] ?? Str::uuid()->toString(),
-            'status' => ClinicalImpressionStatus::COMPLETED->value,
+            'status' => $data['status'] ?? ClinicalImpressionStatus::COMPLETED->value,
             'code' => FhirResource::make()
                 ->coding('eHealth/clinical_impression_patient_categories', $data['codeCode'])
                 ->toCodeableConcept(),
@@ -124,6 +124,7 @@ class ClinicalImpressionMapper implements FhirMapperContract
 
         return [
             'uuid' => data_get($data, 'uuid'),
+            'status' => data_get($data, 'status', ClinicalImpressionStatus::COMPLETED->value),
             'codeCode' => data_get($data, 'code.coding.0.code'),
             'description' => data_get($data, 'description', ''),
             'effectivePeriodStartDate' => data_get($data, 'effectivePeriodStartDate', ''),

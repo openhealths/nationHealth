@@ -1,12 +1,11 @@
 <section class="section-form">
     <x-header-navigation class="breadcrumb-form">
-        <x-slot name="title">
-            {{ __('patients.procedures') }} - {{ $patientFullName }}
-        </x-slot>
+        <x-slot name="title">{{ __('procedures.plural') }} - {{ $patientFullName }}</x-slot>
     </x-header-navigation>
 
-    <form class="form"
-          x-data="{
+    <form
+        class="form"
+        x-data="{
                 modalProcedure: new Procedure(@js($this->form->procedure)),
                 procedureEmployees: @js($procedureEmployees),
 
@@ -81,24 +80,25 @@
                 }
           }"
     >
-
         <fieldset @disabled($isReadonly) @class(['pointer-events-none opacity-80' => $isReadonly])>
             @include('livewire.encounter.procedure-parts.main-information', ['context' => 'procedure'])
             @include('livewire.encounter.procedure-parts.additional-information', ['context' => 'procedure'])
             @include('livewire.encounter.procedure-parts.reason-references', ['wireProp' => 'reasonReferenceResults'])
             @include('livewire.encounter.procedure-parts.used-codes')
-            @if(!empty(data_get($this->form->procedure, 'encounterId')))
+            @if (!empty(data_get($this->form->procedure, 'encounterId')))
                 @include('livewire.encounter.procedure-parts.complication-details', ['context' => 'procedure'])
             @endif
         </fieldset>
 
         <div class="flex gap-8">
-            <a href="{{ url()->previous() }}" type="submit" class="button-minor">
-                {{ __('forms.back') }}
-            </a>
+            <a href="{{ url()->previous() }}" type="submit" class="button-minor"> {{ __('forms.back') }} </a>
 
-            @unless($isReadonly)
-                <button @click.prevent="$wire.save(prepareProcedureForSubmit())" type="submit" class="button-primary-outline">
+            @unless ($isReadonly)
+                <button
+                    @click.prevent="$wire.save(prepareProcedureForSubmit())"
+                    type="submit"
+                    class="button-primary-outline"
+                >
                     {{ __('forms.save') }}
                 </button>
 
@@ -114,7 +114,7 @@
             @endunless
         </div>
 
-        @unless($isReadonly)
+        @unless ($isReadonly)
             <x-signature-modal method="sign" />
         @endunless
     </form>
@@ -161,9 +161,17 @@
             this.complicationDetails = [];
             this.encounterId = '';
             this.performedPeriodStartDate = toFormattedDate(startTime);
-            this.performedPeriodStartTime = startTime.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
+            this.performedPeriodStartTime = startTime.toLocaleTimeString('uk-UA', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+            });
             this.performedPeriodEndDate = toFormattedDate(now);
-            this.performedPeriodEndTime = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
+            this.performedPeriodEndTime = now.toLocaleTimeString('uk-UA', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+            });
             this.performerEmployeeId = '';
             this.performedType = 'period';
             this.performedDate = '';

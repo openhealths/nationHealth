@@ -74,7 +74,7 @@ class DeclarationsSync extends EHealthJob
      * Get the next entity job to be scheduled after DeclarationSync completes.
      *
      * If the job is standalone, returns a CompleteSync job for the current legal entity.
-     * Otherwise, returns a chain of DeclarationRequestsUpsert jobs for declaration requests with PARTIAL sync status.
+     * Otherwise, returns a chain of DeclarationRequestDetailsSync jobs.
      *
      * @return EHealthJob|null
      */

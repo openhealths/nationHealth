@@ -1,11 +1,13 @@
 @use(App\Livewire\Person\PersonCreate)
 @use(App\Livewire\Person\PersonRequestEdit)
+@use(App\Models\Relations\ConfidantPerson)
 @use(App\Enums\Person\Gender)
 
-<fieldset class="fieldset"
-          data-fieldset="incapacitated"
-          x-data="{
-              isIncapacitated: $wire.entangle('isIncapacitated'),
+<fieldset
+    class="fieldset"
+    data-confidant-scope
+    x-data="{
+              isIncapacitated: $wire.entangle('isIncapacitated').live,
               showSignatureModal: $wire.showSignatureModal,
               showConfidantPersonDrawer: @if($canManageConfidantRelationships) $wire.entangle('showConfidantPersonDrawer') @else false @endif,
               showDeactivateConfidantPersonDrawer: @if($canManageConfidantRelationships) $wire.entangle('showDeactivateConfidantPersonDrawer') @else false @endif,
@@ -141,13 +143,16 @@
                   }
               }
           }"
+    x-effect="
+        if (showConfidantPersonDrawer || showDeactivateConfidantPersonDrawer || showDocumentDrawer || showAuthDrawer || showSignatureDrawer || showTerminateModal) {
+            document.body.classList.add('overflow-hidden');
+        } else {
+            document.body.classList.remove('overflow-hidden');
+        }
+    "
 >
     <legend class="legend flex items-baseline gap-2">
-        <input type="checkbox"
-               class="default-checkbox mb-2"
-               x-model="isIncapacitated"
-               id="isIncapacitated"
-        />
+        <input type="checkbox" class="default-checkbox mb-2" x-model="isIncapacitated" id="isIncapacitated" />
         <label for="isIncapacitated" class="cursor-pointer">
             {{ $incapacitatedLabel ?? __('patients.incapacitated') }}
         </label>
@@ -156,290 +161,352 @@
     <div x-show="isIncapacitated" x-cloak x-transition>
         {{-- Legal Representatives Section --}}
         <div class="mb-6">
-            <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
                     {{ __('patients.confidant_persons') }}
                 </h3>
 
-                @if($canManageConfidantRelationships)
-                    <button type="button" class="button-sync" wire:click.prevent="syncConfidantPersons">
-                        @icon('refresh', 'w-4 h-4 mr-2')
-                        {{ __('patients.sync_confidant_persons') }}
-                    </button>
+                @if ($canManageConfidantRelationships)
+                    @can('view', ConfidantPerson::class)
+                        <button type="button" class="button-sync" wire:click.prevent="syncConfidantPersons">
+                            @icon('refresh', 'w-4 h-4 mr-2')
+                            {{ __('patients.sync_confidant_persons') }}
+                        </button>
+                    @endcan
                 @endif
             </div>
 
             {{-- Combined table for both PersonUpdate and PersonCreate --}}
-            <div wire:ignore
-                 x-show="@if($canManageConfidantRelationships) confidantPersons && confidantPersons.length > 0 @else confidantPerson && confidantPerson.documentsRelationship && confidantPerson.documentsRelationship.length > 0 @endif"
+            <div
+                wire:ignore
+                x-show="@if($canManageConfidantRelationships) confidantPersons && confidantPersons.length > 0 @else confidantPerson && confidantPerson.documentsRelationship && confidantPerson.documentsRelationship.length > 0 @endif"
             >
                 <table class="table-input w-full">
                     <thead class="thead-input">
-                    <tr>
-                        <th scope="col" class="th-input">{{ __('forms.personal_data') }}</th>
-                        <th scope="col" class="th-input">{{ __('forms.document') }}</th>
-                        <th scope="col" class="th-input">{{ __('forms.phone') }}</th>
-                        <th scope="col" class="th-input">{{ __('patients.relationship_active_to') }}</th>
-                        <th scope="col" class="th-input">{{ __('patients.relationship_confirmation_document') }}</th>
-                        <th scope="col" class="th-input text-center">{{ __('forms.action') }}</th>
-                    </tr>
+                        <tr>
+                            <th scope="col" class="th-input">{{ __('forms.personal_data') }}</th>
+                            <th scope="col" class="th-input">{{ __('forms.document') }}</th>
+                            <th scope="col" class="th-input">{{ __('forms.phone') }}</th>
+                            <th scope="col" class="th-input">{{ __('patients.relationship_active_to') }}</th>
+                            <th scope="col" class="th-input">
+                                {{ __('patients.relationship_confirmation_document') }}
+                            </th>
+                            <th scope="col" class="th-input text-center">{{ __('forms.action') }}</th>
+                        </tr>
                     </thead>
                     <tbody>
-
-                    @if($canManageConfidantRelationships)
-                        {{-- Existing person: Multiple confidant persons --}}
-                        <template x-for="(confidantPerson, confidantIndex) in confidantPersons"
-                                  :key="'confidant-' + confidantIndex"
-                        >
-                            <tr>
-                                {{-- Personal Data --}}
-                                <td class="td-input align-top">
-                                    <div class="font-bold text-gray-900 dark:text-white">
-                                        <span x-text="confidantPerson.person.name || (confidantPerson.person.lastName + ' ' + confidantPerson.person.firstName + ' ' + (confidantPerson.person.secondName || ''))"
-                                        ></span>
-                                    </div>
-                                    <div class="text-sm text-gray-500 dark:text-gray-400">
-                                    <span x-text="confidantPerson.person?.gender === '{{ Gender::MALE->value }}' ? '{{ Gender::MALE->label() }}' : (confidantPerson.person?.gender === '{{ Gender::FEMALE->value }}' ? '{{ Gender::FEMALE->label() }}' : '')"></span>
-                                    </div>
-                                    <div class="text-sm text-gray-500 dark:text-gray-400">
-                                        <span>{{ __('forms.rnokpp') }} </span>
-                                        <span x-text="confidantPerson.person?.taxId || '-'"></span>
-                                    </div>
-                                    <div class="text-sm text-gray-500 dark:text-gray-400"
-                                         x-show="confidantPerson.person?.unzr"
-                                    >
-                                        <span>{{ __('patients.unzr') }} </span>
-                                        <span x-text="confidantPerson.person?.unzr"></span>
-                                    </div>
-                                </td>
-                                {{-- Confidant person documents --}}
-                                <td class="td-input align-top">
-                                    <div class="space-y-2">
-                                        <template :key="'person-doc-' + confidantIndex + '-' + documentIndex"
-                                                  x-for="(document, documentIndex) in (confidantPerson.person.documents)"
-                                        >
-                                            <div class="border-b border-gray-200 dark:border-gray-600 pb-2 last:border-b-0 last:pb-0">
-                                                <div class="text-gray-900 dark:text-white font-medium"
-                                                     x-text="documentTypes[document.type] || document.type"
-                                                ></div>
-                                                <div class="text-sm text-gray-500 dark:text-gray-400"
-                                                     x-text="document.number"
-                                                ></div>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </td>
-                                {{-- Phone --}}
-                                <td class="td-input align-top">
-                                    <div x-show="!confidantPerson.person?.phones?.length">
-                                        <div class="text-gray-900 dark:text-white">-</div>
-                                    </div>
-                                    <template :key="'phone-' + confidantIndex + '-' + phoneIndex"
-                                              x-for="(phone, phoneIndex) in (confidantPerson?.person?.phones || [])"
-                                    >
-                                        <div>
-                                            <div class="text-gray-900 dark:text-white"
-                                                 x-text="phoneTypes[phone.type] || '-'"
-                                            ></div>
-                                            <div class="text-sm text-gray-500 dark:text-gray-400"
-                                                 x-text="phone.number || '-'"
-                                            ></div>
+                        @if ($canManageConfidantRelationships)
+                            {{-- Existing person: Multiple confidant persons --}}
+                            <template
+                                x-for="(confidantPerson, confidantIndex) in confidantPersons"
+                                :key="'confidant-' + confidantIndex"
+                            >
+                                <tr>
+                                    {{-- Personal Data --}}
+                                    <td class="td-input align-top">
+                                        <div class="font-bold text-gray-900 dark:text-white">
+                                            <span
+                                                x-text="
+                                                    confidantPerson.person.name ||
+                                                    confidantPerson.person.lastName +
+                                                        ' ' +
+                                                        confidantPerson.person.firstName +
+                                                        ' ' +
+                                                        (confidantPerson.person.secondName || '')
+                                                "
+                                            ></span>
                                         </div>
-                                    </template>
-                                </td>
-                                {{-- Relationship Active Until --}}
-                                <td class="td-input align-top">
-                                    <div class="text-gray-900 dark:text-white"
-                                         x-text="confidantPerson.activeTo || '-'"
-                                    ></div>
-                                </td>
-                                {{-- Relationship Confirmation Documents --}}
-                                <td class="td-input align-top">
-                                    <div class="space-y-2">
-                                        <template :key="'relationship-doc-' + confidantIndex + '-' + docIndex"
-                                                  x-for="(doc, docIndex) in (confidantPerson.documentsRelationship || [])"
+                                        <div class="text-sm text-gray-500 dark:text-gray-400">
+                                            <span x-text="confidantPerson.person?.gender === '{{ Gender::MALE->value }}' ? '{{ Gender::MALE->label() }}' : (confidantPerson.person?.gender === '{{ Gender::FEMALE->value }}' ? '{{ Gender::FEMALE->label() }}' : '')"></span>
+                                        </div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400">
+                                            <span>{{ __('forms.rnokpp') }} </span>
+                                            <span x-text="confidantPerson.person?.taxId || '-'"></span>
+                                        </div>
+                                        <div
+                                            class="text-sm text-gray-500 dark:text-gray-400"
+                                            x-show="confidantPerson.person?.unzr"
                                         >
-                                            <div class="border-b border-gray-200 dark:border-gray-600 pb-2 last:border-b-0 last:pb-0">
-                                                <div class="text-gray-900 dark:text-white font-medium"
-                                                     x-text="documentRelationshipTypes[doc.type] || doc.type"
+                                            <span>{{ __('patients.unzr') }} </span>
+                                            <span x-text="confidantPerson.person?.unzr"></span>
+                                        </div>
+                                    </td>
+                                    {{-- Confidant person documents --}}
+                                    <td class="td-input align-top">
+                                        <div class="space-y-2">
+                                            <template
+                                                :key="'person-doc-' + confidantIndex + '-' + documentIndex"
+                                                x-for="(document, documentIndex) in confidantPerson.person.documents"
+                                            >
+                                                <div class="border-b border-gray-200 pb-2 last:border-b-0 last:pb-0 dark:border-gray-600">
+                                                    <div
+                                                        class="font-medium text-gray-900 dark:text-white"
+                                                        x-text="documentTypes[document.type] || document.type"
+                                                    ></div>
+                                                    <div
+                                                        class="text-sm text-gray-500 dark:text-gray-400"
+                                                        x-text="document.number"
+                                                    ></div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </td>
+                                    {{-- Phone --}}
+                                    <td class="td-input align-top">
+                                        <div x-show="! confidantPerson.person?.phones?.length">
+                                            <div class="text-gray-900 dark:text-white">-</div>
+                                        </div>
+                                        <template
+                                            :key="'phone-' + confidantIndex + '-' + phoneIndex"
+                                            x-for="(phone, phoneIndex) in (confidantPerson?.person?.phones || [])"
+                                        >
+                                            <div>
+                                                <div
+                                                    class="text-gray-900 dark:text-white"
+                                                    x-text="phoneTypes[phone.type] || '-'"
                                                 ></div>
-                                                <div class="text-sm text-gray-500 dark:text-gray-400"
-                                                     x-text="doc.number"
+                                                <div
+                                                    class="text-sm text-gray-500 dark:text-gray-400"
+                                                    x-text="phone.number || '-'"
                                                 ></div>
                                             </div>
                                         </template>
-                                    </div>
-                                </td>
-                                {{-- Action --}}
-                                <td class="td-input text-center align-top">
-                                    <div class="relative"
-                                         x-data="{ openDropdown: false }"
-                                         @click.outside="openDropdown = false"
-                                    >
-                                        <button @click="openDropdown = !openDropdown"
+                                    </td>
+                                    {{-- Relationship Active Until --}}
+                                    <td class="td-input align-top">
+                                        <div
+                                            class="text-gray-900 dark:text-white"
+                                            x-text="confidantPerson.activeTo || '-'"
+                                        ></div>
+                                    </td>
+                                    {{-- Relationship Confirmation Documents --}}
+                                    <td class="td-input align-top">
+                                        <div class="space-y-2">
+                                            <template
+                                                :key="'relationship-doc-' + confidantIndex + '-' + docIndex"
+                                                x-for="(doc, docIndex) in (confidantPerson.documentsRelationship || [])"
+                                            >
+                                                <div class="border-b border-gray-200 pb-2 last:border-b-0 last:pb-0 dark:border-gray-600">
+                                                    <div
+                                                        class="font-medium text-gray-900 dark:text-white"
+                                                        x-text="documentRelationshipTypes[doc.type] || doc.type"
+                                                    ></div>
+                                                    <div
+                                                        class="text-sm text-gray-500 dark:text-gray-400"
+                                                        x-text="doc.number"
+                                                    ></div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </td>
+                                    {{-- Action --}}
+                                    <td class="td-input text-center align-top">
+                                        <div
+                                            class="relative"
+                                            x-data="{ openDropdown: false }"
+                                            @click.outside="openDropdown = false"
+                                        >
+                                            <button
+                                                @click="openDropdown = ! openDropdown"
                                                 type="button"
-                                                class="cursor-pointer p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                        >
-                                            @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-gray-200')
-                                        </button>
+                                                class="cursor-pointer rounded-full p-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+                                            >
+                                                @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-gray-200')
+                                            </button>
 
-                                        <div x-show="openDropdown"
-                                             x-transition
-                                             x-cloak
-                                             class="absolute right-0 z-10 w-56 whitespace-nowrap bg-white rounded shadow-lg border border-gray-200 dark:bg-gray-700 dark:border-gray-600"
-                                        >
-                                            <div class="py-1">
-                                                @if(!$canManageConfidantRelationships)
-                                                    <button type="button"
-                                                            class="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 whitespace-nowrap"
-                                                            @click="selectedConfidantIndex = confidantIndex; editLegalRepresentative(confidantIndex); openDropdown = false"
+                                            <div
+                                                x-show="openDropdown"
+                                                x-transition
+                                                x-cloak
+                                                class="absolute right-0 z-10 w-56 rounded border border-gray-200 bg-white whitespace-nowrap shadow-lg dark:border-gray-600 dark:bg-gray-700"
+                                            >
+                                                <div class="py-1">
+                                                    @if (!$canManageConfidantRelationships)
+                                                        <button
+                                                            type="button"
+                                                            class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-sm whitespace-nowrap text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                            @click="
+                                                                selectedConfidantIndex = confidantIndex;
+                                                                editLegalRepresentative(confidantIndex);
+                                                                openDropdown = false;
+                                                            "
+                                                        >
+                                                            @icon('edit', 'w-4 h-4')
+                                                            {{ __('forms.edit') }}
+                                                        </button>
+                                                    @endif
+
+                                                    <template
+                                                        x-if="
+                                                            confidantPerson &&
+                                                            confidantPerson.activeTo &&
+                                                            new Date(
+                                                                confidantPerson.activeTo.split('.').reverse().join('-'),
+                                                            ) > new Date()
+                                                        "
                                                     >
-                                                        @icon('edit', 'w-4 h-4')
-                                                        {{ __('forms.edit') }}
-                                                    </button>
-                                                @endif
-
-                                                <template x-if="confidantPerson && confidantPerson.activeTo && new Date(confidantPerson.activeTo.split('.').reverse().join('-')) > new Date()">
-                                                    <button type="button"
-                                                            class="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 whitespace-nowrap"
+                                                        <button
+                                                            type="button"
+                                                            class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-sm whitespace-nowrap text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
                                                             @click.prevent="
                                                                 selectedConfidantIndex = confidantIndex;
                                                                 showDeactivateConfidantPersonDrawer = true;
                                                             "
-                                                    >
-                                                        @icon('close-circle', 'w-4 h-4 text-gray-600 dark:text-gray-300')
-                                                        {{ __('patients.deactivate_relationship') }}
-                                                    </button>
-                                                </template>
+                                                        >
+                                                            @icon('close-circle', 'w-4 h-4 text-gray-600 dark:text-gray-300')
+                                                            {{ __('patients.deactivate_relationship') }}
+                                                        </button>
+                                                    </template>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </td>
-                            </tr>
-                        </template>
-                    @else
-                        {{-- PersonCreate: Single confidant person --}}
-                        <template x-for="(doc, docIndex) in confidantPerson.documentsRelationship"
-                                  :key="'confidant-doc-' + docIndex"
-                        >
-                            <tr>
-                                {{-- Personal Data - only show on first row --}}
-                                <td class="td-input align-top" x-show="docIndex === 0">
-                                    <div class="font-bold text-gray-900 dark:text-white">
-                                        <span x-text="confidantPerson.names?.[0]?.lastName"></span>
-                                        <span x-text="confidantPerson.names?.[0]?.firstName"></span>
-                                        <span x-text="confidantPerson.names?.[0]?.secondName || ''"></span>
-                                    </div>
-                                    <div class="text-sm text-gray-500 dark:text-gray-400">
-                                    <span x-text="confidantPerson.gender === '{{ Gender::MALE->value }}' ? '{{ Gender::MALE->label() }}' : (confidantPerson.gender === '{{ Gender::FEMALE->value }}' ? '{{ Gender::FEMALE->label() }}' : '')"></span>
-                                    </div>
-                                    <div class="text-sm text-gray-500 dark:text-gray-400">
-                                        <span>{{ __('forms.rnokpp') }} </span>
-                                        <span x-text="confidantPerson.taxId || '-'"></span>
-                                    </div>
-                                    <div class="text-sm text-gray-500 dark:text-gray-400"
-                                         x-show="confidantPerson.unzr"
-                                    >
-                                        <span>{{ __('patients.unzr') }} </span>
-                                        <span x-text="confidantPerson.unzr || ''"></span>
-                                    </div>
-                                </td>
-                                {{-- Confidant person documents --}}
-                                <td class="td-input align-top" x-show="docIndex === 0">
-                                    <div class="space-y-2">
-                                        <template :key="'person-doc-' + documentIndex"
-                                                  x-for="(document, documentIndex) in (confidantPerson.documents)"
+                                    </td>
+                                </tr>
+                            </template>
+                        @else
+                            {{-- PersonCreate: Single confidant person --}}
+                            <template
+                                x-for="(doc, docIndex) in confidantPerson.documentsRelationship"
+                                :key="'confidant-doc-' + docIndex"
+                            >
+                                <tr>
+                                    {{-- Personal Data - only show on first row --}}
+                                    <td class="td-input align-top" x-show="docIndex === 0">
+                                        <div class="font-bold text-gray-900 dark:text-white">
+                                            <span x-text="confidantPerson.names?.[0]?.lastName"></span>
+                                            <span x-text="confidantPerson.names?.[0]?.firstName"></span>
+                                            <span x-text="confidantPerson.names?.[0]?.secondName || ''"></span>
+                                        </div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400">
+                                            <span x-text="confidantPerson.gender === '{{ Gender::MALE->value }}' ? '{{ Gender::MALE->label() }}' : (confidantPerson.gender === '{{ Gender::FEMALE->value }}' ? '{{ Gender::FEMALE->label() }}' : '')"></span>
+                                        </div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400">
+                                            <span>{{ __('forms.rnokpp') }} </span>
+                                            <span x-text="confidantPerson.taxId || '-'"></span>
+                                        </div>
+                                        <div
+                                            class="text-sm text-gray-500 dark:text-gray-400"
+                                            x-show="confidantPerson.unzr"
                                         >
-                                            <div class="border-b border-gray-200 dark:border-gray-600 pb-2 last:border-b-0 last:pb-0">
-                                                <div class="text-gray-900 dark:text-white font-medium"
-                                                     x-text="documentTypes[document.type] || document.type"
+                                            <span>{{ __('patients.unzr') }} </span>
+                                            <span x-text="confidantPerson.unzr || ''"></span>
+                                        </div>
+                                    </td>
+                                    {{-- Confidant person documents --}}
+                                    <td class="td-input align-top" x-show="docIndex === 0">
+                                        <div class="space-y-2">
+                                            <template
+                                                :key="'person-doc-' + documentIndex"
+                                                x-for="(document, documentIndex) in confidantPerson.documents"
+                                            >
+                                                <div class="border-b border-gray-200 pb-2 last:border-b-0 last:pb-0 dark:border-gray-600">
+                                                    <div
+                                                        class="font-medium text-gray-900 dark:text-white"
+                                                        x-text="documentTypes[document.type] || document.type"
+                                                    ></div>
+                                                    <div
+                                                        class="text-sm text-gray-500 dark:text-gray-400"
+                                                        x-text="document.number"
+                                                    ></div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </td>
+                                    {{-- Phone - only show on first row --}}
+                                    <td class="td-input align-top" x-show="docIndex === 0">
+                                        <div x-show="! confidantPerson.phones?.length">
+                                            <div class="text-gray-900 dark:text-white">-</div>
+                                        </div>
+                                        <template
+                                            :key="'phone-' + phoneIndex"
+                                            x-for="(phone, phoneIndex) in confidantPerson.phones"
+                                        >
+                                            <div>
+                                                <div
+                                                    class="text-gray-900 dark:text-white"
+                                                    x-text="phoneTypes[phone.type] || '-'"
                                                 ></div>
-                                                <div class="text-sm text-gray-500 dark:text-gray-400"
-                                                     x-text="document.number"
+                                                <div
+                                                    class="text-sm text-gray-500 dark:text-gray-400"
+                                                    x-text="phone.number || '-'"
                                                 ></div>
                                             </div>
                                         </template>
-                                    </div>
-                                </td>
-                                {{-- Phone - only show on first row --}}
-                                <td class="td-input align-top" x-show="docIndex === 0">
-                                    <div x-show="!confidantPerson.phones?.length">
-                                        <div class="text-gray-900 dark:text-white">-</div>
-                                    </div>
-                                    <template :key="'phone-' + phoneIndex"
-                                              x-for="(phone, phoneIndex) in (confidantPerson.phones)"
-                                    >
-                                        <div>
-                                            <div class="text-gray-900 dark:text-white"
-                                                 x-text="phoneTypes[phone.type] || '-'"
-                                            ></div>
-                                            <div class="text-sm text-gray-500 dark:text-gray-400"
-                                                 x-text="phone.number || '-'"
-                                            ></div>
-                                        </div>
-                                    </template>
-                                </td>
-                                {{-- Relationship Active Until - one per relationship document --}}
-                                <td class="td-input align-top">
-                                    <div class="text-gray-900 dark:text-white" x-text="doc.activeTo || '-'"></div>
-                                </td>
-                                {{-- Relationship Confirmation Document - one per relationship document --}}
-                                <td class="td-input align-top">
-                                    <div class="text-gray-900 dark:text-white"
-                                         x-text="documentRelationshipTypes[doc.type] || doc.type"
-                                    ></div>
-                                    <div class="text-sm text-gray-500 dark:text-gray-400" x-text="doc.number"></div>
-                                </td>
-                                {{-- Action - one per relationship document --}}
-                                <td class="td-input text-center align-top">
-                                    <div class="relative"
-                                         x-data="{ openDropdown: false }"
-                                         @click.outside="openDropdown = false"
-                                    >
-                                        <button @click="openDropdown = !openDropdown"
+                                    </td>
+                                    {{-- Relationship Active Until - one per relationship document --}}
+                                    <td class="td-input align-top">
+                                        <div class="text-gray-900 dark:text-white" x-text="doc.activeTo || '-'"></div>
+                                    </td>
+                                    {{-- Relationship Confirmation Document - one per relationship document --}}
+                                    <td class="td-input align-top">
+                                        <div
+                                            class="text-gray-900 dark:text-white"
+                                            x-text="documentRelationshipTypes[doc.type] || doc.type"
+                                        ></div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400" x-text="doc.number"></div>
+                                    </td>
+                                    {{-- Action - one per relationship document --}}
+                                    <td class="td-input text-center align-top">
+                                        <div
+                                            class="relative"
+                                            x-data="{ openDropdown: false }"
+                                            @click.outside="openDropdown = false"
+                                        >
+                                            <button
+                                                @click="openDropdown = ! openDropdown"
                                                 type="button"
-                                                class="cursor-pointer p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                        >
-                                            @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-gray-200')
-                                        </button>
+                                                class="cursor-pointer rounded-full p-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+                                            >
+                                                @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-gray-200')
+                                            </button>
 
-                                        <div x-show="openDropdown"
-                                             x-transition
-                                             x-cloak
-                                             class="absolute right-0 z-10 w-56 whitespace-nowrap bg-white rounded shadow-lg border border-gray-200 dark:bg-gray-700 dark:border-gray-600"
-                                        >
-                                            <div class="py-1">
-                                                <button type="button"
-                                                        class="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 whitespace-nowrap"
-                                                        @click="editLegalRepresentative(docIndex); openDropdown = false"
-                                                >
-                                                    @icon('edit', 'w-4 h-4')
-                                                    {{ __('forms.edit') }}
-                                                </button>
-                                                <button type="button"
-                                                        class="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-600 text-red-600 dark:text-red-400 whitespace-nowrap"
+                                            <div
+                                                x-show="openDropdown"
+                                                x-transition
+                                                x-cloak
+                                                class="absolute right-0 z-10 w-56 rounded border border-gray-200 bg-white whitespace-nowrap shadow-lg dark:border-gray-600 dark:bg-gray-700"
+                                            >
+                                                <div class="py-1">
+                                                    <button
+                                                        type="button"
+                                                        class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-sm whitespace-nowrap text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                        @click="
+                                                            editLegalRepresentative(docIndex);
+                                                            openDropdown = false;
+                                                        "
+                                                    >
+                                                        @icon('edit', 'w-4 h-4')
+                                                        {{ __('forms.edit') }}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-sm whitespace-nowrap text-red-600 hover:bg-gray-50 dark:text-red-400 dark:hover:bg-gray-600"
                                                         @click="
                                                             confidantPerson.documentsRelationship.splice(docIndex, 1);
                                                             confidantPerson = { ...confidantPerson };
                                                             openDropdown = false;
                                                         "
-                                                >
-                                                    @icon('delete', 'w-4 h-4')
-                                                    {{ __('forms.delete') }}
-                                                </button>
+                                                    >
+                                                        @icon('delete', 'w-4 h-4')
+                                                        {{ __('forms.delete') }}
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </td>
-                            </tr>
-                        </template>
-                    @endif
+                                    </td>
+                                </tr>
+                            </template>
+                        @endif
                     </tbody>
                 </table>
             </div>
 
-            @unless(($this instanceof PersonCreate || $this instanceof PersonRequestEdit) && $this->selectedConfidantPersonId && !empty($this->newConfidantPerson['documentsRelationship']))
-                <button type="button"
+            @unless (($this instanceof PersonCreate || $this instanceof PersonRequestEdit) && $this->selectedConfidantPersonId && !empty($this->newConfidantPerson['documentsRelationship']))
+                {{-- On the registration form the button only picks a confidant for the person request, on the
+                     update page it starts a confidant person relationship request. --}}
+                @if (!$canManageConfidantRelationships || auth()->user()->can('create', ConfidantPerson::class))
+                    <button
+                        type="button"
                         @click="
                             resetForm();
                             resetSearchFilters();
@@ -447,19 +514,25 @@
                             showConfidantPersonDrawer = true;
                         "
                         class="item-add my-5"
-                >
-                    {{ __('patients.add_confidant_person') }}
-                </button>
+                    >
+                        {{ __('patients.add_confidant_person') }}
+                    </button>
+                @endif
             @endunless
         </div>
 
-        @if($canManageConfidantRelationships)
-            @include('livewire.person.parts.drawers.confidant-person-relationship-requests')
-            @include('livewire.person.parts.drawers.add-auth-verification')
-            @include('livewire.person.parts.modals.terminate-relationship')
-            @include('livewire.person.parts.drawers.deactivate-confidant-person')
+        @if ($canManageConfidantRelationships)
+            @can('viewRequests', ConfidantPerson::class)
+                @include('livewire.person.parts.drawers.confidant-person-relationship-requests')
+            @endcan
         @endif
-
-        @include('livewire.person.parts.drawers.add-confidant-person')
     </div>
+
+    @if ($canManageConfidantRelationships)
+        @include('livewire.person.parts.drawers.add-auth-verification')
+        @include('livewire.person.parts.modals.terminate-relationship')
+        @include('livewire.person.parts.drawers.deactivate-confidant-person')
+    @endif
+
+    @include('livewire.person.parts.drawers.add-confidant-person')
 </fieldset>

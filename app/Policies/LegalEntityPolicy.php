@@ -123,7 +123,31 @@ class LegalEntityPolicy
             return Response::denyWithStatus(404);
         }
 
-        if ($user->can('legal_entity:read') && $user->can('related_legal_entities:read')) {
+        if (
+            $user->can('legal_entity:read') &&
+            $user->hasAllowedRole([Role::OWNER, Role::REORGANIZATION_OWNER, Role::ADMIN, Role::HR])
+        ) {
+            return Response::allow();
+        }
+
+        return Response::denyWithStatus(404);
+    }
+
+    /**
+     * Determine if the user can sync data of a legal entities
+     *
+     * @param  User  $user
+     * @param  LegalEntity  $legalEntity
+     * @return true|Response
+     */
+    public function syncLegators(User $user, LegalEntity $legalEntity): true|Response
+    {
+        // Should belong to the same legal entity
+        if (legalEntity()->id !== $legalEntity->id) {
+            return Response::denyWithStatus(404);
+        }
+
+        if ($user->can('related_legal_entities:read')) {
             return Response::allow();
         }
 

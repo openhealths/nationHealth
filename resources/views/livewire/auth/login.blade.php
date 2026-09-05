@@ -1,36 +1,6 @@
 @extends('livewire.auth.login-layout')
 
 @section('showPassword')
-    <div class="mt-6"
-         x-show="isLocalAuth"
-         x-cloak
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0 scale-95"
-         x-transition:enter-end="opacity-100 scale-100"
-    >
-        <div class="form-group group">
-            <input wire:model="password"
-                   :required="isLocalAuth"
-                   type="password"
-                   placeholder=" "
-                   autocomplete="off"
-                   id="password"
-                   aria-describedby="@error('password') hasPasswordErrorHelp @enderror"
-                   class="input @error('password') input-error border-red-500 focus:border-red-500 @enderror peer"
-            />
-
-            @error('password')
-                <p id="hasPasswordErrorHelp" class="text-error">
-                    {{ $message }}
-                </p>
-            @enderror
-
-            <label for="password" class="label z-10">
-                {{ __('forms.password') }}
-            </label>
-        </div>
-    </div>
-
     <div class="block mt-4">
         <div
             x-cloak

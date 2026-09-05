@@ -56,6 +56,18 @@ class PrepersonPolicy
     }
 
     /**
+     * Determine whether the user can view the summary of the preperson's medical records.
+     */
+    public function viewSummary(User $user, Preperson $preperson): Response
+    {
+        if ($user->cannot('patient_summary:read')) {
+            return Response::denyWithStatus(404);
+        }
+
+        return Response::allow();
+    }
+
+    /**
      * Determine whether the user can create preperson.
      */
     public function create(User $user): Response

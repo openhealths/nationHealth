@@ -1,25 +1,14 @@
 @use('App\Enums\JobStatus')
 
 <div>
-    {{-- 1. DEFINE PERMISSIONS --}}
     @php
-        $currentUser = auth()->user();
-
-       $permissions = [
-        'request_view'   => $currentUser->can('employee_request:read'),
-        'request_write'  => $currentUser->can('employee_request:write'),
-        'request_delete' => $currentUser->can('employee_request:write'),
-
-        'employee_view' => false, 'employee_write' => false, 'employee_deactivate' => false
-    ];
+        $permissions = $this->indexPermissions;
     @endphp
 
     <x-header-navigation class="items-start">
-        <x-slot name="title">
-            {{ __('forms.application_register') }}
-        </x-slot>
+        <x-slot name="title">{{ __('forms.application_register') }}</x-slot>
 
-        <div class="mt-3 ml-0 flex flex-col sm:flex-row sm:flex-wrap gap-2 self-start">
+        <div class="mt-3 ml-0 flex flex-col gap-2 self-start sm:flex-row sm:flex-wrap">
             <button
                 wire:click="{{ !$this->isSync ? 'sync' : '' }}"
                 wire:loading.attr="disabled"
@@ -33,21 +22,18 @@
         </div>
 
         <x-slot name="navigation">
-            <div class="flex flex-col -my-4">
+            <div class="-my-4 flex flex-col">
                 <div class="form-row-4">
                     <div class="form-group group">
-                        <input type="text"
-                               wire:model.live.debounce.500ms="search"
-                               class="input peer"
-                               placeholder=" " />
+                        <input type="text" wire:model.live.debounce.500ms="search" class="input peer" placeholder=" " />
                         <label class="label">{{ __('forms.search_name') }}</label>
                     </div>
 
                     <div class="form-group group">
                         <select wire:model.live="status" class="input-select peer">
                             <option value="">Всі статуси</option>
-                            @foreach($statuses as $st)
-                                <option value="{{ $st->value }}">{{ $st->label() }}</option>
+                            @foreach ($statuses as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
                             @endforeach
                         </select>
                         <label class="label">Статус</label>
@@ -57,71 +43,75 @@
         </x-slot>
     </x-header-navigation>
 
-    <div class="flow-root mt-8 shift-content pl-3.5">
+    <div class="shift-content mt-8 flow-root pl-3.5">
         <div class="max-w-screen-xl">
-            @if($requests->isNotEmpty())
+            @if ($requests->isNotEmpty())
                 <div class="index-table-wrapper">
                     <table class="index-table">
                         <thead class="index-table-thead">
-                        <tr>
-                            <th class="index-table-th w-[25%]">{{ __('forms.full_name') }}</th>
-                            <th class="index-table-th w-[20%]">{{ __('forms.role') }}</th>
-                            <th class="index-table-th w-[20%]">{{ __('forms.division') }}</th>
-                            <th class="index-table-th w-[15%]">{{ __('forms.created_at') }}</th>
-                            <th class="index-table-th w-[14%]">{{ __('forms.status.label') }}</th>
-                            <th class="index-table-th w-[6%]">{{ __('forms.action') }}</th>
-                        </tr>
+                            <tr>
+                                <th class="index-table-th w-[12%]">{{ __('forms.request_id') }}</th>
+                                <th class="index-table-th w-[20%]">{{ __('forms.full_name') }}</th>
+                                <th class="index-table-th w-[15%]">{{ __('forms.role') }}</th>
+                                <th class="index-table-th w-[14%]">{{ __('forms.division') }}</th>
+                                <th class="index-table-th w-[13%]">{{ __('forms.inserted_at') }}</th>
+                                <th class="index-table-th w-[16%]">{{ __('forms.status.label') }}</th>
+                                <th class="index-table-th w-[10%]">{{ __('forms.action') }}</th>
+                            </tr>
                         </thead>
                         <tbody>
-                        @foreach($requests as $request)
-                            <tr class="index-table-tr">
-                                <td class="index-table-td-primary">
-                                    @php
-                                        $data = $request->revision->data ?? [];
-                                        $partyData = $data['party'] ?? [];
-                                        $fullName = trim(($partyData['last_name'] ?? '') . ' ' . ($partyData['first_name'] ?? '') . ' ' . ($partyData['second_name'] ?? ''));
-                                    @endphp
-                                    <span title="{{ $fullName }}">{{ $fullName ?: 'N/A' }}</span>
-                                </td>
+                            @foreach ($requests as $request)
+                                <tr class="index-table-tr" wire:key="employee-request-row-{{ $request->id }}">
+                                    <td class="index-table-td">
+                                        <span class="font-mono text-xs" title="{{ $request->uuid ?? $request->id }}">
+                                            {{ $request->uuid ?? $request->id }}
+                                        </span>
+                                    </td>
+                                    <td class="index-table-td-primary">
+                                        @php
+                                            $data = $request->revision->data ?? [];
+                                            $partyData = $data['party'] ?? [];
+                                            $fullName = trim(($partyData['last_name'] ?? '') . ' ' . ($partyData['first_name'] ?? '') . ' ' . ($partyData['second_name'] ?? ''));
+                                        @endphp
+                                        <span title="{{ $fullName }}">{{ $fullName ?: 'N/A' }}</span>
+                                    </td>
 
-                                <td class="index-table-td">
-                                    @php
-                                        $posCode = $data['employee_request_data']['position'] ?? ($data['position'] ?? null);
-                                        $posName = $dictionaries['POSITION'][$posCode] ?? $posCode;
-                                    @endphp
-                                    <span title="{{ $posName }}">{{ $posName ?: 'N/A' }}</span>
-                                </td>
+                                    <td class="index-table-td">
+                                        @php
+                                            $posCode = $data['employee_request_data']['position'] ?? ($data['position'] ?? null);
+                                            $posName = $dictionaries['POSITION'][$posCode] ?? $posCode;
+                                        @endphp
+                                        <span title="{{ $posName }}">{{ $posName ?: 'N/A' }}</span>
+                                    </td>
 
-                                <td class="index-table-td">
-                                    <span title="{{ $request->division->name ?? '' }}">
-                                        {{ $request->division->name ?? 'N/A' }}
-                                    </span>
-                                </td>
+                                    <td class="index-table-td">
+                                        <span title="{{ $request->division->name ?? '' }}">
+                                            {{ $request->division->name ?? 'N/A' }}
+                                        </span>
+                                    </td>
 
-                                <td class="index-table-td">
-                                    {{ $request->created_at ? $request->created_at->format('d.m.Y H:i') : '-' }}
-                                </td>
+                                    <td class="index-table-td">
+                                        {{ ($request->inserted_at ?? $request->created_at)?->format('d.m.Y H:i') ?? '-' }}
+                                    </td>
 
-                                <td class="index-table-td">
-                                    @if($request->status == \App\Enums\Employee\RequestStatus::NEW)
-                                        <span class="badge-red">{{ $request->status->label() }}</span>
-                                    @elseif($request->status == \App\Enums\Employee\RequestStatus::SIGNED)
-                                        <span class="badge-yellow">{{ $request->status->label() }}</span>
-                                    @elseif($request->status == \App\Enums\Employee\RequestStatus::APPROVED)
-                                        <span class="badge-green">{{ $request->status->label() }}</span>
-                                    @else
-                                        <span class="badge-gray">{{ $request->status->label() }}</span>
-                                    @endif
-                                </td>
+                                    <td class="index-table-td whitespace-nowrap">
+                                        @if ($request->isLocalDraft())
+                                            <span class="badge-red inline-block whitespace-nowrap">{{ __('forms.status.draft') }}</span>
+                                        @elseif ($request->isPendingEhealth())
+                                            <span class="{{ $request->status->color() }} inline-block whitespace-nowrap">{{ __('forms.status.new') }}</span>
+                                        @elseif ($request->status)
+                                            <span class="{{ $request->status->color() }} inline-block whitespace-nowrap">{{ $request->status->label() }}</span>
+                                        @endif
+                                    </td>
 
-                                <td class="index-table-td-actions">
-                                    @include('livewire.employee.parts.actions-dropdown', [
-                                        'position' => $request,
-                                        'permissions' => $permissions
-                                    ])
-                                </td>
-                            </tr>
-                        @endforeach
+                                    <td class="index-table-td-actions">
+                                        @include('livewire.employee.parts.actions-dropdown', [
+                                                                                                                        'position' => $request,
+                                                                                                                        'permissions' => $permissions
+                                                                                                                    ])
+                                    </td>
+                                </tr>
+                            @endforeach
                         </tbody>
                     </table>
                 </div>
@@ -129,13 +119,13 @@
                 <x-nothing-found />
             @endif
 
-            @if($requests->isNotEmpty())
-                <div class="pagination">
-                    {{ $requests->links() }}
-                </div>
+            @if ($requests->isNotEmpty())
+                <div class="pagination">{{ $requests->links() }}</div>
             @endif
         </div>
     </div>
 
-    <x-forms.loading wire:target="sync"/>
+    @include('livewire.employee.parts.modals.delete-draft-modal')
+
+    <x-forms.loading wire:target="sync" />
 </div>

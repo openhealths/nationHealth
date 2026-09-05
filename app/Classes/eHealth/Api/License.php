@@ -74,7 +74,17 @@ class License extends Request
         $this->setValidator($this->validateResponse(...));
         $this->setMapper($this->mapResponse(...));
 
+        // license_number is optional (ENT-036). Clearing it in the UI sends ''/null;
+        // format() → removeEmptyKeys() would omit the key, so eHealth PATCH keeps the old value.
+        // eHealth JSON schema requires string (not null): "Expected string but got null".
+        $clearLicenseNumber = (array_key_exists('licenseNumber', $data) && blank($data['licenseNumber']))
+            || (array_key_exists('license_number', $data) && blank($data['license_number']));
+
         $data = $this->format($data, ['issuedDate', 'expiryDate', 'activeFromDate']);
+
+        if ($clearLicenseNumber) {
+            $data['license_number'] = '';
+        }
 
         return $this->patch(self::URL . '/' . $uuid, $data);
     }

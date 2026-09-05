@@ -1,16 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models\MedicalEvents\Sql;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Models\EhealthLink;
+use App\Models\Employee\Employee;
+use App\Services\Dictionary\DictionaryManager;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Builder;
-use App\Models\MedicalEvents\Sql\Identifier;
 use Illuminate\Database\Eloquent\Attributes\Scope;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class Approval extends Model
 {
@@ -32,9 +37,18 @@ class Approval extends Model
         'authentication_method_id',
         'access_level',
         'is_verified',
-        'expires_at'
+        'expires_at',
     ];
 
+    protected $casts = [
+        'is_verified' => 'boolean',
+        'expires_at' => 'datetime',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    protected $appends = ['granted_to_details'];
     /**
      * Get the parent approvable model (CarePlan, DiagnosticReport, etc.).
      */
@@ -67,7 +81,13 @@ class Approval extends Model
         return $this->belongsTo(Identifier::class, 'reason_id');
     }
 
-
+    /**
+     * The employee who granted this approval.
+     */
+    public function grantedBy(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'granted_by_id');
+    }
     public function grantedResources(): HasMany
     {
         return $this->hasMany(ApprovalGrantedResource::class);
@@ -102,6 +122,14 @@ class Approval extends Model
         );
     }
 
+    /**
+     * Async eHealth job links attached to this approval.
+     */
+    public function ehealthLinks(): MorphMany
+    {
+        return $this->morphMany(EhealthLink::class, 'linkable');
+    }
+
     #[Scope]
     protected function withAllRelations(Builder $query): Builder
     {
@@ -114,10 +142,29 @@ class Approval extends Model
         ]);
     }
 
+    /**
+     * Filter approvals that grant write access to the resource with the given eHealth ID.
+     *
+     * @param  Builder  $query
+     * @param  string  $resourceId
+     * @return Builder
+     */
     #[Scope]
-    protected function isAlive(Builder $query): Builder
+    protected function grantingWriteAccessTo(Builder $query, string $resourceId): Builder
+    {
+        return $query->whereAccessLevel('write')
+            ->whereHas(
+                'grantedResources.grantedTo',
+                static fn (Builder $identifier): Builder => $identifier->whereValue($resourceId)
+            );
+    }
+
+    #[Scope]
+    protected function isAlive(Builder $query, Model $model): Builder
     {
         return $query
+            ->where('approvable_type', $model::class)
+            ->where('approvable_id', $model->getKey())
             ->whereNotNull('expires_at')
             ->where('expires_at', '>', now());
     }
@@ -129,12 +176,85 @@ class Approval extends Model
     }
 
     #[Scope]
-    protected function getByModel(Builder $query, int $personId, string $modelClass): Builder
+    protected function getByModel(Builder $query, Model $model): Builder
     {
-        return $query->whereHas('approvable', function (Builder $query) use ($personId, $modelClass) {
+        return $query->whereHas('approvable', function (Builder $query) use ($model) {
             $query
-                ->where('approvable_type', $modelClass)
-                ->where('approvable_id', $personId);
+                ->where('approvable_type', $model::class)
+                ->where('approvable_id', $model->getKey());
         });
+    }
+
+    /**
+     * Resolve human-readable display for the granted_to entity.
+     *
+     * @return array{name: string, description: string}
+     */
+    public function getGrantedToDetailsAttribute(): array
+    {
+        $uuid = $this->grantedTo?->value;
+
+        if (!$uuid) {
+            return [
+                'name' => '-',
+                'description' => $this->granted_to_type ?? '',
+            ];
+        }
+
+        if ($this->granted_to_type === 'employee') {
+            $employee = Employee::where('uuid', $uuid)->with('party', 'specialities')->first();
+
+            if ($employee) {
+                $specNames = [];
+                $basics = null;
+
+                try {
+                    $basics = app(DictionaryManager::class)->basics();
+                    $specialityDict = $basics->byName('eHealth/SPECIALITY_TYPE')?->asCodeDescription()?->toArray()
+                        ?? $basics->byName('SPECIALITY_TYPE')?->asCodeDescription()?->toArray()
+                        ?? [];
+                } catch (\Exception) {
+                    $specialityDict = [];
+                }
+
+                foreach ($employee->specialities as $spec) {
+                    $specNames[] = $specialityDict[$spec->speciality] ?? $spec->speciality;
+                }
+
+                $specialization = implode(', ', array_unique(array_filter($specNames)));
+
+                if (empty($specialization) && $employee->position) {
+                    try {
+                        $positionDict = $basics?->byName('eHealth/POSITION')?->asCodeDescription()?->toArray()
+                            ?? $basics?->byName('POSITION')?->asCodeDescription()?->toArray()
+                            ?? [];
+                        $specialization = $positionDict[$employee->position] ?? $employee->position;
+                    } catch (\Exception) {
+                        $specialization = $employee->position;
+                    }
+                }
+
+                return [
+                    'name' => $employee->fullName,
+                    'description' => 'Співробітник'.($specialization ? ' ('.$specialization.')' : ''),
+                ];
+            }
+        }
+
+        if ($this->granted_to_type === 'legal_entity') {
+            $legalEntity = \App\Models\LegalEntity::where('uuid', $uuid)->first();
+
+            if ($legalEntity) {
+                return [
+                    'name' => $legalEntity->name,
+                    'description' => 'Заклад охорони здоров\'я (ЄДРПОУ: '.($legalEntity->edrpou ?? '-').')',
+                ];
+            }
+        }
+
+        return [
+            'name' => $uuid,
+            'description' => $this->granted_to_type ?? '',
+        ];
     }
 }

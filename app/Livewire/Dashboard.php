@@ -11,7 +11,8 @@ use Illuminate\Contracts\View\View;
 class Dashboard extends Component
 {
     public function mount(LegalEntity $legalEntity): void
-    {}
+    {
+    }
 
     public function render(): View
     {

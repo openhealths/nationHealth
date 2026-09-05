@@ -142,7 +142,7 @@ trait BaseAddress
      */
     public function updateRegion(string $property, string $districts, string $value): void
     {
-        $this->{$districts} = [];
+        $this->setSuggestions($districts, []);
 
         if (mb_strlen($value) >= 2) {
             $this->getDistricts($property, $districts);
@@ -159,7 +159,7 @@ trait BaseAddress
      */
     public function updateStreet(string $property, string $streets, string $value): void
     {
-        $this->{$streets} = [];
+        $this->setSuggestions($streets, []);
 
         if (mb_strlen($value) >= 2) {
             $this->getStreets($property, $streets);
@@ -176,25 +176,69 @@ trait BaseAddress
      */
     public function updateSettlement(string $property, string $settlements, string $value): void
     {
-        $this->{$settlements} = [];
+        $this->setSuggestions($settlements, []);
 
         if (mb_strlen($value) >= 2) {
             $this->getSettlements($property, $settlements);
         }
     }
 
+    /**
+     * Read the address the given property points at. A dotted path addresses one address of a list, for example 'addresses.1'.
+     *
+     * @param  string  $property
+     * @return array
+     */
+    protected function resolveAddress(string $property): array
+    {
+        [$name, $index] = array_pad(explode('.', $property, 2), 2, null);
+
+        return $index === null
+            ? (array)$this->{$name}
+            : (array)($this->{$name}[$index] ?? []);
+    }
+
+    /**
+     * Fill the suggestion list the given property points at. A dotted path addresses the slot of one
+     * address of a list, for example 'districts.1', so that each address searches the registry on its own.
+     *
+     * @param  string  $property
+     * @param  array  $suggestions
+     * @return void
+     */
+    protected function setSuggestions(string $property, array $suggestions): void
+    {
+        [$name, $index] = array_pad(explode('.', $property, 2), 2, null);
+
+        if ($index === null) {
+            $this->{$name} = $suggestions;
+
+            return;
+        }
+
+        $lists = (array)$this->{$name};
+        $lists[$index] = $suggestions;
+
+        $this->{$name} = $lists;
+    }
+
     public function getDistricts(string $property, string $districts): void
     {
-        $area = $this->{$property}['area'];
+        $address = $this->resolveAddress($property);
+
+        $area = $address['area'] ?? null;
 
         if (empty($area)) {
             return;
         }
 
-        $region = $this->{$property}['region'];
+        $region = $address['region'] ?? null;
 
         try {
-            $this->{$districts} = EHealth::address()->getDistricts(['region' => $area, 'name' => $region])->getData();
+            $this->setSuggestions(
+                $districts,
+                EHealth::address()->getDistricts(['region' => $area, 'name' => $region])->getData()
+            );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when searching for districts');
 
@@ -204,10 +248,12 @@ trait BaseAddress
 
     public function getSettlements(string $property, string $settlements): void
     {
-        $region = $this->{$property}['region'];
+        $address = $this->resolveAddress($property);
 
-        $area = $this->{$property}['area'];
-        $settlement = $this->{$property}['settlement']; // Name of the settlement to search for
+        $region = $address['region'] ?? null;
+
+        $area = $address['area'] ?? null;
+        $settlement = $address['settlement'] ?? null; // Name of the settlement to search for
 
         try {
             $settlementsData = EHealth::address()->getSettlements(
@@ -215,17 +261,20 @@ trait BaseAddress
             )->getData();
 
             // Check if we need to perform an exact match for settlements based on the property being searched
-            $exactMatch = $property === 'address'
-                ? $this->exactSettlementMatch
-                : $this->exactSettlementReceptionMatch;
+            $exactMatch = $property === 'receptionAddress'
+                ? $this->exactSettlementReceptionMatch
+                : $this->exactSettlementMatch;
 
             // If exact match is required, filter the settlements data to only include those that match the settlement name exactly (case-insensitive)
-            $this->{$settlements} = $exactMatch
-                ? array_filter(
-                    $settlementsData,
-                    fn (array $founded) => mb_strtolower($founded['name']) === mb_strtolower($settlement)
-                )
-                : $settlementsData;
+            $this->setSuggestions(
+                $settlements,
+                $exactMatch
+                    ? array_values(array_filter(
+                        $settlementsData,
+                        static fn (array $founded): bool => mb_strtolower($founded['name']) === mb_strtolower($settlement)
+                    ))
+                    : $settlementsData
+            );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when searching for settlements');
 
@@ -235,19 +284,24 @@ trait BaseAddress
 
     public function getStreets(string $property, string $streets): void
     {
-        $settlementId = $this->{$property}['settlementId'];
+        $address = $this->resolveAddress($property);
+
+        $settlementId = $address['settlementId'] ?? null;
 
         if (empty($settlementId)) {
             return;
         }
 
-        $streetType = $this->{$property}['streetType'];
-        $street = $this->{$property}['street'];
+        $streetType = $address['streetType'] ?? null;
+        $street = $address['street'] ?? null;
 
         try {
-            $this->{$streets} = EHealth::address()->getStreets(
-                ['settlement_id' => $settlementId, 'type' => $streetType, 'name' => $street]
-            )->getData();
+            $this->setSuggestions(
+                $streets,
+                EHealth::address()->getStreets(
+                    ['settlement_id' => $settlementId, 'type' => $streetType, 'name' => $street]
+                )->getData()
+            );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when searching for streets');
 

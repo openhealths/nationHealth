@@ -9,15 +9,16 @@
 @endphp
 
 <div>
-    <livewire:components.x-message :key="now()->timestamp"/>
+    <livewire:components.x-message :key="now()->timestamp" />
 
     <x-header-navigation x-data="{ showFilter: false }">
         <x-slot name="title">{{ __('forms.declarations') }}</x-slot>
 
-        <div class="ml-auto flex items-center gap-2 mt-2 lg:mt-0">
-            <button :key="sync-button"
-                    wire:click="{{ !$this->isSync ? 'sync' : '' }}"
-                    class="{{ $this->isSync ? 'button-sync-disabled' : 'button-sync' }} flex items-center gap-2 whitespace-nowrap"
+        <div class="mt-2 ml-auto flex items-center gap-2 lg:mt-0">
+            <button
+                :key="sync - button"
+                wire:click="{{ !$this->isSync ? 'sync' : '' }}"
+                class="{{ $this->isSync ? 'button-sync-disabled' : 'button-sync' }} flex items-center gap-2 whitespace-nowrap"
                 {{ $this->isSync ? 'disabled' : '' }}
             >
                 @icon('refresh', 'w-4 h-4')
@@ -41,22 +42,22 @@
                             </div>
                         @endisset
                     </div>
-                    <div class="flex items-end gap-3 mt-1">
-                        <div class="form-group group top-3 grow max-w-xs">
-                            <input type="text"
-                                   id="searchByName"
-                                   placeholder=" "
-                                   class="input peer"
-                                   wire:model="searchByName"
-                                   autocomplete="off"
+                    <div class="mt-1 flex items-end gap-3">
+                        <div class="form-group group top-3 max-w-xs grow">
+                            <input
+                                type="text"
+                                id="searchByName"
+                                placeholder=" "
+                                class="input peer"
+                                wire:model="searchByName"
+                                autocomplete="off"
                             />
-                            <label for="searchByName" class="label">
-                                {{ __('patients.patient_full_name') }}
-                            </label>
+                            <label for="searchByName" class="label"> {{ __('patients.patient_full_name') }} </label>
                         </div>
 
-                        <button class="flex items-center gap-2 button-minor h-11 min-w-max px-4"
-                                @click="showFilter = !showFilter"
+                        <button
+                            class="button-minor flex h-11 min-w-max items-center gap-2 px-4"
+                            @click="showFilter = ! showFilter"
                         >
                             @icon('adjustments', 'w-4 h-4')
                             <span x-text="showFilter ? '{{ __('forms.additional_search_parameters') }}' : '{{ __('forms.additional_search_parameters') }}'">
@@ -67,7 +68,7 @@
 
                     {{-- Show additional filters --}}
                     <div x-show="showFilter" x-cloak x-transition class="mt-8" x-data="{ openType: false }">
-                        @if(Auth::user()->hasAllowedRole(Role::OWNER))
+                        @if (Auth::user()->hasAllowedRole(Role::OWNER))
                             @include('livewire.declaration.parts.owner-filters')
                         @else
                             @include('livewire.declaration.parts.basic-filters')
@@ -76,8 +77,8 @@
                 </div>
             </div>
 
-            <div class="mb-9 mt-6 flex gap-2">
-                <button wire:click.prevent="search" class="flex items-center gap-2 button-primary">
+            <div class="mt-6 mb-9 flex gap-2">
+                <button wire:click.prevent="search" class="button-primary flex items-center gap-2">
                     @icon('search', 'w-4 h-4')
                     <span>{{ __('forms.search') }}</span>
                 </button>
@@ -88,14 +89,29 @@
         </x-slot>
     </x-header-navigation>
 
-    <div class="flow-root mt-4 shift-content pl-3.5"
-         wire:key="declarations-table-page-{{ $declarations->total() }}-{{ $declarations->currentPage() }}"
+    @if ($this->patientRequestsCount)
+        <div class="shift-content mt-4 pl-3.5">
+            <div class="flex max-w-7xl flex-wrap items-center gap-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-900 dark:bg-gray-800">
+                @icon('alert-circle', 'w-5 h-5 text-yellow-700')
+                <p class="font-medium text-yellow-800 dark:text-yellow-300">
+                    {{ __('declarations.patient_requests_waiting', ['count' => $this->patientRequestsCount]) }}
+                </p>
+                <button wire:click="showPatientRequests" type="button" class="button-primary ml-auto">
+                    {{ __('declarations.show_patient_requests') }}
+                </button>
+            </div>
+        </div>
+    @endif
+
+    <div
+        class="shift-content mt-4 flow-root pl-3.5"
+        wire:key="declarations-table-page-{{ $declarations->total() }}-{{ $declarations->currentPage() }}"
     >
         <div class="max-w-7xl">
-            @if($declarations->isNotEmpty())
+            @if ($declarations->isNotEmpty())
                 <div class="relative shadow-md sm:rounded-lg">
                     <table class="table-input w-full min-w-250">
-                            <thead class="thead-input">
+                        <thead class="thead-input">
                             <tr>
                                 <th scope="col" class="th-input w-[25%]">{{ __('forms.full_name') }}</th>
                                 <th scope="col" class="th-input w-[15%]">{{ __('forms.number') }}</th>
@@ -104,13 +120,15 @@
                                 <th scope="col" class="th-input w-[15%]">{{ __('forms.status.label') }}</th>
                                 <th scope="col" class="th-input w-[5%]">{{ __('forms.action') }}</th>
                             </tr>
-                            </thead>
-                            <tbody>
-                            @foreach($declarations as $declaration)
+                        </thead>
+                        <tbody>
+                            @foreach ($declarations as $declaration)
                                 <tr wire:key="{{ $declaration->declarationNumber }}">
                                     <td class="td-input">{{ $declaration->person->fullName }}</td>
                                     <td class="td-input">{{ $declaration->declarationNumber }}</td>
-                                    <td class="td-input">{{ CarbonImmutable::parse($declaration->person->birth_date)->format(config('app.date_format')) }}</td>
+                                    <td class="td-input">
+                                        {{ CarbonImmutable::parse($declaration->person->birth_date)->format(config('app.date_format')) }}
+                                    </td>
                                     <td class="td-input">{{ $declaration->employee->fullName }}</td>
 
                                     <td class="td-input">
@@ -121,8 +139,8 @@
                                                 && !$declaration->hasParentDeclaration();
                                         @endphp
                                         <span class="{{ $isToBeResigned ? 'badge-yellow' : $declaration->status->color() }}">
-                                            @if($declaration->type === 'declaration')
-                                                @if ($hasLegators && $declaration->reorganizedEmployeeDeclaration && $declaration->status == Status::ACTIVE)
+                                            @if ($declaration->type === 'declaration')
+                                                @if ($hasLegators && $declaration->reorganizedEmployeeDeclaration && $declaration->status === Status::ACTIVE)
                                                     {{ __('declarations.status.to_be_resigned') }}
                                                 @else
                                                     {{ !$declaration->hasParentDeclaration() ? $declaration->status->label() : __('declarations.status.resigned') }}
@@ -135,59 +153,66 @@
 
                                     <td
                                         x-data="{ openDropdown: false }"
-                                        class="relative td-input text-center overflow-visible"
+                                        class="td-input relative overflow-visible text-center"
                                     >
-                                        @if(
+                                        @if (
                                             $declaration->status === Status::REJECTED ||
-                                            $declaration->status === Status::TERMINATED ||
-                                            $declaration->status === Status::CLOSED ||
-                                            ($declaration->type === 'declaration' && !$declaration->reorganizedEmployeeDeclaration)
-                                        )
+                                                                                    $declaration->status === Status::TERMINATED ||
+                                                                                    $declaration->status === Status::CLOSED ||
+                                                                                    ($declaration->type === 'declaration' && !$declaration->reorganizedEmployeeDeclaration)
+)
                                             @can('view', $declaration)
-                                                <a href="{{ route('declaration.view', [legalEntity(), $declaration->id]) }}"
-                                                   class="cursor-pointer"
+                                                <a
+                                                    href="{{ route('declaration.view', [legalEntity(), $declaration->id]) }}"
+                                                    class="cursor-pointer"
                                                 >
                                                     @icon('eye', 'w-6 h-6 text-gray-800 dark:text-white')
                                                 </a>
                                             @endcan
                                         @else
-                                            <button @click.stop="openDropdown = !openDropdown" type="button"
-                                                    class="cursor-pointer"
+                                            <button
+                                                @click.stop="openDropdown = ! openDropdown"
+                                                type="button"
+                                                class="cursor-pointer"
                                             >
                                                 @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-white')
                                             </button>
                                         @endif
 
-                                        <div x-show="openDropdown"
-                                             @click.outside="openDropdown = false"
-                                             x-transition
-                                             class="absolute right-0 mt-2 z-10 w-fit bg-white rounded divide-y divide-gray-100 shadow"
-                                             style="display: none"
+                                        <div
+                                            x-show="openDropdown"
+                                            @click.outside="openDropdown = false"
+                                            x-transition
+                                            class="absolute right-0 z-10 mt-2 w-fit divide-y divide-gray-100 rounded bg-white shadow"
+                                            style="display: none"
                                         >
-                                            @if($declaration->type === 'request')
-                                                @if($declaration->status === RequestStatus::DRAFT)
-                                                    <a href="{{ route('declaration.edit', [legalEntity(), $declaration->person->id, $declaration->id]) }}"
-                                                       @click="openDropdown = false"
-                                                       class="cursor-pointer text-[#222222] text-nowrap flex gap-3 items-center py-2 pl-4 pr-10 hover:bg-gray-100"
+                                            @if ($declaration->type === 'request')
+                                                @if ($declaration->status === RequestStatus::DRAFT)
+                                                    <a
+                                                        href="{{ route('declaration.edit', [legalEntity(), $declaration->person->id, $declaration->id]) }}"
+                                                        @click="openDropdown = false"
+                                                        class="flex cursor-pointer items-center gap-3 py-2 pr-10 pl-4 text-nowrap text-[#222222] hover:bg-gray-100"
                                                     >
                                                         @icon('check-circle', 'w-5 h-5 text-green-500')
                                                         {{ __('declarations.continue') }}
                                                     </a>
 
-                                                    <button wire:click="delete({{ $declaration->getKey() }})"
-                                                            @click="openDropdown = false"
-                                                            class="cursor-pointer text-nowrap text-red-500 flex gap-3 items-center py-2 pl-4 pr-5 hover:bg-gray-100 w-full text-left"
+                                                    <button
+                                                        wire:click="delete({{ $declaration->getKey() }})"
+                                                        @click="openDropdown = false"
+                                                        class="flex w-full cursor-pointer items-center gap-3 py-2 pr-5 pl-4 text-left text-nowrap text-red-500 hover:bg-gray-100"
                                                     >
                                                         @icon('delete', 'w-5 h-5')
                                                         {{ __('declarations.delete') }}
                                                     </button>
                                                 @endif
 
-                                                @if($declaration->status === RequestStatus::NEW)
+                                                @if ($declaration->status === RequestStatus::NEW)
                                                     @can('approve', $declaration)
-                                                        <button @click="openDropdown = false"
-                                                                wire:click="approve({{ $declaration->person->id }}, {{ $declaration->id }})"
-                                                                class="cursor-pointer text-[#222222] text-nowrap flex gap-3 items-center py-2 pl-4 pr-19 hover:bg-gray-100 w-full text-left"
+                                                        <button
+                                                            @click="openDropdown = false"
+                                                            wire:click="approve({{ $declaration->person->id }}, {{ $declaration->id }})"
+                                                            class="flex w-full cursor-pointer items-center gap-3 py-2 pr-19 pl-4 text-left text-nowrap text-[#222222] hover:bg-gray-100"
                                                         >
                                                             @icon('check-circle', 'w-5 h-5 text-green-500')
                                                             {{ __('declarations.approve') }}
@@ -195,9 +220,10 @@
                                                     @endcan
 
                                                     @can('reject', $declaration)
-                                                        <button wire:click="reject('{{ $declaration['uuid'] }}')"
-                                                                @click="openDropdown = false"
-                                                                class="cursor-pointer text-nowrap text-red-500 flex gap-3 items-center py-2 pl-4 pr-5 hover:bg-gray-100 w-full text-left"
+                                                        <button
+                                                            wire:click="reject({{ $declaration->getKey() }})"
+                                                            @click="openDropdown = false"
+                                                            class="flex w-full cursor-pointer items-center gap-3 py-2 pr-5 pl-4 text-left text-nowrap text-red-500 hover:bg-gray-100"
                                                         >
                                                             @icon('delete', 'w-5 h-5')
                                                             {{ __('declarations.reject_declaration_request') }}
@@ -205,11 +231,12 @@
                                                     @endcan
                                                 @endif
 
-                                                @if($declaration->status === RequestStatus::APPROVED)
+                                                @if ($declaration->status === RequestStatus::APPROVED)
                                                     @can('sign', $declaration)
-                                                        <button @click="openDropdown = false"
-                                                                wire:click="sign({{ $declaration->person->id }}, {{ $declaration->id }})"
-                                                                class="cursor-pointer text-[#222222] text-nowrap flex gap-3 items-center py-2 pl-4 pr-19 hover:bg-gray-100 w-full text-left"
+                                                        <button
+                                                            @click="openDropdown = false"
+                                                            wire:click="sign({{ $declaration->person->id }}, {{ $declaration->id }})"
+                                                            class="flex w-full cursor-pointer items-center gap-3 py-2 pr-19 pl-4 text-left text-nowrap text-[#222222] hover:bg-gray-100"
                                                         >
                                                             @icon('check-circle', 'w-5 h-5 text-green-500')
                                                             {{ __('declarations.sign') }}
@@ -217,9 +244,10 @@
                                                     @endcan
 
                                                     @can('reject', $declaration)
-                                                        <button wire:click="reject('{{ $declaration['uuid'] }}')"
-                                                                @click="openDropdown = false"
-                                                                class="cursor-pointer text-nowrap text-red-500 flex gap-3 items-center py-2 pl-4 pr-5 hover:bg-gray-100 w-full text-left"
+                                                        <button
+                                                            wire:click="reject({{ $declaration->getKey() }})"
+                                                            @click="openDropdown = false"
+                                                            class="flex w-full cursor-pointer items-center gap-3 py-2 pr-5 pl-4 text-left text-nowrap text-red-500 hover:bg-gray-100"
                                                         >
                                                             @icon('delete', 'w-5 h-5')
                                                             {{ __('declarations.reject_declaration_request') }}
@@ -227,14 +255,14 @@
                                                     @endcan
                                                 @endif
                                             @else
-                                                @if($hasLegators)
+                                                @if ($hasLegators)
                                                     @can('resign', $declaration)
                                                         <button
                                                             @click="
                                                                 openDropdown = false;
                                                                 $wire.resign({{ $declaration->id }});
                                                             "
-                                                            class="cursor-pointer text-[#222222] text-nowrap flex gap-3 items-center py-2 pl-4 pr-19 hover:bg-gray-100 w-full text-left"
+                                                            class="flex w-full cursor-pointer items-center gap-3 py-2 pr-19 pl-4 text-left text-nowrap text-[#222222] hover:bg-gray-100"
                                                         >
                                                             @icon('check-circle', 'w-5 h-5 text-green-500')
                                                             {{ __('declarations.resign') }}
@@ -242,9 +270,11 @@
                                                     @endcan
 
                                                     @can('view', $declaration)
-                                                        <a type="button" @click="openDropdown = false"
+                                                        <a
+                                                            type="button"
+                                                            @click="openDropdown = false"
                                                             href="{{ route('declaration.view', [legalEntity(), $declaration->id]) }}"
-                                                            class="cursor-pointer text-[#222222] text-nowrap flex gap-3 items-center py-2 pl-4 pr-19 hover:bg-gray-100 w-full text-left"
+                                                            class="flex w-full cursor-pointer items-center gap-3 py-2 pr-19 pl-4 text-left text-nowrap text-[#222222] hover:bg-gray-100"
                                                         >
                                                             @icon('eye', 'w-6 h-6 text-gray-800 dark:text-white')
                                                             {{ __('declarations.show_declaration') }}
@@ -256,13 +286,11 @@
                                     </td>
                                 </tr>
                             @endforeach
-                            </tbody>
-                        </table>
+                        </tbody>
+                    </table>
                 </div>
 
-                <div class="pagination">
-                    {{ $declarations->links() }}
-                </div>
+                <div class="pagination">{{ $declarations->links() }}</div>
             @else
                 <x-nothing-found />
             @endif

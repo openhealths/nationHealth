@@ -151,7 +151,8 @@ class LegalEntityDetails extends LegalEntityComponent
      *
      * @return string The label corresponding to the legal entity's status
      */
-    public function getStatusLabelProperty(): string {
+    public function getStatusLabelProperty(): string
+    {
         return States::tryFrom($this->legalEntity->status)?->label() ?? __('forms.unknown');
     }
 
@@ -170,7 +171,8 @@ class LegalEntityDetails extends LegalEntityComponent
      *
      * @return string The label corresponding to the legal entity's EDR status
      */
-    public function getEdrStatusLabelProperty(): string {
+    public function getEdrStatusLabelProperty(): string
+    {
         return EdrStates::tryFrom($this->legalEntity->edr['state'])?->label() ?? __('forms.unknown');
     }
 
@@ -456,27 +458,29 @@ class LegalEntityDetails extends LegalEntityComponent
             }
         }
 
-        // Check if the legal entity has legators and if it does - synchronize them as well
-        try {
-            $response = EHealth::legalEntity()->getLegators($legalEntity->uuid);
+        if (Auth::user()->can('syncLegators', $this->legalEntity)) {
+            // Check if the legal entity has legators and if it does - synchronize them as well
+            try {
+                $response = EHealth::legalEntity()->getLegators($legalEntity->uuid);
 
-            $validated = $response->validate();
+                $validated = $response->validate();
 
-            Repository::legalEntity()->saveLegators($legalEntity, $validated);
-        } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle('Error connecting when getting a legators list');
+                Repository::legalEntity()->saveLegators($legalEntity, $validated);
+            } catch (EHealthException|EHealthConnectionException $exception) {
+                $exception->handle('Error connecting when getting a legators list');
 
-            $legalEntity?->setEntityStatus(JobStatus::FAILED);
+                $legalEntity?->setEntityStatus(JobStatus::FAILED);
 
-            return;
-        } catch (Throwable $err) {
-            Log::channel('db_errors')->error(static::class . ': [syncLegalEntity]: ', ['error' => $err->getMessage()]);
+                return;
+            } catch (Throwable $err) {
+                Log::channel('db_errors')->error(static::class . ': [syncLegalEntity]: ', ['error' => $err->getMessage()]);
 
-            session()->flash('error', __('legal-entity.request.sync.errors.fail'));
+                session()->flash('error', __('legal-entity.request.sync.errors.fail'));
 
-            $legalEntity?->setEntityStatus(JobStatus::FAILED);
+                $legalEntity?->setEntityStatus(JobStatus::FAILED);
 
-            return;
+                return;
+            }
         }
 
         $legalEntity?->setEntityStatus(JobStatus::COMPLETED);

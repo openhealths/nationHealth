@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Classes\eHealth\Errors;
 
 class ErrorHandler
@@ -18,6 +20,8 @@ class ErrorHandler
                     $errorMessages[] = "Error in entry '{$entry}' (Type: {$entryType}): {$description}";
                 }
             }
+        } else if (isset($error['error']['message'])) {
+            $errorMessages[] = $error['error']['message'] ?? 'Error has no description';
         } else {
             $errorMessages[] = "No valid error information provided.";
         }

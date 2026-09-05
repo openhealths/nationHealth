@@ -152,7 +152,7 @@ class PatientImmunizations extends BasePatientComponent
             $this->dispatchRemainingPages('immunization');
         } else {
             legalEntity()->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_IMMUNIZATION);
-            Session::flash('success', __('patients.messages.immunizations_synced_successfully'));
+            Session::flash('success', __('immunizations.messages.synced_successfully'));
         }
 
         $this->loadFilterOptions();

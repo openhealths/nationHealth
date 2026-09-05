@@ -6,8 +6,10 @@ namespace App\Models\Relations;
 
 use App\Casts\EHealthDateCast;
 use App\Enums\JobStatus;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use App\Models\Person\{Person, PersonRequest};
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -34,6 +36,22 @@ class ConfidantPerson extends Model
     ];
 
     protected $casts = ['active_to' => EHealthDateCast::class];
+
+    protected $appends = ['is_active'];
+
+    /**
+     * Whether the relationship still stands. Reads the stored value instead of the attribute, because the cast
+     * turns the end date into a display string.
+     *
+     * @return Attribute
+     */
+    protected function isActive(): Attribute
+    {
+        return Attribute::make(
+            get: static fn (mixed $value, array $attributes): bool => empty($attributes['active_to'])
+                || CarbonImmutable::parse($attributes['active_to'])->isFuture()
+        );
+    }
 
     /**
      * Scope a query to filter confidant persons by legal entity ID.

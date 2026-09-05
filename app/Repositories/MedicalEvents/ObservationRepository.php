@@ -72,9 +72,10 @@ class ObservationRepository extends BaseRepository
                 $code = Repository::codeableConcept()->store($datum['code']);
 
                 $performer = null;
-                if (isset($datum['performer'])) {
-                    $performer = Repository::identifier()->store($datum['performer']['identifier']['value']);
-                    Repository::codeableConcept()->attach($performer, $datum['performer']);
+                $performerData = data_get($datum, 'performer.0') ?? data_get($datum, 'performer');
+                if (!empty($performerData)) {
+                    $performer = Repository::identifier()->store($performerData['identifier']['value']);
+                    Repository::codeableConcept()->attach($performer, $performerData);
                 }
 
                 $context = null;
@@ -83,31 +84,50 @@ class ObservationRepository extends BaseRepository
                     Repository::codeableConcept()->attach($context, $datum['context']);
                 }
 
-                $observation = $this->model->create([
-                    'uuid' => $datum['uuid'] ?? $datum['id'],
-                    $ownerColumn => $ownerId,
-                    'status' => $datum['status'],
-                    'diagnostic_report_id' => $diagnosticReport?->id,
-                    'code_id' => $code->id,
-                    'effective_date_time' => $datum['effectiveDateTime'] ?? null,
-                    'issued' => $datum['issued'],
-                    'primary_source' => $datum['primarySource'],
-                    'performer_id' => $performer?->id,
-                    'report_origin_id' => isset($datum['reportOrigin'])
-                        ? Repository::codeableConcept()->store($datum['reportOrigin'])->id
-                        : null,
-                    'interpretation_id' => isset($datum['interpretation'])
-                        ? Repository::codeableConcept()->store($datum['interpretation'])->id
-                        : null,
-                    'comment' => $datum['comment'] ?? null,
-                    'body_site_id' => isset($datum['bodySite'])
-                        ? Repository::codeableConcept()->store($datum['bodySite'])->id
-                        : null,
-                    'method_id' => isset($datum['method'])
-                        ? Repository::codeableConcept()->store($datum['method'])->id
-                        : null,
-                    'context_id' => $context?->id
-                ]);
+                $reactionOn = null;
+                if (isset($datum['reactionOn'])) {
+                    $reactionOn = Repository::identifier()->store($datum['reactionOn']['identifier']['value']);
+                    Repository::codeableConcept()->attach($reactionOn, $datum['reactionOn']);
+                }
+
+                $observation = $this->model->updateOrCreate(
+                    ['uuid' => $datum['uuid'] ?? $datum['id']],
+                    [
+                        $ownerColumn => $ownerId,
+                        'status' => $datum['status'],
+                        'diagnostic_report_id' => $diagnosticReport?->id,
+                        'code_id' => $code->id,
+                        'effective_date_time' => $datum['effectiveDateTime'] ?? null,
+                        'issued' => $datum['issued'],
+                        'primary_source' => $datum['primarySource'],
+                        'performer_id' => $performer?->id,
+                        'report_origin_id' => isset($datum['reportOrigin'])
+                            ? Repository::codeableConcept()->store($datum['reportOrigin'])->id
+                            : null,
+                        'interpretation_id' => isset($datum['interpretation'])
+                            ? Repository::codeableConcept()->store($datum['interpretation'])->id
+                            : null,
+                        'comment' => $datum['comment'] ?? null,
+                        'body_site_id' => isset($datum['bodySite'])
+                            ? Repository::codeableConcept()->store($datum['bodySite'])->id
+                            : null,
+                        'method_id' => isset($datum['method'])
+                            ? Repository::codeableConcept()->store($datum['method'])->id
+                            : null,
+                        'reaction_on_id' => $reactionOn?->id,
+                        'context_id' => $context?->id
+                    ]
+                );
+
+                // Re-syncing an existing observation replaces its value/categories/components wholesale.
+                if (!$observation->wasRecentlyCreated) {
+                    $observation->value()?->delete();
+                    $observation->categories()->detach();
+                    foreach ($observation->components as $component) {
+                        $component->value()?->delete();
+                        $component->delete();
+                    }
+                }
 
                 $this->storeValue($datum, $observation);
 
@@ -267,7 +287,8 @@ class ObservationRepository extends BaseRepository
     }
 
     /**
-     * Sync observation data and related data by deleting and creating.
+     * Sync observation data and related data.
+     * When an encounter is given, its observations that are no longer part of the package are removed.
      *
      * @param  Person|Preperson  $patient
      * @param  array  $validatedData
@@ -284,7 +305,7 @@ class ObservationRepository extends BaseRepository
 
             if ($encounterUuid !== null) {
                 $this->model->whereNotIn('uuid', $apiUuids)
-                    ->whereHas('context', fn (Builder $query) => $query->where('value', $encounterUuid))
+                    ->whereHas('context', static fn (Builder $query): Builder => $query->where('value', $encounterUuid))
                     ->with(['components.value', 'value'])
                     ->get()
                     ->each(function (Observation $observation): void {
@@ -308,7 +329,8 @@ class ObservationRepository extends BaseRepository
 
                 $code = $this->syncCodeableConcept($existing, $data['code'], 'code');
                 $context = $this->syncIdentifier($existing, $data['context'] ?? null, 'context');
-                $performer = $this->syncIdentifier($existing, $data['performer'] ?? null, 'performer');
+                $performerData = data_get($data, 'performer.0') ?? ($data['performer'] ?? null);
+                $performer = $this->syncIdentifier($existing, $performerData, 'performer');
                 $reportOrigin = $this->syncCodeableConcept($existing, $data['report_origin'] ?? null, 'reportOrigin');
                 $diagnosticReport = $this->syncIdentifier(
                     $existing,

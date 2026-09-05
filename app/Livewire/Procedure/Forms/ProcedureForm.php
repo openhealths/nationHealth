@@ -52,23 +52,15 @@ class ProcedureForm extends BaseForm
                 'nullable',
                 'uuid',
                 Rule::exists('employees', 'uuid')->where(
-                    function ($query): void {
-                        $query
-                            ->where('legal_entity_id', legalEntity()->id)
-                            ->where('status', Status::APPROVED->value)
-                            ->where('is_active', true)
-                            ->whereIn('employee_type', [
-                                Role::DOCTOR->value,
-                                Role::SPECIALIST->value,
-                                Role::ASSISTANT->value,
-                            ]);
-
-                        $divisionUuid = data_get($this->procedure, 'divisionId');
-
-                        if (filled($divisionUuid)) {
-                            $query->where('division_uuid',  $divisionUuid);
-                        }
-                    }
+                    static fn ($query) => $query
+                        ->where('legal_entity_id', legalEntity()->id)
+                        ->where('status', Status::APPROVED->value)
+                        ->where('is_active', true)
+                        ->whereIn('employee_type', [
+                            Role::DOCTOR->value,
+                            Role::SPECIALIST->value,
+                            Role::ASSISTANT->value,
+                        ])
                 ),
             ],
             'procedure.divisionId' => ['nullable', 'uuid'],
@@ -227,7 +219,7 @@ class ProcedureForm extends BaseForm
                 Rule::in(
                     dictionary()->basics()
                         ->byName('eHealth/assistive_products')
-                        ->flattenedChildValues(true, true)
+                        ->flattenedChildValues(true)
                         ->keys()
                         ->values()
                         ->toArray()

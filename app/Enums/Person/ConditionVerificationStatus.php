@@ -22,11 +22,11 @@ enum ConditionVerificationStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::CONFIRMED => __('patients.status.confirmed'),
-            self::DIFFERENTIAL => __('patients.status.differential'),
-            self::ENTERED_IN_ERROR => __('patients.status.entered_in_error'),
-            self::PROVISIONAL => __('patients.status.provisional'),
-            self::REFUTED => __('patients.status.refuted')
+            self::CONFIRMED => __('conditions.status.confirmed'),
+            self::DIFFERENTIAL => __('conditions.status.differential'),
+            self::ENTERED_IN_ERROR => __('conditions.status.entered_in_error'),
+            self::PROVISIONAL => __('conditions.status.provisional'),
+            self::REFUTED => __('conditions.status.refuted')
         };
     }
 

@@ -116,7 +116,7 @@ class EmployeeDetailsUpsert extends EHealthJob
             'division_uuid' => $divisionUuid,
             'inserted_at' => Carbon::parse($employeeEmployeeRequest?->appliedAt)->format('Y-m-d H:i:s'),
             'division_id' => $divisionId,
-            'user_id' => $employee->userId ?? $userID
+            'user_id' => $this->employee->userId ?? $userID
         ]);
 
         Repository::party()->syncUserEmployeesAndRoles($this->employee->party, $this->legalEntity);

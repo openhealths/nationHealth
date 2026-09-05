@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Enums\Contract;
 
+use App\Enums\Contract\ContractStatus;
 use App\Enums\Contract\IdForm;
 use App\Enums\Contract\PaymentMethod;
+use App\Enums\Contract\ContractRequestStatus;
 use App\Enums\Contract\Type;
 use Tests\TestCase;
 
@@ -57,5 +59,34 @@ class ContractLabelEnumsTest extends TestCase
         $this->assertSame('Попередня оплата', PaymentMethod::resolveLabel('FORWARD'));
         $this->assertSame('Післяплата', PaymentMethod::resolveLabel(PaymentMethod::BACKWARD));
         $this->assertSame('-', PaymentMethod::resolveLabel(null));
+    }
+
+    public function test_contract_request_signed_is_completed_not_signed(): void
+    {
+        $this->assertSame('Завершена', ContractRequestStatus::SIGNED->label());
+        $this->assertSame('Завершена', ContractRequestStatus::resolveLabel('SIGNED'));
+        $this->assertStringNotContainsStringIgnoringCase('підпис', ContractRequestStatus::SIGNED->label());
+    }
+
+    public function test_contract_terminated_is_terminated_not_completed(): void
+    {
+        $this->assertSame('Розірваний', ContractStatus::TERMINATED->label());
+        $this->assertSame('Розірваний', ContractStatus::resolveLabel('TERMINATED'));
+        $this->assertSame('Діючий', ContractStatus::VERIFIED->label());
+        $this->assertSame('Діючий', ContractStatus::ACTIVE->label());
+        $this->assertSame('Припинена', ContractRequestStatus::TERMINATED->label());
+    }
+
+    public function test_contract_status_filter_options_are_verified_and_terminated(): void
+    {
+        $options = ContractStatus::listFilterOptions();
+
+        $this->assertSame(['VERIFIED', 'TERMINATED'], array_keys($options));
+        $this->assertSame(
+            ['VERIFIED', 'ACTIVE'],
+            ContractStatus::expandFilterValues(['VERIFIED'])
+        );
+        $this->assertNull(ContractStatus::tryFrom('SIGNED'));
+        $this->assertSame(ContractRequestStatus::SIGNED, ContractRequestStatus::tryFrom('SIGNED'));
     }
 }

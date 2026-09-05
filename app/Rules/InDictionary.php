@@ -48,7 +48,7 @@ class InDictionary implements ValidationRule
             if (!isset(self::$dictionaryCache[$name])) {
                 if ($name === 'eHealth/ICF/classifiers') {
                     self::$dictionaryCache[$name] = dictionary()->basics()
-                        ->byName('eHealth/ICF/classifiers')
+                        ->byName('eHealth/ICF/classifiers', false)
                         ->flattenedChildValues()
                         ->keys()
                         ->toArray();
@@ -56,20 +56,22 @@ class InDictionary implements ValidationRule
                     self::$dictionaryCache[$name] = Icd10::pluck('code')->toArray();
                 } elseif ($name === 'eHealth/assistive_products') {
                     self::$dictionaryCache[$name] = dictionary()->basics()
-                        ->byName('eHealth/assistive_products')
-                        ->flattenedChildValues(true, true)
+                        ->byName('eHealth/assistive_products', false)
+                        ->flattenedChildValues(true)
                         ->keys()
                         ->toArray();
                 } elseif ($name === 'device_definition_classification_type') {
                     // Convert all keys to string
                     self::$dictionaryCache[$name] = dictionary()->basics()
-                        ->byName('device_definition_classification_type')
+                        ->byName('device_definition_classification_type', false)
                         ->asCodeDescription()
                         ->keys()
                         ->map(static fn (int|string $key) => (string)$key)
                         ->toArray();
                 } else {
-                    self::$dictionaryCache[$name] = array_keys(dictionary()->basics()->byName($name)->asCodeDescription()->toArray());
+                    self::$dictionaryCache[$name] = array_keys(
+                        dictionary()->basics()->byName($name, false)->asCodeDescription()->toArray()
+                    );
                 }
             }
 
@@ -81,7 +83,7 @@ class InDictionary implements ValidationRule
 
         // Fail validation if value not found in any dictionary
         if (!$isValid) {
-            $fail(__('Недопустиме значення :attribute'));
+            $fail(__('Недопустиме значення: ' . $value . ' для :attribute'));
         }
     }
 }

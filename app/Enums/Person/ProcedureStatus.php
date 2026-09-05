@@ -20,9 +20,9 @@ enum ProcedureStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::COMPLETED => __('patients.status.completed'),
-            self::ENTERED_IN_ERROR => __('patients.status.entered_in_error'),
-            self::NOT_DONE => __('patients.status.not_done')
+            self::COMPLETED => __('procedures.status.completed'),
+            self::ENTERED_IN_ERROR => __('procedures.status.entered_in_error'),
+            self::NOT_DONE => __('procedures.status.not_done')
         };
     }
 

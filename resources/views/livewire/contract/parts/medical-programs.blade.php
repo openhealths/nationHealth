@@ -29,21 +29,23 @@
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             @if(!empty($medicalProgramsList))
                 @foreach($medicalProgramsList as $program)
-                    <div class="relative flex items-start">
-                        <div class="flex h-5 items-center">
-                            <input id="program-{{ $program['id'] }}" name="medicalPrograms" type="checkbox"
-                                   value="{{ $program['id'] }}" wire:model="form.medicalPrograms"
-                                   class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                        </div>
-                        <div class="ml-3 text-sm">
-                            <label for="program-{{ $program['id'] }}" class="font-medium text-gray-700">
-                                {{ $program['name'] }}
-                            </label>
-                        </div>
+                    <div class="flex items-center">
+                        <input id="program-{{ $program['id'] }}"
+                               name="medicalPrograms"
+                               type="checkbox"
+                               value="{{ $program['id'] }}"
+                               wire:model="form.medicalPrograms"
+                               class="default-checkbox cursor-pointer"
+                        >
+                        <label for="program-{{ $program['id'] }}"
+                               class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300 cursor-pointer"
+                        >
+                            {{ $program['name'] }}
+                        </label>
                     </div>
                 @endforeach
             @else
-                <div class="text-sm text-gray-500">
+                <div class="text-sm text-gray-500 dark:text-gray-400">
                     {{ __('contracts.medical_programs_list_empty') }}
                 </div>
             @endif

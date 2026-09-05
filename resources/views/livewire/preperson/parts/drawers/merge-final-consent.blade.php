@@ -76,6 +76,7 @@
                 wire:target="reject"
                 @click="$wire.reject().then((rejected) => {
                     if (rejected) {
+                        $wire.$parent.$refresh();
                         showMergeFinalConsentDrawer = false;
                         showMergePatientDrawer = true;
                     }

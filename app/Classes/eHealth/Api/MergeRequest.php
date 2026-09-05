@@ -6,16 +6,37 @@ namespace App\Classes\eHealth\Api;
 
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
+use App\Enums\MergeRequest\Status;
+use App\Models\Person\Person;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\Enum;
 
 class MergeRequest extends Request
 {
     protected const string URL = '/api/merge_requests';
+
+    /**
+     * Search merge requests, optionally filtered by master person, merge person and status.
+     *
+     * @param  array  $query
+     * @return PromiseInterface|EHealthResponse
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+     *
+     * @see https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/merge-request/get-merge-requests
+     */
+    public function getMergeRequests(array $query = []): PromiseInterface|EHealthResponse
+    {
+        $this->setValidator($this->validateListResponse(...));
+        $this->setMapper($this->mapMergeRequests(...));
+        $this->setDefaultPageSize();
+
+        return $this->get(self::URL, array_merge($this->options['query'], $query));
+    }
 
     /**
      * Create a request to merge a preperson's records into an identified (master) person.
@@ -37,7 +58,7 @@ class MergeRequest extends Request
      * Approve a previously created merge request, confirming it with the patient's authentication.
      *
      * @param  string  $id
-     * @param  array{verification_code?: string}  $data
+     * @param  array{verification_code?: int}  $data
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
@@ -136,6 +157,58 @@ class MergeRequest extends Request
         }
 
         return $validator->validate();
+    }
+
+    /**
+     * Validate a merge requests list response.
+     *
+     * @param  EHealthResponse  $response
+     * @return array
+     */
+    protected function validateListResponse(EHealthResponse $response): array
+    {
+        $replaced = array_map(
+            static fn (array $mergeRequest): array => self::replaceEHealthPropNames($mergeRequest),
+            $response->getData()
+        );
+
+        $validator = Validator::make($replaced, [
+            '*.uuid' => ['required', 'uuid'],
+            '*.master_person_id' => ['required', 'uuid'],
+            '*.merge_person_id' => ['required', 'uuid'],
+            '*.status' => ['required', new Enum(Status::class)],
+            '*.ehealth_inserted_at' => ['required', 'date'],
+            '*.ehealth_inserted_by' => ['required', 'uuid'],
+            '*.ehealth_updated_at' => ['required', 'date'],
+            '*.ehealth_updated_by' => ['required', 'uuid']
+        ]);
+
+        if ($validator->fails()) {
+            Log::channel('e_health_errors')->error('Validation failed: ' . implode(', ', $validator->errors()->all()));
+        }
+
+        return $validator->validate();
+    }
+
+    /**
+     * Map the validated merge requests list into rows for the local merge_requests table, resolving the master
+     * person UUID to its local id (null when the identified patient is not stored locally) and stamping the
+     * preperson these requests belong to.
+     *
+     * @param  array  $mergeRequests
+     * @param  int  $prepersonId
+     * @return array
+     */
+    protected function mapMergeRequests(array $mergeRequests, int $prepersonId): array
+    {
+        $masterPersonIds = Person::whereIn('uuid', array_column($mergeRequests, 'master_person_id'))
+            ->pluck('id', 'uuid');
+
+        return array_map(static fn (array $mergeRequest): array => [
+            ...$mergeRequest,
+            'master_person_id' => $masterPersonIds[$mergeRequest['master_person_id']] ?? null,
+            'merge_person_id' => $prepersonId
+        ], $mergeRequests);
     }
 
     /**

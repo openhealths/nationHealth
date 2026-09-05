@@ -1,11 +1,13 @@
 <div>
-    <livewire:components.x-message :key="now()->timestamp"/>
-
     <div
-        x-data="{ showSignatureModal: $wire.entangle('showSignatureModal') }"
+        x-data="{
+            showSignatureModal: $wire.entangle('showSignatureModal'),
+            showRequestPreviewModal: $wire.entangle('showRequestPreviewModal'),
+        }"
         x-on:close-signature-modal.window="showSignatureModal = false"
         x-on:open-signature-modal.window="showSignatureModal = true"
-    >
+        x-on:close-request-preview-modal.window="showRequestPreviewModal = false"
+        x-on:open-request-preview-modal.window="showRequestPreviewModal = true" >
         <x-header-navigation class="breadcrumb-form shift-content">
             <x-slot name="title">{{ $pageTitle ?? '' }}</x-slot>
         </x-header-navigation>
@@ -19,11 +21,14 @@
                 }
             }"
         >
-
             <form wire:submit.prevent="save" class="form space-y-8">
+                <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-gray-800 dark:text-amber-200">
+                    {{ __('employees.immutable_fields_warning') }}
+                </div>
 
                 {{-- 1: position (active, cause isPositionDataLocked=false) --}}
-                @include('livewire.employee.parts.position') {{-- --}}
+                @include('livewire.employee.parts.position')
+                {{-- --}}
 
                 {{--  2: doctor/specialist data (active) --}}
                 <template x-if="isMedicalType()">
@@ -43,12 +48,11 @@
 
                 {{--  5: Buttons --}}
                 @include('livewire.employee.parts.form-actions')
-
             </form>
         </section>
 
+        @include('livewire.employee.parts.modals.request-preview-modal')
         @include('livewire.employee.parts.modals.signature-modal')
-        <x-forms.loading/>
-
+        <x-forms.loading />
     </div>
 </div>

@@ -86,7 +86,8 @@ class DeclarationRequestDetailsSync extends EHealthJob
         $personId = Arr::get($person, 'id', null);
 
         // Check if person exists and if any of the critical fields have changed to determine if we need to update or create the person record
-        $isToBeSaved = $personId && (!$personModel ||
+        $isToBeSaved = $personId && (
+            !$personModel ||
                 (
                     $personModel?->noTaxId !== $person['no_tax_id'] ||
                     $personModel?->taxId !== $person['tax_id'] ||
@@ -97,7 +98,7 @@ class DeclarationRequestDetailsSync extends EHealthJob
                     $personModel?->birthCountry !== $person['birth_country'] ||
                     $personModel?->birthSettlement !== $person['birth_settlement']
                 )
-            );
+        );
 
         if ($isToBeSaved) {
             Log::warning('Person with UUID ' . $personId . ' does not exist in the database. It will be created during synchronization.');

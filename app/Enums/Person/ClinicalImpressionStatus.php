@@ -19,8 +19,8 @@ enum ClinicalImpressionStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::COMPLETED => __('patients.status.completed'),
-            self::ENTERED_IN_ERROR => __('patients.status.entered_in_error')
+            self::COMPLETED => __('clinical-impressions.status.completed'),
+            self::ENTERED_IN_ERROR => __('clinical-impressions.status.entered_in_error')
         };
     }
 

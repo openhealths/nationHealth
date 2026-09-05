@@ -44,14 +44,49 @@
                                 </label>
                             </x-slot>
                             <x-slot name="input">
-                                <div x-data="{ fileName: '{{ __('forms.no_file_chosen') }}' }" 
-                                     x-effect="if (!showSignatureModal) { fileName = '{{ __('forms.no_file_chosen') }}'; if ($refs.keyContainerUpload) $refs.keyContainerUpload.value = ''; }"
-                                     class="file-input-wrapper"
+                                <div
+                                    x-data="{
+                                        fileName: '{{ __('forms.no_file_chosen') }}',
+                                        noFileLabel: '{{ __('forms.no_file_chosen') }}',
+                                        displayFileName() {
+                                            const stored = $wire.form?.keyContainerFileName;
+                                            if (stored) {
+                                                return stored;
+                                            }
+                                            if (this.fileName && this.fileName !== this.noFileLabel && !String(this.fileName).startsWith('livewire-file:')) {
+                                                return this.fileName;
+                                            }
+                                            return this.noFileLabel;
+                                        },
+                                        setFileNameFromInput(event) {
+                                            const file = event.target.files?.[0];
+                                            if (file) {
+                                                this.fileName = file.name;
+                                                $wire.set('form.keyContainerFileName', file.name);
+                                            } else {
+                                                this.fileName = this.noFileLabel;
+                                                $wire.set('form.keyContainerFileName', '');
+                                            }
+                                        },
+                                        syncFileNameFromWire() {
+                                            const stored = $wire.form?.keyContainerFileName;
+                                            if (stored) {
+                                                this.fileName = stored;
+                                                return;
+                                            }
+                                            if ($wire.form?.keyContainerUpload) {
+                                                return;
+                                            }
+                                            this.fileName = this.noFileLabel;
+                                        },
+                                    }"
+                                    x-effect="if (!showSignatureModal) { if ($refs.keyContainerUpload) $refs.keyContainerUpload.value = ''; } else { syncFileNameFromWire(); }"
+                                    class="file-input-wrapper"
                                 >
                                     <label for="keyContainerUpload" class="file-input-button">
                                         {{ __('forms.choose_file') }}
                                     </label>
-                                    <span class="file-input-text" x-text="fileName"></span>
+                                    <span class="file-input-text" x-text="displayFileName()"></span>
                                     <input
                                         id="keyContainerUpload"
                                         type="file"
@@ -60,7 +95,8 @@
                                         x-ref="keyContainerUpload"
                                         aria-describedby="file_help"
                                         wire:model="form.keyContainerUpload"
-                                        @change="fileName = $event.target.files[0] ? $event.target.files[0].name : '{{ __('forms.no_file_chosen') }}'"
+                                        @change="setFileNameFromInput($event)"
+                                        x-on:livewire-upload-finish="if ($wire.form?.keyContainerFileName) { fileName = $wire.form.keyContainerFileName; }"
                                     >
                                 </div>
                                 <div class="mt-1 text-sm text-gray-500 dark:text-gray-300" id="file_help">{{ __('forms.key_file_description') ?? 'Upload your key file to sign the document.' }}</div>

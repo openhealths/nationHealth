@@ -8,11 +8,14 @@ use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\JobStatus;
 use App\Jobs\EncounterFullSync;
+use App\Livewire\Encounter\Forms\EncounterCancellationForm;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Repositories\MedicalEvents\Repository;
+use App\Services\MedicalEvents\EncounterReferralDisplay;
 use App\Traits\BatchLegalEntityQueries;
+use App\Traits\HandlesEncounterCancellation;
 use App\Traits\HandlesSyncBatch;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Session;
@@ -20,13 +23,16 @@ use Illuminate\View\View;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use Livewire\Attributes\Computed;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 use Throwable;
 
 class PatientEncounters extends BasePatientComponent
 {
     use BatchLegalEntityQueries;
+    use HandlesEncounterCancellation;
     use HandlesSyncBatch;
+    use WithFileUploads;
     use WithPagination;
 
     public array $episodes = [];
@@ -49,9 +55,14 @@ class PatientEncounters extends BasePatientComponent
 
     public bool $showAdditionalParams = false;
 
+    public bool $showSignatureModal = false;
+
+    public EncounterCancellationForm $form;
+
     public array $dictionaryNames = [
         'eHealth/encounter_classes',
         'eHealth/encounter_types',
+        'eHealth/cancellation_reasons',
         'SPECIALITY_TYPE'
     ];
 
@@ -133,7 +144,7 @@ class PatientEncounters extends BasePatientComponent
             $this->dispatchRemainingPages('encounter');
         } else {
             legalEntity()->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_ENCOUNTER);
-            Session::flash('success', __('patients.messages.encounters_synced_successfully'));
+            Session::flash('success', __('encounters.messages.synced_successfully'));
         }
 
         $this->loadFilterOptions();
@@ -170,11 +181,33 @@ class PatientEncounters extends BasePatientComponent
     protected function filterValidationRules(): array
     {
         return [
-            'filterStartDateRange' => ['nullable', 'string', 'max:255'],
-            'filterEndDateRange' => ['nullable', 'string', 'max:255'],
+            'filterStartDateRange' => [
+                'nullable',
+                'string',
+                'regex:/^\d{2}\.\d{2}\.\d{4}( — \d{2}\.\d{2}\.\d{4})?$/u'
+            ],
+            'filterEndDateRange' => [
+                'nullable',
+                'string',
+                'regex:/^\d{2}\.\d{2}\.\d{4}( — \d{2}\.\d{2}\.\d{4})?$/u'
+            ],
             'filterEpisodeId' => ['nullable', 'uuid'],
             'filterIncomingReferralId' => ['nullable', 'uuid'],
             'filterOriginEpisodeId' => ['nullable', 'uuid']
+        ];
+    }
+
+    /**
+     * Redefine filter names for error messages.
+     *
+     * @return array
+     */
+    public function validationAttributes(): array
+    {
+        return [
+            'filterStartDateRange' => __('patients.filter_period_start_range'),
+            'filterEndDateRange' => __('patients.filter_period_end_range'),
+            'filterEpisodeId' => __('episodes.label')
         ];
     }
 
@@ -227,12 +260,14 @@ class PatientEncounters extends BasePatientComponent
             ->paginate(config('pagination.per_page'));
 
         $paginator->setCollection(
-            $paginator->getCollection()->map(function (Encounter $encounter) {
-                $data = Arr::toCamelCase($encounter->toArray());
-                $data['id'] = $encounter->id;
+            $this->hydrateEncounterReferralLabels(
+                $paginator->getCollection()->map(function (Encounter $encounter) {
+                    $data = Arr::toCamelCase($encounter->toArray());
+                    $data['id'] = $encounter->id;
 
-                return $data;
-            })
+                    return $data;
+                })
+            )
         );
 
         return $paginator;
@@ -248,12 +283,19 @@ class PatientEncounters extends BasePatientComponent
         $perPage = config('pagination.per_page');
         $page = $this->getPage();
 
-        // todo: add period params after change in frontend
+        // The pickers keep both bounds in one field, the API takes them as separate params
+        $periodStart = array_map('trim', explode('—', $this->filterStartDateRange));
+        $periodEnd = array_map('trim', explode('—', $this->filterEndDateRange));
+
         $params = array_filter([
             'managing_organization_id' => legalEntity()->uuid,
             'episode_id' => $this->filterEpisodeId ?: null,
             'incoming_referral_id' => $this->filterIncomingReferralId ?: null,
             'origin_episode_id' => $this->filterOriginEpisodeId ?: null,
+            'period_start_from' => convertToYmd($periodStart[0] ?? ''),
+            'period_start_to' => convertToYmd($periodStart[1] ?? ''),
+            'period_end_from' => convertToYmd($periodEnd[0] ?? ''),
+            'period_end_to' => convertToYmd($periodEnd[1] ?? ''),
             'page' => $page,
             'page_size' => $perPage
         ]);
@@ -268,9 +310,47 @@ class PatientEncounters extends BasePatientComponent
             $total = 0;
         }
 
-        return new LengthAwarePaginator(collect($encounters), $total, $perPage, $page, [
-            'path' => LengthAwarePaginator::resolveCurrentPath()
-        ]);
+        return new LengthAwarePaginator(
+            $this->hydrateEncounterReferralLabels(collect($encounters)),
+            $total,
+            $perPage,
+            $page,
+            [
+                'path' => LengthAwarePaginator::resolveCurrentPath()
+            ]
+        );
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $encounters
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    protected function hydrateEncounterReferralLabels(\Illuminate\Support\Collection $encounters): \Illuminate\Support\Collection
+    {
+        $requestNumbers = EncounterReferralDisplay::requestNumbersFor($encounters->all());
+
+        return $encounters->map(static function (array $encounter) use ($requestNumbers): array {
+            $encounter['referralDisplay'] = EncounterReferralDisplay::label($encounter, $requestNumbers);
+
+            return $encounter;
+        });
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function encounterCancellationForm(): EncounterCancellationForm
+    {
+        return $this->form;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function afterEncounterCancelled(): void
+    {
+        $this->isSearching = false;
+        $this->resetPage();
     }
 
     public function render(): View

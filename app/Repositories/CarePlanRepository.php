@@ -9,7 +9,6 @@ use App\Classes\eHealth\EHealth;
 use App\Models\CarePlan;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class CarePlanRepository
@@ -17,17 +16,37 @@ class CarePlanRepository
     public function getByLegalEntity(int $legalEntityId): Collection
     {
         return CarePlan::where('legal_entity_id', $legalEntityId)
-            ->with(['person', 'author.party', 'encounter.diagnoses.condition', 'encounterIdentifier'])
+            ->with(['person', 'person.names', 'author.party', 'encounter.episode', 'encounter.diagnoses.condition', 'encounterIdentifier'])
             ->latest()
             ->get();
     }
 
-    public function getByPersonId(int $personId): Collection
+    public function getByPersonId(int $personId, array $filters = []): Collection
     {
-        return CarePlan::where('person_id', $personId)
-            ->with(['person', 'author.party', 'encounter.diagnoses.condition', 'encounterIdentifier'])
-            ->latest()
-            ->get();
+        $query = CarePlan::where('person_id', $personId)
+            ->with(['person', 'person.names', 'author.party', 'encounter.episode', 'encounter.diagnoses.condition', 'encounterIdentifier']);
+
+        if (!empty($filters['name'])) {
+            $query->where('title', 'like', "%{$filters['name']}%");
+        }
+
+        if (!empty($filters['status'])) {
+            $query->whereRaw('LOWER(status) = LOWER(?)', [$filters['status']]);
+        }
+
+        if (!empty($filters['start_date'])) {
+            $query->whereDate('period_start', '>=', \Carbon\Carbon::parse($filters['start_date']));
+        }
+
+        if (!empty($filters['end_date'])) {
+            $query->whereDate('period_end', '<=', \Carbon\Carbon::parse($filters['end_date']));
+        }
+
+        if (!empty($filters['encounter_id'])) {
+            $query->where('encounter_id', 'like', "%{$filters['encounter_id']}%");
+        }
+
+        return $query->latest()->get();
     }
 
     public function findById(int $id): ?CarePlan
@@ -115,7 +134,6 @@ class CarePlanRepository
                     ['system' => 'eHealth/care_plan_categories', 'code' => $form['category']]
                 ]
             ],
-            'instantiates_protocol' => !empty($form['clinicalProtocol']) ? [['display' => $form['clinicalProtocol']]] : (!empty($form['clinical_protocol']) ? [['display' => $form['clinical_protocol']]] : null),
             'title' => $form['title'],
             'period' => array_filter([
                 'start' => $finalPeriodStart,
@@ -144,13 +162,82 @@ class CarePlanRepository
                 'coding' => [
                     ['system' => 'PROVIDING_CONDITION', 'code' => $form['termsOfService'] ?? $form['terms_of_service']]
                 ]
-            ]
+            ],
+            'inform_with' => $form['informWith'] ?? ($form['inform_with'] ?? null)
         ]);
 
         return $payload;
     }
 
-    public function syncCarePlans(array $validatedData, ?int $personId = null): void
+    /**
+     * Resolve care plan period bounds as stored in eHealth (UTC).
+     *
+     * @return array{start: ?\Carbon\CarbonInterface, end: ?\Carbon\CarbonInterface}
+     */
+    public function resolveEHealthPeriodBounds(CarePlan $carePlan): array
+    {
+        $carePlan->loadMissing(['effectivePeriod', 'encounter.period']);
+
+        if ($carePlan->effectivePeriod) {
+            $rawStart = $this->periodValueAsUtcString($carePlan->effectivePeriod, 'start');
+            $rawEnd = $this->periodValueAsUtcString($carePlan->effectivePeriod, 'end');
+
+            return [
+                'start' => $rawStart ? \Carbon\Carbon::parse($rawStart, 'UTC') : null,
+                'end' => $rawEnd ? \Carbon\Carbon::parse($rawEnd, 'UTC') : null,
+            ];
+        }
+
+        $periodStartForm = $carePlan->period_start?->format('Y-m-d');
+        $encounterRawStart = $carePlan->encounter?->period?->getRawOriginal('start');
+
+        if ($encounterRawStart && $periodStartForm) {
+            $encounterStart = \Carbon\CarbonImmutable::parse($encounterRawStart, 'UTC');
+            $formStart = \Carbon\CarbonImmutable::parse($periodStartForm, config('app.timezone', 'Europe/Kyiv'))->startOfDay();
+
+            if ($formStart->utc()->lt($encounterStart)) {
+                $start = \Carbon\Carbon::parse($encounterStart->addMinute()->toIso8601ZuluString())->utc();
+            } else {
+                $start = \Carbon\Carbon::parse(convertToEHealthISO8601($periodStartForm . ' 00:00:00'))->utc();
+            }
+        } elseif ($periodStartForm) {
+            $start = \Carbon\Carbon::parse(convertToEHealthISO8601($periodStartForm . ' 00:00:00'))->utc();
+        } else {
+            $start = null;
+        }
+
+        $end = null;
+        if ($carePlan->period_end) {
+            $end = \Carbon\Carbon::parse(
+                convertToEHealthISO8601($carePlan->period_end->format('Y-m-d') . ' 23:59:59')
+            )->utc();
+        }
+
+        return ['start' => $start, 'end' => $end];
+    }
+
+    private function periodValueAsUtcString(\App\Models\MedicalEvents\Sql\Period $period, string $key): ?string
+    {
+        $raw = $period->getRawOriginal($key);
+        if (!empty($raw)) {
+            return (string) $raw;
+        }
+
+        $value = $period->getAttributes()[$key] ?? null;
+        if (empty($value)) {
+            return null;
+        }
+
+        return (string) $value;
+    }
+
+    /**
+     * @param  array<string, mixed>  $validatedData
+     * @param  int|null  $fallbackAuthorId  Employee used when the remote author is unknown locally.
+     *                                      Care plans require an author, so plans stay unsynced
+     *                                      without one rather than being attributed to a guess.
+     */
+    public function syncCarePlans(array $validatedData, ?int $personId = null, ?int $fallbackAuthorId = null): void
     {
         $activityRepo = app(CarePlanActivityRepository::class);
         $plans = isset($validatedData['data']) ? $validatedData['data'] : $validatedData;
@@ -185,7 +272,7 @@ class CarePlanRepository
             );
             */
 
-            DB::transaction(function () use ($person, $rawFhir, $activityRepo) {
+            DB::transaction(function () use ($person, $rawFhir, $activityRepo, $fallbackAuthorId) {
                 $categoryData = isset($rawFhir['category']) && is_array($rawFhir['category'])
                     ? ($rawFhir['category'][0] ?? null)
                     : ($rawFhir['category'] ?? null);
@@ -216,8 +303,16 @@ class CarePlanRepository
                     $author = \App\Models\Employee\Employee::where('uuid', $authorUuid)->first();
                 }
 
-                // Fallback to current user if author not found (to satisfy NOT NULL constraint)
-                $authorId = $author?->id ?? Auth::user()?->getCarePlanWriterEmployee()?->id;
+                $authorId = $author?->id ?? $fallbackAuthorId;
+
+                if (!$authorId) {
+                    \Illuminate\Support\Facades\Log::warning('CarePlanRepository: author not found for CarePlan sync', [
+                        'care_plan_uuid' => $rawFhir['id'] ?? null,
+                        'author_uuid' => $authorUuid,
+                    ]);
+
+                    return;
+                }
 
                 $addresses = [];
                 if (isset($rawFhir['addresses']) && is_array($rawFhir['addresses'])) {
@@ -253,6 +348,12 @@ class CarePlanRepository
                         ->first();
                 }
 
+                $localEncounterId = null;
+                if ($encounterIdentifier) {
+                    $localEncounter = \App\Models\MedicalEvents\Sql\Encounter::where('uuid', $encounterIdentifier->value)->first();
+                    $localEncounterId = $localEncounter?->id;
+                }
+
                 if ($carePlan) {
                     $carePlan->update([
                         'uuid' => $rawFhir['id'] ?? $rawFhir['uuid'] ?? null,
@@ -264,6 +365,7 @@ class CarePlanRepository
                         'note' => !empty($rawFhir['note']) ? $rawFhir['note'] : ($carePlan->note ?? null),
                         'category_id' => $category?->id,
                         'encounter_identifier_id' => $encounterIdentifier?->id,
+                        'encounter_id' => $localEncounterId ?? $carePlan->encounter_id,
                         'care_manager_id' => $careManager?->id,
                         'period_start' => isset($rawFhir['period']['start'])
                             ? \Carbon\Carbon::parse($rawFhir['period']['start'])
@@ -286,6 +388,7 @@ class CarePlanRepository
                         'note' => !empty($rawFhir['note']) ? $rawFhir['note'] : null,
                         'category_id' => $category?->id,
                         'encounter_identifier_id' => $encounterIdentifier?->id,
+                        'encounter_id' => $localEncounterId,
                         'care_manager_id' => $careManager?->id,
                         'period_start' => isset($rawFhir['period']['start'])
                             ? \Carbon\Carbon::parse($rawFhir['period']['start'])

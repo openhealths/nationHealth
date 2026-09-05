@@ -11,20 +11,30 @@ use Illuminate\Auth\Access\Response;
 
 class EmployeeRequestPolicy
 {
+    private function canManageRequests(User $user): bool
+    {
+        return $user->can('employee_request:write') || $user->hasElevatedEmployeeRole();
+    }
+
+    private function canViewRequests(User $user): bool
+    {
+        return $user->can('employee_request:read') || $user->hasElevatedEmployeeRole();
+    }
+
     public function viewAny(User $user): Response
     {
-        return $user->can('employee_request:read')
+        return $this->canViewRequests($user)
             ? Response::allow()
             : Response::deny(__('employees.policy.req.view_any_denied'));
     }
 
     public function view(User $user, EmployeeRequest $employeeRequest): Response
     {
-        if ((int)$employeeRequest->legal_entity_id !== (int)legalEntity()->id) {
+        if ((int) $employeeRequest->legal_entity_id !== (int) legalEntity()->id) {
             return Response::denyWithStatus(404);
         }
 
-        return $user->can('employee_request:read')
+        return $this->canViewRequests($user)
             ? Response::allow()
             : Response::deny(__('employees.policy.req.view_denied'));
     }
@@ -37,37 +47,37 @@ class EmployeeRequestPolicy
             }
         }
 
-        return $user->can('employee_request:write')
+        return $this->canManageRequests($user)
             ? Response::allow()
             : Response::deny(__('employees.policy.req.create_denied'));
     }
 
     public function update(User $user, EmployeeRequest $employeeRequest): Response
     {
-        if ((int)$employeeRequest->legal_entity_id !== (int)legalEntity()->id) {
+        if ((int) $employeeRequest->legal_entity_id !== (int) legalEntity()->id) {
             return Response::denyWithStatus(404);
         }
 
-        if ($employeeRequest->status !== \App\Enums\Employee\RequestStatus::NEW) {
+        if (!$employeeRequest->isLocalDraft()) {
             return Response::deny(__('employees.policy.req.processed_no_edit'));
         }
 
-        return $user->can('employee_request:write')
+        return $this->canManageRequests($user)
             ? Response::allow()
             : Response::deny(__('employees.policy.req.update_denied'));
     }
 
     public function delete(User $user, EmployeeRequest $employeeRequest): Response
     {
-        if ((int)$employeeRequest->legal_entity_id !== (int)legalEntity()->id) {
+        if ((int) $employeeRequest->legal_entity_id !== (int) legalEntity()->id) {
             return Response::denyWithStatus(404);
         }
 
-        if ($employeeRequest->status !== \App\Enums\Employee\RequestStatus::NEW) {
+        if (!$employeeRequest->isLocalDraft()) {
             return Response::deny(__('employees.policy.req.processed_no_delete'));
         }
 
-        return $user->can('employee_request:write')
+        return $this->canManageRequests($user)
             ? Response::allow()
             : Response::deny(__('employees.policy.req.delete_denied'));
     }

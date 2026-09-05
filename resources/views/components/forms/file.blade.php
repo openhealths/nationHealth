@@ -4,7 +4,9 @@
     wire:ignore
     x-data="{
         fileUploaded: @js(!empty($file)),
-        fileName: @js($file)
+        fileName: @js($file),
+        fileError: '',
+        allowedExtensions: ['dat', 'pfx', 'pk8', 'zs2', 'jks', 'p7s']
     }"
     class="flex flex-col items-center justify-center w-full"
 >
@@ -27,9 +29,11 @@
             type="file"
             hidden="hidden"
             class="hidden"
-            @change="fileUploaded = true;fileName = $event.target.files[0].name"
+            @change.capture="const selectedFile = $event.target.files[0]; const extension = selectedFile?.name.split('.').pop().toLowerCase(); if (extension && !allowedExtensions.includes(extension)) { $event.target.value = ''; fileUploaded = false; fileName = ''; fileError = @js(__('forms.key_file_invalid_extension')); } else { fileUploaded = Boolean(selectedFile); fileName = selectedFile?.name ?? ''; fileError = ''; }"
         />
     </label>
+
+    <p x-cloak x-show="fileError" x-text="fileError" class="text-error"></p>
 
     <template x-if="fileUploaded">
         <div x-transition class="text-xs text-green-700 " @click="fileUploaded = false">

@@ -87,21 +87,34 @@ class Employee extends BaseEmployee
             Declaration::class,
             'reorganization_employee_declarations'
         )
-        ->using(ReorganizationEmployeeDeclaration::class)
-        ->withPivot([
-            'legal_entity_uuid',
-            'employee_uuid',
-            'declaration_uuid',
-            'person_uuid',
-            'declaration_number',
-            'authorize_with'
-        ]);
+            ->using(ReorganizationEmployeeDeclaration::class)
+            ->withPivot([
+                'legal_entity_uuid',
+                'employee_uuid',
+                'declaration_uuid',
+                'person_uuid',
+                'declaration_number',
+                'authorize_with'
+            ]);
     }
 
     #[Scope]
     public function doctor(Builder $query): Builder
     {
         return $query->whereEmployeeType(Role::DOCTOR);
+    }
+
+    /**
+     * Scope to the employees that are approved and still working.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    #[Scope]
+    protected function active(Builder $query): Builder
+    {
+        return $query->whereStatus(Status::APPROVED)
+            ->whereIsActive(true);
     }
 
     #[Scope]
@@ -124,13 +137,12 @@ class Employee extends BaseEmployee
     /**
      * Scope to find employees matching the given types, status, user, legal entity, and optionally a party.
      *
-     * @param  Builder    $query
-     * @param  array      $employeeTypes
-     * @param  string     $status
-     * @param  int        $userId
-     * @param  int        $legalEntityId
-     * @param  int|null   $partyId
-     *
+     * @param  Builder  $query
+     * @param  array  $employeeTypes
+     * @param  string  $status
+     * @param  int  $userId
+     * @param  int  $legalEntityId
+     * @param  int|null  $partyId
      * @return void
      */
     public function scopeIdentifyEmployee(Builder $query, array $employeeTypes, string $status, int $userId, int $legalEntityId, ?int $partyId): void
@@ -145,9 +157,8 @@ class Employee extends BaseEmployee
     /**
      * Scope to filter employees by a list of UUIDs.
      *
-     * @param  Builder $query
-     * @param  array   $uuids
-     *
+     * @param  Builder  $query
+     * @param  array  $uuids
      * @return Builder
      */
     public function scopeFilterByUuids(Builder $query, array $uuids): Builder
@@ -155,12 +166,19 @@ class Employee extends BaseEmployee
         return $query->whereIn('uuid', $uuids);
     }
 
+    /**
+     * Scope to the employees that may take part in providing a healthcare service.
+     *
+     * @param  Builder  $query
+     * @param  int  $legalEntityId
+     * @return Builder
+     */
     #[Scope]
     protected function activeSpecialists(Builder $query, int $legalEntityId): Builder
     {
         return $query->whereLegalEntityId($legalEntityId)
-            ->whereStatus(Status::APPROVED)
-            ->whereIsActive(true)
+            ->whereIn('employee_type', [Role::DOCTOR, Role::SPECIALIST, Role::ASSISTANT, Role::LABORANT])
+            ->active()
             ->whereHas('specialities', static function (Builder $query) {
                 $query->select('id')->whereSpecialityOfficio(true);
             })
@@ -172,8 +190,7 @@ class Employee extends BaseEmployee
     protected function activeRecorders(Builder $query, int $legalEntityId, bool $skipVerificationCheck = false): Builder
     {
         $query->whereLegalEntityId($legalEntityId)
-            ->whereStatus(Status::APPROVED)
-            ->whereIsActive(true);
+            ->active();
 
         if (!$skipVerificationCheck) {
             $query->whereHas(
@@ -191,8 +208,7 @@ class Employee extends BaseEmployee
     {
         return $query->whereLegalEntityId($legalEntityId)
             ->whereIn('employee_type', [Role::OWNER, Role::ADMIN])
-            ->whereStatus(Status::APPROVED)
-            ->whereIsActive(true)
+            ->active()
             ->with('party:id,first_name,last_name,second_name');
     }
 
@@ -200,12 +216,13 @@ class Employee extends BaseEmployee
      * Scope to find active OWNERS for a specific legal entity.
      */
     #[Scope]
-    public function activeOwners(Builder $query, int $legalEntityId): Builder
+    protected function activeOwners(Builder $query, int $legalEntityId): Builder
     {
         return $query->where('legal_entity_id', $legalEntityId)
             ->where('employee_type', Role::OWNER)
             ->where('status', Status::APPROVED)
-            ->where('is_active', true);
+            ->where('is_active', true)
+            ->whereNotNull('user_id');
     }
 
     /**
@@ -213,11 +230,10 @@ class Employee extends BaseEmployee
      *
      * Falls back to the current legal entity and party if not provided.
      *
-     * @param  Builder $query
-     * @param  int|null $legalEntityId
-     * @param  int|null $partyId
-     * @param  Status $status
-     *
+     * @param  Builder  $query
+     * @param  int|null  $legalEntityId
+     * @param  int|null  $partyId
+     * @param  Status  $status
      * @return Builder
      */
     public function scopeGetEmployeesForParty(Builder $query, ?int $legalEntityId = null, ?int $partyId = null, Status $status = Status::APPROVED): Builder
@@ -235,9 +251,8 @@ class Employee extends BaseEmployee
      *
      * Falls back to the current legal entity if not provided.
      *
-     * @param  Builder $query
-     * @param  int|null $legalEntityId
-     *
+     * @param  Builder  $query
+     * @param  int|null  $legalEntityId
      * @return Builder
      */
     public function scopeGetEmployeesViaPivot(Builder $query, ?int $legalEntityId = null): Builder
@@ -254,15 +269,15 @@ class Employee extends BaseEmployee
      *
      * Used to check whether a duplicate employee record already exists before creating a new one.
      *
-     * @param  Builder $query
+     * @param  Builder  $query
      * @param  string  $legalEntityUuid
      * @param  string  $employeeType
      * @param  string  $position
-     * @param  int     $partyId
-     *
+     * @param  int  $partyId
      * @return Builder
      */
-    public function scopeMatchingEmployee(Builder $query, string $legalEntityUuid, string $employeeType, string $position, int $partyId): Builder {
+    public function scopeMatchingEmployee(Builder $query, string $legalEntityUuid, string $employeeType, string $position, int $partyId): Builder
+    {
         return $query
             ->where('legal_entity_uuid', $legalEntityUuid)
             ->where('employee_type', $employeeType)
@@ -275,12 +290,65 @@ class Employee extends BaseEmployee
      *
      * Used to determine employees that should be available to a user based on their effective creation time.
      *
-     * @param string $time The reference time to compare against
-     *
+     * @param  string  $time  The reference time to compare against
      * @return bool
      */
     public function isCreatedAtOrAfter(string $time): bool
     {
         return Carbon::parse($this->insertedAt)->greaterThanOrEqualTo(Carbon::parse($time));
+    }
+
+    /**
+     * Scope the employees the user may manage records through.
+     * By default, those are the employees of the user themselves; when other employees of the legal entity
+     * are allowed to manage episodes, those are all of its employees.
+     *
+     * @param  Builder  $query
+     * @param  User  $user
+     * @return Builder
+     */
+    #[Scope]
+    protected function manageableBy(Builder $query, User $user): Builder
+    {
+        return config('ehealth.allow_other_le_employees_to_manage_episode')
+            ? $query->whereLegalEntityId(legalEntity()->id)
+            : $query->wherePartyId($user->partyId);
+    }
+
+    /**
+     * Determine whether the user may manage a record through the care manager with the given UUID.
+     * A record without a care manager came from the short sync and is treated as our own.
+     *
+     * @param  User  $user
+     * @param  string|null  $careManagerId
+     * @return bool
+     */
+    public static function managedByUser(User $user, ?string $careManagerId): bool
+    {
+        return $careManagerId === null
+            || self::query()->manageableBy($user)->whereUuid($careManagerId)->exists();
+    }
+
+    /**
+     * Whether the user still has another APPROVED employee of this type in the legal entity.
+     */
+    public function userHasOtherApprovedOfType(int $userId, int $legalEntityId): bool
+    {
+        $employeeType = $this->employeeType;
+
+        if (!is_string($employeeType) || $employeeType === '') {
+            return false;
+        }
+
+        return self::query()
+            ->where('legal_entity_id', $legalEntityId)
+            ->where('employee_type', $employeeType)
+            ->whereKeyNot($this->id)
+            ->where('status', Status::APPROVED->value)
+            ->where(function (Builder $query) use ($userId) {
+                $query->where('user_id', $userId)
+                    ->orWhereHas('users', static fn (Builder $users) => $users->where('users.id', $userId));
+            })
+            ->exists();
     }
 }

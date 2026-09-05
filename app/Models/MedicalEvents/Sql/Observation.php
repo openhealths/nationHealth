@@ -234,6 +234,40 @@ class Observation extends Model
     }
 
     /**
+     * Filter observations created within the given encounter, which is stored as the context identifier.
+     *
+     * @param  Builder  $query
+     * @param  string  $encounterId
+     * @return Builder
+     */
+    #[Scope]
+    protected function forEncounter(Builder $query, string $encounterId): Builder
+    {
+        return $query->whereHas(
+            'context',
+            static fn (Builder $identifier): Builder => $identifier->whereValue($encounterId)
+        );
+    }
+
+    /**
+     * Limit observations to the codes allowed in the patient summary.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    #[Scope]
+    protected function allowedForSummary(Builder $query): Builder
+    {
+        return $query->whereHas(
+            'code.coding',
+            static fn (Builder $coding): Builder => $coding->whereIn(
+                'code',
+                config('ehealth.summary_observations_allowed')
+            )
+        );
+    }
+
+    /**
      * Scope to eager load all observation relationships.
      */
     #[Scope]

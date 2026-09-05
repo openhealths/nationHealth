@@ -42,6 +42,27 @@ class HealthcareServiceForm extends Form
     public ?array $notAvailable = [];
 
     /**
+     * Fill the form with data of the existing healthcare service.
+     *
+     * @param  HealthcareService  $healthcareService
+     * @return void
+     */
+    public function fillFromModel(HealthcareService $healthcareService): void
+    {
+        // Division is bound by uuid, while the model holds its id
+        $this->fill(Arr::except($healthcareService->toArray(), ['divisionId', 'type']));
+
+        // Type is set only for a few categories, otherwise the default structure has to stay in place
+        if ($healthcareService->type) {
+            $this->type = $healthcareService->type->toArray();
+        }
+
+        if ($this->availableTime) {
+            $this->availableTime = Arr::toCamelCase($this->availableTime);
+        }
+    }
+
+    /**
      * Rules based on: https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/17089101853/Create+healthcare+service#Request-data-validation
      *
      * @return array
@@ -278,8 +299,8 @@ class HealthcareServiceForm extends Form
                         $during = $item['during'];
 
                         $item['during'] = [
-                            'start' => convertToISO8601("{$during['startDate']} {$during['startTime']}"),
-                            'end' => convertToISO8601("{$during['endDate']} {$during['endTime']}")
+                            'start' => convertToEHealthISO8601("{$during['startDate']} {$during['startTime']}"),
+                            'end' => convertToEHealthISO8601("{$during['endDate']} {$during['endTime']}")
                         ];
                     }
 

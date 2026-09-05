@@ -76,9 +76,10 @@ class HealthcareServiceUpdate extends Component
         }
 
         try {
+            // The API format drops empty values, while for a PATCH they are exactly what clears the field
             $response = EHealth::healthcareService()->update(
                 $this->healthcareServiceUuid,
-                $this->form->formatForApi($validated)
+                $this->form->formatForApi($validated) + ['comment' => null, 'available_time' => [], 'not_available' => []]
             );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when updating a healthcare service');
@@ -89,7 +90,9 @@ class HealthcareServiceUpdate extends Component
         try {
             $validated = $response->validate();
 
-            $validated = Arr::only($validated, ['comment', 'coverage_area', 'available_time', 'not_available', 'ehealth_updated_at', 'ehealth_updated_by']);
+            // A cleared field may be missing from the response, so it has to be nulled locally on its own
+            $validated = Arr::only($validated, ['comment', 'coverage_area', 'available_time', 'not_available', 'ehealth_updated_at', 'ehealth_updated_by'])
+                + ['comment' => null, 'available_time' => [], 'not_available' => []];
             $validated['id'] = $this->healthcareServiceId;
 
             Repository::healthcareService()->update($validated, false);

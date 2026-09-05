@@ -5,6 +5,14 @@ declare(strict_types=1);
 return [
     'label' => 'Довідники',
 
+    'party_verification_statuses' => [
+        'VERIFIED' => 'Верифіковано',
+        'NOT_VERIFIED' => 'Не верифіковано',
+        'VERIFICATION_NEEDED' => 'Потребує верифікації',
+        'VERIFICATION_NOT_NEEDED' => 'Не потребує верифікації',
+    ],
+
+
     // Common translations for all program types
     'program_label' => 'Програма',
     'search_title' => 'Пошук програм',

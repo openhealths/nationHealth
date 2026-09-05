@@ -1,4 +1,4 @@
-<div {{ $attributes->merge(['class' => 'flex flex-col h-screen']) }}>
+<div {{ $attributes->merge(['class' => 'flex flex-col min-h-screen']) }}>
     <div>
         <div class="inline-block min-w-full align-middle">
             <div>

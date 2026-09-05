@@ -20,6 +20,9 @@ return new class extends Migration
             $table->uuid()->unique()->nullable();
             $table->string('authorize_with')->nullable()->comment("identifier of person's auth method");
             $table->jsonb('data_to_be_signed')->nullable();
+            $table->jsonb('documents')
+                ->nullable()
+                ->comment('Documents to upload before the approval, each with its own upload URL');
             $table->string('channel')->nullable();
             $table->integer('current_declaration_count')->nullable();
             $table->string('parent_declaration_uuid')

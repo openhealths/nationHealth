@@ -23,9 +23,6 @@ use Illuminate\Validation\ValidationException;
 
 class PersonForm extends BaseForm
 {
-    public const int NO_SELF_AUTH_AGE = 14;
-    public const int NO_SELF_REGISTRATION_AGE = 16;
-    protected const int PERSON_FULL_LEGAL_CAPACITY_AGE = 18;
     private const string EXPIRATION_DATE_ISSUED_AT_CONDITIONAL_TYPE = 'PERMANENT_RESIDENCE_PERMIT';
     private const string EXPIRATION_DATE_ISSUED_AT_REQUIRED_FROM = '2018-06-01';
 
@@ -44,7 +41,7 @@ class PersonForm extends BaseForm
     public array $person = [
         'names' => [
             [
-                'language' => null,
+                'language' => 'uk',
                 'noLastName' => false,
                 'lastName' => null,
                 'firstName' => null,
@@ -57,12 +54,21 @@ class PersonForm extends BaseForm
             'phones' => [['type' => null, 'number' => null]]
         ],
         'confidantPerson' => ['documentsRelationship' => []],
-        'authenticationMethods' => [['type' => null]]
+        'authenticationMethods' => [['type' => null]],
+        // The flag has to be answered, and null is reserved for a person with a foreign document who has
+        // no Ukrainian tax number to refuse in the first place
+        'noTaxId' => false
     ];
 
     public array $addresses = [];
 
-    public bool $processDisclosureDataConsent = true;
+    /**
+     * Mark 'the patient was informed about the purpose and grounds of processing their personal data'. Starts
+     * unanswered, the user ticks it on the leaflet shown before the person request is sent.
+     *
+     * @var bool
+     */
+    public bool $processDisclosureDataConsent = false;
 
     /**
      * Mark 'information from the leaflet was communicated to the patient'
@@ -71,7 +77,7 @@ class PersonForm extends BaseForm
      */
     public bool $patientSigned = false;
 
-    public string $authorizeWith;
+    public ?string $authorizeWith = null;
 
     public int $verificationCode;
 
@@ -94,9 +100,9 @@ class PersonForm extends BaseForm
                 new InDictionary('DOCUMENT_RELATIONSHIP_TYPE')
             ],
             'person.confidantPerson.documentsRelationship.*.number' => ['required', 'string', 'max:255'],
-            'person.confidantPerson.documentsRelationship.*.issuedBy' => ['required', 'string', 'max:255'],
+            'person.confidantPerson.documentsRelationship.*.issuedBy' => ['nullable', 'string', 'max:255'],
             'person.confidantPerson.documentsRelationship.*.issuedAt' => [
-                'required',
+                'nullable',
                 'date',
                 'before_or_equal:today',
                 'after_or_equal:person.birthDate'
@@ -169,23 +175,12 @@ class PersonForm extends BaseForm
             ? config('ehealth.person_documents_specific_expiration_date')
             : 'today';
 
-        // The address UI collects a single address, so its country selects the alphabet for every address field
-        $isUkraineAddress = ($this->person['addresses'][0]['country'] ?? 'UA') === 'UA';
-
-        $addressTextPattern = $isUkraineAddress
-            ? 'regex:/^(?!.*[ЫЪЭЁыъэё@%&$^#])[a-zA-ZА-ЯҐЇІЄа-яґїіє0-9№.,\'"()\/_\- ]+$/u'
-            : 'regex:/^[A-Za-z\s.\-\/\']+$/u';
-
-        $addressBuildingPattern = $isUkraineAddress
-            ? 'regex:/^[1-9]((?![ЫЪЭЁыъэё])()([А-ЯҐЇІЄа-яґїіє \/\'\-0-9])){0,20}$/u'
-            : 'regex:/^[A-Za-z0-9\s\/-]+$/u';
-
         $rules = [
             'person.names' => ['required', 'array', 'min:1'],
             'person.names.*.language' => ['required', 'distinct', new InDictionary('LANGUAGE')],
-            'person.names.*.noLastName' => ['boolean'],
-            'person.names.*.firstName' => ['required', 'min:3'],
-            'person.names.*.secondName' => ['nullable', 'min:3'],
+            'person.names.*.noLastName' => ['required', 'boolean'],
+            'person.names.*.firstName' => ['required', 'min:1', 'max:255'],
+            'person.names.*.secondName' => ['nullable', 'min:1', 'max:255'],
             'person.birthDate' => ['required', 'date_format:' . config('app.date_format')],
             'person.birthCountry' => ['required', 'string'],
             'person.birthSettlement' => ['required', 'string'],
@@ -239,6 +234,7 @@ class PersonForm extends BaseForm
                         fn ($rule) => $rule->ignore($this->person['uuid'], 'uuid')
                     )
             ],
+            'person.preferredWayCommunication' => ['nullable', Rule::in(['email', 'phone'])],
 
             'person.phones.*.type' => ['nullable', 'string', 'distinct', 'required_with:person.phones.*.number'],
             'person.phones.*.number' => [
@@ -255,53 +251,32 @@ class PersonForm extends BaseForm
                 function (string $attribute, mixed $value, Closure $fail): void {
                     $residenceAddresses = collect($value)->where('type', 'RESIDENCE');
 
+                    $residenceType = dictionary()->basics()
+                        ->byName('ADDRESS_TYPE')
+                        ->asCodeDescription()
+                        ->get('RESIDENCE');
+
                     if ($residenceAddresses->count() !== 1) {
-                        $fail(__('validation.custom.person.single_residence_address_required'));
+                        $fail(__(
+                            'validation.custom.person.single_residence_address_required',
+                            ['type' => $residenceType]
+                        ));
 
                         return;
                     }
 
                     if (!$this->hasForeignDocument() && !$residenceAddresses->contains('country', 'UA')) {
-                        $fail(__('validation.custom.person.ua_residence_address_required'));
+                        $fail(__(
+                            'validation.custom.person.ua_residence_address_required',
+                            ['type' => $residenceType]
+                        ));
                     }
                 }
             ],
-            'person.addresses.*.type' => ['required', new InDictionary('ADDRESS_TYPE')],
-            'person.addresses.*.country' => ['required', new InDictionary('COUNTRY')],
-            'person.addresses.*.area' => ['required', 'string', 'max:255', $addressTextPattern],
-            'person.addresses.*.region' => [
-                'sometimes',
-                'required_unless:person.addresses.*.area,М.КИЇВ',
-                $addressTextPattern
-            ],
-            'person.addresses.*.settlement' => ['required', 'string', 'max:255', $addressTextPattern],
-            // Both are only part of the schema for Ukrainian addresses, so they are dropped from the payload otherwise
-            'person.addresses.*.settlementId' => [
-                'exclude_unless:person.addresses.*.country,UA',
-                'required',
-                'uuid'
-            ],
-            'person.addresses.*.streetType' => [
-                'exclude_unless:person.addresses.*.country,UA',
-                'nullable',
-                new InDictionary('STREET_TYPE')
-            ],
-            'person.addresses.*.street' => [
-                'nullable',
-                'required_if:person.addresses.*.country,UA',
-                'string',
-                'max:255',
-                $addressTextPattern
-            ],
-            'person.addresses.*.building' => ['nullable', $addressBuildingPattern],
-            'person.addresses.*.apartment' => $isUkraineAddress
-                ? ['nullable', 'string', 'max:255']
-                : ['nullable', $addressBuildingPattern],
-            'person.addresses.*.zip' => ['nullable', 'string', new Zip()],
 
-            'person.emergencyContact.firstName' => ['required', 'min:3'],
-            'person.emergencyContact.lastName' => ['required', 'min:3'],
-            'person.emergencyContact.secondName' => ['nullable', 'min:3'],
+            'person.emergencyContact.firstName' => ['required', 'min:1', 'max:255'],
+            'person.emergencyContact.lastName' => ['required', 'min:1', 'max:255'],
+            'person.emergencyContact.secondName' => ['nullable', 'min:1', 'max:255'],
             'person.emergencyContact.phones.*.type' => ['required', 'string', 'distinct'],
             'person.emergencyContact.phones.*.number' => ['required', 'string', 'regex:/^\+[0-9]{11,12}$/', 'distinct'],
 
@@ -309,8 +284,10 @@ class PersonForm extends BaseForm
             'patientSigned' => ['required', 'boolean:strict', Rule::in([false])]
         ];
 
-        $this->normalizeNoTaxIdForForeignDocuments();
-        $this->addForeignTaxIdProhibition($rules);
+        foreach ($this->person['addresses'] ?? [] as $index => $address) {
+            $rules += $this->addressRules($index, ($address['country'] ?? 'UA') === 'UA');
+        }
+
         $this->validateNoTaxIdFlag();
         $this->addTaxIdUniquenessValidation($rules);
         $this->addNamesLastNameValidation($rules);
@@ -337,6 +314,55 @@ class PersonForm extends BaseForm
         }
 
         return $rules;
+    }
+
+    /**
+     * Rules of a single address. Its country decides both the alphabet the address is filled in and which of
+     * its parts belong to the schema at all: the ones taken from the address registry are dropped from the
+     * payload of an address abroad. The settlement type has no rule on purpose, it is collected to search
+     * the registry but the schema of a person address has no such property and rejects it.
+     *
+     * @param  int  $index
+     * @param  bool  $isUkraineAddress
+     * @return array
+     */
+    protected function addressRules(int $index, bool $isUkraineAddress): array
+    {
+        // An address abroad is spelled in the Latin alphabet and carries no digits at all, its text fields
+        // are matched against exactly this pattern on the eHealth side too
+        $textPattern = $isUkraineAddress
+            ? 'regex:/^(?!.*[ЫЪЭЁыъэё@%&$^#])[a-zA-ZА-ЯҐЇІЄа-яґїіє0-9№.,\'"()\/_\- ]+$/u'
+            : 'regex:/^[A-Za-z\s.\-\/\']+$/u';
+
+        $buildingPattern = $isUkraineAddress
+            ? 'regex:/^[1-9]((?![ЫЪЭЁыъэё])()([А-ЯҐЇІЄа-яґїіє \/\'\-0-9])){0,20}$/u'
+            : 'regex:/^[A-Za-z0-9\s\/-]+$/u';
+
+        // An address abroad is typed in by hand, so it carries only the parts that are known
+        $registryField = $isUkraineAddress ? 'required' : 'nullable';
+
+        return [
+            "person.addresses.$index.type" => ['required', new InDictionary('ADDRESS_TYPE')],
+            "person.addresses.$index.country" => ['required', new InDictionary('COUNTRY')],
+            "person.addresses.$index.area" => [$registryField, 'string', 'max:255', $textPattern],
+            "person.addresses.$index.region" => [$registryField, 'string', 'max:255', $textPattern],
+            "person.addresses.$index.settlement" => [$registryField, 'string', 'max:255', $textPattern],
+            "person.addresses.$index.street" => [$registryField, 'string', 'max:255', $textPattern],
+            "person.addresses.$index.settlementId" => $isUkraineAddress
+                ? ['required', 'uuid']
+                : ['exclude'],
+            "person.addresses.$index.streetType" => $isUkraineAddress
+                ? ['nullable', new InDictionary('STREET_TYPE')]
+                : ['exclude'],
+            "person.addresses.$index.building" => ['nullable', $buildingPattern],
+            "person.addresses.$index.apartment" => $isUkraineAddress
+                ? ['nullable', 'string', 'max:255']
+                : ['nullable', $buildingPattern],
+            // The five digit index is the Ukrainian postal code, an address abroad follows its own country
+            "person.addresses.$index.zip" => $isUkraineAddress
+                ? ['nullable', 'string', new Zip()]
+                : ['nullable', 'string', 'max:255']
+        ];
     }
 
     /**
@@ -402,6 +428,19 @@ class PersonForm extends BaseForm
         return ['verificationCode' => ['required', 'numeric', 'digits:4']];
     }
 
+    /**
+     * Rules for signing a person request, where the leaflet returned by the approval has to be marked as signed
+     * by the patient on top of the signing credentials.
+     *
+     * @return array
+     */
+    public function rulesForSignPersonRequest(): array
+    {
+        return array_merge($this->signingRules(), [
+            'patientSigned' => ['required', 'boolean:strict', Rule::in([true])]
+        ]);
+    }
+
     public function rulesForFiles(): array
     {
         return ['uploadedDocuments.*' => ['required', 'file', 'mimes:jpeg,jpg', 'max:10000']];
@@ -410,7 +449,21 @@ class PersonForm extends BaseForm
     public function rulesForCreateNewConfidantPersonRelationshipRequest(): array
     {
         return [
-            'confidantPersonId' => ['required', 'uuid'],
+            'confidantPersonId' => [
+                'required',
+                'uuid',
+                function (string $attribute, mixed $value, callable $fail): void {
+                    if ($this->hasLegalCapacityDocument()) {
+                        $fail(__('validation.custom.person.confidant_prohibited_for_legally_capable_person'));
+
+                        return;
+                    }
+
+                    if ($this->isRepresentedBy($value)) {
+                        $fail(__('validation.custom.person.confidant_relationship_already_exists'));
+                    }
+                }
+            ],
             'documentsRelationship' => ['required', 'array'],
             'documentsRelationship.*.type' => ['required', new InDictionary('DOCUMENT_RELATIONSHIP_TYPE')],
             'documentsRelationship.*.number' => ['required', 'string', 'max:255'],
@@ -433,13 +486,76 @@ class PersonForm extends BaseForm
     }
 
     /**
-     * Name each document number after its own document, so an error tells the user which one is wrong.
+     * Check whether the chosen confidant already represents the patient, which the registry answers with
+     * "Confidant person relationship already exists" instead of a second relationship between the two.
+     *
+     * @param  string  $confidantPersonId
+     * @return bool
+     */
+    public function isRepresentedBy(string $confidantPersonId): bool
+    {
+        return collect($this->person['confidantPersons'] ?? [])
+            ->contains(static fn (array $relationship): bool => ($relationship['isActive'] ?? false)
+                && ($relationship['person']['uuid'] ?? null) === $confidantPersonId);
+    }
+
+    /**
+     * Check whether the patient holds a document proving their own legal capacity, which rules out
+     * being represented by a confidant person.
+     *
+     * @return bool
+     */
+    public function hasLegalCapacityDocument(): bool
+    {
+        return !empty(array_intersect(
+            array_column($this->person['documents'] ?? [], 'type'),
+            config('ehealth.person_legal_capacity_document_types')
+        ));
+    }
+
+    /**
+     * Check whether the person data has to be additionally verified by the NHS employees.
+     *
+     * @return bool
+     */
+    public function needsNhsVerification(): bool
+    {
+        if (data_get($this->person, 'authenticationMethods.0.type') === AuthenticationMethod::OFFLINE->value) {
+            return true;
+        }
+
+        $documentType = $this->personAge < config('ehealth.no_self_auth_age')
+            ? 'BIRTH_CERTIFICATE_FOREIGN'
+            : 'PERMANENT_RESIDENCE_PERMIT';
+
+        foreach ($this->person['documents'] as $document) {
+            if ($document['type'] === $documentType) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Name each document number after its own document, so an error tells the user which one is wrong, and
+     * name the fields of every address, because the rules of an address are built for its position in the
+     * list and no longer carry the wildcard the translations are keyed by.
      *
      * @return array
      */
     public function validationAttributes(): array
     {
         $attributes = [];
+
+        $addressAttributes = collect(__('validation.attributes'))
+            ->filter(static fn (mixed $name, string $key): bool => str_starts_with($key, 'person.addresses.*.'));
+
+        foreach (array_keys($this->person['addresses'] ?? []) as $index) {
+            foreach ($addressAttributes as $key => $name) {
+                $attributes[str_replace('.*.', ".$index.", $key)] = $name;
+            }
+        }
 
         foreach ($this->person['documents'] ?? [] as $index => $document) {
             if (blank($document['type'] ?? null)) {
@@ -459,11 +575,12 @@ class PersonForm extends BaseForm
         $messages = [
             'person.unzr.required' => __('validation.custom.person.unzr_required_for_national_id'),
             'person.unzr.prohibited' => __('validation.custom.person.unzr_prohibited_for_foreign'),
-            'person.taxId.prohibited' => __('validation.custom.person.tax_id_prohibited_for_foreign'),
             'person.taxId.unique' => __('validation.custom.person.tax_id_already_used'),
             'person.documents.*.issuingCountry.required' => __(
                 'validation.custom.person.issuing_country_required_for_foreign'
             ),
+            'person.addresses.*.settlementId.required' => __('validation.custom.person.settlement_must_be_picked'),
+            'person.addresses.*.settlementId.uuid' => __('validation.custom.person.settlement_must_be_picked'),
             'person.names.min' => __('validation.custom.person.names_min'),
             'person.names.*.language.distinct' => __('validation.custom.person.names_language_distinct'),
             'person.names.*.lastName.required' => __('validation.custom.person.no_last_name_false_requires_last_name'),
@@ -489,7 +606,7 @@ class PersonForm extends BaseForm
 
         $messages = [];
 
-        foreach ($this->person['documents'] as $key => $document) {
+        foreach ($this->person['documents'] ?? [] as $key => $document) {
             $type = $document['type'] ?? null;
             $documentType = __('patients.documents.' . $type) ?: $type;
 
@@ -688,7 +805,7 @@ class PersonForm extends BaseForm
         $personAge = CarbonImmutable::parse($this->person['birthDate'])->age;
 
         foreach ($this->person['confidantPerson']['documentsRelationship'] as $document) {
-            if ($personAge >= self::PERSON_FULL_LEGAL_CAPACITY_AGE &&
+            if ($personAge >= config('ehealth.person_full_legal_capacity_age') &&
                 in_array(
                     $document['type'],
                     ['BIRTH_CERTIFICATE', 'BIRTH_CERTIFICATE_FOREIGN'],
@@ -778,7 +895,7 @@ class PersonForm extends BaseForm
     }
 
     /**
-     * Do tax_id required if no_tax_id = false and persons age > NO_SELF_AUTH_AGE.
+     * Do tax_id required if no_tax_id = false and persons age is above the self-authentication age.
      *
      * @return void
      */
@@ -805,65 +922,27 @@ class PersonForm extends BaseForm
         if ($noTaxId === false && !$taxIdFilled && !empty($this->person['birthDate'])) {
             $personAge = CarbonImmutable::parse($this->person['birthDate'])->age;
 
-            if ($personAge > self::NO_SELF_AUTH_AGE) {
+            if ($personAge > config('ehealth.no_self_auth_age')) {
                 throw ValidationException::withMessages([
                     'person.taxId' => __('validation.custom.person.no_tax_id_false_requires_tax_id')
                 ]);
             }
         }
 
-        $foreignTypes = config('ehealth.identity_document_types_foreign');
-        $submittedTypes = array_column($this->person['documents'] ?? [], 'type');
-        $hasForeignDocument = (bool)array_intersect($submittedTypes, $foreignTypes);
+        $hasForeignDocument = $this->hasForeignDocument();
 
-        // a non-foreign document requires a defined no_tax_id (the foreign no_tax_id = null case is guaranteed by normalizeNoTaxIdForForeignDocuments)
+        // a foreign document without a tax_id has nothing to refuse, so the flag stays undefined
+        if ($hasForeignDocument && !$taxIdFilled && $noTaxId !== null) {
+            throw ValidationException::withMessages([
+                'person.noTaxId' => __('validation.custom.person.no_tax_id_must_be_null_for_foreign')
+            ]);
+        }
+
+        // a non-foreign document requires a defined no_tax_id
         if (!$hasForeignDocument && $noTaxId === null) {
             throw ValidationException::withMessages([
                 'person.noTaxId' => __('validation.custom.person.no_tax_id_cannot_be_null')
             ]);
-        }
-    }
-
-    /**
-     * When a foreign identity document is present and tax_id is missing, no_tax_id must be null rather than true.
-     *
-     * @return void
-     */
-    private function normalizeNoTaxIdForForeignDocuments(): void
-    {
-        if (!empty($this->person['taxId'])) {
-            return;
-        }
-
-        $foreignTypes = config('ehealth.identity_document_types_foreign');
-
-        $hasForeignDocument = collect($this->person['documents'] ?? [])
-            ->contains(static fn (array $document): bool => in_array($document['type'] ?? null, $foreignTypes, true));
-
-        if ($hasForeignDocument) {
-            $this->person['noTaxId'] = null;
-        }
-    }
-
-    /**
-     * When a foreign identity document is present and no_tax_id is null, tax_id must not be filled.
-     *
-     * @param  array  $rules
-     * @return void
-     */
-    private function addForeignTaxIdProhibition(array &$rules): void
-    {
-        if (($this->person['noTaxId'] ?? false) !== null) {
-            return;
-        }
-
-        $foreignTypes = config('ehealth.identity_document_types_foreign');
-
-        $hasForeignDocument = collect($this->person['documents'] ?? [])
-            ->contains(static fn (array $document): bool => in_array($document['type'] ?? null, $foreignTypes, true));
-
-        if ($hasForeignDocument) {
-            $rules['person.taxId'][] = 'prohibited';
         }
     }
 
@@ -905,9 +984,19 @@ class PersonForm extends BaseForm
             return;
         }
 
-        if (!empty(array_diff($submittedTypes, $foreignTypes))) {
+        $invalidTypes = array_diff($submittedTypes, $foreignTypes);
+
+        if (!empty($invalidTypes)) {
+            $translateTypes = static fn (array $types): string => implode(', ', array_map(
+                static fn (string $type): string => __('patients.documents.' . $type) ?: $type,
+                $types
+            ));
+
             throw ValidationException::withMessages([
-                'person.documents' => __('validation.custom.person.only_foreign_documents_allowed')
+                'person.documents' => __('validation.custom.person.only_foreign_documents_allowed', [
+                    'allowed_types' => $translateTypes($foreignTypes),
+                    'invalid_types' => $translateTypes($invalidTypes)
+                ])
             ]);
         }
     }
@@ -994,7 +1083,7 @@ class PersonForm extends BaseForm
         foreach ($this->person['names'] ?? [] as $index => $name) {
             $rules["person.names.$index.lastName"] = filter_var($name['noLastName'] ?? false, FILTER_VALIDATE_BOOL)
                 ? ['prohibited']
-                : ['required', 'min:3'];
+                : ['required', 'min:1', 'max:255'];
         }
     }
 
@@ -1039,14 +1128,16 @@ class PersonForm extends BaseForm
     private function validateNecessityOfConfidantPerson(): void
     {
         // Below the self-registration age a confidant person is mandatory
-        if ($this->personAge < self::NO_SELF_REGISTRATION_AGE && empty($this->person['confidantPerson']['personId'])) {
+        if ($this->personAge < config('ehealth.no_self_registration_age')
+            && empty($this->person['confidantPerson']['personId'])) {
             throw ValidationException::withMessages([
                 'person.confidantPerson' => __('validation.custom.person.confidant_person_required_for_children')
             ]);
         }
 
         // Between the self-registration age and the full legal capacity age
-        if ($this->personAge > self::NO_SELF_REGISTRATION_AGE && $this->personAge < self::PERSON_FULL_LEGAL_CAPACITY_AGE) {
+        if ($this->personAge >= config('ehealth.no_self_registration_age')
+            && $this->personAge < config('ehealth.person_full_legal_capacity_age')) {
             $personLegalCapacityDocumentTypes = config('ehealth.person_legal_capacity_document_types');
             $hasLegalCapacityDocument = false;
 
@@ -1074,13 +1165,13 @@ class PersonForm extends BaseForm
     }
 
     /**
-     * Check that document types BIRTH_CERTIFICATE or BIRTH_CERTIFICATE_FOREIGN are submitted if person age < NO_SELF_AUTH_AGE.
+     * Check that document types BIRTH_CERTIFICATE or BIRTH_CERTIFICATE_FOREIGN are submitted if person age is below the self-authentication age.
      *
      * @return void
      */
     private function validateDocumentsForMinorPerson(): void
     {
-        if ($this->personAge < self::NO_SELF_AUTH_AGE) {
+        if ($this->personAge < config('ehealth.no_self_auth_age')) {
             $requiredDocumentTypes = ['BIRTH_CERTIFICATE', 'BIRTH_CERTIFICATE_FOREIGN'];
             $hasRequiredDocument = false;
 
@@ -1129,7 +1220,8 @@ class PersonForm extends BaseForm
 
         // Check document types from PERSON_LEGAL_CAPACITY_DOCUMENT_TYPES config parameter (that prove persons legal capacity) are not submitted
         // if persons age is less than no_self_registration_age global parameter or greater than person_full_legal_capacity_age global parameter
-        if ($this->personAge < self::NO_SELF_REGISTRATION_AGE || $this->personAge > self::PERSON_FULL_LEGAL_CAPACITY_AGE) {
+        if ($this->personAge < config('ehealth.no_self_registration_age')
+            || $this->personAge > config('ehealth.person_full_legal_capacity_age')) {
             foreach ($this->person['documents'] as $document) {
                 if (in_array($document['type'], $personLegalCapacityDocumentTypes, true)) {
                     $documentTypeName = __('patients.documents.' . $document['type']) ?: $document['type'];
@@ -1182,8 +1274,8 @@ class PersonForm extends BaseForm
             ]);
         }
 
-        // Check if person age < prm.global_parameters.no_self_auth_age every document type is in NO_SELF_AUTH_AGE_DOCUMENT_TYPES
-        if ($this->personAge < self::NO_SELF_AUTH_AGE) {
+        // Check if person age is below the self-authentication age every document type is in NO_SELF_AUTH_AGE_DOCUMENT_TYPES
+        if ($this->personAge < config('ehealth.no_self_auth_age')) {
             $invalidTypes = array_diff($submittedTypes, $noSelfAuthAgeDocumentTypes);
 
             if (!empty($invalidTypes)) {
@@ -1201,8 +1293,8 @@ class PersonForm extends BaseForm
             }
         }
 
-        // Check if person age > prm.global_parameters.no_self_auth_age check existence SELF_AUTH_AGE_DOCUMENT_TYPES
-        if ($this->personAge > self::NO_SELF_AUTH_AGE) {
+        // Check if person age is above the self-authentication age check existence SELF_AUTH_AGE_DOCUMENT_TYPES
+        if ($this->personAge > config('ehealth.no_self_auth_age')) {
             $hasSelfAuthType = (bool)array_intersect($submittedTypes, $selfAuthAgeDocumentTypes);
 
             if (!$hasSelfAuthType) {

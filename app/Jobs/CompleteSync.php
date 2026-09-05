@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Core\EHealthJob;
+use App\Enums\JobStatus;
 use GuzzleHttp\Promise\PromiseInterface;
 use App\Classes\eHealth\EHealthResponse;
 
@@ -26,8 +27,13 @@ class CompleteSync extends EHealthJob
 
         parent::handle();
 
-        // Notify user about completion of sync of other entities (used for manual syncs)
-        $this->sendEntityNotification(null, 'completed');
+        $syncEntity = $this->batch()->options['sync_entity'] ?? null;
+
+        if ($syncEntity !== null) {
+            $this->legalEntity->setEntityStatus(JobStatus::COMPLETED, $syncEntity);
+        }
+
+        $this->sendEntityNotification($syncEntity, 'completed');
     }
 
     // Get data from EHealth API (here it mostly dummy method)

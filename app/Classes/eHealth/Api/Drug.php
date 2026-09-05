@@ -41,10 +41,8 @@ class Drug extends Request
      */
     public function getMany(array $filters = []): PromiseInterface|EHealthResponse
     {
-        $this->setDefaultPageSize();
-
         $mergedQuery = array_merge(
-            $this->options['query'] ?? [],
+            [self::QUERY_PARAM_PAGE_SIZE => config('ehealth.api.page_size_max')],
             $filters
         );
 

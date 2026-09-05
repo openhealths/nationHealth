@@ -48,6 +48,8 @@ class DeclarationPolicy
 
     /**
      * Determine whether the user can view declaration.
+     *
+     * A doctor sees the declarations of every doctor of their legal entity, the deactivated ones included.
      */
     public function view(User $user, Declaration $declaration): Response
     {
@@ -55,7 +57,9 @@ class DeclarationPolicy
             return Response::denyWithStatus(404);
         }
 
-        if ($user->hasAllowedRole([Role::OWNER, Role::REORGANIZATION_OWNER, Role::ADMIN]) && $declaration->legalEntityId === legalEntity()->id) {
+        $legalEntityWideRoles = [Role::OWNER, Role::REORGANIZATION_OWNER, Role::ADMIN, Role::DOCTOR];
+
+        if ($user->hasAllowedRole($legalEntityWideRoles) && $declaration->legalEntityId === legalEntity()->id) {
             return Response::allow();
         }
 

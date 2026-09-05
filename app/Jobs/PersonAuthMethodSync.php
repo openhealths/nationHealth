@@ -63,7 +63,7 @@ class PersonAuthMethodSync extends EHealthJob
     protected function processResponse(?EHealthResponse $response): void
     {
         if (\is_null($response)) {
-           return;
+            return;
         }
 
         $authMethods = $response->validate();

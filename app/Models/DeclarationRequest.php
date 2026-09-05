@@ -23,7 +23,8 @@ class DeclarationRequest extends Model
 
     protected $casts = [
         'status' => RequestStatus::class,
-        'data_to_be_signed' => 'array'
+        'data_to_be_signed' => 'array',
+        'documents' => 'array'
     ];
 
     #[Scope]

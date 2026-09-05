@@ -25,6 +25,7 @@ return new class extends Migration
             $table->string('birth_settlement')->nullable();
             $table->enum('gender', Gender::values());
             $table->string('email')->nullable();
+            $table->string('preferred_way_communication')->nullable();
             $table->boolean('no_tax_id')->nullable();
             $table->string('tax_id')->nullable();
             $table->string('secret')->nullable();

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Middleware;
 
+use App\Auth\SessionBinder;
 use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Models\User;
 use Closure;
 use App\Auth\EHealth\Services\TokenStorage;
 use App\Exceptions\EHealth\EHealthConnectionException;
@@ -67,8 +69,7 @@ class CheckSessionToken
                     ]);
                 }
 
-                Auth::logout();
-                Session::flush();
+                $this->terminateSession();
 
                 return Redirect::route('login')
                     ->with('error', __('auth.session_expired'));
@@ -81,8 +82,7 @@ class CheckSessionToken
                 $refreshed = $this->tokenStorage->refreshBearerToken();
 
                 if (!$refreshed) {
-                    Auth::logout();
-                    Session::flush();
+                    $this->terminateSession();
 
                     return Redirect::route('login')->with('error', 'Could not refresh eHealth session.');
                 }
@@ -93,5 +93,22 @@ class CheckSessionToken
         }
 
         return $next($request);
+    }
+
+    /**
+     * End the current session, dropping the binding that ties it to the user so no stale session is left behind on the user record.
+     *
+     * @return void
+     */
+    private function terminateSession(): void
+    {
+        $user = Auth::guard('ehealth')->user();
+
+        if ($user instanceof User) {
+            new SessionBinder()->release($user);
+        }
+
+        Auth::logout();
+        Session::flush();
     }
 }

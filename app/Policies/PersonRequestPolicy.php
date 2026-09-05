@@ -56,6 +56,35 @@ class PersonRequestPolicy
     }
 
     /**
+     * Determine whether the user can sign person request.
+     */
+    public function sign(User $user): Response
+    {
+        if ($user->cannot('person_request:sign')) {
+            return Response::denyWithStatus(404);
+        }
+
+        return Response::allow();
+    }
+
+    /**
+     * Determine whether the user can delete the local draft of the person request.
+     */
+    public function delete(User $user, PersonRequest $personRequest): Response
+    {
+        if ($user->cannot('person_request:write')) {
+            return Response::denyWithStatus(404);
+        }
+
+        // A request that already reached eHealth has to be rejected instead of deleted
+        if ($personRequest->status !== Status::DRAFT) {
+            return Response::denyWithStatus(404);
+        }
+
+        return Response::allow();
+    }
+
+    /**
      * Determine whether the user can reject person request.
      */
     public function reject(User $user, PersonRequest $personRequest): Response

@@ -97,6 +97,19 @@ class EHealthResponseExceptionPartyNotVerifiedTest extends TestCase
         );
     }
 
+    #[Test]
+    public function handle_flashes_translated_license_type_already_present_on_409(): void
+    {
+        $exception = $this->makeException(409, 'License with type PHARMACY_DRUGS is already present');
+
+        $exception->handle('Test log message');
+
+        $this->assertEquals(
+            __('errors.ehealth.messages.license_type_already_present', ['type' => 'PHARMACY_DRUGS']),
+            Session::get('error')
+        );
+    }
+
     // -------------------------------------------------------------------------
     // Translation key content
     // -------------------------------------------------------------------------

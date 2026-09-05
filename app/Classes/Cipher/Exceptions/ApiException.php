@@ -1,5 +1,6 @@
 <?php
 
+declare(strict_types=1);
 
 namespace App\Classes\Cipher\Exceptions;
 
@@ -9,7 +10,7 @@ class ApiException extends Exception
 {
     protected array $errors;
 
-    public function __construct(array $errors, $message = "", $code = 0, Exception $previous = null)
+    public function __construct(array $errors, $message = "", $code = 0, ?Exception $previous = null)
     {
         $this->errors = $errors;
         parent::__construct($message, $code, $previous);

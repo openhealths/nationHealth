@@ -7,6 +7,7 @@ namespace App\Jobs;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Services\Dictionary\Dictionaries\BasicDictionary;
 use App\Services\Dictionary\DictionaryManager;
 use Exception;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -50,7 +51,9 @@ class UpdateDictionaryCache implements ShouldQueue
 
             $response = $manager->fetchPage($this->dictionaryKey, $this->pageNumber);
             $paging = $response->getPaging();
-            $currentPageData = $response->getData();
+            $currentPageData = $this->dictionaryKey === BasicDictionary::KEY
+                ? BasicDictionary::prune($response->getData())
+                : $response->getData();
 
             // Get existing cache data and update it
             if ($this->pageNumber === 1) {

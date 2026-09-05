@@ -15,12 +15,14 @@ enum EncounterStatus: string
 
     case ENTERED_IN_ERROR = 'entered_in_error';
     case FINISHED = 'finished';
+    case DRAFT = 'draft';
 
     public function label(): string
     {
         return match ($this) {
-            self::ENTERED_IN_ERROR => __('patients.status.entered_in_error'),
-            self::FINISHED => __('patients.status.completed')
+            self::ENTERED_IN_ERROR => __('encounters.status.entered_in_error'),
+            self::FINISHED => __('encounters.status.finished'),
+            self::DRAFT => __('encounters.status.draft'),
         };
     }
 
@@ -29,6 +31,7 @@ enum EncounterStatus: string
         return match ($this) {
             self::FINISHED => 'badge-green',
             self::ENTERED_IN_ERROR => 'badge-red',
+            self::DRAFT => 'badge-dark',
         };
     }
 }

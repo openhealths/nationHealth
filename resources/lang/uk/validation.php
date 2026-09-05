@@ -17,8 +17,8 @@ return [
 
     'accepted' => 'Ви повинні прийняти :attribute.',
     'activeUrl' => 'Поле :attribute не є правильним URL.',
-    'after' => 'Поле :attribute має містити дату не раніше :date.',
-    'after_or_equal' => 'Поле :attribute має містити дату не раніше або дорівнюватися :date.',
+    'after' => 'Поле :attribute не може містити дату раніше :date.',
+    'after_or_equal' => 'Поле :attribute має містити дату більше або рівну :date.',
     'alpha' => 'Поле :attribute має містити лише літери.',
     'alphaDash' => 'Поле :attribute має містити лише літери, цифри та підкреслення.',
     'alphaNum' => 'Поле :attribute має містити лише літери та цифри.',
@@ -34,6 +34,7 @@ return [
     'boolean' => 'Поле :attribute повинне містити логічний тип.',
     'confirmed' => 'Поле :attribute не збігається з підтвердженням.',
     'date' => 'Поле :attribute не є датою.',
+    'date_equals' => 'Поле :attribute має містити дату :date.',
     'date_format' => 'Поле :attribute не відповідає формату :format.',
     'declined_if' => 'Поле :attribute має бути відхилено, якщо :other є :value.',
     'different' => 'Поля :attribute та :other повинні бути різними.',
@@ -92,6 +93,7 @@ return [
         'string' => 'Текст в полі :attribute повинен містити не менше :min символів.',
         'array' => 'Поле :attribute повинне містити не менше :min елементів.',
     ],
+    'not_in' => 'Вибране для :attribute значення не дозволене.',
     'numeric' => 'Поле :attribute повинно містити число.',
     'phone' => 'Поле має бути дійсним номером телефону з мінімум :min цифрами, без пробілів та крапок, наприклад: +380555555555.',
     'phone.duplicates' => 'Дозволяється лише один телефонний номер типу \':type\'',
@@ -116,7 +118,7 @@ return [
     'string' => 'Поле :attribute повинне містити текст.',
     'timezone' => 'Поле :attribute повинне містити коректну часову зону.',
     'unique' => 'Таке значення поля :attribute вже існує.',
-    'email_already_exists' => 'Користувач з таким e-mail вже існує в системі. Якщо ви бажаєте додати йому нову посаду, будь ласка, скористайтеся функцією "Додати посаду" в профілі співробітника.',
+    'email_already_exists' => 'Користувач з таким e-mail вже існує в системі. Якщо ви бажаєте додати йому нову посаду, будь ласка, скористайтеся функцією "Додати посаду" в профілі працівника.',
     'uploaded' => 'Завантаження поля :attribute не вдалося.',
     'url' => 'Формат поля :attribute неправильний.',
     'uuid' => 'Поле :attribute повинно містити коректний UUID.',
@@ -184,13 +186,16 @@ return [
             'repeated_special' => 'Поле не може містити однакові спеціальні символи поспіль (пробіл, крапка, дефіс, слеш, апостроф).',
         ],
         'person' => [
-            'single_residence_address_required' => 'Має бути рівно одна адреса з типом «Місце проживання».',
-            'ua_residence_address_required' => 'Для пацієнта без іноземного документа адреса проживання має бути в Україні.',
+            'single_residence_address_required' => 'Має бути рівно одна адреса з типом «:type».',
+            'ua_residence_address_required' => 'Для пацієнта без іноземного документа адреса з типом «:type» має бути в Україні.',
+            'settlement_must_be_picked' => 'Оберіть населений пункт зі списку, що з’являється під час введення — інакше адресу не вдасться звірити з реєстром.',
             'document_number_of' => 'серія/номер документа «:document»',
             'search_without_last_name_requires_document_or_tax_id' => 'Щоб шукати без прізвища, вкажіть РНОКПП або тип і номер документа.',
             'confidant_person_required_for_children' => "Довірена особа є обов'язковою для дітей.",
             'confidant_person_required_for_minor' => "Довірена особа є обов'язковою для неповнолітніх пацієнтів.",
             'confidant_person_must_be_capable' => 'Довіреною особою не може бути особа, яка має документ, що підтверджує її дієздатність.',
+            'confidant_prohibited_for_legally_capable_person' => 'Пацієнт має документ, що підтверджує його дієздатність, тому додати йому законного представника неможливо.',
+            'confidant_relationship_already_exists' => "Ця особа вже є чинним законним представником пацієнта. Щоб оновити документи, спершу розірвіть наявний зв'язок.",
             'confidant_auth_method_must_be_third_person' => 'Для пацієнта з довіреною особою можна створити лише метод автентифікації через третю особу.',
             'confidant_must_be_third_person_value' => 'Метод автентифікації через третю особу має вказувати саме на обрану довірену особу.',
             'third_person_limit_exceeded' => 'Цю довірену особу вже призначено в системі понад :limit разів.',
@@ -216,7 +221,8 @@ return [
             'no_tax_id_false_requires_tax_id' => 'Без РНОКПП можуть бути лише особи, які від нього відмовились.',
             'tax_id_requires_no_tax_id_false' => 'Для особи з РНОКПП відмітку про його відсутність має бути знято.',
             'no_tax_id_cannot_be_null' => 'Для цього документа потрібно визначити наявність РНОКПП.',
-            'only_foreign_documents_allowed' => 'Якщо подано документ іноземця, усі документи мають бути лише документами іноземця.',
+            'no_tax_id_must_be_null_for_foreign' => 'Для документа іноземця без РНОКПП відмітку про відсутність РНОКПП не проставляють.',
+            'only_foreign_documents_allowed' => 'Якщо подано документ іноземця, дозволені лише такі документи: :allowed_types. Приберіть: :invalid_types.',
             'issuing_country_required_for_foreign' => 'Вкажіть країну видачі для документа іноземця.',
             'issuing_country_must_be_ua_for_type' => 'Країною видачі має бути Україна для документа «:document_type».',
             'issuing_country_not_ua_for_type' => 'Країною видачі не може бути Україна для документа «:document_type».',
@@ -251,11 +257,14 @@ return [
         'identity_document_required' => 'У розділі «Документи» обов\'язково має бути хоча б один документ, що посвідчує особу (паспорт, ID-картка, посвідка на проживання тощо).',
         'employee' => [
             'passport_national_id_mutual_exclusion' => 'Не можна одночасно вказати «Паспорт» і «Біометричний паспорт громадянина України». Залиште лише один з цих документів.',
+            'document_type_not_allowed' => 'Обраний тип документа недопустимий для працівника. Свідоцтво про народження не використовується в реєстрації працівника — оберіть паспорт, ID-картку або посвідку на проживання.',
         ],
         'document_unique' => 'Дублювання типу документа не дозволено. Вкажіть лише один документ кожного типу.',
         'phone_type_duplicate' => 'Не можна додавати декілька номерів телефону з типом ":type".',
         'phone_number_duplicate' => 'Такий номер телефону вже вказано.',
         'encounter' => [
+            'performer_wrong_legal_entity' => 'Виконавець взаємодії не належить поточному закладу.',
+            'performer_not_current_user' => 'Виконавець взаємодії не є працівником поточного користувача.',
             'priorityCode' => [
                 'required_if' => "Пріоритет є обов'язковим для класу взаємодії 'Стаціонарна медична допомога'"
             ],
@@ -275,37 +284,92 @@ return [
             ],
             'classCode' => [
                 'episode_type_forbidden' => 'Клас взаємодії :value заборонений для типу вашого епізоду',
-                'legal_entity_forbidden' => 'Клас взаємодії :value заборонений для типу вашого медичного закладу'
+                'legal_entity_forbidden' => 'Клас взаємодії :value заборонений для типу вашого медичного закладу',
+                'no_writer_employee' => 'Ви не можете створювати взаємодії: у вас немає діючого запису працівника в цьому закладі'
             ],
             'typeCode' => [
-                'class_forbidden' => 'Тип взаємодії :value заборонений для вашого класу взаємодії'
+                'class_forbidden' => 'Тип взаємодії :value заборонений для вашого класу взаємодії',
+                'employee_forbidden' => 'Тип взаємодії :value заборонений для вашої ролі'
             ],
             'participant' => [
-                'concilium_min' => 'Для типу взаємодії «Консиліум» потрібно щонайменше двох учасників'
+                'concilium_min' => 'Для типу взаємодії «Консиліум» потрібно щонайменше двох учасників',
+                'employee_not_found' => 'Працівника з таким ідентифікатором не знайдено.',
+                'employee_wrong_legal_entity' => 'Працівник :employee не належить вашому закладу.',
+                'employee_invalid_status' => 'Невалідний статус працівника.',
+                'employee_invalid_type' => 'Невалідний тип працівника.',
+                'employee_type_forbidden_for_encounter' => 'Тип працівника :type не дозволений як учасник для обраного типу взаємодії.',
+                'unique' => 'Кожен учасник взаємодії має бути унікальним.',
             ],
             'actionReferences' => [
                 'required_activity' => 'Потрібно додати щонайменше одну послугу, діагностичний звіт або процедуру',
+                'action_required' => 'Додайте принаймні одну дію: діагностичний звіт, процедуру або направлення (дію) до взаємодії. Без цього eHealth відхилить взаємодію під час обробки (помилка "action_references").',
                 'prohibited_concilium' => 'Для типу взаємодії «Консиліум» послуги не передаються',
+                'prohibited_phc' => 'Для первинної медичної допомоги послуги не передаються',
+                'service_not_found' => 'Вибраної послуги немає в довіднику послуг',
                 'invalid_amb_category' => 'Для амбулаторної взаємодії послуга має належати до категорії «консультування»'
             ],
             'observations' => [
                 'patient_identity_required' => 'Для альтернативної ідентифікації обов’язкові спостереження з кодами: :codes',
-                'patient_identity_not_allowed' => 'Для альтернативної ідентифікації неприпустимі спостереження з кодами: :codes'
-            ]
+                'patient_identity_not_allowed' => 'Для альтернативної ідентифікації неприпустимі спостереження з кодами: :codes',
+                'performer_unique' => 'Кожен виконавець обстеження має бути унікальним.',
+                'performer_required' => 'Для обстеження потрібно вказати щонайменше одного виконавця.',
+                'performer_invalid_type' => 'Недопустимий тип виконавця обстеження.',
+            ],
+            'procedures' => [
+                'performer_required' => 'Для процедури потрібно вказати щонайменше одного виконавця.',
+                'performer_invalid_type' => 'Недопустимий тип виконавця процедури.',
+                'performer_unique' => 'Кожен виконавець процедури має бути унікальним.',
+                'performer_employee_not_found' => 'Працівника, вказаного як виконавця процедури, не знайдено.',
+                'performer_wrong_legal_entity' => 'Працівник :employee не належить вашому закладу.',
+                'performer_invalid_status' => 'Невалідний статус працівника.',
+                'performer_employee_invalid_type' => 'Тип працівника не дозволений як виконавець процедури.',
+                'performer_not_participant' => 'Виконавець процедури має бути учасником взаємодії.',
+            ],
         ],
         'diagnosticReport' => [
             'categoryCode' => [
                 'laborant_category' => 'Лаборант може створювати діагностичний звіт лише з категорією "Лабораторна процедура".',
             ],
+            'performer' => [
+                'employee_not_found' => 'Працівника з таким ідентифікатором не знайдено.',
+                'employee_wrong_legal_entity' => 'Працівник :employee не належить вашому закладу.',
+                'employee_invalid_status' => 'Невалідний статус працівника.',
+                'employee_invalid_type' => 'Невалідний тип працівника.',
+                'required' => 'Для діагностичного звіту потрібно вказати щонайменше одного виконавця.',
+                'invalid_type' => 'Недопустимий тип виконавця діагностичного звіту.',
+                'unique' => 'Кожен виконавець діагностичного звіту має бути унікальним.',
+                'employee_not_participant' => 'Виконавець діагностичного звіту має бути учасником взаємодії.',
+            ],
+        ],
+        'immunizations' => [
+            'not_given_by_patient' => 'Зі слів пацієнта можна вносити лише проведену вакцинацію'
         ],
         'conditions' => [
             'codeSystem' => [
                 'class_forbidden' => "Для класу взаємодії 'Амбулаторна медична допомога' та 'Стаціонарна медична допомога' дозволена лише система eHealth/ICD10_AM/condition_codes"
             ],
+            'verificationStatus' => [
+                'not_in' => 'Діагноз, який додано до взаємодії, не може бути позначений внесеним помилково'
+            ],
             'psychiatry_evidence_required' => 'Для коду діагнозу :code необхідно вказати стан як доказ',
             'psychiatry_evidence_code_forbidden' => 'Стан не може бути використаний як доказ для коду діагнозу :code',
-            'employee_type_code_forbidden' => 'Цей код діагнозу недоступний для вашого типу співробітника',
-            'speciality_condition_code_forbidden' => 'Спеціальність встановлювача діагнозу не дозволяє використовувати код :code'
+            'employee_type_code_forbidden' => 'Встановлювач діагнозу не має необхідного типу працівника для встановлення коду :code.',
+            'speciality_condition_code_forbidden' => 'Встановлювач діагнозу не має необхідної спеціальності для встановлення коду :code.',
+            'asserter_employee_not_found' => 'Працівника, вказаного як встановлювача діагнозу, не знайдено.',
+            'asserter_employee_invalid_type' => 'Тип працівника не дозволений як встановлювач діагнозу.',
+            'asserter_employee_not_participant' => 'Працівник, вказаний як встановлювач діагнозу, має бути учасником взаємодії.'
+        ],
+        'form.documents' => [
+            'min' => 'Необхідно додати хоча б один документ, що посвідчує особу.',
+        ],
+        'form.doctor.educations' => [
+            'min' => 'Для ролі лікаря необхідно заповнити розділ "Освіта".',
+        ],
+        'form.doctor.specialities' => [
+            'min' => 'Для ролі лікаря необхідно заповнити розділ "Спеціальності".',
+        ],
+        'form.party.email' => [
+            'unique' => 'Користувач з такою поштою вже зареєстрований у цій мед. організації.',
         ],
     ],
 
@@ -315,9 +379,10 @@ return [
             'birth_date_value' => 'Дата народження має бути пізніше 1900-01-01',
         ],
         'owner_date_mismatch' => 'Вказана дата народження не співпадає з наявною датою для цього користувача',
-        'owner_passport_mandatory_no_tax_id' => 'Потрібно обов\'язково вказати паспорт або національний ID, якщо відсутній ІПН',
-        'wrong_tax_id' => 'Для даного співробітника має бути вказаний його ІПН',
-        'missed_tax_if' => 'Для даного співробітника не вказаний його ІПН'
+        'owner_passport_mandatory_no_tax_id' => 'Потрібно вказати паспорт, ID-картку, посвідчення біженця або посвідку на постійне проживання, якщо відсутній РНОКПП',
+        'wrong_tax_id' => 'РНОКПП не збігається з уже збереженим для цієї електронної пошти. Якщо це той самий працівник, додайте йому посаду. Якщо нова особа — вкажіть її власні email і РНОКПП.',
+        'tax_id_already_used' => 'Працівник з таким РНОКПП уже є в цьому закладі. Відкрийте його картку та додайте посаду замість створення нового запису.',
+        'missed_tax_if' => 'Для даного працівника не вказаний його ІПН'
     ],
 
     /*
@@ -335,14 +400,18 @@ return [
         'name' => 'ім\'я',
         'language' => 'мова',
         'phone' => 'телефон',
+        'statusReason' => 'причина',
         'reasonContext.reason' => 'причина створення неідентифікованого пацієнта',
         'reasonContext.ambulanceCardNumber' => '№ картки виїзду швидкої медичної допомоги',
         'reasonContext.policeReportId' => 'ідентифікатор заяви в поліцію',
         'reasonContext.policeReportDate' => 'дата подання заяви в поліцію',
         'reasonContext.childBirthTime' => 'час народження дитини',
         'reasonContext.otherReason' => 'причини та обставини звернення пацієнта',
+        'episode_period_start' => 'дата відкриття епізоду',
         'issued' => 'час внесення',
         'effective_period_start' => 'час початку прийому',
+        'encounter_period_start' => 'час початку взаємодії',
+        'encounter_period_end' => 'час завершення взаємодії',
         'performed_period_start' => 'час початку процедури',
         'password' => 'пароль',
         'keyContainerUpload' => 'контейнер ключа',
@@ -391,10 +460,6 @@ return [
         'documents.*.number' => __('forms.document_number'),
         'documents.*.issuedBy' => __('forms.document_issued_by'),
         'documents.*.issuedAt' => __('forms.document_issued_at'),
-        'form.documents.min' => 'Необхідно додати хоча б один документ, що посвідчує особу.',
-        'form.doctor.educations.min' => 'Для ролі лікаря необхідно заповнити розділ "Освіта".',
-        'form.doctor.specialities.min' => 'Для ролі лікаря необхідно заповнити розділ "Спеціальності".',
-        'form.party.email.unique' => 'Користувач з такою поштою вже зареєстрований у цій мед. організації.',
         'form.documents' => __('forms.documents'),
         'form.phoneNumber' => __('forms.phone_number'),
         'form.doctor.educations' => __('forms.education'),
@@ -424,7 +489,17 @@ return [
 
         'firstName' => "ім'я",
         'lastName' => 'прізвище',
+        'secondName' => 'по батькові',
+        'noLastName' => 'прізвище відсутнє',
         'birthDate' => 'дата народження',
+        'deathDate' => 'дата смерті',
+        'taxId' => 'РНОКПП',
+        'phoneNumber' => 'номер телефону',
+        'documentType' => 'тип документа',
+        'documentNumber' => 'серія/номер документа',
+        'code' => 'код підтвердження',
+        'processDisclosureDataConsent' => 'згода на обробку персональних даних',
+        'patientSigned' => "ознайомлення пацієнта з пам'яткою",
 
         'person' => [
             'firstName' => "ім'я",
@@ -451,6 +526,15 @@ return [
                 'secondName' => 'по батькові'
             ]
         ],
+        'person.preferredWayCommunication' => "бажаний спосіб зв'язку",
+
+        'person.names' => 'ПІБ пацієнта',
+        'person.names.*.language' => 'мова',
+        'person.names.*.noLastName' => 'прізвище відсутнє',
+        'person.names.*.lastName' => 'прізвище',
+        'person.names.*.firstName' => "ім'я",
+        'person.names.*.secondName' => 'по батькові',
+
         'person.documents' => 'документ, що засвідчує особу',
         'person.documents.*.issuedAt' => 'дата видачі документа',
         'person.documents.*.type' => 'тип документа',
@@ -463,19 +547,34 @@ return [
         'person.emergencyContact.phones.*.type' => 'тип телефону',
         'person.emergencyContact.phones.*.number' => 'номер телефону',
         'person.authenticationMethods' => 'методи автентифікації',
-        'person.authenticationMethods.*' => [
-            'type' => 'метод автентифікації',
-            'phoneNumber' => 'номер телефону',
-            'value' => 'законний представник пацієнта',
-            'alias' => 'роль'
-        ],
+        'person.authenticationMethods.*.type' => 'метод автентифікації',
+        'person.authenticationMethods.*.phoneNumber' => 'номер телефону',
+        'person.authenticationMethods.*.value' => 'законний представник пацієнта',
+        'person.authenticationMethods.*.alias' => 'роль',
 
+        'authenticationMethod.phoneNumber' => 'номер телефону',
+        'authenticationMethod.value' => 'законний представник пацієнта',
+        'authenticationMethod.alias' => 'роль',
+        'authenticationMethod.uuid' => 'метод автентифікації',
+
+        'person.confidantPerson' => 'законний представник',
+        'person.confidantPerson.personId' => 'законний представник',
         'person.confidantPerson.documentsRelationship' => 'документи, що підтверджують законність представництва',
         'person.confidantPerson.documentsRelationship.*.type' => 'тип документа',
         'person.confidantPerson.documentsRelationship.*.number' => 'серія/номер документа',
         'person.confidantPerson.documentsRelationship.*.issuedBy' => 'орган яким виданий документ',
         'person.confidantPerson.documentsRelationship.*.issuedAt' => 'дата видачі документа',
         'person.confidantPerson.documentsRelationship.*.activeTo' => 'дійсний до',
+
+        'confidantPersonId' => 'законний представник',
+        'confidantPersonRelationUuid' => 'законний представник',
+        'documentsRelationship' => 'документи, що підтверджують законність представництва',
+        'documentsRelationship.*.type' => 'тип документа',
+        'documentsRelationship.*.number' => 'серія/номер документа',
+        'documentsRelationship.*.issuedBy' => 'орган яким виданий документ',
+        'documentsRelationship.*.issuedAt' => 'дата видачі документа',
+        'documentsRelationship.*.activeTo' => 'дійсний до',
+        'documents' => 'документи',
 
         'authenticationMethod.type' => 'тип автентифікації',
 
@@ -577,7 +676,7 @@ return [
         'employeeRole' => [
             'constraint' => [
                 'specialityMismatch' => 'Спеціалізація працівника не відповідає типу медичної послуги',
-                'duplicateActiveRole' => 'Для цього співробітника і медичної послуги вже існує активна роль'
+                'duplicateActiveRole' => 'Для цього працівника і медичної послуги вже існує активна роль'
             ]
         ],
 
@@ -721,6 +820,7 @@ return [
             '*.routeCode' => 'шлях введення вакцини',
             '*.doseQuantityValue' => 'кількість введеної вакцини',
             '*.doseQuantityCode' => 'одиниця виміру вакцини',
+            '*.doseQuantityUnit' => 'назва одиниці виміру вакцини',
             '*.vaccinationProtocols' => 'протоколи імунізації',
             '*.vaccinationProtocols.*.authorityCode' => 'автор протоколу імунізації',
             '*.vaccinationProtocols.*.doseSequence' => 'порядковий номер дози імунізації',
@@ -757,6 +857,8 @@ return [
             'valueQuantity.value' => 'значення обстеження',
             'valueQuantityValue' => 'значення обстеження',
             'valueQuantityUnit' => 'одиниця виміру значення',
+            'valueQuantitySystem' => 'словник одиниці виміру значення',
+            'valueQuantityCode' => 'код одиниці виміру значення',
             'valueCodeableConcept' => 'значення обстеження',
             'valueString' => 'значення обстеження',
             'valueBoolean' => 'значення обстеження',
@@ -828,6 +930,9 @@ return [
             'conclusionCode' => 'код заключення за МКХ-10АМ діагностичного звіту',
             'conclusion' => 'заключення діагностичного звіту',
             'divisionId' => 'місце надання послуг діагностичного звіту',
+            'basedOnIdentifier' => 'номер електронного направлення',
+            'performerEmployeeIds' => 'виконавці діагностичного звіту',
+            'performerEmployeeIds.*' => 'виконавець діагностичного звіту',
             'resultsInterpreterEmployeeId' => 'лікар, що інтерпретував результати діагностичного звіту',
             'issuedDate' => 'дата внесення діагностичного звіту',
             'issuedTime' => 'час внесення діагностичного звіту',
@@ -852,6 +957,9 @@ return [
             'conclusionCode' => 'код заключення (за МКХ-10АМ) діагностичного звіту',
             'conclusion' => 'заключення діагностичного звіту',
             'divisionId' => 'місце надання послуг діагностичного звіту',
+            'basedOnIdentifier' => 'номер електронного направлення',
+            'performerEmployeeIds' => 'виконавці діагностичного звіту',
+            'performerEmployeeIds.*' => 'виконавець діагностичного звіту',
             'resultsInterpreterEmployeeId' => 'лікар, що інтерпретував результати діагностичного звіту',
             'issuedDate' => 'дата внесення діагностичного звіту',
             'issuedTime' => 'час внесення діагностичного звіту',
@@ -861,10 +969,15 @@ return [
             'effectivePeriodEndTime' => 'час завершення прийому діагностичного звіту'
         ],
 
+        'procedure' => [
+            'performerEmployeeId' => 'виконавець процедури',
+        ],
+
         'procedures.*' => [
             'categoryCode' => 'категорія',
             'codeValue' => 'послуги',
             'primarySource' => 'джерело інформації',
+            'performerEmployeeId' => 'виконавець процедури',
             'reportOriginCode' => 'джерело',
             'reportOriginText' => 'текст джерела',
             'divisionId' => 'місце надання послуг',
@@ -883,26 +996,15 @@ return [
             'usedCodes.*.code' => 'допоміжні засоби реабілітації'
         ],
 
-        'clinicalImpressions.*' => [
-            'codeCode' => 'код клінічної оцінки',
-            'description' => 'заключення клінічної оцінки',
-            'effectivePeriodStartDate' => 'дата початку клінічної оцінки',
-            'effectivePeriodStartTime' => 'час початку клінічної оцінки',
-            'effectivePeriodEndDate' => 'дата завершення клінічної оцінки',
-            'effectivePeriodEndTime' => 'час завершення клінічної оцінки',
-            'note' => 'опис клінічної оцінки',
-            'supportingInfo.*.uuid' => 'допоміжна медична інформація',
-        ],
-
         // Declaration
         'authorizeWith' => 'метод автентифікації',
         'employeeId' => 'ПІБ лікаря',
 
         // Equipment
-        'names.*.name' => 'назва медичного обладнання',
+        'names.*.name' => 'назва медичного виробу',
         'names.*.type' => 'тип назви',
         'serialNumber' => 'серійний №',
-        'recorder' => 'співробітник, що вносить дані',
+        'recorder' => 'працівник, що вносить дані',
         'inventoryNumber' => 'інвентарний №',
         'manufacturer' => 'виробник',
         'manufactureDate' => 'дата виробництва',

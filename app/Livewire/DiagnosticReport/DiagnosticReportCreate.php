@@ -22,13 +22,13 @@ class DiagnosticReportCreate extends DiagnosticReportComponent
     public function save(array $diagnosticReportData): void
     {
         if (Auth::user()->cannot('create', DiagnosticReport::class)) {
-            Session::flash('error', __('patients.policy.create_diagnostic_report'));
+            Session::flash('error', __('diagnostic-reports.policy.create'));
 
             return;
         }
 
         if (!Auth::user()->getDiagnosticReportWriterEmployee()) {
-            Session::flash('error', __('patients.messages.diagnostic_report_writer_employee_not_found'));
+            Session::flash('error', __('diagnostic-reports.messages.writer_employee_not_found'));
 
             return;
         }
@@ -44,7 +44,7 @@ class DiagnosticReportCreate extends DiagnosticReportComponent
     public function sign(): void
     {
         if (Auth::user()->cannot('create', DiagnosticReport::class)) {
-            Session::flash('error', __('patients.policy.create_diagnostic_report'));
+            Session::flash('error', __('diagnostic-reports.policy.create'));
 
             return;
         }

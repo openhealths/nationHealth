@@ -24,13 +24,13 @@ enum RequestStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::DRAFT => __('patients.status.draft'),
-            self::NEW => __('patients.status.new'),
-            self::APPROVED => __('patients.status.approved'),
-            self::SIGNED => __('patients.status.signed'),
-            self::CANCELLED => __('patients.status.cancelled'),
-            self::EXPIRED => __('patients.status.expired'),
-            self::REJECTED => __('patients.status.rejected')
+            self::DRAFT => __('declarations.request_status.draft'),
+            self::NEW => __('declarations.request_status.new'),
+            self::APPROVED => __('declarations.request_status.approved'),
+            self::SIGNED => __('declarations.request_status.signed'),
+            self::CANCELLED => __('declarations.request_status.cancelled'),
+            self::EXPIRED => __('declarations.request_status.expired'),
+            self::REJECTED => __('declarations.request_status.rejected')
         };
     }
 

@@ -3,14 +3,14 @@
 <div x-data="{ reason: $wire.entangle('form.reasonContext.reason') }">
     <livewire:components.x-message :key="time()" />
 
-    <div>
-        @include('livewire.preperson.parts.preperson-reason')
-        @include('livewire.preperson.parts.preperson-personal-data')
-        @include('livewire.preperson.parts.emergency-contact')
-    </div>
-
     @can('create', Preperson::class)
-        <div class="flex flex-wrap gap-4 items-center">
+        <div>
+            @include('livewire.preperson.parts.preperson-reason')
+            @include('livewire.preperson.parts.preperson-personal-data')
+            @include('livewire.preperson.parts.emergency-contact')
+        </div>
+
+        <div class="flex flex-wrap items-center gap-4">
             <button
                 type="submit"
                 wire:click.prevent="createLocally"
@@ -19,9 +19,7 @@
                 @icon('archive', 'w-4 h-4')
                 {{ __('forms.save') }}
             </button>
-            <button type="button" wire:click.prevent="create" class="button-primary">
-                {{ __('forms.create') }}
-            </button>
+            <button type="button" wire:click.prevent="create" class="button-primary">{{ __('forms.create') }}</button>
         </div>
     @endcan
 

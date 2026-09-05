@@ -2,37 +2,40 @@
 @use('App\Enums\Person\AuthStep')
 @use('App\Livewire\Person\Records\PatientData')
 
-<div x-data="{
+<div
+    x-data="{
         showAuthMethodModal: $wire.entangle('showAuthMethodModal'),
         authenticationMethods: $wire.entangle('authenticationMethods'),
         selectedMethod: $wire.entangle('form.authorizeWith'),
-        localStep: $wire.entangle('authStep')
+        localStep: $wire.entangle('authStep'),
     }"
 >
     <template x-teleport="body">
         <div
             x-show="showAuthMethodModal"
             style="display: none"
-            @keydown.escape.prevent.stop="showAuthMethodModal = false;"
+            @keydown.escape.prevent.stop="showAuthMethodModal = false"
             role="dialog"
             aria-modal="true"
             class="modal"
         >
             <div x-transition.opacity class="fixed inset-0 bg-black/30"></div>
-            <div x-transition @click="showAuthMethodModal = false;" class="modal-wrapper">
+            <div x-transition @click="showAuthMethodModal = false" class="modal-wrapper">
                 <div
                     @click.stop
                     x-trap.noscroll.inert="showAuthMethodModal"
-                    class="modal-content w-full max-w-4xl mx-auto"
+                    class="modal-content mx-auto w-full max-w-4xl"
                 >
                     <div x-show="localStep === {{ AuthStep::INITIAL }}" wire:key="auth-step-0">
-                        <div class="flex items-center justify-between mb-8">
+                        <div class="mb-8 flex items-center justify-between">
                             <legend class="legend !mb-0">{{ __('patients.authentication_methods') }}</legend>
 
                             <div x-data="{ openAdd: false }" class="relative">
-                                <button @click="openAdd = !openAdd" type="button" class="item-add">
-                                    <span>{{ __('patients.add_authentication_method') }}</span>
-                                </button>
+                                @if ($this->canAddSelfAuthenticationMethod() || $this->canAddThirdPersonAuthenticationMethod())
+                                    <button @click="openAdd = ! openAdd" type="button" class="item-add">
+                                        <span>{{ __('patients.add_authentication_method') }}</span>
+                                    </button>
+                                @endif
 
                                 <button type="button" class="button-sync" wire:click.prevent="syncAuthMethods">
                                     <span>{{ __('patients.sync_auth_methods') }}</span>
@@ -45,49 +48,48 @@
                                     x-transition:enter-start="opacity-0 scale-95"
                                     x-transition:enter-end="opacity-100 scale-100"
                                     style="display: none"
-                                    class="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-xl z-50 p-1 border border-gray-100"
+                                    class="absolute right-0 z-50 mt-2 w-72 rounded-lg border border-gray-100 bg-white p-1 shadow-xl"
                                 >
-                                    <template
-                                        x-if="!(authenticationMethods ?? []).some(existingMethod => existingMethod.type === '{{ AuthenticationMethod::THIRD_PERSON->value }}')"
-                                    >
+                                    @if ($this->canAddSelfAuthenticationMethod())
                                         <button
                                             type="button"
                                             @click="localStep = {{ AuthStep::ADD_NEW_BY_SMS }}; openAdd = false"
-                                            class="cursor-pointer w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded text-gray-700 transition-colors"
+                                            class="w-full cursor-pointer rounded px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
                                         >
                                             {{ __('patients.authentication_SMS') }}
                                         </button>
-                                    </template>
 
-                                    <template
-                                        x-if="!(authenticationMethods ?? []).some(existingMethod => ['{{ AuthenticationMethod::OTP->value }}', '{{ AuthenticationMethod::OFFLINE->value }}', '{{ AuthenticationMethod::THIRD_PERSON->value }}'].includes(existingMethod.type))"
-                                    >
                                         <button
                                             type="button"
                                             wire:click.prevent="createOfflineAuthMethod"
                                             @click="openAdd = false"
-                                            class="cursor-pointer w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded text-gray-700 transition-colors"
+                                            class="w-full cursor-pointer rounded px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
                                         >
                                             {{ __('patients.authentication_documents') }}
                                         </button>
-                                    </template>
-                                    <button
-                                        type="button"
-                                        @click="localStep = {{ AuthStep::ADD_NEW_BY_THIRD_PERSON }}; openAdd = false"
-                                        class="cursor-pointer w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded text-gray-700 transition-colors"
-                                    >
-                                        {{ __('patients.authentication_third_person') }}
-                                    </button>
+                                    @endif
+
+                                    @if ($this->canAddThirdPersonAuthenticationMethod())
+                                        <button
+                                            type="button"
+                                            @click="localStep = {{ AuthStep::ADD_NEW_BY_THIRD_PERSON }}; openAdd = false"
+                                            class="w-full cursor-pointer rounded px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                                        >
+                                            {{ __('patients.authentication_third_person') }}
+                                        </button>
+                                    @endif
                                 </div>
                             </div>
                         </div>
 
-                        <template x-if="!authenticationMethods || authenticationMethods.length === 0">
-                            <div class="bg-red-100 rounded-lg mb-8">
+                        <template x-if="! authenticationMethods || authenticationMethods.length === 0">
+                            <div class="mb-8 rounded-lg bg-red-100">
                                 <div class="p-4">
-                                    <div class="flex items-center gap-2 mb-2">
+                                    <div class="mb-2 flex items-center gap-2">
                                         @icon('alert-circle', 'w-5 h-5 text-red-700')
-                                        <p class="font-semibold text-red-700">{{ __('forms.patient_has_no_auth_methods') }}</p>
+                                        <p class="font-semibold text-red-700">
+                                            {{ __('forms.patient_has_no_auth_methods') }}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -96,7 +98,7 @@
                         <template x-if="authenticationMethods && authenticationMethods.length > 0">
                             <div class="space-y-4">
                                 <template x-for="(method, methodIndex) in authenticationMethods" :key="methodIndex">
-                                    <div class="fieldset border dark:border-white p-3 rounded space-y-3">
+                                    <div class="fieldset space-y-3 rounded border p-3 dark:border-white">
                                         <div class="flex items-start justify-between">
                                             <div
                                                 class="shrink"
@@ -105,7 +107,8 @@
                                                     prefix: '{{ __('forms.authentication') }}'
                                                 }"
                                             >
-                                                <h3 class="text-gray-900 dark:text-white font-bold"
+                                                <h3
+                                                    class="font-bold text-gray-900 dark:text-white"
                                                     x-text="`${prefix} ${labels[method.type] ?? method.type}`"
                                                 ></h3>
                                             </div>
@@ -113,9 +116,9 @@
                                             <div class="flex items-center gap-4">
                                                 <div x-data="{ open: false }" class="relative">
                                                     <button
-                                                        @click="open = !open"
+                                                        @click="open = ! open"
                                                         type="button"
-                                                        class="cursor-pointer text-blue-600 hover:underline text-sm whitespace-nowrap"
+                                                        class="cursor-pointer text-sm whitespace-nowrap text-blue-600 hover:underline"
                                                     >
                                                         {{ __('patients.change') }}
                                                     </button>
@@ -124,27 +127,25 @@
                                                         x-show="open"
                                                         @click.away="open = false"
                                                         style="display: none"
-                                                        class="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl z-50 p-2 border border-gray-100"
+                                                        class="absolute right-0 z-50 mt-2 w-64 rounded-lg border border-gray-100 bg-white p-2 shadow-xl"
                                                     >
-                                                        <template
-                                                            x-if="method.type === '{{ AuthenticationMethod::OTP->value }}'">
+                                                        <template x-if="method.type === '{{ AuthenticationMethod::OTP->value }}'">
                                                             <button
                                                                 type="button"
                                                                 @click="open = false"
                                                                 wire:click.prevent="selectAuthMethod(method.uuid, method.type, {{ AuthStep::CHANGE_PHONE_INITIAL }})"
-                                                                class="cursor-pointer w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded text-gray-700"
+                                                                class="w-full cursor-pointer rounded px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
                                                             >
                                                                 {{ __('patients.change_phone_number') }}
                                                             </button>
                                                         </template>
 
-                                                        <template
-                                                            x-if="method.type === '{{ AuthenticationMethod::OFFLINE->value }}'">
+                                                        <template x-if="method.type === '{{ AuthenticationMethod::OFFLINE->value }}'">
                                                             <button
                                                                 type="button"
                                                                 @click="open = false"
                                                                 wire:click.prevent="selectAuthMethod(method.uuid, method.type, {{ AuthStep::CHANGE_PHONE_INITIAL }})"
-                                                                class="cursor-pointer w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded text-gray-700"
+                                                                class="w-full cursor-pointer rounded px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
                                                             >
                                                                 {{ __('patients.change_method_to_sms') }}
                                                             </button>
@@ -154,18 +155,22 @@
                                                             type="button"
                                                             @click="open = false"
                                                             wire:click.prevent="selectAuthMethod(method.uuid, method.type, {{ AuthStep::CHANGE_ALIAS }})"
-                                                            class="cursor-pointer w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded text-gray-700"
+                                                            class="w-full cursor-pointer rounded px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
                                                         >
                                                             {{ __('patients.change_method_alias') }}
                                                         </button>
 
                                                         <template
-                                                            x-if="method.type === '{{ AuthenticationMethod::THIRD_PERSON->value }}'">
+                                                            x-if="
+                                                                method.type === '{{ AuthenticationMethod::THIRD_PERSON->value }}'
+                                                                    && authenticationMethods.length > 1
+                                                            "
+                                                        >
                                                             <button
                                                                 type="button"
                                                                 @click="open = false"
                                                                 wire:click.prevent="deactivateAuthMethod(method.uuid)"
-                                                                class="cursor-pointer w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded text-gray-700"
+                                                                class="w-full cursor-pointer rounded px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
                                                             >
                                                                 {{ __('patients.deactivate_method') }}
                                                             </button>
@@ -173,9 +178,8 @@
                                                     </div>
                                                 </div>
 
-                                                @unless($this instanceof PatientData)
-                                                    <template
-                                                        x-if="method.type === '{{ AuthenticationMethod::OTP->value }}'">
+                                                @unless ($this instanceof PatientData)
+                                                    <template x-if="method.type === '{{ AuthenticationMethod::OTP->value }}'">
                                                         <button
                                                             class="button-primary whitespace-nowrap"
                                                             @click="selectedMethod = method.id || method.uuid; localStep = {{ AuthStep::ASK_OTP_PERMISSION }}"
@@ -184,11 +188,14 @@
                                                         </button>
                                                     </template>
 
-                                                    <template
-                                                        x-if="method.type !== '{{ AuthenticationMethod::OTP->value }}'">
+                                                    <template x-if="method.type !== '{{ AuthenticationMethod::OTP->value }}'">
                                                         <button
                                                             class="button-primary whitespace-nowrap"
-                                                            wire:click.prevent="update"
+                                                            wire:click.prevent="update(method.uuid)"
+                                                            :disabled="! method.isActive"
+                                                            :class="{
+                                                                'cursor-not-allowed opacity-50': ! method.isActive,
+                                                            }"
                                                         >
                                                             {{ __('forms.select') }}
                                                         </button>
@@ -197,10 +204,10 @@
                                             </div>
                                         </div>
 
-                                        <template
-                                            x-if="method.type !== '{{ AuthenticationMethod::THIRD_PERSON->value}}'">
+                                        <template x-if="method.type !== '{{ AuthenticationMethod::THIRD_PERSON->value }}'">
                                             <div>
-                                                <p class="default-p">{{ __('patients.authentication_method_name') }}:
+                                                <p class="default-p">
+                                                    {{ __('patients.authentication_method_name') }}:
                                                     <span x-text="method.alias || '-'"></span>
                                                 </p>
                                             </div>
@@ -219,13 +226,12 @@
                                                             :value="method.phoneNumber"
                                                             id="phoneNumber"
                                                             readonly
-                                                        >
+                                                        />
                                                     </div>
                                                 </div>
                                             </template>
 
-                                            <template
-                                                x-if="method.type === '{{ AuthenticationMethod::THIRD_PERSON->value }}'">
+                                            <template x-if="method.type === '{{ AuthenticationMethod::THIRD_PERSON->value }}'">
                                                 <div class="space-y-4">
                                                     <div class="form-row-2">
                                                         <div class="form-group">
@@ -239,7 +245,7 @@
                                                                 name="alias"
                                                                 :id="'alias-' + methodIndex"
                                                                 readonly
-                                                            >
+                                                            />
                                                         </div>
 
                                                         <div class="form-group">
@@ -250,35 +256,14 @@
                                                                 <span class="text-red-600"></span>
                                                             </label>
                                                             <input
-                                                                x-data="{
-                                                                    get displayDate() {
-                                                                        // Check both camelCase (after sync) and snake_case (initial load)
-                                                                        const date = method.ehealthEndedAt || method.endedAt ||
-                                                                                   method.ehealth_ended_at || method.ended_at;
-                                                                        if (!date) return '';
-                                                                        // If already in dd.mm.yyyy format, return as-is
-                                                                        if (date.match(/^\d{2}\.\d{2}\.\d{4}$/)) return date;
-                                                                        // Otherwise try to parse and format
-                                                                        try {
-                                                                            const parsed = new Date(date);
-                                                                            return parsed.toLocaleDateString('uk-UA', {
-                                                                                day: '2-digit',
-                                                                                month: '2-digit',
-                                                                                year: 'numeric'
-                                                                            });
-                                                                        } catch (e) {
-                                                                            return date;
-                                                                        }
-                                                                    }
-                                                                }"
-                                                                :value="displayDate"
+                                                                :value="method.ehealthEndedAt"
                                                                 type="text"
                                                                 name="endedAt"
                                                                 :id="'endedAt-' + methodIndex"
                                                                 class="input-modal"
                                                                 autocomplete="off"
                                                                 readonly
-                                                            >
+                                                            />
                                                         </div>
                                                     </div>
 
@@ -297,7 +282,7 @@
                                                                 :id="'confidantPersonFullName-' + methodIndex"
                                                                 name="confidantPersonFullName"
                                                                 readonly
-                                                            >
+                                                            />
                                                         </div>
 
                                                         <div class="form-group">
@@ -313,7 +298,7 @@
                                                                 class="input-modal"
                                                                 autocomplete="off"
                                                                 readonly
-                                                            >
+                                                            />
                                                         </div>
                                                     </div>
 
@@ -329,13 +314,15 @@
                                                                 name="unzr"
                                                                 :id="'unzr-' + methodIndex"
                                                                 readonly
-                                                            >
+                                                            />
                                                         </div>
                                                     </div>
 
                                                     <template
                                                         :key="`${method.uuid}-doc-${index}`"
-                                                        x-for="(document, index) in method.confidantPerson.documentsPerson"
+                                                        x-for="
+                                                            (document, index) in method.confidantPerson.documentsPerson
+                                                        "
                                                     >
                                                         <div class="form-row-2">
                                                             <div
@@ -362,7 +349,7 @@
                                                                     class="input-modal"
                                                                     autocomplete="off"
                                                                     readonly
-                                                                >
+                                                                />
                                                             </div>
 
                                                             <div class="form-group">
@@ -379,7 +366,7 @@
                                                                     name="documentNumber"
                                                                     :id="'documentNumber-' + index"
                                                                     readonly
-                                                                >
+                                                                />
                                                             </div>
                                                         </div>
                                                     </template>
@@ -401,7 +388,7 @@
                                                                 class="input-modal"
                                                                 autocomplete="off"
                                                                 readonly
-                                                            >
+                                                            />
                                                         </div>
                                                     </div>
                                                 </div>
@@ -412,7 +399,7 @@
                             </div>
                         </template>
 
-                        <div class="flex justify-between items-center mt-8">
+                        <div class="mt-8 flex items-center justify-between">
                             <button
                                 type="button"
                                 @click="showAuthMethodModal = false; localStep = {{ AuthStep::INITIAL }}"
@@ -444,10 +431,29 @@
                         ];
                     @endphp
 
-                    @foreach($modalSteps as $step => $view)
-                        <template x-if="localStep === {{ $step }}">
-                            @include($view)
-                        </template>
+                    @php
+                        // These steps list the documents the System returned for the current request. Livewire's
+                        // morph does not reach inside <template>, so their content would stay at whatever the page
+                        // was first rendered with — they are put straight into the modal instead
+                        $stepsFilledFromServer = [
+                            AuthStep::CHANGE_FROM_OFFLINE->value,
+                            AuthStep::UPDATE_ALIAS->value,
+                            AuthStep::ADD_NEW_BY_DOCUMENT->value
+                        ];
+                    @endphp
+
+                    @foreach ($modalSteps as $step => $view)
+                        @if (in_array($step, $stepsFilledFromServer, true))
+                            @if ($authStep->value === $step)
+                                <div x-show="localStep === {{ $step }}" x-cloak>
+                                    @include($view)
+                                </div>
+                            @endif
+                        @else
+                            <template x-if="localStep === {{ $step }}">
+                                @include($view)
+                            </template>
+                        @endif
                     @endforeach
                 </div>
             </div>

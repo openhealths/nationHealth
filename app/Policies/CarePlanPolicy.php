@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\CarePlanStatus;
 use App\Models\CarePlan;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
@@ -19,7 +20,24 @@ class CarePlanPolicy
             return Response::denyWithStatus(404);
         }
 
-        if ((int) $carePlan->legal_entity_id !== (int) legalEntity()->id) {
+        if ((int) $carePlan->legalEntityId !== (int) legalEntity()?->id) {
+            return Response::denyWithStatus(404);
+        }
+
+        return Response::allow();
+    }
+
+    /**
+     * Sign, cancel, complete, or issue requests on an already stored plan.
+     * Distinct from update(): eHealth keeps a signed plan in `new` until the first activity.
+     */
+    public function manage(User $user, CarePlan $carePlan): Response
+    {
+        if ($user->cannot('care_plan:write')) {
+            return Response::denyWithStatus(404);
+        }
+
+        if ((int) $carePlan->legalEntityId !== (int) legalEntity()?->id) {
             return Response::denyWithStatus(404);
         }
 
@@ -47,11 +65,12 @@ class CarePlanPolicy
             return Response::denyWithStatus(404);
         }
 
-        if ((int) $carePlan->legal_entity_id !== (int) legalEntity()->id) {
+        if ((int) $carePlan->legalEntityId !== (int) legalEntity()?->id) {
             return Response::denyWithStatus(404);
         }
 
-        if ($carePlan->status !== 'new') {
+        $status = CarePlanStatus::fromStored($carePlan->status);
+        if (!in_array($status, [CarePlanStatus::DRAFT, CarePlanStatus::PENDING], true)) {
             return Response::denyWithStatus(404);
         }
 

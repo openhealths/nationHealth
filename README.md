@@ -42,6 +42,13 @@ DB_USERNAME=root
 DB_PASSWORD=
 ```
 Database block. We recommend to use PostgreSQL `DB_CONNECTION=pgsql`. MySQL, SQLite, SQL Server, MariaDB are also supported.
+#### Session
+```
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+SESSION_SECURE_COOKIE=false
+```
+`SESSION_SECURE_COOKIE` defaults to `true`, which marks the session cookie as `Secure`, so the browser only sends it back over HTTPS. Local development runs over plain `http://`, where Safari drops such a cookie entirely: every request arrives without a session and the first form submit fails with `419 Page Expired` (CSRF token mismatch). Set it to `false` in your local `.env` — other browsers still accept the cookie today, but nothing guarantees they will keep doing so. Keep it `true` on every HTTPS environment.
 #### eHEALTH
 ```
 EHEALTH_API_URL=https://api-preprod.ehealth.gov.ua

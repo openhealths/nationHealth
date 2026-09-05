@@ -18,7 +18,6 @@ class EmployeeEdit extends AbstractEmployeeFormManager
 {
     #[Locked]
     public ?int $employeeId = null;
-    public bool $showSignatureModal = false;
     public bool $isLockedDueToSignedRequest = false;
 
     public function mount(LegalEntity $legalEntity, Employee $employee): void
@@ -34,21 +33,16 @@ class EmployeeEdit extends AbstractEmployeeFormManager
         $this->employee = $employee;
         $this->employeeId = $employee->id;
 
-        if (is_null($employee->userId)) {
-            session()?->flash('error', 'Користувач має підтвердити вхід');
-            $this->redirectRoute('employee.index', ['legalEntity' => legalEntity()->id]);
-
-            return;
-        }
-
         // Check if the Party of this employee holds the Owner position
         $isOwnerParty = $employee->party->employees()
             ->where('employee_type', \App\Enums\User\Role::OWNER->value)
             ->exists();
 
         $this->isPersonalDataLocked = $isOwnerParty;
-        $this->isPositionDataLocked = true;
+        // Keep division / professional blocks editable; lock only immutable core fields via applyImmutableFieldLocks().
+        $this->isPositionDataLocked = false;
         $this->loadDivisions($legalEntity);
+        $this->applyImmutableFieldLocks();
 
         $positionName = $this->dictionaries['POSITION'][$employee->position] ?? $employee->position;
         $this->pageTitle = __('forms.edit_employee') . ' "' . $positionName . '" - ' . ($employee->party->fullName ?? '');
@@ -77,6 +71,52 @@ class EmployeeEdit extends AbstractEmployeeFormManager
     protected function handleDraftPersistence(): EmployeeRequest
     {
         $preparedData = $this->form->getPreparedData();
+
+        // Backend enforcement: immutable fields per 3.23.1.7
+        if ($this->employee && $this->employee->id) {
+            $preparedData['position'] = $this->employee->position;
+            $preparedData['employee_type'] = $this->employee->employeeType;
+            if ($this->employee->startDate) {
+                $preparedData['start_date'] = toIsoDate($this->employee->startDate);
+            }
+
+            $preparedData['tax_id'] = $this->employee->party->taxId;
+            $preparedData['no_tax_id'] = $this->employee->party->noTaxId;
+            if ($this->employee->party->birthDate) {
+                $preparedData['birth_date'] = toIsoDate($this->employee->party->birthDate);
+            }
+
+            $originalPrimarySpeciality = $this->employee->specialities()
+                ->where('speciality_officio', true)
+                ->first();
+
+            if ($originalPrimarySpeciality) {
+                $submittedSpecialities = $preparedData['doctor']['specialities'] ?? [];
+                $filteredSpecialities = array_filter(
+                    $submittedSpecialities,
+                    fn ($spec) => empty($spec['speciality_officio'])
+                );
+
+                // getPreparedData() already returns snake_case — never reintroduce camelCase keys.
+                $attestationDate = toIsoDate($originalPrimarySpeciality->attestationDate);
+                $validToDate = toIsoDate($originalPrimarySpeciality->validToDate);
+
+                $primarySpecData = array_filter([
+                    'speciality' => $originalPrimarySpeciality->speciality,
+                    'speciality_officio' => true,
+                    'attestation_name' => $originalPrimarySpeciality->attestationName,
+                    'attestation_date' => $attestationDate,
+                    'certificate_number' => $originalPrimarySpeciality->certificateNumber,
+                    'level' => $originalPrimarySpeciality->level,
+                    'qualification_type' => $originalPrimarySpeciality->qualificationType,
+                    'valid_to_date' => $validToDate,
+                ], static fn ($value) => $value !== null && $value !== '');
+
+                $filteredSpecialities[] = $primarySpecData;
+                $preparedData['doctor']['specialities'] = array_values($filteredSpecialities);
+            }
+        }
+
         $nestedDataForRevision = $this->mapRevisionData($preparedData);
         $nestedDataForRevision['employee_uuid'] = $this->employee->uuid;
 

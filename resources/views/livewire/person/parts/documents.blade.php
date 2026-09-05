@@ -1,9 +1,11 @@
 {{-- Component to input values to the table through the Modal, built with Alpine --}}
-<div class="relative"> {{-- This required for table overflow scrolling --}}
-    <fieldset class="fieldset"
-              {{-- Binding documents to Alpine, it will be re-used in the modal.
+<div class="relative">
+    {{-- This required for table overflow scrolling --}}
+    <fieldset
+        class="fieldset"
+        {{-- Binding documents to Alpine, it will be re-used in the modal.
                 Note that it's necessary for modal to work properly --}}
-              x-data="{
+        x-data="{
                   documents: $wire.entangle('form.person.documents'),
                   openModal: false,
                   modalDocument: new Document(),
@@ -12,7 +14,28 @@
                   dictionary: $wire.dictionaries['DOCUMENT_TYPE'],
                   issuingCountryDictionary: $wire.dictionaries['ISSUING_COUNTRY'],
                   uaOnlyTypes: ['{{ implode("', '", config('ehealth.document_types_issuing_country_ua_only') ?? []) }}'],
-                  notUaTypes: ['{{ implode("', '", config('ehealth.document_types_issuing_country_not_ua') ?? []) }}']
+                  notUaTypes: ['{{ implode("', '", config('ehealth.document_types_issuing_country_not_ua') ?? []) }}'],
+                  noSelfRegistrationAge: {{ config('ehealth.no_self_registration_age') }},
+                  fullLegalCapacityAge: {{ config('ehealth.person_full_legal_capacity_age') }},
+                  {{-- Documents proving legal capacity are accepted only for a minor who is old enough to register on their own --}}
+                  get isLegalCapacityAge() {
+                      const [day, month, year] = ($wire.form.person.birthDate ?? '').split('.');
+
+                      if (! day || ! month || year?.length !== 4) {
+                          return false;
+                      }
+
+                      const birthDate = new Date(Number(year), Number(month) - 1, Number(day));
+                      const today = new Date();
+                      const monthDifference = today.getMonth() - birthDate.getMonth();
+                      let age = today.getFullYear() - birthDate.getFullYear();
+
+                      if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
+                          age--;
+                      }
+
+                      return age >= this.noSelfRegistrationAge && age < this.fullLegalCapacityAge;
+                  }
               }"
     >
         <legend class="legend">
@@ -21,75 +44,80 @@
 
         <table class="table-input w-inherit">
             <thead class="thead-input">
-            <tr>
-                <th scope="col" class="th-input">{{ __('forms.type') }}</th>
-                <th scope="col" class="th-input">{{ __('forms.number') }} </th>
-                <th scope="col" class="th-input">{{ __('patients.issuing_country') }}</th>
-                <th scope="col" class="th-input">{{ __('forms.issued_by') }}</th>
-                <th scope="col" class="th-input">{{ __('forms.issued_at') }}</th>
-                <th scope="col" class="th-input">{{ __('forms.valid_until') }}</th>
-                <th scope="col" class="th-input">{{ __('forms.actions') }}</th>
-            </tr>
+                <tr>
+                    <th scope="col" class="th-input">{{ __('forms.type') }}</th>
+                    <th scope="col" class="th-input">{{ __('forms.number') }}</th>
+                    <th scope="col" class="th-input">{{ __('patients.issuing_country') }}</th>
+                    <th scope="col" class="th-input">{{ __('forms.issued_by') }}</th>
+                    <th scope="col" class="th-input">{{ __('forms.issued_at') }}</th>
+                    <th scope="col" class="th-input">{{ __('forms.valid_until') }}</th>
+                    <th scope="col" class="th-input">{{ __('forms.actions') }}</th>
+                </tr>
             </thead>
             <tbody>
-            <template x-for="(document, index) in documents">
-                <tr>
-                    <td class="td-input" x-text="dictionary[document.type]"></td>
-                    <td class="td-input" x-text="document.number"></td>
-                    <td class="td-input" x-text="issuingCountryDictionary[document.issuingCountry]"></td>
-                    <td class="td-input" x-text="document.issuedBy"></td>
-                    <td class="td-input" x-text="document.issuedAt"></td>
-                    <td class="td-input" x-text="document.expirationDate"></td>
-                    <td class="td-input">
-                        {{-- That all that is needed for the dropdown --}}
-                        <div x-data="{
-                                 openDropdown: false,
-                                 toggle() {
-                                     if (this.openDropdown) {
-                                         return this.close();
-                                     }
+                <template x-for="(document, index) in documents">
+                    <tr>
+                        <td class="td-input" x-text="dictionary[document.type]"></td>
+                        <td class="td-input" x-text="document.number"></td>
+                        <td class="td-input" x-text="issuingCountryDictionary[document.issuingCountry]"></td>
+                        <td class="td-input" x-text="document.issuedBy"></td>
+                        <td class="td-input" x-text="document.issuedAt"></td>
+                        <td class="td-input" x-text="document.expirationDate"></td>
+                        <td class="td-input">
+                            {{-- That all that is needed for the dropdown --}}
+                            <div
+                                x-data="{
+                                    openDropdown: false,
+                                    toggle() {
+                                        if (this.openDropdown) {
+                                            return this.close();
+                                        }
 
-                                     this.$refs.button.focus();
+                                        this.$refs.button.focus();
 
-                                     this.openDropdown = true;
-                                 },
-                                 close(focusAfter) {
-                                     if (!this.openDropdown) return;
+                                        this.openDropdown = true;
+                                    },
+                                    close(focusAfter) {
+                                        if (! this.openDropdown) return;
 
-                                     this.openDropdown = false;
+                                        this.openDropdown = false;
 
-                                     focusAfter && focusAfter.focus()
-                                 }
-                             }"
-                             @keydown.escape.prevent.stop="close($refs.button)"
-                             @focusin.window="!$refs.panel.contains($event.target) && close()"
-                             x-id="['dropdown-button']"
-                             class="relative"
-                        >
-                            {{-- Dropdown Button --}}
-                            <button x-ref="button"
+                                        focusAfter && focusAfter.focus();
+                                    },
+                                }"
+                                @keydown.escape.prevent.stop="close($refs.button)"
+                                @focusin.window="! $refs.panel.contains($event.target) && close()"
+                                x-id="['dropdown-button']"
+                                class="relative"
+                            >
+                                {{-- Dropdown Button --}}
+                                <button
+                                    x-ref="button"
                                     @click="toggle()"
                                     :aria-expanded="openDropdown"
                                     :aria-controls="$id('dropdown-button')"
                                     type="button"
                                     class="cursor-pointer"
-                            >
-                                @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-gray-200')
-                            </button>
-
-                            {{-- Dropdown Panel --}}
-                            <div class="absolute" style="left: 50%"> {{-- Center a dropdown panel --}}
-                                <div x-ref="panel"
-                                     x-show="openDropdown"
-                                     x-transition.origin.top.left
-                                     @click.outside="close($refs.button)"
-                                     :id="$id('dropdown-button')"
-                                     x-cloak
-                                     class="dropdown-panel relative"
-                                     style="left: -50%" {{-- Center a dropdown panel --}}
                                 >
+                                    @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-gray-200')
+                                </button>
 
-                                    <button @click.prevent="
+                                {{-- Dropdown Panel --}}
+                                <div class="absolute" style="left: 50%">
+                                    {{-- Center a dropdown panel --}}
+                                    <div
+                                        x-ref="panel"
+                                        x-show="openDropdown"
+                                        x-transition.origin.top.left
+                                        @click.outside="close($refs.button)"
+                                        :id="$id('dropdown-button')"
+                                        x-cloak
+                                        class="dropdown-panel relative"
+                                        style="left: -50%"
+                                        {{-- Center a dropdown panel --}}
+                                    >
+                                        <button
+                                            @click.prevent="
                                                 openModal = true; {{-- Open the modal --}}
                                                 item = index; {{-- Identify the item we are corrently editing --}}
                                                 {{-- Replace the previous document with the current, don't assign object directly (modalDocument = document) to avoid reactiveness --}}
@@ -97,59 +125,69 @@
                                                 newDocument = false; {{-- This document is already created --}}
                                             "
                                             class="dropdown-button"
-                                    >
-                                        {{ __('forms.edit') }}
-                                    </button>
+                                        >
+                                            {{ __('forms.edit') }}
+                                        </button>
 
-                                    <button @click.prevent="documents.splice(index, 1); close($refs.button);"
-                                            class="dropdown-button dropdown-delete">
-                                        {{ __('forms.delete') }}
-                                    </button>
+                                        <button
+                                            @click.prevent="
+                                                documents.splice(index, 1);
+                                                close($refs.button);
+                                            "
+                                            class="dropdown-button dropdown-delete"
+                                        >
+                                            {{ __('forms.delete') }}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </td>
-                </tr>
-            </template>
+                        </td>
+                    </tr>
+                </template>
             </tbody>
         </table>
 
         <div>
             {{-- Button to trigger the modal --}}
-            <button @click.prevent="
+            <button
+                @click.prevent="
                         openModal = true; {{-- Open the Modal --}}
                         newDocument = true; {{-- We are adding a new document --}}
                         modalDocument = new Document(); {{-- Replace the data of the previous document with a new one--}}
                     "
-                    class="item-add my-5"
+                class="item-add my-5"
             >
                 {{ __('forms.add') }}
             </button>
 
             {{-- Modal --}}
-            <template x-teleport="body"> {{-- This moves the modal at the end of the body tag --}}
-                <div x-show="openModal"
-                     x-cloak
-                     @keydown.escape.prevent.stop="openModal = false"
-                     role="dialog"
-                     aria-modal="true"
-                     x-id="['modal-title']"
-                     :aria-labelledby="$id('modal-title')" {{-- This associates the modal with unique ID --}}
-                     class="modal"
+            <template x-teleport="body">
+                {{-- This moves the modal at the end of the body tag --}}
+                <div
+                    x-show="openModal"
+                    x-cloak
+                    @keydown.escape.prevent.stop="openModal = false"
+                    role="dialog"
+                    aria-modal="true"
+                    x-id="['modal-title']"
+                    :aria-labelledby="$id('modal-title')"
+                    {{-- This associates the modal with unique ID --}}
+                    class="modal"
                 >
-
                     {{-- Overlay --}}
                     <div x-show="openModal" x-transition.opacity class="fixed inset-0 bg-black/25"></div>
 
                     {{-- Panel --}}
-                    <div x-show="openModal"
-                         x-transition
-                         @click="openModal = false"
-                         class="relative flex min-h-screen items-center justify-center p-4"
+                    <div
+                        x-show="openModal"
+                        x-transition
+                        @click="openModal = false"
+                        class="relative flex min-h-screen items-center justify-center p-4"
                     >
-                        <div @click.stop
-                             x-trap.noscroll.inert="openModal"
-                             class="modal-content h-fit w-full lg:max-w-7xl"
+                        <div
+                            @click.stop
+                            x-trap.noscroll.inert="openModal"
+                            class="modal-content h-fit w-full lg:max-w-7xl"
                         >
                             {{-- Title --}}
                             <h3 class="modal-header" :id="$id('modal-title')">{{ __('forms.document') }}</h3>
@@ -159,39 +197,61 @@
                                 <div class="form-row-modal">
                                     {{-- Type --}}
                                     <div>
-                                        <label for="documentType" class="label-modal">{{ __('forms.type') }}
+                                        <label for="documentType" class="label-modal"
+                                            >{{ __('forms.type') }}
                                             <span class="text-red-600"> *</span>
                                         </label>
-                                        <select x-model="modalDocument.type"
-                                                @change="modalDocument.issuingCountry = uaOnlyTypes.includes(modalDocument.type) ? 'UA' : ''"
-                                                id="documentType"
-                                                class="input-modal"
-                                                type="text"
-                                                required
+                                        <select
+                                            x-model="modalDocument.type"
+                                            @change="
+                                                modalDocument.issuingCountry = uaOnlyTypes.includes(modalDocument.type)
+                                                    ? 'UA'
+                                                    : ''
+                                            "
+                                            id="documentType"
+                                            class="input-modal"
+                                            type="text"
+                                            required
                                         >
                                             <option selected value="">{{ __('forms.select') }} *</option>
-                                            @foreach($this->dictionaries['DOCUMENT_TYPE'] as $key => $documentType)
+                                            @foreach ($this->documentTypes as $key => $documentType)
                                                 <option value="{{ $key }}">{{ $documentType }}</option>
                                             @endforeach
+                                            <template x-if="isLegalCapacityAge">
+                                                <optgroup label="{{ __('patients.legal_capacity_documents') }}">
+                                                    @foreach ($this->legalCapacityDocumentTypes as $key => $documentType)
+                                                        <option value="{{ $key }}">{{ $documentType }}</option>
+                                                    @endforeach
+                                                </optgroup>
+                                            </template>
                                         </select>
                                     </div>
 
                                     {{-- Country of issue: required for every type except the UA-only ones, which are set to UA automatically.
                                          Types outside both configurations accept any country, UA included --}}
-                                    <div x-show="modalDocument.type && !uaOnlyTypes.includes(modalDocument.type)" x-cloak>
+                                    <div
+                                        x-show="modalDocument.type && ! uaOnlyTypes.includes(modalDocument.type)"
+                                        x-cloak
+                                    >
                                         <label for="documentIssuingCountry" class="label-modal">
                                             {{ __('patients.issuing_country') }}
                                             <span class="text-red-600"> *</span>
                                         </label>
-                                        <select x-model="modalDocument.issuingCountry"
-                                                id="documentIssuingCountry"
-                                                class="input-modal"
+                                        <select
+                                            x-model="modalDocument.issuingCountry"
+                                            id="documentIssuingCountry"
+                                            class="input-modal"
                                         >
                                             <option value="" selected>{{ __('forms.select') }} *</option>
-                                            @foreach($this->dictionaries['ISSUING_COUNTRY'] as $key => $country)
-                                                <option value="{{ $key }}"
-                                                        @if($key === 'UA') :disabled="notUaTypes.includes(modalDocument.type)" @endif
-                                                >{{ $country }}</option>
+                                            @foreach ($this->dictionaries['ISSUING_COUNTRY'] as $key => $country)
+                                                <option
+                                                    value="{{ $key }}"
+                                                    @if ($key === 'UA')
+                                                        :disabled="notUaTypes.includes(modalDocument.type)"
+                                                    @endif
+                                                >
+                                                    {{ $country }}
+                                                </option>
                                             @endforeach
                                         </select>
                                     </div>
@@ -202,14 +262,15 @@
                                             {{ __('forms.document_number') }}
                                             <span class="text-red-600"> *</span>
                                         </label>
-                                        <input x-model="modalDocument.number"
-                                               type="text"
-                                               name="documentNumber"
-                                               id="documentNumber"
-                                               class="input-modal"
-                                               autocomplete="off"
-                                               required
-                                        >
+                                        <input
+                                            x-model="modalDocument.number"
+                                            type="text"
+                                            name="documentNumber"
+                                            id="documentNumber"
+                                            class="input-modal"
+                                            autocomplete="off"
+                                            required
+                                        />
                                     </div>
 
                                     {{-- Authority which issued --}}
@@ -218,13 +279,14 @@
                                             {{ __('forms.issued_by') }}
                                             <span class="text-red-600"> *</span>
                                         </label>
-                                        <input x-model="modalDocument.issuedBy"
-                                               type="text"
-                                               name="documentIssuedBy"
-                                               id="documentIssuedBy"
-                                               class="input-modal"
-                                               autocomplete="off"
-                                        >
+                                        <input
+                                            x-model="modalDocument.issuedBy"
+                                            type="text"
+                                            name="documentIssuedBy"
+                                            id="documentIssuedBy"
+                                            class="input-modal"
+                                            autocomplete="off"
+                                        />
                                     </div>
 
                                     {{-- The date when was issued --}}
@@ -235,14 +297,15 @@
                                             {{ __('forms.document_issued_at') }}
                                             <span class="text-red-600"> *</span>
                                         </label>
-                                        <input x-model="modalDocument.issuedAt"
-                                               datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                                               type="text"
-                                               name="documentIssuedAt"
-                                               id="documentIssuedAt"
-                                               class="input-modal datepicker-input"
-                                               autocomplete="off"
-                                        >
+                                        <input
+                                            x-model="modalDocument.issuedAt"
+                                            datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                                            type="text"
+                                            name="documentIssuedAt"
+                                            id="documentIssuedAt"
+                                            class="input-modal datepicker-input"
+                                            autocomplete="off"
+                                        />
                                     </div>
 
                                     {{-- The date when expired --}}
@@ -253,43 +316,38 @@
                                             {{ __('forms.valid_until') }}
                                             <span class="text-red-600"> *</span>
                                         </label>
-                                        <input x-model="modalDocument.expirationDate"
-                                               datepicker-min-date="{{ now()->format(config('app.date_format')) }}"
-                                               type="text"
-                                               name="documentExpirationDate"
-                                               id="documentExpirationDate"
-                                               class="input-modal datepicker-input"
-                                               autocomplete="off"
-                                        >
+                                        <input
+                                            x-model="modalDocument.expirationDate"
+                                            datepicker-min-date="{{ now()->format(config('app.date_format')) }}"
+                                            type="text"
+                                            name="documentExpirationDate"
+                                            id="documentExpirationDate"
+                                            class="input-modal datepicker-input"
+                                            autocomplete="off"
+                                        />
                                     </div>
                                 </div>
-                                <p class="text-sm text-gray-400 mb-2">
-                                    {{ __('forms.form_required_note') }}
-                                </p>
+                                <p class="mb-2 text-sm text-gray-400">{{ __('forms.form_required_note') }}</p>
                                 {{-- Action buttons --}}
                                 <div class="mt-6 flex justify-between space-x-2">
-                                    <button type="button"
-                                            @click="openModal = false"
-                                            class="button-minor"
-                                    >
+                                    <button type="button" @click="openModal = false" class="button-minor">
                                         {{ __('forms.cancel') }}
                                     </button>
 
-                                    <button class="button-primary"
-                                            @click.prevent="
-                                                newDocument !== false
-                                                    ? documents.push(modalDocument)
-                                                    : documents[item] = modalDocument;
+                                    <button
+                                        class="button-primary"
+                                        @click.prevent="
+                                            newDocument !== false
+                                                ? documents.push(modalDocument)
+                                                : (documents[item] = modalDocument);
 
-                                                openModal = false;
-                                            "
-                                            :disabled="
-                                                !modalDocument.type.trim() ||
-                                                !modalDocument.number.trim() ||
-                                                !modalDocument.issuedBy.trim() ||
-                                                !modalDocument.issuedAt.trim() ||
-                                                (!uaOnlyTypes.includes(modalDocument.type) && !modalDocument.issuingCountry)
-                                            "
+                                            openModal = false;
+                                        "
+                                        :disabled="! modalDocument.type.trim() ||
+                                        ! modalDocument.number.trim() ||
+                                        ! modalDocument.issuedBy.trim() ||
+                                        ! modalDocument.issuedAt.trim() ||
+                                        (! uaOnlyTypes.includes(modalDocument.type) && ! modalDocument.issuingCountry)"
                                     >
                                         {{ __('forms.save') }}
                                     </button>

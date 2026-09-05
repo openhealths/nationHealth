@@ -22,11 +22,11 @@ enum ConditionClinicalStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::ACTIVE => __('patients.status.active'),
-            self::FINISHED => __('patients.status.completed'),
-            self::RECURRENCE => __('patients.status.recurrence'),
-            self::REMISSION => __('patients.status.remission'),
-            self::RESOLVED => __('patients.status.resolved')
+            self::ACTIVE => __('conditions.status.active'),
+            self::FINISHED => __('conditions.status.finished'),
+            self::RECURRENCE => __('conditions.status.recurrence'),
+            self::REMISSION => __('conditions.status.remission'),
+            self::RESOLVED => __('conditions.status.resolved')
         };
     }
 

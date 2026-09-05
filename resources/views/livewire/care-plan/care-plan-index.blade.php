@@ -1,13 +1,14 @@
 @use('App\Livewire\CarePlan\CarePlanIndex')
 
-<section class="section-form">
+<div>
+    <livewire:components.x-message :listen-async="true" :key="time()" />
     <x-header-navigation class="items-start" x-data="{ showFilter: false }">
         <x-slot name="title">
             {{ __('care-plan.care_plans') }}
         </x-slot>
 
         <div class="mt-3 ml-0 flex flex-col sm:flex-row sm:flex-wrap gap-2 self-start">
-            <a href="{{ route('persons.index', legalEntity()) }}" class="button-primary">
+            <a href="{{ route('care-plans.create', legalEntity()) }}" class="button-primary">
                 + {{ __('care-plan.new_care_plan') }}
             </a>
 
@@ -26,7 +27,8 @@
         </div>
     </x-header-navigation>
 
-    <div class="form shift-content">
+    <section class="section-form mt-4">
+        <div class="shift-content py-6 px-4 lg:py-10 w-full max-w-screen-xl">
         {{-- Search and Filters Section --}}
         <div class="w-full mb-6" x-data="{ showAdditionalParams: $wire.entangle('showAdditionalParams') }">
             <div class="mb-4 flex items-center gap-1 font-semibold text-gray-900 dark:text-gray-100">
@@ -65,9 +67,12 @@
                     >
                         <option value="">{{ __('forms.select') }}</option>
                         <option value="draft">{{ __('care-plan.status.draft') }}</option>
+                        <option value="new">{{ __('care-plan.status.new') }}</option>
                         <option value="active">{{ __('care-plan.status.active') }}</option>
+                        <option value="on-hold">{{ __('care-plan.status.on-hold') }}</option>
                         <option value="completed">{{ __('care-plan.status.completed') }}</option>
                         <option value="revoked">{{ __('care-plan.status.revoked') }}</option>
+                        <option value="entered-in-error">{{ __('care-plan.status.entered-in-error') }}</option>
                     </select>
                     <label for="filterStatus" class="label">
                         {{ __('forms.status.label') }}
@@ -210,7 +215,7 @@
                                 {{ $plan->title }}
                             </div>
                             <div class="text-xs text-gray-500 mt-1.5 dark:text-gray-400">
-                                {{ __('care-plan.patient') }}: {{ $plan->person?->last_name }} {{ $plan->person?->first_name }}
+                                {{ __('care-plan.patient') }}: {{ $plan->person?->fullName }}
                             </div>
                         </div>
 
@@ -330,7 +335,7 @@
                             <div class="min-w-0">
                                 <div class="record-inner-label text-[10px] uppercase">{{ __('care-plan.episode_id') }}</div>
                                 <div class="record-inner-id-value">
-                                    {{ $plan->episode_id ?? '-' }}
+                                    {{ $plan->episodeUuid() ?? '-' }}
                                 </div>
                             </div>
                         </div>
@@ -343,4 +348,5 @@
     </div>
 
     <x-forms.loading/>
-</section>
+    </section>
+</div>

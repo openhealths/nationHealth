@@ -12,18 +12,23 @@ use App\Enums\User\Role;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Jobs\EmployeeSync;
+use App\Livewire\Actions\Logout;
 use App\Models\Employee\Employee;
-use App\Models\Employee\EmployeeRequest;
 use App\Models\LegalEntity;
 use App\Models\Role as ModelsRole;
 use App\Models\User;
 use App\Notifications\EmployeeSyncCompleted;
 use App\Notifications\SyncNotification;
 use App\Repositories\Repository;
+use App\Services\Party\PartyVerificationCache;
+use App\Models\Relations\Party;
 use App\Traits\BatchLegalEntityQueries;
+use App\Livewire\Employee\Concerns\DeletesEmployeeRequestDraft;
 use Illuminate\Bus\Batch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Crypt;
@@ -42,6 +47,7 @@ class EmployeeIndex extends EmployeeComponent
 {
     use WithPagination;
     use BatchLegalEntityQueries;
+    use DeletesEmployeeRequestDraft;
 
     protected const string BATCH_NAME = 'EmployeeFullSync';
     protected const string DEPENDENT_BATCH_NAME = 'EmployeeDetailsSync';
@@ -51,8 +57,7 @@ class EmployeeIndex extends EmployeeComponent
     public array $status = [
         Status::APPROVED->value,
         Status::NEW->value,
-        Status::SIGNED->value,
-        Status::REORGANIZED->value
+        Status::REORGANIZED->value,
     ];
     public array $filter = [
         'phone' => '',
@@ -60,6 +65,8 @@ class EmployeeIndex extends EmployeeComponent
         'role' => '',
         'position' => '',
         'division_id' => '',
+        'tax_id' => '',
+        'verification_status' => '',
     ];
 
     // --- State for Modals ---
@@ -67,13 +74,11 @@ class EmployeeIndex extends EmployeeComponent
     public ?int $employeeIdToDeactivate = null;
     public ?string $employeeToDeactivateName = null;
     public bool $isDoctorToDeactivate = false;
+    public string $deactivationEndDate = '';
+    public string $deactivationStatus = 'STOPPED';
 
     public ?int $employeeToDismissId = null;
     public ?string $employeeToDismissName = null;
-
-    public bool $showDeleteModal = false;
-    public ?int $requestToDeleteId = null;
-    public ?string $deleteRequestName = null;
 
     public ?string $batchId = null;
     public string $dismissalMessageType = 'default';
@@ -138,6 +143,8 @@ class EmployeeIndex extends EmployeeComponent
 
     public function mount(LegalEntity $legalEntity): void
     {
+        $this->authorize('viewAny', Employee::class);
+
         $this->legalEntity = $legalEntity;
 
         $this->loadDivisions($legalEntity);
@@ -148,9 +155,33 @@ class EmployeeIndex extends EmployeeComponent
         $this->syncStatus = $this->getSyncStatus();
     }
 
+    public function hydrate(): void
+    {
+        $this->status = array_values(array_unique(array_map(
+            fn (string $status): string => match ($status) {
+                Status::SIGNED->value => Status::NEW->value,
+                Status::DISMISSED->value => Status::STOPPED->value,
+                default => $status,
+            },
+            $this->status,
+        )));
+    }
+
     public function applyFilters(): void
     {
         $this->resetPage();
+    }
+
+    /**
+     * @return array<string, array{verification_status: mixed}>
+     */
+    public function partyVerificationDetails(Party $party): array
+    {
+        if (empty($party->uuid)) {
+            return [];
+        }
+
+        return PartyVerificationCache::get($party->uuid)['details'] ?? [];
     }
 
     /**
@@ -175,36 +206,152 @@ class EmployeeIndex extends EmployeeComponent
      */
     private function applyDatabaseFilters(Builder $query): void
     {
-        // 1. Filter: Ensure Party is linked to this Legal Entity via Employee or Request
-        $query->where(function (Builder $q) {
-            $q->whereHas('employees', function ($sub) {
-                $sub->where('legal_entity_id', $this->legalEntity->id);
-                $this->applyChildFilters($sub);
-            })
-                ->orWhereHas('employeeRequests', function ($sub) {
-                    $sub->where('legal_entity_id', $this->legalEntity->id)
-                        ->whereIn('status', [Status::NEW->value, Status::SIGNED->value]);
-                    $this->applyChildFilters($sub);
-                });
+        // Only parties with real Employee records for this legal entity (requests live on EmployeeRequestIndex).
+        $query->whereHas('employees', function ($sub) {
+            $sub->where('legal_entity_id', $this->legalEntity->id);
+            $this->applyChildFilters($sub);
         });
 
-        // 2. Filter: Search Text (Full Name, Case-Insensitive)
+        // 2. Filter: Search Text (Full Name, Case-Insensitive, Order-Independent)
+        // Each word must match any of last/first/second name — "Іван Петренко" and "Петренко Іван" both work.
         if (!empty($this->search)) {
-            $searchTerm = '%' . $this->search . '%';
-            // PostgreSQL specific: ILIKE is case-insensitive
-            $query->whereRaw("CONCAT(last_name, ' ', first_name, ' ', second_name) ILIKE ?", [$searchTerm]);
+            $words = preg_split('/\s+/u', trim($this->search), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+            foreach ($words as $word) {
+                $searchTerm = '%' . $word . '%';
+                $query->where(function (Builder $q) use ($searchTerm) {
+                    $q->where('last_name', 'ILIKE', $searchTerm)
+                        ->orWhere('first_name', 'ILIKE', $searchTerm)
+                        ->orWhere('second_name', 'ILIKE', $searchTerm);
+                });
+            }
         }
 
-        // 3. Filter: Email (via Users)
+        // 3. Filter: Email (via Users on Party)
         if (!empty($this->filter['email'])) {
-            // ILIKE for emails too
-            $query->whereHas('party.users', fn ($q) => $q->where('email', 'ILIKE', '%' . $this->filter['email'] . '%'));
+            $query->whereHas(
+                'users',
+                fn ($q) => $q->where('email', 'ILIKE', '%' . $this->filter['email'] . '%')
+            );
         }
 
         // 4. Filter: Phone
         if (!empty($this->filter['phone'])) {
             $query->whereHas('phones', fn ($q) => $q->where('number', 'like', '%' . $this->filter['phone'] . '%'));
         }
+
+        // 5–6. tax_id / verification_status — 3.23.3.1.1 (OWNER/HR/ADMIN/PHARMACY_OWNER only)
+        if ($this->canViewPartyVerificationMeta()) {
+            if (!empty($this->filter['tax_id'])) {
+                $query->where('tax_id', 'ILIKE', '%' . trim($this->filter['tax_id']) . '%');
+            }
+
+            if (!empty($this->filter['verification_status'])) {
+                $query->where('verification_status', $this->filter['verification_status']);
+            }
+        }
+    }
+
+    /**
+     * Party tax_id / verification_status in list UI — TZ 3.23.3.1 (elevated roles only).
+     */
+    private function canViewPartyVerificationMeta(): bool
+    {
+        $user = Auth::user();
+
+        return $user instanceof User
+            && $user->hasAllowedRole([Role::ADMIN, Role::HR, Role::OWNER, Role::PHARMACY_OWNER]);
+    }
+
+    /**
+     * Unique labels for the status multi-select (NEW covers SIGNED, STOPPED covers DISMISSED).
+     *
+     * @return array<string, string>
+     */
+    public function statusFilterOptions(): array
+    {
+        return [
+            Status::APPROVED->value => __('forms.status.active'),
+            Status::NEW->value => __('forms.status.new'),
+            Status::STOPPED->value => __('forms.status.stopped'),
+            Status::ENTERED_IN_ERROR->value => __('forms.status.entered_in_error'),
+            Status::REORGANIZED->value => __('forms.reorganized'),
+        ];
+    }
+
+    /**
+     * Expand UI status keys to the values stored on employees / requests.
+     *
+     * @return list<string>
+     */
+    public function statusesForQuery(): array
+    {
+        if ($this->status === []) {
+            return [];
+        }
+
+        $expanded = [];
+        foreach ($this->status as $status) {
+            $expanded = [
+                ...$expanded,
+                ...match ($status) {
+                    Status::NEW->value, Status::SIGNED->value => [Status::NEW->value, Status::SIGNED->value],
+                    Status::STOPPED->value, Status::DISMISSED->value => [Status::STOPPED->value, Status::DISMISSED->value],
+                    default => [$status],
+                },
+            ];
+        }
+
+        return array_values(array_unique(array_diff($expanded, ['VERIFIED', 'NOT_VERIFIED'])));
+    }
+
+    /**
+     * Positions shown for a party after applying list filters (status, role, position, division).
+     * Party-level whereHas only decides which parties appear; this trims rows inside each party card.
+     * EmployeeRequest drafts/pending updates are listed only on EmployeeRequestIndex.
+     *
+     * @return Collection<int, mixed>
+     */
+    public function positionsForParty(Party $party): Collection
+    {
+        $legalEntityId = $this->legalEntity->id;
+        $allowed = $this->statusesForQuery();
+
+        $positions = $party->employees
+            ->where('legal_entity_id', $legalEntityId)
+            ->sortByDesc('updated_at');
+
+        return $positions
+            ->filter(function ($position) use ($allowed) {
+                if ($allowed !== []) {
+                    $status = $position->status instanceof \UnitEnum
+                        ? $position->status->value
+                        : (string) $position->status;
+
+                    if (!in_array($status, $allowed, true)) {
+                        return false;
+                    }
+                }
+
+                if (!empty($this->filter['division_id'])
+                    && (string) $position->division_id !== (string) $this->filter['division_id']
+                ) {
+                    return false;
+                }
+
+                $employeeType = $position->employeeType ?? $position->employee_type ?? null;
+                if (!empty($this->filter['role']) && (string) $employeeType !== (string) $this->filter['role']) {
+                    return false;
+                }
+
+                $positionCode = $position->position ?? null;
+                if (!empty($this->filter['position']) && (string) $positionCode !== (string) $this->filter['position']) {
+                    return false;
+                }
+
+                return true;
+            })
+            ->values();
     }
 
     /**
@@ -212,17 +359,9 @@ class EmployeeIndex extends EmployeeComponent
      */
     private function applyChildFilters(Builder $subQuery): void
     {
-        // Status Filter
-        if (!empty($this->status)) {
-            // Map 'DISMISSED' -> 'STOPPED' for DB query
-            $dbStatuses = array_map(fn ($s) => $s === 'DISMISSED' ? 'STOPPED' : $s, $this->status);
-
-            // Remove non-DB statuses (like 'VERIFIED'/'NOT_VERIFIED' which apply to Party)
-            $dbStatuses = array_diff($dbStatuses, ['VERIFIED', 'NOT_VERIFIED']);
-
-            if (!empty($dbStatuses)) {
-                $subQuery->whereIn('status', $dbStatuses);
-            }
+        $dbStatuses = $this->statusesForQuery();
+        if ($dbStatuses !== []) {
+            $subQuery->whereIn('status', $dbStatuses);
         }
 
         // Division Filter
@@ -246,19 +385,34 @@ class EmployeeIndex extends EmployeeComponent
         $employee = Employee::find($id);
 
         if ($employee) {
+            $this->authorize('deactivate', $employee);
+
             $this->employeeIdToDeactivate = $id;
 
             $this->employeeToDeactivateName = $employee->full_name
                 ?? ($employee->last_name . ' ' . $employee->first_name);
 
-            // Logic to determine if the employee is a doctor
-            // Checks both the property/accessor and the position code
             $type = $employee->employeeType ?? $employee->employee_type ?? '';
 
             $this->isDoctorToDeactivate = ($type === Role::DOCTOR->value);
         }
 
+        $this->deactivationStatus = Status::STOPPED->value;
+        $this->deactivationEndDate = $this->defaultDeactivationEndDate(
+            isset($employee) ? ($employee->startDate ?? '') : ''
+        );
+
         $this->showDeactivateModal = true;
+    }
+
+    public function updatedDeactivationStatus(string $value): void
+    {
+        if ($value === Status::ENTERED_IN_ERROR->value) {
+            $this->deactivationEndDate = '';
+        } elseif ($this->deactivationEndDate === '' && $this->employeeIdToDeactivate) {
+            $employee = Employee::find($this->employeeIdToDeactivate);
+            $this->deactivationEndDate = $this->defaultDeactivationEndDate($employee?->startDate ?? '');
+        }
     }
 
     public function closeModal(): void
@@ -270,16 +424,15 @@ class EmployeeIndex extends EmployeeComponent
     public function resetFilters(): void
     {
         $this->reset(['filter', 'status', 'search']);
-        $this->status = ['APPROVED', 'NEW'];
+        $this->status = [
+            Status::APPROVED->value,
+            Status::NEW->value,
+            Status::REORGANIZED->value,
+        ];
         $this->resetPage();
     }
 
-    public function tryEdit(int $employeeId): void
-    {
-        $this->dispatch('flashMessage', ['message' => 'Користувач має підтвердити вхід', 'type' => 'error']);
-    }
-
-    public function deactivate(): void
+    public function deactivate()
     {
         // 1. Get the employee record from the database
         $employee = Employee::find($this->employeeIdToDeactivate);
@@ -291,53 +444,64 @@ class EmployeeIndex extends EmployeeComponent
             return;
         }
 
-        // eHealth requires: end_date >= start_date.
-        $startDateStr = $employee->start_date; // 'Y-m-d' string from DB
-        $endDateStr = \Illuminate\Support\Carbon::now('Europe/Kyiv')->format('Y-m-d');
+        // eHealth: STOPPED requires end_date (>= start_date, <= today); ENTERED_IN_ERROR omits end_date.
+        $status = in_array($this->deactivationStatus, [Status::STOPPED->value, Status::ENTERED_IN_ERROR->value], true)
+            ? $this->deactivationStatus
+            : Status::STOPPED->value;
 
-        // If 'today' in Kiev is lexicographically earlier than 'start_date', use 'start_date' as the dismissal date
-        if ($startDateStr && $endDateStr < $startDateStr) {
-            $formattedEndDate = $startDateStr;
-        } else {
-            $formattedEndDate = $endDateStr;
+        $formattedEndDate = null;
+
+        if ($status === Status::STOPPED->value) {
+            $today = $this->kyivToday();
+            $startDate = $this->parseFlexibleDate($employee->startDate);
+            $endDate = $this->parseFlexibleDate(trim($this->deactivationEndDate)) ?? $today;
+
+            if ($startDate && $endDate->lt($startDate)) {
+                $this->dispatch('flashMessage', [
+                    'message' => __('employees.deactivation_end_date_before_start'),
+                    'type' => 'error',
+                ]);
+
+                return;
+            }
+
+            if ($endDate->gt($today)) {
+                $this->dispatch('flashMessage', [
+                    'message' => __('employees.deactivation_end_date_in_future'),
+                    'type' => 'error',
+                ]);
+
+                return;
+            }
+
+            $formattedEndDate = $endDate->format('Y-m-d');
         }
 
         try {
-            // 2. eHealth API Call using formatted string
-            $response = EHealth::employee()->deactivate($employee->uuid, $formattedEndDate);
+            $response = EHealth::employee()->deactivate(
+                $employee->uuid,
+                $formattedEndDate,
+                $status
+            );
 
             if (!empty($response)) {
                 // 3. Updates in the local database
                 $employee->update([
-                    'status' => Status::STOPPED->value,
+                    'status' => $status,
                     'end_date' => $formattedEndDate,
+                    'is_active' => false,
                 ]);
 
-                // 4. Safe User Cleanup: Remove a role from a user (if binding exists)
-                // This handles cases where email might be 'N/A' or user doesn't exist locally
-                $party = $employee->party;
-                $partyEmployees = $party->employees->where('legal_entity_id', $this->legalEntity->id);
-                $employeesWithUser = $partyEmployees->filter(fn (Employee $employee) => $employee->user_id !== null);
+                $this->deactivateEmployeeRole($employee);
 
-                $partyUsers = $party->users->whereIn('id', $employeesWithUser->pluck('user_id')); // filter by legal entity id
+                $this->resetDeactivateState();
 
-                // Detach all users from the employee to prevent orphaned relationships
-                $employee->users()->detach();
-
-                // Get all specified guards from section 'guards' from file config/auth.php
-                $guards = array_keys((array) config('auth.guards'));
-
-                // Role from dissmisses employee can attached to multiple users, so we need to loop through all of them
-                foreach ($partyUsers as $user) {
-                    $roleToRemove = $employee->employee_type;
-
-                    foreach ($guards as $guard) {
-                        if ($user->hasRole($roleToRemove, $guard)) {
-                            $user->removeRole(
-                                ModelsRole::findByName($roleToRemove, $guard)
-                            );
-                        }
-                    }
+                $sessionUser = Auth::guard('ehealth')->user() ?? Auth::guard('web')->user();
+                if (
+                    $sessionUser instanceof User
+                    && (int) $employee->partyId === (int) $sessionUser->partyId
+                ) {
+                    return app(Logout::class)(message: __('employees.dismissalSuccess'));
                 }
 
                 $this->dispatch('flashMessage', ['message' => __('employees.dismissalSuccess'), 'type' => 'success']);
@@ -356,7 +520,7 @@ class EmployeeIndex extends EmployeeComponent
 
             $this->dispatch(
                 'flashMessage',
-                ['message' => __('employees.requestError', ['error' => $e->getMessage()]), 'type' => 'error']
+                ['message' => __('employees.requestError', ['error' => $this->translateRequestError($e->getMessage())]), 'type' => 'error']
             );
         }
 
@@ -371,6 +535,8 @@ class EmployeeIndex extends EmployeeComponent
         $this->employeeIdToDeactivate = null;
         $this->employeeToDeactivateName = null;
         $this->isDoctorToDeactivate = false;
+        $this->deactivationEndDate = '';
+        $this->deactivationStatus = Status::STOPPED->value;
     }
 
     /**
@@ -392,11 +558,11 @@ class EmployeeIndex extends EmployeeComponent
         // Try to resume previous sync if it was paused or failed
         if ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value) {
 
-            $this->resumeSynchronization($user, $token);
+            if ($this->resumeSynchronization($user, $token)) {
+                $user->notify(new SyncNotification('employee', 'resumed'));
 
-            $user->notify(new SyncNotification('employee', 'resumed'));
-
-            return;
+                return;
+            }
         }
 
         $user->notify(new SyncNotification('employee', 'started'));
@@ -423,7 +589,7 @@ class EmployeeIndex extends EmployeeComponent
             );
             $this->dispatch(
                 'flashMessage',
-                ['message' => __('employees.requestError', ['error' => $e->getMessage()]), 'type' => 'error']
+                ['message' => __('employees.requestError', ['error' => $this->translateRequestError($e->getMessage())]), 'type' => 'error']
             );
 
             return;
@@ -456,14 +622,9 @@ class EmployeeIndex extends EmployeeComponent
                 ->withOption('legal_entity_id', $this->legalEntity->id)
                 ->withOption('token', Crypt::encryptString($token))
                 ->withOption('user', $user)
-                ->then(function (Batch $batch) use ($user) {
-                    app(PermissionRegistrar::class)->forgetCachedPermissions();
-                    $message = __('employees.sync.completed_successfully', [
-                        'processed' => $batch->processedJobs,
-                        'total' => $batch->totalJobs,
-                    ]);
-                    $user->notify(new EmployeeSyncCompleted($message, 'success'));
-                })->catch(callback: function (Batch $batch, \Throwable $e) use ($user) {
+                ->withOption('sync_entity', LegalEntity::ENTITY_EMPLOYEE)
+                ->then(fn () => app(PermissionRegistrar::class)->forgetCachedPermissions())
+                ->catch(callback: function (Batch $batch, \Throwable $e) use ($user) {
                     $message = __('employees.sync.failed');
                     Log::error('Employee sync batch failed.', ['batch_id' => $batch->id, 'exception' => $e]);
                     $user->notify(new EmployeeSyncCompleted($message, 'error'));
@@ -476,13 +637,8 @@ class EmployeeIndex extends EmployeeComponent
                 ->withOption('legal_entity_id', $this->legalEntity->id)
                 ->withOption('token', Crypt::encryptString($token))
                 ->withOption('user', $user)
-                ->then(function (Batch $batch) use ($user) {
-                    $message = __('employees.sync.completed_successfully', [
-                        'processed' => $batch->processedJobs,
-                        'total' => $batch->totalJobs,
-                    ]);
-                    $user->notify(new EmployeeSyncCompleted($message, 'success'));
-                })->catch(callback: function (Batch $batch, \Throwable $e) use ($user) {
+                ->withOption('sync_entity', LegalEntity::ENTITY_EMPLOYEE)
+                ->catch(callback: function (Batch $batch, \Throwable $e) use ($user) {
                     $message = __('employees.sync.failed');
                     Log::error('Employee sync batch failed.', ['batch_id' => $batch->id, 'exception' => $e]);
                     $user->notify(new EmployeeSyncCompleted($message, 'error'));
@@ -510,7 +666,7 @@ class EmployeeIndex extends EmployeeComponent
      * @param  string  $token  The authentication or session token used to resume the sync process
      * @return void
      */
-    protected function resumeSynchronization(User $user, string $token): void
+    protected function resumeSynchronization(User $user, string $token): bool
     {
         $encryptedToken = Crypt::encryptString($token);
 
@@ -530,9 +686,11 @@ class EmployeeIndex extends EmployeeComponent
                     'type' => 'success'
                 ]);
 
-                break;
+                return true;
             }
         }
+
+        return false;
     }
 
     /**
@@ -544,7 +702,7 @@ class EmployeeIndex extends EmployeeComponent
         $employee = Employee::with(['party'])->find($employeeId);
 
         if (!$employee) {
-            $this->dispatch('flashMessage', ['message' => 'Співробітника не знайдено', 'type' => 'error']);
+            $this->dispatch('flashMessage', ['message' => 'Працівника не знайдено', 'type' => 'error']);
 
             return;
         }
@@ -557,52 +715,142 @@ class EmployeeIndex extends EmployeeComponent
         }
     }
 
-    public function confirmRequestDeletion(int $id): void
+    /**
+     * Revoke the Spatie role of the deactivated employee type for linked users,
+     * unless another APPROVED employee of the same type remains in this legal entity.
+     * Also drops stale direct eHealth scopes so the next login can resync them.
+     */
+    protected function deactivateEmployeeRole(Employee $employee): void
     {
-        $request = EmployeeRequest::with('party')->find($id);
+        $linkedUsers = $this->usersLinkedToEmployee($employee);
 
-        if (!$request) {
+        $employee->users()->detach();
+
+        if ($linkedUsers->isEmpty()) {
             return;
         }
 
-        $this->requestToDeleteId = $id;
-        $this->deleteRequestName = $request->party?->fullName ?? __('employees.modals.delete_draft.default_name');
+        $guards = array_keys((array) config('auth.guards'));
+        $savedGuard = Auth::getDefaultDriver();
+        $employeeType = $employee->employeeType;
 
-        $this->showDeleteModal = true;
+        setPermissionsTeamId($this->legalEntity->id);
+
+        foreach ($linkedUsers as $user) {
+            if (
+                is_string($employeeType)
+                && $employeeType !== ''
+                && !$employee->userHasOtherApprovedOfType((int) $user->id, (int) $this->legalEntity->id)
+            ) {
+                foreach ($guards as $guard) {
+                    Auth::shouldUse($guard);
+
+                    if ($user->hasRole($employeeType, $guard)) {
+                        $user->removeRole(ModelsRole::findByName($employeeType, $guard));
+                    }
+                }
+            }
+
+            // Direct eHealth scopes are synced on login only; drop stale rows after deactivate.
+            $user->syncPermissions([]);
+            $user->unsetRelation('roles')->unsetRelation('permissions');
+        }
+
+        Auth::shouldUse($savedGuard);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
     /**
-     * This method is triggered by the "Delete" button in the modal window.
-     * It retrieves the stored ID and executes the deletion logic.
+     * Users bound to the employee via `user_id` or the `employee_users` pivot.
+     *
+     * @return Collection<int, User>
      */
-    public function deleteRequest(): void
+    protected function usersLinkedToEmployee(Employee $employee): Collection
     {
-        if ($this->requestToDeleteId) {
-            $request = EmployeeRequest::with('revision')->find($this->requestToDeleteId);
+        $users = collect();
 
-            // Make sure the request exists and it's a draft (without UUID)
-            if ($request && !$request->uuid) {
+        if ($employee->userId) {
+            $owner = User::query()->without(['person'])->find($employee->userId);
 
-                // 1. Delete the related revision if it exists
-                if ($request->revision) {
-                    // Since Revision model uses SoftDeletes, standard delete() only hides the record.
-                    // We use forceDelete() to physically remove the draft data from the database.
-                    $request->revision->forceDelete();
-                }
+            if ($owner instanceof User) {
+                $users->push($owner);
+            }
+        }
 
-                // 2. Delete the request itself
-                $request->delete();
+        return $users
+            ->concat($employee->users()->without(['person'])->get())
+            ->unique('id')
+            ->values();
+    }
 
-                $this->dispatch(
-                    'flashMessage',
-                    ['message' => __('employees.draft.delete_success'), 'type' => 'success']
-                );
+    /**
+     * Current calendar date in Europe/Kyiv, start of day.
+     */
+    protected function kyivToday(): Carbon
+    {
+        return Carbon::now('Europe/Kyiv')->startOfDay();
+    }
+
+    /**
+     * Parse a date from app display format, ISO, or Carbon into a Kyiv start-of-day value.
+     */
+    protected function parseFlexibleDate(mixed $value): ?Carbon
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof Carbon) {
+            return $value->copy()->timezone('Europe/Kyiv')->startOfDay();
+        }
+
+        $value = trim((string) $value);
+        $formats = array_unique([config('app.date_format'), 'Y-m-d', 'd.m.Y']);
+
+        foreach ($formats as $format) {
+            if ($format === '') {
+                continue;
             }
 
-            // Close the modal and clear the ID
-            $this->showDeleteModal = false;
-            $this->requestToDeleteId = null;
+            try {
+                $parsed = Carbon::createFromFormat($format, $value, 'Europe/Kyiv');
+
+                if ($parsed !== false) {
+                    return $parsed->startOfDay();
+                }
+            } catch (\Throwable) {
+            }
         }
+
+        try {
+            return Carbon::parse($value, 'Europe/Kyiv')->startOfDay();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Default STOPPED end date: today, or the employee start date when it is in the future.
+     */
+    protected function defaultDeactivationEndDate(mixed $startDateRaw = ''): string
+    {
+        $today = $this->kyivToday();
+        $startDate = $this->parseFlexibleDate($startDateRaw);
+
+        if ($startDate && $today->lt($startDate)) {
+            return $startDate->format((string) config('app.date_format'));
+        }
+
+        return $today->format((string) config('app.date_format'));
+    }
+
+    private function translateRequestError(string $error): string
+    {
+        if (str_contains($error, 'Missing allowances: employee:deactivate')) {
+            return __('employees.errors.missing_allowance_employee_deactivate');
+        }
+
+        return $error;
     }
 
     /**

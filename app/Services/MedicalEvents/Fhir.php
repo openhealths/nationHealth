@@ -6,12 +6,18 @@ namespace App\Services\MedicalEvents;
 
 use App\Services\MedicalEvents\Mappers\ClinicalImpressionMapper;
 use App\Services\MedicalEvents\Mappers\ConditionMapper;
+use App\Services\MedicalEvents\Mappers\DeviceAssociationMapper;
+use App\Services\MedicalEvents\Mappers\DeviceMapper;
+use App\Services\MedicalEvents\Mappers\DeviceRequestMapper;
 use App\Services\MedicalEvents\Mappers\DiagnosticReportMapper;
 use App\Services\MedicalEvents\Mappers\EncounterMapper;
 use App\Services\MedicalEvents\Mappers\EpisodeMapper;
 use App\Services\MedicalEvents\Mappers\ImmunizationMapper;
+use App\Services\MedicalEvents\Mappers\MedicationRequestMapper;
 use App\Services\MedicalEvents\Mappers\ObservationMapper;
 use App\Services\MedicalEvents\Mappers\ProcedureMapper;
+use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
+use App\Services\MedicalEvents\Mappers\DetectedIssueMapper;
 
 final class Fhir
 {
@@ -50,13 +56,48 @@ final class Fhir
         return app(DiagnosticReportMapper::class);
     }
 
+    public static function device(): DeviceMapper
+    {
+        return app(DeviceMapper::class);
+    }
+
+    public static function detectedIssue(): DetectedIssueMapper
+    {
+        return app(DetectedIssueMapper::class);
+    }
+
+    public static function deviceAssociation(): DeviceAssociationMapper
+    {
+        return app(DeviceAssociationMapper::class);
+    }
+
     public static function procedure(): ProcedureMapper
     {
         return app(ProcedureMapper::class);
     }
 
+    public static function medicationRequest(): MedicationRequestMapper
+    {
+        return app(MedicationRequestMapper::class);
+    }
+
+    public static function serviceRequest(): ServiceRequestMapper
+    {
+        return app(ServiceRequestMapper::class);
+    }
+
+    public static function deviceRequest(): DeviceRequestMapper
+    {
+        return app(DeviceRequestMapper::class);
+    }
+
     public static function encounterPackage(): EncounterPackageBuilder
     {
         return app(EncounterPackageBuilder::class);
+    }
+
+    public static function encounterPackageLoader(): EncounterPackageLoader
+    {
+        return app(EncounterPackageLoader::class);
     }
 }

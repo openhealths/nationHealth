@@ -1,490 +1,773 @@
 @use('App\Livewire\CarePlan\CarePlanShow')
 @use('App\Enums\CarePlanStatus')
-@use('App\Enums\Status')
 
-<section class="section-form">
-    <x-header-navigation class="breadcrumb-form">
-        <x-slot name="title">
-            План лікування №{{ $carePlan->requisition ?? $carePlan->id }}
-        </x-slot>
-        <x-slot name="actions">
-            <button type="button" wire:click="sync" class="button-success flex items-center gap-2">
-                @icon('refresh', 'w-4 h-4')
-                <span>Синхронізувати дані з ЕСОЗ</span>
-            </button>
-        </x-slot>
-    </x-header-navigation>
+@assets
+    <script src="{{ asset('js/print-sandboxed.js') }}"></script>
+@endassets
 
-    <div x-data="{ 
-        activeTab: 'info',
-        openDropdown: false,
-        showServiceDrawer: @entangle('showServiceDrawer'),
-        showServiceSearchDrawer: @entangle('showServiceSearchDrawer'),
-        showMedicationDrawer: @entangle('showMedicationDrawer'),
-        showMedicationSearchDrawer: @entangle('showMedicationSearchDrawer'),
-        showMedicationFormDrawer: @entangle('showMedicationFormDrawer'),
-        showMedicalDeviceDrawer: @entangle('showMedicalDeviceDrawer'),
-        showMedicalDeviceSearchDrawer: @entangle('showMedicalDeviceSearchDrawer'),
-        showMedicalDeviceFormDrawer: @entangle('showMedicalDeviceFormDrawer')
-    }" 
-    @close-drawers.window="showServiceDrawer = false; showServiceSearchDrawer = false; showMedicationDrawer = false; showMedicationSearchDrawer = false; showMedicationFormDrawer = false; showMedicalDeviceDrawer = false; showMedicalDeviceSearchDrawer = false; showMedicalDeviceFormDrawer = false;"
-    class="form shift-content" wire:key="care-plan-show-container">
+<x-layouts.patient
+    :personId="$carePlan->person_id"
+    :uuid="$carePlan->person?->uuid ?? null"
+    :patientFullName="$carePlan->person?->full_name ?? ''"
+    :hideNavigation="true"
+    :breadcrumbs="[
+        ['label' => __('general.home') ?? 'Головна', 'url' => route('dashboard', [legalEntity()])],
+        ['label' => $carePlan->person?->full_name ?? __('care-plan.patient') ?? 'Пацієнт', 'url' => route('persons.care-plans', [legalEntity(), $carePlan->person_id])],
+        ['label' => __('care-plan.care_plan') . ' №' . ($carePlan->requisition ?? $carePlan->id)]
+    ]"
+>
+    <x-slot name="headerActions"></x-slot>
 
-        {{-- Plan Header --}}
-        @php
-            $status = is_array($carePlan->status) ? ($carePlan->status['coding'][0]['code'] ?? ($carePlan->status['text'] ?? '')) : $carePlan->status;
-            $statusDisplay = is_array($carePlan->status) ? ($carePlan->status['text'] ?? ($carePlan->status['coding'][0]['display'] ?? $status)) : $status;
-            
-            $categoryLabel = $carePlan->categoryConcept?->text ?? $carePlan->categoryConcept?->coding?->first()?->display;
-            if (!$categoryLabel) {
-                $categoryCode = is_array($carePlan->category) ? ($carePlan->category['coding'][0]['code'] ?? ($carePlan->category['text'] ?? '')) : $carePlan->category;
-                $categoryLabel = $dictionaries['care_plan_categories'][$categoryCode] ?? $categoryCode;
-            }
+    <div
+        class="shift-content mt-6 pl-4"
+        x-data="{
+            activeTab: 'info',
+            openDropdown: false,
+            showServiceDrawer: @entangle('showServiceDrawer'),
+            showServiceSearchDrawer: @entangle('showServiceSearchDrawer'),
+            showMedicationDrawer: @entangle('showMedicationDrawer'),
+            showMedicationSearchDrawer: @entangle('showMedicationSearchDrawer'),
+            showMedicationFormDrawer: @entangle('showMedicationFormDrawer'),
+            showMedicalDeviceDrawer: @entangle('showMedicalDeviceDrawer'),
+            showMedicalDeviceSearchDrawer: @entangle('showMedicalDeviceSearchDrawer'),
+            showMedicalDeviceFormDrawer: @entangle('showMedicalDeviceFormDrawer'),
+            showReferralDrawer: @entangle('showReferralDrawer').live,
+            showEPrescriptionDrawer: @entangle('showEPrescriptionDrawer').live
+         }"
+        @close-drawers.window="
+            showServiceDrawer = false;
+            showServiceSearchDrawer = false;
+            showMedicationDrawer = false;
+            showMedicationSearchDrawer = false;
+            showMedicationFormDrawer = false;
+            showMedicalDeviceDrawer = false;
+            showMedicalDeviceSearchDrawer = false;
+            showMedicalDeviceFormDrawer = false;
+            showReferralDrawer = false;
+            showEPrescriptionDrawer = false;
+        "
+        wire:key="care-plan-show-container"
+    >
+        <livewire:components.x-message :listen-async="true" :key="'care-plan-show-flash-'.time()" />
 
-            $intent = 'order'; // In eHealth plans always have intent 'order'
-            $tos = is_array($carePlan->terms_of_service) ? ($carePlan->terms_of_service['coding'][0]['code'] ?? ($carePlan->terms_of_service['text'] ?? '')) : $carePlan->terms_of_service;
-        @endphp
+        <div class="w-full max-w-screen-xl">
+            @php
+                $status = is_array($carePlan->status) ? ($carePlan->status['coding'][0]['code'] ?? ($carePlan->status['text'] ?? '')) : $carePlan->status;
+                $statusEnum = CarePlanStatus::fromStored($status);
 
-        <!-- Tabs Navigation -->
-        <div class="border-b border-gray-200 dark:border-gray-700 mb-8 flex justify-between items-center px-4">
-            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                <button @click="activeTab = 'info'"
-                        :class="activeTab === 'info' ? 'border-blue-500 text-blue-600 dark:text-blue-500 font-bold' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 font-medium'"
-                        class="whitespace-nowrap pb-4 px-1 border-b-2 text-sm transition-all">
-                    Інформація про план
-                </button>
-                <button @click="activeTab = 'activities'"
-                        :class="activeTab === 'activities' ? 'border-blue-500 text-blue-600 dark:text-blue-500 font-bold' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 font-medium'"
-                        class="whitespace-nowrap pb-4 px-1 border-b-2 text-sm transition-all">
-                    Призначення
-                </button>
-            </nav>
+                $categoryLabel = $carePlan->categoryConcept?->text ?? $carePlan->categoryConcept?->coding?->first()?->display;
+                if (!$categoryLabel) {
+                    $categoryCode = is_array($carePlan->category) ? ($carePlan->category['coding'][0]['code'] ?? ($carePlan->category['text'] ?? '')) : $carePlan->category;
+                    $categoryLabel = $dictionaries['care_plan_categories'][$categoryCode] ?? $categoryCode;
+                }
 
-            @if(in_array(strtolower($status), [CarePlanStatus::ACTIVE->value, CarePlanStatus::DRAFT->value, 'new', 'pending']))
-            <div class="relative pb-2 pr-2">
-                <button type="button" 
-                        @click="openDropdown = !openDropdown" 
-                        @click.away="openDropdown = false"
-                        class="button-primary flex items-center gap-2">
-                    <span>+ {{ __('care-plan.new_prescription') }}</span>
-                    @icon('chevron-down', 'w-4 h-4')
-                </button>
-                
-                <div x-show="openDropdown" x-transition style="display: none;" class="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:bg-gray-700">
-                    <div class="py-1" role="none">
-                        <button type="button" @click="openDropdown = false; showServiceDrawer = true" wire:click="initActivityForm('service_request')" class="text-gray-700 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600">
-                            {{ __('care-plan.service_prescription') }}
-                        </button>
-                        <button type="button" @click="openDropdown = false; showMedicationDrawer = true" wire:click="initActivityForm('medication_request')" class="text-gray-700 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600">
-                            {{ __('care-plan.medication_prescription') }}
-                        </button>
-                        <button type="button" @click="openDropdown = false; showMedicalDeviceDrawer = true" wire:click="initActivityForm('device_request')" class="text-gray-700 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600">
-                            {{ __('care-plan.medical_device_prescription') }}
-                        </button>
-                    </div>
-                </div>
-            </div>
-            @endif
-        </div>
+                $intent = 'order'; // In eHealth plans always have intent 'order'
+                $tos = is_array($carePlan->terms_of_service) ? ($carePlan->terms_of_service['coding'][0]['code'] ?? ($carePlan->terms_of_service['text'] ?? '')) : $carePlan->terms_of_service;
+            @endphp
 
-        <!-- Info Tab Content -->
-        <div x-show="activeTab === 'info'" class="space-y-8 px-4">
-            
-            {{-- Doctors --}}
-            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
-                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center gap-2">
-                    @icon('doctor', 'w-5 h-5 text-blue-500')
-                    {{ __('care-plan.doctors') }}
-                </h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Автор</div>
-                        <div class="text-gray-900 dark:text-white font-medium">{{ $carePlan->author?->party?->full_name ?? '-' }}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Керуючий лікар</div>
-                        <div class="text-gray-900 dark:text-white font-medium">{{ $carePlan->author?->party?->full_name ?? '-' }}</div>
-                    </div>
-                </div>
-            </div>
+            <!-- Tabs Navigation -->
+            <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                    <button
+                        @click="activeTab = 'info'"
+                        type="button"
+                        :class="activeTab === 'info'
+                            ? 'border-blue-500 text-blue-600 dark:text-blue-500 font-bold'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 font-medium'"
+                        class="cursor-pointer border-b-2 px-1 pb-4 text-sm whitespace-nowrap transition-all"
+                    >
+                        {{ __('care-plan.plan_info') ?? 'Інформація про план' }}
+                    </button>
+                    <button
+                        @click="activeTab = 'activities'"
+                        type="button"
+                        :class="activeTab === 'activities'
+                            ? 'border-blue-500 text-blue-600 dark:text-blue-500 font-bold'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 font-medium'"
+                        class="cursor-pointer border-b-2 px-1 pb-4 text-sm whitespace-nowrap transition-all"
+                    >
+                        {{ __('care-plan.activities') ?? 'Призначення' }} ({{ $carePlan->activities->count() }})
+                    </button>
+                </nav>
 
-            {{-- Patient Data --}}
-            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
-                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center gap-2">
-                    @icon('patients', 'w-5 h-5 text-blue-500')
-                    {{ __('care-plan.patient_data') }}
-                </h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Пацієнт</div>
-                        <div class="text-gray-900 dark:text-white font-medium">{{ $carePlan->person?->full_name ?? '-' }}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Медичний запис №</div>
-                        <div class="text-gray-900 dark:text-white font-medium">{{ $carePlan->medical_number ?? '-' }}</div>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Care Plan Data --}}
-            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
-                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center gap-2">
-                    @icon('contracts', 'w-5 h-5 text-blue-500')
-                    {{ __('care-plan.care_plan_data') }}
-                </h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-8">
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">eHealth ID</div>
-                        <div class="text-gray-900 dark:text-white font-medium break-all">{{ $carePlan->uuid ?? '-' }}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Статус в ЕСОЗ</div>
-                        <div class="mt-1">
-                            <span class="badge {{ strtoupper($status) === 'ACTIVE' ? 'badge-green' : (strtoupper($status) === 'NEW' ? 'badge-yellow' : 'badge-dark') }}">
-                                {{ $statusDisplay }}
+                <div class="flex flex-col gap-2 pb-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                    @if (filled($carePlan->uuid))
+                        <button
+                            type="button"
+                            class="button-sync flex items-center justify-center gap-2 whitespace-nowrap"
+                            wire:click="sync"
+                            wire:loading.attr="disabled"
+                            wire:target="sync"
+                        >
+                            <span wire:loading.remove wire:target="sync">
+                                @icon('refresh', 'w-4 h-4')
                             </span>
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Категорія</div>
-                        <div class="text-gray-900 dark:text-white font-medium">{{ $categoryLabel ?: '-' }}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Назва плану лікування</div>
-                        <div class="text-gray-900 dark:text-white font-medium">{{ $carePlan->title }}</div>
-                    </div>
-
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Намір (Intent)</div>
-                        <div class="text-gray-900 dark:text-white font-medium">{{ $intent ?: '-' }}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">{{ __('forms.providing_condition') }}</div>
-                        <div class="text-gray-900 dark:text-white font-medium">{{ $tos ?: '-' }}</div>
-                    </div>
-
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Дата початку плану лікування</div>
-                        <div class="text-gray-900 dark:text-white font-medium flex items-center gap-2">
-                            @icon('calendar', 'w-4 h-4 text-blue-400')
-                            {{ $carePlan->period_start?->format('d.m.Y') ?? '-' }}
-                            <span class="text-gray-400 ml-2 flex items-center gap-1">
-                                @icon('clock', 'w-4 h-4')
-                                09:00 AM
+                            <span wire:loading wire:target="sync" class="animate-spin">
+                                @icon('refresh', 'w-4 h-4')
                             </span>
+                            <span>{{ __('forms.synchronise_with_eHealth') }}</span>
+                        </button>
+                    @endif
+
+                    @if (!$this->isTerminalCarePlan && in_array(strtolower((string)$status), [CarePlanStatus::ACTIVE->value, CarePlanStatus::DRAFT->value, 'new', 'pending']))
+                        <div class="relative">
+                            <button
+                                type="button"
+                                @click="openDropdown = ! openDropdown"
+                                @click.away="openDropdown = false"
+                                class="button-primary flex items-center justify-center gap-2"
+                            >
+                                @icon('plus', 'w-4 h-4')
+                                <span>{{ __('care-plan.new_prescription') }}</span>
+                            </button>
+
+                            <div
+                                x-show="openDropdown"
+                                x-transition
+                                style="display: none"
+                                class="ring-opacity-5 absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md border border-gray-100 bg-white shadow-lg ring-1 ring-black focus:outline-none dark:border-gray-600 dark:bg-gray-700"
+                            >
+                                <div class="py-1" role="none">
+                                    <button
+                                        type="button"
+                                        @click="
+                                            openDropdown = false;
+                                            showServiceDrawer = true;
+                                        "
+                                        wire:click="initActivityForm('service_request')"
+                                        class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600"
+                                    >
+                                        {{ __('care-plan.service_prescription') }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        @click="
+                                            openDropdown = false;
+                                            showMedicationDrawer = true;
+                                        "
+                                        wire:click="initActivityForm('medication_request')"
+                                        class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600"
+                                    >
+                                        {{ __('care-plan.medication_prescription') }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        @click="
+                                            openDropdown = false;
+                                            showMedicalDeviceDrawer = true;
+                                        "
+                                        wire:click="initActivityForm('device_request')"
+                                        class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600"
+                                    >
+                                        {{ __('care-plan.medical_device_prescription') }}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Дата завершення плану лікування</div>
-                        <div class="text-gray-900 dark:text-white font-medium flex items-center gap-2">
-                            @icon('calendar', 'w-4 h-4 text-blue-400')
-                            {{ $carePlan->period_end ? $carePlan->period_end->format('d.m.Y') : 'Безтерміново' }}
-                            @if($carePlan->period_end)
-                                <span class="text-gray-400 ml-2 flex items-center gap-1">
-                                    @icon('clock', 'w-4 h-4')
-                                    06:00 PM
-                                </span>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Condition/Diagnosis --}}
-            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
-                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center gap-2">
-                    @icon('alert-circle', 'w-5 h-5 text-blue-500')
-                    Стан/діагноз
-                </h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Дата</th>
-                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Назва</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                            @forelse($carePlan->addresses ?? [] as $address)
-                                @php
-                                    $condId = is_array($address['reference'] ?? null) ? ($address['reference']['identifier']['value'] ?? null) : ($address['reference'] ?? null);
-                                    if(str_contains($condId ?? '', '/')) {
-                                        $condId = last(explode('/', $condId));
-                                    }
-                                    $condition = null;
-                                    if ($condId) {
-                                        $condition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $condId)->first();
-                                    }
-                                @endphp
-                                <tr>
-                                    <td class="px-4 py-4 text-gray-600 dark:text-gray-400">{{ $condition?->onset_date?->format('d.m.Y') ?? '-' }}</td>
-                                    <td class="px-4 py-4 text-gray-900 dark:text-white font-medium">{{ $condition ? ($condition->typeConcept?->text ?? $condition->typeConcept?->coding->first()?->display ?? '-') : '-' }}</td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="2" class="px-4 py-8 text-center text-gray-400 italic">Немає пов'язаних станів</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {{-- Supporting Info --}}
-            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
-                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center gap-2">
-                    @icon('file-text', 'w-5 h-5 text-blue-500')
-                    Допоміжна інформація (епізоди, процедури чи діагностичні звіти)
-                </h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Дата</th>
-                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Назва / ОПИС</th>
-                                <th class="px-4 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-wider w-20">Дії</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                            @php
-                                $episodes = $carePlan->supporting_info['episodes'] ?? [];
-                                $medical_records = $carePlan->supporting_info['medical_records'] ?? [];
-                                $allSupporting = array_merge($episodes, $medical_records);
-                            @endphp
-                            @forelse($allSupporting as $item)
-                                @php
-                                    $ref = $item['reference'] ?? '';
-                                    if(str_contains($ref, '/')) {
-                                        $ref = last(explode('/', $ref));
-                                    }
-                                    $type = $item['type'] ?? '';
-                                @endphp
-                                <tr>
-                                    <td class="px-4 py-4 text-gray-600 dark:text-gray-400">{{ \Carbon\CarbonImmutable::now()->format('d.m.Y') }}</td>
-                                    <td class="px-4 py-4 text-gray-900 dark:text-white font-medium">{{ $ref }} ({{ $type }})</td>
-                                    <td class="px-4 py-4 text-right">
-                                        <button type="button" class="text-gray-400 hover:text-red-500 transition-colors">
-                                            @icon('trash', 'w-5 h-5')
-                                        </button>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="3" class="px-4 py-8 text-center text-gray-400 italic">Немає допоміжної інформації</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {{-- Additional Info --}}
-            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
-                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center gap-2">
-                    @icon('settings', 'w-5 h-5 text-blue-500')
-                    Додаткова інформація
-                </h3>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Клінічний протокол</div>
-                        <div class="text-gray-900 dark:text-white font-medium">{{ $carePlan->clinical_protocol ?: '-' }}</div>
-                    </div>
-                </div>
-
-                <div class="space-y-6">
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Розширений опис</div>
-                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 text-gray-700 dark:text-gray-300 text-sm border border-gray-100 dark:border-gray-600 min-h-[100px] whitespace-pre-line">
-                            {{ $carePlan->description ?: 'Опис відсутній' }}
-                        </div>
-                    </div>
-                    <div>
-                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Нотатки</div>
-                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 text-gray-700 dark:text-gray-300 text-sm border border-gray-100 dark:border-gray-600 min-h-[100px] whitespace-pre-line">
-                            {{ $carePlan->note ?: 'Нотатки відсутні' }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Approvals --}}
-            <div class="mt-4">
-                @livewire('care-plan.care-plan-approvals', ['carePlan' => $carePlan])
-            </div>
-
-            {{-- Bottom Actions --}}
-            <div class="mt-12 flex items-center justify-between pt-8 pb-12 border-t border-gray-100 dark:border-gray-700">
-                <a href="{{ route('persons.care-plans', [legalEntity(), $carePlan->person_id]) }}" class="button-minor flex items-center gap-2" wire:navigate>
-                    @icon('arrow-left', 'w-4 h-4')
-                    <span>{{ __('forms.back') }}</span>
-                </a>
-
-                <div class="flex items-center gap-4">
-                    @if(!$carePlan->uuid && in_array(strtoupper($status), [Status::NEW->value, 'DRAFT', 'PENDING']))
-                        <button type="button" class="button-primary-outline" @click="$wire.openSignatureModal('sign_plan')">
-                            Підписати та відправити План
-                        </button>
-                    @elseif($carePlan->uuid && strtoupper($status) === 'NEW')
-                        <button type="button" class="button-primary" wire:click="openMethodSelectionModal">
-                            Активувати план (Дозвіл пацієнта)
-                        </button>
-                    @elseif($carePlan->uuid && in_array(strtoupper($status), [Status::ACTIVE->value]))
-                        <button type="button" class="button-minor text-red-500 border-red-200 hover:bg-red-50" @click="$wire.openSignatureModal('cancel')">
-                            Скасувати
-                        </button>
-                        <button type="button" class="button-danger-outline" @click="$wire.openSignatureModal('complete')">
-                            Відмінити план лікування
-                        </button>
-                        <button type="button" class="button-primary" @click="$wire.openSignatureModal('complete')">
-                            Завершити план лікування
-                        </button>
                     @endif
                 </div>
             </div>
-        </div>
 
-        <!-- Activities Tab Content -->
-        <div x-show="activeTab === 'activities'" style="display: none;" class="space-y-6 px-4">
-            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
-                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center gap-2">
-                    @icon('list', 'w-5 h-5 text-blue-500')
-                    {{ __('care-plan.activities') }}
-                </h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-[35%]">{{ __('care-plan.kind') }}</th>
-                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-[15%]">{{ __('care-plan.quantity') }}</th>
-                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-[20%]">{{ __('forms.start_date') }}</th>
-                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-[15%]">{{ __('forms.status.label') }}</th>
-                                <th class="px-4 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-wider w-[15%]">Дії</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                            @forelse($carePlan->activities ?? [] as $activity)
+            <!-- Info Tab Content -->
+            <div x-show="activeTab === 'info'">
+                {{-- Doctors --}}
+                <fieldset class="fieldset !mb-6 !max-w-full !rounded-xl !border-gray-100 bg-white !p-6 !shadow-none dark:!border-gray-700 dark:bg-gray-800">
+                    <legend class="legend">{{ __('care-plan.doctors') ?? 'Лікарі' }}</legend>
+
+                    <div class="form">
+                        <div class="form-row-2">
+                            <div class="form-group group">
+                                <input
+                                    type="text"
+                                    class="input peer"
+                                    value="{{ $carePlan->author?->party?->full_name ?? '-' }}"
+                                    readonly
+                                />
+                                <label class="label"> {{ __('care-plan.author') ?? 'Автор' }} </label>
+                            </div>
+                            <div class="form-group group">
+                                <input
+                                    type="text"
+                                    class="input peer"
+                                    value="{{ $carePlan->author?->party?->full_name ?? '-' }}"
+                                    readonly
+                                />
+                                <label class="label"> {{ __('care-plan.managing_doctor') ?? 'Керуючий лікар' }} </label>
+                            </div>
+                        </div>
+                    </div>
+                </fieldset>
+
+                {{-- Patient Data --}}
+                <fieldset class="fieldset !mb-6 !max-w-full !rounded-xl !border-gray-100 bg-white !p-6 !shadow-none dark:!border-gray-700 dark:bg-gray-800">
+                    <legend class="legend">{{ __('care-plan.patient_data') ?? 'Дані пацієнта' }}</legend>
+
+                    <div class="form">
+                        <div class="form-row-2">
+                            <div class="form-group group">
+                                <input
+                                    type="text"
+                                    class="input peer"
+                                    value="{{ $carePlan->person?->full_name ?? '-' }}"
+                                    readonly
+                                />
+                                <label class="label"> {{ __('care-plan.patient') ?? 'Пацієнт' }} </label>
+                            </div>
+
+                            <div class="form-group group">
+                                <input
+                                    type="text"
+                                    class="input peer"
+                                    value="{{ $carePlan->medical_number ?? ($carePlan->encounter_id ? (string)$carePlan->encounter_id : '-') }}"
+                                    readonly
+                                />
+                                <label class="label">
+                                    {{ __('care-plan.medical_number') ?? 'Медичний запис №' }}
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </fieldset>
+
+                {{-- Care Plan Data --}}
+                <fieldset class="fieldset !mb-6 !max-w-full !rounded-xl !border-gray-100 bg-white !p-6 !shadow-none dark:!border-gray-700 dark:bg-gray-800">
+                    <legend class="legend">{{ __('care-plan.care_plan_data') ?? 'Дані плану лікування' }}</legend>
+
+                    <div class="form">
+                        <div class="form-row-2">
+                            <div class="form-group group">
+                                <input
+                                    type="text"
+                                    class="input peer font-mono text-sm"
+                                    value="{{ $carePlan->uuid ?? '-' }}"
+                                    readonly
+                                />
+                                <label class="label"> {{ __('care-plan.ehealth_id') }} </label>
+                            </div>
+
+                            <div class="form-group group flex items-center">
+                                <div class="mt-2.5">
+                                    <span class="{{ $statusEnum->color() }}">
+                                        {{ CarePlanStatus::labelFor($status) }}
+                                    </span>
+                                </div>
+                                <label class="label"> {{ __('care-plan.status_in_ehealth') }} </label>
+                            </div>
+                        </div>
+
+                        <div class="form-row-2 mt-5">
+                            <div class="form-group group">
+                                <input type="text" class="input peer" value="{{ $categoryLabel ?: '-' }}" readonly />
+                                <label class="label"> {{ __('care-plan.category') }} </label>
+                            </div>
+
+                            <div class="form-group group">
+                                <input type="text" class="input peer" value="{{ $carePlan->title }}" readonly />
+                                <label class="label"> {{ __('care-plan.name_care_plan') }} </label>
+                            </div>
+                        </div>
+
+                        <div class="form-row-2 mt-5">
+                            <div class="form-group group">
+                                <input
+                                    type="text"
+                                    class="input peer"
+                                    value="{{ __('care-plan.assignment') ?? $intent }}"
+                                    readonly
+                                />
+                                <label class="label"> {{ __('care-plan.intention') }} </label>
+                            </div>
+
+                            @php
+                                $tosUpper = strtoupper((string) ($tos ?? ''));
+                                $tosMap = [
+                                    'OUTPATIENT' => 'Амбулаторно',
+                                    'INPATIENT' => 'Стаціонарно',
+                                    'FIELD' => 'За місцем перебування пацієнта',
+                                    'COMMUNITY' => 'За місцем проживання/перебування',
+                                ];
+                                $tosLabel = $tosMap[$tosUpper] ?? ($carePlan->care_provision_conditions ?? $tos ?? '-');
+                            @endphp
+
+                            <div class="form-group group">
+                                <input type="text" class="input peer" value="{{ $tosLabel }}" readonly />
+                                <label class="label">
+                                    {{ __('forms.providing_condition') ?? __('care-plan.terms_of_service') }}
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-row-2 mt-5">
+                            <div class="form-group group">
+                                <div class="datepicker-wrapper">
+                                    <input
+                                        type="text"
+                                        class="datepicker-input with-leading-icon input peer"
+                                        value="{{ $carePlan->period_start?->format(config('app.date_format') ?? 'd.m.Y') ?? '-' }}"
+                                        readonly
+                                    />
+                                    <label class="wrapped-label"> {{ __('care-plan.period_start_date') }} </label>
+                                </div>
+                            </div>
+
+                            <div class="form-group group">
+                                <div class="datepicker-wrapper">
+                                    <input
+                                        type="text"
+                                        class="datepicker-input with-leading-icon input peer"
+                                        value="{{ $carePlan->period_end ? $carePlan->period_end->format(config('app.date_format') ?? 'd.m.Y') : __('care-plan.no_end_date') }}"
+                                        readonly
+                                    />
+                                    <label class="wrapped-label"> {{ __('care-plan.period_end_date') }} </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </fieldset>
+
+                {{-- Condition/Diagnosis --}}
+                <fieldset class="fieldset !mb-6 !max-w-full !rounded-xl !border-gray-100 bg-white !p-6 !shadow-none dark:!border-gray-700 dark:bg-gray-800">
+                    <legend class="legend">{{ __('care-plan.condition_diagnosis') ?? 'Стан/діагноз' }}</legend>
+
+                    <div class="index-table-wrapper mt-4">
+                        <table class="index-table w-full">
+                            <thead class="index-table-thead">
                                 <tr>
-                                    <td class="px-4 py-4">
-                                        @php
-                                            $kindValue = '';
-                                            if ($activity->kindConcept) {
-                                                $kindValue = $activity->kindConcept->text ?? $activity->kindConcept->coding->first()?->display ?? $activity->kindConcept->coding->first()?->code ?? '';
-                                            } elseif (is_array($activity->kind)) {
-                                                $kindValue = $activity->kind['text'] ?? $activity->kind['coding'][0]['display'] ?? $activity->kind['coding'][0]['code'] ?? '';
-                                            } else {
-                                                $kindValue = $activity->kind ?? '';
-                                            }
-                                            $kindTranslationKey = 'care-plan.activity_kind.' . \Illuminate\Support\Str::snake($kindValue);
-                                            $translatedKind = \Illuminate\Support\Facades\Lang::has($kindTranslationKey) ? __($kindTranslationKey) : $kindValue;
-                                        @endphp
-                                        <div class="font-medium text-gray-900 dark:text-white">{{ $translatedKind ?: '-' }}</div>
-                                        <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                            @if($activity->uuid)
-                                                ID: <span class="font-mono">{{ $activity->uuid }}</span>
+                                    <th class="index-table-th w-40">{{ __('care-plan.date') }}</th>
+                                    <th class="index-table-th">{{ __('care-plan.name') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($carePlan->addresses ?? [] as $address)
+                                    @php
+                                        $condId = is_array($address['reference'] ?? null) ? ($address['reference']['identifier']['value'] ?? null) : ($address['reference'] ?? null);
+                                        if (str_contains($condId ?? '', '/')) {
+                                            $condId = last(explode('/', $condId));
+                                        }
+                                        $condition = null;
+                                        if ($condId) {
+                                            $condition = \App\Models\MedicalEvents\Sql\Condition::where('uuid', $condId)->first();
+                                        }
+                                    @endphp
+                                    <tr class="index-table-tr">
+                                        <td class="index-table-td">
+                                            {{ $condition?->onset_date?->format('d.m.Y') ?? '-' }}
+                                        </td>
+                                        <td class="index-table-td-primary">
+                                            {{ $condition ? ($condition->typeConcept?->text ?? $condition->typeConcept?->coding->first()?->display ?? '-') : '-' }}
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="2" class="index-table-td !py-3 text-center text-gray-400">
+                                            {{ __('care-plan.no_diagnoses') }}
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </fieldset>
+
+                {{-- Supporting Information --}}
+                <fieldset class="fieldset !mb-6 !max-w-full !rounded-xl !border-gray-100 bg-white !p-6 !shadow-none dark:!border-gray-700 dark:bg-gray-800">
+                    <legend class="legend">{{ __('care-plan.supporting_information') }}</legend>
+
+                    <div class="mt-4 space-y-8">
+                        @php
+                            $episodes = $carePlan->supporting_info['episodes'] ?? [];
+                            $medical_records = $carePlan->supporting_info['medical_records'] ?? [];
+                        @endphp
+
+                        <div class="space-y-3">
+                            <div class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                {{ __('care-plan.episodes') ?? 'Епізоди' }}
+                            </div>
+                            <div class="index-table-wrapper overflow-x-auto">
+                                <table class="index-table w-full">
+                                    <thead class="index-table-thead">
+                                        <tr>
+                                            <th class="index-table-th w-32">{{ __('care-plan.date') }}</th>
+                                            <th class="index-table-th">{{ __('care-plan.name_episode') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse ($episodes as $item)
+                                            @php
+                                                $ref = $item['name'] ?? ($item['reference'] ?? ($item['uuid'] ?? '-'));
+                                                $date = $item['date'] ?? \Carbon\CarbonImmutable::now()->format('d.m.Y');
+                                            @endphp
+                                            <tr class="index-table-tr">
+                                                <td class="index-table-td">{{ $date }}</td>
+                                                <td class="index-table-td-primary">{{ $ref }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="2" class="index-table-td !py-3 text-center text-gray-400">
+                                                    {{ __('care-plan.no_episodes') ?? 'Немає пов\'язаних епізодів' }}
+                                                </td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3">
+                            <div class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                {{ __('care-plan.medical_records') ?? 'Медичні записи' }}
+                            </div>
+                            <div class="index-table-wrapper overflow-x-auto">
+                                <table class="index-table w-full">
+                                    <thead class="index-table-thead">
+                                        <tr>
+                                            <th class="index-table-th w-32">{{ __('care-plan.date') }}</th>
+                                            <th class="index-table-th">{{ __('care-plan.medical_record') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse ($medical_records as $item)
+                                            @php
+                                                $ref = $item['name'] ?? ($item['reference'] ?? ($item['uuid'] ?? '-'));
+                                                $date = $item['date'] ?? \Carbon\CarbonImmutable::now()->format('d.m.Y');
+                                            @endphp
+                                            <tr class="index-table-tr">
+                                                <td class="index-table-td">{{ $date }}</td>
+                                                <td class="index-table-td-primary">{{ $ref }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="2" class="index-table-td !py-3 text-center text-gray-400">
+                                                    {{ __('care-plan.no_records') ?? 'Немає пов\'язаних медичних записів' }}
+                                                </td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </fieldset>
+
+                {{-- Additional Information --}}
+                <fieldset class="fieldset !mb-6 !max-w-full !rounded-xl !border-gray-100 bg-white !p-6 !shadow-none dark:!border-gray-700 dark:bg-gray-800">
+                    <legend class="legend">{{ __('forms.additional_info') }}</legend>
+
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
+                            {{ __('care-plan.extended_description') }}
+                        </label>
+                        <div class="min-h-[90px] rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm whitespace-pre-line text-gray-700 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-300">
+                            {{ $carePlan->description ?: __('care-plan.no_description') }}
+                        </div>
+                    </div>
+
+                    <div class="mt-6">
+                        <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
+                            {{ __('care-plan.notes') }}
+                        </label>
+                        <div class="min-h-[90px] rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm whitespace-pre-line text-gray-700 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-300">
+                            {{ $carePlan->note ?: __('care-plan.no_notes') }}
+                        </div>
+                    </div>
+                </fieldset>
+
+                {{-- Approvals --}}
+                <div class="mb-6">
+                    @livewire('care-plan.care-plan-approvals', ['carePlan' => $carePlan], key('care-plan-approvals-'.$carePlan->id.'-'.$carePlan->status))
+                </div>
+
+                {{-- Bottom Actions --}}
+                <div class="mt-8 flex items-center justify-between gap-4 border-t border-gray-100 pt-6 pb-12 dark:border-gray-700">
+                    <a
+                        href="{{ route('persons.care-plans', [legalEntity(), $carePlan->person_id]) }}"
+                        class="button-minor flex items-center gap-2"
+                        wire:navigate
+                    >
+                        @icon('arrow-left', 'w-4 h-4')
+                        <span>{{ __('forms.back') }}</span>
+                    </a>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        @if ($this->canSignPlan)
+                            <button
+                                type="button"
+                                class="button-primary-outline"
+                                @click="$wire.openSignatureModal('sign_plan')"
+                            >
+                                {{ __('care-plan.sign_and_send_plan') }}
+                            </button>
+                        @elseif ($this->canRequestPatientApproval)
+                            <button type="button" class="button-primary" wire:click="openMethodSelectionModal">
+                                {{ __('care-plan.activate_plan_patient_approval') }}
+                            </button>
+                        @elseif ($this->canChangePlanLifecycle)
+                            <button
+                                type="button"
+                                class="button-primary-outline-red"
+                                @click="$wire.openSignatureModal('cancel')"
+                            >
+                                {{ __('care-plan.cancel_care_plan') }}
+                            </button>
+                            <button type="button" class="button-primary" @click="$wire.openSignatureModal('complete')">
+                                {{ __('care-plan.complete_care_plan') }}
+                            </button>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activities Tab Content -->
+            <div x-show="activeTab === 'activities'" style="display: none">
+                <fieldset class="fieldset !mb-6 !max-w-full !rounded-xl !border-gray-100 bg-white !p-6 !shadow-none dark:!border-gray-700 dark:bg-gray-800">
+                    <legend class="legend">{{ __('care-plan.activities') }}</legend>
+
+                    <div class="index-table-wrapper mt-4">
+                        <table class="index-table w-full">
+                            <thead class="index-table-thead">
+                                <tr>
+                                    <th class="index-table-th w-[35%]">{{ __('care-plan.kind') }}</th>
+                                    <th class="index-table-th w-[15%]">{{ __('care-plan.quantity') }}</th>
+                                    <th class="index-table-th w-[20%]">{{ __('forms.start_date') }}</th>
+                                    <th class="index-table-th w-[15%]">{{ __('forms.status.label') }}</th>
+                                    <th class="index-table-th w-[15%] text-right">{{ __('forms.actions') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($carePlan->activities ?? [] as $activity)
+                                    <tr class="index-table-tr">
+                                        <td class="index-table-td">
+                                            @php
+                                                $resolvedKind = $activity->resolvedKind();
+                                                $kindTranslationKey = 'care-plan.activity_kind.' . $resolvedKind;
+                                                $translatedKind = \Illuminate\Support\Facades\Lang::has($kindTranslationKey) ? __($kindTranslationKey) : $resolvedKind;
+                                            @endphp
+                                            <div class="font-medium text-gray-900 dark:text-white">
+                                                {{ $translatedKind ?: '-' }}
+                                            </div>
+                                            <div class="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                                                @if ($activity->uuid)
+                                                    ID:
+                                                    <span class="font-mono">{{ $activity->uuid }}</span>
+                                                @else
+                                                    ID:
+                                                    <span class="font-mono">{{ $activity->id }} ({{ __('care-plan.status.draft') }})</span>
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td class="index-table-td">
+                                            @if (is_array($activity->quantity))
+                                                {{ $activity->quantity['value'] ?? '-' }} {{ $activity->quantity['unit'] ?? '' }}
                                             @else
-                                                ID: <span class="font-mono">{{ $activity->id }} (Чернетка)</span>
+                                                {{ $activity->quantity ?? '-' }}
                                             @endif
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-4 text-gray-600 dark:text-gray-400">
-                                        @if(is_array($activity->quantity))
-                                            {{ $activity->quantity['value'] ?? '-' }} {{ $activity->quantity['unit'] ?? '' }}
-                                        @else
-                                            {{ $activity->quantity ?? '-' }}
-                                        @endif
-                                    </td>
-                                    <td class="px-4 py-4 text-gray-600 dark:text-gray-400">
-                                        {{ $activity->scheduled_period_start?->format('d.m.Y') }}
-                                    </td>
-                                    <td class="px-4 py-4">
-                                        @php
-                                            $activityStatus = is_array($activity->status) ? ($activity->status['coding'][0]['code'] ?? ($activity->status['text'] ?? '')) : $activity->status;
-                                            $statusKey = 'care-plan.status.' . strtolower($activityStatus);
-                                            $activityStatusDisplay = \Illuminate\Support\Facades\Lang::has($statusKey)
-                                                ? __($statusKey)
-                                                : (is_array($activity->status) ? ($activity->status['text'] ?? ($activity->status['coding'][0]['display'] ?? $activityStatus)) : $activityStatus);
-                                        @endphp
-                                        <span class="badge {{ in_array(strtoupper($activityStatus), ['NEW', 'DRAFT']) ? 'badge-yellow' : 'badge-green' }}">
-                                            {{ $activityStatusDisplay }}
-                                        </span>
-                                    </td>
-                                    <td x-data="{ openDropdown: false }" class="px-4 py-4 text-right relative overflow-visible">
-                                        <div class="flex items-center justify-end">
-                                            <button @click.stop="openDropdown = !openDropdown" type="button" class="cursor-pointer p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                                                @icon('dots-vertical', 'w-5 h-5 text-gray-800 dark:text-white')
-                                            </button>
-                                        </div>
+                                        </td>
+                                        <td class="index-table-td">
+                                            {{ $activity->scheduled_period_start?->format('d.m.Y') }}
+                                        </td>
+                                        <td class="index-table-td">
+                                            @php
+                                                $activityStatus = is_array($activity->status) ? ($activity->status['coding'][0]['code'] ?? ($activity->status['text'] ?? '')) : $activity->status;
+                                                $activityStatusEnum = CarePlanStatus::tryFrom(strtolower(str_replace('_', '-', (string) $activityStatus)));
+                                                $statusKey = 'care-plan.status.' . strtolower($activityStatus);
+                                                $activityStatusDisplay = $activityStatusEnum?->label()
+                                                    ?? (\Illuminate\Support\Facades\Lang::has($statusKey) ? __($statusKey) : (is_array($activity->status) ? ($activity->status['text'] ?? ($activity->status['coding'][0]['display'] ?? $activityStatus)) : $activityStatus));
+                                                $activityBadgeColor = $activityStatusEnum?->color()
+                                                    ?? (in_array(strtoupper($activityStatus), ['NEW', 'DRAFT']) ? 'badge-yellow' : 'badge-green');
+                                            @endphp
+                                            <span class="{{ $activityBadgeColor }}">
+                                                {{ $activityStatusDisplay }}
+                                            </span>
+                                        </td>
+                                        <td class="index-table-td text-right">
+                                            <div
+                                                x-data="{
+                                                    open: false,
+                                                    toggle() {
+                                                        if (this.open) {
+                                                            return this.close();
+                                                        }
+                                                        this.$refs.button.focus();
+                                                        this.open = true;
+                                                    },
+                                                    close(focusAfter) {
+                                                        if (! this.open) return;
+                                                        this.open = false;
+                                                        focusAfter && focusAfter.focus();
+                                                    },
+                                                }"
+                                                @keydown.escape.prevent.stop="close($refs.button)"
+                                                @focusin.window="! $refs.panel.contains($event.target) && close()"
+                                                x-id="['dropdown-button']"
+                                                class="relative inline-block text-left"
+                                            >
+                                                <button
+                                                    @click="toggle()"
+                                                    x-ref="button"
+                                                    :aria-expanded="open"
+                                                    :aria-controls="$id('dropdown-button')"
+                                                    type="button"
+                                                    class="record-inner-action-btn inline-flex cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                                                >
+                                                    @icon('edit-user-outline', 'w-6 h-6 text-gray-700 dark:text-gray-300')
+                                                </button>
 
-                                        <div x-show="openDropdown"
-                                             @click.outside="openDropdown = false"
-                                             x-transition
-                                             class="absolute right-4 mt-1 z-10 w-52 bg-white dark:bg-gray-700 rounded-md shadow-lg border border-gray-100 dark:border-gray-600 divide-y divide-gray-100 dark:divide-gray-600"
-                                             style="display: none"
-                                        >
-                                            @if(in_array(strtoupper($activityStatus), ['NEW', 'DRAFT']))
-                                                <div class="py-1">
-                                                    <button type="button" 
-                                                            @click="openDropdown = false" 
-                                                            wire:click="editActivity({{ $activity->id }})" 
-                                                            class="text-gray-700 dark:text-gray-200 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 w-full"
+                                                <div
+                                                    x-show="open"
+                                                    x-cloak
+                                                    x-ref="panel"
+                                                    x-transition.origin.top.right
+                                                    @click.outside="close($refs.button)"
+                                                    :id="$id('dropdown-button')"
+                                                    class="absolute right-0 z-50 mt-2 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-700"
+                                                >
+                                                    <a
+                                                        href="{{ route('care-plans.activities.show', [legalEntity(), $carePlan->id, $activity->id]) }}"
+                                                        class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                        wire:navigate
                                                     >
-                                                        Редагувати
-                                                    </button>
-                                                    <button type="button" 
-                                                            @click="openDropdown = false" 
-                                                            wire:click="openSignatureModal('sign_activity', {{ $activity->id }})" 
-                                                            class="text-green-600 dark:text-green-400 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 w-full"
-                                                    >
-                                                        Підписати призначення
-                                                    </button>
+                                                        @icon('eye', 'w-5 h-5 text-gray-500')
+                                                        {{ __('patients.view_details') }}
+                                                    </a>
+
+                                                    @if (!$this->isTerminalCarePlan && in_array(strtoupper($activityStatus), ['NEW', 'DRAFT']))
+                                                        <button
+                                                            type="button"
+                                                            @click="close()"
+                                                            wire:click="editActivity({{ $activity->id }})"
+                                                            class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                        >
+                                                            @icon('edit', 'w-5 h-5 text-gray-500')
+                                                            {{ __('forms.edit') }}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            @click="close()"
+                                                            wire:click="openSignatureModal('sign_activity', {{ $activity->id }})"
+                                                            class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                        >
+                                                            @icon('check', 'w-5 h-5 text-gray-500')
+                                                            {{ __('care-plan.sign_activity') }}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            @click="close()"
+                                                            wire:click="confirmDeleteActivity({{ $activity->id }})"
+                                                            class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                        >
+                                                            @icon('trash', 'w-5 h-5 text-gray-500')
+                                                            {{ __('forms.delete') }}
+                                                        </button>
+                                                    @elseif (!$this->isTerminalCarePlan && in_array(strtoupper($activityStatus), ['ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD', 'PROCESSED']))
+                                                        @if ($resolvedKind === 'medication_request')
+                                                            <button
+                                                                type="button"
+                                                                @click="
+                                                                    close();
+                                                                    activeTab = 'activities';
+                                                                "
+                                                                wire:click="initEPrescriptionForm({{ $activity->id }})"
+                                                                class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                            >
+                                                                @icon('check', 'w-5 h-5 text-gray-500')
+                                                                {{ __('care-plan.issue_eprescription') }}
+                                                            </button>
+                                                        @elseif ($resolvedKind === 'device_request')
+                                                            <button
+                                                                type="button"
+                                                                @click="
+                                                                    close();
+                                                                    activeTab = 'activities';
+                                                                "
+                                                                wire:click="initReferralForm({{ $activity->id }})"
+                                                                class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                            >
+                                                                @icon('check', 'w-5 h-5 text-gray-500')
+                                                                {{ __('care-plan.issue_device_eprescription') }}
+                                                            </button>
+                                                        @elseif ($resolvedKind === 'service_request')
+                                                            <button
+                                                                type="button"
+                                                                @click="
+                                                                    close();
+                                                                    activeTab = 'activities';
+                                                                "
+                                                                wire:click="initReferralForm({{ $activity->id }})"
+                                                                class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                            >
+                                                                @icon('check', 'w-5 h-5 text-gray-500')
+                                                                {{ __('care-plan.create_referral') }}
+                                                            </button>
+                                                        @endif
+                                                        <button
+                                                            type="button"
+                                                            @click="close()"
+                                                            wire:click="openSignatureModal('cancel_activity', {{ $activity->id }})"
+                                                            class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                        >
+                                                            @icon('close', 'w-5 h-5 text-gray-500')
+                                                            {{ __('care-plan.cancel_activity') }}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            @click="close()"
+                                                            wire:click="openSignatureModal('complete_activity', {{ $activity->id }})"
+                                                            class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                        >
+                                                            @icon('check-circle', 'w-5 h-5 text-gray-500')
+                                                            {{ __('care-plan.complete_activity') }}
+                                                        </button>
+                                                    @endif
                                                 </div>
-                                            @elseif(in_array(strtoupper($activityStatus), ['ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD']))
-                                                <div class="py-1">
-                                                    <button type="button" 
-                                                            @click="openDropdown = false" 
-                                                            wire:click="openSignatureModal('cancel_activity', {{ $activity->id }})" 
-                                                            class="text-red-600 dark:text-red-400 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 w-full"
-                                                    >
-                                                        Скасувати призначення
-                                                    </button>
-                                                    <button type="button" 
-                                                            @click="openDropdown = false" 
-                                                            wire:click="openSignatureModal('complete_activity', {{ $activity->id }})" 
-                                                            class="text-blue-600 dark:text-blue-400 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 w-full"
-                                                    >
-                                                        Завершити призначення
-                                                    </button>
-                                                </div>
-                                            @endif
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="5" class="px-4 py-12 text-center text-gray-400 italic">
-                                        {{ __('care-plan.no_activities') }}
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="index-table-td !py-8 text-center text-gray-400">
+                                            {{ __('care-plan.no_activities') }}
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </fieldset>
+
+                <div class="mt-8 flex items-center justify-between pt-4 pb-12">
+                    <a
+                        href="{{ route('persons.care-plans', [legalEntity(), $carePlan->person_id]) }}"
+                        class="button-minor flex items-center gap-2"
+                        wire:navigate
+                    >
+                        @icon('arrow-left', 'w-4 h-4')
+                        <span>{{ __('forms.back') }}</span>
+                    </a>
                 </div>
             </div>
         </div>
 
-        @if($actionType === 'cancel')
+        @if ($actionType === 'cancel')
             @include('livewire.care-plan.parts.modals.cancel-care-plan-modal', ['method' => 'sign'])
-        @elseif($actionType === 'complete')
+        @elseif ($actionType === 'complete')
             @include('livewire.care-plan.parts.modals.complete-care-plan-modal', ['method' => 'sign'])
-        @elseif($actionType === 'cancel_activity')
+        @elseif ($actionType === 'cancel_activity')
             @include('livewire.care-plan.parts.modals.cancel-activity-modal', ['method' => 'sign'])
-        @elseif($actionType === 'complete_activity')
+        @elseif ($actionType === 'complete_activity')
             @include('livewire.care-plan.parts.modals.complete-activity-modal', ['method' => 'sign'])
         @else
             @include('components.signature-modal', ['method' => 'sign'])
         @endif
-        @if($showAuthModal)
+
+        @if ($isPolling)
+            <div wire:poll.3s.keep-alive="checkApprovalJobStatus" class="hidden"></div>
+        @endif
+
+        @if ($showAuthModal)
             @include('livewire.care-plan.modals.authentication')
         @endif
-        @if($showMethodSelectionModal)
+
+        @if ($showMethodSelectionModal)
             @include('livewire.care-plan.modals.method-selection')
         @endif
 
@@ -497,7 +780,31 @@
         @include('livewire.care-plan.parts.modals.medical-devices-drawer')
         @include('livewire.care-plan.parts.modals.medical-device-search-drawer')
         @include('livewire.care-plan.parts.modals.medical-device-form-drawer')
-    </div>
+        @include('livewire.care-plan.parts.modals.referral-form-drawer')
+        @include('livewire.care-plan.parts.modals.eprescription-form-drawer')
 
-    <livewire:components.x-message :key="time()" />
-</section>
+        <x-confirmation-modal wire:model.live="confirmingActivityDeletion">
+            <x-slot name="title">{{ __('care-plan.confirm_delete_activity_title') }}</x-slot>
+
+            <x-slot name="content">{{ __('care-plan.confirm_delete_activity') }}</x-slot>
+
+            <x-slot name="footer">
+                <x-secondary-button wire:click="cancelDeleteActivity" wire:loading.attr="disabled">
+                    {{ __('forms.cancel') }}
+                </x-secondary-button>
+
+                @if ($activityToDelete)
+                    <x-danger-button
+                        class="ms-3"
+                        wire:click="deleteActivity({{ $activityToDelete }})"
+                        wire:loading.attr="disabled"
+                    >
+                        {{ __('forms.delete') }}
+                    </x-danger-button>
+                @endif
+            </x-slot>
+        </x-confirmation-modal>
+
+        <x-forms.loading />
+    </div>
+</x-layouts.patient>

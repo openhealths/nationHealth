@@ -5,12 +5,47 @@ declare(strict_types=1);
 namespace App\Services\MedicalEvents\Mappers;
 
 use App\Contracts\FhirMapperContract;
+use App\Core\Arr;
+use App\Enums\Person\ClinicalImpressionStatus;
+use App\Enums\Person\ConditionVerificationStatus;
+use App\Enums\Person\DiagnosticReportStatus;
 use App\Enums\Person\EncounterStatus;
+use App\Enums\Person\ImmunizationStatus;
+use App\Enums\Person\ObservationStatus;
+use App\Enums\Person\ProcedureStatus;
 use App\Services\MedicalEvents\FhirResource;
 use Carbon\CarbonImmutable;
 
 class EncounterMapper implements FhirMapperContract
 {
+    /**
+     * The field each kind of record of the package carries its status in, and the cancelled status to put there.
+     *
+     * @var array
+     */
+    private const array CANCELLED_STATUSES = [
+        'conditions' => ['verificationStatus', ConditionVerificationStatus::ENTERED_IN_ERROR],
+        'observations' => ['status', ObservationStatus::ENTERED_IN_ERROR],
+        'immunizations' => ['status', ImmunizationStatus::ENTERED_IN_ERROR],
+        'diagnosticReports' => ['status', DiagnosticReportStatus::ENTERED_IN_ERROR],
+        'procedures' => ['status', ProcedureStatus::ENTERED_IN_ERROR],
+        'clinicalImpressions' => ['status', ClinicalImpressionStatus::ENTERED_IN_ERROR]
+    ];
+
+    /**
+     * The same for the records that may be marked as entered in error on their own. Conditions are left out
+     * on purpose: a diagnosis is only cancelled together with the encounter it belongs to.
+     *
+     * @var array
+     */
+    private const array SEPARATELY_CANCELLED_STATUSES = [
+        'observations' => ['status', ObservationStatus::ENTERED_IN_ERROR],
+        'immunizations' => ['status', ImmunizationStatus::ENTERED_IN_ERROR],
+        'diagnosticReports' => ['status', DiagnosticReportStatus::ENTERED_IN_ERROR],
+        'procedures' => ['status', ProcedureStatus::ENTERED_IN_ERROR],
+        'clinicalImpressions' => ['status', ClinicalImpressionStatus::ENTERED_IN_ERROR]
+    ];
+
     /**
      * Build a FHIR encounter structure ready for the repository or eHealth API.
      *
@@ -42,6 +77,9 @@ class EncounterMapper implements FhirMapperContract
             $result['incomingReferral'] = FhirResource::make()
                 ->coding('eHealth/resources', 'service_request')
                 ->toIdentifier($data['referralNumber']);
+            if (!empty($data['referralDisplayValue'])) {
+                $result['incomingReferral']['display_value'] = $data['referralDisplayValue'];
+            }
         }
 
         if ($data['referralType'] === 'paper') {
@@ -62,24 +100,30 @@ class EncounterMapper implements FhirMapperContract
             );
         }
 
-        $result['diagnoses'] = array_map(
-            static function (array $fhir, array $diagnosis) {
-                $item = [
-                    'condition' => FhirResource::make()->coding('eHealth/resources', 'condition')
-                        ->toIdentifier($fhir['id']),
-                    'role' => FhirResource::make()->coding('eHealth/diagnosis_roles', $diagnosis['roleCode'])
-                        ->toCodeableConcept(),
-                ];
+        $result['diagnoses'] = [];
 
-                if (!empty($diagnosis['rank'])) {
-                    $item['rank'] = $diagnosis['rank'];
-                }
+        // A diagnosis names the condition standing at its own position among the conditions of the package,
+        // so a condition carried without a diagnosis of its own simply adds nothing here
+        foreach ($data['diagnoses'] as $index => $diagnosis) {
+            $conditionId = $fhirConditions[$index]['id'] ?? null;
 
-                return $item;
-            },
-            $fhirConditions,
-            $data['diagnoses']
-        );
+            if ($conditionId === null) {
+                continue;
+            }
+
+            $item = [
+                'condition' => FhirResource::make()->coding('eHealth/resources', 'condition')
+                    ->toIdentifier($conditionId),
+                'role' => FhirResource::make()->coding('eHealth/diagnosis_roles', $diagnosis['roleCode'])
+                    ->toCodeableConcept()
+            ];
+
+            if (!empty($diagnosis['rank'])) {
+                $item['rank'] = $diagnosis['rank'];
+            }
+
+            $result['diagnoses'][] = $item;
+        }
 
         if (!empty($data['actions'])) {
             $result['actions'] = array_map(
@@ -125,8 +169,24 @@ class EncounterMapper implements FhirMapperContract
 
         // todo: hospitalization
 
+        $asserterUuids = collect($fhirConditions)
+            ->flatMap(function (array $condition) {
+                $asserter = $condition['asserter'] ?? null;
+                if (!$asserter) {
+                    return [];
+                }
+                if (is_array($asserter) && array_is_list($asserter)) {
+                    return collect($asserter)->pluck('identifier.value');
+                }
+
+                return [data_get($asserter, 'identifier.value')];
+            })
+            ->filter();
+
         $mappedParticipants = collect($data['participant'] ?? [])
             ->pluck('uuid')
+            ->push($uuids['employee'] ?? null)
+            ->concat($asserterUuids)
             ->filter()
             ->unique()
             ->map(fn (string $uuid) => FhirResource::make()
@@ -199,7 +259,10 @@ class EncounterMapper implements FhirMapperContract
                 ->values()
                 ->toArray(),
             'participant' => collect(data_get($data, 'participants', []))
-                ->map(static fn (array $item) => ['uuid' => data_get($item, 'identifier.value')])
+                ->map(static fn (array $item) => [
+                    'uuid' => data_get($item, 'identifier.value'),
+                    'name' => data_get($item, 'displayValue', data_get($item, 'display_value', '')),
+                ])
                 ->filter(static fn (array $item) => !empty($item['uuid']))
                 ->values()
                 ->toArray(),
@@ -220,6 +283,123 @@ class EncounterMapper implements FhirMapperContract
                 })
                 ->values()
                 ->toArray(),
+        ];
+    }
+
+    /**
+     * Turn a rebuilt encounter package into the one that marks it and every record in it as entered in error.
+     * The package has to arrive from the same builder that created it, so that the content eHealth compares
+     * the signature against is the content it already stored.
+     *
+     * @param  array  $package  Package as Fhir::encounterPackage()->toFhir() built it
+     * @param  string  $cancellationReason
+     * @param  string  $explanatoryLetter
+     * @param  string|null  $cancellationReasonText
+     * @return array
+     */
+    public function toCancellationPackage(
+        array $package,
+        string $cancellationReason,
+        string $explanatoryLetter,
+        ?string $cancellationReasonText = null
+    ): array {
+        $package['encounter'] = $this->withCancellationDetails(
+            $package['encounter'],
+            EncounterStatus::ENTERED_IN_ERROR->value,
+            $cancellationReason,
+            $explanatoryLetter,
+            $cancellationReasonText
+        );
+
+        foreach (self::CANCELLED_STATUSES as $packageKey => [$statusField, $cancelledStatus]) {
+            $package[$packageKey] = array_map(
+                static fn (array $record): array => [
+                    ...$record,
+                    $statusField => $cancelledStatus->value,
+                    'explanatoryLetter' => $explanatoryLetter
+                ],
+                $package[$packageKey] ?? []
+            );
+        }
+
+        // Sections with no records stay out, the same way the package was signed when it was created
+        return Arr::toSnakeCase(array_filter($package));
+    }
+
+    /**
+     * Turn a rebuilt encounter package into the one that marks the given records of it as entered in error.
+     * The encounter and every record left out keep the status they were stored with, which is what tells eHealth
+     * the package itself stays valid. The package still has to travel whole, since eHealth compares its content
+     * to the content it stored, statuses aside.
+     *
+     * @param  array  $package  Package as Fhir::encounterPackage()->toFhir() built it
+     * @param  string  $encounterStatus  Status the encounter is stored with
+     * @param  array  $recordIds  eHealth IDs of the records to mark, keyed by package section
+     * @param  string  $cancellationReason
+     * @param  string  $explanatoryLetter
+     * @param  string|null  $cancellationReasonText
+     * @return array
+     */
+    public function toRecordCancellationPackage(
+        array $package,
+        string $encounterStatus,
+        array $recordIds,
+        string $cancellationReason,
+        string $explanatoryLetter,
+        ?string $cancellationReasonText = null
+    ): array {
+        $package['encounter'] = $this->withCancellationDetails(
+            $package['encounter'],
+            $encounterStatus,
+            $cancellationReason,
+            $explanatoryLetter,
+            $cancellationReasonText
+        );
+
+        foreach ($recordIds as $packageKey => $ids) {
+            [$statusField, $cancelledStatus] = self::SEPARATELY_CANCELLED_STATUSES[$packageKey];
+
+            $package[$packageKey] = array_map(
+                static fn (array $record): array => in_array($record['id'], $ids, true)
+                    ? [
+                        ...$record,
+                        $statusField => $cancelledStatus->value,
+                        'explanatoryLetter' => $explanatoryLetter
+                    ]
+                    : $record,
+                $package[$packageKey] ?? []
+            );
+        }
+
+        // Sections with no records stay out, the same way the package was signed when it was created
+        return Arr::toSnakeCase(array_filter($package));
+    }
+
+    /**
+     * Put the cancellation details on the encounter. eHealth requires the reason and the explanatory letter in
+     * every cancellation request, even the one that leaves the encounter itself untouched.
+     *
+     * @param  array  $encounter
+     * @param  string  $status
+     * @param  string  $cancellationReason
+     * @param  string  $explanatoryLetter
+     * @param  string|null  $cancellationReasonText
+     * @return array
+     */
+    private function withCancellationDetails(
+        array $encounter,
+        string $status,
+        string $cancellationReason,
+        string $explanatoryLetter,
+        ?string $cancellationReasonText
+    ): array {
+        return [
+            ...$encounter,
+            'status' => $status,
+            'cancellationReason' => FhirResource::make()
+                ->coding('eHealth/cancellation_reasons', $cancellationReason)
+                ->toCodeableConcept($cancellationReasonText ?? ''),
+            'explanatoryLetter' => $explanatoryLetter
         ];
     }
 }

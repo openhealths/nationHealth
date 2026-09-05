@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
@@ -31,7 +33,7 @@ return new class extends Migration
 
         if ($uuidColumn['nullable']) {
             Schema::table('confidant_persons', function (Blueprint $table) {
-                    $table->uuid('uuid')->nullable(false)->default(null)->change();
+                $table->uuid('uuid')->nullable(false)->default(null)->change();
             });
         }
     }

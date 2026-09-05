@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -99,7 +100,7 @@ class DiagnosticReport extends Model
     protected function effectiveDate(): Attribute
     {
         return Attribute::make(
-            get: fn (): string =>  $this->effectiveDateTime ? convertToAppDateFormat($this->effectiveDateTime) : '',
+            get: fn (): string => $this->effectiveDateTime ? convertToAppDateFormat($this->effectiveDateTime) : '',
         );
     }
 
@@ -132,7 +133,7 @@ class DiagnosticReport extends Model
     {
         return Attribute::make(
             get: fn (): string =>
-                $this->effectivePeriod?->end ? CarbonImmutable::parse($this->effectivePeriod->end)->format(config('app.date_format')): '',
+                $this->effectivePeriod?->end ? CarbonImmutable::parse($this->effectivePeriod->end)->format(config('app.date_format')) : '',
         );
     }
 
@@ -199,9 +200,9 @@ class DiagnosticReport extends Model
         return $this->belongsTo(CodeableConcept::class, 'cancellation_reason_id');
     }
 
-    public function performer(): HasOne
+    public function performer(): HasMany
     {
-        return $this->hasOne(DiagnosticReportPerformer::class);
+        return $this->hasMany(DiagnosticReportPerformer::class);
     }
 
     public function managingOrganization(): BelongsTo
@@ -282,6 +283,43 @@ class DiagnosticReport extends Model
     protected function final(Builder $query): Builder
     {
         return $query->whereStatus(DiagnosticReportStatus::FINAL);
+    }
+
+    /**
+     * Filter reports recorded within the given encounter, which is stored as an identifier holding its eHealth ID.
+     *
+     * @param  Builder  $query
+     * @param  string  $encounterId
+     * @return Builder
+     */
+    #[Scope]
+    protected function forEncounter(Builder $query, string $encounterId): Builder
+    {
+        return $query->whereHas(
+            'encounter',
+            static fn (Builder $identifier): Builder => $identifier->whereValue($encounterId)
+        );
+    }
+
+    /**
+     * Limit diagnostic reports to the services allowed in the patient summary.
+     * The report stores its service as a reference, so the allowed service codes are resolved to ids first.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    #[Scope]
+    protected function allowedForSummary(Builder $query): Builder
+    {
+        $serviceIds = dictionary()->services()
+            ->flattened()
+            ->whereIn('code', config('ehealth.summary_diagnostic_reports_allowed'))
+            ->pluck('id');
+
+        return $query->whereHas(
+            'code',
+            static fn (Builder $identifier): Builder => $identifier->whereIn('value', $serviceIds)
+        );
     }
 
     /**

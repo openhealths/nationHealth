@@ -7,6 +7,7 @@ namespace App\Models\MedicalEvents\Sql;
 use App\Casts\EHealthTimestampCast;
 use App\Enums\Person\ConditionClinicalStatus;
 use App\Enums\Person\ConditionVerificationStatus;
+use App\Models\Icd10;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use Eloquence\Behaviours\HasCamelCasing;
@@ -153,6 +154,11 @@ class Condition extends Model
         $coding = $this->code?->coding?->first();
         if ($coding) {
             $code = $coding->code;
+
+            if ($coding->system === 'eHealth/ICD10_AM/condition_codes') {
+                return Icd10::where('code', $code)->value('description') ?? $code;
+            }
+
             try {
                 $dict = dictionary()->basics()->byName($coding->system);
                 if ($dict) {
@@ -189,6 +195,22 @@ class Condition extends Model
     }
 
     /**
+     * Filter conditions created within the given encounter, which is stored as the context identifier.
+     *
+     * @param  Builder  $query
+     * @param  string  $encounterId
+     * @return Builder
+     */
+    #[Scope]
+    protected function forEncounter(Builder $query, string $encounterId): Builder
+    {
+        return $query->whereHas(
+            'context',
+            static fn (Builder $identifier): Builder => $identifier->whereValue($encounterId)
+        );
+    }
+
+    /**
      * Order by most recently updated in eHealth first, keeping records without a timestamp last.
      *
      * @param  Builder  $query
@@ -199,6 +221,24 @@ class Condition extends Model
     {
         return $query->orderByRaw('CASE WHEN ehealth_updated_at IS NULL THEN 1 ELSE 0 END')
             ->orderByDesc('ehealth_updated_at');
+    }
+
+    /**
+     * Limit conditions to the codes allowed in the patient summary.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    #[Scope]
+    protected function allowedForSummary(Builder $query): Builder
+    {
+        return $query->whereHas(
+            'code.coding',
+            static fn (Builder $coding): Builder => $coding->whereIn(
+                'code',
+                config('ehealth.summary_conditions_allowed')
+            )
+        );
     }
 
     /**

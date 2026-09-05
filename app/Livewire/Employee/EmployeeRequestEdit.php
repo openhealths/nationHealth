@@ -16,10 +16,15 @@ class EmployeeRequestEdit extends AbstractEmployeeFormManager
 {
     public function mount(LegalEntity $legalEntity, EmployeeRequest $employee_request): void
     {
-        $this->loadDictionaries();
-        $this->loadDivisions($legalEntity);
         $this->employeeRequest = $employee_request;
         $this->employeeRequestId = $employee_request->id;
+
+        if ($this->redirectIfEmployeeRequestAlreadyProcessed()) {
+            return;
+        }
+
+        $this->loadDictionaries();
+        $this->loadDivisions($legalEntity);
 
         $employeeName = $employee_request->party->fullName ?? ($employee_request->employee->party->fullName ?? '');
         $positionName = $this->dictionaries['POSITION'][$employee_request->position] ?? $employee_request->position;
@@ -47,6 +52,7 @@ class EmployeeRequestEdit extends AbstractEmployeeFormManager
     {
         if ($this->employeeRequestId) {
             $this->employeeRequest = EmployeeRequest::findOrFail($this->employeeRequestId);
+            $this->redirectIfEmployeeRequestAlreadyProcessed();
         }
     }
 

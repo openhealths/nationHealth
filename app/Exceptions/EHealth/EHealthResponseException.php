@@ -55,13 +55,41 @@ class EHealthResponseException extends EHealthException
             return;
         }
 
+        if ($this->isPartyDeceased()) {
+            Session::flash('error', __('errors.ehealth.messages.party_deceased'));
+
+            return;
+        }
+
         $message = $flashMessage ?? __('messages.ehealth_error', ['message' => $this->getMessage()]);
 
         if ($flashMessage === null && $this->response->status() === 409) {
-            $message = $this->response->json('error.message') ?? $this->getMessage();
+            $raw = $this->response->json('error.message') ?? $this->getMessage();
+            $message = $this->translateConflictMessage((string) $raw);
         }
 
         Session::flash('error', $message);
+    }
+
+    /**
+     * Map known eHealth 409 conflict messages to Ukrainian copy.
+     */
+    protected function translateConflictMessage(string $message): string
+    {
+        if (preg_match('/^License with type (.+) is already present$/u', $message, $matches) === 1) {
+            return __('errors.ehealth.messages.license_type_already_present', ['type' => $matches[1]]);
+        }
+
+        if (str_contains($message, 'At least one of action references, diagnostic reports or procedures should reference the same service')) {
+            return __('errors.ehealth.messages.referral_service_mismatch');
+        }
+
+        return match ($message) {
+            'Legal entity type and license type mismatch' => __('errors.ehealth.messages.license_type_mismatch'),
+            'License is expired' => __('errors.ehealth.messages.license_expired'),
+            'No active primary license found for legal entity' => __('errors.ehealth.messages.no_active_primary_license'),
+            default => $message,
+        };
     }
 
     /**
@@ -72,6 +100,16 @@ class EHealthResponseException extends EHealthException
     {
         return $this->response->status() === 403
             && str_contains($this->response->json('error.message', ''), 'Party is not verified');
+    }
+
+    /**
+     * Returns true when the eHealth API denied the request because the
+     * employee's party is marked as deceased (BLOCK_DECEASED_PARTY_USERS=true).
+     */
+    public function isPartyDeceased(): bool
+    {
+        return $this->response->status() === 403
+            && str_contains($this->response->json('error.message', ''), 'Party is deceased');
     }
 
     /**

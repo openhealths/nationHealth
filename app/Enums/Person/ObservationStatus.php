@@ -19,8 +19,8 @@ enum ObservationStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::ENTERED_IN_ERROR => __('patients.status.entered_in_error'),
-            self::VALID => __('patients.status.valid')
+            self::ENTERED_IN_ERROR => __('observations.status.entered_in_error'),
+            self::VALID => __('observations.status.valid')
         };
     }
 

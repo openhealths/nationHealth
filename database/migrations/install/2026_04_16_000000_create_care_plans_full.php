@@ -22,7 +22,6 @@ return new class extends Migration
                 $table->foreignId('legal_entity_id')->constrained('legal_entities');
                 $table->string('status');
                 $table->string('category')->nullable();
-                $table->string('clinical_protocol')->nullable();
                 $table->string('context')->nullable();
                 $table->string('title');
                 $table->date('period_start');
@@ -61,6 +60,9 @@ return new class extends Migration
                 $table->decimal('daily_amount', 15, 2)->nullable();
                 $table->string('daily_amount_system')->nullable();
                 $table->string('daily_amount_code')->nullable();
+                $table->decimal('remaining_quantity', 12, 4)->nullable();
+                $table->string('remaining_quantity_system')->nullable();
+                $table->string('remaining_quantity_code')->nullable();
                 $table->decimal('quantity_per_time', 15, 2)->nullable();
                 $table->string('quantity_per_time_unit')->nullable();
                 $table->integer('frequency')->nullable();
@@ -77,6 +79,7 @@ return new class extends Migration
                 $table->text('status_reason')->nullable();
                 $table->string('outcome_reference')->nullable();
                 $table->string('outcome_codeable_concept')->nullable();
+                $table->boolean('do_not_perform')->default(false);
 
                 // FHIR conversion fields
                 $table->foreignId('kind_id')->nullable()->constrained('codeable_concepts');
@@ -84,6 +87,8 @@ return new class extends Migration
                 $table->foreignId('reason_code_id')->nullable()->constrained('codeable_concepts');
                 $table->foreignId('outcome_codeable_concept_id')->nullable()->constrained('codeable_concepts');
                 $table->foreignId('product_reference_id')->nullable()->constrained('identifiers');
+                $table->foreignId('quantity_id')->nullable()->constrained('quantities')->onDelete('set null');
+                $table->foreignId('daily_amount_id')->nullable()->constrained('quantities')->onDelete('set null');
 
                 $table->timestamps();
             });

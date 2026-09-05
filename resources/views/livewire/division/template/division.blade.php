@@ -15,7 +15,7 @@
 @endphp
 
 <div>
-    <livewire:components.x-message :key="now()->timestamp"/>
+    <livewire:components.x-message :listen-async="true" :key="now()->timestamp"/>
 
     <div
         x-data="{

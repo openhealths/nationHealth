@@ -111,7 +111,7 @@ class Declaration extends Request
             '*.person.birth_date' => 'nullable|date_format:Y-m-d',
             '*.person.first_name' => 'required|string',
             '*.person.uuid' => 'required|uuid',
-            '*.person.last_name' => 'required|string',
+            '*.person.last_name' => 'nullable|string',
             '*.person.second_name' => 'nullable|string',
             '*.person.verification_status' => 'required|string',
 
@@ -223,7 +223,7 @@ class Declaration extends Request
             'person.first_name' => 'required|string',
             'person.gender' => 'required|string',
             'person.uuid' => 'required|uuid',
-            'person.last_name' => 'required|string',
+            'person.last_name' => 'nullable|string',
             'person.phones' => 'nullable|array',
             'person.phones.*.type' => 'required_with:person.phones|string',
             'person.phones.*.number' => 'required_with:person.phones|string',

@@ -1,24 +1,23 @@
 @use(App\Enums\EmployeeRole\Status)
 
 <section class="shift-content section-form w-full max-w-7xl">
-    <div class="flex items-center justify-between gap-4 flex-wrap">
-        <x-header-navigation class="breadcrumb-form flex-1 min-w-0">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+        <x-header-navigation class="breadcrumb-form min-w-0 flex-1">
             <x-slot name="title">{{ __('employee-roles.role') }}</x-slot>
         </x-header-navigation>
     </div>
 
-    <div class="shift-content pl-3.5 mt-8">
+    <div class="shift-content mt-8 pl-3.5">
         <fieldset class="fieldset">
             <legend class="legend">
-                {{ $employeeRole->employee->fullName }}
-                - {{ $dictionaries['SPECIALITY_TYPE'][$employeeRole->healthcareService->specialityType] }}
+                {{ $employeeRole->employee->fullName }} - {{ $dictionaries['SPECIALITY_TYPE'][$employeeRole->healthcareService->specialityType] }}
             </legend>
 
             <div class="form-row-2">
                 <div class="form-group group">
                     <label for="uuid" class="label">{{ __('employee-roles.id') }}</label>
                     <input
-                        value="{{ $employeeRole->healthcareService->uuid }}"
+                        value="{{ $employeeRole->uuid }}"
                         type="text"
                         name="uuid"
                         id="uuid"

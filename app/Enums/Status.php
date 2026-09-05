@@ -43,6 +43,16 @@ enum Status: string
         };
     }
 
+    public function color(): string
+    {
+        return match ($this) {
+            self::APPROVED, self::ACTIVE => 'badge-green',
+            self::NEW, self::SIGNED, self::UNSYNCED, self::REORGANIZED => 'badge-yellow',
+            self::DRAFT, self::REJECTED, self::DISMISSED, self::STOPPED,
+            self::INACTIVE, self::ENTERED_IN_ERROR, self::EXPIRED => 'badge-red',
+        };
+    }
+
     public static function only(array $names): array
     {
         return collect(self::cases())

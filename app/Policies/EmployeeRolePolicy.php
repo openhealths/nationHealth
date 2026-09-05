@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Policies;
 
 use App\Enums\EmployeeRole\Status;
+use App\Enums\User\Role;
 use App\Models\EmployeeRole;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
@@ -12,11 +13,23 @@ use Illuminate\Auth\Access\Response;
 class EmployeeRolePolicy
 {
     /**
+     * Roles that may view and manage employee roles.
+     *
+     * @var array
+     */
+    private const array MANAGING_ROLES = [Role::OWNER, Role::HR, Role::ADMIN];
+
+    /**
      * User allowed to view the list of employee roles
      */
     public function viewAny(User $user): Response
     {
         if ($user->cannot('employee_role:read')) {
+            return Response::denyWithStatus(404);
+        }
+
+        // The scope alone is held by more roles than may view the employee roles
+        if (!$user->hasAllowedRole(self::MANAGING_ROLES)) {
             return Response::denyWithStatus(404);
         }
 
@@ -32,6 +45,11 @@ class EmployeeRolePolicy
             return Response::denyWithStatus(404);
         }
 
+        // The scope alone is held by more roles than may view an employee role
+        if (!$user->hasAllowedRole(self::MANAGING_ROLES)) {
+            return Response::denyWithStatus(404);
+        }
+
         return Response::allow();
     }
 
@@ -41,6 +59,11 @@ class EmployeeRolePolicy
     public function create(User $user): Response
     {
         if ($user->cannot('employee_role:write')) {
+            return Response::denyWithStatus(404);
+        }
+
+        // The scope alone is held by more roles than may create an employee role
+        if (!$user->hasAllowedRole(self::MANAGING_ROLES)) {
             return Response::denyWithStatus(404);
         }
 
@@ -58,6 +81,11 @@ class EmployeeRolePolicy
     public function deactivate(User $user, EmployeeRole $employeeRole): Response
     {
         if ($user->cannot('employee_role:write')) {
+            return Response::denyWithStatus(404);
+        }
+
+        // The scope alone is held by more roles than may deactivate an employee role
+        if (!$user->hasAllowedRole(self::MANAGING_ROLES)) {
             return Response::denyWithStatus(404);
         }
 

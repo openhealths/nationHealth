@@ -1,20 +1,23 @@
 <?php
 
-namespace Tests\Feature;
+declare(strict_types=1);
+
+namespace Tests\Feature\CarePlan;
 
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
-use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
+use App\Models\User;
 use App\Repositories\CarePlanRepository;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 use Mockery;
 
 class CarePlanSyncTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function migrateDatabases()
     {
@@ -31,7 +34,7 @@ class CarePlanSyncTest extends TestCase
     public function test_care_plan_and_activities_can_be_synced_and_mapped_to_structured_sql(): void
     {
         // 1. Setup - Create a person & LegalEntity
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id') 
+        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
             ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = \App\Models\LegalEntity::create([
@@ -45,13 +48,17 @@ class CarePlanSyncTest extends TestCase
 
         $person = new Person();
         $person->uuid = '540d6f4c-1d7c-4a3d-a51b-5e04f981e8d6';
-        $person->first_name = 'John';
-        $person->last_name = 'Doe';
         $person->gender = 'MALE';
         $person->birth_date = '1990-01-01';
         $person->patient_signed = true;
         $person->process_disclosure_data_consent = true;
         $person->save();
+
+        $person->names()->create([
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'language' => 'uk'
+        ]);
 
         // 2. Mock EHealth Response
         $carePlanUuid = 'c0280b2c-686b-4e63-a262-429d4791ea82';
@@ -183,5 +190,127 @@ class CarePlanSyncTest extends TestCase
         $this->assertNotNull($activity->kind_id);
         $this->assertEquals('ServiceRequest', $activity->kindConcept->coding->first()->code);
         $this->assertEquals('J00', $activity->reasonConcept->coding->first()->code);
+    }
+
+    public function test_sync_attributes_plans_with_unknown_remote_authors_to_the_caller_supplied_author(): void
+    {
+        [$person, $employee] = $this->makeSyncContext();
+        $carePlanUuid = (string) Str::uuid();
+        $this->mockEmptyActivitySummary();
+
+        app(CarePlanRepository::class)->syncCarePlans(
+            $this->remotePlan($carePlanUuid, (string) Str::uuid()),
+            $person->id,
+            $employee->id
+        );
+
+        $this->assertDatabaseHas('care_plans', [
+            'uuid' => $carePlanUuid,
+            'author_id' => $employee->id,
+        ]);
+    }
+
+    public function test_sync_skips_plans_whose_author_cannot_be_resolved(): void
+    {
+        [$person, $employee] = $this->makeSyncContext();
+        $carePlanUuid = (string) Str::uuid();
+
+        // Care plans need an author. Without one from the caller the plan stays unsynced rather
+        // than being attributed to whoever happens to be signed in, so this also works on a queue.
+        $this->actingAs(User::findOrFail($employee->user_id));
+
+        app(CarePlanRepository::class)->syncCarePlans(
+            $this->remotePlan($carePlanUuid, (string) Str::uuid()),
+            $person->id
+        );
+
+        $this->assertDatabaseMissing('care_plans', ['uuid' => $carePlanUuid]);
+    }
+
+    /**
+     * @return array{0: Person, 1: \App\Models\Employee\Employee}
+     */
+    private function makeSyncContext(): array
+    {
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+
+        $legalEntity = \App\Models\LegalEntity::create([
+            'uuid' => (string) Str::uuid(),
+            'status' => 'ACTIVE',
+            'sync_status' => 'COMPLETED',
+            'legal_entity_type_id' => $typeId,
+            'is_active' => true,
+        ]);
+        $this->instance('legalEntity', $legalEntity);
+
+        $person = Person::create([
+            'uuid' => (string) Str::uuid(),
+            'gender' => 'MALE',
+            'birth_date' => '1990-01-01',
+            'patient_signed' => true,
+            'process_disclosure_data_consent' => true,
+            'legal_entity_id' => $legalEntity->id,
+        ]);
+
+        $party = \App\Models\Relations\Party::create([
+            'uuid' => (string) Str::uuid(),
+            'first_name' => 'Gregory',
+            'last_name' => 'Doctor',
+            'tax_id' => (string) random_int(1000000000, 9999999999),
+            'birth_date' => '1970-01-01',
+            'gender' => 'MALE',
+        ]);
+
+        $user = User::create([
+            'uuid' => (string) Str::uuid(),
+            'email' => 'sync-'.Str::random(8).'@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'party_id' => $party->id,
+        ]);
+
+        $employee = \App\Models\Employee\Employee::create([
+            'uuid' => (string) Str::uuid(),
+            'full_name' => 'Dr. House',
+            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
+            'status' => \App\Enums\Status::APPROVED->value,
+            'legal_entity_id' => $legalEntity->id,
+            'is_active' => true,
+            'position' => 'Doctor',
+            'start_date' => now()->format('Y-m-d'),
+            'user_id' => $user->id,
+            'party_id' => $party->id,
+        ]);
+
+        return [$person, $employee];
+    }
+
+    private function mockEmptyActivitySummary(): void
+    {
+        $response = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $response->shouldReceive('getData')->andReturn(['data' => []]);
+        $response->shouldReceive('getStatusCode')->andReturn(200);
+
+        $this->mock(\App\Classes\eHealth\Api\CarePlanActivity::class)
+            ->shouldReceive('getSummary')
+            ->andReturn($response);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function remotePlan(string $carePlanUuid, string $authorUuid): array
+    {
+        return [
+            'data' => [
+                [
+                    'id' => $carePlanUuid,
+                    'status' => 'active',
+                    'title' => 'Plan with a remote author',
+                    'author' => ['identifier' => ['value' => $authorUuid]],
+                    'period' => ['start' => '2026-04-14', 'end' => '2026-05-14'],
+                ],
+            ],
+        ];
     }
 }

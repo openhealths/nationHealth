@@ -28,17 +28,16 @@
         </div>
 
         <div class="form-group group">
-            <select name="availabilityStatus"
-                    id="availabilityStatus"
-                    class="peer input-select"
-                    required
-                    disabled
+            <input value="{{ AvailabilityStatus::from($form->availabilityStatus)->label() }}"
+                   type="text"
+                   name="availabilityStatus"
+                   id="availabilityStatus"
+                   placeholder=" "
+                   class="peer input"
+                   disabled
+                   readonly
             >
-                <option value="" selected>
-                    {{ AvailabilityStatus::from($form->availabilityStatus)->label() }}
-                </option>
-            </select>
-            <label for="availabilityStatus" class="label peer-focus:text-blue-600 peer-valid:text-blue-600">
+            <label for="availabilityStatus" class="label">
                 {{ __('equipments.availability_status.label') }}
             </label>
 

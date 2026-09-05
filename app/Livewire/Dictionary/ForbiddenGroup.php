@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Dictionary;
 
 use App\Classes\eHealth\EHealth;
+use App\Models\Icd10;
 use App\Models\LegalEntity;
 use App\Traits\FormTrait;
 use App\Exceptions\EHealth\EHealthConnectionException;
@@ -70,14 +71,12 @@ class ForbiddenGroup extends Component
 
             // Get descriptions for each system separately
             foreach ($codesBySystem as $system => $codes) {
-                $dictionaryName = $system === 'eHealth/ICD10_AM/condition_codes'
-                    ? 'eHealth/ICD10_AM/condition_codes'
-                    : 'eHealth/ICPC2/condition_codes';
-
-                $systemDescriptions = dictionary()->basics()
-                    ->byName($dictionaryName)
-                    ->whereIn('code', $codes)
-                    ->asCodeDescription();
+                $systemDescriptions = $system === 'eHealth/ICD10_AM/condition_codes'
+                    ? Icd10::whereIn('code', $codes)->pluck('description', 'code')
+                    : dictionary()->basics()
+                        ->byName('eHealth/ICPC2/condition_codes')
+                        ->whereIn('code', $codes)
+                        ->asCodeDescription();
 
                 $descriptions = $descriptions->merge($systemDescriptions);
             }

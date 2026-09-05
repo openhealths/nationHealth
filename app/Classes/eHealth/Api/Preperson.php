@@ -12,7 +12,6 @@ use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Rules\InDictionary;
-use App\Rules\PhoneNumber;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -114,7 +113,7 @@ class Preperson extends Request
             'emergency_contact.second_name' => ['nullable', 'string'],
             'emergency_contact.phones' => ['nullable', 'array'],
             'emergency_contact.phones.*.type' => ['nullable', new InDictionary('PHONE_TYPE')],
-            'emergency_contact.phones.*.number' => ['nullable', new PhoneNumber()],
+            'emergency_contact.phones.*.number' => ['nullable', 'regex:/^\+[0-9]{11,12}$/'],
             'death_date' => ['nullable', 'date'],
             'note' => ['nullable', 'string'],
             'status' => ['required', new Enum(Status::class)],

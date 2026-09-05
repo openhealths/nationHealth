@@ -15,9 +15,8 @@ trait SyncsMorphManyRelations
      * It intelligently handles a single record (associative array) or multiple records (array of arrays).
      * If the provided data is null, the method does nothing.
      *
-     * @param string     $relation The name of the morphMany relationship method (e.g., 'educations').
-     * @param array|null $data     The data to sync.
-     *
+     * @param  string  $relation  The name of the morphMany relationship method (e.g., 'educations').
+     * @param  array|null  $data  The data to sync.
      * @return void
      * @throws Throwable
      */

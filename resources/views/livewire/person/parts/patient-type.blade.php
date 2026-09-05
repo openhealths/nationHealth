@@ -1,3 +1,5 @@
+@use('App\Models\Preperson')
+
 <fieldset class="fieldset">
     <legend class="legend">
         {{ __('patients.patient_type') }}
@@ -13,7 +15,9 @@
                 required
             >
                 <option value="person">{{ __('patients.identified') }}</option>
-                <option value="preperson">{{ __('patients.unidentified') }}</option>
+                @can('create', Preperson::class)
+                    <option value="preperson">{{ __('patients.unidentified') }}</option>
+                @endcan
             </select>
             <label for="patientType" class="label">
                 {{ __('patients.patient_type') }}

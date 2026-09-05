@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Auth;
 
 use Closure;
+use Throwable;
 use Carbon\Carbon;
 use App\Models\User;
 use App\Models\LegalEntity;
@@ -23,6 +24,7 @@ use Illuminate\Support\Facades\Session;
 use App\Classes\eHealth\Api\EmployeeApi;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Validator;
+use App\Auth\SessionBinder;
 use App\Auth\EHealth\Services\TokenStorage;
 use App\Classes\eHealth\Exceptions\ApiException;
 use App\Classes\eHealth\Request as EHealthRequest;
@@ -83,7 +85,13 @@ class EHealthLoginController extends Controller
 
         $validatedEHealthTokenData = $validator->validated();
 
-        app(TokenStorage::class)->store($validatedEHealthTokenData);
+        $tokenStorage = app(TokenStorage::class);
+
+        // Grab whatever token this browser was carrying before it gets overwritten below,
+        // so the eHealth session behind it can be terminated once the user is authenticated anew
+        $previousBearerToken = $tokenStorage->getBearerToken();
+
+        $tokenStorage->store($validatedEHealthTokenData);
 
         $authUserUUID = $validatedEHealthTokenData['user_id'];
         $authLegalEntityUUID = $validatedEHealthTokenData['details']['client_id'];
@@ -121,6 +129,8 @@ class EHealthLoginController extends Controller
 
         Auth::guard($loginedGuard)->login($user);
 
+        new SessionBinder()->bind($user, $previousBearerToken);
+
         Session::forget('mis_2fa');
 
         $ehealthScopes = explode(
@@ -128,16 +138,33 @@ class EHealthLoginController extends Controller
             trim(data_get($validatedEHealthTokenData, 'details.scope'))
         );
 
-        $user->syncPermissions($ehealthScopes);
+        // OAuth may return scopes for a single selected role; merge with permissions
+        // from all roles assigned to the user in this legal entity (team).
+        $loginScopes = $this->resolveLoginScopes($user, $ehealthScopes);
 
-        EHealthUserLogin::dispatch($user, $legalEntity, $authUserUUID, $this->isFirstLogin, $loginedGuard);
+        $user->syncPermissions($loginScopes);
+        app(TokenStorage::class)->storeScopesFromUserPermissions($user);
+
+        try {
+            EHealthUserLogin::dispatch($user, $legalEntity, $authUserUUID, $loginScopes, $this->isFirstLogin, $loginedGuard);
+        } catch (Throwable $exception) {
+            $message = $exception->getMessage() ?: '';
+
+            Log::error('EHealth login post-auth listener failed', [
+                'user_id' => $user->id,
+                'legal_entity_id' => $legalEntity->id,
+                'exception' => $message,
+            ]);
+
+            return $this->breakAuth($message);
+        }
 
         $user->refresh();
 
         if (!$user->party) {
-
             Session::put('selected_legal_entity_uuid', $legalEntity->uuid);
-            $user->syncPermissions($ehealthScopes);
+            $user->syncPermissions($loginScopes);
+            app(TokenStorage::class)->storeScopesFromUserPermissions($user);
 
             return Redirect::route('party.verify');
         }
@@ -145,8 +172,8 @@ class EHealthLoginController extends Controller
         if ($legalEntity) {
             Log::info(__('auth.login.success.user_auth', [], 'en'), ['User ID' => $user->id]);
 
-            // Respect EHealth scopes
-            $user->syncPermissions($ehealthScopes);
+            $user->syncPermissions($loginScopes);
+            app(TokenStorage::class)->storeScopesFromUserPermissions($user);
 
             return Redirect::route('dashboard', [$legalEntity])->with(
                 'success',
@@ -267,6 +294,28 @@ class EHealthLoginController extends Controller
             $request->input('code'),
             $selectedLegalEntityUuidFromSession,
         );
+    }
+
+    /**
+     * Build login scopes from the OAuth token plus permissions of all roles
+     * already assigned to the user in the current legal entity (team).
+     *
+     * OAuth may return only the selected role's scopes; role permissions keep
+     * the session/model_has_permissions set complete across all user roles.
+     *
+     * @param  list<string>  $oauthScopes
+     * @return list<string>
+     */
+    protected function resolveLoginScopes(User $user, array $oauthScopes): array
+    {
+        $user->unsetRelation('roles')->unsetRelation('permissions');
+
+        return collect($oauthScopes)
+            ->merge($user->getPermissionsViaRoles()->pluck('name'))
+            ->filter(static fn ($scope) => is_string($scope) && $scope !== '')
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

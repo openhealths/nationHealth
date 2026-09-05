@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Classes\eHealth\EHealth;
+use App\Services\Dictionary\Collections\BasicDictionaryCollection;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
@@ -17,7 +21,7 @@ return new class extends Migration
     {
         Schema::create('icd_10', static function (Blueprint $table) {
             $table->id();
-            $table->string('code')->index();
+            $table->string('code')->unique();
             $table->string('description', 500)->index();
             $table->boolean('is_active');
             $table->jsonb('child_values');
@@ -26,10 +30,10 @@ return new class extends Migration
 
         try {
             $this->setData();
-        } catch (Exception $error) {
+        } catch (Exception $exception) {
             $this->down();
 
-            throw $error;
+            throw $exception;
         }
     }
 
@@ -48,7 +52,14 @@ return new class extends Migration
      */
     protected function setData(): void
     {
-        $dictionary = dictionary()->basics()->byName('eHealth/ICD10_AM/condition_codes')->asLargeDictionary()->toArray();
+        $response = EHealth::dictionary()->getMany(['name' => 'eHealth/ICD10_AM/condition_codes']);
+
+        $dictionary = BasicDictionaryCollection::make($response->getData())
+            ->byName('eHealth/ICD10_AM/condition_codes', false)
+            ->asLargeDictionary()
+            ->toArray();
+
+        $now = CarbonImmutable::now();
 
         $data = [];
 
@@ -58,12 +69,11 @@ return new class extends Migration
                 'description' => $value['description'],
                 'is_active' => $value['is_active'],
                 'child_values' => json_encode($value['child_values'], JSON_THROW_ON_ERROR),
-                'created_at' => now(),
-                'updated_at' => now()
+                'created_at' => $now,
+                'updated_at' => $now
             ];
         }
 
-        // Insert data by chunks
         $chunks = array_chunk($data, self::CHUNK_SIZE);
 
         foreach ($chunks as $chunk) {

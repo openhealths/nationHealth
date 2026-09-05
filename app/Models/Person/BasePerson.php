@@ -34,6 +34,7 @@ abstract class BasePerson extends Model
         'birth_settlement',
         'gender',
         'email',
+        'preferred_way_communication',
         'no_tax_id',
         'tax_id',
         'secret',

@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use Throwable;
-use App\Core\Arr;
 use App\Core\EHealthJob;
 use App\Enums\JobStatus;
 use App\Models\LegalEntity;
 use App\Models\EhealthLink;
-use App\Models\Person\Person;
 use InvalidArgumentException;
 use App\Classes\eHealth\EHealth;
 use Illuminate\Support\Facades\Log;
@@ -31,6 +29,7 @@ class RemoteEHealthLinksProcessing extends EHealthJob
 
     protected const int TIME_TO_RETRY = 5; // Time in seconds to wait before retrying the job
 
+    protected bool $stillPending = false;
     public function __construct(
         public EhealthLink $eHealthLink,
         public ?LegalEntity $legalEntity,
@@ -51,12 +50,22 @@ class RemoteEHealthLinksProcessing extends EHealthJob
     {
         $entity = $this->eHealthLink->entity;
 
-        switch($entity) {
+        switch ($entity) {
             case 'job':
-                $jobUuid = basename($this->eHealthLink->href);
+                $jobHref = (string) $this->eHealthLink->href;
+                $jobUuid = basename($jobHref);
+                $jobApi = EHealth::job()->withToken($token);
 
-                return EHealth::job()->withToken($token)->getDetails($jobUuid);
-            // TODO: fill the entities below with the correct API calls and data processing logic
+                try {
+                    return $jobApi->getDetails($jobUuid);
+                } catch (EHealthResponseException $exception) {
+                    if ($exception->response->status() !== 404) {
+                        throw $exception;
+                    }
+
+                    return $jobApi->getDetailsByHref($jobHref);
+                }
+                // TODO: fill the entities below with the correct API calls and data processing logic
             case 'encounter':
                 return null;
             case 'condition':
@@ -102,16 +111,19 @@ class RemoteEHealthLinksProcessing extends EHealthJob
     protected function processResponse(?EHealthResponse $response): void
     {
         if (\is_null($response)) {
-           return;
+            return;
         }
 
         $responseData = $response->getData();
-        // Status code can be in the response body or in the HTTP response itself, so we check both
         $statusCode = $responseData['status_code'] ?? $response->getStatusCode() ?? null;
-        $status = $responseData['status'] ?? null;
+        $status = strtolower((string) ($responseData['status'] ?? ''));
 
-        // Priority is given to the status code in the response body, if available, otherwise we use the HTTP status code
-        // This is because the API might return a 200 OK HTTP status code even if the operation failed
+        if (in_array($status, ['pending', 'processing', 'accepted'], true)) {
+            $this->stillPending = true;
+            $this->release(self::TIME_TO_RETRY);
+
+            return;
+        }
         if ($statusCode === 200) {
             if ($this->eHealthLink->linkable_type === Approval::class) {
                 $approval = $this->eHealthLink->linkable;
@@ -126,12 +138,7 @@ class RemoteEHealthLinksProcessing extends EHealthJob
             }
 
             return;
-        } else if($status === 'pending' && (!$statusCode || $statusCode === 202)) {
-            // Handle pending status (it means the request is still being processed)
-            $this->release(self::TIME_TO_RETRY); // Release the job back to the queue to be retried after specified time
-
-            return; // Exit the method to avoid further processing
-        } else if (strtolower($status) === strtolower(JobStatus::FAILED->value)) {
+        } elseif (strtolower($status) === strtolower(JobStatus::FAILED->value)) {
             if ($this->eHealthLink->linkable_type === Approval::class) {
                 $this->eHealthLink->linkable->update(['status' => JobStatus::FAILED->value]);
             }
@@ -176,8 +183,10 @@ class RemoteEHealthLinksProcessing extends EHealthJob
      */
     protected function getNextEntityJob(): ?EHealthJob
     {
-        return $this->standalone || !$this->nextEntity
-            ? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin)
-            : $this->nextEntity;
+        if ($this->stillPending || $this->standalone) {
+            return null;
+        }
+
+        return $this->nextEntity ?? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin);
     }
 }

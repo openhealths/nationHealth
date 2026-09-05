@@ -25,6 +25,9 @@ class LoginDev extends Login
     #[Locked]
     public bool $isLocalAuth = false;
 
+    // Redeclared to drop the #[Locked] attribute from the parent: dev login lets the developer type any email.
+    public string $email = '';
+
     /**
      * Dev login is independent of the MIS two-factor flow, so the email
      * must always stay selectable regardless of any leftover gate session.

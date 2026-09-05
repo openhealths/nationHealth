@@ -73,6 +73,34 @@ class Party extends Model
         return $this->hasMany(User::class);
     }
 
+    /**
+     * Users of this party that already have an employee record in the given legal entity.
+     * Used when adding another position so email choice cannot cross facilities.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, User>
+     */
+    public function usersWithEmployeeInLegalEntity(int $legalEntityId): \Illuminate\Database\Eloquent\Collection
+    {
+        return $this->users()
+            ->where(function ($query) use ($legalEntityId): void {
+                $query->whereHas(
+                    'employees',
+                    fn ($employees) => $employees
+                        ->where('legal_entity_id', $legalEntityId)
+                        ->where('party_id', $this->id)
+                )->orWhereIn(
+                    'users.id',
+                    Employee::query()
+                        ->where('legal_entity_id', $legalEntityId)
+                        ->where('party_id', $this->id)
+                        ->whereNotNull('user_id')
+                        ->select('user_id')
+                );
+            })
+            ->oldest()
+            ->get();
+    }
+
     public function employees(): HasMany
     {
         return $this->hasMany(Employee::class, 'party_id');

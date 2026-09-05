@@ -2,14 +2,20 @@
 @use('App\Models\DeclarationRequest')
 @use('App\Livewire\Declaration\DeclarationCreate')
 
-
 <section class="section-form">
     <x-header-navigation class="breadcrumb-form">
         <x-slot name="title">
             {{ $isNeedToResign ? __('declarations.simplified_declaration_creation') : __('declarations.application_for_registration_of_declaration') }} - {{ $patientFullName }}
         </x-slot>
+
+        @if ($declarationRequestId)
+            <div class="flex items-center gap-2">
+                <p class="default-p">{{ __('declarations.request_status.label') }}:</p>
+                <x-status-badge :status="$status" />
+            </div>
+        @endif
     </x-header-navigation>
-    <form class="form shift-content pl-3.5 mt-8">
+    <form class="form shift-content mt-8 pl-3.5">
         @include('livewire.declaration.parts.main-information')
 
         @if (!$isNeedToResign)
@@ -17,11 +23,9 @@
         @endif
 
         <div class="flex gap-8">
-            <a href="{{ url()->previous() }}" type="submit" class="button-minor">
-                {{ __('forms.cancel') }}
-            </a>
+            <a href="{{ url()->previous() }}" type="submit" class="button-minor"> {{ __('forms.cancel') }} </a>
             @can('create', DeclarationRequest::class)
-                @if($this instanceof DeclarationCreate && $status === RequestStatus::DRAFT)
+                @if ($this instanceof DeclarationCreate && $status === RequestStatus::DRAFT)
                     <button wire:click.prevent="createLocally" type="submit" class="button-primary-outline">
                         {{ __('forms.create_locally') }}
                     </button>
@@ -29,30 +33,34 @@
                 <button
                     wire:click.prevent="{{
                         $isNeedToResign && $status === RequestStatus::NEW
-                            ? 'approveSimplifiedDeclaration'
-                            : ($status === RequestStatus::NEW
-                                ? 'openMessageInformationModal'
-                                : ($status === RequestStatus::APPROVED
-                                    ? 'openSignatureModal'
-                                    : 'create'
-                                )
-                            )
+                        ? 'approveSimplifiedDeclaration'
+                        : (
+                            $status === RequestStatus::NEW
+                        ? "\$set('showInformationMessageModal', true)"
+                        : (
+                            $status === RequestStatus::APPROVED
+                        ? 'openSignatureModal'
+                        : 'create'
+                        )
+                        )
                     }}"
                     type="submit"
                     class="button-primary"
                 >
-                    {{ $status === RequestStatus::NEW
+                    {{
+                        $status === RequestStatus::NEW
                         ? __('declarations.approve_declaration_request')
-                        : ($status === RequestStatus::APPROVED
-                            ? __('declarations.sign_declaration_request')
-                            : __('declarations.create_an_application')
-                        ) 
+                        : (
+                            $status === RequestStatus::APPROVED
+                        ? __('declarations.sign_declaration_request')
+                        : __('declarations.create_an_application')
+                        )
                     }}
                 </button>
             @endcan
         </div>
 
-        @if($showInformationMessageModal && !$isNeedToResign)
+        @if ($showInformationMessageModal && !$isNeedToResign)
             @include('livewire.declaration.modals.information-message')
         @endif
 
@@ -60,7 +68,7 @@
             @include('livewire.declaration.modals.person-missed-data-message')
         @endif
 
-        @if($showAuthModal && !$isNeedToResign)
+        @if ($showAuthModal && !$isNeedToResign)
             @include('livewire.declaration.modals.authentication')
         @endif
 
@@ -68,11 +76,11 @@
             @include('livewire.declaration.modals.person-missed-data-message')
         @endif
 
-        @if($showUploadingDocumentsModal)
+        @if ($showUploadingDocumentsModal)
             @include('livewire.declaration.modals.uploading-documents')
         @endif
 
-        @if($showSignModal)
+        @if ($showSignModal)
             @include('livewire.declaration.modals.sign')
         @endif
 

@@ -39,7 +39,7 @@ class PersonRequestEdit extends PersonComponent
             ])->toArray()
         );
 
-        $this->address = $this->form->person['addresses'][0];
+        $this->addresses = $this->form->person['addresses'] ?: $this->addresses;
 
         if (empty($this->form->person['phones'])) {
             $this->form->person['phones'] = [['type' => null, 'number' => null]];

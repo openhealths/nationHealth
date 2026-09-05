@@ -22,6 +22,15 @@ class EmployeeRequestsSyncAll extends EHealthJob
     public const string SCOPE_REQUIRED = 'employee_request:read';
     public const string ENTITY = LegalEntity::ENTITY_EMPLOYEE_REQUEST;
 
+    public function handle(): void
+    {
+        if ($this->batch()?->processedJobs === 0) {
+            $this->sendEntityNotification(static::ENTITY, 'started');
+        }
+
+        parent::handle();
+    }
+
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse
     {
         Log::info('[EmployeeRequestsSyncAll] Sending request for page ' . $this->page);

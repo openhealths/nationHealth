@@ -47,6 +47,7 @@
                 required
                 wire:model="keyContainerUpload"
                 file="{{ $keyContainerUpload?->getClientOriginalName() }}"
+                accept=".dat,.pfx,.pk8,.zs2,.jks,.p7s"
                 aria-describedby="{{ $hasPublicOfferFileError ? 'publicOfferFileErrorHelp' : '' }}"
                 :id="'keyContainerFileUpload'"
             />

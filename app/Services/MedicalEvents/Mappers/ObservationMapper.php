@@ -25,7 +25,7 @@ class ObservationMapper implements FhirMapperContract
 
         $result = [
             'id' => $data['uuid'] ?? Str::uuid()->toString(),
-            'status' => ObservationStatus::VALID->value,
+            'status' => $data['status'] ?? ObservationStatus::VALID->value,
             'categories' => [
                 FhirResource::make()
                     ->coding($data['categorySystem'], $data['categoryCode'])
@@ -57,9 +57,11 @@ class ObservationMapper implements FhirMapperContract
         }
 
         if ($data['primarySource']) {
-            $result['performer'] = FhirResource::make()
-                ->coding('eHealth/resources', 'employee')
-                ->toIdentifier($uuids['employee']);
+            $result['performer'] = [
+                FhirResource::make()
+                    ->coding('eHealth/resources', 'employee')
+                    ->toIdentifier($uuids['employee'])
+            ];
         } else {
             $result['reportOrigin'] = FhirResource::make()
                 ->coding('eHealth/report_origins', $data['reportOriginCode'])
@@ -88,9 +90,13 @@ class ObservationMapper implements FhirMapperContract
                 ->toCodeableConcept();
         }
 
-        $result = array_merge($result, $this->buildValue($data));
+        if (!empty($data['reactionOn'])) {
+            $result['reactionOn'] = FhirResource::make()
+                ->coding('eHealth/resources', 'immunization')
+                ->toIdentifier($data['reactionOn']);
+        }
 
-        // todo: add reaction_on
+        $result = array_merge($result, $this->buildValue($data));
 
         $fhirComponents = collect($data['components'] ?? [])
             ->filter(fn (array $component) => !empty($component['valueCode']))
@@ -211,6 +217,7 @@ class ObservationMapper implements FhirMapperContract
 
         $flat = [
             'uuid' => data_get($data, 'uuid'),
+            'status' => data_get($data, 'status', ObservationStatus::VALID->value),
             'codingSystem' => $codingSystem,
             'categorySystem' => $categorySystem,
             'codeSystem' => data_get($data, 'code.coding.0.system'),
@@ -231,6 +238,7 @@ class ObservationMapper implements FhirMapperContract
             'issuedTime' => data_get($data, 'issuedTime'),
             'effectiveDate' => data_get($data, 'effectiveDate', ''),
             'effectiveTime' => data_get($data, 'effectiveTime', ''),
+            'reactionOn' => data_get($data, 'reactionOn.identifier.value', ''),
             'components' => $this->componentsFromFhir(data_get($data, 'components', []))
         ];
 

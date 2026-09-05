@@ -50,6 +50,7 @@
                     class="button-primary"
                     @click="$wire.create('{{ $authMethod['uuid'] }}').then(() => {
                         if (Object.keys($wire.mergeRequest).length) {
+                            $wire.$parent.$refresh();
                             currentMethod = '{{ $authMethod['type'] }}';
                             showMergeAuthDrawer = false;
                             showMergeConfirmationDrawer = true;

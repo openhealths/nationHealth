@@ -90,7 +90,7 @@ class DeclarationRepository
         } catch (Exception $err) {
             Log::channel('db_errors')->error('Error storing declarations: ' . $err->getMessage());
 
-            session()->flash('error', 'Виникла помилка при збереженні декларацій');
+            session()->flash('error', __('Виникла помилка при збереженні декларацій: ') . $err->getMessage());
         }
     }
 
@@ -195,7 +195,6 @@ class DeclarationRepository
      *
      * @param  array  $data  The payload containing 'employee' and 'party' sub-arrays with UUID and status fields.
      * @param  LegalEntity  $legalEntity
-     *
      * @return void
      */
     public function storeDataForReorganizedLegalEntity(array $data, LegalEntity $legalEntity): void
@@ -229,7 +228,7 @@ class DeclarationRepository
             'declaration_request_id' => $declarationRequest?->id,
             'declaration_request_uuid' => $declarationRequest?->uuid,
             'authorize_with' => $declarationRequest?->authorizeWith,
-            'updated_at'=> now(),
+            'updated_at' => now(),
         ];
 
         ReorganizationEmployeeDeclaration::updateOrCreate(

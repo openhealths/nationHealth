@@ -1,16 +1,5 @@
 <div x-show="showFilter"
      wire:key="{{ time() }}"
-     x-data="{
-         focusNext(el) {
-             let container = el.closest('.breadcrumb-form, [x-data]');
-             if (!container) return;
-             let elements = Array.from(container.querySelectorAll('input:not([readonly]):not([type=hidden]):not([type=checkbox]), button.button-primary')).filter(element => element.offsetWidth > 0 && element.offsetHeight > 0);
-             let index = elements.indexOf(el);
-             if (index > -1 && elements[index + 1]) {
-                 elements[index + 1].focus();
-             }
-         }
-     }"
 >
     <div class="form-row-4">
         <div class="form-group group">
@@ -23,7 +12,6 @@
                 placeholder=" "
                 required
                 autocomplete="off"
-                x-on:keydown.enter.prevent="focusNext($el)"
             />
             <label for="filterFirstName" class="label">
                 {{ __('forms.first_name') }}
@@ -46,7 +34,6 @@
                 placeholder=" "
                 autocomplete="off"
                 :disabled="$wire.form.noLastName"
-                x-on:keydown.enter.prevent="focusNext($el)"
             />
             <label for="filterLastName" class="label">
                 {{ __('forms.last_name') }}
@@ -109,7 +96,6 @@
                     placeholder=" "
                     required
                     autocomplete="off"
-                    x-on:keydown.enter.prevent="focusNext($el)"
                 />
                 <label for="filterBirthDate" class="wrapped-label">
                     {{ __('forms.birth_date') }}
@@ -144,7 +130,6 @@
                         class="input peer @error('form.secondName') input-error @enderror"
                         placeholder=" "
                         autocomplete="off"
-                        x-on:keydown.enter.prevent="focusNext($el)"
                     />
                     <label for="filterSecondName" class="label">
                         {{ __('forms.second_name') }}
@@ -167,7 +152,6 @@
                         placeholder=" "
                         maxlength="10"
                         autocomplete="off"
-                        x-on:keydown.enter.prevent="focusNext($el)"
                     />
                     <label for="filterTaxId" class="label">
                         {{ __('forms.rnokpp') }} ({{ __('forms.ipn') }})
@@ -214,7 +198,6 @@
                         class="input peer @error('form.documentNumber') input-error @enderror"
                         placeholder=" "
                         autocomplete="off"
-                        x-on:keydown.enter.prevent="focusNext($el)"
                     />
                     <label for="filterDocumentNumber" class="label">
                         {{ __('forms.document_number') }}
@@ -239,7 +222,6 @@
                         placeholder=" "
                         autocomplete="off"
                         x-mask="+380999999999"
-                        x-on:keydown.enter.prevent="focusNext($el)"
                     />
                     <label for="filterPhoneNumber" class="label">
                         {{ __('forms.phone_number') }}
@@ -254,7 +236,7 @@
 
                 @if($context === 'index')
                     <div class="form-group group" x-data="{ open: false }">
-                        <label for="filterDropdown" class="label"></label>
+                        <label for="filterDropdown" class="label">{{ __('forms.type_drafts_patients') }}</label>
                         <div class="relative">
                             <input
                                 type="text"

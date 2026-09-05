@@ -7,6 +7,7 @@ namespace App\Livewire\Person\Traits;
 use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Enums\Person\ConfidantPersonRelationshipRequestAction;
 use App\Enums\Person\ConfidantPersonRelationshipRequestStatus;
 use App\Exceptions\Cipher\CipherConnectionException;
 use App\Exceptions\Cipher\CipherException;
@@ -27,20 +28,60 @@ use Throwable;
 
 trait ManagesConfidantPersonRelationships
 {
-    public const string AUTH_DRAWER_MODE_CREATE = 'create';
-    public const string AUTH_DRAWER_MODE_DEACTIVATE = 'deactivate';
-
     public function chooseConfidantPerson(array $personData): void
     {
+        // Drop whatever the previously inspected person left behind, so that a rejection or a failed
+        // eligibility check never shows next to the person the user is looking at now
+        $this->invalidPersonId = null;
+        $this->invalidPersonReason = null;
+        $this->selectedConfidantPersonId = null;
+
         $birthDate = CarbonImmutable::parse($personData['birthDate']);
 
-        if ($birthDate->age < 18) {
+        if ($birthDate->age < config('ehealth.person_full_legal_capacity_age')) {
             $this->invalidPersonId = $personData['id'];
+            $this->invalidPersonReason = __('patients.age_insufficient_for_confidant_person');
 
             return;
         }
 
-        $this->invalidPersonId = null;
+        if ($this->form->isRepresentedBy($personData['id'])) {
+            $this->invalidPersonId = $personData['id'];
+            $this->invalidPersonReason = __('patients.confidant_person_already_represents_patient');
+
+            return;
+        }
+
+        try {
+            $relationships = EHealth::person()->getConfidantPersonRelationships($personData['id'])->validate();
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting confidant person relationships of the chosen person');
+
+            return;
+        }
+
+        if (Person::isRepresentedByConfidant($relationships)) {
+            $this->invalidPersonId = $personData['id'];
+            $this->invalidPersonReason = __('patients.confidant_person_has_own_confidants');
+
+            return;
+        }
+
+        try {
+            $authenticationMethods = EHealth::person()->getAuthMethods($personData['id'])->validate();
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting authentication methods of the chosen person');
+
+            return;
+        }
+
+        if (!Person::hasActiveOtpAuthenticationMethod($authenticationMethods)) {
+            $this->invalidPersonId = $personData['id'];
+            $this->invalidPersonReason = __('patients.confidant_person_has_no_otp_auth_method');
+
+            return;
+        }
+
         $this->selectedConfidantPersonId = $personData['id'];
 
         $person = Person::whereUuid($personData['id'])->with(['documents', 'phones'])->first();
@@ -85,28 +126,23 @@ trait ManagesConfidantPersonRelationships
 
     public function syncConfidantPersons(): void
     {
-        try {
-            $response = EHealth::person()->getConfidantPersonRelationships($this->uuid);
-        } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle('Error when getting auth methods');
+        if (Auth::user()->cannot('view', ConfidantPerson::class)) {
+            Session::flash('error', __('patients.policy.view_confidant'));
 
             return;
         }
 
-        $confidantPersonsData = collect($response->getData())->map(function ($relationship) {
-            $person = $relationship['confidant_person'];
-            $person['documents'] = $relationship['confidant_person']['documents_person'];
+        try {
+            $relationships = EHealth::person()->getConfidantPersonRelationships($this->uuid)->validate();
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting confidant person relationships');
 
-            return [
-                'person' => $person,
-                'documentsRelationship' => $relationship['documents_relationship'],
-                'activeTo' => convertToAppDateFormat($relationship['active_to'])
-            ];
-        })->toArray();
+            return;
+        }
 
-        $this->form->person['confidantPersons'] = $confidantPersonsData;
+        Repository::confidantPerson()->sync($relationships, $this->uuid);
 
-        Repository::confidantPerson()->sync($response->getData(), $this->uuid);
+        $this->reloadConfidantPersons();
 
         Session::flash('success', __('patients.messages.confidant_persons_synced'));
     }
@@ -161,7 +197,6 @@ trait ManagesConfidantPersonRelationships
             return;
         }
 
-        $this->authDrawerMode = self::AUTH_DRAWER_MODE_CREATE;
         $this->showConfidantPersonDrawer = false;
         $this->showAuthDrawer = true;
     }
@@ -186,13 +221,10 @@ trait ManagesConfidantPersonRelationships
 
             return;
         }
-
-        $this->authDrawerMode = self::AUTH_DRAWER_MODE_CREATE;
     }
 
     public function approveFromRequest(string $requestId): void
     {
-        $this->authDrawerMode = self::AUTH_DRAWER_MODE_CREATE;
         $this->showAuthDrawer = true;
         $this->confidantPersonRelationshipRequestId = $requestId;
 
@@ -217,9 +249,11 @@ trait ManagesConfidantPersonRelationships
             return;
         }
 
-        try {
-            $this->uploadDocuments();
+        if (!$this->uploadDocuments()) {
+            return;
+        }
 
+        try {
             $response = EHealth::person()->approveConfidantPersonRelationshipRequest(
                 $this->uuid,
                 $this->confidantPersonRelationshipRequestId,
@@ -233,7 +267,6 @@ trait ManagesConfidantPersonRelationships
             return;
         }
 
-        $this->authDrawerMode = null;
         $this->showSignatureDrawer = true;
     }
 
@@ -275,26 +308,35 @@ trait ManagesConfidantPersonRelationships
                 ['signed_content' => $signedContent->getBase64Data()]
             );
 
+            // The signed request itself carries the action it was created with, so what to do with it is read
+            // from the answer rather than kept in the component between the two steps
+            $signedRequest = $response->validate();
+            $startsRelationship = $signedRequest['action'] === ConfidantPersonRelationshipRequestAction::INSERT->value;
+
             try {
-                if ($this->authDrawerMode === self::AUTH_DRAWER_MODE_CREATE) {
+                if ($startsRelationship) {
                     $personData = collect($this->confidantPerson)->firstWhere('id', $this->selectedConfidantPersonId);
                     Repository::confidantPerson()->createFromSignedResponse(
                         $response->getData(),
                         $this->uuid,
                         (array) $personData
                     );
-
-                    $this->showSignatureDrawer = false;
-                    $this->showAuthDrawer = false;
                 } else {
-                    ConfidantPerson::whereUuid($response->getData()['confidant_person_relationship']['id'])
+                    ConfidantPerson::whereUuid($signedRequest['confidant_person_relationship']['id'])
                         ->update(['active_to' => now()]);
 
-                    $this->showSignatureDrawer = false;
                     $this->showTerminateModal = true;
                 }
 
-                Session::flash('success', __('patients.messages.new_confidant_person_added'));
+                $this->closeConfidantDrawers();
+                $this->completeConfidantPersonRelationshipRequest();
+                $this->reloadConfidantPersons();
+
+                // An ended relationship is reported by the modal that also carries what it means for the
+                // patient, so only a new one needs a message of its own
+                if ($startsRelationship) {
+                    Session::flash('success', __('patients.messages.new_confidant_person_added'));
+                }
             } catch (Exception $exception) {
                 $this->handleDatabaseErrors($exception, 'Failed to create confidant person relationship');
 
@@ -307,8 +349,65 @@ trait ManagesConfidantPersonRelationships
         }
     }
 
+    /**
+     * Close every drawer of the confidant flow, so that a signed request leaves the user back on the patient
+     * card no matter which of the steps they came through.
+     *
+     * @return void
+     */
+    private function closeConfidantDrawers(): void
+    {
+        $this->showSignatureDrawer = false;
+        $this->showAuthDrawer = false;
+        $this->showConfidantPersonDrawer = false;
+        $this->showDeactivateConfidantPersonDrawer = false;
+    }
+
+    /**
+     * Re-read the confidant persons of the patient from the database, so that the table reflects a relationship
+     * that has just been created or ended.
+     *
+     * @return void
+     */
+    private function reloadConfidantPersons(): void
+    {
+        $person = Person::whereUuid($this->uuid)
+            ->with([
+                'confidantPersons.person.names',
+                'confidantPersons.person.documents',
+                'confidantPersons.person.phones',
+                'confidantPersons.documentsRelationship'
+            ])
+            ->firstOrFail();
+
+        $this->form->person['confidantPersons'] = Arr::toCamelCase($person->confidantPersons->toArray());
+    }
+
+    /**
+     * Mark the signed request as done and drop it from the list of requests still awaiting the user, which only
+     * holds the ones in the NEW status.
+     *
+     * @return void
+     */
+    private function completeConfidantPersonRelationshipRequest(): void
+    {
+        ConfidantPersonRelationshipRequest::whereUuid($this->confidantPersonRelationshipRequestId)
+            ->update(['status' => ConfidantPersonRelationshipRequestStatus::COMPLETED]);
+
+        $this->confidantPersonRelationshipRequests = array_values(array_filter(
+            $this->confidantPersonRelationshipRequests,
+            fn (array $request): bool => $request['uuid'] !== $this->confidantPersonRelationshipRequestId
+        ));
+    }
+
     public function syncConfidantPersonRelationshipRequestsList(): void
     {
+        if (Auth::user()->cannot('viewRequests', ConfidantPerson::class)) {
+            Session::flash('error', __('patients.policy.view_confidant_requests'));
+
+            return;
+        }
+
         try {
             $response = EHealth::person()->getConfidantPersonRelationshipRequestsList($this->uuid);
         } catch (EHealthException|EHealthConnectionException $exception) {
@@ -399,7 +498,6 @@ trait ManagesConfidantPersonRelationships
         }
 
         $this->showDeactivateConfidantPersonDrawer = false;
-        $this->authDrawerMode = self::AUTH_DRAWER_MODE_DEACTIVATE;
         $this->showAuthDrawer = true;
     }
 

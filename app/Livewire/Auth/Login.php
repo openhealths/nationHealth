@@ -6,19 +6,21 @@ namespace App\Livewire\Auth;
 
 use App\Models\User;
 use App\Models\Role;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 use Livewire\Component;
+use App\Auth\SessionBinder;
 use App\Models\LegalEntity;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use App\Repositories\Repository;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\App;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Password;
@@ -40,6 +42,7 @@ class Login extends Component
 
     public ?string $role = null;
 
+    #[Locked]
     public string $email = '';
 
     public string $password = '';
@@ -170,16 +173,13 @@ class Login extends Component
             return Redirect::to($this->buildEHealthLoginUrl($user));
         }
 
-        if (!Auth::attempt($credentials)) {
-            RateLimiter::hit($key, config('ehealth.auth.delay_seconds'));
-
-            $this->addError('email', __('auth.login.error.validation.credentials'));
-
-            return Redirect::back();
-        }
+        // Authenticate the web guard before regenerating/binding the session in the local-auth flow.
+        Auth::login($user);
 
         $this->clearLoginAttempts();
         Session::regenerate();
+
+        new SessionBinder()->bind($user);
 
         return Redirect::route('legal-entity.new.create');
     }
@@ -190,7 +190,7 @@ class Login extends Component
 
         return array_filter([
             'email' => 'required|email',
-            'password' => $this->isLocalAuth ? 'required|string' : 'nullable',
+            'password' => 'nullable|string',
             'legalEntityUuid' => !$this->isLocalAuth
                 ? ['required', Rule::in($uuids)]
                 : null,

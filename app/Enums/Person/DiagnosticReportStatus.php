@@ -20,9 +20,9 @@ enum DiagnosticReportStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::ENTERED_IN_ERROR => __('patients.status.entered_in_error'),
-            self::FINAL => __('patients.status.final'),
-            self::DRAFT => __('patients.status.draft')
+            self::ENTERED_IN_ERROR => __('diagnostic-reports.status.entered_in_error'),
+            self::FINAL => __('diagnostic-reports.status.final'),
+            self::DRAFT => __('diagnostic-reports.status.draft')
         };
     }
 

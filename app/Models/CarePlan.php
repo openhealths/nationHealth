@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\Person\ApprovalStatus;
 use App\Models\Employee\Employee;
+use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Identifier;
@@ -21,7 +23,8 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class CarePlan extends Model
 {
-    use HasFactory, HasCamelCasing;
+    use HasFactory;
+    use HasCamelCasing;
 
     protected $fillable = [
         'uuid',
@@ -30,7 +33,6 @@ class CarePlan extends Model
         'legal_entity_id',
         'status',
         'category',
-        'clinical_protocol',
         'context',
         'title',
         'period_start',
@@ -75,6 +77,17 @@ class CarePlan extends Model
         return $this->belongsTo(Encounter::class);
     }
 
+    /**
+     * Episode UUID from the linked encounter identifier.
+     * Care plans do not store episode_id; eHealth still needs this UUID on signed requests.
+     */
+    public function episodeUuid(): ?string
+    {
+        $this->loadMissing('encounter.episode');
+
+        return $this->encounter?->episode?->value;
+    }
+
     public function activities(): HasMany
     {
         return $this->hasMany(CarePlanActivity::class);
@@ -110,11 +123,40 @@ class CarePlan extends Model
         return $this->morphMany(Approval::class, 'approvable');
     }
 
+    /**
+     * True when the given employee already has a patient-confirmed approval on this plan.
+     *
+     * eHealth keeps the plan itself in `new` until the first activity is signed, so UI
+     * must not treat a missing `active` status as “patient permission still required”.
+     */
+    public function hasGrantedApprovalForEmployeeUuid(?string $employeeUuid): bool
+    {
+        if ($employeeUuid === null || $employeeUuid === '') {
+            return false;
+        }
+
+        return $this->approvals()
+            ->whereHas(
+                'grantedTo',
+                static fn ($query) => $query->where('value', $employeeUuid)
+            )
+            ->get()
+            ->contains(
+                static fn (Approval $approval): bool => ApprovalStatus::resolve($approval->status)?->isGranted() === true
+            );
+    }
+
+    public function ehealthLinks(): MorphMany
+    {
+        return $this->morphMany(EhealthLink::class, 'linkable');
+    }
+
     public function getStatusDisplayAttribute(): string
     {
         // Simple translation check, fallback to english or original
         $statusStr = strtolower($this->status ?? 'new');
         $translated = __('care-plan.status.' . $statusStr);
+
         return $translated === 'care-plan.status.' . $statusStr ? ucfirst($statusStr) : $translated;
     }
 
@@ -126,8 +168,24 @@ class CarePlan extends Model
     public function getEpisodeIdAttribute(): ?string
     {
         if (is_array($this->supporting_info) && isset($this->supporting_info['episodes']) && !empty($this->supporting_info['episodes'])) {
-            return $this->supporting_info['episodes'][0]['name'] ?? null;
+            return $this->supporting_info['episodes'][0]['uuid'] ?? $this->supporting_info['episodes'][0]['id'] ?? $this->supporting_info['episodes'][0]['name'] ?? null;
         }
+
+        if ($this->encounter_id) {
+            $encounter = $this->encounter()->with('episode')->first();
+            if ($encounter && $encounter->episode) {
+                return $encounter->episode->value;
+            }
+        }
+
+        $episodeInfo = $this->supportingInfoReferences()->whereHas('type.coding', function ($q) {
+            $q->where('code', 'episode_of_care');
+        })->first();
+
+        if ($episodeInfo) {
+            return $episodeInfo->value;
+        }
+
         return null;
     }
 
@@ -159,10 +217,12 @@ class CarePlan extends Model
                 $diagnosis = $this->encounter->diagnoses->first();
                 if ($diagnosis->condition) {
                     $condition = $diagnosis->condition;
+
                     return ($condition->code ?? '') . ' - ' . ($condition->code_display ?? '');
                 }
             }
         }
+
         return '—';
     }
 
@@ -171,6 +231,7 @@ class CarePlan extends Model
         if ($this->relationLoaded('author')) {
             return $this->author?->party?->fullName ?? '—';
         }
+
         return '—';
     }
 }

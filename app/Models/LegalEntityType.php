@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -21,6 +23,11 @@ class LegalEntityType extends Model
     public function legalEntities(): HasMany
     {
         return $this->hasMany(LegalEntity::class, 'legal_entity_type_id');
+    }
+
+    public function clients(): HasMany
+    {
+        return $this->hasMany(Client::class, 'legal_entity_type_id');
     }
 
     public function permissions(): BelongsToMany

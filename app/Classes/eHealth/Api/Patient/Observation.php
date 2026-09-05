@@ -64,6 +64,7 @@ class Observation extends PatientApiBase
      */
     public function getSummary(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator($this->validateObservations(...));
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $this->format($query, ['issued_from', 'issued_to']));

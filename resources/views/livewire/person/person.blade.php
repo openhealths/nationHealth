@@ -3,15 +3,17 @@
 
 <div x-data="{ patientType: $wire.entangle('patientType') }">
     <x-header-navigation class="breadcrumb-form">
-        <x-slot name="title">{{ __('patients.add_patient') }}</x-slot>
+        <x-slot name="title">
+            {{ $this instanceof PersonUpdate ? __('patients.update_patient') : __('patients.add_patient') }}
+        </x-slot>
     </x-header-navigation>
 
-    @if($viewState === 'default')
+    @if ($viewState === 'default')
         <section wire:key="{{ $viewState }}" class="section-form shift-content">
             <form class="form" wire:key="patient-form-{{ $formKey }}" novalidate>
                 @include('livewire.person.parts.patient-type')
 
-                @if(!$this instanceof PersonUpdate)
+                @if (!$this instanceof PersonUpdate)
                     <div x-show="patientType === 'preperson'" x-cloak>
                         <livewire:preperson.preperson-create />
                     </div>
@@ -25,13 +27,13 @@
                     @include('livewire.person.parts.addresses')
                     @include('livewire.person.parts.emergency-contact')
                     @include('livewire.person.parts.incapacitated')
-                    @if(!$this instanceof PersonUpdate)
+                    @if (!$this instanceof PersonUpdate)
                         @include('livewire.person.parts.authentication-methods')
                     @endif
                 </div>
 
-                <div class="flex flex-wrap gap-4 items-center">
-                    @if($this instanceof PersonUpdate)
+                <div class="flex flex-wrap items-center gap-4">
+                    @if ($this instanceof PersonUpdate)
                         <a href="{{ route('persons.index', [legalEntity()]) }}" class="button-minor">
                             {{ __('forms.back') }}
                         </a>
@@ -43,7 +45,7 @@
                         @endcan
                     @else
                         @can('create', PersonRequest::class)
-                            <div x-show="patientType === 'person'" class="flex flex-wrap gap-4 items-center" x-cloak>
+                            <div x-show="patientType === 'person'" class="flex flex-wrap items-center gap-4" x-cloak>
                                 <button
                                     type="submit"
                                     wire:click.prevent="createLocally"
@@ -52,7 +54,11 @@
                                     @icon('archive', 'w-4 h-4')
                                     {{ __('forms.save') }}
                                 </button>
-                                <button type="submit" wire:click.prevent="create" class="button-primary">
+                                <button
+                                    type="submit"
+                                    wire:click.prevent="openInformationMessageModal"
+                                    class="button-primary"
+                                >
                                     {{ __('forms.create') }}
                                 </button>
                             </div>
@@ -62,7 +68,7 @@
             </form>
         </section>
 
-    @elseif($viewState === 'new')
+    @elseif ($viewState === 'new')
         <section class="section-form">
             <form class="form">
                 @include('livewire.person.parts.sign')
@@ -70,19 +76,19 @@
         </section>
     @endif
 
-    @if($showInformationMessageModal)
+    @if ($showInformationMessageModal)
         @include('livewire.person.parts.modals.information-message')
     @endif
 
-    @if($this instanceof PersonUpdate && $showAuthMethodModal)
+    @if ($this instanceof PersonUpdate && $showAuthMethodModal)
         @include('livewire.person.parts.modals.choose-auth-method')
     @endif
 
-    @if($showLeafletModal)
+    @if ($showLeafletModal)
         @include('livewire.person.parts.modals.leaflet')
     @endif
 
-    @can('create', PersonRequest::class)
+    @can('sign', PersonRequest::class)
         <x-signature-modal method="sign" />
     @endcan
 

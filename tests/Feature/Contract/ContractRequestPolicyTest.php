@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Contract;
 
-use App\Enums\Contract\Status;
+use App\Enums\Contract\ContractRequestStatus;
 use App\Models\Contracts\ContractRequest;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
 use App\Models\User;
 use App\Policies\ContractRequestPolicy;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ContractRequestPolicyTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function migrateFreshUsing(): array
     {
@@ -51,8 +51,8 @@ class ContractRequestPolicyTest extends TestCase
             'password' => bcrypt('password'),
             'party_id' => $party->id,
         ]);
-        $contractRequestApprove = $this->createContractRequest($legalEntity, Status::APPROVED);
-        $contractRequestSign = $this->createContractRequest($legalEntity, Status::NHS_SIGNED);
+        $contractRequestApprove = $this->createContractRequest($legalEntity, ContractRequestStatus::APPROVED);
+        $contractRequestSign = $this->createContractRequest($legalEntity, ContractRequestStatus::NHS_SIGNED);
 
         $policy = new ContractRequestPolicy();
 
@@ -81,7 +81,7 @@ class ContractRequestPolicyTest extends TestCase
             'password' => bcrypt('password'),
             'party_id' => $party->id,
         ]);
-        $contractRequest = $this->createContractRequest($foreignEntity, Status::APPROVED);
+        $contractRequest = $this->createContractRequest($foreignEntity, ContractRequestStatus::APPROVED);
 
         $policy = new ContractRequestPolicy();
 
@@ -164,7 +164,7 @@ class ContractRequestPolicyTest extends TestCase
         ]);
     }
 
-    private function createContractRequest(LegalEntity $legalEntity, Status $status): ContractRequest
+    private function createContractRequest(LegalEntity $legalEntity, ContractRequestStatus $status): ContractRequest
     {
         return ContractRequest::query()->create([
             'uuid' => (string) Str::uuid(),

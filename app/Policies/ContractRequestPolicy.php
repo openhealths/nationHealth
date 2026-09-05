@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\Contract\ContractRequestStatus;
 use App\Models\Contracts\ContractRequest;
 use App\Models\LegalEntity;
 use App\Models\User;
@@ -97,11 +98,11 @@ class ContractRequestPolicy
             return Response::denyWithStatus(404);
         }
 
-        $status = $contractRequest->status instanceof \App\Enums\Contract\Status
+        $status = $contractRequest->status instanceof ContractRequestStatus
             ? $contractRequest->status
-            : \App\Enums\Contract\Status::tryFrom((string) $contractRequest->status);
+            : ContractRequestStatus::tryFrom((string) $contractRequest->status);
 
-        if ($status !== \App\Enums\Contract\Status::APPROVED) {
+        if ($status !== ContractRequestStatus::APPROVED) {
             return Response::deny(__('contracts.policy.approve_denied'));
         }
 
@@ -126,11 +127,11 @@ class ContractRequestPolicy
             return Response::denyWithStatus(404);
         }
 
-        $status = $contractRequest->status instanceof \App\Enums\Contract\Status
+        $status = $contractRequest->status instanceof ContractRequestStatus
             ? $contractRequest->status
-            : \App\Enums\Contract\Status::tryFrom((string) $contractRequest->status);
+            : ContractRequestStatus::tryFrom((string) $contractRequest->status);
 
-        if ($status !== \App\Enums\Contract\Status::NHS_SIGNED) {
+        if ($status !== ContractRequestStatus::NHS_SIGNED) {
             return Response::deny(__('contracts.policy.sign_denied'));
         }
 

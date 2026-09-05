@@ -33,6 +33,21 @@ class Encounter extends PatientApiBase
     }
 
     /**
+     * Submit signed data for marking the encounter and every record of its package as entered in error.
+     *
+     * @param  string  $id  Person ID
+     * @param  array{signed_data: string, signed_data_encoding: string}  $data
+     * @return PromiseInterface|EHealthResponse
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+     *
+     * @see https://medicaleventsmisapi.docs.apiary.io/#reference/medical-events/encounter-data-package/cancel-encounter-package
+     */
+    public function cancel(string $id, array $data): PromiseInterface|EHealthResponse
+    {
+        return $this->patch(self::URL . "/$id/encounter_package", $data);
+    }
+
+    /**
      * Get a list of short Encounter info filtered by search params.
      *
      * @param  string  $patientId
@@ -230,7 +245,6 @@ class Encounter extends PatientApiBase
         return ValidationRuleBuilder::merge(
             // Basic fields
             [
-                'cancellation_reason' => ['nullable', 'string', 'max:255'],
                 'explanatory_letter' => ['nullable', 'string', 'max:255'],
                 'uuid' => ['required', 'uuid'],
                 'ehealth_inserted_at' => ['required', 'date'],
@@ -244,12 +258,25 @@ class Encounter extends PatientApiBase
             ValidationRuleBuilder::identifierCollectionRules('participant'),
             ValidationRuleBuilder::identifierCollectionRules('supporting_info'),
 
-            // Collections of сodeable concept
+            // Collections of сodeable concept. Presence of `actions` (ICPC-2) and `reasons` is
+            // class-dependent, mirroring the create form (EncounterForm): PHC requires `actions`
+            // and prohibits it otherwise, while `reasons` is only mandatory for PHC.
+            // @see https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/18167398401/AH+RC+CSI-1758+Submit+Encounter+Package
             ValidationRuleBuilder::codeableConceptCollectionRules('actions'),
+            [
+                'actions' => [
+                    'nullable',
+                    'array',
+                    'required_if:*.class.code,PHC',
+                    'prohibited_unless:*.class.code,PHC'
+                ]
+            ],
             ValidationRuleBuilder::codeableConceptCollectionRules('reasons'),
+            ['reasons' => ['nullable', 'array', 'required_if:*.class.code,PHC']],
 
             // Coding relationships
             ValidationRuleBuilder::codingRules('class', true),
+            ValidationRuleBuilder::codeableConceptRules('cancellation_reason'),
 
             // Diagnoses
             [

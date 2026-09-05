@@ -32,12 +32,16 @@ button.item-remove {
     @apply pl-0 peer-placeholder-shown:pl-10 peer-focus:font-medium absolute text-sm text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-6 scale-75 top-3 z-10 origin-[0] peer-focus:start-0 peer-focus:pl-0 rtl:peer-focus:translate-x-1/4 rtl:peer-focus:left-auto peer-focus:text-blue-600 peer-focus:dark:text-blue-500 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-6;
 }
 
+.timepicker-uk ~ .wrapped-label {
+    @apply !-translate-y-6 !scale-75 !origin-[0] !pl-0 !font-medium;
+}
+
 .datepicker-wrapper {
     @apply relative;
 
     &:before {
         mask: url("../icons/calendar-week.svg") no-repeat;
-        @apply content-[''] absolute top-1/2 left-2.5 -translate-y-1/2 w-5 h-5 bg-gray-500;
+        @apply content-[''] absolute top-2.5 left-2.5 w-5 h-5 bg-gray-500;
     }
 }
 
@@ -50,7 +54,7 @@ button.item-remove {
 
     &:before {
         mask: url("../icons/phone.svg") no-repeat;
-        @apply content-[''] absolute top-1/2 left-2 -translate-y-1/2 w-5 h-5 bg-gray-500;
+        @apply content-[''] absolute top-2.5 left-2 w-5 h-5 bg-gray-500;
     }
 }
 

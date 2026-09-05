@@ -76,16 +76,25 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
 
         $employeeRequestPartyId = $employeeRequestUser?->partyId;
 
-        $this->employeeRequest->fill(
-            array_merge(
-                $response->map($validatedData, $this->legalEntity, $employeeRequestUser?->id ?? null, $employeeRequestPartyId ?? null),
-                [
-                    'sync_status' => JobStatus::COMPLETED->value,
-                    'inserted_at' => Carbon::parse($validatedData['inserted_at'])->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? Carbon::now(),
-                    'applied_at' => Carbon::parse($validatedData['updated_at'])->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? Carbon::now()
-                ]
-            )
+        $remoteStatus = $validatedData['status'] ?? null;
+        $isTerminal = in_array($remoteStatus, ['APPROVED', 'REJECTED', 'EXPIRED'], true);
+
+        $fillData = array_merge(
+            $response->map($validatedData, $this->legalEntity, $employeeRequestUser?->id ?? null, $employeeRequestPartyId ?? null),
+            [
+                'sync_status' => JobStatus::COMPLETED->value,
+                'inserted_at' => Carbon::parse($validatedData['inserted_at'])->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? Carbon::now(),
+            ]
         );
+
+        // Only terminal eHealth decisions get applied_at — not details refresh of still-NEW rows.
+        if ($isTerminal) {
+            $fillData['applied_at'] = Carbon::parse($validatedData['updated_at'] ?? now())
+                ->setTimezone(config('app.timezone'))
+                ->format('Y-m-d H:i:s');
+        }
+
+        $this->employeeRequest->fill($fillData);
 
         $this->employeeRequest->save();
 

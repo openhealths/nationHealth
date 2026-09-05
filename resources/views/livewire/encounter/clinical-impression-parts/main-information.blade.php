@@ -1,21 +1,12 @@
 <fieldset class="fieldset">
-    <legend class="legend">
-        {{ __('forms.main_information') }}
-    </legend>
+    <legend class="legend">{{ __('forms.main_information') }}</legend>
 
     {{-- Code --}}
     <div class="form-row-modal" x-data="{ openModal: false }">
         <div class="form-group group">
-            <select x-model="modalClinicalImpression.codeCode"
-                    id="code"
-                    class="input-select peer"
-                    type="text"
-                    required
-            >
-                <option value="" selected>
-                    {{ __('forms.select') }} {{ mb_strtolower(__('forms.code')) }} *
-                </option>
-                @foreach($this->dictionaries['eHealth/clinical_impression_patient_categories'] as $key => $clinicalImpressionPatientCategory)
+            <select x-model="modalClinicalImpression.codeCode" id="code" class="input-select peer" type="text" required>
+                <option value="" selected>{{ __('forms.select') }} {{ mb_strtolower(__('forms.code')) }} *</option>
+                @foreach ($this->dictionaries['eHealth/clinical_impression_patient_categories'] as $key => $clinicalImpressionPatientCategory)
                     <option value="{{ $key }}">{{ $clinicalImpressionPatientCategory }}</option>
                 @endforeach
             </select>
@@ -24,48 +15,56 @@
         {{-- Rule engine rules --}}
         <div class="form-group group">
             <div class="flex items-start pt-[10px]">
-                <a @click.prevent="modalClinicalImpression.codeCode && (openModal = true)"
-                   class="rule-engine-rules default-p"
+                <a
+                    @click.prevent="modalClinicalImpression.codeCode && (openModal = true)"
+                    class="rule-engine-rules default-p"
                 >
-                    {{ __('patients.set_of_rule_engines') }}
+                    {{ __('clinical-impressions.set_of_rule_engines') }}
                 </a>
             </div>
         </div>
 
-        <template x-teleport="body"> {{-- This moves the modal at the end of the body tag --}}
-            <div x-show="openModal"
-                 style="display: none"
-                 @keydown.escape.prevent.stop="openModal = false"
-                 role="dialog"
-                 aria-modal="true"
-                 x-id="['modal-title']"
-                 :aria-labelledby="$id('modal-title')" {{-- This associates the modal with unique ID --}}
-                 class="modal"
+        <template x-teleport="body">
+            {{-- This moves the modal at the end of the body tag --}}
+            <div
+                x-show="openModal"
+                style="display: none"
+                @keydown.escape.prevent.stop="openModal = false"
+                role="dialog"
+                aria-modal="true"
+                x-id="['modal-title']"
+                :aria-labelledby="$id('modal-title')"
+                {{-- This associates the modal with unique ID --}}
+                class="modal"
             >
-
                 {{-- Overlay --}}
                 <div x-show="openModal" x-transition.opacity class="fixed inset-0 bg-black/25"></div>
 
                 {{-- Panel --}}
-                <div x-show="openModal"
-                     x-transition
-                     @click="openModal = false"
-                     class="relative flex min-h-screen items-center justify-center p-4"
+                <div
+                    x-show="openModal"
+                    x-transition
+                    @click="openModal = false"
+                    class="relative flex min-h-screen items-center justify-center p-4"
                 >
-                    <div @click.stop
-                         x-trap.noscroll.inert="openModal"
-                         class="modal-content h-fit w-full lg:max-w-5xl"
-                    >
+                    <div @click.stop x-trap.noscroll.inert="openModal" class="modal-content h-fit w-full lg:max-w-5xl">
                         {{-- Title --}}
-                        <h3 class="modal-header" :id="$id('modal-title')">{{ __('patients.set_of_rule_engines') }}</h3>
+                        <h3 class="modal-header" :id="$id('modal-title')">
+                            {{ __('clinical-impressions.set_of_rule_engines') }}
+                        </h3>
 
                         {{-- Content --}}
                         <form>
                             <div class="space-y-2">
                                 <p class="default-p">{{ __('forms.details') }}:</p>
-                                <div class="space-y-2 border-2 rounded-md border-dashed border-white dark:border-white">
+                                <div class="space-y-2 rounded-md border-2 border-dashed border-white dark:border-white">
                                     <template
-                                        x-for="(detail, index) in $wire.dictionaries['custom/rule_engine_details'][modalClinicalImpression.codeCode]?.items"
+                                        x-for="
+                                            (detail, index) in
+                                            $wire.dictionaries['custom/rule_engine_details'][
+                                                modalClinicalImpression.codeCode
+                                            ]?.items
+                                        "
                                         :key="index"
                                     >
                                         <p class="default-p" x-text="detail.value.string"></p>
@@ -75,11 +74,7 @@
 
                             {{-- Action button --}}
                             <div class="mt-6 flex justify-center space-x-2">
-                                <button @click.prevent
-                                        type="button"
-                                        @click="openModal = false"
-                                        class="button-minor"
-                                >
+                                <button @click.prevent type="button" @click="openModal = false" class="button-minor">
                                     {{ __('forms.cancel') }}
                                 </button>
                             </div>
@@ -93,17 +88,16 @@
     {{-- Description --}}
     <div class="form-row-modal">
         <div class="form-group group">
-            <input x-model="modalClinicalImpression.description"
-                   type="text"
-                   name="description"
-                   id="description"
-                   class="input peer"
-                   placeholder=" "
-                   autocomplete="off"
-            >
-            <label for="description" class="label">
-                {{ __('patients.conclusion') }}
-            </label>
+            <input
+                x-model="modalClinicalImpression.description"
+                type="text"
+                name="description"
+                id="description"
+                class="input peer"
+                placeholder=" "
+                autocomplete="off"
+            />
+            <label for="description" class="label"> {{ __('medical-events.conclusion') }} </label>
         </div>
     </div>
 

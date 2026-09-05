@@ -20,6 +20,7 @@ use Exception;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -120,6 +121,12 @@ class PersonIndex extends Component
      */
     public function searchForPerson(): void
     {
+        if (Auth::user()->cannot('viewAny', Person::class)) {
+            Session::flash('error', __('patients.policy.view_any'));
+
+            return;
+        }
+
         try {
             $validated = $this->form->validate($this->form->rulesForSearch());
         } catch (ValidationException $exception) {
@@ -218,7 +225,15 @@ class PersonIndex extends Component
      */
     public function deleteDraft(int $id): void
     {
-        PersonRequest::destroy($id);
+        $personRequest = PersonRequest::findOrFail($id);
+
+        if (Auth::user()->cannot('delete', $personRequest)) {
+            Session::flash('error', __('patients.policy.delete_draft'));
+
+            return;
+        }
+
+        $personRequest->delete();
 
         // Update list
         $this->patients = collect($this->patients)

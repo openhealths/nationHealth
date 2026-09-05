@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Rules\ContractRules;
 
 use Closure;
@@ -11,9 +13,9 @@ class ValidStartDate implements ValidationRule
     /**
      * Start validation
      *
-     * @param string $attribute
-     * @param mixed $value
-     * @param \Closure(string): \Illuminate\Translation\PotentiallyTranslatedString $fail
+     * @param  string  $attribute
+     * @param  mixed  $value
+     * @param  \Closure(string): \Illuminate\Translation\PotentiallyTranslatedString  $fail
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
@@ -23,6 +25,7 @@ class ValidStartDate implements ValidationRule
         // Validate date format
         if (!preg_match($datePattern, $value)) {
             $fail('Атрибут :attribute має бути дійсною датою у форматі ISO 8601.');
+
             return;
         }
 

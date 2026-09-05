@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -33,6 +34,9 @@ return new class extends Migration
     /**
      * Reverse the migrations.
      *
+     * Person addresses may contain null settlement_type after eHealth dropped the field.
+     * Backfill those rows before restoring NOT NULL so rollback does not fail with SQLSTATE[23502].
+     *
      * @return void
      */
     public function down(): void
@@ -40,6 +44,10 @@ return new class extends Migration
         if (!Schema::hasColumn('addresses', 'settlement_type')) {
             return;
         }
+
+        DB::table('addresses')
+            ->whereNull('settlement_type')
+            ->update(['settlement_type' => '']);
 
         Schema::table('addresses', static function (Blueprint $table): void {
             $table->string('settlement_type')

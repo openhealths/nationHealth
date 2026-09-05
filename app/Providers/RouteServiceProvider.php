@@ -29,6 +29,16 @@ class RouteServiceProvider extends ServiceProvider
     {
         Route::model('legalEntity', LegalEntity::class);
 
+        Route::bind('carePlan', function (string $value) {
+            $query = \App\Models\CarePlan::query()->whereKey($value);
+
+            if (legalEntity() !== null) {
+                $query->where('legal_entity_id', legalEntity()->id);
+            }
+
+            return $query->firstOrFail();
+        });
+
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });

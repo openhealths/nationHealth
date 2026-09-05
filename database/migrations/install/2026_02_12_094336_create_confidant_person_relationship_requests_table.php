@@ -18,7 +18,8 @@ return new class extends Migration
             $table->id();
             $table->uuid();
             $table->foreignId('person_id')->constrained('persons');
-            $table->string('action');
+            $table->string('action')->nullable()
+                ->comment('Left empty for the requests read from the listing, which does not carry it');
             $table->enum('status', ConfidantPersonRelationshipRequestStatus::values());
             $table->string('channel');
             $table->jsonb('documents')->nullable();

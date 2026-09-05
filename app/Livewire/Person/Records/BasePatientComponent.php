@@ -47,8 +47,6 @@ abstract class BasePatientComponent extends Component
      */
     public string $patientFullName;
 
-    public string $verificationStatus;
-
     /**
      * Whether the list is showing eHealth API search results instead of local observations.
      *
@@ -131,21 +129,20 @@ abstract class BasePatientComponent extends Component
 
             $this->patientFullName = $preperson->fullName;
             $this->uuid = $preperson->uuid;
-            $this->verificationStatus = '';
 
             return;
         }
 
-        $patient = Person::whereId($this->personId)
+        // Memoized the same way the preperson branch above does it, so that a component needing the patient
+        // itself does not read the row a second time
+        $patient = $this->patientModel = Person::whereId($this->personId)
             ->with([
                 'names',
                 'declarations' => fn (HasMany $declaration) => $declaration->active()->latest()->take(1)
             ])
-            ->select(['id', 'uuid', 'verification_status'])
             ->firstOrFail();
 
         $this->patientFullName = $patient->fullName;
-        $this->verificationStatus = $patient->verificationStatus;
         $this->uuid = $patient->uuid;
         $this->declarationNumber = $patient->declarations->first()?->declarationNumber ?? null;
     }

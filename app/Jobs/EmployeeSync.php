@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Jobs;
 
 use App\Core\EHealthJob;
@@ -34,6 +36,7 @@ class EmployeeSync extends EHealthJob
 
     /**
      * Store or update data in the database.
+     *
      * * @param EHealthResponse|null $response
      */
     protected function processResponse(?EHealthResponse $response): void
@@ -53,7 +56,7 @@ class EmployeeSync extends EHealthJob
         data_fill($employees, '*.legal_entity_id', $this->legalEntity->id);
         data_fill($employees, '*.sync_status', JobStatus::PARTIAL->value);
 
-        $divisionUuids = collect($employees)->pluck('division_id')->filter(fn($id) => is_string($id) && strlen($id) === 36)->unique();
+        $divisionUuids = collect($employees)->pluck('division_id')->filter(fn ($id) => is_string($id) && strlen($id) === 36)->unique();
         if ($divisionUuids->isNotEmpty()) {
             $divisions = \App\Models\Division::whereIn('uuid', $divisionUuids)->pluck('id', 'uuid');
             foreach ($employees as &$emp) {

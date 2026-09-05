@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Procedure;
 
 use App\Core\Arr;
+use App\Models\Division;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\Person\Person;
@@ -70,6 +71,16 @@ class ProcedureEdit extends ProcedureComponent
         );
 
         $this->form->procedure = Fhir::procedure()->fromFhir($procedureData, $detailsMap);
+
+        $divisionUuid = data_get($this->form->procedure, 'divisionId');
+
+        if ($divisionUuid && !collect($this->divisions)->contains('uuid', $divisionUuid)) {
+            $divisionName = Division::query()->whereUuid($divisionUuid)->value('name')
+                ?: data_get($procedureData, 'division.displayValue')
+                ?: $divisionUuid;
+
+            $this->divisions[] = ['uuid' => $divisionUuid, 'name' => $divisionName];
+        }
 
         $this->loadIcd10Descriptions($this->form->procedure['reasonReferences'] ?? []);
     }

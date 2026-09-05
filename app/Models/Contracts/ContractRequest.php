@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models\Contracts;
 
+use App\Enums\Contract\ContractRequestStatus;
 use App\Enums\JobStatus;
-use App\Enums\Contract\Status;
 
 class ContractRequest extends BaseContract
 {
@@ -35,7 +35,7 @@ class ContractRequest extends BaseContract
 
     protected $casts = [
         'contractor_employee_divisions' => 'array',
-        'status' => Status::class,
+        'status' => ContractRequestStatus::class,
         'start_date' => 'date',
         'end_date' => 'date',
         'nhs_signed_date' => 'date',

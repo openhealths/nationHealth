@@ -7,6 +7,7 @@ namespace App\Livewire\DiagnosticReport;
 use App\Core\Arr;
 use App\Enums\Person\DiagnosticReportStatus;
 use App\Models\LegalEntity;
+use App\Models\Employee\Employee;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\Person\Person;
 use App\Models\Preperson;
@@ -43,12 +44,51 @@ class DiagnosticReportEdit extends DiagnosticReportComponent
         $this->isReadonly = request()->routeIs('diagnostic-report.view')
             || $diagnosticReport->status === DiagnosticReportStatus::FINAL;
 
+        $diagnosticReportFhirData = Arr::toCamelCase($diagnosticReport->toArray());
+
         $diagnosticReportData = Fhir::diagnosticReport()->fromFhir(
-            $diagnosticReport->toArray()
+            $diagnosticReportFhirData
         );
 
         $diagnosticReportData['status'] = $diagnosticReport->status->value;
 
+        if (!empty($diagnosticReportData['basedOnIdentifier'])) {
+            $diagnosticReportData['isReferralAvailable'] = true;
+            $diagnosticReportData['referralType'] = 'electronic';
+        }
+
+        $selectedEmployeeIds = collect($diagnosticReportData['performerEmployeeIds'] ?? [])
+            ->push($diagnosticReportData['resultsInterpreterEmployeeId'] ?? null)
+            ->filter()
+            ->unique();
+
+        $missingEmployeeIds = $selectedEmployeeIds->diff(collect($this->employees)->pluck('uuid'));
+
+        if ($missingEmployeeIds->isNotEmpty()) {
+            $selectedEmployees = Employee::query()
+                ->whereIn('uuid', $missingEmployeeIds)
+                ->select([
+                    'uuid',
+                    'party_id',
+                    'position',
+                    'employee_type',
+                    'division_uuid',
+                ])
+                ->with('party:id,last_name,first_name,second_name')
+                ->get()
+                ->map(static fn (Employee $employee): array => [
+                    'uuid' => $employee->uuid,
+                    'name' => $employee->fullName,
+                    'position' => $employee->position,
+                    'employeeType' => $employee->employeeType,
+                    'divisionUuid' => $employee->divisionUuid,
+                ]);
+
+            $this->employees = collect($this->employees)
+                ->concat($selectedEmployees)
+                ->values()
+                ->toArray();
+        }
         $conclusionCode = data_get($diagnosticReportData, 'conclusionCode');
 
         if ($conclusionCode) {

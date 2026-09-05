@@ -1,7 +1,7 @@
 @use('App\Enums\Person\AuthStep')
 
 <div x-data="{ alias: '' }">
-    <legend class="legend mt-6">{{ __('patients.auth_method_name_title') }}</legend>
+    <legend class="legend mt-6">{{ __('patients.authentication_method_name') }}</legend>
 
     <div class="form-row-3 mt-4">
         <div class="form-group group">

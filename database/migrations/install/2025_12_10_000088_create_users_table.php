@@ -19,6 +19,7 @@ return new class extends Migration
             $table->string('password');
             $table->boolean('must_change_password')->default(false);
             $table->rememberToken();
+            $table->string('session_id')->nullable()->index();
             $table->string('two_factor_code')->nullable();
             $table->timestamp('two_factor_code_expires_at')->nullable();
             $table->foreignId('current_team_id')->nullable();

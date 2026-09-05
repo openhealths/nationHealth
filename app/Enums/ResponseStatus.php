@@ -14,7 +14,7 @@ enum ResponseStatus: string
     case ASYNC = 'ASYNC';
     case SUCCESS = 'SUCCESS';
     case NOT_FOUND = 'NOT_FOUND';
-   
+
     public function label(): string
     {
         return match($this) {

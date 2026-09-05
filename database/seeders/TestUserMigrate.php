@@ -135,7 +135,7 @@ class TestUserMigrate extends Seeder
                     ]),
                     'edr_verified' => null,
                     'edrpou' => '3139821559',
-                    'email' => 'vitaliybezsh@gmail.com',
+                    'email' => 'vitaliybezsh+fop@gmail.com',
                     'inserted_by' => '4261eacf-8008-4e62-899f-de1e2f7065f0',
                     'is_active' => true,
                     'nhs_comment' => '',
@@ -249,10 +249,10 @@ class TestUserMigrate extends Seeder
 
                 $ownerUserId = User::insertGetId(
                     [
-                        'uuid' => '82d1f518-23c9-4c6c-868b-6f7ab26c6da8',
-                        'email' => 'vitaliybezsh@gmail.com',
+                        'uuid' => '012db340-445d-4afa-852c-2f9d636c3b21',
+                        'email' => 'vitaliybezsh+fop@gmail.com',
                         'password' => Hash::make($password),
-                        'email_verified_at' => new Carbon('2024-09-11T11:00:52.000000Z'),
+                        'email_verified_at' => new Carbon('2026-08-26T11:03:57Z'),
                         'party_id' => $partyId,
                         'current_team_id' => null,
                         'profile_photo_path' => null,
@@ -261,9 +261,9 @@ class TestUserMigrate extends Seeder
                         'is_blocked' => null,
                         'block_reason' => null,
                         'person_id' => null,
-                        'inserted_at' => new Carbon('2024-06-06T17:07:44Z'),
-                        'created_at' => new Carbon('2024-09-11T10:00:52.000000Z'),
-                        'updated_at' => new Carbon('2024-09-11T10:03:10.000000Z'),
+                        'inserted_at' => new Carbon('2026-08-26T11:03:57Z'),
+                        'created_at' => new Carbon('2026-08-26T11:03:57Z'),
+                        'updated_at' => new Carbon('2026-08-26T11:03:57Z'),
                     ]
                 );
 
@@ -317,7 +317,7 @@ class TestUserMigrate extends Seeder
                     'status' => 'APPROVED',
                     'employee_id' => $employeeId,
                     'legal_entity_id' => $legalEntityId,
-                    'email' => 'vitaliybezsh@gmail.com',
+                    'email' => 'vitaliybezsh+fop@gmail.com',
                     'division_id' => null,
                     'user_id' => $ownerUserId,
                     'party_id' => $partyId,

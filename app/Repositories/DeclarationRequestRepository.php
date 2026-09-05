@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Core\Arr;
+use App\Enums\Declaration\RequestStatus;
 use App\Enums\JobStatus;
 use App\Enums\Status;
 use App\Models\DeclarationRequest;
@@ -40,22 +41,9 @@ class DeclarationRequestRepository
     }
 
     /**
-     * Update previously created request.
-     *
-     * @param  int  $id
-     * @param  array  $validatedData
-     * @return void
-     */
-    public function updateRequest(int $id, array $validatedData): void
-    {
-        $validatedData = $this->mapUuidsToIds($validatedData);
-        DeclarationRequest::where('id', $id)->update($validatedData);
-    }
-
-    /**
      * Update records based on response from EHealth.
      *
-     * @param  int  $id
+     * @param  int|string  $id
      * @param  array  $responseData
      * @return void
      */
@@ -106,14 +94,32 @@ class DeclarationRequestRepository
     }
 
     /**
+     * Cancel the patient's other pending requests, which a newly created request supersedes.
+     *
+     * @param  int  $personId
+     * @param  int  $exceptId  ID of the just created request
+     * @return void
+     */
+    public function cancelPendingRequests(int $personId, int $exceptId): void
+    {
+        DeclarationRequest::wherePersonId($personId)
+            ->whereKeyNot($exceptId)
+            ->whereIn('status', [RequestStatus::NEW->value, RequestStatus::APPROVED->value])
+            ->update([
+                'status' => RequestStatus::CANCELLED->value,
+                'sync_status' => JobStatus::PARTIAL->value
+            ]);
+    }
+
+    /**
      * Update status and status reason after reject.
      *
      * @param  string  $uuid
      * @param  string  $status
-     * @param  string  $statusReason
+     * @param  string|null  $statusReason
      * @return void
      */
-    public function updateStatuses(string $uuid, string $status, string $statusReason): void
+    public function updateStatuses(string $uuid, string $status, ?string $statusReason): void
     {
         DeclarationRequest::where('uuid', $uuid)->update([
             'status' => $status,

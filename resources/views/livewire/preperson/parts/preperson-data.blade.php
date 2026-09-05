@@ -1,20 +1,21 @@
 @use('App\Enums\Preperson\Status')
 @use('App\Models\MergeRequest')
+@use('App\Enums\MergeRequest\Status as MergeRequestStatus')
 
 @php
     $emergencyContact = (array) $preperson->emergencyContact;
 @endphp
 
-<div class="breadcrumb-form p-4 shift-content space-y-6" x-data="{ showCertificate: false }">
+<div class="breadcrumb-form shift-content space-y-6 p-4" x-data="{ showCertificate: false }">
     <div
         x-data="{ open: true }"
-        class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm"
+        class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
     >
         <h2>
             <button
                 type="button"
-                class="flex items-center justify-between w-full px-6 py-4 text-left group cursor-pointer"
-                @click="open = !open"
+                class="group flex w-full cursor-pointer items-center justify-between px-6 py-4 text-left"
+                @click="open = ! open"
                 :aria-expanded="open"
             >
                 <span class="text-base font-semibold text-gray-900 dark:text-white">
@@ -25,9 +26,9 @@
         </h2>
 
         <div x-show="open" wire:ignore.self>
-            <div class="px-6 pb-6 border-t border-gray-100 dark:border-gray-700 pt-4 space-y-6">
+            <div class="space-y-6 border-t border-gray-100 px-6 pt-4 pb-6 dark:border-gray-700">
                 <div class="form-row-2">
-                    <div class="flex items-center gap-2 mt-4">
+                    <div class="mt-4 flex items-center gap-2">
                         <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">
                             {{ __('preperson.ehealth_status') }}:
                         </span>
@@ -58,7 +59,7 @@
                                 <input
                                     type="text"
                                     id="prepersonCreatedAt"
-                                    class="peer input pl-10 appearance-none text-gray-500 dark:text-gray-400"
+                                    class="peer input appearance-none pl-10 text-gray-500 dark:text-gray-400"
                                     placeholder=" "
                                     value="{{ formatDisplayDate($preperson->ehealthInsertedAt) }}"
                                     autocomplete="off"
@@ -74,7 +75,7 @@
                                 <input
                                     type="text"
                                     id="prepersonCreatedTime"
-                                    class="peer input pl-10 appearance-none text-gray-500 dark:text-gray-400"
+                                    class="peer input appearance-none pl-10 text-gray-500 dark:text-gray-400"
                                     placeholder=" "
                                     value="{{ formatDisplayDate($preperson->ehealthInsertedAt, 'H:i') }}"
                                     autocomplete="off"
@@ -109,7 +110,7 @@
                                 <input
                                     type="text"
                                     id="prepersonUpdatedAt"
-                                    class="peer input pl-10 appearance-none text-gray-500 dark:text-gray-400"
+                                    class="peer input appearance-none pl-10 text-gray-500 dark:text-gray-400"
                                     placeholder=" "
                                     value="{{ formatDisplayDate($preperson->ehealthUpdatedAt) }}"
                                     autocomplete="off"
@@ -125,7 +126,7 @@
                                 <input
                                     type="text"
                                     id="prepersonUpdatedTime"
-                                    class="peer input pl-10 appearance-none text-gray-500 dark:text-gray-400"
+                                    class="peer input appearance-none pl-10 text-gray-500 dark:text-gray-400"
                                     placeholder=" "
                                     value="{{ formatDisplayDate($preperson->ehealthUpdatedAt, 'H:i') }}"
                                     autocomplete="off"
@@ -157,27 +158,22 @@
 
     @can('create', MergeRequest::class)
         @php
-            $isInactive = $preperson->status !== Status::ACTIVE;
-            $mergeRequestsList = method_exists($preperson, 'mergeRequests') ? $preperson->mergeRequests : collect();
+            $mergeRequests = $preperson->mergeRequests;
 
-            $confirmedMergeRequest = $mergeRequestsList->first(function ($item) {
-                $code = is_object($item) && isset($item->status_code) ? $item->status_code : (isset($item->status) ? $item->status->value : '');
-                return in_array($code, ['APPROVED', 'SIGNED'], true);
-            });
-
-            $hasConfirmedMerge = $confirmedMergeRequest !== null;
-            $masterPersonId = $confirmedMergeRequest ? (is_object($confirmedMergeRequest) ? ($confirmedMergeRequest->master_person_id ?? null) : ($confirmedMergeRequest->master_person_id ?? null)) : null;
+            $confirmedMergeRequest = $mergeRequests->first(
+                fn (MergeRequest $mergeRequest): bool => in_array($mergeRequest->status->value, ['APPROVED', 'SIGNED'], true)
+            );
         @endphp
 
         <div
             x-data="{ open: true }"
-            class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm"
+            class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
         >
             <h2>
                 <button
                     type="button"
-                    class="flex items-center justify-between w-full px-6 py-4 text-left group cursor-pointer"
-                    @click="open = !open"
+                    class="group flex w-full cursor-pointer items-center justify-between px-6 py-4 text-left"
+                    @click="open = ! open"
                     :aria-expanded="open"
                 >
                     <span class="text-base font-semibold text-gray-900 dark:text-white">
@@ -188,72 +184,56 @@
             </h2>
 
             <div x-show="open">
-                <div class="px-6 pb-6 border-t border-gray-100 dark:border-gray-700 pt-4">
-                    @if($mergeRequestsList->isNotEmpty())
-                        <div class="overflow-x-auto relative mb-4">
-                            <table class="table-input w-full">
+                <div class="border-t border-gray-100 px-6 pt-4 pb-6 dark:border-gray-700">
+                    <div class="mb-4 flex justify-end">
+                        <button
+                            type="button"
+                            wire:click="syncMergeRequests({{ $preperson->id }})"
+                            wire:target="syncMergeRequests"
+                            wire:loading.attr="disabled"
+                            class="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-400"
+                        >
+                            @icon('refresh', 'w-4 h-4')
+                            <span>{{ __('forms.synchronise_with_eHealth') }}</span>
+                        </button>
+                    </div>
+
+                    @if ($mergeRequests->isNotEmpty())
+                        <div class="relative mb-4 overflow-x-auto">
+                            <table class="table-input w-full table-auto">
                                 <thead class="thead-input">
                                     <tr>
-                                        <th scope="col" class="td-input">
+                                        <th scope="col" class="th-input">
                                             {{ __('preperson.merge_request_table.number') }}
                                         </th>
-                                        <th scope="col" class="td-input">
+                                        <th scope="col" class="th-input">
                                             {{ __('preperson.merge_request_table.patient_name') }}
                                         </th>
-                                        <th scope="col" class="td-input">
-                                            {{ __('preperson.merge_request_table.birth_date') }}
-                                        </th>
-                                        <th scope="col" class="td-input">
-                                            {{ __('preperson.merge_request_table.status') }}
-                                        </th>
-                                        <th scope="col" class="td-input">
-                                            {{ __('preperson.merge_request_table.action') }}
-                                        </th>
+                                        <th scope="col" class="th-input">{{ __('forms.birth_date') }}</th>
+                                        <th scope="col" class="th-input">{{ __('forms.status.label') }}</th>
+                                        <th scope="col" class="th-input text-center">{{ __('forms.action') }}</th>
                                     </tr>
                                 </thead>
 
                                 <tbody>
-                                    @foreach($mergeRequestsList as $index => $item)
-                                        @php
-                                            $id = is_object($item) && isset($item->id) ? $item->id : 1;
-                                            $number = is_object($item) && isset($item->number) ? $item->number : ($index + 1);
-                                            $patientName = is_object($item) && isset($item->patient_name) ? $item->patient_name : (is_object($item) && isset($item->masterPerson) ? $item->masterPerson?->fullName : '-');
-                                            $birthDate = is_object($item) && isset($item->birth_date) ? $item->birth_date : (is_object($item) && isset($item->masterPerson) ? formatDisplayDate($item->masterPerson?->birthDate) : '-');
-                                            $statusCode = is_object($item) && isset($item->status_code) ? $item->status_code : (isset($item->status) ? $item->status->value : '');
-                                            $statusLabel = is_object($item) && isset($item->status_label) ? $item->status_label : __('preperson.statuses.' . $statusCode);
-                                            $canConfirm = is_object($item) && isset($item->can_confirm) ? $item->can_confirm : in_array($statusCode, ['NEW', 'APPROVED'], true);
-                                        @endphp
-                                        <tr>
-                                            <td class="td-input">
-                                                {{ $number }}
+                                    @foreach ($mergeRequests as $index => $mergeRequest)
+                                        <tr wire:key="merge-request-{{ $mergeRequest->id }}">
+                                            <td class="td-input align-top text-gray-700 dark:text-gray-300">
+                                                {{ $index + 1 }}
                                             </td>
-                                            <td class="td-input">
-                                                {{ $patientName }}
+                                            <td class="td-input align-top font-bold whitespace-nowrap text-gray-900 dark:text-white">
+                                                {{ $mergeRequest->masterPerson?->fullName ?: '-' }}
                                             </td>
-                                            <td class="td-input">
-                                                {{ $birthDate }}
+                                            <td class="td-input align-top text-gray-700 dark:text-gray-300">
+                                                {{ $mergeRequest->masterPerson ? formatDisplayDate($mergeRequest->masterPerson->birthDate) : '-' }}
                                             </td>
-                                            <td class="td-input">
-                                                @if($statusCode === 'CANCELLED' || $statusCode === 'REJECTED')
-                                                    <span class="badge-red">
-                                                        {{ $statusLabel }}
-                                                    </span>
-                                                @elseif($statusCode === 'NEW')
-                                                    <span class="badge-yellow">
-                                                        {{ $statusLabel }}
-                                                    </span>
-                                                @elseif($statusCode === 'APPROVED' || $statusCode === 'SIGNED')
-                                                    <span class="badge-green">
-                                                        {{ $statusLabel }}
-                                                    </span>
-                                                @else
-                                                    <span class="badge-dark">
-                                                        {{ $statusLabel }}
-                                                    </span>
-                                                @endif
+                                            <td class="td-input align-top whitespace-nowrap">
+                                                <span class="{{ $mergeRequest->status->color() }}">
+                                                    {{ $mergeRequest->status->label() }}
+                                                </span>
                                             </td>
-                                            <td class="td-input">
-                                                @if($canConfirm)
+                                            <td class="td-input text-center align-top">
+                                                @if ($mergeRequest->status === MergeRequestStatus::NEW || $mergeRequest->status === MergeRequestStatus::APPROVED)
                                                     <div
                                                         x-data="{
                                                             openDropdown: false,
@@ -265,13 +245,15 @@
                                                                 this.openDropdown = true;
                                                             },
                                                             close(focusAfter) {
-                                                                if (!this.openDropdown) return;
+                                                                if (! this.openDropdown) return;
                                                                 this.openDropdown = false;
                                                                 focusAfter && focusAfter.focus();
-                                                            }
+                                                            },
                                                         }"
                                                         @keydown.escape.prevent.stop="close($refs.button)"
-                                                        @focusin.window="!$refs.panel.contains($event.target) && close()"
+                                                        @focusin.window="
+                                                            ! $refs.panel.contains($event.target) && close()
+                                                        "
                                                         x-id="['dropdown-button']"
                                                         class="relative"
                                                     >
@@ -294,21 +276,15 @@
                                                                 @click.outside="close($refs.button)"
                                                                 :id="$id('dropdown-button')"
                                                                 class="dropdown-panel relative"
-                                                                style="left: -50%; display: none;"
+                                                                style="left: -50%; display: none"
                                                             >
                                                                 <button
                                                                     type="button"
                                                                     class="dropdown-button"
                                                                     @click.prevent="
-                                                                        openDropdown = false;
-                                                                        if (typeof $wire.resumeMergeRequest === 'function') {
-                                                                            $wire.resumeMergeRequest({{ $id }}).then(() => {
-                                                                                showMergeAuthDrawer = true;
-                                                                            });
-                                                                        } else {
-                                                                            showMergeAuthDrawer = true;
-                                                                        }
-                                                                    "
+                                                                    openDropdown = false;
+                                                                    {{ $mergeRequest->status === MergeRequestStatus::NEW ? 'showMergeSmsDrawer' : 'showMergeFinalConsentDrawer' }} = true;
+                                                                "
                                                                 >
                                                                     {{ __('forms.confirm') }}
                                                                 </button>
@@ -324,36 +300,38 @@
                         </div>
                     @endif
 
-                        <div>
-                            @if($isInactive || $hasConfirmedMerge)
-                                <a
-                                    href="{{ route('persons.patient-data', [legalEntity(), $masterPersonId]) }}"
-                                    class="cursor-pointer text-[#2f54eb] hover:text-blue-700 dark:text-blue-400 font-medium text-sm transition-colors inline-block mt-4"
-                                >
-                                    {{ __('preperson.go_to_merged_patient') }}
-                                </a>
-                            @else
-                                <button
-                                    type="button"
-                                    class="cursor-pointer text-[#2f54eb] hover:text-blue-700 dark:text-blue-400 font-medium text-sm transition-colors flex items-center gap-1 mt-4"
-                                    @click="showMergePatientDrawer = true"
-                                >
-                                    {{ __('preperson.create_merge_request') }}
-                                </button>
-                            @endif
-                        </div>
+                    <div>
+                        @if ($confirmedMergeRequest?->masterPerson)
+                            <a
+                                href="{{ route('persons.patient-data', [legalEntity(), $confirmedMergeRequest->masterPerson->id]) }}"
+                                class="mt-4 inline-block cursor-pointer text-sm font-medium text-[#2f54eb] transition-colors hover:text-blue-700 dark:text-blue-400"
+                            >
+                                {{ __('preperson.go_to_merged_patient') }}
+                            </a>
+                        @elseif ($preperson->status === Status::ACTIVE)
+                            <button
+                                type="button"
+                                class="mt-4 flex cursor-pointer items-center gap-1 text-sm font-medium text-[#2f54eb] transition-colors hover:text-blue-700 dark:text-blue-400"
+                                @click="showMergePatientDrawer = true"
+                            >
+                                {{ __('preperson.create_merge_request') }}
+                            </button>
+                        @endif
                     </div>
                 </div>
             </div>
+        </div>
     @endcan
 
-    <div x-data="{ open: true }"
-         class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
+    <div
+        x-data="{ open: true }"
+        class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
+    >
         <h2>
             <button
                 type="button"
-                class="flex items-center justify-between w-full px-6 py-4 text-left group cursor-pointer"
-                @click="open = !open"
+                class="group flex w-full cursor-pointer items-center justify-between px-6 py-4 text-left"
+                @click="open = ! open"
                 :aria-expanded="open"
             >
                 <span class="text-base font-semibold text-gray-900 dark:text-white">
@@ -363,7 +341,7 @@
             </button>
         </h2>
         <div x-show="open" wire:ignore.self>
-            <div class="px-6 pb-6 border-t border-gray-100 dark:border-gray-700 pt-4 space-y-6">
+            <div class="space-y-6 border-t border-gray-100 px-6 pt-4 pb-6 dark:border-gray-700">
                 <div class="form-row-3">
                     <div class="form-group group">
                         <input
@@ -468,13 +446,13 @@
 
     <div
         x-data="{ open: true }"
-        class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm"
+        class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
     >
         <h2>
             <button
                 type="button"
-                class="flex items-center justify-between w-full px-6 py-4 text-left group cursor-pointer"
-                @click="open = !open"
+                class="group flex w-full cursor-pointer items-center justify-between px-6 py-4 text-left"
+                @click="open = ! open"
                 :aria-expanded="open"
             >
                 <span class="text-base font-semibold text-gray-900 dark:text-white">
@@ -485,7 +463,7 @@
         </h2>
 
         <div x-show="open">
-            <div class="px-6 pb-6 border-t border-gray-100 dark:border-gray-700 pt-4 space-y-6">
+            <div class="space-y-6 border-t border-gray-100 px-6 pt-4 pb-6 dark:border-gray-700">
                 <div class="form-row-3">
                     <div class="form-group group">
                         <input
@@ -550,37 +528,32 @@
         </div>
     </div>
 
-    <div class="flex flex-wrap gap-4 pt-4 border-t border-gray-100 dark:border-gray-700 justify-start items-center">
-        <a href="{{ route('prepersons.index', [legalEntity()]) }}" class="button-minor" style="margin: 0 !important;">
+    <div class="flex flex-wrap items-center justify-start gap-4 border-t border-gray-100 pt-4 dark:border-gray-700">
+        <a href="{{ route('prepersons.index', [legalEntity()]) }}" class="button-minor" style="margin: 0 !important">
             {{ __('forms.close') }}
         </a>
 
-        @if($preperson->status === Status::DRAFT)
+        @if ($preperson->status === Status::DRAFT)
             @can('edit', $preperson)
                 <a
                     href="{{ route('prepersons.edit', [legalEntity(), $preperson]) }}"
                     class="button-primary"
-                    style="margin: 0 !important;"
+                    style="margin: 0 !important"
                 >
                     {{ __('patients.edit_data') }}
                 </a>
             @endcan
         @else
             @can('update', $preperson)
-                <button
-                    type="button"
-                    class="button-primary"
-                    style="margin: 0 !important;"
-                    @click="openEdit()"
-                >
+                <button type="button" class="button-primary" style="margin: 0 !important" @click="openEdit()">
                     {{ __('patients.edit_data') }}
                 </button>
             @endcan
 
             <button
                 type="button"
-                class="button-primary-outline flex items-center gap-2 !me-0"
-                style="margin: 0 !important;"
+                class="button-primary-outline !me-0 flex items-center gap-2"
+                style="margin: 0 !important"
                 @click="showCertificate = true"
             >
                 @icon('printer', 'w-4 h-4')
@@ -591,7 +564,7 @@
                 <button
                     type="button"
                     class="button-primary-outline-red !me-0"
-                    style="margin: 0 !important;"
+                    style="margin: 0 !important"
                     @click="showRegisterDeathModal = true"
                 >
                     {{ __('patients.register_death') }}

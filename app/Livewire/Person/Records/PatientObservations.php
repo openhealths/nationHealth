@@ -179,7 +179,7 @@ class PatientObservations extends BasePatientComponent
             $this->dispatchRemainingPages('observation');
         } else {
             legalEntity()->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_OBSERVATION);
-            Session::flash('success', __('patients.messages.observations_synced_successfully'));
+            Session::flash('success', __('observations.messages.synced_successfully'));
         }
 
         $this->loadFilterOptions();

@@ -16,6 +16,16 @@ class BasicDictionary implements DictionaryInterface
     public const string KEY = 'dictionaries.basic';
 
     /**
+     * Dictionaries kept out of the cached payload. ICD 10 is separate table.
+     *
+     */
+    public const array EXCLUDED_NAMES = [
+        'eHealth/ICD10_AM/condition_codes',
+        'eHealth/ICD10_AM_FULL/condition_codes',
+        'ORPHAcodes'
+    ];
+
+    /**
      * Get the dictionary key.
      *
      * @return string Dictionary identifier for caching and registry
@@ -32,5 +42,21 @@ class BasicDictionary implements DictionaryInterface
     {
         // Basic dictionaries don't support pagination, ignore $page parameter
         return EHealth::dictionary()->getMany();
+    }
+
+    /**
+     * Drop the excluded dictionaries before the payload is cached.
+     *
+     * @param  array  $data
+     * @return array
+     */
+    public static function prune(array $data): array
+    {
+        return array_values(
+            array_filter(
+                $data,
+                static fn (array $entry): bool => !in_array($entry['name'] ?? '', self::EXCLUDED_NAMES, true)
+            )
+        );
     }
 }

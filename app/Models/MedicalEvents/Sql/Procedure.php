@@ -241,6 +241,49 @@ class Procedure extends Model
             : $query->wherePersonId($patient->id);
     }
 
+    /**
+     * Filter procedures recorded within the given encounter, which is stored as an identifier holding its eHealth ID.
+     *
+     * @param  Builder  $query
+     * @param  string  $encounterId
+     * @return Builder
+     */
+    #[Scope]
+    protected function forEncounter(Builder $query, string $encounterId): Builder
+    {
+        return $query->whereHas(
+            'encounter',
+            static fn (Builder $identifier): Builder => $identifier->whereValue($encounterId)
+        );
+    }
+
+    /**
+     * Limit procedures to the services allowed in the patient summary.
+     * The procedure stores its service as a reference, so the allowed service codes are resolved to ids first.
+     * An empty list of allowed codes leaves the query untouched.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    #[Scope]
+    protected function allowedForSummary(Builder $query): Builder
+    {
+        $allowedCodes = config('ehealth.summary_procedures_allowed');
+
+        if (empty($allowedCodes)) {
+            return $query;
+        }
+
+        $serviceIds = dictionary()->services()
+            ->flattened()
+            ->whereIn('code', $allowedCodes)
+            ->pluck('id');
+
+        return $query->whereHas(
+            'code',
+            static fn (Builder $identifier): Builder => $identifier->whereIn('value', $serviceIds)
+        );
+    }
     #[Scope]
     protected function withAllRelations(Builder $query): Builder
     {

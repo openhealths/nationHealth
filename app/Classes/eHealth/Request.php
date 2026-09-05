@@ -119,12 +119,13 @@ class Request
             Log::channel('api_errors')->error('API request failed', [
                 'url' => $this->makeApiUrl(),
                 'status' => $response->status(),
+                'request' => $this->params,
                 'errors' => $errors
             ]);
 
-            dd('Request error', $errors);
-
-            return (new ErrorHandler())->handleError($errors);
+            $errorResult = (new ErrorHandler())->handleError($errors ?? []);
+            $errorMessage = implode(' | ', $errorResult['errors'] ?? ['Unknown API Error']);
+            throw new ApiException($errorMessage, $response->status());
         }
     }
 

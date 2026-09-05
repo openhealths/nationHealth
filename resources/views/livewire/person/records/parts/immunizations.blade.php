@@ -5,28 +5,26 @@
     $hasLimit = $limit && count($this->immunizations) > $limit;
 @endphp
 
-<div @if($hasLimit) x-data="{ limit: {{ $limit }} }" @endif>
-    @foreach($this->immunizations as $index => $immunization)
-        <div class="record-inner-card" @if($hasLimit) x-show="limit > {{ $index }}" @endif>
+<div @if ($hasLimit) x-data="{ limit: {{ $limit }} }" @endif>
+    @foreach ($this->immunizations as $index => $immunization)
+        <div class="record-inner-card" @if ($hasLimit) x-show="limit > {{ $index }}" @endif>
             <div class="record-inner-header">
                 <div class="record-inner-checkbox-col">
-                    <input type="checkbox" class="default-checkbox w-5 h-5">
+                    <input type="checkbox" class="default-checkbox h-5 w-5" />
                 </div>
 
                 <div class="record-inner-column flex-1">
-                    <div class="record-inner-label">{{ __('patients.vaccine') }}</div>
+                    <div class="record-inner-label">{{ __('immunizations.vaccine') }}</div>
                     <div class="record-inner-value text-[16px]">
                         {{ data_get($this->dictionaries, 'eHealth/vaccine_codes.' . data_get($immunization, 'vaccineCode.coding.0.code'), data_get($immunization, 'vaccineCode.coding.0.code', '-')) }}
                     </div>
                 </div>
 
-                <div class="record-inner-column-bordered w-full md:w-36 shrink-0">
+                <div class="record-inner-column-bordered w-full shrink-0 md:w-36">
                     <div class="record-inner-label">{{ __('forms.status.label') }}</div>
                     <div>
                         @php($status = ImmunizationStatus::from(data_get($immunization, 'status')))
-                        <span @class([$status->color()])>
-                            {{ $status->label() }}
-                        </span>
+                        <span @class([$status->color()])> {{ $status->label() }} </span>
                     </div>
                 </div>
 
@@ -39,8 +37,7 @@
 
             <div class="record-inner-body">
                 <div class="record-inner-grid-container">
-                    <div
-                        class="grid grid-cols-2 xl:grid-cols-5 gap-y-4 gap-x-4 w-full [&>div]:min-w-0 [&_.record-inner-subvalue]:break-words">
+                    <div class="[&>div]:min-w-0 [&_.record-inner-subvalue]:break-words grid w-full grid-cols-2 gap-x-4 gap-y-4 xl:grid-cols-5">
                         <div>
                             <div class="record-inner-label">{{ __('patients.dosage') }}</div>
                             <div class="record-inner-subvalue">
@@ -48,7 +45,7 @@
                             </div>
                         </div>
                         <div>
-                            <div class="record-inner-label">{{ __('patients.route') }}</div>
+                            <div class="record-inner-label">{{ __('immunizations.route') }}</div>
                             <div class="record-inner-subvalue">
                                 {{ data_get($this->dictionaries, 'eHealth/vaccination_routes.' . data_get($immunization, 'route.coding.0.code'), '-') }}
                             </div>
@@ -60,18 +57,18 @@
                             </div>
                         </div>
                         <div>
-                            <div class="record-inner-label">{{ __('patients.reactions') }}</div>
+                            <div class="record-inner-label">{{ __('immunizations.reactions') }}</div>
                             <div class="record-inner-subvalue">-</div>
                         </div>
                         <div>
-                            <div class="record-inner-label">{{ __('patients.performer') }}</div>
+                            <div class="record-inner-label">{{ __('medical-events.performer') }}</div>
                             <div class="record-inner-subvalue">
                                 {{ data_get($immunization, 'performer.displayValue', '-') }}
                             </div>
                         </div>
 
                         <div>
-                            <div class="record-inner-label">{{ __('patients.manufacturer_and_lot_number') }}</div>
+                            <div class="record-inner-label">{{ __('immunizations.manufacturer_and_lot_number') }}</div>
                             <div class="record-inner-subvalue">
                                 {{ data_get($immunization, 'manufacturer', '') . ' ' . data_get($immunization, 'lotNumber', '') ?: '-' }}
                             </div>
@@ -83,21 +80,22 @@
                             </div>
                         </div>
                         <div>
-                            <div class="record-inner-label">{{ __('patients.was_performed') }}</div>
+                            <div class="record-inner-label">{{ __('immunizations.was_performed') }}</div>
                             <div class="record-inner-subvalue">
                                 {{ data_get($immunization, 'notGiven') ? __('forms.no') : __('forms.yes') }}
                             </div>
                         </div>
                         <div>
-                            <div class="record-inner-label">{{ __('patients.date_time_performed') }}</div>
+                            <div class="record-inner-label">{{ __('immunizations.date_time_performed') }}</div>
                             <div class="record-inner-subvalue">
                                 {{ data_get($immunization, 'date', '') . ' ' . data_get($immunization, 'time', '') ?: '-' }}
                             </div>
                         </div>
                         <div>
                             <div class="record-inner-label">{{ __('patients.date_time_entered') }}</div>
-                            <div
-                                class="record-inner-subvalue">{{ data_get($immunization, 'ehealthInsertedAt', '-') }}</div>
+                            <div class="record-inner-subvalue">
+                                {{ data_get($immunization, 'ehealthInsertedAt', '-') }}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -118,14 +116,9 @@
         </div>
     @endforeach
 
-    @if($hasLimit)
-        <div x-show="limit < {{ count($this->immunizations) }}" class="flex justify-start mt-4">
-            <button type="button"
-                    @click="limit += 5"
-                    class="item-add"
-            >
-                {{ __('patients.show_more') }}
-            </button>
+    @if ($hasLimit)
+        <div x-show="limit < {{ count($this->immunizations) }}" class="mt-4 flex justify-start">
+            <button type="button" @click="limit += 5" class="item-add">{{ __('patients.show_more') }}</button>
         </div>
     @endif
 </div>

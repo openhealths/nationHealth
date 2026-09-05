@@ -1,14 +1,15 @@
 <div
-    x-data="{ showSignatureModal: $wire.entangle('showSignatureModal') }"
+    x-data="{
+        showSignatureModal: $wire.entangle('showSignatureModal'),
+        showRequestPreviewModal: $wire.entangle('showRequestPreviewModal'),
+    }"
     x-on:close-signature-modal.window="showSignatureModal = false"
     x-on:open-signature-modal.window="showSignatureModal = true"
+    x-on:close-request-preview-modal.window="showRequestPreviewModal = false"
+    x-on:open-request-preview-modal.window="showRequestPreviewModal = true"
 >
-    <livewire:components.x-message :key="now()->timestamp"/>
-
     <x-header-navigation class="breadcrumb-form shift-content">
-        <x-slot name="title">
-            {{ $pageTitle ?? __('forms.employee') }}
-        </x-slot>
+        <x-slot name="title">{{ $pageTitle ?? __('forms.employee') }}</x-slot>
     </x-header-navigation>
 
     <section
@@ -21,7 +22,6 @@
         }"
     >
         <form wire:submit.prevent="save" class="form space-y-8">
-
             {{-- Part 1: Personal Data --}}
             @include('livewire.employee.parts.party')
 
@@ -45,7 +45,7 @@
             <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 pt-6">
                 <div class="flex items-center space-x-4">
                     <a href="{{ route('employee.index', ['legalEntity' => legalEntity()->id]) }}" class="button-minor">
-                        {{__('forms.cancel')}}
+                        {{ __('forms.cancel') }}
                     </a>
                     {{-- This button now just toggles the Alpine.js modal --}}
                     <button type="button" wire:click="prepareForSigning" class="button-primary">
@@ -60,14 +60,14 @@
                         wire:target="save"
                     >
                         <svg
-                            class="w-5 h-5"
+                            class="h-5 w-5"
                             xmlns="http://www.w3.org/2000/svg"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
                             stroke-width="2"
                         >
-                            <path stroke-linejoin="round" d="M10 12v1h4v-1m4 7H6a1 1 0 0 1-1-1V9h14v9a1 1 0 0 1-1 1ZM4 5h16a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/>
+                            <path stroke-linejoin="round" d="M10 12v1h4v-1m4 7H6a1 1 0 0 1-1-1V9h14v9a1 1 0 0 1-1 1ZM4 5h16a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" />
                         </svg>
                         <span wire:loading.remove wire:target="save">{{ __('forms.save') }}</span>
                         <span wire:loading wire:target="save">{{ __('forms.saving') }}...</span>
@@ -77,7 +77,8 @@
         </form>
     </section>
 
+    @include('livewire.employee.parts.modals.request-preview-modal')
     @include('livewire.employee.parts.modals.signature-modal')
 
-    <x-forms.loading/>
+    <x-forms.loading />
 </div>

@@ -67,6 +67,27 @@ trait HandlesSyncBatch
     }
 
     /**
+     * Returns the language file holding the sync messages for the given entity type.
+     *
+     * @param  string  $entityType
+     * @return string
+     */
+    protected function syncLangGroup(string $entityType): string
+    {
+        return match ($entityType) {
+            'diagnostic_report' => 'diagnostic-reports',
+            'procedure' => 'procedures',
+            'observation' => 'observations',
+            'condition' => 'conditions',
+            'immunization' => 'immunizations',
+            'clinical_impression' => 'clinical-impressions',
+            'encounter' => 'encounters',
+            'episode' => 'episodes',
+            default => 'patients'
+        };
+    }
+
+    /**
      * Returns true if a batch for this entity type is currently running.
      *
      * @param  string  $entityType
@@ -89,7 +110,7 @@ trait HandlesSyncBatch
     protected function cannotStartSync(string $entityType): bool
     {
         if ($this->isSyncProcessing($entityType)) {
-            Session::flash('error', __('patients.messages.' . $entityType . '_sync_already_running'));
+            Session::flash('error', __($this->syncLangGroup($entityType) . '.messages.sync_already_running'));
 
             return true;
         }
@@ -122,7 +143,7 @@ trait HandlesSyncBatch
         $token = Session::get(config('ehealth.api.oauth.bearer_token'));
 
         $this->resumeSynchronization($entityType, $user, $token);
-        Session::flash('success', __('patients.messages.' . $entityType . '_sync_resume_started'));
+        Session::flash('success', __($this->syncLangGroup($entityType) . '.messages.sync_resume_started'));
         $user->notify(new SyncNotification($entityType, 'resumed'));
     }
 
@@ -140,11 +161,11 @@ trait HandlesSyncBatch
         try {
             $user->notify(new SyncNotification($entityType, 'started'));
             $this->dispatchNextJobs($entityType, $user, $token);
-            Session::flash('success', __('patients.messages.' . $entityType . 's_first_page_synced_successfully'));
+            Session::flash('success', __($this->syncLangGroup($entityType) . '.messages.first_page_synced_successfully'));
         } catch (Throwable $exception) {
             Log::error('Failed to dispatch ' . ucfirst($entityType) . 'Sync batch', ['exception' => $exception]);
             $user->notify(new SyncNotification($entityType, 'failed'));
-            Session::flash('error', __('patients.messages.' . $entityType . '_sync_background_dispatch_error'));
+            Session::flash('error', __($this->syncLangGroup($entityType) . '.messages.sync_background_dispatch_error'));
         }
     }
 

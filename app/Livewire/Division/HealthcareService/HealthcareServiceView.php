@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Division\HealthcareService;
 
-use App\Core\Arr;
 use App\Models\Division;
 use App\Models\HealthcareService;
 use App\Models\LegalEntity;
@@ -18,11 +17,7 @@ class HealthcareServiceView extends HealthcareServiceComponent
         $this->baseMount($legalEntity, $division);
 
         $healthcareService->loadMissing(['category.coding', 'type.coding']);
-        $this->form->fill($healthcareService);
-
-        if ($this->form->availableTime) {
-            $this->form->availableTime = Arr::toCamelCase($this->form->availableTime);
-        }
+        $this->form->fillFromModel($healthcareService);
     }
 
     public function render(): View

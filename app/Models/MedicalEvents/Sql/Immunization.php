@@ -46,6 +46,7 @@ class Immunization extends Model
 
     protected $casts = [
         'date' => EHealthTimestampCast::class,
+        'expiration_date' => EHealthTimestampCast::class,
         'status' => ImmunizationStatus::class
     ];
 
@@ -125,6 +126,22 @@ class Immunization extends Model
             ->orderByDesc('ehealth_updated_at');
     }
 
+    /**
+     * Filter immunizations created within the given encounter, which is stored as the context identifier.
+     *
+     * @param  Builder  $query
+     * @param  string  $encounterId
+     * @return Builder
+     */
+    #[Scope]
+    protected function forEncounter(Builder $query, string $encounterId): Builder
+    {
+        return $query->whereHas(
+            'context',
+            static fn (Builder $identifier): Builder => $identifier->whereValue($encounterId)
+        );
+    }
+
     public function preperson(): BelongsTo
     {
         return $this->belongsTo(Preperson::class);
@@ -173,19 +190,9 @@ class Immunization extends Model
     protected function explanation(): Attribute
     {
         return Attribute::make(
-            get: fn () => [
-                'reasons' => $this->explanations()
-                    ->with(['reasons.coding'])
-                    ->get()
-                    ->pluck('reasons')
-                    ->filter()
-                    ?->toArray() ?: [],
-                'reasonsNotGiven' => $this->explanations()
-                    ->with(['reasonsNotGiven.coding'])
-                    ->get()
-                    ->pluck('reasonsNotGiven')
-                    ->filter()
-                    ?->toArray() ?: []
+            get: fn (): array => [
+                'reasons' => $this->explanations->pluck('reasons')->filter()->toArray(),
+                'reasonsNotGiven' => $this->explanations->pluck('reasonsNotGiven')->filter()->toArray()
             ]
         );
     }

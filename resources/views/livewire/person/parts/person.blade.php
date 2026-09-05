@@ -4,11 +4,19 @@
     <legend class="legend">{{ __('patients.patient_information') }}</legend>
 
     {{-- Using Alpine to dynamically add and remove name groups filled in different languages --}}
-    <div x-data="{ names: $wire.entangle('form.person.names') }">
-        
+    <div
+        x-data="{
+             names: $wire.entangle('form.person.names'),
+             documents: $wire.entangle('form.person.documents'),
+             foreignDocumentTypes: @js(config('ehealth.identity_document_types_foreign')),
+             get hasForeignDocument() {
+                 return (this.documents ?? []).some(document => this.foreignDocumentTypes.includes(document.type));
+             }
+         }"
+        x-effect="if (hasForeignDocument && $wire.get('form.person.unzr')) $wire.set('form.person.unzr', '', false);"
+    >
         <template x-if="names && names.length > 0">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5 mb-6">
-                
+            <div class="mb-6 grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-3">
                 <div class="form-group group">
                     <input
                         x-model="names[0].firstName"
@@ -19,20 +27,28 @@
                         required
                         autocomplete="off"
                     />
-                    <label for="patientFirstName-0" class="label">
-                        {{ __('forms.first_name') }}
-                    </label>
-                    @error('form.person.names.0.firstName') <p class="text-error">{{ $message }}</p> @enderror
+                    <label for="patientFirstName-0" class="label"> {{ __('forms.first_name') }} </label>
+                    @error('form.person.names.0.firstName')
+                        <p class="text-error">{{ $message }}</p>
+                    @enderror
                 </div>
 
-                <div class="flex items-center" x-data="{ hasLastName: !names[0].noLastName }" x-init="$watch('names[0].noLastName', value => hasLastName = !value)">
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox"
-                               x-model="hasLastName"
-                               x-on:change="names[0].noLastName = !hasLastName; if (!hasLastName) names[0].lastName = ''"
-                               class="sr-only peer"
+                <div
+                    class="flex items-center"
+                    x-data="{ hasLastName: ! names[0].noLastName }"
+                    x-init="$watch('names[0].noLastName', (value) => (hasLastName = ! value))"
+                >
+                    <label class="relative inline-flex cursor-pointer items-center">
+                        <input
+                            type="checkbox"
+                            x-model="hasLastName"
+                            x-on:change="
+                                names[0].noLastName = ! hasLastName;
+                                if (! hasLastName) names[0].lastName = '';
+                            "
+                            class="peer sr-only"
                         />
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                        <div class="peer h-6 w-11 rounded-full bg-gray-200 peer-checked:bg-blue-600 peer-focus:outline-none after:absolute after:top-0.5 after:left-0.5 after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:border-gray-600 dark:bg-gray-700"></div>
                         <span class="ml-3 text-sm font-semibold text-gray-900 dark:text-gray-300">
                             {{ __('patients.has_last_name') }}
                         </span>
@@ -46,14 +62,14 @@
                         id="patientLastName-0"
                         class="input peer @error('form.person.names.0.lastName') input-error @enderror"
                         placeholder=" "
-                        :required="!names[0].noLastName"
+                        :required="! names[0].noLastName"
                         :disabled="names[0].noLastName"
                         autocomplete="off"
                     />
-                    <label for="patientLastName-0" class="label">
-                        {{ __('forms.last_name') }}
-                    </label>
-                    @error('form.person.names.0.lastName') <p class="text-error">{{ $message }}</p> @enderror
+                    <label for="patientLastName-0" class="label"> {{ __('forms.last_name') }} </label>
+                    @error('form.person.names.0.lastName')
+                        <p class="text-error">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <div class="form-group group">
@@ -65,10 +81,10 @@
                         placeholder=" "
                         autocomplete="off"
                     />
-                    <label for="patientSecondName-0" class="label">
-                        {{ __('forms.second_name') }}
-                    </label>
-                    @error('form.person.names.0.secondName') <p class="text-error">{{ $message }}</p> @enderror
+                    <label for="patientSecondName-0" class="label"> {{ __('forms.second_name') }} </label>
+                    @error('form.person.names.0.secondName')
+                        <p class="text-error">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <div class="form-group">
@@ -79,14 +95,14 @@
                         required
                     >
                         <option value="" selected>{{ __('forms.select') }}</option>
-                        @foreach($this->dictionaries['LANGUAGE'] as $key => $language)
+                        @foreach ($this->dictionaries['LANGUAGE'] as $key => $language)
                             <option value="{{ $key }}">{{ $language }}</option>
                         @endforeach
                     </select>
-                    <label for="nameLanguage-0" class="label">
-                        {{ __('patients.name_language') }}
-                    </label>
-                    @error('form.person.names.0.language') <p class="text-error">{{ $message }}</p> @enderror
+                    <label for="nameLanguage-0" class="label"> {{ __('patients.name_language') }} </label>
+                    @error('form.person.names.0.language')
+                        <p class="text-error">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <div class="form-group group">
@@ -102,11 +118,11 @@
                             required
                             autocomplete="off"
                         />
-                        <label for="birthDate" class="wrapped-label">
-                            {{ __('forms.birth_date') }}
-                        </label>
+                        <label for="birthDate" class="wrapped-label"> {{ __('forms.birth_date') }} </label>
                     </div>
-                    @error('form.person.birthDate') <p class="text-error">{{ $message }}</p> @enderror
+                    @error('form.person.birthDate')
+                        <p class="text-error">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <div class="form-group group">
@@ -120,10 +136,10 @@
                         required
                         autocomplete="off"
                     />
-                    <label for="birthCountry" class="label">
-                        {{ __('forms.birth_country') }}
-                    </label>
-                    @error('form.person.birthCountry') <p class="text-error">{{ $message }}</p> @enderror
+                    <label for="birthCountry" class="label"> {{ __('forms.birth_country') }} </label>
+                    @error('form.person.birthCountry')
+                        <p class="text-error">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <div class="form-group group">
@@ -137,10 +153,10 @@
                         required
                         autocomplete="off"
                     />
-                    <label for="birthSettlement" class="label">
-                        {{ __('forms.birth_settlement') }}
-                    </label>
-                    @error('form.person.birthSettlement') <p class="text-error">{{ $message }}</p> @enderror
+                    <label for="birthSettlement" class="label"> {{ __('forms.birth_settlement') }} </label>
+                    @error('form.person.birthSettlement')
+                        <p class="text-error">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <div class="form-group">
@@ -152,14 +168,14 @@
                         required
                     >
                         <option value="" selected>{{ __('forms.select') }}</option>
-                        @foreach($this->dictionaries['GENDER'] as $key => $gender)
+                        @foreach ($this->dictionaries['GENDER'] as $key => $gender)
                             <option value="{{ $key }}">{{ $gender }}</option>
                         @endforeach
                     </select>
-                    <label for="patientGender" class="label">
-                        {{ __('forms.gender') }}
-                    </label>
-                    @error('form.person.gender') <p class="text-error">{{ $message }}</p> @enderror
+                    <label for="patientGender" class="label"> {{ __('forms.gender') }} </label>
+                    @error('form.person.gender')
+                        <p class="text-error">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <div class="form-group group">
@@ -174,32 +190,30 @@
                         maxlength="14"
                         autocomplete="off"
                     />
-                    <label for="unzr" class="label">
-                        {{ __('patients.unzr') }}
-                    </label>
-                    @error('form.person.unzr') <p class="text-error">{{ $message }}</p> @enderror
+                    <label for="unzr" class="label"> {{ __('patients.unzr') }} </label>
+                    @error('form.person.unzr')
+                        <p class="text-error">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <div></div>
 
                 <div></div>
-
             </div>
         </template>
 
         <template x-for="(name, index) in names">
             <template x-if="index > 0">
-                <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6" :key="'name-group-' + index">
-                    <div class="flex items-center justify-between mb-4">
+                <div class="mt-6 border-t border-gray-200 pt-6 dark:border-gray-700" :key="'name-group-' + index">
+                    <div class="mb-4 flex items-center justify-between">
                         <h4 class="text-sm font-semibold text-gray-900 dark:text-white">
-                            {{ __('patients.name') }} №<span x-text="index + 1"></span>
+                            {{ __('forms.first_name') }} №<span x-text="index + 1"></span>
                         </h4>
-                        <button @click="names.splice(index, 1)" type="button" class="text-sm text-red-600 hover:text-red-800 font-medium">
+                        <button @click="names.splice(index, 1)" type="button" class="item-remove">
                             {{ __('patients.remove_name') }}
                         </button>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5">
-                        
+                    <div class="grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-3">
                         <div class="form-group group">
                             <input
                                 x-model="name.firstName"
@@ -214,14 +228,22 @@
                             </label>
                         </div>
 
-                        <div class="flex items-center" x-data="{ hasLastName: !name.noLastName }" x-init="$watch('name.noLastName', value => hasLastName = !value)">
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox"
-                                       x-model="hasLastName"
-                                       x-on:change="name.noLastName = !hasLastName; if (!hasLastName) name.lastName = ''"
-                                       class="sr-only peer"
+                        <div
+                            class="flex items-center"
+                            x-data="{ hasLastName: ! name.noLastName }"
+                            x-init="$watch('name.noLastName', (value) => (hasLastName = ! value))"
+                        >
+                            <label class="relative inline-flex cursor-pointer items-center">
+                                <input
+                                    type="checkbox"
+                                    x-model="hasLastName"
+                                    x-on:change="
+                                        name.noLastName = ! hasLastName;
+                                        if (! hasLastName) name.lastName = '';
+                                    "
+                                    class="peer sr-only"
                                 />
-                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                                <div class="peer h-6 w-11 rounded-full bg-gray-200 peer-checked:bg-blue-600 peer-focus:outline-none after:absolute after:top-[2px] after:left-0.5 after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:border-gray-600 dark:bg-gray-700"></div>
                                 <span class="ml-3 text-sm font-semibold text-gray-900 dark:text-gray-300">
                                     {{ __('patients.has_last_name') }}
                                 </span>
@@ -235,12 +257,10 @@
                                 :id="'patientLastName-' + index"
                                 class="input peer"
                                 placeholder=" "
-                                :required="!name.noLastName"
+                                :required="! name.noLastName"
                                 :disabled="name.noLastName"
                             />
-                            <label :for="'patientLastName-' + index" class="label">
-                                {{ __('forms.last_name') }}
-                            </label>
+                            <label :for="'patientLastName-' + index" class="label"> {{ __('forms.last_name') }} </label>
                         </div>
 
                         <div class="form-group group">
@@ -264,7 +284,7 @@
                                 required
                             >
                                 <option value="" selected>{{ __('forms.select') }}</option>
-                                @foreach($this->dictionaries['LANGUAGE'] as $key => $language)
+                                @foreach ($this->dictionaries['LANGUAGE'] as $key => $language)
                                     <option value="{{ $key }}">{{ $language }}</option>
                                 @endforeach
                             </select>
@@ -272,7 +292,6 @@
                                 {{ __('patients.name_language') }}
                             </label>
                         </div>
-
                     </div>
                 </div>
             </template>

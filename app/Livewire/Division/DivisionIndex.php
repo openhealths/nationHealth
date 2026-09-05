@@ -263,8 +263,10 @@ class DivisionIndex extends DivisionComponent
 
         $syncQuery = [
             'page' => 1,
-            'per_page' => config('ehealth.api.max_per_page')
+            'per_page' => config('ehealth.api.page_size_max')
         ];
+
+        
 
         try {
             $response = EHealth::division()->getMany(query: $syncQuery);
@@ -304,9 +306,8 @@ class DivisionIndex extends DivisionComponent
                 ->withOption('legal_entity_id', legalEntity()->id)
                 ->withOption('token', Crypt::encryptString($token))
                 ->withOption('user', $user)
-                ->then(function (Batch $batch) use ($user) {
-                    $user->notify(new SyncNotification('division', 'complete'));
-                })->catch(callback: function (Batch $batch, Throwable $e) use ($user) {
+                ->withOption('sync_entity', LegalEntity::ENTITY_DIVISION)
+                ->catch(callback: function (Batch $batch, Throwable $e) use ($user) {
                     Log::error('Division sync batch failed.', [
                         'batch_id' => $batch->id,
                         'exception' => $e
@@ -319,7 +320,7 @@ class DivisionIndex extends DivisionComponent
                 ->dispatch();
 
             legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_DIVISION);
-
+            $user->notify(new SyncNotification('division', 'started'));
             session()->flash('success', __('Синхронізація запущена у фоновому режимі'));
         } else {
             legalEntity()?->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_DIVISION);

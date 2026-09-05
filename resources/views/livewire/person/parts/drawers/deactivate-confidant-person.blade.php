@@ -1,3 +1,17 @@
+<div
+    x-show="showDeactivateConfidantPersonDrawer"
+    x-transition:enter="transition ease-out duration-300"
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100"
+    x-transition:leave="transition ease-in duration-200"
+    x-transition:leave-start="opacity-100"
+    x-transition:leave-end="opacity-0"
+    x-cloak
+    @click="showDeactivateConfidantPersonDrawer = false"
+    class="fixed inset-0 bg-gray-900/50"
+    style="z-index: 45"
+></div>
+
 <div x-show="showDeactivateConfidantPersonDrawer"
      x-transition:enter="transition ease-out duration-300"
      x-transition:enter-start="translate-x-full"
@@ -6,7 +20,8 @@
      x-transition:leave-start="translate-x-0"
      x-transition:leave-end="translate-x-full"
      x-cloak
-     class="fixed top-0 right-0 z-40 h-screen pt-20 p-4 overflow-y-auto transition-transform bg-white w-4/5 dark:bg-gray-800 shadow-2xl"
+     class="fixed top-0 right-0 h-screen pt-20 p-4 overflow-y-auto transition-transform bg-white w-4/5 dark:bg-gray-800 shadow-2xl"
+     style="z-index: 45"
      x-data="{
          showResults: false,
          showDocumentDrawer: false,

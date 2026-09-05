@@ -250,31 +250,37 @@
                                 </div>
 
                                 <div class="form-group">
-                                    @icon('calendar-month', 'w-5 h-5 svg-input absolute left-1 !top-2/3 transform -translate-y-1/2 pointer-events-none')
                                     <label for="issuedAt" class="label-modal">
                                         {{__('contracts.start_date_label')}}<span class="text-red-600"> *</span>
                                     </label>
-                                    <input x-model="externalContractor.issuedAt"
-                                           type="text"
-                                           id="issuedAt"
-                                           class="input-modal datepicker-input"
-                                           autocomplete="off"
-                                           required
-                                    >
+                                    <div class="datepicker-wrapper relative w-full">
+                                        <input x-model="externalContractor.issuedAt"
+                                               datepicker-format="{{ frontendDateFormat() }}"
+                                               type="text"
+                                               id="issuedAt"
+                                               class="input-modal datepicker-input with-leading-icon !pl-10"
+                                               autocomplete="off"
+                                               placeholder=" "
+                                               required
+                                        >
+                                    </div>
                                 </div>
 
                                 <div class="form-group">
-                                    @icon('calendar-month', 'w-5 h-5 svg-input absolute left-1 !top-2/3 transform -translate-y-1/2 pointer-events-none')
                                     <label for="expiresAt" class="label-modal">
                                         {{__('contracts.end_date_label')}}<span class="text-red-600"> *</span>
                                     </label>
-                                    <input x-model="externalContractor.expiresAt"
-                                           type="text"
-                                           id="expiresAt"
-                                           class="input-modal datepicker-input"
-                                           autocomplete="off"
-                                           required
-                                    >
+                                    <div class="datepicker-wrapper relative w-full">
+                                        <input x-model="externalContractor.expiresAt"
+                                               datepicker-format="{{ frontendDateFormat() }}"
+                                               type="text"
+                                               id="expiresAt"
+                                               class="input-modal datepicker-input with-leading-icon !pl-10"
+                                               autocomplete="off"
+                                               placeholder=" "
+                                               required
+                                        >
+                                    </div>
                                 </div>
 
                                 <div class="form-group group">

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
@@ -46,7 +48,7 @@ return new class extends Migration
      */
     protected function setData(): void
     {
-        $typesData= config('ehealth.legal_entity_types', []);
+        $typesData = config('ehealth.legal_entity_types', []);
 
         // Fetch type ids keyed by name
         $typeIds = DB::table('legal_entity_types')->pluck('id', 'name');

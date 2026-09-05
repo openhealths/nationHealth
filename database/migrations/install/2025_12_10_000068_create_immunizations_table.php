@@ -29,7 +29,7 @@ return new class extends Migration
             $table->foreignId('report_origin_id')->nullable()->constrained('codeable_concepts');
             $table->string('manufacturer')->nullable();
             $table->string('lot_number')->nullable();
-            $table->date('expiration_date')->nullable();
+            $table->timestamp('expiration_date')->nullable();
             $table->string('explanatory_letter')->nullable();
             $table->foreignId('site_id')->nullable()->constrained('codeable_concepts');
             $table->foreignId('route_id')->nullable()->constrained('codeable_concepts');

@@ -18,7 +18,8 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class CarePlanActivity extends Model
 {
-    use HasFactory, HasCamelCasing;
+    use HasFactory;
+    use HasCamelCasing;
 
     protected $fillable = [
         'uuid',
@@ -35,6 +36,9 @@ class CarePlanActivity extends Model
         'daily_amount',
         'daily_amount_system',
         'daily_amount_code',
+        'remaining_quantity',
+        'remaining_quantity_system',
+        'remaining_quantity_code',
         'reason_code',
         'reason_reference',
         'goal',
@@ -58,6 +62,7 @@ class CarePlanActivity extends Model
         'do_not_perform' => 'boolean',
         'quantity' => 'integer',
         'daily_amount' => 'decimal:4',
+        'remaining_quantity' => 'decimal:4',
         'reason_reference' => 'array',
         'goal' => 'array',
         'scheduled_period_start' => 'date',
@@ -127,5 +132,32 @@ class CarePlanActivity extends Model
     public function outcomeReferences(): BelongsToMany
     {
         return $this->belongsToMany(Identifier::class, 'care_plan_activity_outcomes', 'activity_id', 'identifier_id');
+    }
+
+    /**
+     * Canonical activity kind used for UI and business rules.
+     * The `kind` column is the source of truth; kindConcept may be stale after manual edits.
+     */
+    public function resolvedKind(): string
+    {
+        $kind = strtolower(trim((string) ($this->kind ?? '')));
+
+        if ($kind !== '') {
+            return match ($kind) {
+                'servicerequest' => 'service_request',
+                'medicationrequest' => 'medication_request',
+                'devicerequest' => 'device_request',
+                default => $kind,
+            };
+        }
+
+        $conceptCode = strtolower(trim((string) ($this->kindConcept?->coding?->first()?->code ?? '')));
+
+        return match ($conceptCode) {
+            'servicerequest', 'service_request' => 'service_request',
+            'medicationrequest', 'medication_request' => 'medication_request',
+            'devicerequest', 'device_request' => 'device_request',
+            default => $conceptCode,
+        };
     }
 }

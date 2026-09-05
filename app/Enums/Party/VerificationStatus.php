@@ -26,6 +26,19 @@ enum VerificationStatus: string
      */
     public function label(): string
     {
-        return Lang::get('general.verification_statuses.' . $this->value);
+        return Lang::get('party_verification.statuses.' . $this->value);
+    }
+
+    /**
+     * Badge CSS class for list/detail views.
+     */
+    public function color(): string
+    {
+        return match ($this) {
+            self::VERIFIED => 'badge-green',
+            self::VERIFICATION_NEEDED => 'badge-yellow',
+            self::NOT_VERIFIED => 'badge-red',
+            self::VERIFICATION_NOT_NEEDED => 'badge-gray',
+        };
     }
 }

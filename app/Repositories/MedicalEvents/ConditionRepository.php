@@ -34,9 +34,11 @@ class ConditionRepository extends BaseRepository
                 $asserter = null;
                 $severity = null;
 
-                if (isset($datum['asserter'])) {
-                    $asserter = Repository::identifier()->store($datum['asserter']['identifier']['value']);
-                    Repository::codeableConcept()->attach($asserter, $datum['asserter']);
+                $asserterData = data_get($datum, 'asserter.0') ?? data_get($datum, 'asserter');
+
+                if (!empty($asserterData)) {
+                    $asserter = Repository::identifier()->store($asserterData['identifier']['value']);
+                    Repository::codeableConcept()->attach($asserter, $asserterData);
                 }
 
                 $context = Repository::identifier()->store($datum['context']['identifier']['value']);
@@ -52,22 +54,27 @@ class ConditionRepository extends BaseRepository
                     $severity = Repository::codeableConcept()->store($datum['severity']);
                 }
 
-                $condition = $this->model->create([
-                    'uuid' => $datum['id'],
-                    $ownerColumn => $ownerId,
-                    'primary_source' => $datum['primarySource'],
-                    'asserter_id' => $asserter?->id,
-                    'report_origin_id' => $reportOrigin?->id,
-                    'context_id' => $context->id,
-                    'code_id' => $code->id,
-                    'clinical_status' => $datum['clinicalStatus'],
-                    'verification_status' => $datum['verificationStatus'],
-                    'severity_id' => $severity?->id,
-                    'onset_date' => $datum['onsetDate'],
-                    'asserted_date' => $datum['assertedDate'] ?? null
-                ]);
+                $condition = $this->model->updateOrCreate(
+                    ['uuid' => $datum['id']],
+                    [
+                        $ownerColumn => $ownerId,
+                        'primary_source' => $datum['primarySource'],
+                        'asserter_id' => $asserter?->id,
+                        'report_origin_id' => $reportOrigin?->id,
+                        'context_id' => $context->id,
+                        'code_id' => $code->id,
+                        'clinical_status' => $datum['clinicalStatus'],
+                        'verification_status' => $datum['verificationStatus'],
+                        'severity_id' => $severity?->id,
+                        'onset_date' => $datum['onsetDate'],
+                        'asserted_date' => $datum['assertedDate'] ?? null
+                    ]
+                );
 
                 if (!empty($datum['evidences'])) {
+                    if (!$condition->wasRecentlyCreated) {
+                        $condition->evidencesRelation()->delete();
+                    }
                     foreach ($datum['evidences'] as $evidence) {
                         if (!empty($evidence['codes'])) {
                             foreach ($evidence['codes'] as $evidenceCode) {
@@ -106,6 +113,20 @@ class ConditionRepository extends BaseRepository
     }
 
     /**
+     * Get conditions recorded within the encounter, with all relationships needed for the edit form.
+     *
+     * @param  string  $encounterId  eHealth ID of the encounter
+     * @return array
+     */
+    public function get(string $encounterId): array
+    {
+        return $this->model->withAllRelations()
+            ->forEncounter($encounterId)
+            ->get()
+            ->toArray();
+    }
+
+    /**
      * Build a UUID => [insertedAt, codeCode] map for the given condition/observation UUIDs.
      *
      * @param  array  $uuids
@@ -113,7 +134,14 @@ class ConditionRepository extends BaseRepository
      */
     public function getDetailsMapByUuids(array $uuids): array
     {
-        return collect($this->model->whereIn('uuid', $uuids)->with(['code.coding', 'stageSummary'])->get()->toArray())
+        // The model appends evidences, so the relation behind them has to come along with the rest
+        return collect(
+            $this->model
+                ->whereIn('uuid', $uuids)
+                ->with(['code.coding', 'stageSummary', 'evidencesRelation.codes.coding', 'evidencesRelation.details.type.coding'])
+                ->get()
+                ->toArray()
+        )
             ->mapWithKeys(fn (array $condition) => [
                 $condition['uuid'] => [
                     'ehealthInsertedAt' => $condition['ehealthInsertedAt'] ?? null,
@@ -212,7 +240,9 @@ class ConditionRepository extends BaseRepository
             foreach ($validatedData as $data) {
                 $existing = $existingConditions->get($data['uuid']);
 
-                $asserter = $this->syncIdentifier($existing, $data['asserter'] ?? null, 'asserter');
+                $asserterData = data_get($data, 'asserter.0') ?? ($data['asserter'] ?? null);
+
+                $asserter = $this->syncIdentifier($existing, $asserterData, 'asserter');
                 $reportOrigin = $this->syncCodeableConcept($existing, $data['report_origin'] ?? null, 'reportOrigin');
                 $context = $this->syncIdentifier($existing, $data['context'], 'context');
                 $code = $this->syncCodeableConcept($existing, $data['code'], 'code');

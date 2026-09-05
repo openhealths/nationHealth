@@ -12,6 +12,11 @@ class Range extends Model
 {
     use HasCamelCasing;
 
+    protected $fillable = [
+        'low_id',
+        'high_id'
+    ];
+
     protected $hidden = [
         'id',
         'low_id',

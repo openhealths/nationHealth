@@ -7,6 +7,7 @@ namespace App\Repositories;
 use App\Core\Arr;
 use App\Models\Person\Person;
 use App\Models\Person\PersonRequest;
+use App\Models\Relations\PersonVerificationDetail;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOneOrMany;
 use Throwable;
@@ -164,42 +165,47 @@ class PersonRepository
     }
 
     /**
-     * Update verification status by provided ID or UUID.
+     * Update verification status.
      *
-     * @param  int|string  $personId
+     * @param  int  $personId
      * @param  string  $verificationStatus
      * @return void
      */
-    public function updateVerificationStatusById(int|string $personId, string $verificationStatus): void
+    public function updateVerificationStatusById(int $personId, string $verificationStatus): void
     {
-        $query = Person::query();
-
-        if (is_numeric($personId)) {
-            $query->where('id', $personId);
-        } else {
-            $query->where('uuid', $personId);
-        }
-
-        $query->update(['verification_status' => $verificationStatus]);
+        Person::whereId($personId)->update(['verification_status' => $verificationStatus]);
     }
 
     /**
-     * Update synchronization person data status by provided ID or UUID.
+     * Store the person verification result of each registry.
      *
-     * @param  int|string  $personId
+     * @param  int  $personId
+     * @param  array  $details
+     * @return void
+     */
+    public function syncVerificationDetails(int $personId, array $details): void
+    {
+        $columns = array_fill_keys(new PersonVerificationDetail()->getFillable(), null);
+
+        $rows = Arr::map($details, static fn (array $detail, string $source): array => [
+            ...$columns,
+            ...$detail,
+            'person_id' => $personId,
+            'source' => $source
+        ]);
+
+        PersonVerificationDetail::upsert(array_values($rows), ['person_id', 'source']);
+    }
+
+    /**
+     * Update synchronization person data status.
+     *
+     * @param  int  $personId
      * @param  bool  $synchronizationStatus
      * @return void
      */
-    public function updateSynchronizationStatusById(int|string $personId, bool $synchronizationStatus): void
+    public function updateSynchronizationStatusById(int $personId, bool $synchronizationStatus): void
     {
-        $query = Person::query();
-
-        if (is_numeric($personId)) {
-            $query->where('id', $personId);
-        } else {
-            $query->where('uuid', $personId);
-        }
-
-        $query->update(['is_syncing' => $synchronizationStatus]);
+        Person::whereId($personId)->update(['is_syncing' => $synchronizationStatus]);
     }
 }

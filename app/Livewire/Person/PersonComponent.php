@@ -17,8 +17,10 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\Person\Forms\PersonForm as Form;
 use App\Models\Person\Person;
 use App\Models\Person\PersonRequest;
+use App\Models\Relations\Address;
+use App\Notifications\NhsVerificationNeededNotification;
 use App\Repositories\Repository;
-use App\Traits\Addresses\AddressSearch;
+use App\Traits\Addresses\BaseAddress;
 use App\Traits\FormTrait;
 use Carbon\CarbonImmutable;
 use Exception;
@@ -30,6 +32,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -40,9 +43,29 @@ class PersonComponent extends Component
 {
     use FormTrait;
     use WithFileUploads;
-    use AddressSearch;
+    use BaseAddress;
 
     private const int SMS_RESEND_LIMIT = 1;
+
+    /**
+     * Addresses of the person, exactly one of which has to be the address of residence.
+     *
+     * @var array
+     */
+    public array $addresses = [
+        ['country' => Address::DEFAULT_COUNTRY, 'type' => Address::DEFAULT_TYPE]
+    ];
+
+    /**
+     * Suggestions of the address registry for the address being filled in.
+     *
+     * @var array
+     */
+    public array $districts = [];
+
+    public array $settlements = [];
+
+    public array $streets = [];
 
     #[Locked]
     public int $personId;
@@ -135,6 +158,13 @@ class PersonComponent extends Component
     public ?string $invalidPersonId = null;
 
     /**
+     * Why the person found by the search may not be chosen as a legal representative.
+     *
+     * @var string|null
+     */
+    public ?string $invalidPersonReason = null;
+
+    /**
      * Data about new confidant person.
      *
      * @var array
@@ -160,17 +190,43 @@ class PersonComponent extends Component
         'GENDER',
         'PHONE_TYPE',
         'LANGUAGE',
-        'ISSUING_COUNTRY'
+        'ISSUING_COUNTRY',
+        'COUNTRY',
+        'ADDRESS_TYPE',
+        'PREFERRED_WAY_COMMUNICATION'
     ];
 
     public function baseMount(): void
     {
         $this->getDictionary();
+    }
 
-        // Show only documents that are used to register person in the system.
-        $this->dictionaries['DOCUMENT_TYPE'] = array_intersect_key(
+    /**
+     * Document types a person is registered with.
+     *
+     * @return array
+     */
+    #[Computed]
+    public function documentTypes(): array
+    {
+        return array_intersect_key(
             $this->dictionaries['DOCUMENT_TYPE'],
             array_flip(config('ehealth.person_registration_document_types'))
+        );
+    }
+
+    /**
+     * Document types that prove legal capacity. They are offered only between the self-registration age and the
+     * full legal capacity age, which the document modal decides on its own from the entered birth date.
+     *
+     * @return array
+     */
+    #[Computed]
+    public function legalCapacityDocumentTypes(): array
+    {
+        return array_intersect_key(
+            $this->dictionaries['DOCUMENT_TYPE'],
+            array_flip(config('ehealth.person_legal_capacity_document_types'))
         );
     }
 
@@ -182,17 +238,52 @@ class PersonComponent extends Component
      */
     public function chooseConfidantPerson(array $personData): void
     {
+        // Drop whatever the previously inspected person left behind, so that a rejection never shows next
+        // to the person the user is looking at now
+        $this->invalidPersonId = null;
+        $this->invalidPersonReason = null;
+        $this->selectedConfidantPersonId = null;
+
         $birthDate = CarbonImmutable::parse($personData['birthDate']);
 
-        // Below the self-registration age a person cannot be a confidant (the remaining eligibility
-        // rules — legal capacity, verification statuses, existing relationships — are enforced by eHealth)
-        if ($birthDate->age < Form::NO_SELF_REGISTRATION_AGE) {
+        // Below the full legal capacity age a person cannot be a confidant (the remaining eligibility
+        // rules — legal capacity, verification statuses — are enforced by eHealth)
+        if ($birthDate->age < config('ehealth.person_full_legal_capacity_age')) {
             $this->invalidPersonId = $personData['id'];
+            $this->invalidPersonReason = __('patients.age_insufficient_for_confidant_person');
 
             return;
         }
 
-        $this->invalidPersonId = null;
+        try {
+            $relationships = EHealth::person()->getConfidantPersonRelationships($personData['id'])->validate();
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting confidant person relationships of the chosen person');
+
+            return;
+        }
+
+        if (Person::isRepresentedByConfidant($relationships)) {
+            $this->invalidPersonId = $personData['id'];
+            $this->invalidPersonReason = __('patients.confidant_person_has_own_confidants');
+
+            return;
+        }
+
+        try {
+            $authenticationMethods = EHealth::person()->getAuthMethods($personData['id'])->validate();
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting authentication methods of the chosen person');
+
+            return;
+        }
+
+        if (!Person::hasActiveOtpAuthenticationMethod($authenticationMethods)) {
+            $this->invalidPersonId = $personData['id'];
+            $this->invalidPersonReason = __('patients.confidant_person_has_no_otp_auth_method');
+
+            return;
+        }
 
         $this->selectedConfidantPersonId = $personData['id'];
 
@@ -220,6 +311,25 @@ class PersonComponent extends Component
 
         $this->form->person['confidantPerson']['personId'] = '';
         $this->selectedConfidantPersonId = null;
+    }
+
+    /**
+     * Drop the legal representative once the patient is no longer marked as incapacitated, so that a confidant
+     * person hidden behind the unchecked box does not keep constraining the authentication method.
+     *
+     * @param  bool  $value
+     * @return void
+     */
+    public function updatedIsIncapacitated(bool $value): void
+    {
+        if ($value) {
+            return;
+        }
+
+        $this->removeConfidantPerson();
+
+        $this->form->person['confidantPerson']['documentsRelationship'] = [];
+        $this->newConfidantPerson = [];
     }
 
     /**
@@ -256,6 +366,37 @@ class PersonComponent extends Component
     }
 
     /**
+     * Validate the filled in form and show the leaflet the patient has to be informed about. The person request
+     * is sent from that leaflet, once the user marks the information as communicated.
+     *
+     * @return void
+     */
+    public function openInformationMessageModal(): void
+    {
+        if (Auth::user()->cannot('create', PersonRequest::class)) {
+            Session::flash('error', __('patients.policy.create'));
+
+            return;
+        }
+
+        $this->form->person['addresses'] = $this->addresses;
+
+        try {
+            // The consent is the answer the leaflet collects, so it cannot be required to pass yet
+            $this->form->validate(Arr::except($this->form->rulesForCreate(), 'processDisclosureDataConsent'));
+            $this->formKey++;
+        } catch (ValidationException $exception) {
+            Session::flash('error', $exception->validator->errors()->first());
+            $this->setAddressAwareErrorBag($exception);
+            $this->formKey++;
+
+            return;
+        }
+
+        $this->showInformationMessageModal = true;
+    }
+
+    /**
      * Send API request 'Create Person v2' and show the next page if data is validated.
      *
      * @return void
@@ -268,19 +409,14 @@ class PersonComponent extends Component
             return;
         }
 
-        $this->form->person['addresses'] = [$this->address]; // must be multiple
+        $this->form->person['addresses'] = $this->addresses;
 
         try {
-            $addressErrors = $this->addressValidation();
-            if (!empty($addressErrors)) {
-                throw ValidationException::withMessages($addressErrors);
-            }
-
             $validated = $this->form->validate($this->form->rulesForCreate());
             $this->formKey++;
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
-            $this->setErrorBag($exception->validator->getMessageBag());
+            $this->setAddressAwareErrorBag($exception);
             $this->formKey++;
 
             return;
@@ -323,13 +459,12 @@ class PersonComponent extends Component
         $this->form->person['id'] = $response->getData()['id'];
         $this->uploadedDocuments = $urgent['documents'] ?? [];
         $this->authenticationMethodCurrent = $urgent['authentication_method_current'] ?? [];
-        $this->showInformationMessageModal = true;
-    }
-
-    public function openNewState(): void
-    {
         $this->showInformationMessageModal = false;
         $this->viewState = 'new';
+
+        if ($this->form->needsNhsVerification()) {
+            Auth::user()->notify(new NhsVerificationNeededNotification());
+        }
     }
 
     /**
@@ -345,14 +480,17 @@ class PersonComponent extends Component
             return;
         }
 
-        $this->form->person['addresses'] = [$this->address]; // must be multiple
+        $this->form->person['addresses'] = $this->addresses;
 
         try {
-            $validated = $this->form->validate($this->form->rulesForCreate());
+            // A draft is not sent to eHealth yet, so the leaflet has not been shown for it either
+            $validated = $this->form->validate(
+                Arr::except($this->form->rulesForCreate(), 'processDisclosureDataConsent')
+            );
             $this->formKey++;
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
-            $this->setErrorBag($exception->validator->getMessageBag());
+            $this->setAddressAwareErrorBag($exception);
             $this->formKey++;
 
             return;
@@ -387,6 +525,125 @@ class PersonComponent extends Component
 
         Session::flash('success', $successMessage);
         $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
+    }
+
+    /**
+     * Report the address errors of the form under the addresses.* keys as well, because that is where the
+     * shared address component looks them up.
+     *
+     * @param  ValidationException  $exception
+     * @return void
+     */
+    protected function setAddressAwareErrorBag(ValidationException $exception): void
+    {
+        $messages = $exception->validator->errors()->getMessages();
+
+        foreach ($messages as $key => $keyMessages) {
+            if (str_starts_with($key, 'form.person.addresses.')) {
+                $messages[Str::replaceFirst('form.person.', '', $key)] = $keyMessages;
+            }
+        }
+
+        $this->setErrorBag($messages);
+    }
+
+    /**
+     * Give every address a slot of its own in the suggestion lists. The address component binds them by
+     * position, and a slot that does not exist yet leaves the registry search of that address unbound.
+     *
+     * @return void
+     */
+    public function dehydrate(): void
+    {
+        foreach (array_keys($this->addresses) as $index) {
+            $this->districts[$index] ??= [];
+            $this->settlements[$index] ??= [];
+            $this->streets[$index] ??= [];
+        }
+    }
+
+    /**
+     * Add an address the user fills in on top of the one the form starts with.
+     *
+     * @return void
+     */
+    public function addAddress(): void
+    {
+        $this->addresses[] = ['country' => Address::DEFAULT_COUNTRY, 'type' => ''];
+    }
+
+    /**
+     * Remove the address at the given position, leaving at least one in the form.
+     *
+     * @param  int  $index
+     * @return void
+     */
+    public function removeAddress(int $index): void
+    {
+        if (count($this->addresses) <= 1) {
+            return;
+        }
+
+        unset($this->addresses[$index]);
+
+        $this->addresses = array_values($this->addresses);
+
+        $this->districts = $this->shiftSuggestions($this->districts, $index);
+        $this->settlements = $this->shiftSuggestions($this->settlements, $index);
+        $this->streets = $this->shiftSuggestions($this->streets, $index);
+    }
+
+    /**
+     * Drop the suggestion slot of the removed address and pull the ones behind it down, so that every slot
+     * keeps matching the position of its address.
+     *
+     * @param  array  $lists
+     * @param  int  $index
+     * @return array
+     */
+    private function shiftSuggestions(array $lists, int $index): array
+    {
+        unset($lists[$index]);
+
+        $shifted = [];
+
+        foreach ($lists as $position => $list) {
+            $shifted[$position > $index ? $position - 1 : $position] = $list;
+        }
+
+        return $shifted;
+    }
+
+    /**
+     * Drop the address being edited when it stops being a Ukrainian one or becomes it, because the two are
+     * filled in a different alphabet and only the Ukrainian one takes its values from the address registry.
+     * A switch between two countries abroad keeps everything that was typed in.
+     *
+     * @param  mixed  $value
+     * @param  string|null  $key
+     * @return void
+     */
+    public function updatingAddresses(mixed $value, ?string $key): void
+    {
+        [$index, $field] = array_pad(explode('.', (string)$key, 2), 2, null);
+
+        if ($field !== 'country') {
+            return;
+        }
+
+        $currentCountry = $this->addresses[$index]['country'] ?? Address::DEFAULT_COUNTRY;
+
+        if ($value === $currentCountry) {
+            return;
+        }
+
+        if ($value !== Address::DEFAULT_COUNTRY && $currentCountry !== Address::DEFAULT_COUNTRY) {
+            return;
+        }
+
+        $this->addresses[$index] = ['type' => $this->addresses[$index]['type'] ?? Address::DEFAULT_TYPE];
+
+        unset($this->districts[$index], $this->settlements[$index], $this->streets[$index]);
     }
 
     /**
@@ -449,7 +706,10 @@ class PersonComponent extends Component
         }
 
         try {
-            $this->approvePersonRequest();
+            if (!$this->approvePersonRequest()) {
+                return;
+            }
+
             $this->showLeafletModal = true;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when approving person request');
@@ -492,19 +752,17 @@ class PersonComponent extends Component
         }
 
         try {
-            $response = EHealth::personRequest()->resendAuthOtp($this->form->person['id']);
+            EHealth::personRequest()->resendAuthOtp($this->form->person['id']);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when resending sms to person');
 
             return;
         }
 
-        if ($response->getData()['status'] === 'new') {
-            // Mark SMS as sent for this session (no expiration - persists until cache clear)
-            RateLimiter::hit($rateLimitKey);
+        // Mark SMS as sent for this session (no expiration - persists until cache clear)
+        RateLimiter::hit($rateLimitKey);
 
-            Session::flash('success', __('patients.messages.sms_sent_successfully'));
-        }
+        Session::flash('success', __('patients.messages.sms_sent_successfully'));
     }
 
     /**
@@ -542,8 +800,10 @@ class PersonComponent extends Component
         }
 
         try {
-            $this->approvePersonRequest(['verification_code' => $validated['verificationCode']]);
-            Session::flash('success', __('patients.messages.person_request_approved'));
+            if (!$this->approvePersonRequest(['verification_code' => $validated['verificationCode']])) {
+                return;
+            }
+
             $this->showLeafletModal = true;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when approving person request');
@@ -560,7 +820,6 @@ class PersonComponent extends Component
     public function openSignatureModal(): void
     {
         $this->showLeafletModal = false;
-        $this->form->patientSigned = true;
         $this->showSignatureModal = true;
     }
 
@@ -606,14 +865,14 @@ class PersonComponent extends Component
      */
     public function sign(): void
     {
-        if (Auth::user()->cannot('create', PersonRequest::class)) {
+        if (Auth::user()->cannot('sign', PersonRequest::class)) {
             Session::flash('error', __('patients.policy.sign'));
 
             return;
         }
 
         try {
-            $validated = $this->form->validate($this->form->signingRules());
+            $validated = $this->form->validate($this->form->rulesForSignPersonRequest());
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
@@ -774,10 +1033,10 @@ class PersonComponent extends Component
      * Approve person request.
      *
      * @param  array  $requestData
-     * @return void
+     * @return bool
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
-    private function approvePersonRequest(array $requestData = []): void
+    private function approvePersonRequest(array $requestData = []): bool
     {
         $response = EHealth::personRequest()->approve($this->form->person['id'], $requestData);
         $responseData = $response->getData();
@@ -787,9 +1046,13 @@ class PersonComponent extends Component
         } catch (Exception $exception) {
             $this->handleDatabaseErrors($exception, 'Failed to update person request status');
 
-            return;
+            return false;
         }
 
         $this->leafletContent = $responseData['content'];
+
+        Session::flash('success', __('patients.messages.person_request_approved'));
+
+        return true;
     }
 }

@@ -41,6 +41,12 @@ class PersonRequest extends Request
 
         $data = $this->format($data, ['birthDate', 'issuedAt', 'expirationDate', 'activeTo']);
 
+        // no_tax_id is a required property that carries null for foreign documents without a tax_id;
+        // removeEmptyKeys strips that null, so restore the key here to keep it in the payload.
+        if (isset($data['person']) && !array_key_exists('no_tax_id', $data['person'])) {
+            $data['person']['no_tax_id'] = null;
+        }
+
         return $this->post(self::URL_V3, $data);
     }
 
@@ -157,11 +163,29 @@ class PersonRequest extends Request
             'person.addresses' => ['required', 'array'],
             'person.addresses.*.type' => ['required', new InDictionary('ADDRESS_TYPE')],
             'person.addresses.*.country' => ['required', new InDictionary('COUNTRY')],
-            'person.addresses.*.area' => ['required', 'string', 'max:255'],
+            // An address abroad is typed in by hand and comes back with only the parts that were filled
+            'person.addresses.*.area' => [
+                'nullable',
+                'required_if:person.addresses.*.country,UA',
+                'string',
+                'max:255'
+            ],
             'person.addresses.*.region' => ['nullable', 'string', 'max:255'],
-            'person.addresses.*.settlement' => ['required', 'string', 'max:255'],
-            'person.addresses.*.settlement_id' => ['required', 'uuid'],
+            'person.addresses.*.settlement' => [
+                'nullable',
+                'required_if:person.addresses.*.country,UA',
+                'string',
+                'max:255'
+            ],
+            // Part of the address schema for Ukrainian addresses only
+            'person.addresses.*.settlement_id' => ['nullable', 'uuid'],
             'person.addresses.*.street_type' => ['nullable', new InDictionary('STREET_TYPE')],
+            'person.addresses.*.street' => [
+                'nullable',
+                'required_if:person.addresses.*.country,UA',
+                'string',
+                'max:255'
+            ],
             'person.addresses.*.building' => ['nullable', 'string', 'max:255'],
             'person.addresses.*.apartment' => ['nullable', 'string', 'max:255'],
             'person.addresses.*.zip' => ['nullable', new Zip()],
@@ -177,12 +201,13 @@ class PersonRequest extends Request
             'person.documents.*.number' => ['required', 'string', 'max:255'],
             'person.documents.*.issued_by' => ['required', 'string', 'max:255'],
             'person.documents.*.issued_at' => ['required', 'date'],
+            'person.documents.*.issuing_country' => ['nullable', new InDictionary('ISSUING_COUNTRY')],
             'person.documents.*.expiration_date' => ['nullable', 'date'],
             'person.emergency_contact.first_name' => ['required', 'string', 'max:255'],
             'person.emergency_contact.last_name' => ['required', 'string', 'max:255'],
             'person.emergency_contact.second_name' => ['nullable', 'string', 'max:255'],
             'person.emergency_contact.phones.*.type' => ['required', new InDictionary('PHONE_TYPE')],
-            'person.emergency_contact.phones.*.number' => ['required', new PhoneNumber()],
+            'person.emergency_contact.phones.*.number' => ['required', 'regex:/^\+[0-9]{11,12}$/'],
             'person.names' => ['required', 'array', 'min:1'],
             'person.names.*.language' => ['required', 'string', 'max:255'],
             'person.names.*.first_name' => ['required', 'string', 'max:255'],
@@ -192,9 +217,9 @@ class PersonRequest extends Request
             'person.gender' => ['required', new InDictionary('GENDER')],
             'person.email' => ['nullable', new Email()],
             'person.unzr' => ['nullable', 'string', 'max:255'],
-            'person.no_tax_id' => ['required', 'boolean:strict'],
+            'person.no_tax_id' => ['present', 'nullable', 'boolean:strict'],
             'person.phones.*.type' => ['required', new InDictionary('PHONE_TYPE')],
-            'person.phones.*.number' => ['required', new PhoneNumber()],
+            'person.phones.*.number' => ['required', 'regex:/^\+[0-9]{11,12}$/'],
             'person.secret' => ['required', 'string', 'max:255'],
             'person.tax_id' => ['nullable', new TaxId()],
             'person.confidant_person' => ['sometimes', 'array'],

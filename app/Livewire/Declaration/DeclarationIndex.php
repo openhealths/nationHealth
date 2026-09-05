@@ -22,6 +22,7 @@ use App\Models\Person\Person;
 use App\Jobs\DeclarationsSync;
 use App\Repositories\Repository;
 use App\Classes\eHealth\EHealth;
+use App\Enums\Declaration\Channel;
 use App\Enums\Declaration\Status;
 use App\Enums\Declaration\RequestStatus;
 use App\Models\Employee\Employee;
@@ -88,6 +89,13 @@ class DeclarationIndex extends Component
      * @var array|string[]
      */
     public array $statusFilter = [Status::ACTIVE->value];
+
+    /**
+     * Channels the declaration requests have been created in.
+     *
+     * @var array|string[]
+     */
+    public array $channelFilter = [];
 
     public array $reorganizationFilter = [];
 
@@ -253,10 +261,43 @@ class DeclarationIndex extends Component
         $this->searchByNumber = '';
         $this->typeFilter = ['request', 'declaration'];
         $this->statusFilter = [Status::ACTIVE->value];
+        $this->channelFilter = [];
         $this->reorganizationFilter = [];
         $this->doctorFilter = $this->ownEmployeeUuids;
 
         $this->isFiltersApplied = false;
+
+        $this->resetPage();
+    }
+
+    /**
+     * Count the requests the patients have created on their own and confirmed, so they wait for the doctor signature.
+     *
+     * @return int
+     */
+    #[Computed]
+    public function patientRequestsCount(): int
+    {
+        if (Auth::user()->hasAllowedRole([Role::OWNER, Role::ADMIN])) {
+            return 0;
+        }
+
+        return DeclarationRequest::forEmployees($this->employeeIds)
+            ->whereStatus(RequestStatus::APPROVED->value)
+            ->whereChannel(Channel::PIS->value)
+            ->count();
+    }
+
+    /**
+     * Narrow the list down to the requests created by the patients.
+     *
+     * @return void
+     */
+    public function showPatientRequests(): void
+    {
+        $this->typeFilter = ['request'];
+        $this->channelFilter = [Channel::PIS->value];
+        $this->isFiltersApplied = true;
 
         $this->resetPage();
     }
@@ -342,17 +383,23 @@ class DeclarationIndex extends Component
                 });
             }
 
-            // Search by first and last name
+            // Search by patient name
             if (!empty($this->searchByName)) {
-                $searchTerm = Str::lower(trim($this->searchByName));
+                $searchTerms = preg_split('/\s+/u', Str::lower(trim($this->searchByName)));
 
-                $allItems = $allItems->filter(function (DeclarationRequest|Declaration $item) use ($searchTerm) {
-                    $primaryName = $item->person?->primaryName;
-                    $last = Str::lower($primaryName?->lastName ?? '');
-                    $first = Str::lower($primaryName?->firstName ?? '');
+                $allItems = $allItems->filter(
+                    function (DeclarationRequest|Declaration $item) use ($searchTerms) {
+                        $fullName = Str::lower($item->person?->fullName ?? '');
 
-                    return Str::contains($last, $searchTerm) || Str::contains($first, $searchTerm);
-                });
+                        foreach ($searchTerms as $searchTerm) {
+                            if (!Str::contains($fullName, $searchTerm)) {
+                                return false;
+                            }
+                        }
+
+                        return true;
+                    }
+                );
             }
 
             // Search by declaration number
@@ -363,6 +410,17 @@ class DeclarationIndex extends Component
                     $number = Str::lower($item->declaration_number ?? '');
 
                     return Str::contains($number, $searchTerm);
+                });
+            }
+
+            // Filter by the channel the request has been created in
+            if (!empty($this->channelFilter)) {
+                $allItems = $allItems->filter(function (DeclarationRequest|Declaration $item) {
+                    if ($item instanceof DeclarationRequest) {
+                        return \in_array($item->channel, $this->channelFilter, true);
+                    }
+
+                    return true;
                 });
             }
 
@@ -396,6 +454,13 @@ class DeclarationIndex extends Component
                 });
             }
         }
+
+        // The newest first. A declaration is dated by the moment eHealth created it, because the local timestamp
+        // only tells when the synchronisation brought it in and is the same for a whole batch of them.
+        $allItems = $allItems
+            ->sortByDesc(static fn (Declaration|DeclarationRequest $item): string
+                => (string) ($item->insertedAt ?? $item->createdAt))
+            ->values();
 
         // Pagination
         $perPage = config('pagination.per_page');
@@ -484,21 +549,15 @@ class DeclarationIndex extends Component
             Bus::batch([
                 new DeclarationsSync(
                     legalEntity: $legalEntity,
-                    page: 2,
-                    nextEntity: null
+                    nextEntity: null,
+                    page: 2
                 )
             ])
                 ->withOption('legal_entity_id', $legalEntity->id)
                 ->withOption('token', Crypt::encryptString($token))
                 ->withOption('user', $user)
-                ->then(function (Batch $batch) use ($user) {
-                    $message = __('declarations.sync.completed', [
-                        'processed' => $batch->processedJobs,
-                        'total' => $batch->totalJobs,
-                    ]);
-
-                    $user->notify(new DeclarationSyncCompleted($message, 'success'));
-                })->catch(callback: function (Batch $batch, Throwable $err) use ($user) {
+                ->withOption('sync_entity', LegalEntity::ENTITY_DECLARATION)
+                ->catch(callback: function (Batch $batch, Throwable $err) use ($user) {
                     $message = __('declarations.sync.failed');
 
                     Log::error('Declaration sync batch failed.', [
@@ -512,7 +571,7 @@ class DeclarationIndex extends Component
                 ->name(self::BATCH_NAME)
                 ->dispatch();
 
-            legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_DECLARATION);
+            legalEntity()->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_DECLARATION);
 
             Session::flash('success', __('declarations.sync.started'));
         } else {
@@ -521,14 +580,8 @@ class DeclarationIndex extends Component
                     ->withOption('legal_entity_id', $legalEntity->id)
                     ->withOption('token', Crypt::encryptString($token))
                     ->withOption('user', $user)
-                    ->then(function (Batch $batch) use ($user) {
-                        $message = __('declarations.sync.completed', [
-                            'processed' => $batch->processedJobs,
-                            'total' => $batch->totalJobs,
-                        ]);
-
-                        $user->notify(new DeclarationSyncCompleted($message, 'success'));
-                    })->catch(callback: function (Batch $batch, Throwable $err) use ($user) {
+                    ->withOption('sync_entity', LegalEntity::ENTITY_DECLARATION)
+                    ->catch(callback: function (Batch $batch, Throwable $err) use ($user) {
                         $message = __('declarations.sync.failed');
 
                         Log::error('DeclarationRequest sync batch failed.', [
@@ -542,12 +595,12 @@ class DeclarationIndex extends Component
                     ->name(self::DEPENDENT_BATCH_NAME)
                     ->dispatch();
 
-                legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_DECLARATION);
+                legalEntity()->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_DECLARATION);
 
                 Session::flash('success', __('declarations.sync.started'));
             } else {
                 // If there were no declarations to sync, mark the status as completed
-                legalEntity()?->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_DECLARATION);
+                legalEntity()->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_DECLARATION);
 
                 Session::flash('success', __('declarations.sync.completed'));
             }
@@ -606,12 +659,15 @@ class DeclarationIndex extends Component
 
     public function sign(int $personId, int $declarationRequestId): void
     {
-        if (!$this->ensureAbility('sign', __('declarations.policy.sign'))) {
+        $declarationRequest = DeclarationRequest::findOrFail($declarationRequestId);
+
+        if (Auth::user()->cannot('sign', $declarationRequest)) {
+            Session::flash('error', __('declarations.policy.sign'));
+
             return;
         }
 
         Session::flash('showSignModal');
-        $declarationRequest = DeclarationRequest::findOrFail($declarationRequestId);
 
         $this->redirectRoute(
             'declaration.edit',
@@ -640,7 +696,23 @@ class DeclarationIndex extends Component
             return;
         }
 
-        $reorganizedDeclaration = Declaration::find($declarationId)->reorganizedEmployeeDeclaration()->first();
+        $user = Auth::user();
+
+        // Only an active declaration the current doctor holds in a legator of this legal entity can be resigned
+        $reorganizedDeclaration = Declaration::whereKey($declarationId)
+            ->where('status', Status::ACTIVE)
+            ->first()
+            ?->reorganizedEmployeeDeclaration()
+            ->hasConnectionTo(legalEntity())
+            ->where('party_id', $user->partyId)
+            ->first();
+
+        if (!$reorganizedDeclaration) {
+            Session::flash('error', __('declarations.cannot_be_resigned'));
+
+            return;
+        }
+
         $currentEmployee = Employee::whereUserId(Auth::id())
             ->whereEmployeeType('DOCTOR')
             ->whereNot('status', EntityStatus::REORGANIZED)
@@ -661,7 +733,7 @@ class DeclarationIndex extends Component
         try {
             $response = EHealth::declarationRequest()->create(removeEmptyKeys(Arr::toSnakeCase($resignRequestData)));
 
-            $responseData = $response->getData();
+            $responseData = $response->validate();
 
             $responseData['sync_status'] = JobStatus::PARTIAL->value;
 
@@ -686,18 +758,30 @@ class DeclarationIndex extends Component
         );
     }
 
-    public function reject(string $declarationUuid): void
+    /**
+     * Reject a declaration request that is still awaiting the patient.
+     *
+     * @param  DeclarationRequest  $declarationRequest
+     * @return void
+     */
+    public function reject(DeclarationRequest $declarationRequest): void
     {
-        if (!$this->ensureAbility('reject', __('declarations.policy.reject'))) {
+        if (Auth::user()->cannot('reject', $declarationRequest)) {
+            Session::flash('error', __('declarations.policy.reject'));
+
             return;
         }
 
         try {
-            $response = EHealth::declarationRequest()->reject($declarationUuid);
+            $response = EHealth::declarationRequest()->reject($declarationRequest->uuid);
 
-            ['status' => $status, 'status_reason' => $statusReason] = $response->getData();
+            $responseData = $response->validate();
 
-            Repository::declarationRequest()->updateStatuses($declarationUuid, $status, $statusReason);
+            Repository::declarationRequest()->updateStatuses(
+                $declarationRequest->uuid,
+                $responseData['status'],
+                $responseData['status_reason'] ?? null
+            );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while rejecting declaration request');
 

@@ -26,10 +26,10 @@ use App\Exceptions\EHealth\EHealthValidationException;
 
 class DivisionView extends DivisionComponent
 {
-    use WorkTimeUtilities,
-        ReceptionAddressSearch,
-        AddressSearch,
-        HasAction;
+    use WorkTimeUtilities;
+    use ReceptionAddressSearch;
+    use AddressSearch;
+    use HasAction;
 
     #[Locked]
     public string $divisionUuid = '';
@@ -61,8 +61,7 @@ class DivisionView extends DivisionComponent
      * - Assigns the address and phones to the form.
      * - Initializes working hours if not already set.
      *
-     * @param Division $division
-     *
+     * @param  Division  $division
      * @return void
      */
     public function setDivisionData(Division $division)
@@ -72,7 +71,7 @@ class DivisionView extends DivisionComponent
         $this->divisionForm->division['addresses'] = $division->addresses->toArray();
 
         if (!empty($this->divisionForm->division['addresses'])) {
-            foreach ( $this->divisionForm->division['addresses'] as $address ) {
+            foreach ($this->divisionForm->division['addresses'] as $address) {
                 $addressType = strtolower($address['type']);
 
                 switch ($addressType) {

@@ -7,17 +7,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const responsiveMenu = document.getElementById('responsiveMenu');
     const menuToggleIcons = document.querySelectorAll('#menuToggle i');
 
-    //! Smooth scrolling
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
         anchor.addEventListener('click', function(e) {
             e.preventDefault();
-            document.querySelector(this.getAttribute('href')).scrollIntoView({
-                behavior: 'smooth'
-            });
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                setTimeout(() => {
+                    target.scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                }, 100);
+            }
         });
     });
 
-    //! Toggle Menu
     const toggleMenu = function() {
         menuButton.classList.toggle('open');
         const isMenuOpen = header.classList.toggle('h-screen');

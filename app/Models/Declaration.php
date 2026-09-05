@@ -19,8 +19,6 @@ class Declaration extends Model
 {
     use HasCamelCasing;
 
-    public const int ADULT_AGE = 18;
-
     protected $fillable = [
         'id',
         'uuid',

@@ -156,7 +156,7 @@ class PatientConditions extends BasePatientComponent
             $this->dispatchRemainingPages('condition');
         } else {
             legalEntity()->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_CONDITION);
-            Session::flash('success', __('patients.messages.conditions_synced_successfully'));
+            Session::flash('success', __('conditions.messages.synced_successfully'));
         }
 
         $this->loadFilterOptions();

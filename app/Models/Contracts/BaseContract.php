@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models\Contracts;
 
-use App\Enums\Contract\Status;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Model;
 
@@ -27,7 +26,6 @@ abstract class BaseContract extends Model
         'start_date' => 'date',
         'end_date' => 'date',
         'nhs_signed_date' => 'date',
-        'status' => Status::class,
 
         // JSON fields - explicit casting is required to prevent "Array to string conversion" errors
         'contractor_payment_details' => 'array',

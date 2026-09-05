@@ -1,5 +1,8 @@
 <?php
 
+declare(strict_types=1);
+
+
 use App\Enums\JobStatus;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;

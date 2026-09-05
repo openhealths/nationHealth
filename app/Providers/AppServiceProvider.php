@@ -18,6 +18,7 @@ use App\Jobs\LegalEntitySync;
 use App\Jobs\ObservationSync;
 use App\Jobs\PersonAuthMethodSync;
 use App\Jobs\RemoteEHealthLinksProcessing;
+use App\Livewire\Hooks\IgnoreSpuriousToJsonCalls;
 use App\Rules\TranslatedDateValidator;
 use Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider;
 use Fruitcake\LaravelDebugbar\ServiceProvider as DebugbarServiceProvider;
@@ -30,6 +31,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use App\Repositories\EHealthDatabaseBatchRepository;
 use Illuminate\Bus\BatchFactory;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -66,6 +68,8 @@ class AppServiceProvider extends ServiceProvider
 
         Model::shouldBeStrict($this->app->isLocal());
         DB::prohibitDestructiveCommands($this->app->isProduction());
+
+        Livewire::componentHook(IgnoreSpuriousToJsonCalls::class);
 
         $this->app['validator']->resolver(
             static fn ($translator, $data, $rules, $messages, $customAttributes) => new TranslatedDateValidator(
@@ -118,13 +122,18 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('ehealth-declaration-get', function (object $job) {
-            return Limit::perMinute(config('ehealth.rate_limit.declaration'))->by($job->user->id);
+            return [
+                Limit::perMinute(config('ehealth.rate_limit.declaration.minute'))->by($job->user->id),
+                Limit::perHour(config('ehealth.rate_limit.declaration.hour'))->by($job->user->id),
+            ];
         });
 
         RateLimiter::for('ehealth-declaration-request-get', function (object $job) {
-            return Limit::perMinute(config('ehealth.rate_limit.declaration_request'))->by($job->user->id);
+            return [
+                Limit::perMinute(config('ehealth.rate_limit.declaration_request.minute'))->by($job->user->id),
+                Limit::perHour(config('ehealth.rate_limit.declaration_request.hour'))->by($job->user->id),
+            ];
         });
-
 
         RateLimiter::for(
             'ehealth-episode-get',
@@ -169,7 +178,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for(
             'person-authentication-method-get',
             static fn (PersonAuthMethodSync $job) => Limit::perMinute(config('ehealth.rate_limit.person_authentication_method'))
-            ->by($job->user->id)
+                ->by($job->user->id)
         );
 
         RateLimiter::for(

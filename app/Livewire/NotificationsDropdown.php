@@ -31,14 +31,25 @@ class NotificationsDropdown extends Component
         $notification = Auth::user()?->unreadNotifications()->findOrFail($id);
         if ($notification) {
             $notification->markAsRead();
-            $this->notifications = Auth::user()->unreadNotifications->take(4);
+            $this->notifications = Auth::user()->unreadNotifications()->take(4)->get();
         }
+    }
+
+    /**
+     * Mark all notifications as read.
+     *
+     * @return void
+     */
+    public function markAllAsRead(): void
+    {
+        Auth::user()?->unreadNotifications()->update(['read_at' => now()]);
+        $this->notifications = new DatabaseNotificationCollection();
     }
 
     #[Computed]
     public function totalUnreadCount(): int
     {
-        return Auth::user()->unreadNotifications->count();
+        return Auth::user()->unreadNotifications()->count();
     }
 
     public function getNotificationIconType(DatabaseNotification $notification): string

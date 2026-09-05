@@ -1,4 +1,5 @@
 @php
+    use App\Enums\Declaration\Channel;
     use App\Enums\Declaration\ReorganizedStatus;
 
     $typeOptions = [
@@ -21,18 +22,25 @@
         @open-changed="openType = $event.detail.open"
     />
 
+    {{-- Filter by the channel the request has been created in --}}
+    <x-forms.multiselect
+        bind="channelFilter"
+        :options="Channel::options()"
+        label="{{ __('declarations.channel.label') }}"
+        placeholder="{{ __('declarations.channel.placeholder') }}"
+    />
+
     {{-- Search by declaration number --}}
     <div class="form-group group">
-        <input type="text"
+        <input
+            type="text"
             id="searchByNumber"
             placeholder=" "
             class="input peer"
             wire:model="searchByNumber"
             autocomplete="off"
         />
-        <label for="searchByNumber" class="label">
-            {{ __('declarations.number') }}
-        </label>
+        <label for="searchByNumber" class="label"> {{ __('declarations.number') }} </label>
     </div>
 </div>
 
@@ -55,7 +63,7 @@
     />
 
     {{-- Filter by reorganization --}}
-    @if(legalEntity()->legators->isNotEmpty())
+    @if (legalEntity()->legators->isNotEmpty())
         <x-forms.multiselect
             bind="reorganizationFilter"
             :options="$reorganizationOptions"

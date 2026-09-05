@@ -4,9 +4,7 @@
 @endphp
 <section class="section-form">
     <x-header-navigation class="breadcrumb-form">
-        <x-slot name="title">
-            {{ __('patients.diagnostic_reports') }} - {{ $patientFullName }}
-        </x-slot>
+        <x-slot name="title">{{ __('diagnostic-reports.plural') }} - {{ $patientFullName }}</x-slot>
     </x-header-navigation>
 
     <form
@@ -107,30 +105,34 @@
             }
         }"
     >
-
         <fieldset @disabled($isReadonly) @class(['pointer-events-none opacity-80' => $isReadonly])>
             @include('livewire.encounter.diagnostic-report-parts.main-information', ['context' => 'diagnostic-report'])
             @include('livewire.encounter.diagnostic-report-parts.additional-information', ['context' => 'diagnostic-report'])
-            @include('livewire.encounter.parts.observations')
+            <fieldset class="fieldset">
+                <legend class="legend">{{ __('observations.plural') }}</legend>
+
+                @include('livewire.encounter.parts.observations', ['context' => 'diagnostic-report'])
+            </fieldset>
         </fieldset>
 
         <div class="flex gap-8">
-            <a href="{{ url()->previous() }}" type="submit" class="button-minor">
-                {{ __('forms.back') }}
-            </a>
+            <a href="{{ url()->previous() }}" type="submit" class="button-minor"> {{ __('forms.back') }} </a>
 
-            @if($isReadonly && $isDraft)
-                <a href="{{ $prepersonId
-                    ? route('prepersons.diagnostic-report.edit', [legalEntity(), 'preperson' => $prepersonId, 'diagnosticReportId' => $diagnosticReportId])
-                    : route('diagnostic-report.edit', [legalEntity(), 'person' => $personId, 'diagnosticReportId' => $diagnosticReportId]) }}"
-                   wire:navigate
-                   class="button-primary"
+            @if ($isReadonly && $isDraft)
+                <a
+                    href="{{
+                        $prepersonId
+                        ? route('prepersons.diagnostic-report.edit', [legalEntity(), 'preperson' => $prepersonId, 'diagnosticReportId' => $diagnosticReportId])
+                        : route('diagnostic-report.edit', [legalEntity(), 'person' => $personId, 'diagnosticReportId' => $diagnosticReportId])
+                    }}"
+                    wire:navigate
+                    class="button-primary"
                 >
                     {{ __('forms.edit') }}
                 </a>
             @endif
 
-            @unless($isReadonly)
+            @unless ($isReadonly)
                 <button @click.prevent="$wire.save(modalDiagnosticReport)" type="submit" class="button-primary-outline">
                     {{ __('forms.save') }}
                 </button>
@@ -144,10 +146,10 @@
                     {{ __('forms.complete_the_interaction_and_sign') }}
                     @icon('arrow-right', 'w-5 h-5')
                 </button>
-        @endunless
+            @endunless
     </form>
 
-    @unless($isReadonly)
+    @unless ($isReadonly)
         <x-signature-modal method="sign" />
     @endunless
 
@@ -176,6 +178,7 @@
 
             this.isReferralAvailable = false;
             this.referralType = '';
+            this.basedOnIdentifier = '';
 
             this.paperReferralRequisition = '';
             this.paperReferralRequesterEmployeeName = '';
@@ -193,7 +196,7 @@
             this.reportOriginText = '';
 
             this.divisionId = '';
-            this.performerEmployeeId = '';
+            this.performerEmployeeIds = [];
             this.resultsInterpreterEmployeeId = '';
             this.usedReferences = [];
 

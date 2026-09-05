@@ -6,7 +6,6 @@ namespace App\Livewire\Person;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
-use App\Enums\Person\AuthenticationMethod;
 use App\Enums\Person\AuthStep;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
@@ -15,6 +14,7 @@ use App\Livewire\Person\Traits\ManagesConfidantPersonRelationships;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
 use App\Models\Person\PersonRequest;
+use App\Notifications\NhsVerificationNeededNotification;
 use App\Repositories\Repository;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
@@ -137,19 +137,15 @@ class PersonUpdate extends PersonComponent
      */
     public bool $showTerminateModal = false;
 
-    /**
-     * Mode for the auth drawer - 'create' or 'deactivate'
-     *
-     * @var string|null
-     */
-    public ?string $authDrawerMode = null;
-
     public function mount(LegalEntity $legalEntity, Person $person): void
     {
         $this->canManageConfidantRelationships = true;
         $this->personId = $person->id;
         $this->uuid = $person->uuid;
         $this->baseMount();
+
+        // Updating a person sends the request straight from the form, it has no leaflet step to answer this on
+        $this->form->processDisclosureDataConsent = true;
 
         $this->form->person = Arr::toCamelCase(
             $person->load([
@@ -166,7 +162,14 @@ class PersonUpdate extends PersonComponent
             ])->toArray()
         );
 
-        $this->address = Arr::get($this->form->person, 'addresses.0', []);
+        $uaOnlyTypes = config('ehealth.document_types_issuing_country_ua_only');
+
+        // Fix cases where the issuing country is not set for document types that require it to be 'UA'
+        foreach ($this->form->person['documents'] as &$document) {
+            $document['issuingCountry'] ??= \in_array($document['type'], $uaOnlyTypes, true) ? 'UA' : '';
+        }
+
+        $this->addresses = Arr::get($this->form->person, 'addresses') ?: $this->addresses;
 
         if (empty($this->form->person['phones'])) {
             $this->form->person['phones'] = [['type' => null, 'number' => null]];
@@ -176,48 +179,10 @@ class PersonUpdate extends PersonComponent
             $this->form->person['emergencyContact']['phones'] = [['type' => null, 'number' => null]];
         }
 
-        $authenticationMethods = $person->authenticationMethods->toArray();
-
         // Initialize confidant person relationship requests for all cases
         $this->confidantPersonRelationshipRequests = $this->loadConfidantPersonRelationshipRequests($person);
 
-        if ($person->confidantPersons->isNotEmpty()) {
-            // Create a lookup map of confidant persons by their UUID
-            $confidantPersonsLookup = $person->confidantPersons->keyBy(function ($confidantPerson) {
-                return $confidantPerson->person->uuid;
-            });
-
-            $modifiedMethods = collect($authenticationMethods)->map(
-                function (array $method) use ($confidantPersonsLookup) {
-                    if ($method['type'] === AuthenticationMethod::THIRD_PERSON->value) {
-                        // Find the corresponding confidant person using the authentication method's 'value' field
-                        $confidantPersonRelation = $confidantPersonsLookup->get($method['value']);
-
-                        if ($confidantPersonRelation && $confidantPersonRelation->person) {
-                            $confidantPersonData = $confidantPersonRelation->person;
-                            $method['confidantPerson'] = [
-                                'name' => $confidantPersonData->fullName,
-                                'taxId' => $confidantPersonData->taxId,
-                                'unzr' => $confidantPersonData->unzr,
-                                'documentsPerson' => $confidantPersonData->documents->toArray(),
-                                'phones' => $confidantPersonData->phones->first() ?
-                                    ['number' => $confidantPersonData->phones->first()->number] : null
-                            ];
-                        }
-                    }
-
-                    return $method;
-                }
-            );
-
-            $this->authenticationMethods = $modifiedMethods->toArray();
-        } else {
-            $this->authenticationMethods = $authenticationMethods;
-            $this->phoneNumber = collect($authenticationMethods)
-                ->where('type', AuthenticationMethod::OTP->value)
-                ->pluck('phoneNumber')
-                ->first();
-        }
+        $this->loadAuthenticationMethods($person);
     }
 
     /**
@@ -225,7 +190,7 @@ class PersonUpdate extends PersonComponent
      *
      * @return void
      */
-    public function update(): void
+    public function update(?string $authorizeWith = null): void
     {
         if (Auth::user()->cannot('create', PersonRequest::class)) {
             Session::flash('error', __('patients.policy.update'));
@@ -233,26 +198,24 @@ class PersonUpdate extends PersonComponent
             return;
         }
 
-        $this->form->person['addresses'] = [$this->address]; // must be multiple
+        // The OTP method carries its own confirmation step, which fills the property in before getting here
+        if ($authorizeWith !== null) {
+            $this->form->authorizeWith = $authorizeWith;
+        }
+
+        $this->form->person['addresses'] = $this->addresses;
+        $this->form->person['id'] = $this->uuid;
 
         try {
-            $addressErrors = $this->addressValidation();
-            if (!empty($addressErrors)) {
-                throw ValidationException::withMessages($addressErrors);
-            }
-
             $validated = $this->form->validate($this->form->rulesForUpdate());
             $this->formKey++;
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
-            $this->setErrorBag($exception->validator->getMessageBag());
+            $this->setAddressAwareErrorBag($exception);
             $this->formKey++;
 
             return;
         }
-
-        $validated = array_merge($validated, ['addresses' => $this->form->addresses]);
-        $validated['person']['id'] = $this->uuid;
 
         try {
             // update
@@ -277,6 +240,11 @@ class PersonUpdate extends PersonComponent
         $this->uploadedDocuments = $urgent['documents'] ?? [];
         $this->authenticationMethodCurrent = $urgent['authentication_method_current'] ?? [];
         $this->viewState = 'new';
+        $this->showAuthMethodModal = false;
+
+        if ($this->form->needsNhsVerification()) {
+            Auth::user()->notify(new NhsVerificationNeededNotification());
+        }
     }
 
     public function render(): View

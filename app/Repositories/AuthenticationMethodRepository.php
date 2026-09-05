@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Core\Arr;
+use App\Enums\Person\AuthenticationMethod;
 use App\Models\Person\Person;
 
 class AuthenticationMethodRepository
@@ -19,6 +20,12 @@ class AuthenticationMethodRepository
      */
     public function sync(Person $person, array $authMethods): void
     {
+        // NA stands for the absence of a method: it carries no identifier and nothing to store
+        $authMethods = collect($authMethods)
+            ->reject(static fn (array $authMethod): bool => $authMethod['type'] === AuthenticationMethod::NA->value)
+            ->values()
+            ->toArray();
+
         $incomingUuids = collect($authMethods)->pluck('uuid')->filter()->values();
 
         // Delete unrelated (keep only the ones provided) and also delete methods without UUID

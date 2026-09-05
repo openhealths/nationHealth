@@ -5,7 +5,7 @@
           }"
           x-init="$watch('employeeType', (value) => {
               /* Reset position only if fields are not locked (Creation/Add mode) */
-              if (!$wire.isPositionDataLocked) {
+              if (!$wire.isPositionDataLocked && !$wire.isCorePositionDataLocked) {
                   $wire.set('form.position', '', false);
                   if (document.getElementById('position')) {
                       document.getElementById('position').value = '';
@@ -24,9 +24,9 @@
                     id="employeeType"
                     class="peer input appearance-none bg-white text-gray-500 dark:bg-gray-800 dark:text-gray-400"
                     required
-                    wire:model="form.employeeType"
+                    wire:model.live="form.employeeType"
                     x-model="employeeType"
-                    :disabled="$wire.isPositionDataLocked">
+                    :disabled="$wire.isPositionDataLocked || $wire.isCorePositionDataLocked">
                 <option value="" disabled selected hidden>{{ __('forms.role_choose') }}</option>
 
                 @foreach($this->dictionaries['EMPLOYEE_TYPE'] as $employeeTypes => $employeeTypeOption)
@@ -44,14 +44,25 @@
 
         {{-- 2. Position: Locked based on component state --}}
         <div class="form-group">
-            <select name="position" id="position" class="peer input appearance-none bg-white text-gray-500 dark:bg-gray-800 dark:text-gray-400" required wire:model="form.position" :disabled="$wire.isPositionDataLocked">>
-                <option value="" disabled selected hidden>{{ __('forms.select_position') }}</option>
-                <div x-show="employeeType && employeeTypePosition[employeeType]" x-cloak>
-                    <template x-for="(positionName, positionKey) in employeeTypePosition[employeeType]" :key="positionKey">
-                        <option :value="positionKey" x-text="positionName"></option>
-                    </template>
-                </div>
-            </select>
+            @if(in_array($this->form->employeeType, config('ehealth.employee_type_custom_position_allowed', []), true))
+                <input type="text"
+                       name="position"
+                       id="position"
+                       class="peer input text-gray-500 dark:text-gray-400"
+                       required
+                       wire:model="form.position"
+                       :disabled="$wire.isPositionDataLocked || $wire.isCorePositionDataLocked"
+                       placeholder=" "/>
+            @else
+                <select name="position" id="position" class="peer input appearance-none bg-white text-gray-500 dark:bg-gray-800 dark:text-gray-400" required wire:model="form.position" :disabled="$wire.isPositionDataLocked || $wire.isCorePositionDataLocked">
+                    <option value="" disabled selected hidden>{{ __('forms.select_position') }}</option>
+                    <div x-show="employeeType && employeeTypePosition[employeeType]" x-cloak>
+                        <template x-for="(positionName, positionKey) in employeeTypePosition[employeeType]" :key="positionKey">
+                            <option :value="positionKey" x-text="positionName"></option>
+                        </template>
+                    </div>
+                </select>
+            @endif
             <label for="position" class="label">{{ __('forms.position') }}</label>
             @error('form.position') <p class="text-error">{{ $message }}</p> @enderror
         </div>
@@ -67,7 +78,7 @@
                    class="peer input pl-10 appearance-none datepicker-input text-gray-500 dark:text-gray-400"
                    placeholder=" "
                    required
-                   :disabled="$wire.isPositionDataLocked"
+                   :disabled="$wire.isPositionDataLocked || $wire.isCorePositionDataLocked"
                    datepicker-autohide
                    datepicker-button="false"/>
             <label for="startDate" class="wrapped-label">{{ __('forms.start_date_work') }}</label>

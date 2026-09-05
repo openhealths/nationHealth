@@ -36,6 +36,11 @@ final class Repository
         return app(EpisodeRepository::class);
     }
 
+    public static function personCurrentDiagnosis(): PersonCurrentDiagnosisRepository
+    {
+        return app(PersonCurrentDiagnosisRepository::class);
+    }
+
     public static function immunization(): ImmunizationRepository
     {
         return app(ImmunizationRepository::class);
@@ -61,9 +66,29 @@ final class Repository
         return app(ProcedureRepository::class);
     }
 
+    public static function device(): DeviceRepository
+    {
+        return app(DeviceRepository::class);
+    }
+
+    public static function deviceAssociation(): DeviceAssociationRepository
+    {
+        return app(DeviceAssociationRepository::class);
+    }
+
+    public static function detectedIssue(): DetectedIssueRepository
+    {
+        return app(DetectedIssueRepository::class);
+    }
+
     public static function clinicalImpression(): ClinicalImpressionRepository
     {
         return app(ClinicalImpressionRepository::class);
+    }
+
+    public static function approval(): ApprovalRepository
+    {
+        return app(ApprovalRepository::class);
     }
 
     public static function period(): PeriodRepository
@@ -71,8 +96,18 @@ final class Repository
         return app(PeriodRepository::class);
     }
 
-    public static function approval(): ApprovalRepository
+    public static function medicationRequest(): MedicationRequestRepository
     {
-        return app(ApprovalRepository::class);
+        return app(MedicationRequestRepository::class);
+    }
+
+    public static function serviceRequest(): ServiceRequestRequestRepository
+    {
+        return app(ServiceRequestRequestRepository::class);
+    }
+
+    public static function deviceRequest(): DeviceRequestRequestRepository
+    {
+        return app(DeviceRequestRequestRepository::class);
     }
 }

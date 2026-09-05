@@ -110,7 +110,6 @@ class DivisionPolicy
      *
      * @param  \App\Models\User  $user
      * @param  \App\Models\Division  $division
-     *
      * @return bool
      */
     public function activate(User $user, Division $division): Response
@@ -136,8 +135,7 @@ class DivisionPolicy
      *
      * @param  \App\Models\User  $user  The user attempting the action
      * @param  \App\Models\Division  $division  The division to be deactivated
-     *
-     * @return bool  True if user can deactivate the division, false otherwise
+     * @return bool True if user can deactivate the division, false otherwise
      */
     public function deactivate(User $user, Division $division): Response
     {
@@ -170,8 +168,7 @@ class DivisionPolicy
     /**
      * Get services associated with a division.
      *
-     * @param Division $division The division to get services for
-     *
+     * @param  Division  $division  The division to get services for
      * @return Builder Query builder for division services
      */
     protected function getDivisionServices(Division $division): Builder
@@ -183,8 +180,7 @@ class DivisionPolicy
      * Check if the division has any associated service.
      *
      * @param  Division  $division  The division to check for services
-     *
-     * @return bool  True if the division has at least one service, false otherwise
+     * @return bool True if the division has at least one service, false otherwise
      */
     protected function hasAnyService(Division $division): bool
     {
@@ -194,8 +190,7 @@ class DivisionPolicy
     /**
      * Checks if the division has any active service.
      *
-     * @param \App\Models\Division $division The division to check
-     *
+     * @param  \App\Models\Division  $division  The division to check
      * @return bool Returns true if the division has at least one active service, false otherwise
      */
     protected function hasAnyActiveService(Division $division): bool

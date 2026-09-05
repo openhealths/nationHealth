@@ -59,7 +59,7 @@
                     <template x-if="names.length > 1">
                         <button type="button"
                                 @click.prevent="names.splice(index, 1)"
-                                class="text-red-600 hover:text-red-800 item-remove justify-self-start">
+                                class="text-red-600 hover:text-red-800 justify-self-start">
                             @icon('delete', 'w-5 h-5 text-red-600')
                         </button>
                     </template>

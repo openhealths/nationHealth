@@ -29,4 +29,18 @@ class Job extends Request
     {
         return $this->get(self::URL . "/$uuid", $query);
     }
+
+    /**
+     * Fetch job details by raw href returned by ESOZ links.
+     * Supports both "/jobs/{id}" and "/api/jobs/{id}" style links.
+     *
+     * @param  string  $href
+     * @param  array  $query
+     * @return PromiseInterface|EHealthResponse
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+     */
+    public function getDetailsByHref(string $href, array $query = []): PromiseInterface|EHealthResponse
+    {
+        return $this->get($href, $query);
+    }
 }

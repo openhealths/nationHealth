@@ -6,6 +6,7 @@ namespace App\Policies;
 
 use App\Enums\Declaration\RequestStatus;
 use App\Enums\Status as LegalEntityStatus;
+use App\Enums\User\Role;
 use App\Models\DeclarationRequest;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
@@ -60,6 +61,8 @@ class DeclarationRequestPolicy
 
     /**
      * Determine whether the user can continue to create declaration request.
+     *
+     * A cancelled, expired or rejected request is final and cannot be used any further.
      */
     public function update(User $user, DeclarationRequest $declarationRequest): Response
     {
@@ -70,6 +73,12 @@ class DeclarationRequestPolicy
         $user->load(['party:id,tax_id', 'party.employees:id,uuid,party_id']);
         // Check if belongs to employee_id
         if (!$user->party->employees->contains('id', $declarationRequest->employeeId)) {
+            return Response::denyWithStatus(404);
+        }
+
+        $finalStatuses = [RequestStatus::CANCELLED, RequestStatus::EXPIRED, RequestStatus::REJECTED];
+
+        if (in_array($declarationRequest->status, $finalStatuses, true)) {
             return Response::denyWithStatus(404);
         }
 
@@ -90,10 +99,20 @@ class DeclarationRequestPolicy
 
     /**
      * Determine whether the user can reject declaration request.
+     *
+     * Only a request of the current legal entity that is still awaiting the patient can be rejected.
      */
-    public function reject(User $user): Response
+    public function reject(User $user, DeclarationRequest $declarationRequest): Response
     {
-        if ($user->cannot('declaration_request:reject') && $user->cannot('declaration_request:write')) {
+        if ($user->cannot('declaration_request:reject')) {
+            return Response::denyWithStatus(404);
+        }
+
+        if ($declarationRequest->legalEntityId !== legalEntity()->id) {
+            return Response::denyWithStatus(404);
+        }
+
+        if (!in_array($declarationRequest->status, [RequestStatus::NEW, RequestStatus::APPROVED], true)) {
             return Response::denyWithStatus(404);
         }
 
@@ -102,10 +121,25 @@ class DeclarationRequestPolicy
 
     /**
      * Determine whether the user can sign declaration request.
+     *
+     * Only a doctor signs the declaration request, even though the scope itself is granted to other roles as well,
+     * and only an approved request of the current legal entity can be signed.
      */
-    public function sign(User $user): Response
+    public function sign(User $user, DeclarationRequest $declarationRequest): Response
     {
         if ($user->cannot('declaration_request:sign')) {
+            return Response::denyWithStatus(404);
+        }
+
+        if (!$user->hasAllowedRole(Role::DOCTOR, true)) {
+            return Response::denyWithStatus(404);
+        }
+
+        if ($declarationRequest->legalEntityId !== legalEntity()->id) {
+            return Response::denyWithStatus(404);
+        }
+
+        if ($declarationRequest->status !== RequestStatus::APPROVED) {
             return Response::denyWithStatus(404);
         }
 

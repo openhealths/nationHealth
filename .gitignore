@@ -41,3 +41,5 @@ opencode.json
 # Personal Spec Kit feature docs (not for upstream; keep local copies)
 /specs/
 /storage/personal/
+/storage/cli-testing/
+/storage/db-dumps/

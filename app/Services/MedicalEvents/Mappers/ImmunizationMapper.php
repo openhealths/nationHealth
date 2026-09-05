@@ -25,7 +25,7 @@ class ImmunizationMapper implements FhirMapperContract
 
         $result = [
             'id' => $data['uuid'] ?? Str::uuid()->toString(),
-            'status' => ImmunizationStatus::COMPLETED->value,
+            'status' => $data['status'] ?? ImmunizationStatus::COMPLETED->value,
             'notGiven' => $data['notGiven'],
             'vaccineCode' => FhirResource::make()
                 ->coding('eHealth/vaccine_codes', $data['vaccineCode'])
@@ -56,7 +56,11 @@ class ImmunizationMapper implements FhirMapperContract
         }
 
         if (!empty($data['expirationDate'])) {
-            $result['expirationDate'] = convertToEHealthISO8601($data['expirationDate'] . ' ' . now()->format('H:i'));
+            // The form holds the date alone, so a record read back keeps the time it was stored with; taking the
+            // current one instead would rebuild the package as something the encounter never sent
+            $result['expirationDate'] = convertToEHealthISO8601(
+                $data['expirationDate'] . ' ' . (($data['expirationTime'] ?? '') ?: now()->format('H:i'))
+            );
         }
 
         if (!empty($data['siteCode'])) {
@@ -128,8 +132,15 @@ class ImmunizationMapper implements FhirMapperContract
             $reasons = [['code' => '']];
         }
 
+        // The form holds the date alone, so the time is carried alongside it to rebuild the instant as it was sent
+        $expirationDate = data_get($data, 'expirationDate');
+        $expiration = $expirationDate
+            ? CarbonImmutable::createFromFormat(config('app.date_format') . ' H:i', $expirationDate)
+            : null;
+
         return [
             'uuid' => data_get($data, 'uuid'),
+            'status' => data_get($data, 'status', ImmunizationStatus::COMPLETED->value),
             'primarySource' => data_get($data, 'primarySource'),
             'notGiven' => $notGiven,
             'vaccineCode' => data_get($data, 'vaccineCode.coding.0.code'),
@@ -141,9 +152,8 @@ class ImmunizationMapper implements FhirMapperContract
             'reportOriginText' => data_get($data, 'reportOrigin.text', ''),
             'manufacturer' => data_get($data, 'manufacturer', ''),
             'lotNumber' => data_get($data, 'lotNumber', ''),
-            'expirationDate' => data_get($data, 'expirationDate')
-                ? convertToAppDateFormat(data_get($data, 'expirationDate'))
-                : '',
+            'expirationDate' => $expiration?->format(config('app.date_format')) ?? '',
+            'expirationTime' => $expiration?->format('H:i') ?? '',
             'siteCode' => data_get($data, 'site.coding.0.code', ''),
             'routeCode' => data_get($data, 'route.coding.0.code', ''),
             'doseQuantityValue' => data_get($data, 'doseQuantity.value'),

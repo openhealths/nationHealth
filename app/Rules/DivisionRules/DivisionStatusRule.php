@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Rules\DivisionRules;
 
 use App\Enums\Status;
@@ -25,7 +27,7 @@ class DivisionStatusRule implements ValidationRule
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         // CustomValidationException
-        if($this->division->status !== Status::ACTIVE) {
+        if ($this->division->status !== Status::ACTIVE) {
             throw new CustomValidationException($this->message(), 'custom');
         }
     }

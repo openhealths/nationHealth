@@ -12,6 +12,7 @@ use App\Enums\Equipment\Status as EquipmentStatus;
 use App\Rules\AfterOrEqualDateTime;
 use App\Rules\InDictionary;
 use App\Rules\PastDateTime;
+use App\Models\Employee\Employee;
 use App\Models\Equipment;
 use Carbon\CarbonImmutable;
 use Closure;
@@ -33,10 +34,24 @@ class DiagnosticReportForm extends BaseForm
 
     protected function rules(): array
     {
+        $isReferralAvailable = data_get($this->diagnosticReport, 'isReferralAvailable') === true;
+        $isElectronicReferral = $isReferralAvailable && data_get($this->diagnosticReport, 'referralType') === 'electronic';
+        $isPaperReferral = $isReferralAvailable && data_get($this->diagnosticReport, 'referralType') === 'paper';
         $effectiveType = data_get($this->diagnosticReport, 'effectiveType');
 
         return [
-            'diagnosticReport.referralType' => ['nullable', 'string'],
+            'diagnosticReport.isReferralAvailable' => ['nullable', 'boolean'],
+            'diagnosticReport.referralType' => [
+                Rule::requiredIf($isReferralAvailable),
+                'nullable',
+                Rule::in(['electronic', 'paper']),
+            ],
+            'diagnosticReport.basedOnIdentifier' => [
+                Rule::requiredIf($isElectronicReferral),
+                Rule::prohibitedIf($isPaperReferral),
+                'nullable',
+                'uuid',
+            ],
             'diagnosticReport.primarySource' => [
                 'required',
                 'boolean:strict',
@@ -327,41 +342,48 @@ class DiagnosticReportForm extends BaseForm
                 },
             ],
             'diagnosticReport.divisionId' => ['nullable', 'uuid'],
-            'diagnosticReport.performerEmployeeId' => [
+            'diagnosticReport.performerEmployeeIds' => [
+                'required_without:diagnosticReport.resultsInterpreterEmployeeId',
+                'nullable',
+                'array',
+                'min:1',
+            ],
+            'diagnosticReport.performerEmployeeIds.*' => [
                 'required',
                 'uuid',
-                Rule::exists('employees', 'uuid')->where(
-                    function ($query): void {
-                        $query
-                            ->where(
-                                'legal_entity_id',
-                                legalEntity()->id
-                            )
-                            ->where(
-                                'status',
-                                Status::APPROVED->value
-                            )
-                            ->where('is_active', true)
-                            ->whereIn('employee_type', [
-                                Role::DOCTOR->value,
-                                Role::SPECIALIST->value,
-                                Role::ASSISTANT->value,
-                                Role::LABORANT->value,
-                            ]);
+                'distinct',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    $employee = Employee::query()
+                        ->where('uuid', $value)
+                        ->first([
+                            'uuid',
+                            'legal_entity_id',
+                            'status',
+                            'employee_type',
+                        ]);
 
-                        $divisionUuid = data_get(
-                            $this->diagnosticReport,
-                            'divisionId'
-                        );
+                    if ($employee === null) {
+                        $fail(__('validation.custom.diagnosticReport.performer.employee_not_found'));
 
-                        if (filled($divisionUuid)) {
-                            $query->where(
-                                'division_uuid',
-                                $divisionUuid
-                            );
-                        }
+                        return;
                     }
-                ),
+
+                    if ($employee->legalEntityId !== legalEntity()->id) {
+                        $fail(__('validation.custom.diagnosticReport.performer.employee_wrong_legal_entity', ['employee' => $value,]));
+
+                        return;
+                    }
+
+                    if ($employee->status !== Status::APPROVED) {
+                        $fail(__('validation.custom.diagnosticReport.performer.employee_invalid_status'));
+
+                        return;
+                    }
+
+                    if (!in_array($employee->employeeType, [Role::DOCTOR->value, Role::SPECIALIST->value, Role::ASSISTANT->value, Role::LABORANT->value,], true)) {
+                        $fail(__('validation.custom.diagnosticReport.performer.employee_invalid_type'));
+                    }
+                },
             ],
             'diagnosticReport.resultsInterpreterEmployeeId' => [
                 Rule::requiredIf(
@@ -452,8 +474,14 @@ class DiagnosticReportForm extends BaseForm
             'observations.*.valueQuantityValue' => ['nullable', 'numeric'],
             'observations.*.valueQuantityComparator' => ['nullable', 'string', Rule::in(['>', '>=', '=', '<=', '<'])],
             'observations.*.valueQuantityUnit' => ['nullable', 'string', new InDictionary('eHealth/ucum/units')],
-            'observations.*.valueQuantitySystem' => ['nullable', 'string'],
-            'observations.*.valueQuantityCode' => ['nullable', 'string'],
+            'observations.*.valueQuantitySystem' => [
+                'required_with:observations.*.valueQuantityValue',
+                'string'
+            ],
+            'observations.*.valueQuantityCode' => [
+                'required_with:observations.*.valueQuantityValue',
+                'string'
+            ],
 
             'observations.*.valueCodeableConcept' => ['nullable', 'string'],
             'observations.*.valueString' => ['nullable', 'string'],

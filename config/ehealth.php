@@ -20,6 +20,7 @@ return [
         'auth_ehealth' => env('EHEALTH_CODE_TOKEN', 'user_id_auth_ehealth'),
         'oauth' => [
             'bearer_token' => env('EHEALTH_OAUTH_TOKEN', 'auth_token'),
+            'token_scopes' => env('EHEALTH_OAUTH_TOKEN_SCOPES', 'auth_token_scopes'),
             'tokens' => env('EHEALTH_OAUTH_TOKENS', '/oauth/tokens'),
             'user' => env('EHEALTH_OAUTH_USER', '/oauth/user'),
             'logout' => env('EHEALTH_OAUTH_LOGOUT', '/auth/logout')
@@ -30,6 +31,11 @@ return [
         'retries' => 10,
         'page_size' => env('EHEALTH_PAGE_SIZE', 300),
         'page_size_max' => env('EHEALTH_PAGE_SIZE_MAX', 500)
+    ],
+
+    'party_verification' => [
+        // Local parties synced synchronously via getDetails before the rest go to the queue.
+        'details_sync_page_size' => (int) env('EHEALTH_PARTY_VERIFICATION_DETAILS_PAGE_SIZE', 50),
     ],
 
     'auth' => [
@@ -78,6 +84,14 @@ return [
 
     'capitation_contract_max_period_days' => 366,
 
+    /*
+     * Employee types that may enter position as free text instead of POSITION dictionary codes.
+     * Matches ESOZ EMPLOYEE_TYPE_CUSTOM_POSITION_ALLOWED.
+     */
+    'employee_type_custom_position_allowed' => ['ADMIN', 'HR', 'RECEPTIONIST'],
+
+    'reimbursement_contract_max_period_day' => env('EHEALTH_REIMBURSEMENT_CONTRACT_MAX_PERIOD_DAY', 1096),
+
     'rate_limit' => [
         'employee_request' => 29,
         'division_request' => 50,
@@ -92,17 +106,40 @@ return [
         'diagnostic_report' => 50,
         'employee_role' => 50,
         'party_request' => 30,
-        'declaration' => 10,
-        'declaration_request' => 20,
+        'declaration' => [
+            'minute' => 9,
+            'hour' => 99
+        ],
+        'declaration_request' => [
+            'minute' => 19,
+            'hour' => 149
+        ],
         'legal_entity_legators' => 2,
         'person_authentication_method' => 20,
         'remote_job' => 1399
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Asynchronous job polling
+    |--------------------------------------------------------------------------
+    |
+    | eHealth answers write requests with a job link that has to be polled until
+    | it reaches a final state. Polling blocks the request, so max_attempts *
+    | interval_seconds is the worst-case time a user waits before the operation
+    | is reported as unresolved.
+    |
+    */
+    'jobs' => [
+        'max_attempts' => env('EHEALTH_JOB_MAX_ATTEMPTS', 15),
+        'interval_seconds' => env('EHEALTH_JOB_INTERVAL_SECONDS', 2),
+    ],
+
     'employee_type' => [
         'OWNER' => [
             'position' => [
-                'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P18', 'P19', 'P22', 'P23', 'P24', 'P25', 'P26', 'P32', 'P229',
-                'P230', 'P231', 'P232', 'P233', 'P234', 'P235', 'P236', 'P237', 'P238', 'P239', 'P240', 'P247', 'P249', 'P257'
+                'P1', 'P2', 'P3', 'P32', 'P4', 'P5', 'P6', 'P18', 'P19', 'P22', 'P23', 'P24', 'P25', 'P26', 'P229',
+                'P230', 'P231', 'P232', 'P233', 'P234', 'P235', 'P236', 'P237', 'P238', 'P239', 'P247', 'P249', 'P257'
             ]
         ],
         'PHARMACY_OWNER' => [
@@ -118,6 +155,7 @@ return [
             'education_degree' => ['EXPERT', 'MASTER', 'BACHELOR', 'JUNIOR_EXPERT'],
             'qualification_type' => ['REATTESTATION', 'SPECIALIZATION', 'STAZHUVANNYA', 'POSTGRADUATE'],
             'speciality_level' => ['FIRST', 'SECOND', 'HIGHEST', 'NOT_APPLICABLE'],
+            'speciality_qualification_type' => ['AWARDING', 'DEFENSE'],
         ],
         'ADMIN' => [
             'position' => [
@@ -362,7 +400,8 @@ return [
     ],
 
     'pharmacy_employee_types' => [
-        'PHARMASIST', ' PHARMACY_OWNER'
+        'PHARMACIST',
+        'PHARMACY_OWNER',
     ],
     // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583402009/Medical+Events+Dictionaries+and+configurations#legal_entity_encounter_classes
     'legal_entity_encounter_classes' => [
@@ -384,6 +423,47 @@ return [
         'ASSISTANT' => ['intervention'],
         'MED_COORDINATOR' => ['service_delivery_location', 'virtual']
     ],
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20212351131/DRAFT+Config+params+Encounter+ENT-026#ENCOUNTER_PACKAGE_ALLOWED_ENCOUNTER_PARTICIPANT_EMPLOYEE_TYPES
+    'encounter_package_allowed_encounter_participant_employee_types' => [
+        'DOCTOR',
+        'SPECIALIST',
+        'ASSISTANT',
+        'MED_COORDINATOR',
+    ],
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20212351131/DRAFT+Config+params+Encounter+ENT-026#ENCOUNTER_PACKAGE_ALLOWED_CONDITION_ASSERTER_EMPLOYEE_TYPES
+    'encounter_package_allowed_condition_asserter_employee_types' => [
+        'DOCTOR',
+        'SPECIALIST',
+        'ASSISTANT',
+        'MED_COORDINATOR',
+    ],
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20212351131/DRAFT+Config+params+Encounter+ENT-026#ENCOUNTER_PACKAGE_ALLOWED_OBSERVATION_PERFORMER_EMPLOYEE_TYPES
+    'encounter_package_allowed_observation_performer_employee_types' => [
+        'DOCTOR',
+        'SPECIALIST',
+        'ASSISTANT',
+        'LABORANT',
+    ],
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20212351131/DRAFT+Config+params+Encounter+ENT-026#ENCOUNTER_PACKAGE_ALLOWED_PROCEDURE_PERFORMER_EMPLOYEE_TYPES
+    'encounter_package_allowed_procedure_performer_employee_types' => [
+        'DOCTOR',
+        'SPECIALIST',
+        'ASSISTANT',
+    ],
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20212351131/DRAFT+Config+params+Encounter+ENT-026#ENCOUNTER_PACKAGE_ALLOWED_DIAGNOSTIC_REPORT_PERFORMER_EMPLOYEE_TYPES
+    'encounter_package_allowed_diagnostic_report_performer_employee_types' => [
+        'DOCTOR',
+        'SPECIALIST',
+        'ASSISTANT',
+        'MED_COORDINATOR',
+        'LABORANT',
+    ],
+    //
+    'encounter_type_concilium_encounter_participant_employee_types_allowed' => [
+        'SPECIALIST',
+    ],
+    //
+    'digital_signature_check_last_name_for_encounter_package' => true,
     // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583402009/Medical+Events+Dictionaries+and+configurations#encounter_class_encounter_types
     'encounter_class_encounter_types' => [
         'AMB' => ['service_delivery_location', 'virtual', 'patient_identity', 'field', 'home', 'intervention', 'concilium'],
@@ -396,13 +476,68 @@ return [
         '8302-2', '46098-0', '29463-7', 'stature', 'eye_colour', 'hair_color', 'hair_length', 'beard', 'mustache',
         'clothes', 'peculiarity'
     ],
-    // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583402009/Medical+Events+Dictionaries+and+configurations#legal_entity_%3CLEGAL_ENTITY_TYPE%3E_episode_types
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20215398401/DRAFT+Config+params+Observation+ENT-048
+    'observation_max_days_passed' => 54750,
+    // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583402176/Transferred+Summary+Observations#Configuration
+    'summary_observations_allowed' => ['APGAR_1', 'APGAR_5', '10331-7', '14578-9', '29463-7', '82810-3'],
+
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20238172184/DRAFT+Config+params+Condition+ENT-010
+    'condition_max_days_passed' => 54750,
+    'summary_conditions_allowed' => [
+        'N19', 'R92', 'T71', 'X75', 'X76', 'X77', 'X80', 'B80', 'B79', 'L82', 'R89', 'L88', 'N86', 'T85', 'T86',
+        'E10.0', 'E10.1', 'E10.2', 'E10.3', 'E10.4', 'E10.5', 'E10.6', 'E10.7', 'E10.8', 'E10.9', 'E11.0', 'E11.1',
+        'E11.2', 'E11.3', 'E11.4', 'E11.5', 'E11.6', 'E11.7', 'E11.8', 'E11.9', 'E13.0', 'E13.1', 'E13.2', 'E13.3',
+        'E13.4', 'E13.5', 'E13.6', 'E13.7', 'E13.8', 'E13.9', 'N00.0', 'N00.1', 'N00.2', 'N00.3', 'N00.4', 'N00.5',
+        'N00.6', 'N00.7', 'N00.8', 'N00.9', 'N01.0', 'N01.1', 'N01.2', 'N01.3', 'N01.4', 'N01.5', 'N01.6', 'N01.7',
+        'N01.8', 'N01.9', 'N02.0', 'N02.1', 'N02.2', 'N02.3', 'N02.4', 'N02.5', 'N02.6', 'N02.7', 'N02.8', 'N02.9',
+        'N03.0', 'N03.1', 'N03.2', 'N03.3', 'N03.4', 'N03.5', 'N03.6', 'N03.7', 'N03.8', 'N03.9', 'N04.0', 'N04.1',
+        'N04.2', 'N04.3', 'N04.4', 'N04.5', 'N04.6', 'N04.7', 'N04.8', 'N04.9', 'N05.0', 'N05.1', 'N05.2', 'N05.3',
+        'N05.4', 'N05.5', 'N05.6', 'N05.7', 'N05.8', 'N05.9', 'N06.0', 'N06.1', 'N06.2', 'N06.3', 'N06.4', 'N06.5',
+        'N06.6', 'N06.7', 'N06.8', 'N06.9', 'N07.0', 'N07.1', 'N07.2', 'N07.3', 'N07.4', 'N07.5', 'N07.6', 'N07.7',
+        'N07.8', 'N07.9', 'N08.0', 'N08.1', 'N08.2', 'N08.4', 'N08.5', 'N08.8', 'N11.0', 'N11.1', 'N11.8', 'N11.9',
+        'N17.0', 'N17.1', 'N17.2', 'N17.8', 'N17.9', 'N18.1', 'N18.2', 'N18.3', 'N18.4', 'N18.5', 'N18.9', 'N20.0',
+        'N20.1', 'N20.2', 'N20.9', 'N21.0', 'N21.1', 'N21.8', 'N21.9', 'N22.0', 'N22.8', 'K25.0', 'K25.1', 'K25.2',
+        'K25.3', 'K25.4', 'K25.5', 'K25.6', 'K25.7', 'K25.9', 'K26.0', 'K26.1', 'K26.2', 'K26.3', 'K26.4', 'K26.5',
+        'K26.6', 'K26.7', 'K26.9', 'K27.0', 'K27.1', 'K27.2', 'K27.3', 'K27.4', 'K27.5', 'K27.6', 'K27.7', 'K27.9',
+        'I09.0', 'I09.1', 'I09.2', 'I09.8', 'I09.9', 'I11.0', 'I11.9', 'I12.0', 'I12.9', 'I13.0', 'I13.1', 'I13.2',
+        'I13.9', 'I20.0', 'I20.1', 'I20.8', 'I20.9', 'I21.0', 'I21.1', 'I21.2', 'I21.3', 'I21.4', 'I21.9', 'I22.0',
+        'I22.1', 'I22.8', 'I22.9', 'I26.0', 'I26.9', 'I27.0', 'I27.1', 'I27.2', 'I27.8', 'I27.9', 'I28.0', 'I28.1',
+        'I28.8', 'I28.9', 'I42.0', 'I42.1', 'I42.2', 'I42.3', 'I42.4', 'I42.5', 'I42.6', 'I42.7', 'I42.8', 'I42.9',
+        'I43.0', 'I43.1', 'I43.2', 'I43.8', 'I60.0', 'I60.1', 'I60.2', 'I60.3', 'I60.4', 'I60.5', 'I60.6', 'I60.7',
+        'I60.8', 'I60.9', 'I61.0', 'I61.1', 'I61.2', 'I61.3', 'I61.4', 'I61.5', 'I61.6', 'I61.8', 'I61.9', 'I62.0',
+        'I62.1', 'I62.9', 'I63.0', 'I63.1', 'I63.2', 'I63.3', 'I63.4', 'I63.5', 'I63.6', 'I63.8', 'I63.9', 'D50.0',
+        'D50.1', 'D50.8', 'D50.9', 'D51.0', 'D51.1', 'D51.2', 'D51.3', 'D51.8', 'D51.9', 'D52.0', 'D52.1', 'D52.8',
+        'D52.9', 'D53.0', 'D53.1', 'D53.2', 'D53.8', 'D53.9', 'D60.0', 'D60.1', 'D60.8', 'D60.9', 'D61.0', 'D61.1',
+        'D61.2', 'D61.3', 'D61.8', 'D61.9', 'E00.9', 'E01.0', 'E01.1', 'E01.2', 'E01.8', 'E03.0', 'E03.1', 'E03.2',
+        'E03.3', 'E03.4', 'E03.5', 'E03.8', 'E03.9', 'E05.0', 'E05.1', 'E05.2', 'E05.3', 'E05.4', 'E05.5', 'E05.8',
+        'E05.9', 'E06.3', 'E31.0'
+    ],
+
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20215136310/DRAFT+Config+params+Diagnostic+Report+ENT-021
+    'diagnostic_report_max_days_passed' => 90,
+
+    // The age limit, in days, of the medical event that serves as the evidence for an emergency contact request.
+    // The documented minimum is 0, which admits only the events created within the last day.
+    // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583402009/Medical+Events+Dictionaries+and+configurations#EMERGENCY_CONTACT_MEDICAL_EVENT_MAX_DAYS_PASSED
+    'emergency_contact_medical_event_max_days_passed' => 0,
+
+    // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583403527/Transferred+Summary+Diagnostic+Reports#Configuration
+    'summary_diagnostic_reports_allowed' => [
+        '56010-00', '56010-02', '56001-00', '57001-00', '57001-01', '56301-01', '56801-00', '56401-00', '56619-00',
+        '56022-00', '56101-00', '56030-00', '56549-01'
+    ],
+
+    //
+    'summary_procedures_allowed' => [],
+
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20213956636/DRAFT+Config+params+Legal+Entity+ENT-035
     'legal_entity_episode_types' => [
         'OUTPATIENT' => ['TREATMENT', 'PREVENTION', 'PALLIATIVE_CARE', 'DG', 'REHAB', 'CONDITIONING'],
         'PRIMARY_CARE' => ['TREATMENT', 'PREVENTION', 'PALLIATIVE_CARE', 'PHC'],
         'MSP' => ['TREATMENT', 'PHC', 'PREVENTION', 'PALLIATIVE_CARE'],
-        'MSP_PHARMACY' => ['TREATMENT', 'PREVENTION', 'PALLIATIVE_CARE']
+        'MSP_PHARMACY' => ['TREATMENT', 'PHC', 'PREVENTION', 'PALLIATIVE_CARE']
     ],
+
     // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583402009/Medical+Events+Dictionaries+and+configurations#episode_type_%3CeHealth%2Fepisode_types%3E_encounter_classes--dynamic-configuration-for-episode-types
     'episode_type_encounter_classes' => [
         'TREATMENT' => ['AMD', 'PHC', 'INPATIENT'],
@@ -413,31 +548,66 @@ return [
         'PHC' => ['PHC'],
         'CONDITIONING' => ['INPATIENT']
     ],
-    // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583402009/Medical+Events+Dictionaries+and+configurations#employee_%3CEMPLOYEE_TYPE%3E_episode_types
+
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20217659393/DRAFT+Config+params+Episode+of+Care+ENT-027
     'employee_episode_types' => [
         'SPECIALIST' => ['TREATMENT', 'PREVENTION', 'PALLIATIVE_CARE', 'DG', 'REHAB', 'CONDITIONING'],
         'DOCTOR' => ['TREATMENT', 'PREVENTION', 'PALLIATIVE_CARE', 'PHC'],
-        'ASSISTANT' => ['TREATMENT'],
+        'ASSISTANT' => ['PREVENTION'],
         'MED_COORDINATOR' => ['TREATMENT', 'DG']
     ],
+    'allowed_episode_care_manager_employee_types' => ['DOCTOR', 'SPECIALIST', 'ASSISTANT', 'MED_COORDINATOR'],
+    'allow_other_le_employees_to_manage_episode' => env('EHEALTH_ALLOW_OTHER_LE_EMPLOYEES_TO_MANAGE_EPISODE', false),
+
     // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/17999298851/RC_+CSI-1323+_Create+Update+person+request+v2#Validate-person-documents
     'expiration_date_exists' => [
         'NATIONAL_ID', 'COMPLEMENTARY_PROTECTION_CERTIFICATE', 'PERMANENT_RESIDENCE_PERMIT', 'REFUGEE_CERTIFICATE',
         'TEMPORARY_CERTIFICATE', 'TEMPORARY_PASSPORT'
     ],
-    // PERSON_DOCUMENTS_USE_SPECIFIC_EXPIRATION_DATE / PERSON_DOCUMENTS_SPECIFIC_EXPIRATION_DATE — when enabled,
-    // a document expiration_date must be later than the specific date instead of just being in the future
-    'person_documents_use_specific_expiration_date' => true,
-    'person_documents_specific_expiration_date' => null,
-    // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/17999299028/Person+documents+configurable+parameters#Person-documents-configurable-parameters
-    'self_auth_age_document_types' => [
-        'COMPLEMENTARY_PROTECTION_CERTIFICATE', 'FOREIGN_DOCUMENT_OTHER', 'FOREIGN_PASSPORT', 'NATIONAL_ID',
-        'NO_CITIZENSHIP_CERTIFICATE', 'PASSPORT', 'PERMANENT_RESIDENCE_PERMIT', 'REFUGEE_CERTIFICATE',
-        'TEMPORARY_CERTIFICATE', 'TEMPORARY_PASSPORT'
+
+    // Config params Person Authentication Method
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20224540713/DRAFT+Config+params+Person+Authentication+Method+ENT-051
+    'no_self_auth_age' => 14,
+
+    // Config params Person
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20214317118/DRAFT+Config+params+Person+ENT-050
+    'adult_age' => 18,
+    'person_full_legal_capacity_age' => 18,
+
+    // Config params Person Request
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20229226509/DRAFT+Config+params+Person+Request+ENT-055
+    'no_self_registration_age' => 14,
+
+    // Config params Person Documents
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20236599297/DRAFT+Config+params+Person+Documents+ENT-053
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/19725978326/RCC_FOREIGN+Foreigners+registration+Charts+Configuration+Parameters_EN
+    'declaration_no_self_auth_age_document_types' => [
+        'BIRTH_CERTIFICATE', 'BIRTH_CERTIFICATE_FOREIGN', 'FOREIGN_PASSPORT'
     ],
+    'declaration_self_auth_age_document_types' => [
+        'PASSPORT', 'NATIONAL_ID', 'TEMPORARY_PASSPORT', 'PERMANENT_RESIDENCE_PERMIT', 'REFUGEE_CERTIFICATE',
+        'COMPLEMENTARY_PROTECTION_CERTIFICATE', 'FOREIGN_PASSPORT'
+    ],
+    'document_types_issuing_country_not_ua' => [
+        'FOREIGN_PASSPORT', 'FOREIGN_DOCUMENT_OTHER', 'BIRTH_CERTIFICATE_FOREIGN'
+    ],
+    'document_types_issuing_country_ua_only' => [
+        'BIRTH_CERTIFICATE', 'COMPLEMENTARY_PROTECTION_CERTIFICATE', 'NATIONAL_ID', 'PASSPORT',
+        'PERMANENT_RESIDENCE_PERMIT', 'REFUGEE_CERTIFICATE', 'TEMPORARY_PASSPORT', 'TEMPORARY_CERTIFICATE'
+    ],
+    'identity_document_types' => [
+        'BIRTH_CERTIFICATE', 'BIRTH_CERTIFICATE_FOREIGN', 'COMPLEMENTARY_PROTECTION_CERTIFICATE', 'NATIONAL_ID',
+        'PASSPORT', 'PERMANENT_RESIDENCE_PERMIT', 'REFUGEE_CERTIFICATE', 'TEMPORARY_CERTIFICATE', 'TEMPORARY_PASSPORT'
+    ],
+    'identity_document_types_foreign' => ['FOREIGN_PASSPORT', 'NO_CITIZENSHIP_CERTIFICATE', 'FOREIGN_DOCUMENT_OTHER'],
     'no_self_auth_age_document_types' => [
         'BIRTH_CERTIFICATE', 'BIRTH_CERTIFICATE_FOREIGN', 'FOREIGN_PASSPORT', 'FOREIGN_DOCUMENT_OTHER'
     ],
+    'permanent_residence_permit' => [],
+    // PERSON_DOCUMENTS_USE_SPECIFIC_EXPIRATION_DATE / PERSON_DOCUMENTS_SPECIFIC_EXPIRATION_DATE — when enabled,
+    // a document expiration_date must be later than the specific date instead of just being in the future
+    'person_documents_specific_expiration_date' => null,
+    'person_documents_use_specific_expiration_date' => true,
     'person_legal_capacity_document_types' => [
         'DIVORCE_CERTIFICATE', 'MARRIAGE_CERTIFICATE', 'STATE_REGISTER_EXTRACT', 'COURT_DECISION_LEGAL_CAPACITY',
         'COURT_DECISION_DIVORCE', 'GUARDIANSHIP_DECISION_LEGAL_CAPACITY', 'LEGAL_CAPACITY_DOCUMENT'
@@ -448,15 +618,24 @@ return [
         'PASSPORT', 'PERMANENT_RESIDENCE_PERMIT', 'REFUGEE_CERTIFICATE', 'TEMPORARY_CERTIFICATE', 'TEMPORARY_PASSPORT',
         'FOREIGN_PASSPORT', 'NO_CITIZENSHIP_CERTIFICATE', 'FOREIGN_DOCUMENT_OTHER'
     ],
-    'document_types_issuing_country_ua_only' => [
-        'BIRTH_CERTIFICATE', 'COMPLEMENTARY_PROTECTION_CERTIFICATE', 'NATIONAL_ID', 'PASSPORT',
-        'PERMANENT_RESIDENCE_PERMIT', 'REFUGEE_CERTIFICATE', 'TEMPORARY_PASSPORT', 'TEMPORARY_CERTIFICATE'
+    'self_auth_age_document_types' => [
+        'COMPLEMENTARY_PROTECTION_CERTIFICATE', 'FOREIGN_DOCUMENT_OTHER', 'FOREIGN_PASSPORT', 'NATIONAL_ID',
+        'NO_CITIZENSHIP_CERTIFICATE', 'PASSPORT', 'PERMANENT_RESIDENCE_PERMIT', 'REFUGEE_CERTIFICATE',
+        'TEMPORARY_CERTIFICATE', 'TEMPORARY_PASSPORT'
     ],
-    'document_types_issuing_country_not_ua' => [
-        'FOREIGN_PASSPORT', 'FOREIGN_DOCUMENT_OTHER', 'BIRTH_CERTIFICATE_FOREIGN'
-    ],
-    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20214317118/DRAFT+Config+params+Person+ENT-050#IDENTITY_DOCUMENT_TYPES_FOREIGN
-    'identity_document_types_foreign' => ['FOREIGN_PASSPORT', 'NO_CITIZENSHIP_CERTIFICATE', 'FOREIGN_DOCUMENT_OTHER'],
+
+    // Config params Declaration Request
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20224704618/DRAFT+Config+params+Declaration+Request+ENT-014
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17570234464/DRAFT+REST+API+Create+Declaration+Request+V3+API-005-014-0001#Validate-Legal-Entity-Type
+    'declaration_request_legal_entity_types' => ['MSP', 'PRIMARY_CARE', 'MSP_PHARMACY', 'MSP_LIMITED'],
+
+    // Config params Declaration
+    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20223426657/DRAFT+Config+params+Declaration+ENT-013
+    'declaration_term' => 5400,
+    'family_doctor_declaration_limit' => 5400,
+    'pediatrician_declaration_limit' => 2700,
+    'therapist_declaration_limit' => 6000,
+
     // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20214317118/DRAFT+Config+params+Person+ENT-050#VALIDATE_PERSON_TAX_ID_UNIQUENESS
     'validate_person_tax_id_uniqueness' => true,
     'third_person_limit' => 150,
@@ -492,9 +671,6 @@ return [
     // TBD: values are not published yet.
     // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/20233683284/DRAFT+Config+params+Preperson+ENT-057#PREPERSON_HEALTHCARE_SERVICES_SPECIALITY_TYPES
     'preperson_healthcare_services_speciality_types' => [],
-
-    // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17570234464/DRAFT+REST+API+Create+Declaration+Request+V3+API-005-014-0001#Validate-Legal-Entity-Type
-    'declaration_request_legal_entity_types' => ['MSP', 'PRIMARY_CARE', 'MSP_PHARMACY', 'MSP_LIMITED'],
 
     // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/18504778043/NEW+Equipment+dictionaries+and+configurable+parameters+OMB-126
     'equipment_types_with_required_serial_number' => ['Z1203010502'],
@@ -648,4 +824,5 @@ return [
         'N03AX14', 'R03BB04', 'C01DA08', 'A10BB01', 'А10ВВ01', 'N07AA02', 'H02AB09', 'C03CA01', 'С03СА01', 'N04AA02',
         'C07AB03', 'A03FA01', 'L02BA01', 'L02BG06', 'L02BG04', 'A10AD05',
     ],
+    'show_connection_button' => false
 ];

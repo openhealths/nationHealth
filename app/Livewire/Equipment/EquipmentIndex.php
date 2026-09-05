@@ -342,7 +342,7 @@ class EquipmentIndex extends Component
             ->withOption('legal_entity_id', legalEntity()->id)
             ->withOption('token', Crypt::encryptString($token))
             ->withOption('user', $user)
-            ->then(fn () => $user->notify(new SyncNotification('equipment', 'completed')))
+            ->withOption('sync_entity', LegalEntity::ENTITY_EQUIPMENT)
             ->catch(function (Batch $batch, Throwable $exception) use ($user) {
                 Log::error('Equipment sync batch failed.', [
                     'batch_id' => $batch->id,

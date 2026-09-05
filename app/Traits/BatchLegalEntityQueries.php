@@ -25,7 +25,9 @@ use Illuminate\Bus\BatchRepository;
 use App\Jobs\DeclarationDetailsSync;
 use App\Models\Employee\EmployeeRequest;
 use App\Models\Relations\ConfidantPerson;
+use App\Models\Relations\Party;
 use App\Jobs\EmployeeRequestDetailsUpsert;
+use App\Jobs\PartyVerificationDetailsUpsert;
 use App\Jobs\DeclarationRequestDetailsSync;
 use App\Models\Relations\AuthenticationMethod;
 use App\Jobs\RemoteEHealthLinksProcessing;
@@ -49,14 +51,10 @@ trait BatchLegalEntityQueries
      */
     protected function isEntitySyncIsInProgress(?string $entityStatus = null, bool $isLegalEntity = false): bool
     {
-        return $isLegalEntity
-            ? $entityStatus !== JobStatus::COMPLETED->value
-            : (
-                $entityStatus !== JobStatus::COMPLETED->value &&
+        return $entityStatus !== JobStatus::COMPLETED->value &&
                $entityStatus !== JobStatus::PAUSED->value &&
                $entityStatus !== JobStatus::FAILED->value &&
-               !empty($entityStatus)
-            );
+               !empty($entityStatus);
     }
 
     /**
@@ -243,6 +241,37 @@ trait BatchLegalEntityQueries
     }
 
     /**
+     * Creates a chain of PartyVerificationDetailsUpsert jobs for the given parties.
+     *
+     * Jobs are created in reverse order so execution follows the original collection order.
+     *
+     * @param  LegalEntity  $legalEntity
+     * @param  Collection<int, Party>  $parties
+     * @param  EHealthJob|null  $nextEntity  Job after the chain completes (or null)
+     * @return EHealthJob|null First job in the chain, or $nextEntity when parties is empty
+     */
+    protected function getPartyVerificationDetailsStartJob(
+        LegalEntity $legalEntity,
+        Collection $parties,
+        ?EHealthJob $nextEntity = null
+    ): ?EHealthJob {
+        $job = null;
+        $previousJob = $nextEntity;
+
+        foreach ($parties->reverse() as $party) {
+            $job = new PartyVerificationDetailsUpsert(
+                party: $party,
+                legalEntity: $legalEntity,
+                nextEntity: $previousJob
+            );
+
+            $previousJob = $job;
+        }
+
+        return $job ?? $previousJob;
+    }
+
+    /**
      * Creates a chain of EmployeeDetailsUpsert jobs for all employees with PARTIAL sync status.
      *
      * Jobs are created in reverse order, each next job receives the previous one as nextEntity.
@@ -398,7 +427,6 @@ trait BatchLegalEntityQueries
      *
      * @param  LegalEntity  $legalEntity
      * @param  EHealthJob|null  $nextEntity  The job to be executed after the chain completes (or null)
-     *
      * @return EHealthJob|null The first job in the ConfidantPersonSync chain, or null if there are no confidant_persons
      */
     protected function getConfidantPersonStartJob(LegalEntity $legalEntity, ?EHealthJob $nextEntity): ?EHealthJob
@@ -437,7 +465,6 @@ trait BatchLegalEntityQueries
      *
      * @param  LegalEntity  $legalEntity
      * @param  EHealthJob|null  $nextEntity  The job to be executed after the chain completes (or null)
-     *
      * @return EHealthJob|null The first job in the PersonAuthMethodSync chain, or null if there are no authentication methods
      */
     protected function getPersonAuthMethodStartJob(LegalEntity $legalEntity, ?EHealthJob $nextEntity): ?EHealthJob
@@ -511,8 +538,8 @@ trait BatchLegalEntityQueries
         $previousJob = $nextEntity;
 
         $models = EhealthLink::where('ehealth_job_id', $eHealthJob->id)
-             ->where('status', JobStatus::PENDING->value)
-             ->get();
+            ->where('status', JobStatus::PENDING->value)
+            ->get();
 
         foreach ($models->reverse() as $index => $model) {
             $job = new RemoteEHealthLinksProcessing(

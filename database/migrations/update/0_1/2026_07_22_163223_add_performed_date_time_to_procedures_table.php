@@ -10,7 +10,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('procedures', static function (Blueprint $table): void {
+        Schema::table(
+            'procedures',
+            static function (Blueprint $table): void {
                 if (!Schema::hasColumn('procedures', 'performed_date_time')) {
                     $table
                         ->timestamp('performed_date_time')
@@ -23,7 +25,9 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('procedures', static function (Blueprint $table): void {
+        Schema::table(
+            'procedures',
+            static function (Blueprint $table): void {
                 if (Schema::hasColumn('procedures', 'performed_date_time')) {
                     $table->dropColumn('performed_date_time');
                 }

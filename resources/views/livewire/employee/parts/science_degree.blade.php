@@ -1,8 +1,9 @@
 <div class="overflow-x-auto relative">
     <fieldset class="fieldset" id="section-doctor-science-degree"
               :disabled="$wire.isPositionDataLocked ?? false"
+              {{-- Avoid $wire.entangle on objects: Livewire JSON-clones via stringify and can RPC missing toJSON. --}}
               x-data="{
-                  scienceDegree: $wire.entangle('form.doctor.scienceDegree').live,
+                  scienceDegree: {},
                   employeeType: $wire.entangle('form.employeeType'),
                   employeeTypeSpecialities: @js($this->employeeTypeSpecialities),
                   openModal: false,
@@ -21,6 +22,17 @@
                           && this.modalScienceDegree.diplomaNumber;
                   }
               }"
+              x-init="
+                  const initial = $wire.get('form.doctor.scienceDegree');
+                  scienceDegree = (initial && typeof initial === 'object') ? { ...initial } : {};
+                  $watch('scienceDegree', (val) => {
+                      $wire.set(
+                          'form.doctor.scienceDegree',
+                          (val && typeof val === 'object') ? { ...val } : {},
+                          false
+                      );
+                  });
+              "
     >
         <legend class="legend">
             <h2>{{ __('forms.science_degree') }}</h2>
@@ -36,7 +48,7 @@
                 <th class="th-input">{{ __('forms.degree') }}</th>
                 <th class="th-input">{{ __('forms.country') }}</th>
                 <th class="th-input">{{ __('forms.city') }}</th>
-                <th class="th-input">{{ __('forms.issued_date') }}</th>
+                <th class="th-input">{{ __('forms.issuedDate') }}</th>
                 <th class="th-input">{{ __('forms.institutionName') }}</th>
                 <th class="th-input">{{ __('forms.speciality') }}</th>
                 <th class="th-input">{{ __('forms.diplomaNumber') }}</th>
@@ -102,7 +114,7 @@
                                 {{-- Кнопка "Видалити" --}}
                                 <button
                                     @click.prevent="
-                                        scienceDegree = new ScienceDegree();
+                                        scienceDegree = {};
                                         openDropdown = false;
                                     "
                                     class="dropdown-button dropdown-delete"
@@ -145,7 +157,7 @@
                 <div x-show="openModal"
                      x-transition
                      @click="openModal = false"
-                     class="relative flex min-h-screen items-center justify-start pl-72 p-4"
+                     class="modal-wrapper"
                 >
                     <div @click.stop
                          x-trap.noscroll.inert="openModal"
@@ -185,7 +197,7 @@
                                     <svg class="svg-input absolute left-1 !top-2/3 transform -translate-y-1/2 pointer-events-none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M6 5V4a1 1 0 1 1 2 0v1h3V4a1 1 0 1 1 2 0v1h3V4a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v2H3V7a2 2 0 0 1 2-2h1ZM3 19v-8h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Zm5-6a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2H8Z" clip-rule="evenodd"/>
                                     </svg>
-                                    <label for="scienceDegreeIssuedDate" class="label-modal">{{ __('forms.issued_date') }}<span class="text-red-600"> *</span></label>
+                                    <label for="scienceDegreeIssuedDate" class="label-modal">{{ __('forms.issuedDate') }}<span class="text-red-600"> *</span></label>
                                     <input x-model="modalScienceDegree.issuedDate" datepicker-format="{{ frontendDateFormat() }}" type="text" name="scienceDegreeIssuedDate" id="scienceDegreeIssuedDate" class="input-modal datepicker-input" autocomplete="off">
                                 </div>
                                 <div>
@@ -213,7 +225,7 @@
                             <p class="text-sm text-gray-400 mb-2">{{ __('forms.form_required_note') }}</p>
                             <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 pt-6">
                                 <button type="button" @click="openModal = false" class="button-minor">{{ __('forms.cancel') }}</button>
-                                <button @click.prevent="scienceDegree = modalScienceDegree; openModal = false;"
+                                <button @click.prevent="scienceDegree = { ...modalScienceDegree }; openModal = false;"
                                         class="button-primary"
                                         :class="{ 'opacity-50 cursor-not-allowed': !isModalValid() }"
                                         :disabled="!isModalValid()">

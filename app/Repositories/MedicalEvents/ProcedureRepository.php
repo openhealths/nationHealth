@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories\MedicalEvents;
 
 use App\Models\MedicalEvents\Sql\Procedure;
+use App\Models\Employee\Employee;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Enums\Person\ProcedureStatus;
@@ -21,9 +22,46 @@ use Throwable;
  */
 class ProcedureRepository extends BaseRepository
 {
+    protected ?string $employeeUuid;
+
+    protected ?string $employeeFullName;
+
     public function __construct(Model $model)
     {
         parent::__construct($model);
+
+        $employee = Auth::user()?->getProcedureWriterEmployee();
+
+        $this->employeeUuid = $employee?->uuid;
+        $this->employeeFullName = $employee?->fullName;
+    }
+
+    private function getEmployeeDisplayValue(?string $employeeUuid): ?string
+    {
+        if (!$employeeUuid) {
+            return null;
+        }
+
+        if ($employeeUuid === $this->employeeUuid) {
+            return $this->employeeFullName;
+        }
+
+        return Employee::query()
+            ->select(['uuid', 'party_id'])
+            ->with('party:id,last_name,first_name,second_name')
+            ->where('uuid', $employeeUuid)
+            ->first()
+            ?->fullName;
+    }
+
+    private function getServiceDisplayValue(?string $serviceId): ?string
+    {
+        if (!$serviceId) {
+            return null;
+        }
+
+        return collect(dictionary()->services()->flattened()->toArray())
+            ->firstWhere('id', $serviceId)['name'] ?? null;
     }
 
     /**
@@ -41,12 +79,19 @@ class ProcedureRepository extends BaseRepository
         return DB::transaction(function () use ($data, $ownerColumn, $ownerId) {
             foreach ($data as $datum) {
                 $basedOn = null;
-                if (isset($datum['basedOn'])) {
-                    $basedOn = Repository::identifier()->store($datum['basedOn']['identifier']['value']);
-                    Repository::codeableConcept()->attach($basedOn, $datum['basedOn']);
+                $basedOnData = data_get($datum, 'basedOn.0') ?? data_get($datum, 'basedOn');
+                if (!empty($basedOnData)) {
+                    $basedOn = Repository::identifier()->store($basedOnData['identifier']['value']);
+                    Repository::codeableConcept()->attach($basedOn, $basedOnData);
                 }
 
-                $code = Repository::identifier()->store($datum['code']['identifier']['value']);
+                $codeValue = $datum['code']['identifier']['value'];
+
+                $code = Repository::identifier()->store(
+                    $codeValue,
+                    $this->getServiceDisplayValue($codeValue)
+                );
+
                 Repository::codeableConcept()->attach($code, $datum['code']);
 
                 $encounter = null;
@@ -55,13 +100,27 @@ class ProcedureRepository extends BaseRepository
                     Repository::codeableConcept()->attach($encounter, $datum['encounter']);
                 }
 
-                $recordedBy = Repository::identifier()->store($datum['recordedBy']['identifier']['value']);
+                $recordedByValue = $datum['recordedBy']['identifier']['value'];
+
+                $recordedBy = Repository::identifier()->store(
+                    $recordedByValue,
+                    $this->getEmployeeDisplayValue($recordedByValue)
+                );
+
                 Repository::codeableConcept()->attach($recordedBy, $datum['recordedBy']);
 
                 $performer = null;
-                if (isset($datum['performer'])) {
-                    $performer = Repository::identifier()->store($datum['performer']['identifier']['value']);
-                    Repository::codeableConcept()->attach($performer, $datum['performer']);
+                $performerData = data_get($datum, 'performer.0') ?? data_get($datum, 'performer');
+
+                if (!empty($performerData)) {
+                    $performerValue = $performerData['identifier']['value'];
+
+                    $performer = Repository::identifier()->store(
+                        $performerValue,
+                        $this->getEmployeeDisplayValue($performerValue)
+                    );
+
+                    Repository::codeableConcept()->attach($performer, $performerData);
                 }
 
                 $division = null;
@@ -70,8 +129,10 @@ class ProcedureRepository extends BaseRepository
                     Repository::codeableConcept()->attach($division, $datum['division']);
                 }
 
-                $managingOrganization = Repository::identifier()
-                    ->store($datum['managingOrganization']['identifier']['value']);
+                $managingOrganization = Repository::identifier()->store(
+                    $datum['managingOrganization']['identifier']['value'],
+                    legalEntity()->name
+                );
                 Repository::codeableConcept()->attach($managingOrganization, $datum['managingOrganization']);
 
                 $category = Repository::codeableConcept()->store($datum['category']);
@@ -311,7 +372,8 @@ class ProcedureRepository extends BaseRepository
                 $encounter = $this->syncIdentifier($existing, $data['encounter'] ?? null, 'encounter');
                 $originEpisode = $this->syncIdentifier($existing, $data['origin_episode'] ?? null, 'originEpisode');
                 $recordedBy = $this->syncIdentifier($existing, $data['recorded_by'], 'recordedBy');
-                $performer = $this->syncIdentifier($existing, $data['performer'] ?? null, 'performer');
+                $performerData = data_get($data, 'performer.0') ?? ($data['performer'] ?? null);
+                $performer = $this->syncIdentifier($existing, $performerData, 'performer');
                 $reportOrigin = $this->syncCodeableConcept($existing, $data['report_origin'] ?? null, 'reportOrigin');
                 $division = $this->syncIdentifier($existing, $data['division'] ?? null, 'division');
                 $managingOrganization = $this->syncIdentifier($existing, $data['managing_organization'], 'managingOrganization');

@@ -45,14 +45,14 @@
                                 >
                                     <div class="py-1">
                                         <button type="button"
-                                                class="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200"
+                                                class="flex items-center gap-2 w-full cursor-pointer px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200"
                                                 @click="editDocument(index); openDropdown = false"
                                         >
                                             @icon('file-edit', 'w-4 h-4')
                                             {{ __('forms.edit') }}
                                         </button>
                                         <button type="button"
-                                                class="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-600 text-red-600 dark:text-red-400"
+                                                class="flex items-center gap-2 w-full cursor-pointer px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-600 text-red-600 dark:text-red-400"
                                                 @click="confidantPerson.documentsRelationship.splice(index, 1); openDropdown = false"
                                         >
                                             @icon('delete', 'w-4 h-4')

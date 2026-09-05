@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Models\Relations;
 
 use App\Casts\EHealthDateCast;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class AuthenticationMethod extends Model
@@ -37,9 +39,25 @@ class AuthenticationMethod extends Model
 
     protected $casts = ['ehealth_ended_at' => EHealthDateCast::class];
 
+    protected $appends = ['is_active'];
+
     public function authenticatable(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * Whether the method can still be used to authorize an action on the patient record. Reads the stored value
+     * instead of the attribute, because the cast turns the end date into a display string.
+     *
+     * @return Attribute
+     */
+    protected function isActive(): Attribute
+    {
+        return Attribute::make(
+            get: static fn (mixed $value, array $attributes): bool => empty($attributes['ehealth_ended_at'])
+                || CarbonImmutable::parse($attributes['ehealth_ended_at'])->isFuture()
+        );
     }
 
     /**
@@ -47,8 +65,7 @@ class AuthenticationMethod extends Model
      *
      * @param  Builder  $query
      * @param  Model  $authenticatable
-     * @param  string|null $uuid
-     *
+     * @param  string|null  $uuid
      * @return Builder
      */
     #[Scope]

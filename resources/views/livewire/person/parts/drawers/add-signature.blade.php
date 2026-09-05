@@ -8,8 +8,8 @@
      x-transition:leave-end="opacity-0"
      x-cloak
      @click="showSignatureDrawer = false"
-     class="fixed top-16 left-0 right-0 bottom-0 bg-gray-900/70"
-     style="z-index: 55;"
+     class="fixed inset-0 bg-gray-900/70"
+     style="z-index: 46;"
 ></div>
 
 {{-- Signature Drawer --}}
@@ -22,8 +22,8 @@
      x-transition:leave-end="translate-x-full"
      x-cloak
      @click.stop
-     class="fixed top-16 right-0 h-[calc(100vh-4rem)] bg-white dark:bg-gray-800 shadow-2xl"
-     style="z-index: 60; width: calc(80% - 100px);"
+     class="fixed top-0 right-0 h-screen pt-20 bg-white dark:bg-gray-800 shadow-2xl"
+     style="z-index: 47; width: 50%;"
      id="signature-drawer"
      tabindex="-1"
      x-data="{ fileUploaded: false, fileName: '' }"

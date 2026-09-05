@@ -51,80 +51,86 @@
         </div>
 
         <x-slot name="navigation">
-            <div x-data="{ open: false, search: '' }" class="form-row-3">
-                <div class="flex items-center gap-4 col-span-1">
-                    <div class="form-group group top-3 grow max-w-xs">
-                        <input type="text"
-                                id="searchByName"
-                                placeholder=" "
-                                class="input peer"
-                                wire:model="searchByName"
-                                autocomplete="off"
-                        />
-                        <label for="searchByName" class="label">
-                            {{ __('forms.search_by_name') }}
-                        </label>
+            <div class="flex flex-col -my-4">
+                <div class="flex flex-wrap items-end justify-between gap-4">
+                    <div class="flex flex-col lg:flex-row items-stretch lg:items-end gap-2 lg:gap-4 w-full">
+                        <div class="w-full lg:w-96 pt-6 lg:pt-0">
+                            <div class="form-group group w-full">
+                                <input type="text"
+                                        id="searchByName"
+                                        placeholder=" "
+                                        class="input peer"
+                                        wire:model="searchByName"
+                                        autocomplete="off"
+                                />
+                                <label for="searchByName" class="label">
+                                    {{ __('forms.search_by_name') }}
+                                </label>
+                            </div>
+                        </div>
+                        <button
+                            class="button-minor flex items-center justify-center gap-2 w-full lg:w-auto self-stretch lg:self-auto h-[46px]"
+                            @click="showFilter = !showFilter"
+                        >
+                            @icon('adjustments', 'w-4 h-4')
+                            <span>{{ __('forms.additional_search_parameters') }}</span>
+                        </button>
                     </div>
-                    <button
-                        class="flex items-center gap-2 button-minor h-11 min-w-max px-4"
-                        @click="showFilter = !showFilter"
-                    >
-                        @icon('adjustments', 'w-4 h-4')
-                        {{--
-                        <span x-text="showFilter ? '{{ __('forms.additional_search_parameters') }}' : '{{ __('forms.additional_search_parameters') }}'">
-                            {{ __('forms.additional_search_parameters') }}
-                        </span>
-                        --}}
-                    </button>
+
+                    {{-- Filters --}}
+                    <div x-cloak x-show="showFilter" x-transition class="pt-0 mt-4 w-full lg:w-96">
+                        <div class="flex flex-col gap-4">
+                            <div class="form-group group relative" style="z-index: 30;">
+                                <x-forms.multiselect
+                                    bind="typeFilter"
+                                    :options="$availableTypes"
+                                    label="{{ __('forms.select_type') }}"
+                                    placeholder="{{ __('forms.select') }}"
+                                />
+                            </div>
+
+                            <div class="form-group group relative" style="z-index: 20;">
+                                <x-forms.multiselect
+                                    bind="searchByUuid"
+                                    :options="$divisionUuids"
+                                    label="{{ __('forms.select') }}"
+                                    placeholder="{{ __('forms.uuid') }}"
+                                />
+                            </div>
+
+                            <div class="form-group group relative" style="z-index: 10;">
+                                <x-forms.multiselect
+                                    bind="statusFilter"
+                                    :options="DivisionStatus::entries()"
+                                    label="{{ __('forms.status.label') }}"
+                                    placeholder="{{ __('forms.select') }}"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Filter buttons --}}
+                    <div class="mb-9 mt-6 flex flex-col sm:flex-row gap-2 w-full">
+                        @can('viewAny', Division::class)
+                            <button
+                                type="button"
+                                wire:click.prevent="search"
+                                class="button-primary"
+                            >
+                                @icon('search', 'w-4 h-4')
+                                <span>{{ __('forms.search') }}</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                wire:click="resetFilters"
+                                class="button-primary-outline-red"
+                            >
+                                {{ __('forms.reset_all_filters') }}
+                            </button>
+                        @endcan
+                    </div>
                 </div>
-            </div>
-
-            {{-- Filters --}}
-            <div x-cloak x-show="showFilter" class="shift-content form-group group top-3 grow max-w-xs mt-6 pb-4">
-                <div class="flex flex-col gap-4">
-                    <x-forms.multiselect
-                        bind="typeFilter"
-                        :options="$availableTypes"
-                        label="{{ __('forms.select_type') }}"
-                        placeholder="{{ __('forms.select') }}"
-                    />
-
-                    <x-forms.multiselect
-                        bind="searchByUuid"
-                        :options="$divisionUuids"
-                        label="{{ __('forms.select') }}"
-                        placeholder="{{ __('forms.uuid') }}"
-                    />
-
-                    <x-forms.multiselect
-                        bind="statusFilter"
-                        :options="DivisionStatus::entries()"
-                        label="{{ __('forms.status.label') }}"
-                        placeholder="{{ __('forms.select') }}"
-                    />
-                </div>
-            </div>
-
-            {{-- Filter buttons --}}
-            <div class="mb-9 mt-6 flex flex-col sm:flex-row gap-2 w-full">
-                @can('viewAny', Division::class)
-                    <button
-                        type="button"
-                        wire:click.prevent="search"
-                        class="button-primary"
-                    >
-                        @icon('search', 'w-4 h-4')
-                        <span>{{ __('forms.search') }}</span>
-                    </button>
-
-                    <button
-                        type="button"
-                        wire:click="resetFilters"
-                        class="button-primary-outline-red"
-                    >
-                        {{ __('forms.reset_all_filters') }}
-                    </button>
-                @endcan
             </div>
         </x-slot>
     </x-header-navigation>

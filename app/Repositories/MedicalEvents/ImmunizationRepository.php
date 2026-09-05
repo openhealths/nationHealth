@@ -42,29 +42,40 @@ class ImmunizationRepository extends BaseRepository
                     Repository::codeableConcept()->attach($performer, $datum['performer']);
                 }
 
-                $immunization = $this->model->create([
-                    'uuid' => $datum['uuid'] ?? $datum['id'],
-                    $ownerColumn => $ownerId,
-                    'status' => $datum['status'],
-                    'not_given' => $datum['notGiven'],
-                    'vaccine_code_id' => $vaccineCode->id,
-                    'context_id' => $context->id,
-                    'date' => $datum['date'] ?? null,
-                    'primary_source' => $datum['primarySource'],
-                    'performer_id' => $performer?->id,
-                    'report_origin_id' => isset($datum['reportOrigin'])
-                        ? Repository::codeableConcept()->store($datum['reportOrigin'])->id
-                        : null,
-                    'manufacturer' => $datum['manufacturer'] ?? null,
-                    'lot_number' => $datum['lotNumber'] ?? null,
-                    'expiration_date' => $datum['expirationDate'] ?? null,
-                    'site_id' => isset($datum['site'])
-                        ? Repository::codeableConcept()->store($datum['site'])->id
-                        : null,
-                    'route_id' => isset($datum['route'])
-                        ? Repository::codeableConcept()->store($datum['route'])->id
-                        : null
-                ]);
+                $immunization = $this->model->updateOrCreate(
+                    ['uuid' => $datum['uuid'] ?? $datum['id']],
+                    [
+                        $ownerColumn => $ownerId,
+                        'status' => $datum['status'],
+                        'not_given' => $datum['notGiven'],
+                        'vaccine_code_id' => $vaccineCode->id,
+                        'context_id' => $context->id,
+                        'date' => $datum['date'] ?? null,
+                        'primary_source' => $datum['primarySource'],
+                        'performer_id' => $performer?->id,
+                        'report_origin_id' => isset($datum['reportOrigin'])
+                            ? Repository::codeableConcept()->store($datum['reportOrigin'])->id
+                            : null,
+                        'manufacturer' => $datum['manufacturer'] ?? null,
+                        'lot_number' => $datum['lotNumber'] ?? null,
+                        'expiration_date' => $datum['expirationDate'] ?? null,
+                        'site_id' => isset($datum['site'])
+                            ? Repository::codeableConcept()->store($datum['site'])->id
+                            : null,
+                        'route_id' => isset($datum['route'])
+                            ? Repository::codeableConcept()->store($datum['route'])->id
+                            : null
+                    ]
+                );
+
+                if (!$immunization->wasRecentlyCreated) {
+                    $immunization->doseQuantity()?->delete();
+                    $immunization->explanations()?->delete();
+                    foreach ($immunization->vaccinationProtocols as $protocol) {
+                        $protocol->targetDiseases()->detach();
+                        $protocol->delete();
+                    }
+                }
 
                 if (isset($datum['doseQuantity'])) {
                     $immunization->doseQuantity()->create([

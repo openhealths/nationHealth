@@ -18,6 +18,7 @@ use App\Enums\ResponseStatus;
 use App\Classes\eHealth\EHealth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
+use App\Enums\Person\ApprovalStatus;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Database\Eloquent\Model;
@@ -47,13 +48,11 @@ trait HasApproval
      *   completion or failure via {@see RemoteEHealthLinksNotification}.
      * - **Any other outcome**: flashes an error and throws an {@see Exception}.
      *
-     * @param  Model  $model        The approvable model (e.g. {@see \App\Models\Person\Person}).
+     * @param  Model  $model  The approvable model (e.g. {@see \App\Models\Person\Person}).
      * @param  array  $payloadData  Approval payload. Must include an `authorize_with` key
      *                              containing the authentication method with `type` and `uuid`
      *                              sub-keys. The `OFFLINE` type is not allowed.
-     *
      * @return void
-     *
      * @throws Exception If the user lacks permission, `authorize_with` is invalid or missing,
      *                   the eHealth request fails, or the response cannot be processed.
      */
@@ -62,7 +61,7 @@ trait HasApproval
         if (Auth::user()->cannot('create', Approval::class)) {
             Session::flash('error', __('patients.policy.approval'));
 
-            throw new Exception('Approval creation failed');
+            throw new Exception('Approval creation failed: policy violation');
         }
 
         $authorizeWith = $payloadData['authorize_with'] ?? null;
@@ -70,18 +69,18 @@ trait HasApproval
         if (!$authorizeWith) {
             Session::flash('error', __('patients.errors.authMethod.not_found'));
 
-            throw new Exception('Approval creation failed');
-        } else if ($authorizeWith['type'] === 'OFFLINE') {
+            throw new Exception('Approval creation failed: missing authorize_with');
+        } elseif ($authorizeWith['type'] === 'OFFLINE') {
             Session::flash('error', __('patients.errors.authMethod.wrong_type'));
 
-            throw new Exception('Approval creation failed');
+            throw new Exception('Approval creation failed: wrong authorize_with type');
         }
 
         $payloadData['authorize_with'] = $authorizeWith['uuid'];
 
         $requestData = Repository::approval()->formatEHealthRequest($payloadData);
 
-        $approval = Approval::getByModel($model->id, get_class($model))
+        $approval = Approval::getByModel($model)
             ->whereStatus(Status::NEW->value)
             ->first() ?? Repository::approval()->create($requestData, $model);
 
@@ -104,7 +103,7 @@ trait HasApproval
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle(__('Error throughout creating approval for getting a data for: ' . $model->uuid));
 
-            throw new Exception('Approval creation failed');
+            throw new Exception('Approval creation failed: eHealth request error');
         }
 
         // If $responseData['is_verified'] is not empty, it means that response contains all approval's data so we don't need to create eHealth job in the database.
@@ -118,15 +117,15 @@ trait HasApproval
 
                 Repository::approval()->sync(modelData: $responseData, approvableModel: $resourceModel, approvalModel: $approval);
             }
-        } else if ($responseStatus === ResponseStatus::ASYNC) {
-            $jobData= [];
+        } elseif ($responseStatus === ResponseStatus::ASYNC) {
+            $jobData = [];
 
             $jobData = [
                 'status' => \strtoupper($responseData['status']),
                 'processing_method' => $responseStatus?->name,
                 'request_data' => null,
                 'response_data' => $responseData,
-                'eta' =>  Carbon::parse($responseData['eta'])->setTimezone(config('app.timezone', 'Europe/Kyiv'))
+                'eta' => Carbon::parse($responseData['eta'])->setTimezone(config('app.timezone', 'Europe/Kyiv'))
             ];
 
             try {
@@ -134,7 +133,7 @@ trait HasApproval
             } catch (Exception $exception) {
                 $this->handleDatabaseErrors($exception, __('Error creating eHealth job request after response'));
 
-                throw new Exception('Approval creation failed');
+                throw new Exception('Approval creation failed: error creating eHealth job');
             }
 
             DB::transaction(function () use ($approval, $links, $job) {
@@ -161,7 +160,7 @@ trait HasApproval
                 ->withOption('legal_entity_id', legalEntity()->id)
                 ->withOption('token', Crypt::encryptString($token))
                 ->withOption('user', $user)
-                ->then(fn() => $user->notify(new RemoteEHealthLinksNotification(__('Approval created successfully'), 'success')))
+                ->then(fn () => $user->notify(new RemoteEHealthLinksNotification(__('Approval created successfully'), 'success')))
                 ->catch(callback: function (Batch $batch, Throwable $e) use ($user) {
                     $message = __('Approval job failed');
                     Log::error('Approval job batch failed.', ['batch_id' => $batch->id, 'exception' => $e]);
@@ -174,7 +173,7 @@ trait HasApproval
         } else {
             Session::flash('error', __('patients.errors.error_creating_approval'));
 
-            throw new Exception('Approval creation failed');
+            throw new Exception('Approval creation failed: unknown error');
         }
     }
 
@@ -186,7 +185,6 @@ trait HasApproval
      * @param  Model  $model  An {@see Approval} to resend the code for, or the approvable
      *                        model (e.g. {@see \App\Models\Person\Person}) whose latest
      *                        approval should be looked up.
-     *
      * @return void
      */
     public function resendApprovalSms(Model $model): void
@@ -199,8 +197,8 @@ trait HasApproval
 
         $approval = is_a($model, Approval::class)
             ? $model
-            : Approval::getByModel($model->id, get_class($model))
-                ->whereStatus(Status::APPROVED->value)
+            : Approval::getByModel($model)
+                ->whereStatus(ApprovalStatus::ACTIVE->value)
                 ->whereNotNull('uuid')
                 ->first();
 
@@ -231,9 +229,8 @@ trait HasApproval
      * `Repository::approval()->sync()`.
      * Any other status code or caught exception causes an error flash, error logging, and returns `false`.
      *
-     * @param  Model       $approvable  The model (e.g. {@see Person}) the approval belongs to.
-     * @param  int|string  $code        The OTP verification code submitted by the user.
-     *
+     * @param  Model  $approvable  The model (e.g. {@see Person}) the approval belongs to.
+     * @param  int|string  $code  The OTP verification code submitted by the user.
      * @return bool `true` when the approval was successfully verified and synced, `false` otherwise.
      */
     public function verifyApproval(Model $approvable, int|string $code): bool
@@ -244,8 +241,8 @@ trait HasApproval
             return false;
         }
 
-        $approval = Approval::getByModel($approvable?->id, get_class($approvable))
-            ->whereStatus(Status::APPROVED->value)
+        $approval = Approval::getByModel($approvable)
+            ->whereStatus(ApprovalStatus::ACTIVE->value)
             ->first();
 
         if (!$approval) {
@@ -259,6 +256,7 @@ trait HasApproval
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle(__('Error occurred while trying to verify current Approval: ' . $approval->uuid));
             \Log::error('Error occurred while trying to verify current Approval: ' . $approval->uuid, ['exception' => $exception, 'verify_response' => $verifyResponse ?? null]);
+
             return false;
         }
 
@@ -274,8 +272,6 @@ trait HasApproval
                 return false;
             }
         } else {
-            Session::flash('error', __('patients.errors.approval_verification_failed'));
-
             Log::error('Approval verification failed', [
                 'approval_uuid' => $approval->uuid,
                 'response_status' => $verifyResponse->getStatusCode(),

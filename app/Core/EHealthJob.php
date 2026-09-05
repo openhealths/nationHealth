@@ -147,7 +147,12 @@ abstract class EHealthJob implements ShouldQueue
         if ($nextJob !== null) {
             echo "Scheduling next job: " . $nextJob::BATCH_NAME . " from " . static::BATCH_NAME.  PHP_EOL;
 
-            if ($nextJob::BATCH_NAME === CompleteSync::BATCH_NAME || $nextJob::BATCH_NAME !== static::BATCH_NAME) {
+            $syncEntity = $this->batch()->options['sync_entity'] ?? null;
+
+            if (
+                $syncEntity !== static::ENTITY
+                && ($nextJob::BATCH_NAME === CompleteSync::BATCH_NAME || $nextJob::ENTITY !== static::ENTITY)
+            ) {
                 echo "Job COMPLETED: " . static::BATCH_NAME . PHP_EOL;
 
                 $this->setEntityStatus(JobStatus::COMPLETED);
@@ -158,6 +163,7 @@ abstract class EHealthJob implements ShouldQueue
                 ->withOption('legal_entity_id', $this->legalEntity->id)
                 ->withOption('token', Crypt::encryptString($this->token)) // Passing the same token to the next job
                 ->withOption('user', $this->user) // Passing the same user to the next job
+                ->withOption('sync_entity', $syncEntity)
                 ->onQueue('sync')
                 ->dispatch();
         }

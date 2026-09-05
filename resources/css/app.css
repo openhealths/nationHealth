@@ -240,6 +240,25 @@ input:-webkit-autofill ~ .label {
     @apply absolute left-0 rounded-lg shadow-sm mt-2 z-10 origin-top-left bg-white dark:bg-gray-700 outline-none border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200
 }
 
+.multiselect-dropdown {
+    @apply !bg-white dark:!bg-gray-800;
+    background-color: #ffffff !important;
+}
+
+.multiselect-dropdown :is(ul, li, label) {
+    @apply !bg-white dark:!bg-gray-800;
+}
+
+:is(.dark .multiselect-dropdown),
+:is(.dark .multiselect-dropdown :is(ul, li, label)) {
+    background-color: rgb(31 41 55) !important; /* gray-800 */
+}
+
+/* Open multiselect must stack above following .form-group siblings (they use z-0). */
+.form-group:has(.multiselect-dropdown:not([style*="display: none"])) {
+    z-index: 50;
+}
+
 .dropdown-panel button {
     @apply p-2 px-2.5 w-full block items-center transition-colors text-left text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600 focus-visible:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed
 }
@@ -735,6 +754,10 @@ input:-webkit-autofill {
         @apply p-4 flex items-center justify-center shrink-0 w-14 border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-700
     }
 
+    .record-inner-badge-error {
+        @apply self-center shrink-0 ml-4 inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20
+    }
+
     .record-inner-action-col {
         @apply p-4 flex flex-col md:!items-center justify-center border-t md:border-t-0 md:border-l border-gray-200 dark:border-gray-700 w-full md:w-16 shrink-0 relative
     }
@@ -762,54 +785,63 @@ input:-webkit-autofill {
 }
 /* SIDEBAR NAVIGATION STYLES */
 
-#drawer-navigation .menu-item {
+.menu-item {
     @apply cursor-pointer flex items-center p-2 w-full text-base font-medium text-gray-900 rounded-lg transition-all duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700;
 }
 
-#drawer-navigation .submenu-item {
+.submenu-item {
     @apply flex items-center p-2 pl-6 w-full text-sm font-medium text-gray-900 rounded-lg transition-all duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700;
 }
 
-#drawer-navigation .menu-item-simple {
+.menu-item-simple {
     @apply flex items-center p-2 text-base font-medium text-gray-900 rounded-lg transition-all duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700;
 }
 
-#drawer-navigation .menu-item > svg:not(:last-child),
-#drawer-navigation .menu-item-simple > svg {
+.menu-item > svg:not(:last-child),
+.menu-item-simple > svg {
     @apply w-6 h-6 min-w-[1.5rem] min-h-[1.5rem] flex-shrink-0 text-gray-500 transition-all duration-75 dark:text-gray-400;
 }
 
-#drawer-navigation .menu-item:hover > svg:not(:last-child),
-#drawer-navigation .menu-item-simple:hover > svg {
+.menu-item:hover > svg:not(:last-child),
+.menu-item-simple:hover > svg,
+.menu-item-active > svg,
+.submenu-item-active > svg {
     @apply text-gray-900 dark:text-white;
 }
 
-#drawer-navigation .submenu-item > svg {
+.submenu-item > svg {
     @apply w-5 h-5 min-w-[1.25rem] min-h-[1.25rem] flex-shrink-0 text-gray-500 transition-all duration-75 dark:text-gray-400;
 }
 
-#drawer-navigation .submenu-item:hover > svg {
+.submenu-item:hover > svg {
     @apply text-gray-900 dark:text-white;
 }
 
-#drawer-navigation .menu-item > span {
+.menu-item-active,
+.submenu-item-active {
+    @apply bg-gray-100 dark:bg-gray-700;
+}
+
+.menu-item > span {
     @apply ml-3 whitespace-nowrap;
 }
 
-#drawer-navigation .menu-item > span:first-of-type {
+.menu-item > span:first-of-type {
     @apply flex-1 text-left;
 }
 
-#drawer-navigation .menu-item-simple > span,
-#drawer-navigation .submenu-item > span {
+.menu-item-simple > span,
+.submenu-item > span {
     @apply ml-3 whitespace-nowrap;
 }
 
-#drawer-navigation .menu-item > svg:last-child {
+.menu-item > svg:last-child {
     @apply w-6 h-6 min-w-[1.5rem] min-h-[1.5rem] flex-shrink-0 transition-transform duration-200;
 }
 
-#drawer-navigation ul svg {
+.menu-item svg,
+.submenu-item svg,
+.menu-item-simple svg {
     @apply flex-shrink-0;
 }
 

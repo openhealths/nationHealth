@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Session;
 use App\Traits\BatchLegalEntityQueries;
 use App\Models\Employee\EmployeeRequest;
 use App\Livewire\Employee\EmployeeComponent;
+use App\Livewire\Employee\Concerns\DeletesEmployeeRequestDraft;
 use Illuminate\Pagination\LengthAwarePaginator;
 use App\Notifications\EmployeeRequestSyncCompleted;
 use App\Services\Employee\EmployeeRequestProcessor;
@@ -32,6 +33,7 @@ class EmployeeRequestIndex extends EmployeeComponent
 {
     use WithPagination;
     use BatchLegalEntityQueries;
+    use DeletesEmployeeRequestDraft;
 
     protected const string BATCH_NAME = 'EmployeeRequestsSyncAll';
     protected const string DEPENDENT_BATCH_NAME = 'EmployeeRequestDetailsSync';
@@ -47,6 +49,33 @@ class EmployeeRequestIndex extends EmployeeComponent
     public string $syncStatus = '';
 
     private LegalEntity $legalEntity;
+
+    /**
+     * Index ACL flags for the Blade view (authorization lives in EmployeeRequestPolicy).
+     *
+     * @return array{
+     *     request_view: bool,
+     *     request_write: bool,
+     *     request_delete: bool,
+     *     employee_view: bool,
+     *     employee_write: bool,
+     *     employee_deactivate: bool
+     * }
+     */
+    #[Computed]
+    public function indexPermissions(): array
+    {
+        $user = Auth::user();
+
+        return [
+            'request_view' => $user->can('viewAny', EmployeeRequest::class),
+            'request_write' => $user->can('create', EmployeeRequest::class),
+            'request_delete' => $user->can('create', EmployeeRequest::class),
+            'employee_view' => false,
+            'employee_write' => false,
+            'employee_deactivate' => false,
+        ];
+    }
 
     #[Computed]
     public function isSync(): bool
@@ -91,6 +120,8 @@ class EmployeeRequestIndex extends EmployeeComponent
 
     public function mount(LegalEntity $legalEntity): void
     {
+        $this->authorize('viewAny', EmployeeRequest::class);
+
         $this->legalEntity = $legalEntity;
 
         $this->loadDictionaries();
@@ -112,64 +143,59 @@ class EmployeeRequestIndex extends EmployeeComponent
     {
         Log::info("[SyncOne] Started for Request ID: {$requestId}");
 
-        $localRequest = EmployeeRequest::with(['revision', 'employee', 'party'])->find($requestId);
+        $localRequest = EmployeeRequest::with(['revision', 'employee', 'party', 'division'])
+            ->where('legal_entity_id', legalEntity()->id)
+            ->find($requestId);
 
-        if (!$localRequest || !$localRequest->uuid) {
-            $this->dispatch('flashMessage', ['message' => 'Request has no UUID.', 'type' => 'error']);
+        if (!$localRequest) {
+            $this->dispatch('flashMessage', [
+                'message' => __('employees.sync.employee_request_not_found'),
+                'type' => 'error',
+            ]);
 
             return;
         }
 
-        $token = session()->get(config('ehealth.api.oauth.bearer_token'));
-        if (!$token) {
-            $this->dispatch('flashMessage', ['message' => 'Session token missing. Please re-login.', 'type' => 'error']);
+        if (Auth::user()->cannot('viewAny', EmployeeRequest::class)) {
+            $this->dispatch('flashMessage', [
+                'message' => __('employees.sync.employee_request_forbidden'),
+                'type' => 'error',
+            ]);
+
+            return;
+        }
+
+        if (!$localRequest->isPendingEhealth()) {
+            $this->dispatch('flashMessage', [
+                'message' => __('employees.sync.employee_request_not_pending'),
+                'type' => 'warning',
+            ]);
 
             return;
         }
 
         try {
-            Log::info("[SyncOne] Fetching Status via User Token for UUID: {$localRequest->uuid}");
+            $result = $processor->syncSinglePendingRequest($localRequest, legalEntity());
 
-            // Call standard getById (User Token)
-            $response = EHealth::employeeRequest()
-                ->withToken($token)
-                ->getDetails($localRequest->uuid);
+            $type = match ($result['outcome']) {
+                EmployeeRequestProcessor::OUTCOME_APPROVED => 'success',
+                EmployeeRequestProcessor::OUTCOME_PENDING,
+                EmployeeRequestProcessor::OUTCOME_REJECTED,
+                EmployeeRequestProcessor::OUTCOME_EXPIRED => 'info',
+                default => 'error',
+            };
 
-            // Expecting 'data' key. Note: User Token response DOES NOT contain 'employee_id'.
-            $remoteData = $response->json('data');
-
-            if (!$remoteData) {
-                $this->dispatch('flashMessage', ['message' => 'eHealth returned empty data.', 'type' => 'warning']);
-
-                return;
-            }
-
-            $remoteStatus = $remoteData['status'] ?? 'UNKNOWN';
-            Log::info("[SyncOne] Remote status: {$remoteStatus}.");
-
-            if ($remoteStatus === 'APPROVED') {
-                // Delegate to Processor. It will search by Tax ID since employee_id is missing.
-                $processor->applyApprovedRequest($localRequest, $remoteData);
-
-                $this->dispatch('flashMessage', [
-                    'message' => __('employees.sync.employee_request_success'),
-                    'type' => 'success'
-                ]);
-
-            } elseif (in_array($remoteStatus, ['REJECTED', 'EXPIRED'])) {
-                $newStatus = ($remoteStatus === 'REJECTED') ? RequestStatus::REJECTED : RequestStatus::EXPIRED;
-                $localRequest->update(['status' => $newStatus, 'applied_at' => now()]);
-
-                $this->dispatch('flashMessage', ['message' => "Status updated to {$remoteStatus}.", 'type' => 'info']);
-            } else {
-                $this->dispatch('flashMessage', ['message' => "Status unchanged: {$remoteStatus}", 'type' => 'info']);
-            }
-
-        } catch (\Exception $e) {
-            Log::error("[SyncOne] ERROR: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             $this->dispatch('flashMessage', [
-                'message' => 'Sync Error: ' . $e->getMessage(),
-                'type' => 'error'
+                'message' => $result['message'],
+                'type' => $type,
+            ]);
+
+            unset($this->requests);
+        } catch (\Exception $e) {
+            Log::error('[SyncOne] ERROR: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            $this->dispatch('flashMessage', [
+                'message' => __('employees.sync.employee_request_failed', ['error' => $e->getMessage()]),
+                'type' => 'error',
             ]);
         }
     }
@@ -206,6 +232,8 @@ class EmployeeRequestIndex extends EmployeeComponent
         }
 
         // Notify start
+        $user->notify(new SyncNotification('employee_request', 'started'));
+
         $this->dispatch('flashMessage', [
             'message' => __('employees.sync.started'),
             'type' => 'success'
@@ -249,14 +277,8 @@ class EmployeeRequestIndex extends EmployeeComponent
                 ->withOption('legal_entity_id', $this->legalEntity->id)
                 ->withOption('token', Crypt::encryptString($token))
                 ->withOption('user', $user)
-                ->then(function (Batch $batch) use ($user) {
-                    // app(PermissionRegistrar::class)->forgetCachedPermissions();
-                    $message = __('employees.sync.completed_successfully', [
-                        'processed' => $batch->processedJobs,
-                        'total' => $batch->totalJobs,
-                    ]);
-                    $user->notify(new EmployeeRequestSyncCompleted($message, 'success'));
-                })->catch(callback: function (Batch $batch, \Throwable $e) use ($user) {
+                ->withOption('sync_entity', LegalEntity::ENTITY_EMPLOYEE_REQUEST)
+                ->catch(callback: function (Batch $batch, \Throwable $e) use ($user) {
                     $message = __('employees.sync.failed');
                     Log::error('EmployeeRequest sync batch failed.', ['batch_id' => $batch->id, 'exception' => $e]);
                     $user->notify(new EmployeeRequestSyncCompleted($message, 'error'));
@@ -269,13 +291,8 @@ class EmployeeRequestIndex extends EmployeeComponent
                 ->withOption('legal_entity_id', $this->legalEntity->id)
                 ->withOption('token', Crypt::encryptString($token))
                 ->withOption('user', $user)
-                ->then(function (Batch $batch) use ($user) {
-                    $message = __('employees.sync.completed_successfully', [
-                        'processed' => $batch->processedJobs,
-                        'total' => $batch->totalJobs,
-                    ]);
-                    $user->notify(new EmployeeRequestSyncCompleted($message, 'success'));
-                })->catch(callback: function (Batch $batch, \Throwable $e) use ($user) {
+                ->withOption('sync_entity', LegalEntity::ENTITY_EMPLOYEE_REQUEST)
+                ->catch(callback: function (Batch $batch, \Throwable $e) use ($user) {
                     $message = __('employees.sync.failed');
                     Log::error('Employee sync batch failed.', ['batch_id' => $batch->id, 'exception' => $e]);
                     $user->notify(new EmployeeRequestSyncCompleted($message, 'error'));
@@ -351,26 +368,15 @@ class EmployeeRequestIndex extends EmployeeComponent
             ->with(['party', 'division', 'revision'])
             ->where('legal_entity_id', legalEntity()->id)
             ->whereHas('revision')
-            ->when($this->search, function ($query) {
-                $searchTerm = '%' . $this->search . '%';
-
-                $query->where(function ($subQuery) use ($searchTerm) {
-                    $subQuery->whereHas('party', function ($q) use ($searchTerm) {
-                        $q->whereRaw("CONCAT(last_name, ' ', first_name, ' ', second_name) ILIKE ?", [$searchTerm]);
-                    })
-                        ->orWhereHas('revision', function ($q) use ($searchTerm) {
-                            $q->whereRaw("
-                        (data->'party'->>'last_name') ILIKE ? OR
-                        (data->'party'->>'first_name') ILIKE ? OR
-                        (data->'party'->>'second_name') ILIKE ?
-                    ", [$searchTerm, $searchTerm, $searchTerm]);
-                        });
-                });
+            ->when($this->search, fn ($query) => $query->searchByFullName($this->search))
+            ->when($this->status !== '', function ($query) {
+                match ($this->status) {
+                    RequestStatus::FILTER_DRAFT => $query->localDraft(),
+                    RequestStatus::NEW->value => $query->pendingEhealth(),
+                    default => $query->where('status', $this->status),
+                };
             })
-            ->when($this->status, function ($query) {
-                $query->where('status', $this->status);
-            })
-            ->orderByDesc('created_at')
+            ->orderByRaw('COALESCE(inserted_at, created_at) DESC')
             ->paginate(20);
     }
 
@@ -378,7 +384,7 @@ class EmployeeRequestIndex extends EmployeeComponent
     {
         return view('livewire.employee-request.employee-request-index', [
             'requests' => $this->requests,
-            'statuses' => RequestStatus::cases(),
+            'statuses' => RequestStatus::filterChoices(),
             'dictionaries' => $this->dictionaries,
         ]);
     }

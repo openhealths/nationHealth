@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\HasOneThrough;
+use Illuminate\Support\Facades\Schema;
 use Override;
 
 class LegalEntity extends Model
@@ -43,6 +44,7 @@ class LegalEntity extends Model
     public const string ENTITY_EMPLOYEE = 'employee_';
     public const string ENTITY_EMPLOYEE_ROLE = 'employee_role_';
     public const string ENTITY_EMPLOYEE_REQUEST = 'employee_request_';
+    public const string ENTITY_PARTY_VERIFICATION = 'party_verification_';
     public const string ENTITY_LICENSE = 'license_';
     public const string ENTITY_CONTRACT = 'contract_';
     public const string ENTITY_CONTRACT_REQUEST = 'contract_request_';
@@ -148,6 +150,16 @@ class LegalEntity extends Model
         return $this->hasMany(Division::class);
     }
 
+    public function clients(): HasMany
+    {
+        return $this->hasMany(Client::class);
+    }
+
+    public function connections(): HasMany
+    {
+        return $this->hasMany(Connection::class);
+    }
+
     public function contracts(): HasMany
     {
         return $this->hasMany(\App\Models\Contracts\Contract::class, 'legal_entity_id');
@@ -161,6 +173,11 @@ class LegalEntity extends Model
     public function licenses(): HasMany
     {
         return $this->hasMany(License::class);
+    }
+
+    public function carePlans(): HasMany
+    {
+        return $this->hasMany(CarePlan::class);
     }
 
     public function equipments(): HasMany
@@ -249,6 +266,14 @@ class LegalEntity extends Model
     }
 
     /**
+     * Pharmacy legal entities dispense e-prescriptions; they do not issue referrals.
+     */
+    public function isPharmacy(): bool
+    {
+        return $this->type?->name === self::TYPE_PHARMACY;
+    }
+
+    /**
      * Determine whether the legal entity has an active, non-expired primary license.
      */
     public function hasActivePrimaryLicense(): bool
@@ -301,11 +326,14 @@ class LegalEntity extends Model
      */
     public function setEntityStatus(JobStatus $status, string $entityType = ''): void
     {
-        if (!$this->hasAttribute($entityType . 'sync_status')) {
+        $column = $entityType . 'sync_status';
+
+        // hasAttribute() is false when the column was never loaded on this instance (e.g. fresh create).
+        if (!Schema::hasColumn($this->getTable(), $column)) {
             return;
         }
 
-        $this->{$entityType . 'sync_status'} = $status->value;
+        $this->setAttribute($column, $status->value);
         $this->save();
         $this->refresh();
     }

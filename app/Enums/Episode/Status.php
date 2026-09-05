@@ -34,10 +34,10 @@ enum Status: string
     public function label(): string
     {
         return match ($this) {
-            self::DRAFT => __('patients.status.draft'),
-            self::ACTIVE => __('patients.status.active'),
-            self::CLOSED => __('patients.status.completed'),
-            self::ENTERED_IN_ERROR => __('patients.status.entered_in_error')
+            self::DRAFT => __('episodes.status.draft'),
+            self::ACTIVE => __('episodes.status.active'),
+            self::CLOSED => __('episodes.status.closed'),
+            self::ENTERED_IN_ERROR => __('episodes.status.entered_in_error')
         };
     }
 

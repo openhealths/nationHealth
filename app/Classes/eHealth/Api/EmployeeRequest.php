@@ -243,18 +243,19 @@ class EmployeeRequest extends EHealthRequest
         $transformedData = self::replaceEHealthPropNames($response->getData());
 
         $validator = Validator::make($transformedData, [
-            "employee_type" => 'required|string',
+            'employee_type' => 'required|string',
             'division_uuid' => 'nullable|uuid',
-            "uuid" => 'required|uuid',
-            "inserted_at" => 'required|date',
-            "created_at" => 'required|date', // The same as 'inserted_at' date
-            "legal_entity_uuid" => 'required|uuid',
+            'uuid' => 'required|uuid',
+            'employee_id' => 'nullable|uuid',
+            'inserted_at' => 'required|date',
+            'created_at' => 'required|date', // The same as 'inserted_at' date
+            'legal_entity_uuid' => 'required|uuid',
             'party' => 'required|array',
-            "email" => 'required|string',
-            "position" => 'required|string',
-            "start_date" => 'nullable|date',
-            "status" => ['required', Rule::enum(Status::class)],
-            "updated_at" => 'required|date'
+            'email' => 'required|string',
+            'position' => 'required|string',
+            'start_date' => 'nullable|date',
+            'status' => ['required', Rule::enum(Status::class)],
+            'updated_at' => 'required|date',
         ]);
 
         if ($validator->fails()) {
@@ -411,7 +412,15 @@ class EmployeeRequest extends EHealthRequest
             'properties' => [
                 'type' => [
                     'type' => 'string',
-                    'enum' => ['PASSPORT', 'NATIONAL_ID', 'BIRTH_CERTIFICATE', 'TEMPORARY_CERTIFICATE'],
+                    'enum' => [
+                        'PASSPORT',
+                        'NATIONAL_ID',
+                        'COMPLEMENTARY_PROTECTION_CERTIFICATE',
+                        'PERMANENT_RESIDENCE_PERMIT',
+                        'REFUGEE_CERTIFICATE',
+                        'TEMPORARY_CERTIFICATE',
+                        'TEMPORARY_PASSPORT',
+                    ],
                 ],
                 'number' => ['type' => 'string'],
             ],
@@ -442,6 +451,8 @@ class EmployeeRequest extends EHealthRequest
                 'speciality' => ['type' => 'string'],
                 'issued_date' => ['type' => 'string', 'format' => 'date'],
                 'certificate_number' => ['type' => 'string'],
+                'valid_to' => ['type' => 'string', 'format' => 'date'],
+                'additional_info' => ['type' => 'string'],
             ],
             'required' => ['type', 'institution_name', 'speciality'],
             'additionalProperties' => false,

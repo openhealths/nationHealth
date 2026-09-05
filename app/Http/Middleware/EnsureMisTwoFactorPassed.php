@@ -27,6 +27,7 @@ class EnsureMisTwoFactorPassed
     {
         if (!$this->isGateValid($request->session()->get('mis_2fa'))) {
             $request->session()->forget('mis_2fa');
+            $request->session()->reflash();
 
             return redirect()->route('mis.login');
         }

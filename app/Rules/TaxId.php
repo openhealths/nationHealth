@@ -6,6 +6,7 @@ namespace App\Rules;
 
 use Closure;
 use App\Core\Arr;
+use App\Models\Relations\Party;
 use App\Models\User;
 use Illuminate\Contracts\Validation\DataAwareRule;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -119,7 +120,7 @@ class TaxId implements ValidationRule, DataAwareRule
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        // Check if the validation is for a passport/national ID.
+        // When no_tax_id=true, tax_id stores an identity document number (not РНОКПП).
         if ($this->noTaxId) {
             $identityDoc = collect($this->documents)->first(
                 fn (array $doc) => in_array($doc['type'] ?? '', self::ALLOWED_DOCUMENT_TYPES, true)
@@ -132,17 +133,19 @@ class TaxId implements ValidationRule, DataAwareRule
                 return;
             }
 
-            // If the value is a boolean (true/false), we need to fetch the actual document number for validation.
-            if (\is_bool($value)) {
-                $value = collect($this->documents)
-                    ->first(fn (array $doc) => \in_array($doc['type'], ['PASSPORT', 'NATIONAL_ID']))['number'] ?? null;
+            if (is_bool($value)) {
+                $value = $identityDoc['number'];
             }
 
-            // TODO: check if it need to be validated (the same validation used in the document's field)
-            // A national ID can be either 9 digits or 2 Ukrainian letters followed by 6 digits.
-            // The "\\d" correctly escapes the backslash for the regex engine.
-            if (!preg_match('/^([0-9]{9}|[А-ЯЁЇIЄҐ]{2}\\d{6})$/u', $value)) {
-                $fail(__('validation.attributes.errors.invalidNationalId'));
+            $numberValidator = validator(
+                ['number' => $value],
+                ['number' => [new DocumentNumber($identityDoc['type'])]]
+            );
+
+            if ($numberValidator->fails()) {
+                foreach ($numberValidator->errors()->all() as $error) {
+                    $fail($error);
+                }
 
                 return;
             }
@@ -163,10 +166,37 @@ class TaxId implements ValidationRule, DataAwareRule
             return;
         }
 
+        if (!\is_bool($value) && !$this->isOwner && $this->taxIdAlreadyUsedInLegalEntity((string) $value)) {
+            $fail(__('validation.employee.tax_id_already_used'));
+
+            return;
+        }
+
         // If an email is provided, we perform an additional check against the database.
         if ($this->email) {
             $this->validateWithEmail($value, $fail);
         }
+    }
+
+    private function taxIdAlreadyUsedInLegalEntity(string $taxId): bool
+    {
+        $legalEntity = legalEntity();
+
+        if ($legalEntity === null) {
+            return false;
+        }
+
+        $existingPartyId = Arr::get($this->data, 'existingPartyId')
+            ?? $this->user?->party?->id;
+
+        return Party::query()
+            ->where('tax_id', $taxId)
+            ->when($existingPartyId, fn ($query, $partyId) => $query->where('id', '!=', $partyId))
+            ->whereHas(
+                'employees',
+                fn ($query) => $query->where('legal_entity_id', $legalEntity->id)
+            )
+            ->exists();
     }
 
     /**

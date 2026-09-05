@@ -82,6 +82,38 @@ if (!function_exists('convertToAppDateFormat')) {
     }
 }
 
+if (!function_exists('toIsoDate')) {
+    /**
+     * Normalize Carbon / app date strings / ISO dates to Y-m-d for API payloads and comparisons.
+     */
+    function toIsoDate(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+
+        $string = trim((string) $value);
+
+        if ($string === '') {
+            return null;
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $string) === 1) {
+            return $string;
+        }
+
+        try {
+            return CarbonImmutable::parse($string)->format('Y-m-d');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+}
+
 if (!function_exists('formatDisplayDate')) {
     /**
      * Formats a model/API date for read-only views (handles Carbon, strings, null).

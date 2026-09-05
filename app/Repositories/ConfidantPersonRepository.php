@@ -117,14 +117,30 @@ class ConfidantPersonRepository
 
         if (!$confidantPerson) {
             // Create new person if it doesn't exist in our DB
-            $personDataArray = $personData;
+            $personDataArray = Arr::toSnakeCase($personData);
             $phones = Arr::pull($personDataArray, 'phones', []);
+            $documents = Arr::pull($personDataArray, 'documents', []);
+            $names = Arr::pull($personDataArray, 'names', []);
 
             // Set the UUID from the API response to ensure consistency
             $personDataArray['uuid'] = $confidantPersonUuid;
             unset($personDataArray['id']);
 
-            $confidantPerson = Person::create(Arr::toSnakeCase($personDataArray));
+            $confidantPerson = Person::create($personDataArray);
+
+            // The name lives in its own table, so it never reaches the person through the fillable attributes
+            if (!empty($names)) {
+                $confidantPerson->names()->createMany($names);
+            }
+
+            if (!empty($documents)) {
+                Repository::declarationRequest()->syncRelatedData(
+                    $confidantPerson,
+                    'documents',
+                    $documents,
+                    Document::class
+                );
+            }
 
             // Add phones if provided
             if (!empty($phones)) {
@@ -153,26 +169,56 @@ class ConfidantPersonRepository
         );
 
         // Save documents relationship
-        if (!empty($responseData['documents_relationship'])) {
-            // Create new documents
-            foreach ($responseData['documents_relationship'] as $document) {
-                $confidantPersonRelation->documentsRelationship()->create([
+        $confidantPersonRelation->documentsRelationship()->createMany(
+            collect($responseData['documents_relationship'] ?? [])
+                ->map(static fn (array $document): array => [
                     'type' => $document['type'],
                     'number' => $document['number'],
                     'issued_by' => $document['issued_by'],
                     'issued_at' => $document['issued_at'],
                     'active_to' => $document['active_to'] ?? null
-                ]);
-            }
-        }
+                ])
+                ->all()
+        );
 
         return $confidantPersonRelation;
     }
 
     /**
+     * Resolve the confidant behind a relationship, recording one the registry knows but we do not.
+     *
+     * The relationship carries the personal data masked, the surname and the initials arriving as a single
+     * value, so it only fills a name that is missing altogether — a record already holding a real name, of a
+     * person registered here in full, keeps it.
+     *
+     * @param  string  $confidantPersonUuid
+     * @param  array  $confidantPersonData
+     * @return Person
+     */
+    private function resolveConfidantPerson(string $confidantPersonUuid, array $confidantPersonData): Person
+    {
+        $person = Person::whereUuid($confidantPersonUuid)->first() ?? Person::create([
+            'uuid' => $confidantPersonUuid,
+            'gender' => $confidantPersonData['gender'],
+            'tax_id' => $confidantPersonData['tax_id'] ?? null,
+            'no_tax_id' => $confidantPersonData['no_tax_id'] ?? false,
+            'unzr' => $confidantPersonData['unzr'] ?? null
+        ]);
+
+        if (!empty($confidantPersonData['name']) && $person->names()->doesntExist()) {
+            $person->names()->create([
+                'language' => 'uk',
+                'first_name' => $confidantPersonData['name']
+            ]);
+        }
+
+        return $person;
+    }
+
+    /**
      * Sync confidant person relationships from API response.
      *
-     * @param  array  $responseData  The API response data containing confidant persons
+     * @param  array  $responseData  The validated relationships, whose own identifier arrives as uuid
      * @param  string  $subjectPersonUuid  The UUID of the person who needs confidants
      * @return Collection
      */
@@ -187,53 +233,46 @@ class ConfidantPersonRepository
 
         $syncedConfidantPersons = collect();
 
-        // Process each relationship individually (don't group by person_id)
-        // Each relationship should be a separate ConfidantPerson record
-        foreach ($responseData as $relationshipData) {
-            $confidantPersonData = $relationshipData['confidant_person'];
-            $confidantPersonUuid = $confidantPersonData['person_id'];
+        // The same confidant can hold several relationships with the subject, and their personal data comes
+        // repeated in each of them, so the person is read and refreshed once per confidant rather than once
+        // per relationship. Every relationship still becomes a record of its own.
+        foreach (collect($responseData)->groupBy('confidant_person.person_id') as $confidantPersonUuid => $relationships) {
+            $confidantPersonData = $relationships->first()['confidant_person'];
 
-            // Find the confidant person
-            $confidantPerson = Person::whereUuid($confidantPersonUuid)->first();
+            $confidantPerson = $this->resolveConfidantPerson((string) $confidantPersonUuid, $confidantPersonData);
 
-            if (!$confidantPerson) {
-                // If person doesn't exist, skip this relationship
-                continue;
-            }
-
-            // Sync phones if provided (update person data each time)
             if (!empty($confidantPersonData['phones'])) {
                 Repository::phone()->syncPhones($confidantPerson, $confidantPersonData['phones']);
             }
 
-            // Sync documents if provided (update person data each time)
             if (!empty($confidantPersonData['documents_person'])) {
                 Repository::document()->sync($confidantPerson, $confidantPersonData['documents_person']);
             }
 
-            // Create a separate confidant person relationship for each relationship
-            $confidantPersonRelation = ConfidantPerson::create([
-                'uuid' => $relationshipData['id'],
-                'person_id' => $confidantPerson->id,
-                'subject_person_id' => $subjectPerson->id,
-                'active_to' => $relationshipData['active_to'] ?? null,
-                'sync_status' => JobStatus::COMPLETED
-            ]);
+            foreach ($relationships as $relationshipData) {
+                $confidantPersonRelation = ConfidantPerson::create([
+                    'uuid' => $relationshipData['uuid'] ?? null,
+                    'person_id' => $confidantPerson->id,
+                    'subject_person_id' => $subjectPerson->id,
+                    'active_to' => $relationshipData['active_to'] ?? null,
+                    'sync_status' => JobStatus::COMPLETED
+                ]);
 
-            // Add relationship documents for this specific relationship
-            if (!empty($relationshipData['documents_relationship'])) {
-                foreach ($relationshipData['documents_relationship'] as $document) {
-                    $confidantPersonRelation->documentsRelationship()->create([
-                        'type' => $document['type'],
-                        'number' => $document['number'],
-                        'issued_by' => $document['issued_by'] ?? null,
-                        'issued_at' => $document['issued_at'] ?? null,
-                        'active_to' => $document['active_to'] ?? null
-                    ]);
-                }
+                // Add relationship documents for this specific relationship
+                $confidantPersonRelation->documentsRelationship()->createMany(
+                    collect($relationshipData['documents_relationship'] ?? [])
+                        ->map(static fn (array $document): array => [
+                            'type' => $document['type'],
+                            'number' => $document['number'],
+                            'issued_by' => $document['issued_by'] ?? null,
+                            'issued_at' => $document['issued_at'] ?? null,
+                            'active_to' => $document['active_to'] ?? null
+                        ])
+                        ->all()
+                );
+
+                $syncedConfidantPersons->push($confidantPersonRelation);
             }
-
-            $syncedConfidantPersons->push($confidantPersonRelation);
         }
 
         return $syncedConfidantPersons;
