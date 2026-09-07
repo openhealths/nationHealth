@@ -42,6 +42,13 @@ class EncounterStandalonePhase6Test extends TestCase
 
         $this->assertFalse($harness->showEncounterReferralDrawer);
         $this->assertTrue(session()->has('error'));
+        $this->assertNotEmpty(
+            array_filter(
+                $harness->dispatched,
+                static fn (array $event): bool => $event[0] === 'flashMessage'
+            ),
+            'Draft encounter must dispatch Livewire flashMessage so the toast is visible without a full reload.'
+        );
     }
 
     public function test_eprescription_drawer_opens_for_finished_encounter(): void
@@ -163,14 +170,13 @@ class EncounterStandaloneHarness
 
     public ?string $actionType = null;
 
+    /** @var list<array{0: string, 1: mixed}> */
+    public array $dispatched = [];
+
     public function dispatch(string $event, mixed ...$params): static
     {
-        return $this;
-    }
+        $this->dispatched[] = [$event, $params[0] ?? null];
 
-    protected function flashOutcome(string $type, string $message): void
-    {
-        session()->flash($type, $message);
-        $this->dispatch('flashMessage', ['message' => $message, 'type' => $type]);
+        return $this;
     }
 }
