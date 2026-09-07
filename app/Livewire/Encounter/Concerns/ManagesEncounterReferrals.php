@@ -77,7 +77,7 @@ trait ManagesEncounterReferrals
             'quantity' => 1,
             'started_at' => $start->format('d.m.Y'),
             'ended_at' => $start->copy()->addMonths(3)->format('d.m.Y'),
-            'program_id' => '',
+            'program_id' => $this->resolveDefaultEncounterReferralProgramId(),
             'note' => '',
             'patient_instruction' => '',
             'inform_with' => InformWith::formValue($this->encounterReferralAuthMethods[0] ?? []),
@@ -350,5 +350,23 @@ trait ManagesEncounterReferrals
             Log::warning('EncounterEdit: failed to load service programs for standalone referral: '.$exception->getMessage());
             $this->encounterReferralPrograms = [];
         }
+    }
+
+    /**
+     * Prefer PMG (state guarantees) when present; otherwise first loaded SERVICE program.
+     */
+    protected function resolveDefaultEncounterReferralProgramId(): string
+    {
+        foreach ($this->encounterReferralPrograms as $program) {
+            $name = mb_strtolower((string) ($program['name'] ?? ''));
+            if (
+                str_contains($name, 'державних фінансових гарантій')
+                || str_contains($name, 'пмг')
+            ) {
+                return (string) ($program['id'] ?? '');
+            }
+        }
+
+        return (string) ($this->encounterReferralPrograms[0]['id'] ?? '');
     }
 }

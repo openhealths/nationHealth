@@ -199,10 +199,13 @@ trait ManagesCarePlanEPrescription
             ? (string) $this->ePrescriptionEligibleEncounters[0]['id']
             : '';
 
+        // eHealth MedicationRequest expects a drug id; activity.productReference is INNM dosage.
+        $resolvedMedicationId = (string) ($this->ePrescriptionSelectedProduct['id'] ?? $activity->productReference);
+
         $this->ePrescriptionForm = [
             'activity_id' => $activity->id,
             'encounter_id' => $defaultEncounterId,
-            'medication_id' => $activity->productReference,
+            'medication_id' => $resolvedMedicationId,
             'started_at' => now()->toDateString(),
             'duration' => 10,
             'ended_at' => '',

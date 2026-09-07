@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Referral;
 
+use App\Classes\eHealth\Api\Patient\ServiceRequest as PatientServiceRequestApi;
 use App\Classes\eHealth\Api\ServiceRequest as ServiceRequestApi;
+use App\Classes\eHealth\EHealthResponse;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
@@ -122,13 +124,14 @@ class ReferralExecutorPhase4Test extends TestCase
             'priority' => 'routine',
         ]);
 
-        $mockApi = Mockery::mock('alias:'.ServiceRequestApi::class);
+        $mockApi = Mockery::mock(ServiceRequestApi::class);
         $mockApi->shouldReceive('qualify')
             ->once()
             ->andThrow(new EHealthValidationException([
                 'error' => ['message' => 'program not allowed'],
             ]));
         $mockApi->shouldReceive('process')->never();
+        $this->app->instance(ServiceRequestApi::class, $mockApi);
 
         $service = app(ReferralRequestLifecycleService::class);
 
@@ -155,15 +158,18 @@ class ReferralExecutorPhase4Test extends TestCase
             'priority' => 'routine',
         ]);
 
-        $mockApi = Mockery::mock('alias:'.ServiceRequestApi::class);
+        $mockApi = Mockery::mock(ServiceRequestApi::class);
+        $qualifyResponse = Mockery::mock(EHealthResponse::class);
+        $qualifyResponse->shouldReceive('getData')->andReturn([
+            'data' => [
+                ['status' => 'INVALID', 'rejection_reason' => 'limit exceeded'],
+            ],
+        ]);
         $mockApi->shouldReceive('qualify')
             ->once()
-            ->andReturn([
-                'data' => [
-                    ['status' => 'INVALID', 'rejection_reason' => 'limit exceeded'],
-                ],
-            ]);
+            ->andReturn($qualifyResponse);
         $mockApi->shouldReceive('process')->never();
+        $this->app->instance(ServiceRequestApi::class, $mockApi);
 
         $service = app(ReferralRequestLifecycleService::class);
 
@@ -188,13 +194,17 @@ class ReferralExecutorPhase4Test extends TestCase
             'priority' => 'routine',
         ]);
 
-        $mockApi = Mockery::mock('alias:'.ServiceRequestApi::class);
-        $mockApi->shouldReceive('recall')
+        $recallResponse = Mockery::mock(EHealthResponse::class);
+        $recallResponse->shouldReceive('getData')->andReturn(['status' => 'recalled']);
+
+        $mockPatientApi = Mockery::mock(PatientServiceRequestApi::class)->makePartial();
+        $mockPatientApi->shouldReceive('recall')
             ->once()
             ->with($this->person->uuid, $referralUuid, Mockery::on(static function (array $payload): bool {
                 return ($payload['explanatory_letter'] ?? '') === 'Пацієнт більше не потребує послуги';
             }))
-            ->andReturn(['status' => 'recalled']);
+            ->andReturn($recallResponse);
+        $this->app->instance(PatientServiceRequestApi::class, $mockPatientApi);
 
         $service = app(ReferralRequestLifecycleService::class);
         $result = $service->recallReferral($this->person->uuid, $referralUuid, [
@@ -230,14 +240,18 @@ class ReferralExecutorPhase4Test extends TestCase
             'ehealth_inserted_at' => now(),
         ]);
 
-        $mockApi = Mockery::mock('alias:'.ServiceRequestApi::class);
+        $completeResponse = Mockery::mock(EHealthResponse::class);
+        $completeResponse->shouldReceive('getData')->andReturn(['status' => 'completed']);
+
+        $mockApi = Mockery::mock(ServiceRequestApi::class);
         $mockApi->shouldReceive('complete')
             ->once()
             ->with($referralUuid, Mockery::on(static function (array $payload) use ($encounterUuid): bool {
                 return data_get($payload, 'based_on.0.identifier.type.coding.0.code') === 'encounter'
                     && data_get($payload, 'based_on.0.identifier.value') === $encounterUuid;
             }))
-            ->andReturn(['status' => 'completed']);
+            ->andReturn($completeResponse);
+        $this->app->instance(ServiceRequestApi::class, $mockApi);
 
         $service = app(ReferralRequestLifecycleService::class);
         $result = $service->completeReferral($referralUuid, $encounterUuid, 'encounter');

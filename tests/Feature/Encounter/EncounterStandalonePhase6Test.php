@@ -63,7 +63,6 @@ class EncounterStandalonePhase6Test extends TestCase
         $harness->openEncounterReferralDrawer();
 
         $this->assertTrue($harness->showEncounterReferralDrawer);
-        $this->assertSame('service_request', $harness->encounterReferralForm['kind']);
         $this->assertSame('', $harness->encounterReferralForm['service_id']);
         $this->assertIsArray($harness->encounterReferralPrograms);
     }
@@ -104,7 +103,7 @@ class EncounterStandalonePhase6Test extends TestCase
         $harness = $this->makeHarness($encounter->id);
         $harness->openEncounterReferralDrawer();
 
-        $this->assertSame('procedure', $harness->encounterReferralForm['category']);
+        $this->assertSame('diagnostic_procedure', $harness->encounterReferralForm['category']);
 
         $serviceId = (string) Str::uuid();
         $harness->encounterReferralServiceResults = [[

@@ -742,7 +742,15 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
     public function takeIntoWork(string $referralUuid, Employee $employee, ?string $patientUuid = null, array $payload = []): array
     {
         $model = Repository::serviceRequest()->findByUuid($referralUuid);
-        $programId = $model ? $model->programId : null;
+        $programId = $model?->programId
+            ?? ($payload['program_id'] ?? null)
+            ?? data_get($payload, 'program.identifier.value');
+
+        if (is_string($programId)) {
+            $programId = trim($programId) !== '' ? $programId : null;
+        } else {
+            $programId = $programId ?: null;
+        }
 
         $payload = $this->buildTakeIntoWorkPayload($employee, $programId);
 
@@ -779,11 +787,15 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
 
         // Use Service Request (взяти в роботу)
         $response = \App\Classes\eHealth\EHealth::serviceRequest()->process($referralUuid, $payload)->getData();
+        $response = $this->jobResolver->resolve(is_array($response) ? $response : []);
 
         // Persist status to local DB:
         // If the referral was found from eHealth search (not in our DB), upsert it with in_progress status.
         if ($model) {
-            $model->update(['status' => ServiceRequestStatus::IN_PROGRESS->value]);
+            $model->update([
+                'status' => ServiceRequestStatus::IN_PROGRESS->value,
+                'program_id' => $programId ?? $model->programId,
+            ]);
         } elseif ($patientUuid) {
             // The referral came from eHealth search and is not in our local DB yet.
             // Store a minimal record so we can track its status going forward.
@@ -799,6 +811,9 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
                     'request_number' => $responseData['requisition'] ?? null,
                     'employee_id' => $employee->id,
                     'division_id' => $employee->divisionId,
+                    'program_id' => $programId
+                        ?? data_get($responseData, 'program.identifier.value')
+                        ?? data_get($responseData, 'program.id'),
                     // service_id is required by the repository schema; extract from response or fallback to empty
                     'service_id' => data_get($responseData, 'code.identifier.value')
                         ?? data_get($responseData, 'code.coding.0.code')
@@ -856,6 +871,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
         ];
 
         $response = \App\Classes\eHealth\EHealth::serviceRequest()->complete($referralUuid, $payload)->getData();
+        $response = $this->jobResolver->resolve(is_array($response) ? $response : []);
 
         $model = Repository::serviceRequest()->findByUuid($referralUuid);
         if ($model) {
