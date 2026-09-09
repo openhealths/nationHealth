@@ -179,7 +179,7 @@ class ServiceRequestRequestRepository extends BaseRepository
             'id' => $request->id,
             'uuid' => (string) $request->uuid,
             'kind' => 'service_request',
-            'requestNumber' => (string) ($request->requestNumber ?: $request->uuid),
+            'requestNumber' => trim((string) ($request->requestNumber ?? '')),
             'status' => (string) $request->status,
             'statusLabel' => ServiceRequestStatus::labelFor($status),
             'statusBadge' => ServiceRequestStatus::colorFor($status),

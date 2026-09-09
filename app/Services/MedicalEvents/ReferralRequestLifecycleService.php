@@ -17,8 +17,9 @@ use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Repositories\MedicalEvents\Repository;
-use Illuminate\Support\Str;
 use App\Services\MedicalEvents\Concerns\ResolvesEmployeeContext;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
 {
@@ -677,6 +678,12 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
     }
 
     /**
+     * Persist local referral state after a signed create job finishes.
+     *
+     * Async job envelopes often report status=processed without embedding the
+     * clinical resource (requisition / active). Prefer the entity payload when
+     * present, otherwise default to active and enrich requisition from GET by id.
+     *
      * @param  array<string, mixed>  $dbData
      * @param  array<string, mixed>  $finalResponse
      * @return array<string, mixed>
@@ -687,17 +694,94 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
         string $kind,
         int $personId
     ): array {
-        $entity = isset($finalResponse['result'][0])
-            ? $finalResponse['result'][0]
-            : ($finalResponse['result'] ?? $finalResponse);
+        $entity = $this->extractSignedCreateEntity($finalResponse);
 
-        $dbData['status'] = $entity['status'] ?? ($finalResponse['status'] ?? 'active');
-        $dbData['request_number'] = $entity['request_number'] ?? $entity['requisition'] ?? $dbData['request_number'] ?? null;
-        $dbData['uuid'] = $entity['id'] ?? $dbData['uuid'];
+        $entityStatus = strtolower((string) ($entity['status'] ?? ''));
+        $jobEnvelopeStatuses = ['processed', 'completed', 'success', 'pending', 'processing', 'accepted', 'queued'];
+
+        if ($entityStatus !== '' && !in_array($entityStatus, $jobEnvelopeStatuses, true)) {
+            $dbData['status'] = $entity['status'];
+        } else {
+            $dbData['status'] = ServiceRequestStatus::ACTIVE->value;
+        }
+
+        $dbData['request_number'] = $entity['request_number']
+            ?? $entity['requisition']
+            ?? $dbData['request_number']
+            ?? null;
+        $dbData['uuid'] = $entity['id'] ?? $dbData['uuid'] ?? null;
 
         $this->persistSignedReferral($dbData, $kind, $personId);
 
+        if (empty($dbData['request_number']) && !empty($dbData['uuid'])) {
+            try {
+                $personUuid = \App\Models\Person\Person::query()->whereKey($personId)->value('uuid');
+                if (is_string($personUuid) && $personUuid !== '') {
+                    $remote = $this->fetchRemoteReferral($personUuid, (string) $dbData['uuid'], $kind);
+                    $mapped = $this->mapRemoteReferralFields($remote, $kind);
+
+                    if (!empty($mapped['request_number'])) {
+                        $dbData['request_number'] = $mapped['request_number'];
+                    }
+
+                    $remoteStatus = strtolower((string) ($mapped['status'] ?? ''));
+                    if ($remoteStatus !== '' && !in_array($remoteStatus, $jobEnvelopeStatuses, true)) {
+                        $dbData['status'] = $mapped['status'];
+                    }
+
+                    $this->persistSignedReferral($dbData, $kind, $personId);
+                }
+            } catch (\Throwable $exception) {
+                Log::warning('ReferralRequestLifecycle: failed to enrich requisition after signed create', [
+                    'uuid' => $dbData['uuid'] ?? null,
+                    'kind' => $kind,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+
         return $dbData;
+    }
+
+    /**
+     * Unwrap the clinical resource from an async job response when present.
+     *
+     * @param  array<string, mixed>  $finalResponse
+     * @return array<string, mixed>
+     */
+    private function extractSignedCreateEntity(array $finalResponse): array
+    {
+        $result = $finalResponse['result'] ?? null;
+
+        if (is_array($result)) {
+            if (array_is_list($result) && isset($result[0]) && is_array($result[0])) {
+                return $result[0];
+            }
+
+            if (isset($result['data']) && is_array($result['data'])) {
+                $data = $result['data'];
+                if (array_is_list($data) && isset($data[0]) && is_array($data[0])) {
+                    return $data[0];
+                }
+
+                return $data;
+            }
+
+            if (isset($result['id']) || isset($result['requisition']) || isset($result['request_number'])) {
+                return $result;
+            }
+        }
+
+        if (isset($finalResponse['data']) && is_array($finalResponse['data'])) {
+            $data = $finalResponse['data'];
+            if (array_is_list($data) && isset($data[0]) && is_array($data[0])) {
+                return $data[0];
+            }
+
+            return $data;
+        }
+
+        return $finalResponse;
     }
 
     /**
