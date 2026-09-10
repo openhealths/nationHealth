@@ -68,6 +68,14 @@
                                     <div class="flex items-center justify-end gap-2">
                                         <button
                                             type="button"
+                                            wire:click="cancelApproval('{{ $approval['uuid'] }}')"
+                                            wire:confirm="{{ __('care-plan.confirm_cancel_approval') }}"
+                                            class="button-secondary px-3 py-1 text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
+                                        >
+                                            {{ __('care-plan.revoke_approval') }}
+                                        </button>
+                                        <button
+                                            type="button"
                                             wire:click="recreateApproval('{{ $approval['uuid'] }}')"
                                             class="button-secondary px-3 py-1 text-xs text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
                                             title="Перестворити запит, якщо старий завис або СМС не приходить"

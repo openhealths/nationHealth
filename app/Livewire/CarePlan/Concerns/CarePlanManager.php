@@ -534,6 +534,9 @@ trait CarePlanManager
             $msg = $exception instanceof EHealthValidationException
                 ? $exception->getTranslatedMessage()
                 : __('care-plan.ehealth_error_prefix') . $exception->getMessage();
+            if ($exception instanceof EHealthResponseException && $exception->getCode() === 403) {
+                $msg = __('care-plan.activity_sign_needs_approval');
+            }
             $this->flashOutcome('error', $msg);
             $this->showSignatureModal = false;
         } catch (\Throwable $exception) {

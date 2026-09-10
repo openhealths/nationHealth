@@ -460,6 +460,7 @@ class CarePlanApprovals extends Component
                 ->deactivate($this->patientUuid, $approvalUuid);
             Session::flash('success', __('care-plan.approval_cancelled'));
             $this->fetchApprovals();
+            $this->dispatch('care-plan-approvals-changed');
         } catch (\Exception $e) {
             Log::error('CarePlanApprovals: failed to cancel: ' . $e->getMessage());
             Session::flash('error', __('care-plan.approval_cancel_error'));

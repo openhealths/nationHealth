@@ -139,6 +139,8 @@ return [
     'grant_access_btn' => 'Grant access',
     'approval_inpatient_granted' => 'Inpatient care plans do not require SMS. eHealth confirms the approval automatically.',
     'approval_inpatient_no_sms' => 'An inpatient plan at this facility does not need patient SMS. Click “Grant access” — eHealth will confirm without a code.',
+    'revoke_approval' => 'Revoke',
+    'activity_sign_needs_approval' => 'eHealth denied signing: this doctor has no active write approval on the care plan. Open Access management and click Grant access.',
     'no_approvals_found' => 'No approvals found',
     'cannot_grant_unregistered' => 'Cannot grant access: care plan is not registered in eHealth.',
     'cannot_mutate_terminal_care_plan' => 'A care plan in status “:status” cannot be changed.',

@@ -422,8 +422,8 @@ class CarePlanCreate extends BasePatientComponent
         }
 
         try {
+            // GET /api/patients/{id}/approvals rejects `status` (422 additional properties).
             $response = EHealth::approval()->getPatientApprovals($patientUuid, [
-                'status' => 'NEW',
                 'granted_resource_type' => 'care_plan',
                 'granted_resources' => $carePlanUuid,
             ]);
@@ -1002,8 +1002,9 @@ class CarePlanCreate extends BasePatientComponent
             ]);
 
             if (app(CarePlanApprovalService::class)->skipsPatientOtp($carePlan)) {
-                session()->flash('success', __('care-plan.approval_inpatient_granted'));
-                $this->redirectRoute('care-plans.show', [legalEntity(), $carePlan->id], navigate: true);
+                // SMS is skipped, but eHealth still requires an active write approval
+                // before activities can be signed (otherwise POST .../activities returns 403).
+                $this->createApproval('');
 
                 return;
             }
