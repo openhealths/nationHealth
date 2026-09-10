@@ -161,6 +161,22 @@ class CarePlanShowActionsTest extends TestCase
             ->assertSee(__('care-plan.new_prescription'));
     }
 
+    public function test_cancel_modal_shows_the_required_status_reason_select(): void
+    {
+        $this->actingAs($this->user);
+
+        $carePlan = $this->makeSignedNewPlan();
+        $this->grantApproval($carePlan, $this->employee, ApprovalStatus::ACTIVE->value);
+
+        Livewire::test(CarePlanShow::class, ['carePlan' => $carePlan->fresh()])
+            ->call('openSignatureModal', 'cancel')
+            ->assertSet('showSignatureModal', true)
+            ->assertSet('actionType', 'cancel')
+            ->assertSee(__('care-plan.status_reason'), false)
+            ->assertSeeHtml('wire:model="statusReason"')
+            ->assertSeeHtml('id="statusReason"');
+    }
+
     public function test_cancel_sign_without_kep_flashes_an_error_the_doctor_can_see(): void
     {
         $this->actingAs($this->user);

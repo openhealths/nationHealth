@@ -1,4 +1,4 @@
-@props(['method', 'onlyActions' => [], 'exceptActions' => []])
+@props(['method', 'onlyActions' => [], 'exceptActions' => [], 'agreementText' => null])
 
 @php
     $actionType = $this->actionType ?? null;
@@ -6,118 +6,141 @@
 @endphp
 
 @if ($shouldRender)
-<template x-teleport="body">
-    <div x-data="{ 
+    <template x-teleport="body">
+        <div
+            x-data="{ 
             showSignatureModal: $wire.entangle('showSignatureModal'), 
             fileName: '{{ __('forms.no_file_chosen') }}' 
          }"
-         x-effect="if (!showSignatureModal) { fileName = '{{ __('forms.no_file_chosen') }}'; if ($refs.keyContainerUpload) $refs.keyContainerUpload.value = ''; }"
-         x-show="showSignatureModal"
-         x-cloak
-         role="dialog"
-         aria-modal="true"
-         class="modal"
-         @keydown.escape.prevent.stop="showSignatureModal = false"
-    >
-        <div x-transition.opacity class="fixed inset-0 bg-black/30" @click="showSignatureModal = false"></div>
-        <div class="modal-wrapper">
-            <div class="modal-content w-full max-w-4xl mx-auto"
-                 @click.stop
-                 x-transition
-                 x-trap.noscroll.inert="showSignatureModal"
-            >
-                {{-- Title --}}
-                <h3 class="modal-header">@yield('title', __('forms.sign_with_KEP'))</h3>
+            x-effect="if (! showSignatureModal) { fileName = '{{ __('forms.no_file_chosen') }}'; if ($refs.keyContainerUpload) $refs.keyContainerUpload.value = ''; }"
+            x-show="showSignatureModal"
+            x-cloak
+            role="dialog"
+            aria-modal="true"
+            class="modal"
+            @keydown.escape.prevent.stop="showSignatureModal = false"
+        >
+            <div x-transition.opacity class="fixed inset-0 bg-black/30" @click="showSignatureModal = false"></div>
+            <div class="modal-wrapper">
+                <div
+                    class="modal-content mx-auto w-full max-w-4xl"
+                    @click.stop
+                    x-transition
+                    x-trap.noscroll.inert="showSignatureModal"
+                >
+                    {{-- Title --}}
+                    <h3 class="modal-header">@yield('title', __('forms.sign_with_KEP'))</h3>
 
-                {{-- Content --}}
-                <div class="p-6">
-                    <form>
-                        <div class="flex flex-col gap-6">
-                            @isset($customFields)
-                                {{ $customFields }}
-                            @endisset
+                    {{-- Content --}}
+                    <div class="p-6">
+                        <form>
+                            <div class="flex flex-col gap-6">
+                                {{-- Care-plan cancel/complete still @extends this layout and fill @section('custom-fields'). --}}
+                                {{-- Encounter/contract flows pass a $customFields slot instead. Keep both. --}}
+                                @hasSection('custom-fields')
+                                    @yield('custom-fields')
+                                @elseif (isset($customFields))
+                                    {{ $customFields }}
+                                @endif
 
-                            {{-- KEP Provider --}}
-                            <div>
-                                <label for="knedp" class="default-label">{{ __('forms.knedp') }} *</label>
-                                <select class="input-modal" wire:model="form.knedp" name="knedp" id="knedp">
-                                    <option value="" selected>{{__('forms.select')}}</option>
-                                    @foreach(signatureService()->getCertificateAuthorities() as $certificateType)
-                                        <option value="{{ $certificateType['id'] }}"
+                                @if (!empty($agreementText))
+                                    <div class="show-alert-warning">
+                                        <p class="text-sm font-medium">{{ $agreementText }}</p>
+                                    </div>
+                                @endif
+
+                                {{-- KEP Provider --}}
+                                <div>
+                                    <label for="knedp" class="default-label">{{ __('forms.knedp') }} *</label>
+                                    <select class="input-modal" wire:model="form.knedp" name="knedp" id="knedp">
+                                        <option value="" selected>{{ __('forms.select') }}</option>
+                                        @foreach (signatureService()->getCertificateAuthorities() as $certificateType)
+                                            <option
+                                                value="{{ $certificateType['id'] }}"
                                                 wire:key="{{ $certificateType['id'] }}"
-                                        >
-                                            {{ $certificateType['name'] }}
-                                        </option>
-                                    @endforeach
-                                </select>
+                                            >
+                                                {{ $certificateType['name'] }}
+                                            </option>
+                                        @endforeach
+                                    </select>
 
-                                @error('form.knedp') <p class="text-error">{{ $message }}</p> @enderror
-                            </div>
+                                    @error('form.knedp')
+                                        <p class="text-error">{{ $message }}</p>
+                                    @enderror
+                                </div>
 
-                            {{-- Key File --}}
-                            <div>
-                                <label for="keyContainerUpload" class="default-label">
-                                    {{ __('forms.key_container_upload') }} *
-                                </label>
-                                <div class="file-input-wrapper">
-                                    <label for="keyContainerUpload" class="file-input-button">
-                                        {{ __('forms.choose_file') }}
+                                {{-- Key File --}}
+                                <div>
+                                    <label for="keyContainerUpload" class="default-label">
+                                        {{ __('forms.key_container_upload') }} *
                                     </label>
-                                    <span class="file-input-text" x-text="fileName"></span>
-                                    <input type="file"
-                                           wire:model="form.keyContainerUpload"
-                                           class="hidden"
-                                           id="keyContainerUpload"
-                                           name="keyContainerUpload"
-                                           x-ref="keyContainerUpload"
-                                           accept=".dat,.pfx,.pk8,.zs2,.jks,.p7s"
-                                           @change="fileName = $event.target.files[0] ? $event.target.files[0].name : '{{ __('forms.no_file_chosen') }}'"
+                                    <div class="file-input-wrapper">
+                                        <label for="keyContainerUpload" class="file-input-button">
+                                            {{ __('forms.choose_file') }}
+                                        </label>
+                                        <span class="file-input-text" x-text="fileName"></span>
+                                        <input
+                                            type="file"
+                                            wire:model="form.keyContainerUpload"
+                                            class="hidden"
+                                            id="keyContainerUpload"
+                                            name="keyContainerUpload"
+                                            x-ref="keyContainerUpload"
+                                            accept=".dat,.pfx,.pk8,.zs2,.jks,.p7s"
+                                            @change="fileName = $event.target.files[0] ? $event.target.files[0].name : '{{ __('forms.no_file_chosen') }}'"
+                                        />
+                                    </div>
+                                    <div
+                                        wire:loading
+                                        wire:target="form.keyContainerUpload"
+                                        class="mt-2 text-sm text-gray-500"
                                     >
+                                        {{ __('general.loading') }}...
+                                    </div>
+
+                                    @error('form.keyContainerUpload')
+                                        <p class="text-error">{{ $message }}</p>
+                                    @enderror
                                 </div>
-                                <div wire:loading
-                                     wire:target="form.keyContainerUpload"
-                                     class="text-sm text-gray-500 mt-2"
-                                >
-                                    {{ __('general.loading') }}...
+
+                                {{-- Password --}}
+                                <div>
+                                    <label for="password" class="default-label">{{ __('forms.password') }} *</label>
+                                    <input
+                                        type="password"
+                                        wire:model="form.password"
+                                        class="default-input"
+                                        id="password"
+                                        name="password"
+                                        autocomplete="current-password"
+                                    />
+
+                                    @error('form.password')
+                                        <p class="text-error">{{ $message }}</p>
+                                    @enderror
                                 </div>
-
-                                @error('form.keyContainerUpload') <p class="text-error">{{ $message }}</p> @enderror
                             </div>
+                        </form>
 
-                            {{-- Password --}}
-                            <div>
-                                <label for="password" class="default-label">{{ __('forms.password') }} *</label>
-                                <input type="password"
-                                       wire:model="form.password"
-                                       class="default-input"
-                                       id="password"
-                                       name="password"
-                                       autocomplete="current-password"
-                                />
-
-                                @error('form.password') <p class="text-error">{{ $message }}</p> @enderror
-                            </div>
-                        </div>
-                    </form>
-
-                    <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 pt-6">
-                        <button type="button" @click="showSignatureModal = false" class="button-minor">
-                            {{ __('forms.cancel') }}
-                        </button>
-                        <button wire:click="{{ $method }}"
+                        <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 pt-6">
+                            <button type="button" @click="showSignatureModal = false" class="button-minor">
+                                {{ __('forms.cancel') }}
+                            </button>
+                            <button
+                                wire:click="{{ $method }}"
                                 type="button"
                                 class="button-primary"
                                 wire:loading.attr="disabled"
                                 wire:loading.class="opacity-50 cursor-not-allowed"
                                 wire:target="{{ $method }}"
-                        >
-                            <span wire:loading.remove wire:target="{{ $method }}">{{ __('forms.sign') }}</span>
-                            <span wire:loading wire:target="{{ $method }}">{{ __('forms.signature') }}...</span>
-                        </button>
+                            >
+                                <span wire:loading.remove wire:target="{{ $method }}">{{ __('forms.sign') }}</span>
+                                <span wire:loading wire:target="{{ $method }}">{{ __('forms.signature') }}...</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-</template>
+    </template>
 @endif
