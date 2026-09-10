@@ -407,28 +407,67 @@ class CarePlanCreate extends BasePatientComponent
         }
     }
 
+    /**
+     * Look up a NEW care_plan approval on the patient-scoped eHealth endpoint.
+     *
+     * GET /api/approvals is rejected by Cloudflare WAF; list by patient instead.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function findNewCarePlanApproval(string $carePlanUuid): ?array
+    {
+        $patientUuid = $this->patientUuid ?: $this->uuid;
+        if ($patientUuid === '' || $carePlanUuid === '') {
+            return null;
+        }
+
+        try {
+            $response = EHealth::approval()->getPatientApprovals($patientUuid, [
+                'status' => 'NEW',
+                'granted_resource_type' => 'care_plan',
+                'granted_resources' => $carePlanUuid,
+            ]);
+            $approvals = $response->getData();
+            $approvalsData = is_array($approvals) ? ($approvals['data'] ?? $approvals) : [];
+            if (!is_array($approvalsData) || $approvalsData === []) {
+                return null;
+            }
+
+            foreach ($approvalsData as $approval) {
+                if (!is_array($approval)) {
+                    continue;
+                }
+
+                foreach ($approval['granted_resources'] ?? [] as $resource) {
+                    if (($resource['identifier']['value'] ?? null) === $carePlanUuid) {
+                        return $approval;
+                    }
+                }
+            }
+
+            $first = $approvalsData[0] ?? null;
+
+            return is_array($first) ? $first : null;
+        } catch (\Exception $exception) {
+            Log::warning('CarePlanCreate: Failed to fetch approvals: '.$exception->getMessage());
+
+            return null;
+        }
+    }
+
     public function openActivationManually(): void
     {
-        // Try to find the latest approval for this care plan
         if (!$this->approvalId && $this->carePlanUuid) {
-            try {
-                $response = EHealth::approval()->getMany([
-                    'granted_resource_type' => 'care_plan',
-                    'granted_resource_id' => $this->carePlanUuid,
-                ]);
-                $approvals = $response->getData();
-                if (!empty($approvals)) {
-                    $this->approvalId = $approvals[0]['id'] ?? null;
-                }
-            } catch (\Exception $e) {
-                Log::error('CarePlan: Failed to fetch approvals manually: ' . $e->getMessage());
+            $matchedApproval = $this->findNewCarePlanApproval($this->carePlanUuid);
+            $this->approvalId = $matchedApproval['id'] ?? null;
+            if (is_array($matchedApproval)) {
+                $this->currentAuthMethod = $matchedApproval['authentication_method_current'] ?? $this->currentAuthMethod;
             }
         }
 
         if ($this->approvalId) {
-            $this->showAuthModal = true;
+            $this->openAuthModal();
         } else {
-            // If there is no approval ID, suggest selecting a verification method (create a new approval request)
             $this->openMethodSelectionModal();
         }
     }
@@ -943,31 +982,10 @@ class CarePlanCreate extends BasePatientComponent
 
             $this->showSignatureModal = false;
 
-            // Query eHealth for the approval associated with this new care plan if not found in finalResponse
+            $matchedApproval = null;
             if (!$this->approvalId && $carePlanUuid) {
-                try {
-                    $response = EHealth::approval()->getMany([
-                        'patient_id' => $this->patientUuid ?: $this->uuid,
-                        'status' => 'NEW',
-                    ]);
-                    $approvals = $response->getData();
-                    $approvalsData = $approvals['data'] ?? $approvals;
-                    if (!empty($approvalsData)) {
-                        $matchedApproval = null;
-                        foreach ($approvalsData as $appr) {
-                            $resources = $appr['granted_resources'] ?? [];
-                            foreach ($resources as $res) {
-                                if (isset($res['identifier']['value']) && $res['identifier']['value'] === $carePlanUuid) {
-                                    $matchedApproval = $appr;
-                                    break 2;
-                                }
-                            }
-                        }
-                        $this->approvalId = $matchedApproval ? $matchedApproval['id'] : ($approvalsData[0]['id'] ?? null);
-                    }
-                } catch (\Exception $e) {
-                    Log::warning('CarePlanCreate: Failed to fetch approvals on creation: ' . $e->getMessage());
-                }
+                $matchedApproval = $this->findNewCarePlanApproval($carePlanUuid);
+                $this->approvalId = $matchedApproval['id'] ?? null;
             }
 
             Log::info('CarePlan: creation result details', [
@@ -1000,7 +1018,7 @@ class CarePlanCreate extends BasePatientComponent
                 }
 
                 $this->currentAuthMethod = $authMethod;
-                $this->showAuthModal = true;
+                $this->openAuthModal();
 
                 $msg = $this->isOfflineAuthMethod($this->currentAuthMethod)
                     ? 'План успішно створено. Пацієнт авторизований за документами (СМС не потрібне, перевірте посвідчення особи).'

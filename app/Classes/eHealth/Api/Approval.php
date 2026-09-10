@@ -20,12 +20,22 @@ class Approval extends Request
     /**
      * Get Approvals by search parameters.
      *
-     * @param  array  $query  query params: granted_resource_type=care_plan, status, etc.
+     * eHealth WAF rejects GET /api/approvals. When a patient id is known, route to the
+     * documented patient-scoped list instead.
+     *
+     * @param  array  $query  query params: patient_id, granted_resource_type=care_plan, status, etc.
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
     public function getMany(array $query = []): PromiseInterface|EHealthResponse
     {
+        $patientId = $query['patient_id'] ?? $query['person_id'] ?? null;
+        if (is_string($patientId) && $patientId !== '') {
+            unset($query['patient_id'], $query['person_id']);
+
+            return $this->getPatientApprovals($patientId, $query);
+        }
+
         return $this->get(self::URL, $query);
     }
 
@@ -132,53 +142,52 @@ class Approval extends Request
      * Build the request payload for an approval request for a person data.
      *
      * @param  array  $payloadData  Expected keys: employee_id (string), person_id (string), authorize_with (string|null)
-     * 
      * @return array
      */
     public function getPayloadForPersonDataApproval(array $payloadData): array
     {
-         $payload = [
-            'granted_to' => [
-                'identifier' => [
-                    'type' => [
-                        'coding' => [
-                            [
-                                'system' => 'eHealth/resources',
-                                'code' => 'employee'
-                            ]
-                        ]
-                    ],
-                    'value' => $payloadData['employee_id'],
-                ]
-            ],
-            'created_by' => [
-                'identifier' => [
-                    'type' => [
-                        'coding' => [
-                            [
-                                'system' => 'eHealth/resources',
-                                'code' => 'employee'
-                            ]
-                        ]
-                    ],
-                    'value' => $payloadData['employee_id'],
-                ]
-            ],
-            'person' => [
-                'identifier' => [
-                    'type' => [
-                        'coding' => [
-                            [
-                                'system' => 'eHealth/resources',
-                                'code' => 'person'
-                            ]
-                        ]
-                    ],
-                    'value' => $payloadData['person_id'],
-                ]
-            ],
-            'access_level' => 'read',
-            'authorize_with' => $payloadData['authorize_with'] ?: null,
+        $payload = [
+           'granted_to' => [
+               'identifier' => [
+                   'type' => [
+                       'coding' => [
+                           [
+                               'system' => 'eHealth/resources',
+                               'code' => 'employee'
+                           ]
+                       ]
+                   ],
+                   'value' => $payloadData['employee_id'],
+               ]
+           ],
+           'created_by' => [
+               'identifier' => [
+                   'type' => [
+                       'coding' => [
+                           [
+                               'system' => 'eHealth/resources',
+                               'code' => 'employee'
+                           ]
+                       ]
+                   ],
+                   'value' => $payloadData['employee_id'],
+               ]
+           ],
+           'person' => [
+               'identifier' => [
+                   'type' => [
+                       'coding' => [
+                           [
+                               'system' => 'eHealth/resources',
+                               'code' => 'person'
+                           ]
+                       ]
+                   ],
+                   'value' => $payloadData['person_id'],
+               ]
+           ],
+           'access_level' => 'read',
+           'authorize_with' => $payloadData['authorize_with'] ?: null,
         ];
 
         return $payload;

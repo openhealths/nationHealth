@@ -274,7 +274,7 @@ class CarePlanApprovalServiceTest extends TestCase
         ]);
     }
 
-    public function test_resolve_async_job_stays_pending_when_is_verified_is_missing(): void
+    public function test_resolve_async_job_requests_otp_when_processed_without_is_verified(): void
     {
         [$carePlan] = $this->makeCarePlanContext();
 
@@ -304,7 +304,9 @@ class CarePlanApprovalServiceTest extends TestCase
 
         $status = app(CarePlanApprovalService::class)->resolveAsyncJob($link->id);
 
-        $this->assertSame(CarePlanApprovalJobOutcome::Pending, $status->outcome);
+        $this->assertTrue($status->requiresOtp());
+        $this->assertSame('77777777-7777-7777-7777-777777777777', $status->approvalId);
+        $this->assertSame(CarePlanApprovalJobOutcome::OtpRequired, $status->outcome);
     }
 
     private function mockAsyncCreateApi(): ApprovalApi

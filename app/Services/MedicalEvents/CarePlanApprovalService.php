@@ -222,6 +222,16 @@ class CarePlanApprovalService
             );
         }
 
+        // Job is already PROCESSED. Missing is_verified must not leave the UI polling forever:
+        // OTP create sends SMS when the job finishes, and the doctor needs the verification modal.
+        if ($authType === 'OTP' || $authType === null) {
+            return new CarePlanApprovalJobStatusResult(
+                CarePlanApprovalJobOutcome::OtpRequired,
+                $realApprovalId,
+                $authMethod,
+            );
+        }
+
         return new CarePlanApprovalJobStatusResult(CarePlanApprovalJobOutcome::Pending);
     }
 
@@ -335,6 +345,7 @@ class CarePlanApprovalService
             $data['data']['is_verified'] ?? null,
             $data['is_verified'] ?? null,
             $data['urgent']['is_verified'] ?? null,
+            $data['response']['data']['is_verified'] ?? null,
         ];
 
         foreach ($candidates as $value) {
