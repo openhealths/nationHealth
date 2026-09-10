@@ -72,6 +72,91 @@ class CarePlanApprovalServiceTest extends TestCase
         $this->assertSame('read', $payload['access_level']);
     }
 
+    public function test_skips_patient_otp_for_inpatient_plan_at_same_legal_entity(): void
+    {
+        $legalEntity = new LegalEntity();
+        $legalEntity->id = 10;
+
+        $inpatient = new CarePlan([
+            'legal_entity_id' => 10,
+            'terms_of_service' => 'INPATIENT',
+        ]);
+        $outpatient = new CarePlan([
+            'legal_entity_id' => 10,
+            'terms_of_service' => 'OUTPATIENT',
+        ]);
+        $otherFacility = new CarePlan([
+            'legal_entity_id' => 99,
+            'terms_of_service' => 'INPATIENT',
+        ]);
+
+        $service = app(CarePlanApprovalService::class);
+
+        $this->assertTrue($service->skipsPatientOtp($inpatient, $legalEntity));
+        $this->assertFalse($service->skipsPatientOtp($outpatient, $legalEntity));
+        $this->assertFalse($service->skipsPatientOtp($otherFacility, $legalEntity));
+    }
+
+    public function test_build_create_payload_omits_authorize_with_for_inpatient_same_org(): void
+    {
+        $legalEntity = new LegalEntity();
+        $legalEntity->id = 10;
+        $this->instance('legalEntity', $legalEntity);
+
+        $carePlan = new CarePlan([
+            'uuid' => 'care-plan-uuid',
+            'legal_entity_id' => 10,
+            'terms_of_service' => 'INPATIENT',
+        ]);
+
+        $payload = app(CarePlanApprovalService::class)->buildCreatePayload(
+            $carePlan,
+            'employee-uuid',
+            'write',
+            'auth-method-uuid',
+            $legalEntity,
+        );
+
+        $this->assertArrayNotHasKey('authorize_with', $payload);
+    }
+
+    public function test_create_returns_granted_for_inpatient_even_when_otp_is_in_response(): void
+    {
+        [$carePlan, $legalEntity, $user] = $this->makeCarePlanContext();
+        $carePlan->update(['terms_of_service' => 'INPATIENT']);
+
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('getStatusCode')->andReturn(201);
+        $response->shouldReceive('getData')->andReturn([
+            'id' => '11111111-1111-1111-1111-111111111111',
+            'urgent' => [
+                'authentication_method_current' => ['type' => 'OTP'],
+            ],
+        ]);
+
+        $api = Mockery::mock(ApprovalApi::class);
+        $api->shouldReceive('createApproval')
+            ->once()
+            ->with('patient-uuid', Mockery::on(function (array $payload): bool {
+                return !array_key_exists('authorize_with', $payload);
+            }))
+            ->andReturn($response);
+        $this->instance(ApprovalApi::class, $api);
+
+        $result = app(CarePlanApprovalService::class)->create(
+            carePlan: $carePlan->fresh(),
+            patientUuid: 'patient-uuid',
+            employeeUuid: 'employee-uuid',
+            accessLevel: 'write',
+            authorizeWith: 'otp-uuid',
+            legalEntity: $legalEntity,
+            user: $user,
+        );
+
+        $this->assertTrue($result->isGranted());
+        $this->assertSame(CarePlanApprovalCreateOutcome::Granted, $result->outcome);
+    }
+
     public function test_resolve_access_level_write_for_same_legal_entity(): void
     {
         $legalEntity = new LegalEntity();
@@ -307,6 +392,43 @@ class CarePlanApprovalServiceTest extends TestCase
         $this->assertTrue($status->requiresOtp());
         $this->assertSame('77777777-7777-7777-7777-777777777777', $status->approvalId);
         $this->assertSame(CarePlanApprovalJobOutcome::OtpRequired, $status->outcome);
+    }
+
+    public function test_resolve_async_job_grants_inpatient_same_org_without_otp(): void
+    {
+        [$carePlan, $legalEntity] = $this->makeCarePlanContext();
+        $carePlan->update(['terms_of_service' => 'INPATIENT']);
+        $this->instance('legalEntity', $legalEntity);
+
+        $approval = Approval::create([
+            'uuid' => '88888888-8888-8888-8888-888888888888',
+            'approvable_type' => CarePlan::class,
+            'approvable_id' => $carePlan->id,
+            'status' => 'NEW',
+        ]);
+
+        $job = EhealthJob::create([
+            'processing_method' => 'ASYNC',
+            'status' => 'PROCESSED',
+            'response_data' => [
+                'id' => '99999999-9999-9999-9999-999999999999',
+                'is_verified' => false,
+                'authentication_method_current' => ['type' => 'OTP'],
+            ],
+        ]);
+
+        $link = EhealthLink::create([
+            'linkable_type' => Approval::class,
+            'linkable_id' => $approval->id,
+            'ehealth_job_id' => $job->id,
+            'entity' => 'approval',
+            'href' => '/jobs/job-inpatient',
+        ]);
+
+        $status = app(CarePlanApprovalService::class)->resolveAsyncJob($link->id);
+
+        $this->assertTrue($status->isGranted());
+        $this->assertSame(CarePlanApprovalJobOutcome::Granted, $status->outcome);
     }
 
     private function mockAsyncCreateApi(): ApprovalApi

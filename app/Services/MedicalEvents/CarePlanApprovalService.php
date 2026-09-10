@@ -34,6 +34,7 @@ class CarePlanApprovalService
         string $employeeUuid,
         string $accessLevel = 'write',
         ?string $authorizeWith = null,
+        ?LegalEntity $legalEntity = null,
     ): array {
         $payload = [
             'resources' => [
@@ -58,11 +59,29 @@ class CarePlanApprovalService
             'authorize_with' => $authorizeWith ?: null,
         ];
 
-        if (empty($payload['authorize_with'])) {
+        if ($this->skipsPatientOtp($carePlan, $legalEntity) || empty($payload['authorize_with'])) {
             unset($payload['authorize_with']);
         }
 
         return $payload;
+    }
+
+    /**
+     * INPATIENT plans at the managing organisation skip patient OTP.
+     *
+     * eHealth does not send SMS, sets urgent=null, and auto-verifies the approval.
+     *
+     * @see https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/17629119758/RC._Create+Approval_EN
+     */
+    public function skipsPatientOtp(CarePlan $carePlan, ?LegalEntity $legalEntity = null): bool
+    {
+        $legalEntity ??= legalEntity();
+        if ($legalEntity === null) {
+            return false;
+        }
+
+        return strtoupper((string) ($carePlan->termsOfService ?? '')) === 'INPATIENT'
+            && (int) $carePlan->legalEntityId === (int) $legalEntity->id;
     }
 
     public function resolveAccessLevel(CarePlan $carePlan, ?LegalEntity $legalEntity = null): string
@@ -93,7 +112,7 @@ class CarePlanApprovalService
     ): CarePlanApprovalCreateResult {
         $legalEntity ??= legalEntity();
 
-        $payload = $this->buildCreatePayload($carePlan, $employeeUuid, $accessLevel, $authorizeWith);
+        $payload = $this->buildCreatePayload($carePlan, $employeeUuid, $accessLevel, $authorizeWith, $legalEntity);
         $response = EHealth::approval()->createApproval($patientUuid, $payload);
         $responseData = $response->getData();
         $statusCode = $response->getStatusCode();
@@ -109,6 +128,13 @@ class CarePlanApprovalService
         $approvalId = $this->extractApprovalId($responseData);
         $authMethod = $this->extractAuthMethod($responseData);
         $urgentOtp = ($authMethod['type'] ?? null) === 'OTP';
+
+        if ($this->skipsPatientOtp($carePlan, $legalEntity)) {
+            return new CarePlanApprovalCreateResult(
+                CarePlanApprovalCreateOutcome::Granted,
+                $approvalId,
+            );
+        }
 
         if (($authorizeWith || $urgentOtp) && $approvalId) {
             return new CarePlanApprovalCreateResult(
@@ -130,6 +156,14 @@ class CarePlanApprovalService
         return EHealth::approval()->verify($patientUuid, $approvalId, [
             'code' => $code,
         ]);
+    }
+
+    /**
+     * Confirm an INPATIENT same-org approval that eHealth auto-verifies without an OTP code.
+     */
+    public function confirmWithoutOtp(string $patientUuid, string $approvalId): EHealthResponse
+    {
+        return EHealth::approval()->verify($patientUuid, $approvalId, []);
     }
 
     public function deactivate(string $patientUuid, string $approvalId): EHealthResponse
@@ -161,7 +195,7 @@ class CarePlanApprovalService
      */
     public function resolveAsyncJob(int $pollingLinkId): CarePlanApprovalJobStatusResult
     {
-        $link = EhealthLink::with(['job', 'linkable', 'processingData'])->find($pollingLinkId);
+        $link = EhealthLink::with(['job', 'linkable.approvable', 'processingData'])->find($pollingLinkId);
 
         if (!$link || !$link->job) {
             return new CarePlanApprovalJobStatusResult(CarePlanApprovalJobOutcome::Pending);
@@ -198,6 +232,20 @@ class CarePlanApprovalService
 
         $authMethod = $this->extractAuthMethod($jobResult);
         $isVerified = $this->extractIsVerified($jobResult);
+
+        $carePlan = null;
+        if ($link->linkable instanceof Approval) {
+            $carePlan = $link->linkable->approvable;
+            if (!$carePlan instanceof CarePlan && $link->linkable->approvableId) {
+                $carePlan = CarePlan::query()->find($link->linkable->approvableId);
+            }
+        }
+        if ($carePlan instanceof CarePlan && $this->skipsPatientOtp($carePlan, legalEntity() ?? $carePlan->legalEntity)) {
+            return new CarePlanApprovalJobStatusResult(
+                CarePlanApprovalJobOutcome::Granted,
+                $realApprovalId,
+            );
+        }
 
         if ($isVerified === true) {
             return new CarePlanApprovalJobStatusResult(

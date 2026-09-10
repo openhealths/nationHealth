@@ -163,7 +163,14 @@
                             @endif
                         </div>
 
-                        @if (!empty($authMethods))
+                        @if ($skipsPatientOtp)
+                            <div
+                                class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-900/30 dark:bg-gray-700/50 dark:text-blue-300"
+                                role="status"
+                            >
+                                {{ __('care-plan.approval_inpatient_no_sms') }}
+                            </div>
+                        @elseif (!empty($authMethods))
                             <div class="form-group group">
                                 <select
                                     class="input-select peer"

@@ -1001,6 +1001,13 @@ class CarePlanCreate extends BasePatientComponent
                 'approvalId' => $this->approvalId
             ]);
 
+            if (app(CarePlanApprovalService::class)->skipsPatientOtp($carePlan)) {
+                session()->flash('success', __('care-plan.approval_inpatient_granted'));
+                $this->redirectRoute('care-plans.show', [legalEntity(), $carePlan->id], navigate: true);
+
+                return;
+            }
+
             if ($this->approvalId) {
                 $authMethod = $finalResponse['response_data']['urgent']['authentication_method_current'] ??
                               $finalResponse['result']['urgent']['authentication_method_current'] ??

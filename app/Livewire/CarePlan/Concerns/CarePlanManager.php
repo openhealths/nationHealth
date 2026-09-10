@@ -808,12 +808,13 @@ trait CarePlanManager
                 return;
             }
 
-            $result = app(CarePlanApprovalService::class)->create(
+            $service = app(CarePlanApprovalService::class);
+            $result = $service->create(
                 carePlan: $this->carePlan,
                 patientUuid: $this->carePlan->person->uuid,
                 employeeUuid: $employeeUuid,
                 accessLevel: 'write',
-                authorizeWith: $methodUuid ?: null,
+                authorizeWith: $service->skipsPatientOtp($this->carePlan) ? null : ($methodUuid ?: null),
                 user: Auth::user(),
                 bearerToken: session()->get(config('ehealth.api.oauth.bearer_token')),
             );
