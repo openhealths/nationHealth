@@ -177,6 +177,59 @@ class CarePlanShowActionsTest extends TestCase
             ->assertSeeHtml('id="statusReason"');
     }
 
+    public function test_inpatient_activate_skips_auth_method_modal_and_creates_approval_without_otp(): void
+    {
+        $this->actingAs($this->user);
+
+        $carePlan = $this->makeSignedNewPlan();
+        $carePlan->update(['terms_of_service' => 'INPATIENT']);
+
+        $response = \Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $response->shouldReceive('getStatusCode')->andReturn(201);
+        $response->shouldReceive('getData')->andReturn([
+            'id' => (string) Str::uuid(),
+        ]);
+
+        $api = \Mockery::mock(\App\Classes\eHealth\Api\Approval::class);
+        $api->shouldReceive('createApproval')
+            ->once()
+            ->with(
+                $this->person->uuid,
+                \Mockery::on(static fn (array $payload): bool => !array_key_exists('authorize_with', $payload))
+            )
+            ->andReturn($response);
+        $this->instance(\App\Classes\eHealth\Api\Approval::class, $api);
+
+        Livewire::test(CarePlanShow::class, ['carePlan' => $carePlan->fresh()])
+            ->call('openMethodSelectionModal')
+            ->assertSet('showMethodSelectionModal', false)
+            ->assertSet('showAuthModal', false)
+            ->assertDispatched('flashMessage');
+    }
+
+    public function test_outpatient_activate_opens_auth_method_modal(): void
+    {
+        $this->actingAs($this->user);
+
+        $carePlan = $this->makeSignedNewPlan();
+        $carePlan->update(['terms_of_service' => 'OUTPATIENT']);
+
+        $authResponse = \Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $authResponse->shouldReceive('getData')->andReturn([
+            ['id' => (string) Str::uuid(), 'type' => 'OTP', 'phone_number' => '+380000000000'],
+        ]);
+
+        $personApi = \Mockery::mock(\App\Classes\eHealth\Api\Person::class);
+        $personApi->shouldReceive('getAuthMethods')
+            ->andReturn($authResponse);
+        $this->instance(\App\Classes\eHealth\Api\Person::class, $personApi);
+
+        Livewire::test(CarePlanShow::class, ['carePlan' => $carePlan->fresh()])
+            ->call('openMethodSelectionModal')
+            ->assertSet('showMethodSelectionModal', true)
+            ->assertSet('showAuthModal', false);
+    }
+
     public function test_cancel_sign_without_kep_flashes_an_error_the_doctor_can_see(): void
     {
         $this->actingAs($this->user);

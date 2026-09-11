@@ -97,6 +97,39 @@ class CarePlanApprovalServiceTest extends TestCase
         $this->assertFalse($service->skipsPatientOtp($otherFacility, $legalEntity));
     }
 
+    public function test_skips_patient_otp_when_inpatient_plan_has_no_legal_entity_yet(): void
+    {
+        $legalEntity = new LegalEntity();
+        $legalEntity->id = 10;
+
+        $newInpatient = new CarePlan([
+            'terms_of_service' => 'INPATIENT',
+        ]);
+        $newOutpatient = new CarePlan([
+            'terms_of_service' => 'OUTPATIENT',
+        ]);
+
+        $service = app(CarePlanApprovalService::class);
+
+        $this->assertTrue($service->skipsPatientOtp($newInpatient, $legalEntity));
+        $this->assertFalse($service->skipsPatientOtp($newOutpatient, $legalEntity));
+    }
+
+    public function test_skips_patient_otp_reads_coded_terms_of_service(): void
+    {
+        $legalEntity = new LegalEntity();
+        $legalEntity->id = 10;
+
+        $carePlan = new CarePlan([
+            'legal_entity_id' => 10,
+            'terms_of_service' => [
+                'coding' => [['code' => 'INPATIENT']],
+            ],
+        ]);
+
+        $this->assertTrue(app(CarePlanApprovalService::class)->skipsPatientOtp($carePlan, $legalEntity));
+    }
+
     public function test_build_create_payload_omits_authorize_with_for_inpatient_same_org(): void
     {
         $legalEntity = new LegalEntity();

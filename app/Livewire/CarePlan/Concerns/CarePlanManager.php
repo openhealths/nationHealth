@@ -745,6 +745,13 @@ trait CarePlanManager
             return;
         }
 
+        $service = app(CarePlanApprovalService::class);
+        if ($service->skipsPatientOtp($this->carePlan)) {
+            $this->createApproval('');
+
+            return;
+        }
+
         try {
             $this->authMethods = EHealth::person()->getAuthMethods($this->carePlan->person->uuid)->getData();
             $this->showMethodSelectionModal = true;
@@ -803,7 +810,7 @@ trait CarePlanManager
     protected function createApproval(string $methodUuid): void
     {
         try {
-            $employeeUuid = Auth::user()?->getCarePlanWriterEmployee($this->carePlan->terms_of_service)?->uuid;
+            $employeeUuid = Auth::user()?->getCarePlanWriterEmployee($this->carePlan->termsOfService)?->uuid;
 
             if (!$employeeUuid) {
                 $this->flashOutcome('error', 'Не вдалося визначити лікаря для створення дозволу.');
@@ -832,7 +839,7 @@ trait CarePlanManager
 
             $this->approvalId = $result->approvalId;
 
-            if ($result->requiresOtp()) {
+            if ($result->requiresOtp() && !$service->skipsPatientOtp($this->carePlan)) {
                 $this->currentAuthMethod = $result->authMethod ?? $this->currentAuthMethod;
                 $this->openAuthModal();
 
@@ -840,7 +847,12 @@ trait CarePlanManager
             }
 
             $this->syncPlanStatus();
-            $this->flashOutcome('success', 'План лікування успішно активовано.');
+            $this->flashOutcome(
+                'success',
+                $service->skipsPatientOtp($this->carePlan)
+                    ? __('care-plan.approval_inpatient_granted')
+                    : 'План лікування успішно активовано.'
+            );
         } catch (\Exception $e) {
             Log::error('CarePlanShow: failed to create approval: ' . $e->getMessage());
             $this->flashOutcome('error', 'Не вдалося створити запит на дозвіл: ' . $e->getMessage());
@@ -872,7 +884,8 @@ trait CarePlanManager
             $this->approvalId = $status->approvalId;
         }
 
-        if ($status->requiresOtp()) {
+        $service = app(CarePlanApprovalService::class);
+        if ($status->requiresOtp() && !$service->skipsPatientOtp($this->carePlan)) {
             $this->currentAuthMethod = $status->authMethod ?? $this->currentAuthMethod;
             $this->openAuthModal();
 
@@ -880,7 +893,12 @@ trait CarePlanManager
         }
 
         $this->syncPlanStatus();
-        $this->flashOutcome('success', 'План лікування успішно активовано.');
+        $this->flashOutcome(
+            'success',
+            $service->skipsPatientOtp($this->carePlan)
+                ? __('care-plan.approval_inpatient_granted')
+                : 'План лікування успішно активовано.'
+        );
     }
 
     public function verify(): void

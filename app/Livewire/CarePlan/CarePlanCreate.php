@@ -457,6 +457,16 @@ class CarePlanCreate extends BasePatientComponent
 
     public function openActivationManually(): void
     {
+        $carePlan = $this->carePlanUuid
+            ? CarePlan::where('uuid', $this->carePlanUuid)->first()
+            : null;
+
+        if ($this->shouldSkipPatientAuthUi($carePlan)) {
+            $this->createApproval('');
+
+            return;
+        }
+
         if (!$this->approvalId && $this->carePlanUuid) {
             $matchedApproval = $this->findNewCarePlanApproval($this->carePlanUuid);
             $this->approvalId = $matchedApproval['id'] ?? null;
@@ -474,6 +484,16 @@ class CarePlanCreate extends BasePatientComponent
 
     public function openMethodSelectionModal(): void
     {
+        $carePlan = $this->carePlanUuid
+            ? CarePlan::where('uuid', $this->carePlanUuid)->first()
+            : null;
+
+        if ($this->shouldSkipPatientAuthUi($carePlan)) {
+            $this->createApproval('');
+
+            return;
+        }
+
         if (!empty($this->form->periodEnd)) {
             session()->flash('error', __('care-plan.period_end_warning'));
         }
@@ -522,13 +542,15 @@ class CarePlanCreate extends BasePatientComponent
             }
 
             $carePlan = CarePlan::where('uuid', $this->carePlanUuid)->firstOrFail();
+            $approvalService = app(CarePlanApprovalService::class);
+            $skipsOtp = $this->shouldSkipPatientAuthUi($carePlan);
 
-            $result = app(CarePlanApprovalService::class)->create(
+            $result = $approvalService->create(
                 carePlan: $carePlan,
                 patientUuid: $this->patientUuid,
                 employeeUuid: $employeeUuid,
                 accessLevel: 'write',
-                authorizeWith: $methodUuid ?: null,
+                authorizeWith: $skipsOtp ? null : ($methodUuid ?: null),
                 user: Auth::user(),
                 bearerToken: Session::get(config('ehealth.api.oauth.bearer_token')),
             );
@@ -543,14 +565,16 @@ class CarePlanCreate extends BasePatientComponent
 
             $this->approvalId = $result->approvalId;
 
-            if ($result->requiresOtp()) {
+            if ($result->requiresOtp() && !$skipsOtp) {
                 $this->currentAuthMethod = $result->authMethod ?? $this->currentAuthMethod;
                 $this->openAuthModal();
 
                 return;
             }
 
-            Session::flash('flash_message', 'План лікування успішно активовано.');
+            Session::flash('success', $skipsOtp
+                ? __('care-plan.approval_inpatient_granted')
+                : 'План лікування успішно активовано.');
             $this->redirectRoute('care-plans.show', [legalEntity(), $carePlan->id], navigate: true);
         } catch (\Exception $e) {
             Log::error('CarePlanCreate: failed to create approval: ' . $e->getMessage());
@@ -588,15 +612,19 @@ class CarePlanCreate extends BasePatientComponent
             $this->approvalId = $status->approvalId;
         }
 
-        if ($status->requiresOtp()) {
+        $carePlan = CarePlan::where('uuid', $this->carePlanUuid)->first();
+        $skipsOtp = $this->shouldSkipPatientAuthUi($carePlan);
+
+        if ($status->requiresOtp() && !$skipsOtp) {
             $this->currentAuthMethod = $status->authMethod ?? $this->currentAuthMethod;
             $this->openAuthModal();
 
             return;
         }
 
-        Session::flash('flash_message', 'План лікування успішно активовано.');
-        $carePlan = CarePlan::where('uuid', $this->carePlanUuid)->first();
+        Session::flash('success', $skipsOtp
+            ? __('care-plan.approval_inpatient_granted')
+            : 'План лікування успішно активовано.');
         $this->redirectRoute('care-plans.show', [legalEntity(), $carePlan?->id ?? $this->carePlanUuid], navigate: true);
     }
 
@@ -1001,9 +1029,8 @@ class CarePlanCreate extends BasePatientComponent
                 'approvalId' => $this->approvalId
             ]);
 
-            if (app(CarePlanApprovalService::class)->skipsPatientOtp($carePlan)) {
-                // SMS is skipped, but eHealth still requires an active write approval
-                // before activities can be signed (otherwise POST .../activities returns 403).
+            if ($this->shouldSkipPatientAuthUi($carePlan)) {
+                // INPATIENT at this facility: eHealth skips SMS. Do not ask for an auth method.
                 $this->createApproval('');
 
                 return;
@@ -1263,6 +1290,32 @@ class CarePlanCreate extends BasePatientComponent
         }
 
         return $data;
+    }
+
+    /**
+     * INPATIENT plans at this facility skip the SMS / method-selection step.
+     * OUTPATIENT (typical PMD) still requires patient OTP.
+     */
+    protected function shouldSkipPatientAuthUi(?CarePlan $carePlan): bool
+    {
+        if ($carePlan && app(CarePlanApprovalService::class)->skipsPatientOtp($carePlan)) {
+            return true;
+        }
+
+        if (strtoupper((string) $this->form->termsOfService) !== 'INPATIENT') {
+            return false;
+        }
+
+        $legalEntity = legalEntity();
+        if ($legalEntity === null) {
+            return false;
+        }
+
+        if ($carePlan === null || $carePlan->legalEntityId === null) {
+            return true;
+        }
+
+        return (int) $carePlan->legalEntityId === (int) $legalEntity->id;
     }
 
     /**

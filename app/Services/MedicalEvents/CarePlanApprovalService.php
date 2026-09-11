@@ -80,8 +80,22 @@ class CarePlanApprovalService
             return false;
         }
 
-        return strtoupper((string) ($carePlan->termsOfService ?? '')) === 'INPATIENT'
-            && (int) $carePlan->legalEntityId === (int) $legalEntity->id;
+        $terms = $carePlan->termsOfService;
+        if (is_array($terms)) {
+            $terms = $terms['coding'][0]['code'] ?? $terms['code'] ?? '';
+        }
+
+        if (strtoupper(trim((string) $terms)) !== 'INPATIENT') {
+            return false;
+        }
+
+        // Newly created plans may not have legalEntityId yet; they are still this facility.
+        $planLegalEntityId = $carePlan->legalEntityId;
+        if ($planLegalEntityId === null || $planLegalEntityId === '') {
+            return true;
+        }
+
+        return (int) $planLegalEntityId === (int) $legalEntity->id;
     }
 
     public function resolveAccessLevel(CarePlan $carePlan, ?LegalEntity $legalEntity = null): string
