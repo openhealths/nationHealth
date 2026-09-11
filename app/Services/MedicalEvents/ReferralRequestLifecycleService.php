@@ -33,19 +33,19 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
     public function sumIssuedQuantity(CarePlanActivity $activity): float
     {
         if ($activity->kind === 'service_request') {
-            return Repository::serviceRequest()->sumIssuedQuantityByActivity($activity->id);
+            return Repository::serviceRequest()->sumIssuedQuantityByActivity((string) $activity->uuid);
         }
 
-        return Repository::deviceRequest()->sumIssuedQuantityByActivity($activity->id);
+        return Repository::deviceRequest()->sumIssuedQuantityByActivity((string) $activity->uuid);
     }
 
     public function findDraftByActivity(CarePlanActivity $activity): ServiceRequestRequest|DeviceRequestRequest|null
     {
         if ($activity->kind === 'service_request') {
-            return Repository::serviceRequest()->findDraftByActivity($activity->id);
+            return Repository::serviceRequest()->findDraftByActivity((string) $activity->uuid);
         }
 
-        return Repository::deviceRequest()->findDraftByActivity($activity->id);
+        return Repository::deviceRequest()->findDraftByActivity((string) $activity->uuid);
     }
 
     /**
@@ -70,13 +70,13 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
         app(ActivityRemainingQuantityGuard::class)->assertCanIssue(
             (int) $activity->id,
             $qty,
-            function (int $activityId) use ($resolvedKind): float {
+            function (int $activityId) use ($resolvedKind, $activity): float {
                 $query = $resolvedKind === 'service_request'
                     ? ServiceRequestRequest::query()
                     : DeviceRequestRequest::query();
 
                 return (float) $query
-                    ->where('based_on_id', $activityId)
+                    ->whereHas('basedOn', fn ($q) => $q->where('value', $activity->uuid))
                     ->whereNotIn('status', ActivityRemainingQuantityGuard::occupyingStatusesExcluded())
                     ->sum('quantity');
             }
@@ -96,8 +96,6 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             'program_id' => $formData['program_id'] ?? null,
             'intent' => $formData['intent'] ?? 'order',
             'category' => $formData['category'] ?? null,
-            'based_on_id' => $formData['activity_id'],
-            'context_id' => $carePlan->encounter?->id ?? null,
             'priority' => $formData['priority'],
             'note' => $formData['note'] ?? null,
             'patient_instruction' => $formData['patient_instruction'] ?? null,
@@ -105,6 +103,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             'inform_with' => $formData['inform_with'] ?? null,
             'supporting_info' => $formData['supporting_info'] ?? null,
             'based_on_uuid' => $activity->uuid,
+            'context_uuid' => $carePlan->encounter?->uuid,
         ];
 
         $uuids = [
@@ -179,8 +178,6 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             'program_id' => $formData['program_id'] ?? null,
             'intent' => $formData['intent'] ?? 'order',
             'category' => $formData['category'] ?? null,
-            'based_on_id' => null,
-            'context_id' => $encounter->id,
             'priority' => $formData['priority'] ?? 'routine',
             'note' => $formData['note'] ?? null,
             'patient_instruction' => $formData['patient_instruction'] ?? null,
@@ -188,6 +185,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             'inform_with' => $formData['inform_with'] ?? null,
             'supporting_info' => $formData['supporting_info'] ?? null,
             'based_on_uuid' => null,
+            'context_uuid' => $encounter->uuid,
         ];
 
         $personUuid = \App\Models\Person\Person::find($encounter->person_id)?->uuid;
@@ -375,8 +373,14 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
 
         $dbData['employee_id'] = $localDbData['employee_id'] ?? $requestRecord->employeeId;
         $dbData['division_id'] = $localDbData['division_id'] ?? $requestRecord->divisionId;
-        $dbData['based_on_id'] = $localDbData['based_on_id'] ?? $requestRecord->basedOnId ?? $activity?->id;
-        $dbData['context_id'] = $localDbData['context_id'] ?? $requestRecord->contextId ?? ($contextModel instanceof CarePlan ? $contextModel->encounter?->id : $contextModel->id);
+        $dbData['based_on_uuid'] = $localDbData['based_on_uuid']
+            ?? $requestRecord->basedOn?->value
+            ?? $activity?->uuid;
+        $dbData['context_uuid'] = $localDbData['context_uuid']
+            ?? $requestRecord->context?->value
+            ?? ($contextModel instanceof CarePlan
+                ? $contextModel->encounter?->uuid
+                : $contextModel->uuid);
 
         $this->persistSignedReferral($dbData, $kind, (int) $contextModel->person_id);
 
@@ -566,20 +570,18 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             }
         }
 
-        $contextId = $requestRecord->contextId
-            ?? ($context instanceof CarePlan ? $context->encounter?->id : $context?->id);
+        $contextUuid = $requestRecord->context?->value
+            ?? ($context instanceof CarePlan ? $context->encounter?->uuid : $context?->uuid);
 
         $dbData = [
             'uuid' => $requestRecord->uuid,
             'employee_id' => $employeeContext['employee_id'] ?? $requestRecord->employeeId,
             'division_id' => $employeeContext['division_id'] ?? $requestRecord->divisionId,
-            'based_on_id' => $requestRecord->basedOnId ?? $activity?->id,
-            'context_id' => $contextId,
             'quantity' => $requestRecord->quantity,
-            'intent' => $requestRecord->intent ?? 'order',
-            'category' => $requestRecord->category,
+            'intent' => $requestRecord->intent?->code ?? 'order',
+            'category' => $requestRecord->category?->text,
             'program_id' => $requestRecord->programId,
-            'priority' => $requestRecord->priority ?? 'routine',
+            'priority' => $requestRecord->priority?->text ?? 'routine',
             'note' => $requestRecord->note,
             'patient_instruction' => $requestRecord instanceof ServiceRequestRequest
                 ? ($requestRecord->patientInstruction ?? null)
@@ -597,7 +599,8 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             'ended_at' => $endedAt instanceof \DateTimeInterface
                 ? $endedAt->format('Y-m-d')
                 : (string) $endedAt,
-            'based_on_uuid' => $activity?->uuid,
+            'based_on_uuid' => $requestRecord->basedOn?->value ?? $activity?->uuid,
+            'context_uuid' => $contextUuid,
         ];
 
         if ($requestRecord instanceof ServiceRequestRequest) {

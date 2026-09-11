@@ -69,6 +69,7 @@ class CarePlanLifecycleGateServiceTest extends TestCase
     public function test_detects_open_mrr_mr_service_and_device_requests(): void
     {
         [$carePlan, $activity] = $this->createPlanWithActivity();
+        $basedOnId = $this->identifierIdFor($activity->uuid);
 
         MedicationRequestRequest::create([
             'uuid' => (string) Str::uuid(),
@@ -77,8 +78,9 @@ class CarePlanLifecycleGateServiceTest extends TestCase
             'status' => 'new',
             'medication_id' => 'INN-1',
             'medication_qty' => 1,
-            'intent' => 'order',
-            'based_on_id' => $activity->id,
+            'intent_id' => $this->intentId(),
+            'based_on_id' => $basedOnId,
+            'source' => MedicationRequestRequest::SOURCE_LOCAL,
         ]);
 
         MedicationRequestRequest::create([
@@ -88,8 +90,9 @@ class CarePlanLifecycleGateServiceTest extends TestCase
             'status' => 'active',
             'medication_id' => 'INN-2',
             'medication_qty' => 1,
-            'intent' => 'order',
-            'based_on_id' => $activity->id,
+            'intent_id' => $this->intentId(),
+            'based_on_id' => $basedOnId,
+            'source' => MedicationRequestRequest::SOURCE_LOCAL,
         ]);
 
         ServiceRequestRequest::create([
@@ -99,9 +102,9 @@ class CarePlanLifecycleGateServiceTest extends TestCase
             'status' => 'active',
             'service_id' => '59300-00',
             'quantity' => 1,
-            'intent' => 'order',
-            'based_on_id' => $activity->id,
-            'priority' => 'routine',
+            'intent_id' => $this->intentId(),
+            'based_on_id' => $basedOnId,
+            'priority_id' => $this->conceptId('routine'),
         ]);
 
         DeviceRequestRequest::create([
@@ -111,9 +114,9 @@ class CarePlanLifecycleGateServiceTest extends TestCase
             'status' => 'active',
             'device_id' => 'device-1',
             'quantity' => 1,
-            'intent' => 'order',
-            'based_on_id' => $activity->id,
-            'priority' => 'routine',
+            'intent_id' => $this->intentId(),
+            'based_on_id' => $basedOnId,
+            'priority_id' => $this->conceptId('routine'),
         ]);
 
         MedicationRequestRequest::create([
@@ -123,8 +126,9 @@ class CarePlanLifecycleGateServiceTest extends TestCase
             'status' => 'completed',
             'medication_id' => 'INN-3',
             'medication_qty' => 1,
-            'intent' => 'order',
-            'based_on_id' => $activity->id,
+            'intent_id' => $this->intentId(),
+            'based_on_id' => $basedOnId,
+            'source' => MedicationRequestRequest::SOURCE_LOCAL,
         ]);
 
         $open = $this->service->findOpenDocumentsForActivity($activity);
@@ -149,6 +153,7 @@ class CarePlanLifecycleGateServiceTest extends TestCase
     public function test_ignores_closed_documents(): void
     {
         [$carePlan, $activity] = $this->createPlanWithActivity();
+        $basedOnId = $this->identifierIdFor($activity->uuid);
 
         foreach (['completed', 'rejected', 'cancelled', 'expired', 'entered-in-error'] as $status) {
             MedicationRequestRequest::create([
@@ -158,8 +163,9 @@ class CarePlanLifecycleGateServiceTest extends TestCase
                 'status' => $status,
                 'medication_id' => 'INN-x',
                 'medication_qty' => 1,
-                'intent' => 'order',
-                'based_on_id' => $activity->id,
+                'intent_id' => $this->intentId(),
+                'based_on_id' => $basedOnId,
+                'source' => MedicationRequestRequest::SOURCE_LOCAL,
             ]);
         }
 
@@ -329,5 +335,23 @@ class CarePlanLifecycleGateServiceTest extends TestCase
         ]);
 
         return [$carePlan, $activity];
+    }
+
+    private function identifierIdFor(string $uuid): int
+    {
+        return (int) \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $uuid])->id;
+    }
+
+    private function intentId(string $code = 'order'): int
+    {
+        return (int) \App\Models\MedicalEvents\Sql\Coding::firstOrCreate([
+            'code' => $code,
+            'system' => 'http://hl7.org/fhir/request-intent',
+        ])->id;
+    }
+
+    private function conceptId(string $text): int
+    {
+        return (int) \App\Models\MedicalEvents\Sql\CodeableConcept::firstOrCreate(['text' => $text])->id;
     }
 }

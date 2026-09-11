@@ -84,9 +84,9 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
             app(ActivityRemainingQuantityGuard::class)->assertCanIssue(
                 (int) $activity->id,
                 (float) ($formData['medication_qty'] ?? 1),
-                function (int $activityId): float {
+                function (int $activityId) use ($activity): float {
                     return (float) MedicationRequestRequest::query()
-                        ->where('based_on_id', $activityId)
+                        ->whereHas('basedOn', fn ($q) => $q->where('value', $activity->uuid))
                         ->whereNotIn('status', ActivityRemainingQuantityGuard::occupyingStatusesExcluded())
                         ->sum('medication_qty');
                 }
@@ -121,9 +121,8 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
             'medication_program_id' => $formData['program_id'] ?? null,
             'intent' => 'order',
             'category' => $formData['category'] ?? 'community',
-            'based_on_id' => $activity ? $activity->id : null,
-            'context_id' => $activeEncounter->id,
             'based_on_uuid' => $activity ? $activity->uuid : null,
+            'context_uuid' => $activeEncounter->uuid,
             'container_dosage' => $formData['container_dosage'] ?? null,
             'note' => $formData['note'] ?? null,
             'dosage_instructions' => [
@@ -180,9 +179,8 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
             'medication_program_id' => $formData['program_id'] ?? null,
             'intent' => 'order',
             'category' => $formData['category'] ?? 'community',
-            'based_on_id' => null,
-            'context_id' => $encounter->id,
             'based_on_uuid' => null,
+            'context_uuid' => $encounter->uuid,
             'container_dosage' => $formData['container_dosage'] ?? null,
             'note' => $formData['note'] ?? null,
             'dosage_instructions' => [
@@ -293,18 +291,22 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
     ): array {
         $this->requireLocalKep($formData);
 
-        if ($requestRecord->basedOnId) {
-            app(ActivityRemainingQuantityGuard::class)->assertCanIssue(
-                (int) $requestRecord->basedOnId,
-                (float) ($requestRecord->medicationQty ?? 0),
-                function (int $activityId) use ($requestRecord): float {
-                    return (float) MedicationRequestRequest::query()
-                        ->where('based_on_id', $activityId)
-                        ->where('uuid', '!=', $requestRecord->uuid)
-                        ->whereNotIn('status', ActivityRemainingQuantityGuard::occupyingStatusesExcluded())
-                        ->sum('medication_qty');
-                }
-            );
+        $activityUuid = $requestRecord->basedOn?->value;
+        if ($activityUuid) {
+            $activityForQty = CarePlanActivity::query()->where('uuid', $activityUuid)->first();
+            if ($activityForQty !== null) {
+                app(ActivityRemainingQuantityGuard::class)->assertCanIssue(
+                    (int) $activityForQty->id,
+                    (float) ($requestRecord->medicationQty ?? 0),
+                    function (int $activityId) use ($requestRecord, $activityUuid): float {
+                        return (float) MedicationRequestRequest::query()
+                            ->whereHas('basedOn', fn ($q) => $q->where('value', $activityUuid))
+                            ->where('uuid', '!=', $requestRecord->uuid)
+                            ->whereNotIn('status', ActivityRemainingQuantityGuard::occupyingStatusesExcluded())
+                            ->sum('medication_qty');
+                    }
+                );
+            }
         }
 
         $signedContent = signatureService()->signData(
@@ -542,9 +544,11 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
 
         $employee = \App\Models\Employee\Employee::find($requestRecord->employeeId);
         $division = \App\Models\Division::find($requestRecord->divisionId);
-        $encounter = Encounter::find($requestRecord->contextId);
-        $activity = $requestRecord->basedOnId
-            ? CarePlanActivity::find($requestRecord->basedOnId)
+        $encounter = $requestRecord->context?->value
+            ? Encounter::query()->where('uuid', $requestRecord->context->value)->first()
+            : null;
+        $activity = $requestRecord->basedOn?->value
+            ? CarePlanActivity::query()->where('uuid', $requestRecord->basedOn->value)->first()
             : null;
 
         $carePlanUuid = $contextModel instanceof CarePlan
@@ -605,8 +609,8 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
             'medication_id' => $requestRecord->medicationId,
             'medication_qty' => (float) $requestRecord->medicationQty,
             'medication_program_id' => $requestRecord->medicationProgramId,
-            'intent' => $requestRecord->intent ?? 'order',
-            'category' => $requestRecord->category ?? 'community',
+            'intent' => $requestRecord->intent?->code ?? 'order',
+            'category' => $requestRecord->category?->text ?? 'community',
             'based_on_uuid' => $activity?->uuid,
             'container_dosage' => $requestRecord->containerDosage,
             'note' => $requestRecord->note,
