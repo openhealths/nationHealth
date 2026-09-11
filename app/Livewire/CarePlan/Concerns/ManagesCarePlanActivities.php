@@ -394,7 +394,7 @@ trait ManagesCarePlanActivities
         $activityValidation = app(\App\Services\MedicalEvents\CarePlanActivityValidationService::class);
         $programPayload = $this->resolveMedicalProgramPayload(is_string($programId) ? $programId : null);
 
-        if (str_contains($kindLower, 'medication') && $programPayload !== null) {
+        if ($programPayload !== null) {
             $providingBlock = $activityValidation->providingConditionsBlockReason($this->carePlan, $programPayload);
             if ($providingBlock !== null) {
                 $this->flashOutcome('error', $providingBlock);
@@ -402,9 +402,7 @@ trait ManagesCarePlanActivities
 
                 return;
             }
-        }
 
-        if ($programPayload !== null) {
             $program = $programPayload;
             $allowedIcd10 = \Illuminate\Support\Arr::get($program, 'medical_program_settings.conditions_icd10_am_allowed', []);
             $allowedIcpc2 = \Illuminate\Support\Arr::get($program, 'medical_program_settings.conditions_icpc2_allowed', []);
@@ -1351,7 +1349,9 @@ trait ManagesCarePlanActivities
         }
         $devicePrograms = array_keys($this->dictionaries['medical_programs_device'] ?? []);
         if ($devicePrograms === []) {
-            return self::DEFAULT_DEVICE_PROGRAM_ID;
+            // Do not fall back to the glucose program: it is OUTPATIENT-only and eHealth
+            // rejects it on INPATIENT care plans ("terms of service are not allowed").
+            return null;
         }
         if (in_array(self::DEFAULT_DEVICE_PROGRAM_ID, $devicePrograms, true)) {
             return self::DEFAULT_DEVICE_PROGRAM_ID;

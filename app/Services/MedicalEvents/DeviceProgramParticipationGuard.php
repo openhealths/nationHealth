@@ -66,6 +66,21 @@ class DeviceProgramParticipationGuard
 
         $programId = (string) $activity->program;
         $programName = $this->resolveProgramName($programId);
+
+        try {
+            $programPayload = dictionary()->medicalPrograms()->firstWhere('id', $programId);
+        } catch (\Throwable) {
+            $programPayload = null;
+        }
+
+        if (is_array($programPayload)) {
+            $tosBlock = app(CarePlanActivityValidationService::class)
+                ->providingConditionsBlockReason($carePlan, $programPayload);
+            if ($tosBlock !== null) {
+                $blockingIssues[] = $tosBlock;
+            }
+        }
+
         $participatingProgramIds = $this->resolveParticipatingProgramIds($legalEntity);
 
         if ($participatingProgramIds === []) {

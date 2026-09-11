@@ -875,16 +875,13 @@ abstract class CarePlanComponent extends Component
     protected function filterDevicePrograms(Collection $programs): Collection
     {
         $user = Auth::user();
-        if (!$user) {
-            return $programs->where('is_active', '=', true);
-        }
+        $filtered = $programs->where('is_active', '=', true);
 
-        $roles = $user->allowedRoles;
-        $mainSpeciality = $user->getMainSpeciality(legalEntity());
+        if ($user) {
+            $roles = $user->allowedRoles;
+            $mainSpeciality = $user->getMainSpeciality(legalEntity());
 
-        $filtered = $programs
-            ->where('is_active', '=', true)
-            ->filter(function (array $program) use ($roles, $user, $mainSpeciality): bool {
+            $filtered = $filtered->filter(function (array $program) use ($roles, $user, $mainSpeciality): bool {
                 $allowedEmployeeTypes = Arr::get($program, 'medical_program_settings.employee_types_to_create_request', []);
                 if (!empty($allowedEmployeeTypes) && $roles->intersect($allowedEmployeeTypes)->isEmpty()) {
                     return false;
@@ -902,6 +899,12 @@ abstract class CarePlanComponent extends Component
 
                 return true;
             });
+        }
+
+        $activityValidation = app(\App\Services\MedicalEvents\CarePlanActivityValidationService::class);
+        $filtered = $filtered->filter(
+            fn (array $program): bool => $activityValidation->providingConditionsBlockReason($this->carePlan, $program) === null
+        );
 
         if ($this->participatingDeviceProgramIds !== []) {
             $filtered = app(\App\Services\MedicalEvents\DeviceProgramParticipationGuard::class)

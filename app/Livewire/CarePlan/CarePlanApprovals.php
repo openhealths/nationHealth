@@ -81,7 +81,7 @@ class CarePlanApprovals extends Component
         // Load active employees for the dropdown, filtered by the current active legal entity.
         // We must use the active legal entity (not the care plan's owner), because eHealth validates
         // that the granted employee belongs to the requesting clinic.
-        $legalEntityId = legalEntity()->id;
+        $legalEntityId = legalEntity()?->id ?? $legalEntity->id;
         if ($legalEntityId) {
             $this->employees = \App\Models\Employee\Employee::where('legal_entity_id', $legalEntityId)
                 ->where('status', 'APPROVED')
@@ -95,6 +95,13 @@ class CarePlanApprovals extends Component
                     'label' => trim($e->fullName) . ' (' . $e->employee_type . ')',
                 ])
                 ->toArray();
+
+            $writerUuid = Auth::user()?->getCarePlanWriterEmployee($carePlan->termsOfService)?->uuid;
+            if ($writerUuid && collect($this->employees)->contains(fn (array $employee): bool => $employee['uuid'] === $writerUuid)) {
+                $this->newApproval['employee_uuid'] = $writerUuid;
+            } elseif (count($this->employees) === 1) {
+                $this->newApproval['employee_uuid'] = $this->employees[0]['uuid'];
+            }
         }
 
         try {
