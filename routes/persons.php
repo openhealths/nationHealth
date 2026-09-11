@@ -33,6 +33,9 @@ use App\Livewire\Person\Records\PatientData;
 use App\Livewire\Person\Records\PatientDeviceAssociations;
 use App\Livewire\Person\Records\PatientDeviceIssues;
 use App\Livewire\Person\Records\PatientMedicationRequests;
+use App\Livewire\Person\Records\PatientMedicationRequestView;
+use App\Livewire\Person\Records\PatientPrescriptionRequests;
+use App\Livewire\Person\Records\PatientPrescriptionRequestView;
 use App\Livewire\Person\Records\PatientReferrals;
 use App\Livewire\Person\Records\PatientSummary;
 use App\Livewire\Person\Records\PatientVerification;
@@ -97,6 +100,12 @@ Route::prefix('persons')->whereNumber(['person', 'personRequest', 'personId', 'e
                 Route::get('/{person}/care-plans', PatientCarePlans::class)->name('care-plans');
                 Route::get('/{person}/medication-requests', PatientMedicationRequests::class)
                     ->name('medication-requests');
+                Route::get('/{person}/medication-requests/{requestId}', \App\Livewire\Person\Records\PatientMedicationRequestView::class)
+                    ->name('medication-requests.view');
+                Route::get('/{person}/prescription-requests', \App\Livewire\Person\Records\PatientPrescriptionRequests::class)
+                    ->name('prescription-requests');
+                Route::get('/{person}/prescription-requests/{requestId}', \App\Livewire\Person\Records\PatientPrescriptionRequestView::class)
+                    ->name('prescription-requests.view');
                 Route::get('/{person}/referrals', PatientReferrals::class)->name('referrals');
                 Route::get('/{person}/observations', ObservationIndex::class)->name('observations');
                 Route::get('/{person}/immunizations', ImmunizationIndex::class)->name('immunizations');
@@ -197,6 +206,18 @@ Route::prefix('prepersons')
             ->can('update', 'episode')
             ->whereNumber('episode')
             ->name('episodes.edit');
+        Route::get('/{preperson}/medication-requests', PatientMedicationRequests::class)
+            ->can('view', 'preperson')
+            ->name('medication-requests');
+        Route::get('/{preperson}/medication-requests/{requestId}', PatientMedicationRequestView::class)
+            ->can('view', 'preperson')
+            ->name('medication-requests.view');
+        Route::get('/{preperson}/prescription-requests', PatientPrescriptionRequests::class)
+            ->can('view', 'preperson')
+            ->name('prescription-requests');
+        Route::get('/{preperson}/prescription-requests/{requestId}', PatientPrescriptionRequestView::class)
+            ->can('view', 'preperson')
+            ->name('prescription-requests.view');
         Route::get('/{preperson}/observations', ObservationIndex::class)
             ->can('view', 'preperson')
             ->name('observations');

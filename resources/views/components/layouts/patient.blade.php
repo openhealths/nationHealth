@@ -222,6 +222,13 @@
                             {{ __('detected-issues.label') }}
                         </a>
 
+                        <a
+                            href="{{ route("$routePrefix.prescription-requests", [legalEntity(), $routeParamKey => $recordId]) }}"
+                            class="summary-tab {{ request()->routeIs("$routePrefix.prescription-requests") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                        >
+                            {{ __('patients.prescription_requests') }}
+                        </a>
+
                         <div class="flex-1"></div>
                     </div>
                 </div>
