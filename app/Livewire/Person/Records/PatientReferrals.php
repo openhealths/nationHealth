@@ -311,14 +311,14 @@ class PatientReferrals extends BasePatientComponent
             $validated = $this->form->validate($this->form->signingRules());
             $lifecycle = app(ReferralRequestLifecycleService::class);
 
-            $activity = $requestRecord->basedOnId
-                ? CarePlanActivity::query()->find($requestRecord->basedOnId)
+            $activity = $requestRecord->basedOn?->value
+                ? CarePlanActivity::query()->where('uuid', $requestRecord->basedOn->value)->first()
                 : null;
             $carePlan = $activity !== null
                 ? CarePlan::query()->with(['encounter.episode', 'person'])->find($activity->carePlanId)
                 : null;
-            $encounter = $requestRecord->contextId
-                ? Encounter::query()->with('episode')->find($requestRecord->contextId)
+            $encounter = $requestRecord->context?->value
+                ? Encounter::query()->with('episode')->where('uuid', $requestRecord->context->value)->first()
                 : $carePlan?->encounter;
 
             if ($carePlan === null && $encounter === null) {
@@ -427,10 +427,12 @@ class PatientReferrals extends BasePatientComponent
     {
         $record = $this->ownedReferral($uuid);
 
-        $activity = $record->basedOnId ? CarePlanActivity::query()->find($record->basedOnId) : null;
+        $activity = $record->basedOn?->value
+            ? CarePlanActivity::query()->where('uuid', $record->basedOn->value)->first()
+            : null;
         $carePlan = $activity !== null ? CarePlan::query()->find($activity->carePlanId) : null;
-        $encounter = $record->contextId
-            ? Encounter::query()->find($record->contextId)
+        $encounter = $record->context?->value
+            ? Encounter::query()->where('uuid', $record->context->value)->first()
             : $carePlan?->encounter;
 
         $context = $carePlan ?? $encounter;

@@ -18,6 +18,32 @@ use Tests\TestCase;
  */
 class ApprovalResendSmsTest extends TestCase
 {
+    public function test_get_many_with_patient_id_uses_the_patient_scoped_endpoint(): void
+    {
+        Http::fake(['*' => Http::response(['data' => []], 200)]);
+
+        $this->makeApi()->getMany([
+            'patient_id' => 'patient-1',
+            'status' => 'NEW',
+        ]);
+
+        Http::assertSent(static function (Request $request): bool {
+            $path = parse_url($request->url(), PHP_URL_PATH) ?? '';
+            $query = [];
+            parse_str(parse_url($request->url(), PHP_URL_QUERY) ?? '', $query);
+
+            return $request->method() === 'GET'
+                && str_ends_with($path, '/api/patients/patient-1/approvals')
+                && ($query['status'] ?? null) === 'NEW';
+        });
+
+        Http::assertNotSent(static function (Request $request): bool {
+            $path = parse_url($request->url(), PHP_URL_PATH) ?? '';
+
+            return $request->method() === 'GET' && str_ends_with($path, '/api/approvals');
+        });
+    }
+
     public function test_resend_sms_calls_the_documented_patient_scoped_endpoint(): void
     {
         Http::fake(['*' => Http::response(['data' => ['id' => 'approval-1']], 200)]);

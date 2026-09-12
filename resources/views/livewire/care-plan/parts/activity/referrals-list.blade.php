@@ -41,10 +41,15 @@
                         <div class="min-w-0 space-y-2">
                             <div class="flex flex-wrap items-center gap-3">
                                 <span class="font-bold text-gray-900 dark:text-gray-100">
-                                    № {{ $referral['request_number'] ?? $referral['requisition'] ?? $referral['uuid'] }}
+                                    № {{ $referral['request_number'] ?? $referral['requisition'] ?? '—' }}
                                 </span>
                                 <span class="badge {{ $statusBadgeClass }}"> {{ $statusLabel }} </span>
                             </div>
+                            @if (!empty($referral['uuid']))
+                                <div class="font-mono text-xs break-all text-gray-400">
+                                    UUID: {{ $referral['uuid'] }}
+                                </div>
+                            @endif
                             <div class="flex flex-wrap gap-x-4 gap-y-1 text-gray-600 dark:text-gray-300">
                                 <span>Код: {{ $referral['product_code'] ?? '—' }}</span>
                                 <span>Кількість: {{ $referral['quantity'] ?? '—' }}</span>

@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
+use App\Models\Employee\Employee;
+use App\Models\Person\Person;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use App\Models\Person\Person;
-use App\Models\Employee\Employee;
-use App\Models\CarePlanActivity;
 
 class DeviceRequestRequest extends Model
 {
@@ -29,20 +28,20 @@ class DeviceRequestRequest extends Model
         'device_id',
         'quantity',
         'program_id',
-        'intent',
-        'category',
+        'intent_id',
+        'category_id',
         'based_on_id',
         'context_id',
-        'priority',
+        'priority_id',
         'note',
-        'supporting_info'
+        'supporting_info',
     ];
 
     protected $casts = [
         'started_at' => 'datetime',
         'ended_at' => 'datetime',
         'quantity' => 'decimal:2',
-        'supporting_info' => 'array'
+        'supporting_info' => 'array',
     ];
 
     public function person(): BelongsTo
@@ -57,11 +56,26 @@ class DeviceRequestRequest extends Model
 
     public function basedOn(): BelongsTo
     {
-        return $this->belongsTo(CarePlanActivity::class, 'based_on_id');
+        return $this->belongsTo(Identifier::class, 'based_on_id');
     }
 
     public function context(): BelongsTo
     {
-        return $this->belongsTo(Encounter::class, 'context_id');
+        return $this->belongsTo(Identifier::class, 'context_id');
+    }
+
+    public function intent(): BelongsTo
+    {
+        return $this->belongsTo(Coding::class, 'intent_id');
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(CodeableConcept::class, 'category_id');
+    }
+
+    public function priority(): BelongsTo
+    {
+        return $this->belongsTo(CodeableConcept::class, 'priority_id');
     }
 }

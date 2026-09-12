@@ -62,6 +62,10 @@ class CarePlanApprovals extends Component
     #[Locked]
     public string $statusLabel = '';
 
+    /** INPATIENT plans at this legal entity skip patient SMS. */
+    #[Locked]
+    public bool $skipsPatientOtp = false;
+
     public function mount(LegalEntity $legalEntity, CarePlan $carePlan): void
     {
         $this->authorize('view', $carePlan);
@@ -71,12 +75,13 @@ class CarePlanApprovals extends Component
         $this->patientUuid = $carePlan->person?->uuid ?? '';
         $this->isReadOnly = CarePlanStatus::fromStored($carePlan->status)->isTerminal();
         $this->statusLabel = CarePlanStatus::labelFor($carePlan->status);
+        $this->skipsPatientOtp = app(CarePlanApprovalService::class)->skipsPatientOtp($carePlan);
         $this->fetchApprovals();
 
         // Load active employees for the dropdown, filtered by the current active legal entity.
         // We must use the active legal entity (not the care plan's owner), because eHealth validates
         // that the granted employee belongs to the requesting clinic.
-        $legalEntityId = legalEntity()->id;
+        $legalEntityId = legalEntity()?->id ?? $legalEntity->id;
         if ($legalEntityId) {
             $this->employees = \App\Models\Employee\Employee::where('legal_entity_id', $legalEntityId)
                 ->where('status', 'APPROVED')
@@ -90,6 +95,13 @@ class CarePlanApprovals extends Component
                     'label' => trim($e->fullName) . ' (' . $e->employee_type . ')',
                 ])
                 ->toArray();
+
+            $writerUuid = Auth::user()?->getCarePlanWriterEmployee($carePlan->termsOfService)?->uuid;
+            if ($writerUuid && collect($this->employees)->contains(fn (array $employee): bool => $employee['uuid'] === $writerUuid)) {
+                $this->newApproval['employee_uuid'] = $writerUuid;
+            } elseif (count($this->employees) === 1) {
+                $this->newApproval['employee_uuid'] = $this->employees[0]['uuid'];
+            }
         }
 
         try {
@@ -167,7 +179,7 @@ class CarePlanApprovals extends Component
                 patientUuid: $this->patientUuid,
                 employeeUuid: $this->newApproval['employee_uuid'],
                 accessLevel: $service->resolveAccessLevel($carePlan),
-                authorizeWith: $this->selectedAuthMethodUuid ?: null,
+                authorizeWith: $this->skipsPatientOtp ? null : ($this->selectedAuthMethodUuid ?: null),
                 user: Auth::user(),
                 bearerToken: Session::get(config('ehealth.api.oauth.bearer_token')),
             );
@@ -189,7 +201,9 @@ class CarePlanApprovals extends Component
                 return;
             }
 
-            Session::flash('success', __('care-plan.approval_created'));
+            Session::flash('success', $this->skipsPatientOtp
+                ? __('care-plan.approval_inpatient_granted')
+                : __('care-plan.approval_created'));
             $this->reset('newApproval');
             $this->fetchApprovals();
             $this->dispatch('care-plan-approvals-changed');
@@ -242,7 +256,9 @@ class CarePlanApprovals extends Component
             return;
         }
 
-        Session::flash('success', __('care-plan.approval_created'));
+        Session::flash('success', $this->skipsPatientOtp
+            ? __('care-plan.approval_inpatient_granted')
+            : __('care-plan.approval_created'));
         $this->reset('newApproval');
         $this->fetchApprovals();
         $this->dispatch('care-plan-approvals-changed');
@@ -254,6 +270,12 @@ class CarePlanApprovals extends Component
             return;
         }
 
+        if ($this->skipsPatientOtp) {
+            $this->confirmInpatientApproval($approvalUuid);
+
+            return;
+        }
+
         $this->approvalId = $approvalUuid;
         if (empty($this->currentAuthMethod)) {
             $this->currentAuthMethod = collect($this->authMethods)->first(function ($method) {
@@ -261,6 +283,7 @@ class CarePlanApprovals extends Component
             });
         }
         $this->openAuthModal();
+        $this->resendSms();
     }
 
     public function recreateApproval(string $oldApprovalUuid): void
@@ -279,23 +302,26 @@ class CarePlanApprovals extends Component
                 // Ignore if it's already 404 or can't be cancelled
             }
 
-            $carePlan = \App\Models\CarePlan::findOrFail($this->carePlanId);
-            $oldApproval = $carePlan->approvals()->where('uuid', $oldApprovalUuid)->first();
-            $employeeUuid = $oldApproval ? $oldApproval->granted_to : \Illuminate\Support\Facades\Auth::user()?->activeDoctorEmployee()?->uuid;
+            $carePlan = CarePlan::findOrFail($this->carePlanId);
+            $oldApproval = $carePlan->approvals()->with('grantedTo')->where('uuid', $oldApprovalUuid)->first();
+            $employeeUuid = $oldApproval?->grantedTo?->value
+                ?? Auth::user()?->getCarePlanWriterEmployee($carePlan->termsOfService)?->uuid;
 
             if (!$employeeUuid) {
-                \Illuminate\Support\Facades\Session::flash('error', __('care-plan.employee_not_found') ?? 'Працівника не знайдено');
+                Session::flash('error', __('care-plan.employee_not_found') ?? 'Працівника не знайдено');
 
                 return;
             }
 
-            $service = app(\App\Services\MedicalEvents\CarePlanApprovalService::class);
+            $service = app(CarePlanApprovalService::class);
             $result = $service->create(
                 carePlan: $carePlan,
                 patientUuid: $this->patientUuid,
                 employeeUuid: $employeeUuid,
                 accessLevel: $service->resolveAccessLevel($carePlan),
-                authorizeWith: $this->selectedAuthMethodUuid ?: null,
+                authorizeWith: $this->skipsPatientOtp ? null : ($this->selectedAuthMethodUuid ?: null),
+                user: Auth::user(),
+                bearerToken: Session::get(config('ehealth.api.oauth.bearer_token')),
             );
 
             if ($result->isAsync()) {
@@ -315,14 +341,34 @@ class CarePlanApprovals extends Component
                 return;
             }
 
-            \Illuminate\Support\Facades\Session::flash('success', __('care-plan.approval_created'));
+            \Illuminate\Support\Facades\Session::flash('success', $this->skipsPatientOtp
+                ? __('care-plan.approval_inpatient_granted')
+                : __('care-plan.approval_created'));
             $this->fetchApprovals();
             $this->dispatch('care-plan-approvals-changed');
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('CarePlanApprovals: failed to recreate: ' . $e->getMessage());
+            Log::error('CarePlanApprovals: failed to recreate: ' . $e->getMessage());
             $this->errorMessage = 'Помилка при перестворенні: ' . $e->getMessage();
-            \Illuminate\Support\Facades\Session::flash('error', $this->errorMessage);
+            Session::flash('error', $this->errorMessage);
         }
+    }
+
+    /**
+     * INPATIENT same-org approvals are auto-verified in eHealth — no SMS code exists.
+     */
+    private function confirmInpatientApproval(string $approvalUuid): void
+    {
+        $this->approvalId = $approvalUuid;
+
+        try {
+            app(CarePlanApprovalService::class)->confirmWithoutOtp($this->patientUuid, $approvalUuid);
+        } catch (\Throwable $exception) {
+            Log::info('CarePlanApprovals: inpatient confirm without OTP: '.$exception->getMessage());
+        }
+
+        $this->fetchApprovals();
+        $this->dispatch('care-plan-approvals-changed');
+        Session::flash('success', __('care-plan.approval_inpatient_granted'));
     }
 
     public function verify(): void
@@ -421,6 +467,7 @@ class CarePlanApprovals extends Component
                 ->deactivate($this->patientUuid, $approvalUuid);
             Session::flash('success', __('care-plan.approval_cancelled'));
             $this->fetchApprovals();
+            $this->dispatch('care-plan-approvals-changed');
         } catch (\Exception $e) {
             Log::error('CarePlanApprovals: failed to cancel: ' . $e->getMessage());
             Session::flash('error', __('care-plan.approval_cancel_error'));

@@ -179,6 +179,7 @@ class PatientReferralsPhase6Test extends TestCase
 
         $this->assertCount(1, $rows);
         $this->assertSame($uuid, $rows[0]['uuid']);
+        $this->assertSame('', $rows[0]['requestNumber']);
         $this->assertTrue($rows[0]['canSign']);
         $this->assertFalse($rows[0]['canOperate']);
         $this->assertFalse($rows[0]['canRecall']);
@@ -187,5 +188,31 @@ class PatientReferralsPhase6Test extends TestCase
         $this->assertSame('Діагностична процедура', $rows[0]['categoryLabel']);
         $this->assertSame('12.08.2026 — 12.11.2026', $rows[0]['periodLabel']);
         $this->assertSame('service_request', $rows[0]['kind']);
+    }
+
+    public function test_registry_row_keeps_requisition_separate_from_uuid(): void
+    {
+        $uuid = (string) Str::uuid();
+        ServiceRequestRequest::create([
+            'uuid' => $uuid,
+            'employee_id' => $this->employee->id,
+            'person_id' => $this->person->id,
+            'status' => 'active',
+            'request_number' => '0000-SMS1-NUMB-ER01',
+            'service_id' => (string) Str::uuid(),
+            'quantity' => 1,
+            'started_at' => '2026-09-01',
+            'ended_at' => '2026-12-01',
+            'intent' => 'order',
+            'category' => 'diagnostic_procedure',
+            'context_id' => $this->encounter->id,
+        ]);
+
+        $rows = app(ServiceRequestRequestRepository::class)->searchByPersonId($this->person->id);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('0000-SMS1-NUMB-ER01', $rows[0]['requestNumber']);
+        $this->assertSame($uuid, $rows[0]['uuid']);
+        $this->assertNotSame($rows[0]['requestNumber'], $rows[0]['uuid']);
     }
 }

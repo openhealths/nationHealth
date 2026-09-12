@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Referral;
 
-use App\Classes\eHealth\Api\ServiceRequest;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
@@ -89,7 +88,19 @@ class ReferralIndex extends Component
                 throw new Exception('Не знайдено співробітника для виконання дії.');
             }
 
-            $service->takeIntoWork($uuid, $employee, $patientUuid ?: null);
+            $programId = null;
+            foreach ($this->searchResults as $result) {
+                if (($result['id'] ?? '') === $uuid) {
+                    $programId = data_get($result, 'program.identifier.value')
+                        ?? data_get($result, 'program.id')
+                        ?? data_get($result, 'medical_program_id');
+                    break;
+                }
+            }
+
+            $service->takeIntoWork($uuid, $employee, $patientUuid ?: null, array_filter([
+                'program_id' => is_string($programId) && $programId !== '' ? $programId : null,
+            ]));
 
             foreach ($this->searchResults as $key => $result) {
                 if (($result['id'] ?? '') === $uuid) {

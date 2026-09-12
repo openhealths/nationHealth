@@ -8,10 +8,14 @@ use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
+use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\User;
+use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -82,12 +86,12 @@ class ReferralSignPayloadTest extends TestCase
             'process_disclosure_data_consent' => true,
         ]);
 
-        $identifierId = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => (string) Str::uuid()])->id;
-        $codingId = \App\Models\MedicalEvents\Sql\Coding::create([
+        $identifierId = Identifier::create(['value' => (string) Str::uuid()])->id;
+        $codingId = Coding::create([
             'code' => 'AMB',
             'system' => 'eHealth/encounter_classes',
         ])->id;
-        $ccId = \App\Models\MedicalEvents\Sql\CodeableConcept::create()->id;
+        $ccId = CodeableConcept::create()->id;
 
         $this->encounter = Encounter::create([
             'uuid' => (string) Str::uuid(),
@@ -120,8 +124,8 @@ class ReferralSignPayloadTest extends TestCase
         $this->assertSame('SERVICE_UNIT', $payload['quantity_system']);
         $this->assertSame('PIECE', $payload['quantity_code']);
         $this->assertSame($serviceId, $payload['service_id']);
-        $this->assertNull($payload['based_on_id']);
-        $this->assertSame($this->encounter->id, $payload['context_id']);
+        $this->assertNull($payload['based_on_uuid']);
+        $this->assertSame($this->encounter->uuid, $payload['context_uuid']);
         $this->assertSame($request->patientInstruction, $payload['patient_instruction']);
         $this->assertSame($request->informWith, $payload['inform_with']);
     }
@@ -153,7 +157,7 @@ class ReferralSignPayloadTest extends TestCase
         ]);
 
         $request = $this->createDraft([
-            'based_on_id' => $activity->id,
+            'based_on_uuid' => $activity->uuid,
             'quantity' => 2,
             'service_id' => $productId,
         ]);
@@ -173,7 +177,6 @@ class ReferralSignPayloadTest extends TestCase
         $this->assertSame('SERVICE_UNIT', $payload['quantity_system']);
         $this->assertSame('PROCEDURE', $payload['quantity_code']);
         $this->assertSame($activity->productReference, $payload['service_id']);
-        $this->assertSame($activity->id, $payload['based_on_id']);
         $this->assertSame($activity->uuid, $payload['based_on_uuid']);
     }
 
@@ -182,10 +185,9 @@ class ReferralSignPayloadTest extends TestCase
      */
     private function createDraft(array $overrides = []): ServiceRequestRequest
     {
-        return ServiceRequestRequest::create(array_merge([
+        $data = array_merge([
             'uuid' => (string) Str::uuid(),
             'employee_id' => $this->employee->id,
-            'person_id' => $this->person->id,
             'status' => 'draft',
             'started_at' => '2026-08-12',
             'ended_at' => '2026-11-12',
@@ -193,11 +195,18 @@ class ReferralSignPayloadTest extends TestCase
             'quantity' => 1,
             'intent' => 'order',
             'category' => 'diagnostic_procedure',
-            'context_id' => $this->encounter->id,
+            'context_uuid' => $this->encounter->uuid,
             'priority' => 'routine',
             'note' => 'standalone',
             'patient_instruction' => 'take documents',
             'inform_with' => (string) Str::uuid(),
-        ], $overrides));
+        ], $overrides);
+
+        Repository::serviceRequest()->store($data, $this->person->id);
+
+        return ServiceRequestRequest::query()
+            ->with(['basedOn', 'context', 'intent', 'category', 'priority'])
+            ->where('uuid', $data['uuid'])
+            ->firstOrFail();
     }
 }

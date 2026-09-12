@@ -376,7 +376,11 @@
                 {{ __('forms.cancel') }}
             </button>
 
-            <button type="submit" class="button-primary">{{ __('forms.save') }}</button>
+            <button type="submit" class="button-primary-outline">{{ __('forms.save') }}</button>
+
+            <button type="button" class="button-primary" wire:click="saveActivityAndSign">
+                {{ __('forms.save_and_sign') }}
+            </button>
         </div>
     </form>
 </div>

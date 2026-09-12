@@ -98,6 +98,36 @@ class ServiceRequest extends PatientApiBase
         return $this->post(self::URL . "/{$patientId}/service_requests/{$id}/actions/resend", []);
     }
 
+    /**
+     * Executor actions live on the facility-scoped Service Request API.
+     * EHealth::serviceRequest() is bound to this Patient client for create/search,
+     * so these methods delegate to Api\ServiceRequest for use / complete / qualify.
+     */
+    public function qualify(string $id, array $payload = []): PromiseInterface|EHealthResponse
+    {
+        return $this->executorApi()->qualify($id, $payload);
+    }
+
+    public function process(string $id, array $payload = []): PromiseInterface|EHealthResponse
+    {
+        return $this->executorApi()->process($id, $payload);
+    }
+
+    public function complete(string $id, array $payload = []): PromiseInterface|EHealthResponse
+    {
+        return $this->executorApi()->complete($id, $payload);
+    }
+
+    public function cancelUsage(string $id, string $patientId, array $payload = []): PromiseInterface|EHealthResponse
+    {
+        return $this->executorApi()->cancelUsage($id, $patientId, $payload);
+    }
+
+    private function executorApi(): \App\Classes\eHealth\Api\ServiceRequest
+    {
+        return app(\App\Classes\eHealth\Api\ServiceRequest::class);
+    }
+
     protected function validateDetails(EHealthResponse $response): array
     {
         $data = $this->replaceEHealthPropNames($response->getData());

@@ -7,6 +7,7 @@ namespace App\Repositories\MedicalEvents;
 use App\Enums\Person\ServiceRequestStatus;
 use App\Models\CarePlanActivity;
 use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
+use App\Repositories\MedicalEvents\Concerns\ResolvesRequestFhirRefs;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
 use Throwable;
@@ -16,10 +17,13 @@ use Throwable;
  */
 class DeviceRequestRequestRepository extends BaseRepository
 {
+    use ResolvesRequestFhirRefs;
+
     public function __construct(DeviceRequestRequest $model)
     {
         parent::__construct($model);
     }
+
     /**
      * Create or update device request request in DB for patient.
      *
@@ -31,6 +35,14 @@ class DeviceRequestRequestRepository extends BaseRepository
     public function store(array $data, int $personId): int
     {
         return DB::transaction(function () use ($data, $personId) {
+            $fhirRefs = $this->resolveRequestFhirRefs([
+                'intent' => $data['intent'] ?? 'order',
+                'category' => $data['category'] ?? null,
+                'priority' => $data['priority'] ?? null,
+                'based_on_uuid' => $data['based_on_uuid'] ?? null,
+                'context_uuid' => $data['context_uuid'] ?? null,
+            ]);
+
             $request = $this->model->updateOrCreate(
                 ['uuid' => $data['uuid'] ?? $data['id']],
                 [
@@ -44,11 +56,11 @@ class DeviceRequestRequestRepository extends BaseRepository
                     'device_id' => $data['device_id'],
                     'quantity' => $data['quantity'] ?? 1,
                     'program_id' => $data['program_id'] ?? null,
-                    'intent' => $data['intent'] ?? 'order',
-                    'category' => $data['category'] ?? null,
-                    'based_on_id' => $data['based_on_id'] ?? null,
-                    'context_id' => $data['context_id'] ?? null,
-                    'priority' => $data['priority'] ?? null,
+                    'intent_id' => $fhirRefs['intent_id'],
+                    'category_id' => $fhirRefs['category_id'],
+                    'based_on_id' => $fhirRefs['based_on_id'],
+                    'context_id' => $fhirRefs['context_id'],
+                    'priority_id' => $fhirRefs['priority_id'],
                     'note' => $data['note'] ?? null,
                     'supporting_info' => $data['supporting_info'] ?? null,
                 ]
@@ -72,6 +84,7 @@ class DeviceRequestRequestRepository extends BaseRepository
     {
         $query = $this->model
             ->newQuery()
+            ->with(['basedOn', 'context', 'category', 'priority'])
             ->where('person_id', $personId);
 
         $status = trim((string) ($filters['status'] ?? ''));
@@ -97,32 +110,54 @@ class DeviceRequestRequestRepository extends BaseRepository
             ->orderByDesc('id')
             ->get();
 
-        $activityIds = $requests
-            ->pluck('basedOnId')
-            ->filter(static fn ($id): bool => (int) $id > 0)
+        $activityUuids = $requests
+            ->map(fn ($r) => $r->basedOn?->value)
+            ->filter()
             ->unique()
             ->values()
             ->all();
 
-        $carePlanIdsByActivity = $activityIds === []
+        $carePlanIdsByActivityUuid = $activityUuids === []
             ? []
             : CarePlanActivity::query()
-                ->whereIn('id', $activityIds)
-                ->pluck('care_plan_id', 'id')
-                ->map(static fn ($id): int => (int) $id)
+                ->whereIn('uuid', $activityUuids)
+                ->get(['id', 'uuid', 'care_plan_id'])
+                ->keyBy('uuid')
+                ->all();
+
+        $encounterUuids = $requests
+            ->map(fn ($r) => $r->context?->value)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $encounterIdsByUuid = $encounterUuids === []
+            ? []
+            : \App\Models\MedicalEvents\Sql\Encounter::query()
+                ->whereIn('uuid', $encounterUuids)
+                ->pluck('id', 'uuid')
                 ->all();
 
         return $requests
-            ->map(fn (DeviceRequestRequest $request): array => $this->toPatientRegistryRow($request, $carePlanIdsByActivity))
+            ->map(fn (DeviceRequestRequest $request): array => $this->toPatientRegistryRow(
+                $request,
+                $carePlanIdsByActivityUuid,
+                $encounterIdsByUuid
+            ))
             ->all();
     }
 
     /**
-     * @param  array<int, int>  $carePlanIdsByActivity
+     * @param  array<string, object>  $carePlanIdsByActivityUuid
+     * @param  array<string, int>  $encounterIdsByUuid
      * @return array<string, mixed>
      */
-    public function toPatientRegistryRow(DeviceRequestRequest $request, array $carePlanIdsByActivity = []): array
-    {
+    public function toPatientRegistryRow(
+        DeviceRequestRequest $request,
+        array $carePlanIdsByActivityUuid = [],
+        array $encounterIdsByUuid = []
+    ): array {
         $status = strtolower((string) $request->status);
         $startedAt = $request->startedAt;
         $endedAt = $request->endedAt;
@@ -131,13 +166,13 @@ class DeviceRequestRequestRepository extends BaseRepository
             ? rtrim(rtrim(number_format((float) $qty, 2, '.', ''), '0'), '.')
             : '';
 
-        $category = strtolower((string) ($request->category ?? ''));
+        $category = strtolower((string) ($request->category?->text ?? ''));
         $categoryKey = 'care-plan.referral_category.'.$category;
         $categoryLabel = $category !== '' && Lang::has($categoryKey)
             ? __($categoryKey)
             : ($category !== '' ? $category : '—');
 
-        $priority = strtolower((string) ($request->priority ?? ''));
+        $priority = strtolower((string) ($request->priority?->text ?? ''));
         $priorityKey = 'care-plan.referral_priority.'.$priority;
         $priorityLabel = $priority !== '' && Lang::has($priorityKey)
             ? __($priorityKey)
@@ -148,12 +183,13 @@ class DeviceRequestRequestRepository extends BaseRepository
             ? $deviceId
             : 'Медичний виріб';
 
-        $activityId = $request->basedOnId !== null ? (int) $request->basedOnId : null;
-        $encounterId = $request->contextId !== null ? (int) $request->contextId : null;
-        $carePlanId = ($activityId !== null && $activityId > 0)
-            ? (int) ($carePlanIdsByActivity[$activityId] ?? 0)
-            : 0;
-        $carePlanId = $carePlanId > 0 ? $carePlanId : null;
+        $activityUuid = $request->basedOn?->value;
+        $encounterUuid = $request->context?->value;
+        $activityData = $activityUuid ? ($carePlanIdsByActivityUuid[$activityUuid] ?? null) : null;
+        $activityId = $activityData ? $activityData->id : null;
+        $carePlanId = $activityData ? $activityData->care_plan_id : null;
+        $encounterId = $encounterUuid ? ($encounterIdsByUuid[$encounterUuid] ?? null) : null;
+
         $basisLabel = match (true) {
             $activityId !== null && $activityId > 0 => 'План лікування',
             $encounterId !== null && $encounterId > 0 => 'Взаємодія',
@@ -181,7 +217,7 @@ class DeviceRequestRequestRepository extends BaseRepository
             'id' => $request->id,
             'uuid' => (string) $request->uuid,
             'kind' => 'device_request',
-            'requestNumber' => (string) ($request->requestNumber ?: $request->uuid),
+            'requestNumber' => trim((string) ($request->requestNumber ?? '')),
             'status' => (string) $request->status,
             'statusLabel' => ServiceRequestStatus::labelFor($status),
             'statusBadge' => ServiceRequestStatus::colorFor($status),
@@ -225,18 +261,18 @@ class DeviceRequestRequestRepository extends BaseRepository
         return $this->model->newQuery()->where('uuid', $uuid)->first();
     }
 
-    public function sumIssuedQuantityByActivity(int $activityId): float
+    public function sumIssuedQuantityByActivity(string $activityUuid): float
     {
         return (float) $this->model->newQuery()
-            ->where('based_on_id', $activityId)
+            ->whereHas('basedOn', fn ($q) => $q->where('value', $activityUuid))
             ->whereNotIn('status', MedicalEventsRequestStatuses::EXCLUDED_FROM_ISSUED_SUM)
             ->sum('quantity');
     }
 
-    public function findDraftByActivity(int $activityId): ?DeviceRequestRequest
+    public function findDraftByActivity(string $activityUuid): ?DeviceRequestRequest
     {
         return $this->model->newQuery()
-            ->where('based_on_id', $activityId)
+            ->whereHas('basedOn', fn ($q) => $q->where('value', $activityUuid))
             ->whereIn('status', ['draft', 'DRAFT'])
             ->latest('id')
             ->first();

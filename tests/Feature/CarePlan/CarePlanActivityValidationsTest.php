@@ -97,13 +97,13 @@ class CarePlanActivityValidationsTest extends TestCase
     /**
      * @param  array<string, mixed>  $settings
      */
-    private function seedMedicalProgram(string $programId, string $name, array $settings): void
+    private function seedMedicalProgram(string $programId, string $name, array $settings, string $type = 'MEDICATION'): void
     {
         Cache::put(MedicalProgramDictionary::KEY, [
             [
                 'id' => $programId,
                 'name' => $name,
-                'type' => 'MEDICATION',
+                'type' => $type,
                 'is_active' => true,
                 'medical_program_settings' => $settings,
             ],
@@ -332,5 +332,68 @@ class CarePlanActivityValidationsTest extends TestCase
             ->assertSee('pain_control')
             ->assertSee('20')
             ->assertSee('TV detail coverage');
+    }
+
+    public function test_blocks_device_activity_when_providing_conditions_mismatch(): void
+    {
+        $this->actingAs($this->user);
+
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->legalEntity->id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'Inpatient Device Plan',
+            'status' => 'draft',
+            'terms_of_service' => 'INPATIENT',
+        ]);
+
+        $programId = '85953838-1834-4ed6-8bf4-3f83057380ec';
+        $deviceId = '0fa1e6cd-7066-4881-92a5-6d747a1128f7';
+        $this->seedMedicalProgram($programId, 'Glucose strips', [
+            'providing_conditions_allowed' => ['OUTPATIENT'],
+        ], 'DEVICE');
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->call('initActivityForm', 'device_request')
+            ->set('selectedProgram', $programId)
+            ->set('activityForm.program', $programId)
+            ->set('activityForm.product_reference', $deviceId)
+            ->set('activityForm.quantity', 200)
+            ->set('activityForm.scheduled_period_start', now()->format('d.m.Y'))
+            ->set('activityForm.scheduled_period_end', now()->addMonths(3)->format('d.m.Y'))
+            ->call('saveActivity')
+            ->assertHasErrors(['activityForm.program']);
+
+        $this->assertDatabaseMissing('care_plan_activities', [
+            'care_plan_id' => $carePlan->id,
+            'product_reference' => $deviceId,
+        ]);
+    }
+
+    public function test_inpatient_device_form_does_not_default_to_outpatient_only_program(): void
+    {
+        $this->actingAs($this->user);
+
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->legalEntity->id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'Inpatient No Default Program',
+            'status' => 'draft',
+            'terms_of_service' => 'INPATIENT',
+        ]);
+
+        $this->seedMedicalProgram('85953838-1834-4ed6-8bf4-3f83057380ec', 'Glucose strips', [
+            'providing_conditions_allowed' => ['OUTPATIENT'],
+        ], 'DEVICE');
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->call('initActivityForm', 'device_request')
+            ->assertSet('selectedProgram', '')
+            ->assertSet('activityForm.program', '');
     }
 }

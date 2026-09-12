@@ -76,6 +76,15 @@ class EHealthValidationException extends EHealthException
             default => $this->getMessage()
         };
 
+        // Prefer a Ukrainian platform message over raw English internals from eHealth.
+        if (
+            $type === 'internal_error'
+            && is_string($errorMessage)
+            && ($translated === '' || $translated === $errorMessage)
+        ) {
+            $translated = __('errors.ehealth.messages.internal_error');
+        }
+
         $message = 'Помилка від ЕСОЗ:' . ($translated !== '' ? ' ' . $translated : '');
 
         if (isset($this->details['error']['invalid']) && is_array($this->details['error']['invalid'])) {
@@ -267,8 +276,12 @@ class EHealthValidationException extends EHealthException
 
         if (empty($errorList)) {
             $mainMessage = Arr::get($this->details, 'error.message') ?? Arr::get($this->details, 'message') ?? '';
+            $errorType = Arr::get($this->details, 'error.type');
             if (!empty($mainMessage)) {
                 $errorList = $this->translateTopLevelMessage((string) $mainMessage);
+                if ($errorType === 'internal_error' && $errorList === $mainMessage) {
+                    $errorList = __('errors.ehealth.messages.internal_error');
+                }
             }
         }
 
@@ -293,6 +306,18 @@ class EHealthValidationException extends EHealthException
 
         if (str_contains($message, 'At least one of action references, diagnostic reports or procedures should reference the same service')) {
             return __('errors.ehealth.messages.referral_service_mismatch');
+        }
+
+        if (str_contains($message, 'Failed to save signed content')) {
+            return __('errors.ehealth.messages.failed_to_save_signed_content');
+        }
+
+        // Elixir ETS crash while the async job stores the signed package (preprod/platform).
+        if (
+            str_contains($message, 'ETS table with insufficient access rights')
+            || (str_contains($message, 'ArgumentError') && str_contains($message, 'ETS'))
+        ) {
+            return __('errors.ehealth.messages.ets_insufficient_access');
         }
 
         if (preg_match('/^Care plan in status (\S+) cannot be cancelled$/i', $message, $matches) === 1) {

@@ -316,6 +316,22 @@ trait ManagesCarePlanActivities
 
     public function saveActivity(CarePlanActivityRepository $repository): void
     {
+        $this->persistActivityDraft($repository, andSign: false);
+    }
+
+    /**
+     * Persist the local activity draft, then open the KEP modal for sign_activity.
+     */
+    public function saveActivityAndSign(CarePlanActivityRepository $repository): void
+    {
+        $this->persistActivityDraft($repository, andSign: true);
+    }
+
+    /**
+     * @return void
+     */
+    private function persistActivityDraft(CarePlanActivityRepository $repository, bool $andSign): void
+    {
         $kindLower = strtolower((string) ($this->activityForm['kind'] ?? ''));
         if (str_contains($kindLower, 'medication')) {
             $this->activityForm['program'] = $this->resolveMedicationProgramId();
@@ -378,17 +394,15 @@ trait ManagesCarePlanActivities
         $activityValidation = app(\App\Services\MedicalEvents\CarePlanActivityValidationService::class);
         $programPayload = $this->resolveMedicalProgramPayload(is_string($programId) ? $programId : null);
 
-        if (str_contains($kindLower, 'medication') && $programPayload !== null) {
+        if ($programPayload !== null) {
             $providingBlock = $activityValidation->providingConditionsBlockReason($this->carePlan, $programPayload);
             if ($providingBlock !== null) {
-                session()->flash('error', $providingBlock);
+                $this->flashOutcome('error', $providingBlock);
                 $this->addError('activityForm.program', $providingBlock);
 
                 return;
             }
-        }
 
-        if ($programPayload !== null) {
             $program = $programPayload;
             $allowedIcd10 = \Illuminate\Support\Arr::get($program, 'medical_program_settings.conditions_icd10_am_allowed', []);
             $allowedIcpc2 = \Illuminate\Support\Arr::get($program, 'medical_program_settings.conditions_icpc2_allowed', []);
@@ -417,7 +431,7 @@ trait ManagesCarePlanActivities
 
                 if (!$hasValidDiagnosis) {
                     $message = __('care-plan.medical_program_diagnosis_mismatch');
-                    session()->flash('error', $message);
+                    $this->flashOutcome('error', $message);
                     $this->addError('activityForm.program', $message);
 
                     return;
@@ -427,7 +441,7 @@ trait ManagesCarePlanActivities
 
         $rehabBlock = $activityValidation->rehabReasonReferenceBlockReason($this->carePlan, $this->linkedGrounds);
         if ($rehabBlock !== null) {
-            session()->flash('error', $rehabBlock);
+            $this->flashOutcome('error', $rehabBlock);
             $this->addError('linkedGrounds', $rehabBlock);
 
             return;
@@ -437,7 +451,7 @@ trait ManagesCarePlanActivities
             $validated = $this->validate($rules);
         } catch (ValidationException $exception) {
             $this->setErrorBag($exception->validator->errors());
-            session()->flash('error', $exception->validator->errors()->first());
+            $this->flashOutcome('error', $exception->validator->errors()->first());
 
             return;
         }
@@ -446,7 +460,7 @@ trait ManagesCarePlanActivities
         $activityEnd = convertToYmd($validated['activityForm']['scheduled_period_end']);
         $periodError = $this->validateActivityPeriodAgainstCarePlan($activityStart, $activityEnd);
         if ($periodError !== null) {
-            session()->flash('error', $periodError);
+            $this->flashOutcome('error', $periodError);
             $this->addError('activityForm.scheduled_period_start', $periodError);
 
             return;
@@ -476,7 +490,7 @@ trait ManagesCarePlanActivities
                 $quantityCode = strtoupper((string) ($validated['activityForm']['quantity_code'] ?? ''));
                 if ($quantityCode !== strtoupper($expectedUnit)) {
                     $message = __('care-plan.medication_unit_mismatch', ['unit' => $expectedUnit]);
-                    session()->flash('error', $message);
+                    $this->flashOutcome('error', $message);
                     $this->addError('activityForm.quantity_code', $message);
 
                     return;
@@ -491,7 +505,7 @@ trait ManagesCarePlanActivities
                     $quotient = $quantity / $packageStep;
                     if (abs($quotient - round($quotient)) > 1e-6) {
                         $message = __('care-plan.medication_qty_packaging', ['count' => $packageStep]);
-                        session()->flash('error', $message);
+                        $this->flashOutcome('error', $message);
                         $this->addError('activityForm.quantity', $message);
 
                         return;
@@ -499,7 +513,7 @@ trait ManagesCarePlanActivities
                 }
             } elseif (!empty($this->activityForm['product_reference'])) {
                 $message = 'Не вдалося перевірити одиниці виміру препарату. Будь ласка, знайдіть і оберіть препарат зі списку ще раз.';
-                session()->flash('error', $message);
+                $this->flashOutcome('error', $message);
                 $this->addError('activityForm.quantity_code', $message);
 
                 return;
@@ -513,7 +527,7 @@ trait ManagesCarePlanActivities
                 ?? $this->resolveDeviceProgramId();
             if (!$guard->deviceAllowsCarePlanActivity($this->selectedProduct, $programForDevice)) {
                 $message = __('care-plan.device_care_plan_activity_not_allowed');
-                session()->flash('error', $message);
+                $this->flashOutcome('error', $message);
                 $this->addError('activityForm.product_reference', $message);
 
                 return;
@@ -529,7 +543,7 @@ trait ManagesCarePlanActivities
 
             if ($packagingUnit !== null && $quantityCode !== '' && strcasecmp($packagingUnit, $quantityCode) !== 0) {
                 $message = __('care-plan.device_quantity_unit_mismatch', ['unit' => $packagingUnit]);
-                session()->flash('error', $message);
+                $this->flashOutcome('error', $message);
                 $this->addError('activityForm.quantity_code', $message);
 
                 return;
@@ -537,7 +551,7 @@ trait ManagesCarePlanActivities
 
             if ($packagingCount > 0 && $quantity % $packagingCount !== 0) {
                 $message = __('care-plan.device_quantity_packaging', ['count' => $packagingCount]);
-                session()->flash('error', $message);
+                $this->flashOutcome('error', $message);
                 $this->addError('activityForm.quantity', $message);
 
                 return;
@@ -592,21 +606,27 @@ trait ManagesCarePlanActivities
         }
 
         if (!empty($this->activityForm['id'])) {
-            $repository->updateById($this->activityForm['id'], $activityData);
-            session()->flash('success', __('care-plan.activity_updated'));
+            $activityId = (int) $this->activityForm['id'];
+            $repository->updateById($activityId, $activityData);
+            $this->flashOutcome('success', __('care-plan.activity_updated'));
         } else {
             $activityData['care_plan_id'] = $this->carePlan->id;
             $activityData['author_id'] = Auth::user()?->activeDoctorEmployee()?->id;
             $activityData['status'] = CarePlanStatus::DRAFT->value;
 
-            $repository->create($activityData);
-            session()->flash('success', __('care-plan.activity_draft_saved'));
+            $created = $repository->create($activityData);
+            $activityId = (int) $created->id;
+            $this->flashOutcome('success', __('care-plan.activity_draft_saved'));
         }
 
         $this->refreshCarePlan();
 
         // Close drawers
         $this->dispatch('close-drawers');
+
+        if ($andSign) {
+            $this->openSignatureModal('sign_activity', $activityId);
+        }
     }
 
     public function searchServices(): void
@@ -1329,7 +1349,9 @@ trait ManagesCarePlanActivities
         }
         $devicePrograms = array_keys($this->dictionaries['medical_programs_device'] ?? []);
         if ($devicePrograms === []) {
-            return self::DEFAULT_DEVICE_PROGRAM_ID;
+            // Do not fall back to the glucose program: it is OUTPATIENT-only and eHealth
+            // rejects it on INPATIENT care plans ("terms of service are not allowed").
+            return null;
         }
         if (in_array(self::DEFAULT_DEVICE_PROGRAM_ID, $devicePrograms, true)) {
             return self::DEFAULT_DEVICE_PROGRAM_ID;

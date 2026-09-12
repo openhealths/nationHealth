@@ -29,6 +29,7 @@ return [
     'next' => 'Далі',
     'open' => 'Відкрити',
     'save' => 'Зберегти',
+    'save_and_sign' => 'Зберегти і підписати',
     'saving' => 'Збереження...',
     'saved_successfully' => 'Дані успішно збережено',
     'data_saved_successfully' => 'Дані успішно збережено',

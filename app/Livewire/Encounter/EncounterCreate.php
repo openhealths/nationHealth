@@ -448,6 +448,33 @@ class EncounterCreate extends EncounterComponent
     {
         try {
             if ($this->referralToRedeemUuid && $this->createdEncounterUuidForRedeem) {
+                $employee = Auth::user()?->employees()
+                    ->where('legal_entity_id', legalEntity()->id)
+                    ->first();
+
+                $local = Repository::serviceRequest()->findByUuid($this->referralToRedeemUuid);
+                $status = strtolower((string) ($local?->status ?? ''));
+                $needsTakeIntoWork = $local === null
+                    || $status === ''
+                    || $status === \App\Enums\Person\ServiceRequestStatus::ACTIVE->value
+                    || $status === 'active';
+
+                // eHealth complete requires the referral to be in progress (use) first.
+                if ($needsTakeIntoWork) {
+                    if ($employee === null) {
+                        throw new \RuntimeException('Не знайдено співробітника для погашення направлення.');
+                    }
+
+                    $service->takeIntoWork(
+                        $this->referralToRedeemUuid,
+                        $employee,
+                        $this->patientUuid ?: null,
+                        array_filter([
+                            'program_id' => $local?->programId,
+                        ])
+                    );
+                }
+
                 $service->completeReferral($this->referralToRedeemUuid, $this->createdEncounterUuidForRedeem);
                 Session::flash('success', 'Направлення успішно погашено!');
             }

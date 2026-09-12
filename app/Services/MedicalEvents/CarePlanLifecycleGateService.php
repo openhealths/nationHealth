@@ -209,7 +209,7 @@ class CarePlanLifecycleGateService
     private function openMedicationDocuments(CarePlanActivity $activity): array
     {
         return MedicationRequestRequest::query()
-            ->where('based_on_id', $activity->id)
+            ->whereHas('basedOn', fn ($q) => $q->where('value', $activity->uuid))
             ->get(['uuid', 'status'])
             ->filter(fn (MedicationRequestRequest $row): bool => $this->isOpenDocumentStatus((string) $row->status))
             ->map(fn (MedicationRequestRequest $row): array => [
@@ -227,7 +227,7 @@ class CarePlanLifecycleGateService
     private function openServiceDocuments(CarePlanActivity $activity): array
     {
         return ServiceRequestRequest::query()
-            ->where('based_on_id', $activity->id)
+            ->whereHas('basedOn', fn ($q) => $q->where('value', $activity->uuid))
             ->get(['uuid', 'status'])
             ->filter(fn (ServiceRequestRequest $row): bool => $this->isOpenDocumentStatus((string) $row->status))
             ->map(fn (ServiceRequestRequest $row): array => [
@@ -245,7 +245,7 @@ class CarePlanLifecycleGateService
     private function openDeviceDocuments(CarePlanActivity $activity): array
     {
         return DeviceRequestRequest::query()
-            ->where('based_on_id', $activity->id)
+            ->whereHas('basedOn', fn ($q) => $q->where('value', $activity->uuid))
             ->get(['uuid', 'status'])
             ->filter(fn (DeviceRequestRequest $row): bool => $this->isOpenDocumentStatus((string) $row->status))
             ->map(fn (DeviceRequestRequest $row): array => [
