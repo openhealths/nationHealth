@@ -78,6 +78,10 @@
                                     <div class="flex justify-center relative">
                                         <div x-data="{
                                                 open: false,
+                                                openUpdateSecretDrawer: false,
+                                                isSecretUpdated: false,
+                                                openUpdateCallbackDrawer: false,
+                                                isCallbackUpdated: false,
                                                 toggle() {
                                                     if (this.open) {
                                                         return this.close();
@@ -127,17 +131,19 @@
                                                     @icon('eye', 'w-5 h-5 text-gray-600 dark:text-gray-300') {{ __('legal-entity-connection.btn_view_details') }}
                                                 </a>
                                                 @can('updateSecret', $connection)
-                                                <a href="#" class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                                <button type="button" @click="close(); openUpdateSecretDrawer = true" class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">
                                                     @icon('refresh', 'w-5 h-5 text-gray-600 dark:text-gray-300') {{ __('legal-entity-connection.btn_update_secret_short') }}
-                                                </a>
+                                                </button>
                                                 @endcan
 
                                                 @can('updateConnection', $connection)
-                                                <a href="#" class="flex items-center gap-2 w-full last-of-type:rounded-b-md px-4 py-2.5 text-left text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                                <button type="button" @click="close(); openUpdateCallbackDrawer = true" class="flex items-center gap-2 w-full last-of-type:rounded-b-md px-4 py-2.5 text-left text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">
                                                     @icon('refresh', 'w-5 h-5 text-gray-600 dark:text-gray-300') {{ __('legal-entity-connection.btn_update_callback_short') }}
-                                                </a>
+                                                </button>
                                                 @endcan
                                             </div>
+
+                                            @include('livewire.legal-entity.connection.parts.drawers.update-secret-callback', ['connection' => $connection])
                                         </div>
                                     </div>
                                 </td>

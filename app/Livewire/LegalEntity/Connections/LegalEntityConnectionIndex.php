@@ -3,16 +3,14 @@ declare(strict_types=1);
 
 namespace App\Livewire\LegalEntity\Connections;
 
-use Exception;
 use Throwable;
+use Exception;
 use App\Models\User;
-use Livewire\Component;
 use App\Enums\JobStatus;
 use Illuminate\Bus\Batch;
 use App\Models\Connection;
 use App\Models\LegalEntity;
 use App\Jobs\ConnectionSync;
-use App\Traits\LogsExceptions;
 use Livewire\Attributes\Title;
 use App\Classes\eHealth\EHealth;
 use App\Repositories\Repository;
@@ -28,40 +26,24 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 
-class LegalEntityConnectionIndex extends Component
+class LegalEntityConnectionIndex extends LegalEntityConnectionComponent
 {
-    use LogsExceptions,
-        BatchLegalEntityQueries;
+    use BatchLegalEntityQueries;
 
     public const string BATCH_NAME = 'ConnectionSync';
+
     public const string BATCH_SUBNAME = 'ConnectionClientSync';
 
-    public bool $showSignatureModal = false;
-    public array $form = [];
-    public $legalEntity;
-
-    public function mount(?LegalEntity $legalEntity = null)
-    {
-        $this->legalEntity = $legalEntity ?? request()->route('legalEntity');
-    }
-
-    public function sign()
-    {
-        $this->showSignatureModal = false;
-
-        session()->flash('success', 'Зв\'язок успішно встановлений!');
-
-        return redirect()->route('legal-entity-connection.show', [
-            'legalEntity' => $this->legalEntity ?? 1,
-            'id' => 'conn-13-1312qe11'
-        ]);
-    }
-
+    /**
+     * Retrieves paginated connections for the current legal entity.
+     *
+     * @return LengthAwarePaginator
+     */
     #[Computed]
     public function connections(): LengthAwarePaginator
     {
         $connections = Connection::with(['legalEntity', 'client'])
-            ->where('legal_entity_id', $this->legalEntity->id)
+            ->where('legal_entity_id', $this->legalEntityId)
             ->get();
 
         // Pagination
@@ -95,6 +77,15 @@ class LegalEntityConnectionIndex extends Component
             return;
         }
 
+        /*
+         * This is need by Livewire behavior.
+         * On the first render, mount() runs and assigns $this->legalEntity.
+         * On subsequent requests (e.g., when clicking synchronize button), Livewire does NOT run mount() again
+         * and does NOT rehydrate protected typed properties.
+         * Code below allows to ensure that property is set before use.
+         */
+        $this->setLegalEntity();
+
         $token = Session::get(config('ehealth.api.oauth.bearer_token'));
 
         $syncQuery = [
@@ -103,7 +94,7 @@ class LegalEntityConnectionIndex extends Component
         ];
 
         try {
-            $response = EHealth::connection()->getClientConnections(clientId: legalEntity()->uuid, query: $syncQuery);
+            $response = EHealth::connection()->getClientConnections(clientId: $this->legalEntity->uuid, query: $syncQuery);
 
             $connections = $response->validate();
         } catch (EHealthResponseException $err) {
@@ -126,8 +117,8 @@ class LegalEntityConnectionIndex extends Component
         $isJobsStarted = false;
 
         if ($response->isNotLast()) {
-            Bus::batch([new ConnectionSync(legalEntity(), page: 2)])
-                ->withOption('legal_entity_id', legalEntity()->id)
+            Bus::batch([new ConnectionSync($this->legalEntity, page: 2)])
+                ->withOption('legal_entity_id', $this->legalEntityId)
                 ->withOption('token', Crypt::encryptString($token))
                 ->withOption('user', $user)
                 ->withOption('sync_entity', LegalEntity::ENTITY_CONNECTION)
@@ -158,7 +149,7 @@ class LegalEntityConnectionIndex extends Component
                 }
             } else {
                 try {
-                    $this->dispatchNextSyncJobs($user, $token);
+                    $this->dispatchNextSyncJobs($user, $token, $this->legalEntity);
                 } catch (Throwable $exception) {
                     Log::error('Failed to dispatch Connection Client sync batch', ['exception' => $exception]);
 
@@ -183,13 +174,16 @@ class LegalEntityConnectionIndex extends Component
      *
      * @param  User  $user
      * @param  string  $token
+     * @param  LegalEntity $legalEntity
+     *
      * @return void
+     *
      * @throws Throwable
      */
-    protected function dispatchNextSyncJobs(User $user, string $token): void
+    protected function dispatchNextSyncJobs(User $user, string $token, LegalEntity $legalEntity): void
     {
-        Bus::batch($this->getConnectionClientsDataJob($this->legalEntity, null))
-            ->withOption('legal_entity_id', $this->legalEntity->id)
+        Bus::batch($this->getConnectionClientsDataJob($legalEntity, null))
+            ->withOption('legal_entity_id', $legalEntity->id)
             ->withOption('token', Crypt::encryptString($token))
             ->withOption('user', $user)
             ->withOption('sync_entity', LegalEntity::ENTITY_CONNECTION_CLIENT)
@@ -207,43 +201,7 @@ class LegalEntityConnectionIndex extends Component
 
         $user->notify(new SyncNotification('connection_client', 'started'));
 
-        $this->legalEntity->setEntityStatus(JobStatus::PROCESSING);
-    }
-
-    /**
-     * Synchronize a single client's details from eHealth.
-     *
-     * @param  string  $clientUuid  The UUID of the client to synchronize
-     *
-     * @return bool  Returns true if synchronization was successful, false otherwise
-     *
-     * @throws EHealthResponseException  If eHealth API returns a server error
-     * @throws EHealthValidationException  If eHealth API returns a validation error
-     */
-    protected function syncSingleClient(string $clientUuid): bool
-    {
-        try {
-            $response = EHealth::connection()->getClientDetails(clientId: $clientUuid);
-
-            $clientData = $response->validate();
-        } catch (EHealthResponseException $err) {
-            Log::channel('e_health_errors')->error(self::class . ':syncConnections', ['error' => $err->getDetails()]);
-            session()->flash('error', __('errors.ehealth.messages.server_error'));
-
-            return false;
-        } catch (EHealthValidationException $err) {
-            Log::channel('e_health_errors')->error(self::class . ':syncConnections', ['error' => $err->getDetails()]);
-
-            session()->flash('error', __('errors.ehealth.messages.validation_error'));
-
-            return false;
-        }
-
-        if (!Repository::legalEntity()->syncClient($clientData)) {
-            return false;
-        }
-
-        return true;
+        $legalEntity->setEntityStatus(JobStatus::PROCESSING);
     }
 
     #[Title('Зв\'язки МІС та СГуСОЗ')]
