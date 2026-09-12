@@ -22,6 +22,7 @@ use App\Livewire\Encounter\Forms\ClinicalImpressionForm;
 use App\Livewire\Encounter\Forms\DetectedIssueForm;
 use App\Livewire\Encounter\Forms\DeviceAssociationForm;
 use App\Livewire\Encounter\Forms\DeviceForm;
+use App\Livewire\Encounter\Forms\DeviceDispenseForm;
 use App\Livewire\Encounter\Forms\ConditionForm;
 use App\Livewire\Encounter\Forms\DiagnosticReportForm;
 use App\Livewire\Encounter\Forms\ImmunizationForm;
@@ -61,6 +62,8 @@ class EncounterComponent extends Component
     public DeviceAssociationForm $deviceAssociationForm;
 
     public DeviceForm $deviceForm;
+
+    public DeviceDispenseForm $deviceDispenseForm;
 
     public ClinicalImpressionForm $clinicalImpressionForm;
 
@@ -283,6 +286,20 @@ class EncounterComponent extends Component
     public array $patientDevices = [];
 
     /**
+     * 
+     *
+     * @var array
+     */
+    public array $deviceRequests = [];
+
+    /**
+     * List of authenticated user's employees available as device dispense performers.
+     *
+     * @var array
+     */
+    public array $deviceDispenseEmployees = [];
+
+    /**
      * Previous detected issues available for selection.
      *
      * @var array
@@ -336,6 +353,7 @@ class EncounterComponent extends Component
         'immunizations' => [],
         'diagnosticReports' => [],
         'procedures' => [],
+        'deviceDispenses' => [],
         'clinicalImpressions' => [],
         'devices' => [],
         'deviceAssociations' => [],
@@ -421,6 +439,7 @@ class EncounterComponent extends Component
         'device_name_type',
         'device_properties',
         'device_association_statuses',
+        'device_dispense_statuses',
         'eHealth/body_structures',
         'detected_issue_statuses',
         'detected_issue_codes',
@@ -572,6 +591,26 @@ class EncounterComponent extends Component
     {
         $authUser = Auth::user();
 
+        $this->deviceDispenseEmployees = $authUser->employees()
+            ->whereLegalEntityId(legalEntity()->id)
+            ->active()
+            ->where(static fn (Builder $query): Builder => $query->whereNull('end_date')->orWhereDate('end_date', '>', today()))
+            ->select([
+                'employees.uuid',
+                'employees.position',
+                'employees.party_id',
+                'employees.employee_type'
+            ])
+            ->with('party:id,last_name,first_name,second_name')
+            ->get()
+            ->map(static fn (Employee $employee): array => [
+                'uuid' => $employee->uuid,
+                'name' => $employee->fullName,
+                'position' => $employee->position
+            ])
+            ->values()
+            ->toArray();
+
         $employees = Employee::whereLegalEntityId(legalEntity()->id)
             ->active()
             ->whereIn('employee_type', config('ehealth.encounter_package_allowed_encounter_participant_employee_types'))
@@ -658,6 +697,10 @@ class EncounterComponent extends Component
             ->toArray();
 
         $this->setPatientData();
+
+        if ($this->personId !== null) {
+            $this->deviceRequests = MedicalEventsRepository::deviceRequest()->searchByPersonId($this->personId);
+        }
 
         // set division ID if only one exist
         if (count($this->divisions) === 1) {
@@ -895,21 +938,31 @@ class EncounterComponent extends Component
     }
 
     /**
-     * @param  string  $type  One of: episodes, encounter, procedure, diagnostic_report.
+     * @param  string  $type  One of: episodes, encounter, procedure, diagnosticReport, condition, observation.
+     * @param  string|null  $episodeId
      * @return void
      */
-    public function searchSupportingInfo(string $type): void
+    public function searchSupportingInfo(string $type, ?string $episodeId = null): void
     {
         try {
             $params = ['managing_organization_id' => legalEntity()->uuid];
 
+            if ($episodeId) {
+                if ($type === 'diagnosticReport') {
+                    $params['context_episode_id'] = $episodeId;
+                } elseif ($type !== 'episodes') {
+                    $params['episode_id'] = $episodeId;
+                }
+            }
+
             $this->supportingInfoResults = match ($type) {
                 'episodes' => collect($this->episodes)
+                    ->when($episodeId, static fn ($episodes) => $episodes->where('uuid', $episodeId))
                     ->map(fn (array $episode) => [
                         'uuid' => data_get($episode, 'uuid'),
                         'ehealthInsertedAt' => convertToAppDateFormat(data_get($episode, 'ehealthInsertedAt')),
                         'code' => data_get($episode, 'name'),
-                        'type' => 'episode_of_care'
+                        'type' => 'episode'
                     ])
                     ->values()
                     ->all(),

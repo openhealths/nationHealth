@@ -145,6 +145,11 @@ class EncounterPackageBuilder
             ->values()
             ->toArray();
 
+        $fhirDeviceDispenses = collect($data['deviceDispenses'] ?? [])
+            ->map(fn (array $deviceDispense) => Fhir::deviceDispense()->toFhir($deviceDispense, $uuids))
+            ->values()
+            ->toArray();
+
         $encounterData = $data['encounter'];
 
         return [
@@ -157,6 +162,7 @@ class EncounterPackageBuilder
             'detectedIssues' => $fhirDetectedIssues,
             'devices' => $fhirDevices,
             'deviceAssociations' => $fhirDeviceAssociations,
+            'deviceDispenses' => $fhirDeviceDispenses,
             'clinicalImpressions' => $fhirClinicalImpressions
         ];
     }

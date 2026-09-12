@@ -28,6 +28,7 @@ class EncounterPackageLoader
             'diagnosticReports' => $this->loadDiagnosticReports($encounterId),
             'observations' => $this->loadObservations($encounterId),
             'procedures' => $this->loadProcedures($encounterId),
+            'deviceDispenses' => $this->loadDeviceDispenses($encounterId),
             'devices' => $this->loadDevices($encounterId),
             'deviceAssociations' => $this->loadDeviceAssociations($encounterId),
             'detectedIssues' => $this->loadDetectedIssues($encounterId),
@@ -155,6 +156,59 @@ class EncounterPackageLoader
 
         return collect($procedures)
             ->map(static fn (array $procedure) => Fhir::procedure()->fromFhir($procedure, $detailsMap))
+            ->toArray();
+    }
+
+    /**
+     * @param  string  $encounterId
+     * @return array
+     */
+    private function loadDeviceDispenses(string $encounterId): array
+    {
+        $deviceDispenses = Repository::deviceDispense()->get($encounterId);
+
+        if (!$deviceDispenses) {
+            return [];
+        }
+
+        $allSupportingInfo = collect($deviceDispenses)
+            ->flatMap(static fn (array $deviceDispense) => data_get($deviceDispense, 'supportingInfo', []))
+            ->filter();
+
+        $uuidsByType = $allSupportingInfo
+            ->groupBy(static fn (array $item) => data_get($item, 'identifier.type.coding.0.code'))
+            ->map(static fn ($group) => 
+                $group
+                    ->pluck('identifier.value')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->toArray()
+            );
+
+        $detailsMap = array_merge(
+            Repository::condition()->getDetailsMapByUuids(
+                $uuidsByType->get('condition', [])
+            ),
+            Repository::observation()->getDetailsMapByUuids(
+                $uuidsByType->get('observation', [])
+            ),
+            Repository::diagnosticReport()->getDetailsMapByUuids(
+                $uuidsByType->get('diagnostic_report', [])
+            ),
+            Repository::procedure()->getDetailsMapByUuids(
+                $uuidsByType->get('procedure', [])
+            ),
+            Repository::encounter()->getDetailsMapByUuids(
+                $uuidsByType->get('encounter', [])
+            ),
+            Repository::episode()->getDetailsMapByUuids(
+                $uuidsByType->get('episode', [])
+            )
+        );
+
+        return collect($deviceDispenses)
+            ->map(static fn (array $deviceDispense) => Fhir::deviceDispense()->fromFhir($deviceDispense, $detailsMap))
             ->toArray();
     }
 

@@ -386,6 +386,7 @@
      */
     class Procedure {
         constructor(obj = null) {
+            this.uuid = crypto.randomUUID();
             const now = new Date();
             const startTime = new Date(now.getTime() - 15 * 60 * 1000);
             const toFormattedDate = (date) => {

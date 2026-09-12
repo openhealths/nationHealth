@@ -179,6 +179,10 @@ class DeviceRequestRequestRepository extends BaseRepository
 
         return [
             'id' => $request->id,
+            'deviceId' => $deviceId,
+            'deviceSelectionType' => preg_match('/^[0-9a-f-]{36}$/i', $deviceId) === 1 ? 'model' : 'type',
+            'quantityValue' => $qty !== null && $qty !== '' ? (int) $qty : null,
+            'programId' => $programId !== '' ? $programId : null,
             'uuid' => (string) $request->uuid,
             'kind' => 'device_request',
             'requestNumber' => (string) ($request->requestNumber ?: $request->uuid),
