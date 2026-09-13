@@ -79,6 +79,22 @@ class EmployeeRequestProcessor
             ];
         }
 
+        // Never apply revision data while the eHealth request is still awaiting email confirmation.
+        // An APPROVED Employee may already exist (edit flow) — that must not count as request approval.
+        if (EmployeeRequestMatcher::isRemoteStillPending($remoteStatus)) {
+            return [
+                'outcome' => self::OUTCOME_PENDING,
+                'message' => __('employees.sync.employee_request_still_pending'),
+            ];
+        }
+
+        if ($remoteStatus !== 'APPROVED') {
+            return [
+                'outcome' => self::OUTCOME_FAILED,
+                'message' => __('employees.sync.employee_request_status_updated', ['status' => (string) $remoteStatus]),
+            ];
+        }
+
         // Prefer employee_id from request details; otherwise search APPROVED employees like EmployeeCreate.
         $taxId = data_get($request->revision?->data, 'party.tax_id');
         $employeeUuid = $remoteData['employee_id'] ?? null;
@@ -93,13 +109,6 @@ class EmployeeRequestProcessor
         }
 
         if ($remoteEmployee === null && !is_string($employeeUuid)) {
-            if (EmployeeRequestMatcher::isRemoteStillPending($remoteStatus)) {
-                return [
-                    'outcome' => self::OUTCOME_PENDING,
-                    'message' => __('employees.sync.employee_request_still_pending'),
-                ];
-            }
-
             return [
                 'outcome' => self::OUTCOME_FAILED,
                 'message' => __('employees.sync.no_employees_found'),
@@ -117,24 +126,7 @@ class EmployeeRequestProcessor
 
         $applyPayload['legal_entity_id'] = $applyPayload['legal_entity_id'] ?? $legalEntity->uuid;
 
-        try {
-            $this->applyApprovedRequest($request, $applyPayload);
-        } catch (\Throwable $e) {
-            if (EmployeeRequestMatcher::isRemoteStillPending($remoteStatus)) {
-                Log::info('[EmployeeRequestProcessor] Pending request has no APPROVED employee yet.', [
-                    'request_id' => $request->id,
-                    'remote_status' => $remoteStatus,
-                    'error' => $e->getMessage(),
-                ]);
-
-                return [
-                    'outcome' => self::OUTCOME_PENDING,
-                    'message' => __('employees.sync.employee_request_still_pending'),
-                ];
-            }
-
-            throw $e;
-        }
+        $this->applyApprovedRequest($request, $applyPayload);
 
         return [
             'outcome' => self::OUTCOME_APPROVED,

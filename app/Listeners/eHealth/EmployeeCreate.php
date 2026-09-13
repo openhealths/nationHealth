@@ -16,13 +16,16 @@ use App\Enums\User\Role;
 use App\Models\Relations\Party;
 use App\Classes\eHealth\EHealth;
 use App\Events\EHealthUserLogin;
+use App\Jobs\EmployeeRequestPendingApply;
 use App\Repositories\Repository;
 use App\Models\Employee\Employee;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use App\Enums\Employee\RequestStatus;
 use App\Enums\Employee\RevisionStatus;
 use App\Models\Employee\EmployeeRequest;
+use App\Models\LegalEntity;
 use App\Services\Employee\EmployeeRequestMatcher;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 
@@ -133,9 +136,21 @@ class EmployeeCreate
             return;
         }
 
-        $matched = 0;
+        // One list call: uuid → remote status. Missing uuids are "unknown" and fall back to jobs.
+        $remoteRequestStatuses = $this->fetchRemoteRequestStatusMap($event->legalEntity);
 
-        DB::transaction(function () use ($user, $employees, $employeeRequests, $event, &$matched) {
+        $matched = 0;
+        $pendingEditsToQueue = collect();
+
+        DB::transaction(function () use (
+            $user,
+            $employees,
+            $employeeRequests,
+            $event,
+            $remoteRequestStatuses,
+            &$matched,
+            &$pendingEditsToQueue
+        ) {
             foreach ($employees as $eHealthEmployee) {
                 $employeeRequest = $this->findMatchingLocalRequest($employeeRequests, $eHealthEmployee);
 
@@ -150,6 +165,63 @@ class EmployeeCreate
                     continue;
                 }
 
+                // Pending edit: never apply from "employee is APPROVED" alone — use list status first.
+                if (
+                    $employeeRequest->status !== RequestStatus::APPROVED
+                    && $employeeRequest->isPendingEhealth()
+                    && filled($employeeRequest->employeeId)
+                ) {
+                    $action = $this->resolvePendingEditAction(
+                        $remoteRequestStatuses->get($employeeRequest->uuid)
+                    );
+
+                    if ($action === 'queue') {
+                        $pendingEditsToQueue->push($employeeRequest);
+
+                        Log::info('[EmployeeCreate] Pending edit not on list page; queue details job.', [
+                            'user_id' => $user->id,
+                            'request_id' => $employeeRequest->id,
+                            'request_uuid' => $employeeRequest->uuid,
+                        ]);
+
+                        continue;
+                    }
+
+                    if ($action === 'skip') {
+                        Log::info('[EmployeeCreate] Pending edit still NEW/SIGNED on list; skip apply.', [
+                            'user_id' => $user->id,
+                            'request_id' => $employeeRequest->id,
+                            'request_uuid' => $employeeRequest->uuid,
+                        ]);
+
+                        continue;
+                    }
+
+                    if ($action === 'reject' || $action === 'expire') {
+                        $newStatus = $action === 'reject' ? RequestStatus::REJECTED : RequestStatus::EXPIRED;
+                        $employeeRequest->update([
+                            'status' => $newStatus,
+                            'applied_at' => now(),
+                        ]);
+                        $employeeRequest->revision?->update(['status' => RevisionStatus::OUTDATED]);
+
+                        Log::info('[EmployeeCreate] Pending edit marked terminal from list status.', [
+                            'user_id' => $user->id,
+                            'request_id' => $employeeRequest->id,
+                            'status' => $newStatus->value,
+                        ]);
+
+                        continue;
+                    }
+
+                    // 'apply' — remote list says APPROVED; fall through to sync apply below.
+                    Log::info('[EmployeeCreate] Pending edit APPROVED on list; applying now.', [
+                        'user_id' => $user->id,
+                        'request_id' => $employeeRequest->id,
+                        'request_uuid' => $employeeRequest->uuid,
+                    ]);
+                }
+
                 // If the employee type is OWNER, we need to check if the current owner is different from the one in EHealth.
                 if ($eHealthEmployee['employee_type'] === Role::OWNER->value) {
                     $currOwner = $event->legalEntity->getOwner();
@@ -162,13 +234,13 @@ class EmployeeCreate
                         if ($currentOwnerUser) {
                             Repository::legalEntity()->disableOldOwner($currentOwnerUser, $event->legalEntity);
                         } else {
-                             Log::error('[EmployeeCreate] User not found for current owner.', [
-                                'user_id' => $currOwner->userId,
-                                'legal_entity_uuid' => $event->legalEntity->uuid,
-                                'employee_uuid' => $eHealthEmployee['uuid'] ?? null,
+                            Log::error('[EmployeeCreate] User not found for current owner.', [
+                               'user_id' => $currOwner->userId,
+                               'legal_entity_uuid' => $event->legalEntity->uuid,
+                               'employee_uuid' => $eHealthEmployee['uuid'] ?? null,
                             ]);
 
-                            throw new RuntimeException( __('auth.login.error.owner_replacement.current_owner_user_not_found'));
+                            throw new RuntimeException(__('auth.login.error.owner_replacement.current_owner_user_not_found'));
                         }
                     }
                 }
@@ -241,6 +313,8 @@ class EmployeeCreate
             ]);
         }
 
+        $this->dispatchPendingEditApplyJobs($pendingEditsToQueue->unique('id')->values(), $event);
+
         // This means (if NULL) that proceeded the first OWNER's login, so we can skip role sync
         // because roles are assigned based on employee types and employee types are assigned based on employee records that are just created,
         // so if it's first login and OWNER, it means that there is no employee record with employee type OWNER before,
@@ -269,6 +343,126 @@ class EmployeeCreate
             ->filter(fn ($taxId) => is_string($taxId) && $taxId !== '')
             ->unique()
             ->values();
+    }
+
+    /**
+     * One EmployeeRequest list page (max page_size). Fresh approvals tend to appear first.
+     * Absence from the map means "unknown" — caller should fall back to details jobs.
+     *
+     * @return Collection<string, string> uuid => remote status
+     */
+    private function fetchRemoteRequestStatusMap(LegalEntity $legalEntity): Collection
+    {
+        try {
+            $filters = [
+                'page_size' => (int) config('ehealth.api.page_size', 300),
+            ];
+
+            if (filled($legalEntity->edrpou)) {
+                $filters['edrpou'] = $legalEntity->edrpou;
+            }
+
+            $page = EHealth::employeeRequest()
+                ->getMany($filters, 1)
+                ->validate();
+
+            /** @var Collection<string, string> $statuses */
+            $statuses = collect($page)
+                ->filter(static fn ($row): bool => is_array($row) && is_string($row['uuid'] ?? null))
+                ->mapWithKeys(static function (array $row): array {
+                    $status = $row['status'] ?? null;
+                    $statusValue = $status instanceof \BackedEnum ? $status->value : $status;
+
+                    return is_string($statusValue) && $statusValue !== ''
+                        ? [$row['uuid'] => $statusValue]
+                        : [];
+                });
+
+            Log::info('[EmployeeCreate] Loaded remote EmployeeRequest status map.', [
+                'legal_entity_id' => $legalEntity->id,
+                'count' => $statuses->count(),
+            ]);
+
+            return $statuses;
+        } catch (Throwable $e) {
+            Log::warning('[EmployeeCreate] EmployeeRequest list failed; pending edits will use details jobs.', [
+                'legal_entity_id' => $legalEntity->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return collect();
+        }
+    }
+
+    /**
+     * Decide how to handle a pending edit given an optional status from the list page.
+     *
+     * @return 'apply'|'skip'|'queue'|'reject'|'expire'
+     */
+    private function resolvePendingEditAction(?string $remoteStatus): string
+    {
+        if ($remoteStatus === null || $remoteStatus === '') {
+            return 'queue';
+        }
+
+        if (EmployeeRequestMatcher::isRemoteStillPending($remoteStatus)) {
+            return 'skip';
+        }
+
+        if ($remoteStatus === 'REJECTED') {
+            return 'reject';
+        }
+
+        if ($remoteStatus === 'EXPIRED') {
+            return 'expire';
+        }
+
+        if ($remoteStatus === RequestStatus::APPROVED->value) {
+            return 'apply';
+        }
+
+        return 'skip';
+    }
+
+    /**
+     * Queue details jobs only for pending edits whose status was not on the list page.
+     *
+     * @param  Collection<int, EmployeeRequest>  $pendingEdits
+     */
+    private function dispatchPendingEditApplyJobs(Collection $pendingEdits, EHealthUserLogin $event): void
+    {
+        $pendingEdits = $pendingEdits
+            ->filter(fn (EmployeeRequest $request) => filled($request->uuid))
+            ->values();
+
+        if ($pendingEdits->isEmpty()) {
+            return;
+        }
+
+        $previousJob = null;
+
+        foreach ($pendingEdits->reverse() as $request) {
+            $previousJob = new EmployeeRequestPendingApply(
+                employeeRequest: $request,
+                legalEntity: $event->legalEntity,
+                nextEntity: $previousJob,
+                standalone: $previousJob === null,
+            );
+        }
+
+        Bus::batch([$previousJob])
+            ->name(EmployeeRequestPendingApply::BATCH_NAME)
+            ->withOption('legal_entity_id', $event->legalEntity->id)
+            ->withOption('token', $event->token)
+            ->withOption('user', $event->user)
+            ->withOption('sync_entity', LegalEntity::ENTITY_EMPLOYEE_REQUEST)
+            ->onQueue('sync')
+            ->dispatch();
+
+        Log::info('[EmployeeCreate] Dispatched pending edit apply job chain for unknown list statuses.', [
+            'user_id' => $event->user->id,
+            'request_ids' => $pendingEdits->pluck('id')->all(),
+        ]);
     }
 
     /**
