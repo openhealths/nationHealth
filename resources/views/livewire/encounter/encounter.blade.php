@@ -384,13 +384,24 @@
 
                             <fieldset class="fieldset-card p-5">
                                 <legend class="legend">{{ __('patients.medical_reports') }}</legend>
-                                <button
-                                    type="button"
-                                    class="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                                >
-                                    @icon('plus', 'w-4 h-4')
-                                    <span>{{ __('encounters.add_medical_report') }}</span>
-                                </button>
+                                @if ($this instanceof EncounterEdit && $this->createCompositionFromEncounterUrl)
+                                    <a
+                                        href="{{ $this->createCompositionFromEncounterUrl }}"
+                                        wire:navigate
+                                        class="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                    >
+                                        @icon('plus', 'w-4 h-4')
+                                        <span>{{ __('patients.add_medical_report') }}</span>
+                                    </a>
+                                @else
+                                    <span
+                                        class="flex cursor-not-allowed items-center gap-1.5 text-sm font-medium text-gray-400 opacity-60"
+                                        title="{{ __('patients.composition.errors.create_temp_disability_not_allowed') }}"
+                                    >
+                                        @icon('plus', 'w-4 h-4')
+                                        <span>{{ __('patients.add_medical_report') }}</span>
+                                    </span>
+                                @endif
                             </fieldset>
 
                             <fieldset class="fieldset-card p-5">

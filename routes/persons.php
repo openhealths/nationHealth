@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Livewire\CarePlan\CarePlanCreate;
+use App\Livewire\Composition\CompositionCreate;
+use App\Livewire\Composition\CompositionTempDisabilityCreate;
 use App\Livewire\ClinicalImpression\ClinicalImpressionIndex;
 use App\Livewire\Condition\ConditionIndex;
 use App\Livewire\Declaration\DeclarationCreate;
@@ -29,6 +31,7 @@ use App\Livewire\Person\PersonRequestEdit;
 use App\Livewire\Person\PersonUpdate;
 use App\Livewire\Person\Records\DeviceDispenses;
 use App\Livewire\Person\Records\PatientCarePlans;
+use App\Livewire\Person\Records\PatientCompositions;
 use App\Livewire\Person\Records\PatientData;
 use App\Livewire\Person\Records\PatientDeviceAssociations;
 use App\Livewire\Person\Records\PatientDeviceIssues;
@@ -44,6 +47,7 @@ use App\Livewire\Procedure\ProcedureCreate;
 use App\Livewire\Procedure\ProcedureEdit;
 use App\Models\CarePlan;
 use App\Models\DeclarationRequest;
+use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
@@ -117,6 +121,15 @@ Route::prefix('persons')->whereNumber(['person', 'personRequest', 'personId', 'e
                     ->name('device-associations');
                 Route::get('/{person}/device-dispenses', DeviceDispenses::class)->name('device-dispenses');
                 Route::get('/{person}/device-issues', PatientDeviceIssues::class)->name('device-issues');
+            Route::get('/{person}/compositions', PatientCompositions::class)
+                ->can('viewAny', Composition::class)
+                ->name('compositions');
+            Route::get('/{person}/compositions/temp-disability/create', CompositionTempDisabilityCreate::class)
+                ->can('createTempDisability', Composition::class)
+                ->name('compositions.temp-disability.create');
+            Route::get('/{person}/compositions/newborn/create', CompositionCreate::class)
+                ->can('createNewborn', Composition::class)
+                ->name('compositions.newborn.create');
             });
         });
 
@@ -230,6 +243,22 @@ Route::prefix('prepersons')
         Route::get('/{preperson}/device-issues', PatientDeviceIssues::class)
             ->can('view', 'preperson')
             ->name('device-issues');
+
+
+        // A birth conclusion is filed against the newborn, who exists only as a preperson,
+        // and a disability conclusion may also be issued for an unidentified patient.
+        Route::get('/{preperson}/compositions', PatientCompositions::class)
+            ->can('view', 'preperson')
+            ->can('viewAny', Composition::class)
+            ->name('compositions');
+        Route::get('/{preperson}/compositions/temp-disability/create', CompositionTempDisabilityCreate::class)
+            ->can('view', 'preperson')
+            ->can('createTempDisability', Composition::class)
+            ->name('compositions.temp-disability.create');
+        Route::get('/{preperson}/compositions/newborn/create', CompositionCreate::class)
+            ->can('view', 'preperson')
+            ->can('createNewborn', Composition::class)
+            ->name('compositions.newborn.create');
 
         Route::get('/{preperson}/encounter/create', EncounterCreate::class)
             ->can('view', 'preperson')

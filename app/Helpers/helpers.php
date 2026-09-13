@@ -169,6 +169,29 @@ if (!function_exists('dictionary')) {
     }
 }
 
+if (!function_exists('compositionTreatmentViolationLabel')) {
+    /**
+     * Resolve a COMPOSITION_TREATMENT_VIOLATION code to its Ukrainian description.
+     */
+    function compositionTreatmentViolationLabel(?string $code): string
+    {
+        if ($code === null || $code === '') {
+            return '-';
+        }
+
+        try {
+            $label = dictionary()->basics()
+                ->byName('COMPOSITION_TREATMENT_VIOLATION')
+                ->asCodeDescription()
+                ->get($code);
+
+            return is_string($label) && $label !== '' ? $label : $code;
+        } catch (Throwable) {
+            return $code;
+        }
+    }
+}
+
 if (!function_exists('legalEntity')) {
     function legalEntity(): ?LegalEntity
     {

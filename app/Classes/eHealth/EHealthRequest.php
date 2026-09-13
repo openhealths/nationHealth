@@ -123,6 +123,11 @@ abstract class EHealthRequest extends PendingRequest
                 }
             }
 
+            // The Composition endpoints carry the whole signed conclusion in `data`.
+            if (isset($json['data']) && is_string($json['data']) && strlen($json['data']) > 512) {
+                $json['data'] = '[base64_signed_content_redacted length=' . strlen($json['data']) . ']';
+            }
+
             $options['json'] = $json;
         }
 
