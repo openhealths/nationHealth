@@ -16,13 +16,16 @@ use App\Enums\User\Role;
 use App\Models\Relations\Party;
 use App\Classes\eHealth\EHealth;
 use App\Events\EHealthUserLogin;
+use App\Jobs\EmployeeRequestPendingApply;
 use App\Repositories\Repository;
 use App\Models\Employee\Employee;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use App\Enums\Employee\RequestStatus;
 use App\Enums\Employee\RevisionStatus;
 use App\Models\Employee\EmployeeRequest;
+use App\Models\LegalEntity;
 use App\Services\Employee\EmployeeRequestMatcher;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 
@@ -134,8 +137,9 @@ class EmployeeCreate
         }
 
         $matched = 0;
+        $pendingEditsToQueue = collect();
 
-        DB::transaction(function () use ($user, $employees, $employeeRequests, $event, &$matched) {
+        DB::transaction(function () use ($user, $employees, $employeeRequests, $event, &$matched, &$pendingEditsToQueue) {
             foreach ($employees as $eHealthEmployee) {
                 $employeeRequest = $this->findMatchingLocalRequest($employeeRequests, $eHealthEmployee);
 
@@ -150,13 +154,17 @@ class EmployeeCreate
                     continue;
                 }
 
-                // Pending local requests may match a pre-existing APPROVED employee (edit flow).
-                // Apply revision data only after the eHealth EmployeeRequest itself is APPROVED.
+                // Pending edit requests already link to a local employee. An APPROVED remote
+                // Employee always exists for them, so applying revision here would write
+                // unconfirmed email changes. Defer status check + apply to rate-limited jobs.
                 if (
                     $employeeRequest->status !== RequestStatus::APPROVED
-                    && !$this->isRemoteEmployeeRequestApproved($employeeRequest)
+                    && $employeeRequest->isPendingEhealth()
+                    && filled($employeeRequest->employeeId)
                 ) {
-                    Log::info('[EmployeeCreate] Skipping apply: EmployeeRequest not APPROVED yet.', [
+                    $pendingEditsToQueue->push($employeeRequest);
+
+                    Log::info('[EmployeeCreate] Queuing pending edit EmployeeRequest for async apply.', [
                         'user_id' => $user->id,
                         'request_id' => $employeeRequest->id,
                         'local_status' => $employeeRequest->status?->value,
@@ -257,6 +265,8 @@ class EmployeeCreate
             ]);
         }
 
+        $this->dispatchPendingEditApplyJobs($pendingEditsToQueue->unique('id')->values(), $event);
+
         // This means (if NULL) that proceeded the first OWNER's login, so we can skip role sync
         // because roles are assigned based on employee types and employee types are assigned based on employee records that are just created,
         // so if it's first login and OWNER, it means that there is no employee record with employee type OWNER before,
@@ -288,34 +298,44 @@ class EmployeeCreate
     }
 
     /**
-     * Remote Create Employee Request must be APPROVED (email confirmed) before local apply.
-     * Matching an APPROVED Employee by tax_id alone is insufficient for edit requests.
+     * Queue one rate-limited EHealthJob per pending edit request (no getDetails in this listener).
+     *
+     * @param  Collection<int, EmployeeRequest>  $pendingEdits
      */
-    private function isRemoteEmployeeRequestApproved(EmployeeRequest $request): bool
+    private function dispatchPendingEditApplyJobs(Collection $pendingEdits, EHealthUserLogin $event): void
     {
-        if (blank($request->uuid)) {
-            return false;
+        $pendingEdits = $pendingEdits
+            ->filter(fn (EmployeeRequest $request) => filled($request->uuid))
+            ->values();
+
+        if ($pendingEdits->isEmpty()) {
+            return;
         }
 
-        try {
-            $remoteData = EHealth::employeeRequest()
-                ->getDetails($request->uuid)
-                ->validate();
+        $previousJob = null;
 
-            $remoteStatus = $remoteData['status'] instanceof \BackedEnum
-                ? $remoteData['status']->value
-                : $remoteData['status'];
-
-            return $remoteStatus === RequestStatus::APPROVED->value;
-        } catch (Throwable $e) {
-            Log::warning('[EmployeeCreate] Failed to verify remote EmployeeRequest status.', [
-                'request_id' => $request->id,
-                'request_uuid' => $request->uuid,
-                'error' => $e->getMessage(),
-            ]);
-
-            return false;
+        foreach ($pendingEdits->reverse() as $request) {
+            $previousJob = new EmployeeRequestPendingApply(
+                employeeRequest: $request,
+                legalEntity: $event->legalEntity,
+                nextEntity: $previousJob,
+                standalone: $previousJob === null,
+            );
         }
+
+        Bus::batch([$previousJob])
+            ->name(EmployeeRequestPendingApply::BATCH_NAME)
+            ->withOption('legal_entity_id', $event->legalEntity->id)
+            ->withOption('token', $event->token)
+            ->withOption('user', $event->user)
+            ->withOption('sync_entity', LegalEntity::ENTITY_EMPLOYEE_REQUEST)
+            ->onQueue('sync')
+            ->dispatch();
+
+        Log::info('[EmployeeCreate] Dispatched pending edit apply job chain.', [
+            'user_id' => $event->user->id,
+            'request_ids' => $pendingEdits->pluck('id')->all(),
+        ]);
     }
 
     /**
