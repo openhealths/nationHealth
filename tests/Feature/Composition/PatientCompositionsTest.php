@@ -31,6 +31,17 @@ class PatientCompositionsTest extends TestCase
     use CompositionTestFixtures;
     use RefreshDatabase;
 
+    protected function migrateDatabases(): void
+    {
+        $this->artisan('migrate:fresh', [
+            '--path' => [
+                database_path('migrations'),
+                database_path('migrations/install'),
+            ],
+            '--realpath' => true,
+        ]);
+    }
+
     /**
      * TV 3.8.2.15.4 — cancelling records the job and leaves the conclusion FINAL.
      */
@@ -48,13 +59,16 @@ class PatientCompositionsTest extends TestCase
 
         $composition = $this->storedComposition($person, $employee->uuid);
 
+        // Livewire's test helper does not route-model-bind a Person mount parameter,
+        // so seed the locked personId the same way production hydrate does.
         $component = Livewire::test(PatientCompositions::class, [
             'legalEntity' => $legalEntity,
-            'person' => $person,
+            'personId' => $person->id,
         ])
             ->call('openCancellationModal', $composition->uuid)
             ->assertSet('showSignatureModal', true)
-            ->set('form.cancellationReason', $this->firstCancellationReason())
+            ->set('form.reason', $this->firstCancellationReason())
+            ->set('form.reasonText', 'Помилково створений висновок')
             ->set('form.knedp', 'ca-1')
             ->set('form.password', 'secret')
             ->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 8))
@@ -94,7 +108,7 @@ class PatientCompositionsTest extends TestCase
 
         $component = Livewire::test(PatientCompositions::class, [
             'legalEntity' => $legalEntity,
-            'person' => $person,
+            'personId' => $person->id,
         ])->call('pollAsyncJobs');
 
         $this->assertSame(CompositionStatus::FINAL, $composition->fresh()->status);
@@ -132,7 +146,7 @@ class PatientCompositionsTest extends TestCase
 
         Livewire::test(PatientCompositions::class, [
             'legalEntity' => $legalEntity,
-            'person' => $person,
+            'personId' => $person->id,
         ])->call('pollAsyncJobs');
 
         $composition->refresh();
@@ -159,7 +173,7 @@ class PatientCompositionsTest extends TestCase
 
         Livewire::test(PatientCompositions::class, [
             'legalEntity' => $legalEntity,
-            'person' => $person,
+            'personId' => $person->id,
         ])
             ->call('openErlnResendModal', $composition->uuid)
             ->assertSet('showErlnResendModal', true)
@@ -196,7 +210,7 @@ class PatientCompositionsTest extends TestCase
 
         Livewire::test(PatientCompositions::class, [
             'legalEntity' => $legalEntity,
-            'person' => $person,
+            'personId' => $person->id,
         ])
             ->call('search')
             ->assertOk();
@@ -222,7 +236,7 @@ class PatientCompositionsTest extends TestCase
 
         Livewire::test(PatientCompositions::class, [
             'legalEntity' => $legalEntity,
-            'person' => $person,
+            'personId' => $person->id,
         ])
             ->call('search')
             ->assertForbidden();

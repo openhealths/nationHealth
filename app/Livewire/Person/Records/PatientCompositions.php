@@ -422,7 +422,9 @@ class PatientCompositions extends BasePatientComponent
     public function cancelComposition(): void
     {
         try {
-            $this->validate(array_merge(
+            // Validate on the form object so rules resolve against form.* properties
+            // (component-level validate() looks for $this->reason, which does not exist).
+            $this->form->validate(array_merge(
                 $this->form->cancellationRules($this->cancellationReasons),
                 $this->form->signingRules()
             ));
