@@ -7,6 +7,7 @@ namespace App\Livewire\Encounter;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Device\Status as DeviceStatus;
+use App\Enums\DeviceDispense\SupportingInfoType;
 use App\Enums\Episode\Status as EpisodeStatus;
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Person\ClinicalImpressionStatus;
@@ -21,6 +22,7 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\Encounter\Forms\ClinicalImpressionForm;
 use App\Livewire\Encounter\Forms\DetectedIssueForm;
 use App\Livewire\Encounter\Forms\DeviceAssociationForm;
+use App\Livewire\Encounter\Forms\DeviceDispenseForm;
 use App\Livewire\Encounter\Forms\DeviceForm;
 use App\Livewire\Encounter\Forms\ConditionForm;
 use App\Livewire\Encounter\Forms\DiagnosticReportForm;
@@ -32,6 +34,7 @@ use App\Models\Employee\Employee;
 use App\Models\Equipment;
 use App\Models\Icd10;
 use App\Models\MedicalEvents\Sql\Device;
+use App\Models\MedicalEvents\Sql\DeviceDispense;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Immunization;
 use App\Models\Person\Person;
@@ -40,6 +43,9 @@ use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\EpisodeCurrentDiagnosis;
 use App\Repositories\Repository;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Services\MedicalEvents\DeviceDispenseRules;
+use App\Services\MedicalEvents\DeviceDispenseSourceRequest;
+use App\Services\MedicalEvents\DeviceDispenseSourceRequestResolver;
 use App\Services\MedicalEvents\Fhir;
 use App\Services\Dictionary\Mappers\ImmunizationDictionaryMapper;
 use App\Traits\FormTrait;
@@ -61,6 +67,8 @@ class EncounterComponent extends Component
     public DeviceAssociationForm $deviceAssociationForm;
 
     public DeviceForm $deviceForm;
+
+    public DeviceDispenseForm $deviceDispenseForm;
 
     public ClinicalImpressionForm $clinicalImpressionForm;
 
@@ -290,6 +298,37 @@ class EncounterComponent extends Component
     public array $previousDetectedIssues = [];
 
     /**
+     * Device requests the patient may be dispensed against, each carrying what the dispense rules need:
+     * the medical program it was written under, the amount still to be handed over and whether it names
+     * a device type or a concrete model (TV 3.22.1.1 - 3.22.1.4).
+     *
+     * @var array<int, array{
+     *     uuid: string,
+     *     deviceReferenceType: string,
+     *     deviceId: string,
+     *     programId: string|null,
+     *     quantity: int|null,
+     *     remainingQuantity: int|null
+     * }>
+     */
+    public array $deviceRequestOptions = [];
+
+    /**
+     * Device definitions allowed under the medical program of a device request, keyed by request UUID.
+     * A request without a program is absent here, so the general catalog is offered for it instead.
+     *
+     * @var array<string, array<int, array{id: string, name: string}>>
+     */
+    public array $deviceDispenseProgramDevices = [];
+
+    /**
+     * Records found for the supporting info of a device dispense.
+     *
+     * @var array
+     */
+    public array $deviceDispenseSupportingInfoResults = [];
+
+    /**
      * List of employees available as diagnostic report performers.
      *
      * @var array
@@ -503,6 +542,76 @@ class EncounterComponent extends Component
     }
 
     /**
+     * Load the device requests the patient may be dispensed against, together with the leftover of each.
+     *
+     * The leftover is what the drawer shows and what the form checks a partial dispense against, so it is
+     * read here rather than recomputed per keystroke (TV 3.22.1.1).
+     *
+     * @return void
+     */
+    public function loadDeviceRequestOptions(): void
+    {
+        if ($this->patientUuid === null || Auth::user()->cannot('create', DeviceDispense::class)) {
+            return;
+        }
+
+        $resolver = app(DeviceDispenseSourceRequestResolver::class);
+        $rules = app(DeviceDispenseRules::class);
+
+        $this->deviceRequestOptions = collect($resolver->activeRequests($this->patientUuid))
+            ->map(static fn (DeviceDispenseSourceRequest $request): array => [
+                'uuid' => $request->uuid,
+                'deviceReferenceType' => $request->deviceReferenceType->value,
+                'deviceId' => $request->deviceId,
+                'programId' => $request->programId,
+                'quantity' => $request->quantity,
+                'remainingQuantity' => $request->remainingQuantity()
+            ])
+            ->values()
+            ->all();
+
+        // Only devices taking part in the program of the request may be handed over under it, so the
+        // catalog offered for such a request is the program one and never the general dictionary (TV 3.22.1.5)
+        foreach ($this->deviceRequestOptions as $option) {
+            if (empty($option['programId'])) {
+                continue;
+            }
+
+            $this->deviceDispenseProgramDevices[$option['uuid']] = collect($rules->programDevices($option['programId']) ?? [])
+                ->map(static fn (array $device): array => [
+                    'id' => (string) ($device['id'] ?? ''),
+                    'name' => (string) (data_get($device, 'device_names.0.name') ?? $device['id'] ?? '')
+                ])
+                ->filter(static fn (array $device): bool => $device['id'] !== '')
+                ->values()
+                ->all();
+        }
+    }
+
+    /**
+     * Search records the user may point a device dispense at as supporting info (TV 3.22.2.1).
+     *
+     * @param  string  $type  One of the eHealth resource codes a dispense may reference.
+     * @return void
+     */
+    public function searchDeviceDispenseSupportingInfo(string $type): void
+    {
+        if (SupportingInfoType::tryFrom($type) === null) {
+            return;
+        }
+
+        // The generic search names its sources the way the encounter form does, while a dispense points at
+        // them by their eHealth resource code, so the two namings are lined up here
+        $this->searchSupportingInfo(match ($type) {
+            SupportingInfoType::EPISODE_OF_CARE->value => 'episodes',
+            SupportingInfoType::DIAGNOSTIC_REPORT->value => 'diagnosticReport',
+            default => $type
+        });
+
+        $this->deviceDispenseSupportingInfoResults = $this->supportingInfoResults;
+    }
+
+    /**
      * Load previous detected issues for the selected device.
      *
      * @param  string|null  $deviceUuid
@@ -658,6 +767,8 @@ class EncounterComponent extends Component
             ->toArray();
 
         $this->setPatientData();
+
+        $this->loadDeviceRequestOptions();
 
         // set division ID if only one exist
         if (count($this->divisions) === 1) {

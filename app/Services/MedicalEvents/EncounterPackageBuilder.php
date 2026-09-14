@@ -140,6 +140,11 @@ class EncounterPackageBuilder
         $fhirDeviceAssociations = Fhir::deviceAssociation()
             ->toFhirCollection($data['deviceAssociations'] ?? [], $uuids);
 
+        $fhirDeviceDispenses = collect($data['deviceDispenses'] ?? [])
+            ->map(fn (array $deviceDispense): array => Fhir::deviceDispense()->toFhir($deviceDispense, $uuids))
+            ->values()
+            ->toArray();
+
         $fhirClinicalImpressions = collect($data['clinicalImpressions'] ?? [])
             ->map(fn (array $clinicalImpression) => Fhir::clinicalImpression()->toFhir($clinicalImpression, $uuids))
             ->values()
@@ -157,6 +162,7 @@ class EncounterPackageBuilder
             'detectedIssues' => $fhirDetectedIssues,
             'devices' => $fhirDevices,
             'deviceAssociations' => $fhirDeviceAssociations,
+            'deviceDispenses' => $fhirDeviceDispenses,
             'clinicalImpressions' => $fhirClinicalImpressions
         ];
     }

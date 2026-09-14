@@ -91,7 +91,17 @@ class RemoteEHealthLinksProcessing extends EHealthJob
             case 'specimen':
                 return null;
             case 'device_dispense':
-                return null;
+                $patientUuid = $this->eHealthLink->linkable?->person?->uuid;
+
+                // The details endpoint is patient-scoped, so a link without a patient behind it has
+                // nothing to be fetched with and is left to the generic handling below
+                if (!$patientUuid) {
+                    return null;
+                }
+
+                return EHealth::deviceDispense()
+                    ->withToken($token)
+                    ->getById($patientUuid, basename((string) $this->eHealthLink->href));
             case 'device_association':
                 return null;
             case 'detected_issue':

@@ -51,6 +51,7 @@ use App\Classes\eHealth\Api\Connection;
 use App\Classes\eHealth\Api\Patient\MedicationRequest;
 use App\Classes\eHealth\Api\Patient\MedicationDispense;
 use App\Classes\eHealth\Api\Patient\ServiceRequest;
+use App\Classes\eHealth\Api\Patient\DeviceDispense;
 use App\Classes\eHealth\Api\Patient\DeviceRequest;
 
 final class EHealth
@@ -294,5 +295,10 @@ final class EHealth
     public static function device(): Device
     {
         return app(Device::class);
+    }
+
+    public static function deviceDispense(): DeviceDispense
+    {
+        return app(DeviceDispense::class);
     }
 }

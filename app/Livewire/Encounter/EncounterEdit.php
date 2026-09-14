@@ -92,6 +92,7 @@ class EncounterEdit extends EncounterComponent
         $this->deviceForm->devices = $package['devices'];
         $this->detectedIssueForm->detectedIssues = $package['detectedIssues'];
         $this->deviceAssociationForm->deviceAssociations = $package['deviceAssociations'];
+        $this->deviceDispenseForm->deviceDispenses = $package['deviceDispenses'];
         $this->clinicalImpressionForm->clinicalImpressions = $package['clinicalImpressions'];
 
         if ($this->isReadonly) {
@@ -173,6 +174,7 @@ class EncounterEdit extends EncounterComponent
         $fhirProcedures = $fhir['procedures'];
         $fhirDevices = $fhir['devices'];
         $fhirDeviceAssociations = $fhir['deviceAssociations'];
+        $fhirDeviceDispenses = $fhir['deviceDispenses'];
         $fhirDetectedIssues = $fhir['detectedIssues'];
         $fhirClinicalImpressions = $fhir['clinicalImpressions'];
 
@@ -194,6 +196,10 @@ class EncounterEdit extends EncounterComponent
             Repository::deviceAssociation()->sync(
                 $this->patient(),
                 array_map($this->fhirToSync(...), $fhirDeviceAssociations)
+            );
+            Repository::deviceDispense()->sync(
+                $this->patient(),
+                array_map($this->fhirToSync(...), $fhirDeviceDispenses)
             );
             Repository::detectedIssue()->sync(
                 $this->patient(),
@@ -221,6 +227,7 @@ class EncounterEdit extends EncounterComponent
             'procedures' => $fhirProcedures,
             'devices' => $fhirDevices,
             'deviceAssociations' => $fhirDeviceAssociations,
+            'deviceDispenses' => $fhirDeviceDispenses,
             'detectedIssues' => $fhirDetectedIssues,
             'clinicalImpressions' => $fhirClinicalImpressions
         ]);

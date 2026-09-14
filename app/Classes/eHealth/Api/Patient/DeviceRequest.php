@@ -36,6 +36,31 @@ class DeviceRequest extends PatientApiBase
     }
 
     /**
+     * Get Device Requests of the patient by search params.
+     *
+     * A dispense is issued against one of these, so the ones offered as `based_on` are read from here
+     * rather than from the local drafts alone (TV 3.22.2.1).
+     *
+     * @param  array{
+     *     status?: string,
+     *     requester_legal_entity?: string,
+     *     encounter_id?: string,
+     *     episode_id?: string,
+     *     device_definition_id?: string,
+     *     page?: int,
+     *     page_size?: int
+     * }  $query
+     */
+    public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
+    {
+        $this->setDefaultPageSize();
+
+        $mergedQuery = array_merge($this->options['query'] ?? [], $query);
+
+        return $this->get(self::URL . "/{$patientId}/device_requests", $mergedQuery);
+    }
+
+    /**
      * Pre-qualify device request data before creation.
      *
      * @see REST API PreQualify Device Request [API-007-020-0009]
