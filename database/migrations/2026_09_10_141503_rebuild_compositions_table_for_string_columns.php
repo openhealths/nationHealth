@@ -231,8 +231,16 @@ return new class extends Migration
             $table->timestampTz('ehealth_updated_at')->nullable();
             $table->timestamps();
 
-            $table->foreign('person_id')->references('id')->on('persons')->nullOnDelete();
-            $table->foreign('preperson_id')->references('id')->on('prepersons')->nullOnDelete();
+            // The patient tables are created by later migrations on a database built
+            // from scratch, so the constraints are only added when they are already
+            // there. Both columns are indexed regardless.
+            if (Schema::hasTable('persons')) {
+                $table->foreign('person_id')->references('id')->on('persons')->nullOnDelete();
+            }
+
+            if (Schema::hasTable('prepersons')) {
+                $table->foreign('preperson_id')->references('id')->on('prepersons')->nullOnDelete();
+            }
         });
     }
 };
