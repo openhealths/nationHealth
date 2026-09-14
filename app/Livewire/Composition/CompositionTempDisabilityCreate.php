@@ -4,20 +4,23 @@ declare(strict_types=1);
 
 namespace App\Livewire\Composition;
 
-use App\Classes\eHealth\EHealth;
+use App\Enums\MergeRequest\Status as MergeRequestStatus;
 use App\Enums\Person\CompositionCategory;
+use App\Enums\Person\CompositionPregnancyPeriodMode;
+use App\Enums\Person\CompositionStatus;
 use App\Enums\Person\CompositionType;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthException;
+use App\Exceptions\MedicalEvents\CompositionGuardException;
 use App\Livewire\Composition\Concerns\DrivesCompositionWizard;
 use App\Livewire\Composition\Forms\CompositionTempDisabilityForm;
 use App\Livewire\Person\Records\BasePatientComponent;
 use App\Models\MedicalEvents\Sql\Composition;
+use App\Models\MergeRequest;
 use App\Models\Person\Person;
 use App\Models\Preperson;
+use App\Services\MedicalEvents\CompositionPregnancyPeriodService;
 use App\Services\MedicalEvents\Fhir;
+use App\Services\MedicalEvents\Mappers\CompositionMapper;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
@@ -130,45 +133,33 @@ class CompositionTempDisabilityCreate extends BasePatientComponent
         }
 
         try {
-            $configurations = EHealth::configuration()->getCompositions([
-                'type' => CompositionType::TEMP_DISABILITY->value,
-                'category' => CompositionCategory::PREGNANCY->value,
-                'is_active' => true,
-            ])->getData();
-        } catch (EHealthConnectionException | EHealthException $exception) {
-            Log::error('Failed to load pregnancy period configuration', ['error' => $exception->getMessage()]);
+            return $this->pregnancyPeriods()->allowedEndDates(
+                $this->form->eventPeriodStart,
+                $this->pregnancyPeriodMode()
+            );
+        } catch (CompositionGuardException $exception) {
+            // Fail closed: without the configuration there is no permitted period to
+            // offer, and a free date entry here would only produce a rejected payload.
+            Session::flash('error', $exception->getMessage());
 
             return [];
         }
+    }
 
-        $start = CarbonImmutable::parse($this->form->eventPeriodStart);
-        $needle = filled($this->form->relatesToTargetUuid) ? 'APPENDED' : 'NEW';
+    /**
+     * Which pregnancy period set applies to the conclusion being built (TV 3.8.2.5.4).
+     */
+    private function pregnancyPeriodMode(): CompositionPregnancyPeriodMode
+    {
+        return CompositionPregnancyPeriodMode::fromRelation(
+            $this->form->relatesToCode,
+            $this->form->relatesToTargetUuid
+        );
+    }
 
-        $days = collect($configurations)
-            ->filter(static fn (mixed $row): bool => is_array($row)
-                && ($needle === 'NEW'
-                    ? !str_contains((string) data_get($row, 'name'), 'APPENDED')
-                    : str_contains((string) data_get($row, 'name'), 'APPENDED')))
-            ->pluck('value')
-            ->flatten()
-            ->filter(static fn (mixed $value) => is_numeric($value))
-            ->map(static fn (mixed $value) => (int) $value);
-
-        if ($days->isEmpty()) {
-            $days = collect($configurations)
-                ->pluck('value')
-                ->flatten()
-                ->filter(static fn (mixed $value) => is_numeric($value))
-                ->map(static fn (mixed $value) => (int) $value);
-        }
-
-        return $days
-            ->unique()
-            ->sort()
-            ->mapWithKeys(static fn (int $count) => [
-                $count => $start->addDays($count - 1)->format(config('app.date_format')),
-            ])
-            ->all();
+    private function pregnancyPeriods(): CompositionPregnancyPeriodService
+    {
+        return app(CompositionPregnancyPeriodService::class);
     }
 
     /**
@@ -272,6 +263,143 @@ class CompositionTempDisabilityCreate extends BasePatientComponent
         );
     }
 
+    /**
+     * Server-side rules the details step must satisfy before anything is signed.
+     *
+     * @throws CompositionGuardException
+     */
+    protected function assertSubmissionAllowed(): void
+    {
+        $category = $this->selectedCategory();
+
+        if ($category === null) {
+            throw new CompositionGuardException(__('patients.composition.errors.category_not_allowed'));
+        }
+
+        // TV 3.8.2.6 — an unidentified patient may only be issued these two categories.
+        if ($this->form->isUnidentified && !$category->isAllowedForPreperson()) {
+            throw new CompositionGuardException(__('patients.composition.errors.category_not_allowed_preperson'));
+        }
+
+        // TV 3.8.2.6.1 — the no-ERLN consequences must be acknowledged, not merely shown.
+        if ($this->form->isUnidentified
+            && $category === CompositionCategory::SICKNESS
+            && !$this->acknowledgedUnidentifiedErln) {
+            throw new CompositionGuardException(__('patients.composition.errors.unidentified_erln_not_acknowledged'));
+        }
+
+        // TV 3.8.2.5.4 — a pregnancy period must be one eHealth publishes as allowed.
+        if ($category->hasRestrictedValidityPeriods()) {
+            $this->pregnancyPeriods()->assertPeriodAllowed(
+                $this->form->eventPeriodStart,
+                $this->form->eventPeriodEnd,
+                $this->pregnancyPeriodMode()
+            );
+        }
+
+        // TV 3.8.2.12, 3.8.2.13 — the chain is re-validated against eHealth, because the
+        // previous conclusion may have been cancelled since the wizard was opened.
+        if (filled($this->form->relatesToTargetUuid)) {
+            $this->assertRelatedConclusionUsable(
+                (string) $this->form->relatesToTargetUuid,
+                $this->form->relatesToCode === CompositionMapper::RELATION_APPENDS
+            );
+        }
+    }
+
+    /**
+     * Load the conclusion this one continues or clarifies, refusing an unusable chain.
+     *
+     * The UUID arrives in the URL, so it is not evidence of anything on its own: it is
+     * resolved locally, re-read from eHealth, and checked against the rules for the
+     * relation being built.
+     *
+     * @throws CompositionGuardException
+     */
+    private function assertRelatedConclusionUsable(string $previousUuid, bool $isContinuation): Composition
+    {
+        $previous = Composition::whereUuid($previousUuid)->first();
+
+        if (!$previous?->isTempDisability) {
+            throw new CompositionGuardException(__('patients.composition.errors.related_not_found'));
+        }
+
+        $authorUuid = $this->authorEmployeeUuid();
+
+        if ($authorUuid === null || $previous->authorUuid !== $authorUuid) {
+            throw new CompositionGuardException(__('patients.composition.errors.related_not_author'));
+        }
+
+        $fresh = $this->lifecycle()->fetchDetailsFor($previous);
+
+        if ($fresh === []) {
+            throw new CompositionGuardException(__('patients.composition.errors.related_unreadable'));
+        }
+
+        $status = CompositionStatus::fromEHealth(data_get($fresh, 'status'));
+
+        if ($status !== CompositionStatus::FINAL) {
+            throw new CompositionGuardException(__('patients.composition.errors.related_not_final'));
+        }
+
+        if (data_get($fresh, 'type.coding.0.code') !== CompositionType::TEMP_DISABILITY->value) {
+            throw new CompositionGuardException(__('patients.composition.errors.related_wrong_type'));
+        }
+
+        $previousCategory = (string) data_get($fresh, 'category.coding.0.code');
+
+        if ($previousCategory !== $this->form->category) {
+            throw new CompositionGuardException(__('patients.composition.errors.related_category_mismatch'));
+        }
+
+        if ($isContinuation) {
+            // A continuation stays with the same patient and must start after the case it
+            // extends; a clarification deliberately crosses from a preperson to the
+            // identified person, so the subject is allowed to differ there.
+            if (data_get($fresh, 'subject.value') !== $this->form->subjectUuid) {
+                throw new CompositionGuardException(__('patients.composition.errors.related_other_patient'));
+            }
+
+            $previousEnd = data_get($fresh, 'event.0.period.end');
+
+            if ($previousEnd !== null
+                && CarbonImmutable::parse($this->form->eventPeriodStart)
+                    ->lessThanOrEqualTo(CarbonImmutable::parse($previousEnd)->startOfDay())) {
+                throw new CompositionGuardException(__('patients.composition.errors.related_period_overlap'));
+            }
+        } elseif (!$this->mayClarify($previous)) {
+            throw new CompositionGuardException(__('patients.composition.errors.related_not_clarifiable'));
+        }
+
+        return $previous;
+    }
+
+    /**
+     * Whether this patient may supersede the given conclusion (TV 3.8.2.12).
+     *
+     * Either the conclusion already belongs to them, or it belongs to an unidentified
+     * record that has since been merged into them — which is exactly the case the
+     * post-identification clarification exists for.
+     */
+    private function mayClarify(Composition $previous): bool
+    {
+        if ($previous->subjectUuid === $this->form->subjectUuid) {
+            return true;
+        }
+
+        $patient = $this->patient();
+
+        if ($patient instanceof Preperson || $previous->prepersonId === null) {
+            return false;
+        }
+
+        return MergeRequest::query()
+            ->whereMasterPersonId($patient->id)
+            ->whereMergePersonId($previous->prepersonId)
+            ->whereIn('status', [MergeRequestStatus::APPROVED->value, MergeRequestStatus::SIGNED->value])
+            ->exists();
+    }
+
     private function applyRelatedConclusion(): void
     {
         $previousUuid = $this->continueFrom ?: $this->refineFrom;
@@ -288,13 +416,20 @@ class CompositionTempDisabilityCreate extends BasePatientComponent
             return;
         }
 
+        // Prefill from the conclusion as eHealth holds it now; the local row is only a
+        // projection and may be behind. Falling back to it keeps the wizard usable when
+        // the read context is incomplete, and the guard at submit re-reads it anyway.
+        $source = $this->lifecycle()->fetchDetailsFor($previous) ?: $previous->data;
+
         if ($this->continueFrom) {
-            $this->form->prefillForContinuation($previous->data);
-            $this->form->category = $previous->category?->value ?? $this->form->category;
+            $this->form->prefillForContinuation($source);
         } else {
-            $this->form->prefillFromPrevious($previous->data);
-            $this->form->category = $previous->category?->value ?? $this->form->category;
+            $this->form->prefillFromPrevious($source);
         }
+
+        $this->form->category = data_get($source, 'category.coding.0.code')
+            ?? $previous->category?->value
+            ?? $this->form->category;
 
         unset($this->pregnancyPeriodOptions);
     }

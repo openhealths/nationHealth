@@ -45,7 +45,11 @@ class CompositionPolicyTest extends TestCase
 
     public function test_outpatient_specialist_with_scopes_may_create_both_conclusion_types(): void
     {
-        ['user' => $user] = $this->actingInEntity(LegalEntity::TYPE_OUTPATIENT, ['composition:create']);
+        ['user' => $user] = $this->actingInEntity(
+            LegalEntity::TYPE_OUTPATIENT,
+            ['composition:create'],
+            Role::SPECIALIST
+        );
 
         $policy = new CompositionPolicy();
 
@@ -53,9 +57,13 @@ class CompositionPolicyTest extends TestCase
         $this->assertTrue($policy->createTempDisability($user)->allowed());
     }
 
-    public function test_primary_care_may_create_a_disability_conclusion_but_not_a_birth_one(): void
+    public function test_primary_care_doctor_may_create_a_disability_conclusion_but_not_a_birth_one(): void
     {
-        ['user' => $user] = $this->actingInEntity(LegalEntity::TYPE_PRIMARY_CARE, ['composition:create']);
+        ['user' => $user] = $this->actingInEntity(
+            LegalEntity::TYPE_PRIMARY_CARE,
+            ['composition:create'],
+            Role::DOCTOR
+        );
 
         $policy = new CompositionPolicy();
 
@@ -66,12 +74,66 @@ class CompositionPolicyTest extends TestCase
         );
     }
 
+    /**
+     * TV 3.8.1.1 / 3.8.2.1 name role and entity type as a pair. Each of these users
+     * satisfies one half of a permitted combination and none of them satisfies a whole
+     * one, so every attempt has to be refused.
+     */
+    public function test_role_and_entity_type_are_required_as_a_pair(): void
+    {
+        $policy = new CompositionPolicy();
+
+        ['user' => $outpatientDoctor] = $this->actingInEntity(
+            LegalEntity::TYPE_OUTPATIENT,
+            ['composition:create'],
+            Role::DOCTOR
+        );
+
+        $this->assertTrue(
+            $policy->createNewborn($outpatientDoctor)->denied(),
+            'An outpatient DOCTOR is not a permitted author of a birth conclusion.'
+        );
+        $this->assertTrue(
+            $policy->createTempDisability($outpatientDoctor)->denied(),
+            'Outpatient disability conclusions are reserved for a SPECIALIST.'
+        );
+
+        ['user' => $primaryCareSpecialist] = $this->actingInEntity(
+            LegalEntity::TYPE_PRIMARY_CARE,
+            ['composition:create'],
+            Role::SPECIALIST
+        );
+
+        $this->assertTrue(
+            $policy->createTempDisability($primaryCareSpecialist)->denied(),
+            'Primary care disability conclusions are reserved for a DOCTOR.'
+        );
+        $this->assertTrue($policy->createNewborn($primaryCareSpecialist)->denied());
+    }
+
+    public function test_a_user_without_a_clinical_employee_record_cannot_create_anything(): void
+    {
+        ['user' => $user, 'employee' => $employee] = $this->actingInEntity(
+            LegalEntity::TYPE_OUTPATIENT,
+            ['composition:create'],
+            Role::SPECIALIST
+        );
+
+        // The scope and the entity type still line up; only the employee is gone.
+        $employee->update(['is_active' => false]);
+
+        $policy = new CompositionPolicy();
+
+        $this->assertTrue($policy->createNewborn($user)->denied());
+        $this->assertTrue($policy->createTempDisability($user)->denied());
+    }
+
     public function test_pharmacy_may_not_create_or_list_conclusions_at_all(): void
     {
         ['user' => $user] = $this->actingInEntity(LegalEntity::TYPE_PHARMACY, [
             'composition:create',
             'composition:search',
-        ]);
+        ], Role::SPECIALIST);
 
         $policy = new CompositionPolicy();
 
@@ -82,7 +144,7 @@ class CompositionPolicyTest extends TestCase
 
     public function test_holding_the_right_entity_type_is_not_enough_without_the_scope(): void
     {
-        ['user' => $user] = $this->actingInEntity(LegalEntity::TYPE_OUTPATIENT, []);
+        ['user' => $user] = $this->actingInEntity(LegalEntity::TYPE_OUTPATIENT, [], Role::SPECIALIST);
 
         $policy = new CompositionPolicy();
 
@@ -141,7 +203,7 @@ class CompositionPolicyTest extends TestCase
     {
         ['user' => $user, 'employee' => $employee] = $this->actingInEntity(
             LegalEntity::TYPE_PRIMARY_CARE,
-            ['composition:create']
+            ['composition:write']
         );
 
         $policy = new CompositionPolicy();
@@ -187,7 +249,7 @@ class CompositionPolicyTest extends TestCase
      * @param  list<string>  $scopes
      * @return array{legalEntity: LegalEntity, user: User, employee: Employee}
      */
-    private function actingInEntity(string $type, array $scopes): array
+    private function actingInEntity(string $type, array $scopes, Role $role = Role::DOCTOR): array
     {
         $typeId = DB::table('legal_entity_types')->where('name', $type)->value('id')
             ?? DB::table('legal_entity_types')->insertGetId(['name' => $type]);
@@ -211,7 +273,8 @@ class CompositionPolicyTest extends TestCase
 
         $user = User::create([
             'uuid' => (string) Str::uuid(),
-            'email' => 'doctor@example.com',
+            // The cross-matrix cases build several users inside one test.
+            'email' => 'doctor+' . Str::random(6) . '@example.com',
             'password' => Hash::make('password'),
             'party_id' => $party->id,
         ]);
@@ -219,7 +282,7 @@ class CompositionPolicyTest extends TestCase
         $employee = Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Ольга Лікарівна',
-            'employee_type' => Role::DOCTOR->value,
+            'employee_type' => $role->value,
             'status' => Status::APPROVED->value,
             'legal_entity_id' => $legalEntity->id,
             'is_active' => true,

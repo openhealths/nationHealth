@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire\Composition;
 
 use App\Enums\Person\CompositionType;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
+use App\Exceptions\MedicalEvents\CompositionGuardException;
 use App\Livewire\Composition\Concerns\DrivesCompositionWizard;
 use App\Livewire\Composition\Forms\CompositionForm;
 use App\Livewire\Person\Records\BasePatientComponent;
@@ -13,6 +16,7 @@ use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Services\MedicalEvents\Fhir;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
@@ -239,6 +243,38 @@ class CompositionCreate extends BasePatientComponent
     protected function detailsRules(): array
     {
         return $this->form->compositionRules($this->sexOptions);
+    }
+
+    /**
+     * TV 3.8.1.3 — a newborn may hold only one birth conclusion that is not in error.
+     *
+     * The local projection alone cannot answer this (a conclusion issued by another MIS
+     * never reaches it), so eHealth is asked as well. A registry that cannot be reached
+     * blocks the attempt rather than waving it through: issuing a second conclusion is
+     * not something that can be undone by the author afterwards.
+     *
+     * @throws CompositionGuardException
+     */
+    protected function assertSubmissionAllowed(): void
+    {
+        if ($this->hasExistingActiveBirthConclusion) {
+            throw new CompositionGuardException(__('patients.composition.errors.newborn_duplicate'));
+        }
+
+        try {
+            $existsRemotely = $this->lifecycle()->hasActiveNewbornConclusion($this->form->prepersonUuid);
+        } catch (EHealthConnectionException | EHealthException $exception) {
+            Log::error('Could not verify whether the newborn already has a birth conclusion', [
+                'preperson' => $this->form->prepersonUuid,
+                'error' => $exception->getMessage(),
+            ]);
+
+            throw new CompositionGuardException(__('patients.composition.errors.newborn_duplicate_unverifiable'));
+        }
+
+        if ($existsRemotely) {
+            throw new CompositionGuardException(__('patients.composition.errors.newborn_duplicate'));
+        }
     }
 
     private function toIsoDate(mixed $value): string

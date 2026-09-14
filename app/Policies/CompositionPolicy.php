@@ -13,13 +13,14 @@ use Illuminate\Auth\Access\Response;
 /**
  * Authorisation for Medical Conclusions (МВН / МВТН).
  *
- * Two independent conditions gate every action, and eHealth enforces both again on its
- * side: the caller must hold the matching `composition:*` scope, and the legal entity
- * they are acting in must be of a type allowed to issue that kind of conclusion
- * (TV 3.8.1.1, 3.8.2.1):
+ * Every action is gated by the matching `composition:*` scope, and creation additionally
+ * by the legal entity type and employee role *as a pair* — TV 3.8.1.1 and 3.8.2.1 name
+ * combinations, not two separate conditions:
  *
- *   - МВН (NEWBORN)          — OUTPATIENT only.
- *   - МВТН (TEMP_DISABILITY) — PRIMARY_CARE or OUTPATIENT.
+ *   - МВН (NEWBORN)          — OUTPATIENT + SPECIALIST.
+ *   - МВТН (TEMP_DISABILITY) — PRIMARY_CARE + DOCTOR, or OUTPATIENT + SPECIALIST.
+ *
+ * eHealth enforces the same rules again on its side.
  */
 class CompositionPolicy
 {
@@ -45,31 +46,50 @@ class CompositionPolicy
     }
 
     /**
-     * Create a birth conclusion — OUTPATIENT only (TV 3.8.1.1).
+     * Create a birth conclusion — OUTPATIENT + SPECIALIST (TV 3.8.1.1).
      */
     public function createNewborn(User $user): Response
     {
-        if (!$user->can('composition:create')) {
-            return Response::deny(__('patients.composition.errors.create_newborn_not_allowed'));
-        }
-
-        return $this->legalEntityType() === LegalEntity::TYPE_OUTPATIENT
-            ? Response::allow()
-            : Response::deny(__('patients.composition.errors.create_newborn_not_allowed'));
+        return $this->mayCreate(
+            $user,
+            CompositionType::NEWBORN,
+            __('patients.composition.errors.create_newborn_not_allowed')
+        );
     }
 
     /**
-     * Create a temporary disability conclusion — PRIMARY_CARE or OUTPATIENT (TV 3.8.2.1).
+     * Create a temporary disability conclusion (TV 3.8.2.1).
+     *
+     * PRIMARY_CARE + DOCTOR, or OUTPATIENT + SPECIALIST.
      */
     public function createTempDisability(User $user): Response
     {
+        return $this->mayCreate(
+            $user,
+            CompositionType::TEMP_DISABILITY,
+            __('patients.composition.errors.create_temp_disability_not_allowed')
+        );
+    }
+
+    /**
+     * The scope, the legal entity type and the employee role, checked as one rule.
+     *
+     * Checking the entity type on its own is what allowed an outpatient DOCTOR to reach
+     * the birth conclusion flow: the pair is the requirement, so the pair is the check.
+     */
+    private function mayCreate(User $user, CompositionType $type, string $denial): Response
+    {
         if (!$user->can('composition:create')) {
-            return Response::deny(__('patients.composition.errors.create_temp_disability_not_allowed'));
+            return Response::deny($denial);
         }
 
-        return $this->inConclusionIssuingEntity()
+        if ($type->allowedAuthorRoles($this->legalEntityType()) === []) {
+            return Response::deny($denial);
+        }
+
+        return $user->getCompositionAuthorEmployee($type) !== null
             ? Response::allow()
-            : Response::deny(__('patients.composition.errors.create_temp_disability_not_allowed'));
+            : Response::deny($denial);
     }
 
     /**
@@ -119,7 +139,9 @@ class CompositionPolicy
      */
     public function resendErln(User $user, Composition $composition): Response
     {
-        if (!$user->can('composition:create')) {
+        // Retrying is a PATCH on an existing conclusion, so it is gated by the write
+        // scope rather than by the one that allows a brand new conclusion to be issued.
+        if (!$user->can('composition:write')) {
             return Response::deny(__('patients.composition.errors.erln_resend_not_allowed'));
         }
 
@@ -158,6 +180,6 @@ class CompositionPolicy
         $authorUuid = $composition->authorUuid;
 
         return filled($authorUuid)
-            && $user->getCompositionAuthorEmployee()?->uuid === $authorUuid;
+            && in_array($authorUuid, $user->getCompositionEmployeeUuids(), true);
     }
 }

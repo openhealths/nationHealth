@@ -11,6 +11,7 @@ use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthErrorTranslator;
 use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\MedicalEvents\CompositionGuardException;
 use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\Person\Person;
 use App\Models\Preperson;
@@ -195,8 +196,27 @@ trait DrivesCompositionWizard
         }
     }
 
+    /**
+     * Adopt one of the authentication methods eHealth returned for this person.
+     *
+     * The list is reloaded rather than trusted from component state, because the action
+     * is reachable with any UUID and eHealth would otherwise be handed an INFORM_WITH
+     * that does not belong to the patient.
+     */
     public function selectAuthMethod(string $methodUuid): void
     {
+        if ($this->authMethods === []) {
+            $this->loadAuthMethods();
+        }
+
+        if (!$this->isKnownAuthMethod($methodUuid)) {
+            $this->addError('form.informWithUuid', __('patients.composition.errors.auth_method_not_offered'));
+
+            Session::flash('error', __('patients.composition.errors.auth_method_not_offered'));
+
+            return;
+        }
+
         $this->form->informWithUuid = $methodUuid;
         $this->acknowledgedMissingAuthMethod = false;
         $this->step = self::STEP_DETAILS;
@@ -204,6 +224,19 @@ trait DrivesCompositionWizard
         if (method_exists($this, 'applyDefaultPeriodDates')) {
             $this->applyDefaultPeriodDates();
         }
+    }
+
+    /**
+     * Whether the UUID is one of the methods eHealth listed for the relevant person.
+     */
+    protected function isKnownAuthMethod(string $methodUuid): bool
+    {
+        // The list is taken straight from the response, so an entry may still carry the
+        // raw eHealth `id` rather than the renamed `uuid` — the view reads both too.
+        return collect($this->authMethods)
+            ->map(static fn (mixed $method): mixed => data_get($method, 'uuid') ?? data_get($method, 'id'))
+            ->filter()
+            ->contains($methodUuid);
     }
 
     /**
@@ -223,14 +256,60 @@ trait DrivesCompositionWizard
         }
     }
 
+    /**
+     * Check everything that must hold, then ask for the author's KEP.
+     *
+     * createComposition transports the conclusion as a detached signature, so the
+     * signature is part of creating it rather than a later step: nothing is sent until
+     * {@see submitComposition()} has something signed to send.
+     */
     public function reviewDetails(): void
     {
         $this->authorize($this->createAbility(), Composition::class);
 
         try {
             $this->form->validate($this->detailsRules());
+            $this->assertSubmissionAllowed();
         } catch (ValidationException $exception) {
             $this->setErrorBag($exception->validator->getMessageBag());
+
+            return;
+        } catch (CompositionGuardException $exception) {
+            $this->reportGuardFailure($exception);
+
+            return;
+        }
+
+        if ($this->authorEmployeeUuid() === null) {
+            Session::flash('error', __('patients.composition.errors.author_not_found'));
+
+            return;
+        }
+
+        $this->form->resetSigningFields();
+        $this->showSignatureModal = true;
+    }
+
+    /**
+     * Sign the mapped conclusion and send it to eHealth (TV 3.8.1.5, 3.8.2.5).
+     *
+     * Every rule checked in {@see reviewDetails()} is checked again here. This action is
+     * a public Livewire endpoint of its own, so the earlier pass is a UX affordance, not
+     * a guarantee that it ran.
+     */
+    public function submitComposition(): void
+    {
+        $this->authorize($this->createAbility(), Composition::class);
+
+        try {
+            $this->form->validate(array_merge($this->detailsRules(), $this->form->signingRules()));
+            $this->assertSubmissionAllowed();
+        } catch (ValidationException $exception) {
+            $this->setErrorBag($exception->validator->getMessageBag());
+
+            return;
+        } catch (CompositionGuardException $exception) {
+            $this->reportGuardFailure($exception);
 
             return;
         }
@@ -244,15 +323,22 @@ trait DrivesCompositionWizard
         }
 
         try {
-            $payload = $this->mapperPayload($authorUuid);
-            Log::info('Submitting medical conclusion payload', ['payload' => $payload]);
+            // The payload is deliberately not logged: it is the patient's medical record.
+            $signedContent = app(SignatureService::class)->signData(
+                $this->mapperPayload($authorUuid),
+                $this->form->password,
+                $this->form->knedp,
+                $this->form->keyContainerUpload,
+                Auth::user()->party->taxId
+            );
 
-            $job = $this->lifecycle()->create($payload);
+            $job = $this->lifecycle()->create($signedContent);
 
             $this->asyncJobId = $job['id'];
             $this->asyncJobStatus = (string) ($job['status'] ?? CompositionLifecycleService::JOB_PENDING);
             $this->asyncJobErrors = [];
             $this->showSignatureModal = false;
+            $this->form->resetSigningFields();
             $this->step = self::STEP_AWAITING_JOB;
         } catch (EHealthResponseException $exception) {
             $details = $exception->getDetails();
@@ -272,6 +358,29 @@ trait DrivesCompositionWizard
 
             Log::error('Failed to submit a medical conclusion', ['error' => $exception->getMessage()]);
         }
+    }
+
+    /**
+     * Type-specific rules that the UI also expresses but cannot enforce.
+     *
+     * @throws CompositionGuardException
+     */
+    protected function assertSubmissionAllowed(): void
+    {
+        // Overridden by the conclusion types that have extra rules.
+    }
+
+    /**
+     * Surface a refused rule both next to the form and as a page-level message.
+     *
+     * The error bag keeps it visible where the user is working; the flash covers the
+     * case where the step has already been left behind.
+     */
+    protected function reportGuardFailure(CompositionGuardException $exception): void
+    {
+        $this->addError('form.guard', $exception->getMessage());
+
+        Session::flash('error', $exception->getMessage());
     }
 
     /**
@@ -367,7 +476,7 @@ trait DrivesCompositionWizard
         }
 
         try {
-            $templateId = $this->conclusionType() === CompositionType::NEWBORN ? '1000' : '1001';
+            $templateId = $this->conclusionType()->printTemplateId();
             $response = EHealth::composition()->getPrintForm(
                 $this->encounterSubjectUuid(),
                 $this->compositionUuid,
@@ -477,9 +586,13 @@ trait DrivesCompositionWizard
         ], $extra));
     }
 
+    /**
+     * Employee the conclusion is authored as, restricted to the role TV 3.8 allows for
+     * this conclusion type in the current legal entity.
+     */
     protected function authorEmployeeUuid(): ?string
     {
-        return Auth::user()?->getCompositionAuthorEmployee()?->uuid;
+        return Auth::user()?->getCompositionAuthorEmployee($this->conclusionType())?->uuid;
     }
 
     protected function lifecycle(): CompositionLifecycleService

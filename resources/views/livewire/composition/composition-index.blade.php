@@ -97,7 +97,49 @@
                 </button>
             </div>
 
-            <div class="space-y-4">
+            {{--
+                TV 3.8.2.12 — conclusions of an unidentified record that has since been
+                merged into this patient are stored against the preperson, so they are
+                surfaced here rather than in the patient's own list.
+            --}}
+            @if ($this->clarifiableUnidentifiedConclusions->isNotEmpty())
+                <div class="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/20">
+                    <p class="font-semibold text-gray-900 dark:text-gray-100">
+                        {{ __('patients.composition.clarification.title') }}
+                    </p>
+                    <p class="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                        {{ __('patients.composition.clarification.hint') }}
+                    </p>
+
+                    <ul class="mt-3 space-y-2">
+                        @foreach ($this->clarifiableUnidentifiedConclusions as $clarifiable)
+                            <li
+                                class="flex flex-wrap items-center gap-3"
+                                wire:key="clarifiable-{{ $clarifiable->id }}"
+                            >
+                                <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                    {{ $clarifiable->title ?: $clarifiable->uuid }}
+                                </span>
+                                <span class="text-sm text-gray-600 dark:text-gray-400">
+                                    {{ $clarifiable->eventPeriodStartDate }} — {{ $clarifiable->eventPeriodEndDate }}
+                                </span>
+                                <a
+                                    href="{{ $this->refineUrl($clarifiable) }}"
+                                    class="button-primary px-4 py-1.5 text-xs"
+                                >
+                                    {{ __('patients.composition.actions.clarify_after_identification') }}
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            {{--
+                Cancellation and the ERLN retry finish asynchronously in eHealth, so the
+                list keeps asking until every outstanding job has an answer.
+            --}}
+            <div class="space-y-4" @if ($this->hasPendingAsyncJobs) wire:poll.5s="pollAsyncJobs" @endif>
                 @forelse ($this->paginatedCompositions as $composition)
                     <div class="record-inner-card" wire:key="composition-{{ $composition->id }}">
                         <div class="record-inner-header">
@@ -115,6 +157,17 @@
                                         {{ $composition->status->label() }}
                                     </span>
                                 </div>
+
+                                @if ($composition->asyncJobStatus === \App\Services\MedicalEvents\CompositionLifecycleService::JOB_PENDING)
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                        {{ __('patients.composition.async.pending') }}
+                                    </p>
+                                @elseif ($composition->asyncJobStatus === \App\Services\MedicalEvents\CompositionLifecycleService::JOB_FAILED)
+                                    <p class="mt-1 text-xs text-red-600 dark:text-red-400">
+                                        {{ __('patients.composition.async.failed') }}
+                                        {{ $composition->asyncJobError }}
+                                    </p>
+                                @endif
                             </div>
 
                             <div class="record-inner-action-col">

@@ -45,7 +45,7 @@ class CompositionLifecycleServiceTest extends TestCase
             'data' => ['id' => 'job-1', 'eta' => '2026-08-13T12:35:49.956Z', 'status' => 'PENDING'],
         ]);
 
-        $job = $this->service()->create(['type' => 'TEMP_DISABILITY']);
+        $job = $this->service()->create('base64-signed-payload');
 
         $this->assertSame('job-1', $job['id']);
         $this->assertSame('PENDING', $job['status']);
@@ -54,6 +54,31 @@ class CompositionLifecycleServiceTest extends TestCase
             Composition::count(),
             'A conclusion must not be mirrored locally before eHealth has assigned it an id.'
         );
+    }
+
+    /**
+     * createComposition transports the conclusion as a detached signature, so the body
+     * must be the signed content under `data` and never the mapper array itself.
+     */
+    public function test_create_sends_the_signed_payload_wrapped_in_data(): void
+    {
+        $this->fakeApi(['data' => ['id' => 'job-1', 'status' => 'PENDING']]);
+
+        $this->service()->create('base64-signed-payload');
+
+        Http::assertSent(static function ($request): bool {
+            return str_contains($request->url(), '/composition')
+                && $request->data() === ['data' => 'base64-signed-payload'];
+        });
+    }
+
+    public function test_cancel_and_erln_retry_return_the_job_they_scheduled(): void
+    {
+        $this->fakeApi(['data' => ['id' => 'job-cancel', 'status' => 'PENDING']]);
+        $this->assertSame('job-cancel', $this->service()->cancel(self::COMPOSITION_ID, 'signed')['id']);
+
+        $this->fakeApi(['data' => ['id' => 'job-erln', 'status' => 'PENDING']]);
+        $this->assertSame('job-erln', $this->service()->resendErln(self::COMPOSITION_ID)['id']);
     }
 
     public function test_job_status_reports_pending_without_a_composition_id(): void
@@ -264,9 +289,15 @@ class CompositionLifecycleServiceTest extends TestCase
      */
     private function fakeApi(array $response, int $status = 200): void
     {
+        $factory = Http::getFacadeRoot();
+
+        // Http::fake() appends, so the previous catch-all would keep answering instead.
+        (function (): void {
+            $this->stubCallbacks = collect();
+        })->call($factory);
+
         Http::fake(['*' => Http::response($response, $status)]);
 
-        $factory = Http::getFacadeRoot();
         $api = new CompositionApi($factory);
         $api->stub((function () {
             return $this->stubCallbacks;

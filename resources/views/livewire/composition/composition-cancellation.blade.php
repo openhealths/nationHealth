@@ -4,8 +4,16 @@
     The action is inseparable from signing it, so it reuses the shared KEP modal and adds
     the reason as a custom field rather than presenting two dialogs in sequence.
 --}}
-<x-signature-modal method="cancelComposition" :agreementText="__('patients.composition.cancel.warning_message')">
+<x-signature-modal method="cancelComposition">
     <x-slot name="customFields">
+        {{--
+            TV 3.8.2.15.3 — the consequences of cancelling a МВТН must be shown verbatim
+            before the signature, so the text is rendered with its own line breaks intact.
+        --}}
+        <div class="rounded-lg border border-red-300 bg-red-50 p-4 dark:border-red-700 dark:bg-red-900/20">
+            <p class="text-sm whitespace-pre-line text-red-700 dark:text-red-300">{{ $this->cancellationWarning }}</p>
+        </div>
+
         <div>
             <label for="cancel-reason" class="default-label">
                 {{ __('patients.composition.cancel.reason_label') }} *

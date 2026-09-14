@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Models\MedicalEvents\Sql;
 
 use App\Casts\EHealthTimestampCast;
+use App\Enums\Person\CompositionAsyncOperation;
 use App\Enums\Person\CompositionCategory;
 use App\Enums\Person\CompositionStatus;
 use App\Enums\Person\CompositionType;
 use App\Models\Person\Person;
 use App\Models\Preperson;
+use App\Services\MedicalEvents\CompositionLifecycleService;
 use Carbon\CarbonImmutable;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -55,6 +57,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $relatesToTargetUuid
  * @property string|null $asyncJobId
  * @property string|null $asyncJobStatus
+ * @property CompositionAsyncOperation|null $asyncJobOperation
+ * @property string|null $asyncJobError
  * @property string|null $erlnStatus
  * @property string|null $erlnRecordNumber
  * @property string|null $erlnStatusMessage
@@ -102,6 +106,8 @@ class Composition extends Model
         'relates_to_target_uuid',
         'async_job_id',
         'async_job_status',
+        'async_job_operation',
+        'async_job_error',
         'erln_status',
         'erln_record_number',
         'erln_status_message',
@@ -124,6 +130,7 @@ class Composition extends Model
             'status' => CompositionStatus::class,
             'type' => CompositionType::class,
             'category' => CompositionCategory::class,
+            'async_job_operation' => CompositionAsyncOperation::class,
             'is_accident' => 'boolean',
             'is_intoxicated' => 'boolean',
             'is_foreign_treatment' => 'boolean',
@@ -322,6 +329,21 @@ class Composition extends Model
     protected function excludingErrors(Builder $query): Builder
     {
         return $query->where('status', '!=', CompositionStatus::ENTERED_IN_ERROR->value);
+    }
+
+    /**
+     * Conclusions with an async request eHealth has not finished yet.
+     *
+     * These are what the list poller has to keep asking about: until the job completes,
+     * the local row does not yet reflect what was requested.
+     */
+    #[Scope]
+    protected function awaitingAsyncJob(Builder $query): Builder
+    {
+        return $query
+            ->whereNotNull('async_job_id')
+            ->whereNotNull('async_job_operation')
+            ->where('async_job_status', CompositionLifecycleService::JOB_PENDING);
     }
 
     /**

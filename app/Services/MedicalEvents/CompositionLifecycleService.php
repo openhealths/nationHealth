@@ -31,20 +31,42 @@ class CompositionLifecycleService
     public const string JOB_FAILED = 'FAILED';
 
     /**
-     * Submit a conclusion request payload and return the async job it scheduled.
+     * Submit a conclusion and return the async job it scheduled.
      *
-     * @param  array<string, mixed>  $payload
+     * createComposition carries the whole conclusion as a detached signature, so what is
+     * sent is the KEP-signed payload rather than the mapper array itself. Taking the
+     * signed string as the parameter keeps it impossible to call this with an unsigned
+     * body by mistake.
+     *
+     * @param  string  $signedContent  Base64-encoded PKCS#7 signed createComposition body.
      * @return array{id: string|null, eta: string|null, status: string|null}
      */
-    public function create(array $payload): array
+    public function create(string $signedContent): array
     {
-        $data = EHealth::composition()->create($payload)->getData();
+        return $this->jobFrom(EHealth::composition()->create(['data' => $signedContent])->getData());
+    }
 
-        return [
-            'id' => data_get($data, 'id'),
-            'eta' => data_get($data, 'eta'),
-            'status' => data_get($data, 'status'),
-        ];
+    /**
+     * Mark a conclusion as entered in error and return the async job it scheduled.
+     *
+     * @param  string  $signedContent  Base64-encoded PKCS#7 signed cancellation body.
+     * @return array{id: string|null, eta: string|null, status: string|null}
+     */
+    public function cancel(string $compositionUuid, string $signedContent): array
+    {
+        return $this->jobFrom(
+            EHealth::composition()->cancel($compositionUuid, ['data' => $signedContent])->getData()
+        );
+    }
+
+    /**
+     * Retry ERLN registration and return the async job it scheduled.
+     *
+     * @return array{id: string|null, eta: string|null, status: string|null}
+     */
+    public function resendErln(string $compositionUuid): array
+    {
+        return $this->jobFrom(EHealth::composition()->resendErln($compositionUuid)->getData());
     }
 
     /**
@@ -137,16 +159,76 @@ class CompositionLifecycleService
     }
 
     /**
+     * Re-read a locally projected conclusion straight from eHealth.
+     *
+     * Chain rules (TV 3.8.2.12, 3.8.2.13) have to be decided on the conclusion as it
+     * exists now, not on the copy this MIS happened to cache: a conclusion may have been
+     * cancelled or superseded elsewhere since the row was written.
+     *
+     * @return array<string, mixed> Empty when the read context is incomplete.
+     */
+    public function fetchDetailsFor(Composition $composition): array
+    {
+        if (!$composition->hasReadContext) {
+            return [];
+        }
+
+        return $this->fetchDetails(
+            (string) $composition->patientUuid,
+            $composition->uuid,
+            (string) $composition->episodeOfCareUuid,
+            (string) $composition->encounterUuid
+        );
+    }
+
+    /**
+     * Whether eHealth already holds a birth conclusion for this newborn (TV 3.8.1.3).
+     *
+     * A newborn may carry only one conclusion that is not in error, so the check has to
+     * reach eHealth: a conclusion issued by another MIS never appears in the local
+     * projection, and relying on that projection alone would permit a duplicate.
+     */
+    public function hasActiveNewbornConclusion(string $prepersonUuid): bool
+    {
+        $response = EHealth::composition()->search([
+            'subject' => $prepersonUuid,
+            'type' => CompositionType::NEWBORN->value,
+        ]);
+
+        $results = $response->getData();
+
+        if (empty($results)) {
+            $results = $response->json() ?? [];
+        }
+
+        return collect($results)
+            ->filter(static fn (mixed $item): bool => is_array($item))
+            ->contains(static fn (array $item): bool => CompositionStatus::fromEHealth(data_get($item, 'status'))
+                !== CompositionStatus::ENTERED_IN_ERROR);
+    }
+
+    /**
      * Submit the author's signature over the conclusion.
      *
      * @return array{id: string|null, eta: string|null, status: string|null}
      */
     public function sign(string $compositionUuid, string $signedContent): array
     {
-        $data = EHealth::composition()->sign($compositionUuid, ['data' => $signedContent])->getData();
+        return $this->jobFrom(
+            EHealth::composition()->sign($compositionUuid, ['data' => $signedContent])->getData()
+        );
+    }
 
+    /**
+     * Normalise the async job every write endpoint answers with.
+     *
+     * @return array{id: string|null, eta: string|null, status: string|null}
+     */
+    private function jobFrom(mixed $data): array
+    {
         return [
-            'id' => data_get($data, 'id'),
+            // The response reader renames eHealth's `id` to `uuid`, so accept either.
+            'id' => data_get($data, 'id') ?? data_get($data, 'uuid'),
             'eta' => data_get($data, 'eta'),
             'status' => data_get($data, 'status'),
         ];

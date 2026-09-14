@@ -10,6 +10,7 @@ use App\Enums\Status;
 use App\Enums\User\Role;
 use InvalidArgumentException;
 use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
+use App\Enums\Person\CompositionType;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
 use App\Models\Employee\Employee;
@@ -518,9 +519,38 @@ class User extends Authenticatable implements MustVerifyEmail
      *
      * @return Employee|null
      */
-    public function getCompositionAuthorEmployee(): ?Employee
+    /**
+     * Employee this user would author a medical conclusion as.
+     *
+     * With a type given, only the roles TV 3.8 permits for that conclusion in the current
+     * legal entity are considered, so a user who holds several employee records cannot
+     * slip through on the strength of an unrelated one.
+     */
+    public function getCompositionAuthorEmployee(?CompositionType $type = null): ?Employee
     {
-        return $this->getWriterEmployeeByRolePriority(Role::DOCTOR, Role::SPECIALIST);
+        if ($type === null) {
+            return $this->getWriterEmployeeByRolePriority(Role::DOCTOR, Role::SPECIALIST);
+        }
+
+        $roles = $type->allowedAuthorRoles(legalEntity()?->type?->name);
+
+        return $roles === [] ? null : $this->getWriterEmployeeByRolePriority(...$roles);
+    }
+
+    /**
+     * Every employee of this user that may act on a medical conclusion here.
+     *
+     * Authorship is compared against all of them, because the conclusion may have been
+     * authored under a different one of this user's roles than the one currently in play.
+     *
+     * @return array<int, string>
+     */
+    public function getCompositionEmployeeUuids(): array
+    {
+        return $this->getWriterEmployeeCandidates(Role::DOCTOR, Role::SPECIALIST)
+            ->pluck('uuid')
+            ->filter()
+            ->all();
     }
 
     /**

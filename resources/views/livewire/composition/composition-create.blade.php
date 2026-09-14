@@ -368,6 +368,10 @@
                     </div>
                 @endif
 
+                @error('form.guard')
+                    <p class="text-error mb-4">{{ $message }}</p>
+                @enderror
+
                 <div class="flex flex-wrap gap-2">
                     <button type="button" wire:click="reviewDetails" class="button-primary px-5 py-2.5 text-sm">
                         {{ __('forms.sign_with_KEP') }}

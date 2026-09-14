@@ -352,6 +352,10 @@
                     </div>
                 @endif
 
+                @error('form.guard')
+                    <p class="text-error mb-4">{{ $message }}</p>
+                @enderror
+
                 <div class="flex flex-wrap gap-2">
                     <button
                         type="button"

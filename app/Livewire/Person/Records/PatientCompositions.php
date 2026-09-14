@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\Livewire\Person\Records;
 
 use App\Classes\eHealth\EHealth;
+use App\Enums\MergeRequest\Status as MergeRequestStatus;
+use App\Enums\Person\CompositionAsyncOperation;
+use App\Enums\Person\CompositionCategory;
 use App\Enums\Person\CompositionStatus;
 use App\Enums\Person\CompositionType;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\Composition\Forms\CompositionCancellationForm;
 use App\Models\MedicalEvents\Sql\Composition;
+use App\Models\MergeRequest;
 use App\Models\Preperson;
 use App\Services\MedicalEvents\CompositionLifecycleService;
 use App\Services\SignatureService;
@@ -44,11 +48,6 @@ class PatientCompositions extends BasePatientComponent
 {
     use WithFileUploads;
     use WithPagination;
-
-    /**
-     * Async job status reported by eHealth while a request is still being processed.
-     */
-    private const string JOB_STATUS_PENDING = 'PENDING';
 
     public CompositionCancellationForm $form;
 
@@ -258,7 +257,7 @@ class PatientCompositions extends BasePatientComponent
         $this->authorize('view', $composition);
 
         try {
-            $templateId = $composition->isNewborn ? '1000' : '1001';
+            $templateId = $composition->type->printTemplateId();
             $response = EHealth::composition()->getPrintForm(
                 $composition->patientUuid,
                 $composition->uuid,
@@ -326,6 +325,7 @@ class PatientCompositions extends BasePatientComponent
         }
 
         $this->cancellingCompositionUuid = $compositionUuid;
+        unset($this->cancellationReasons, $this->cancellationWarning);
         $this->form->resetCancellationFields();
         $this->form->resetSigningFields();
         $this->showSignatureModal = true;
@@ -401,6 +401,21 @@ class PatientCompositions extends BasePatientComponent
     }
 
     /**
+     * Consequences the user must read before cancelling (TV 3.8.1.10.3, 3.8.2.15.3).
+     */
+    #[Computed]
+    public function cancellationWarning(): string
+    {
+        $composition = $this->cancellingCompositionUuid
+            ? $this->findLocalComposition($this->cancellingCompositionUuid)
+            : null;
+
+        return $composition?->isNewborn
+            ? __('patients.composition.cancel.warning_message_newborn')
+            : __('patients.composition.cancel.warning_message');
+    }
+
+    /**
      * Sign and submit the cancelComposition request.
      * ТЗ 3.8.1.10.4 / 3.8.2.15.4
      */
@@ -425,6 +440,16 @@ class PatientCompositions extends BasePatientComponent
 
         $this->authorize('cancel', $composition);
 
+        // TV 3.8.1.10.1 — re-checked here rather than only when the modal opened. The
+        // modal can stay open for as long as signing takes, and DRACS / DIIA processing
+        // may well have started in between.
+        if ($composition->isNewborn && $this->lifecycle()->hasIntegrationProcesses($composition)) {
+            $this->closeCancellationModal();
+            Session::flash('error', __('patients.composition.errors.cancel_has_integration'));
+
+            return;
+        }
+
         try {
             /** @var SignatureService $signer */
             $signer = app(SignatureService::class);
@@ -437,11 +462,17 @@ class PatientCompositions extends BasePatientComponent
                 Auth::user()->party->taxId
             );
 
-            EHealth::composition()->cancel($composition->uuid, ['data' => $signedContent]);
+            $job = $this->lifecycle()->cancel($composition->uuid, $signedContent);
 
-            // eHealth processes the cancellation asynchronously, so the conclusion is not in
-            // error yet. Record the job and let the poller move the status once it is done.
-            $composition->update(['async_job_status' => self::JOB_STATUS_PENDING]);
+            // eHealth processes the cancellation asynchronously, so the conclusion is not
+            // in error yet. The job is recorded so the poller can finish the job off;
+            // discarding it would leave the row permanently claiming to be pending.
+            $composition->update([
+                'async_job_id' => $job['id'],
+                'async_job_status' => $job['status'] ?? CompositionLifecycleService::JOB_PENDING,
+                'async_job_operation' => CompositionAsyncOperation::CANCEL->value,
+                'async_job_error' => null,
+            ]);
 
             $this->closeCancellationModal();
             Session::flash('success', __('patients.composition.messages.cancellation_submitted'));
@@ -452,6 +483,99 @@ class PatientCompositions extends BasePatientComponent
                 'compositionUuid' => $this->cancellingCompositionUuid,
                 'error' => $e->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Advance every conclusion whose async request eHealth has now finished.
+     *
+     * Driven from the list by `wire:poll`, because cancellation and the ERLN retry both
+     * complete after the user has left the modal behind (TV 3.8.2.14, 3.8.2.15.4).
+     */
+    public function pollAsyncJobs(): void
+    {
+        foreach ($this->pendingJobCompositions() as $composition) {
+            $this->advanceAsyncJob($composition);
+        }
+
+        unset($this->paginatedCompositions, $this->hasPendingAsyncJobs);
+    }
+
+    /**
+     * Whether the list should keep polling.
+     */
+    #[Computed]
+    public function hasPendingAsyncJobs(): bool
+    {
+        return $this->pendingJobCompositions()->isNotEmpty();
+    }
+
+    /**
+     * @return Collection<int, Composition>
+     */
+    private function pendingJobCompositions(): Collection
+    {
+        return Composition::forPatient($this->patient())
+            ->awaitingAsyncJob()
+            ->get();
+    }
+
+    /**
+     * Apply the outcome of one finished job to the local projection.
+     *
+     * The local state is only moved on DONE. A PENDING job says nothing yet, and a
+     * FAILED one means the conclusion is exactly as it was — the failure is recorded so
+     * the list can explain why nothing changed.
+     */
+    private function advanceAsyncJob(Composition $composition): void
+    {
+        try {
+            $status = $this->lifecycle()->jobStatus((string) $composition->asyncJobId);
+        } catch (Throwable $exception) {
+            Log::error('Failed to read a composition async job', [
+                'compositionUuid' => $composition->uuid,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return;
+        }
+
+        if ($status['status'] === CompositionLifecycleService::JOB_FAILED) {
+            $composition->update([
+                'async_job_status' => CompositionLifecycleService::JOB_FAILED,
+                'async_job_error' => implode(' ', $status['errors'])
+                    ?: __('patients.composition.errors.async_job_failed'),
+            ]);
+
+            return;
+        }
+
+        if ($status['status'] !== CompositionLifecycleService::JOB_DONE) {
+            return;
+        }
+
+        $operation = $composition->asyncJobOperation;
+
+        $composition->update([
+            'async_job_status' => CompositionLifecycleService::JOB_DONE,
+            'async_job_error' => null,
+        ]);
+
+        if ($operation === CompositionAsyncOperation::CANCEL) {
+            $composition->update(['status' => CompositionStatus::ENTERED_IN_ERROR->value]);
+
+            return;
+        }
+
+        if ($operation === CompositionAsyncOperation::ERLN_RETRY) {
+            try {
+                $this->lifecycle()->syncIntegration($composition->fresh());
+            } catch (Throwable $exception) {
+                Log::error('Failed to refresh ERLN status after a retry', [
+                    'compositionUuid' => $composition->uuid,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
         }
     }
 
@@ -506,14 +630,17 @@ class PatientCompositions extends BasePatientComponent
         $this->authorize('resendErln', $composition);
 
         try {
-            EHealth::composition()->resendErln($composition->uuid);
+            $job = $this->lifecycle()->resendErln($composition->uuid);
 
-            try {
-                $this->lifecycle()->syncIntegration($composition->fresh());
-            } catch (Throwable) {
-                // The resend itself is asynchronous; failing to refresh the cached
-                // status must not look like the retry never left.
-            }
+            // The retry is asynchronous: the ERLN status will not change until the job
+            // finishes, so the job is recorded and the list poller reports the outcome
+            // instead of an immediate refresh that can only show the stale status.
+            $composition->update([
+                'async_job_id' => $job['id'],
+                'async_job_status' => $job['status'] ?? CompositionLifecycleService::JOB_PENDING,
+                'async_job_operation' => CompositionAsyncOperation::ERLN_RETRY->value,
+                'async_job_error' => null,
+            ]);
 
             $this->closeErlnResendModal();
             Session::flash('success', __('patients.composition.messages.erln_resent_successfully'));
@@ -591,10 +718,15 @@ class PatientCompositions extends BasePatientComponent
      */
     private function refreshFromEHealth(): void
     {
+        // TV 3.8.1.9 / 3.8.2.11 — searching is its own capability, and a user who may not
+        // see conclusions here must not be able to pull them into the local table either.
+        $this->authorize('viewAny', Composition::class);
+
         try {
             // `subject` and `focus` are mutually exclusive, so searching by an explicit
             // focus replaces the implicit search by the patient being viewed.
             $searchByFocus = filled($this->filterSectionFocusUuid);
+            $limit = (int) config('ehealth.api.page_size', 15);
 
             $query = array_filter([
                 'subject' => $searchByFocus ? null : $this->uuid,
@@ -603,6 +735,10 @@ class PatientCompositions extends BasePatientComponent
                 'status' => $this->filterStatus ?: null,
                 'encounter' => $this->filterEncounterId ?: null,
                 'episodeOfCare' => $this->filterEpisodeOfCareId ?: null,
+                // The remote result set is paged independently of the local one, so the
+                // page currently being viewed decides which slice is worth fetching.
+                'offset' => max(0, ($this->getPage() - 1) * $limit) ?: null,
+                'limit' => $limit,
             ]);
 
             $response = EHealth::composition()->search($query);
@@ -611,6 +747,48 @@ class PatientCompositions extends BasePatientComponent
         } catch (EHealthConnectionException | EHealthException $exception) {
             $exception->handle('Error searching compositions');
         }
+    }
+
+    /**
+     * Conclusions of a merged-in unidentified record that may now be clarified.
+     *
+     * TV 3.8.2.12 — once an unidentified patient has been identified and their records
+     * merged, the last SICKNESS МВТН issued to them can be superseded by one for the
+     * identified person, which is what creates the ERLN record they never got. Those
+     * rows are stored against the preperson, so they never appear in this patient's own
+     * list and have to be surfaced explicitly.
+     *
+     * @return Collection<int, Composition>
+     */
+    #[Computed]
+    public function clarifiableUnidentifiedConclusions(): Collection
+    {
+        $patient = $this->patient();
+
+        if ($patient instanceof Preperson) {
+            return collect();
+        }
+
+        $mergedPrepersonIds = MergeRequest::query()
+            ->whereMasterPersonId($patient->id)
+            ->whereIn('status', [MergeRequestStatus::APPROVED->value, MergeRequestStatus::SIGNED->value])
+            ->pluck('merge_person_id');
+
+        if ($mergedPrepersonIds->isEmpty()) {
+            return collect();
+        }
+
+        return Composition::query()
+            ->whereIn('preperson_id', $mergedPrepersonIds)
+            ->ofType(CompositionType::TEMP_DISABILITY)
+            ->where('category', CompositionCategory::SICKNESS->value)
+            ->final()
+            // Only the newest one per merged record is offered: clarifying an already
+            // superseded conclusion is not what TV 3.8.2.12 describes.
+            ->orderByDesc('event_period_start')
+            ->get()
+            ->unique('preperson_id')
+            ->values();
     }
 
     /**
