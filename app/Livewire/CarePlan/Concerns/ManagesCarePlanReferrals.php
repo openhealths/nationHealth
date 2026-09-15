@@ -352,7 +352,7 @@ trait ManagesCarePlanReferrals
             : 'device_request';
 
         try {
-            $activity = $this->ownedActivity((int) $requestRecord->basedOnId);
+            $activity = $this->ownedActivityByBasedOnUuid($requestRecord->basedOn?->value);
             if (!$activity) {
                 throw new \RuntimeException('Призначення для направлення не знайдено');
             }
@@ -403,7 +403,7 @@ trait ManagesCarePlanReferrals
         } catch (EHealthValidationException $e) {
             if ($e->isDuplicateReferralError()) {
                 try {
-                    $activity = $this->ownedActivity((int) $requestRecord->basedOnId);
+                    $activity = $this->ownedActivityByBasedOnUuid($requestRecord->basedOn?->value);
                     if (!$activity) {
                         throw new \RuntimeException('Призначення для направлення не знайдено');
                     }
@@ -614,7 +614,7 @@ trait ManagesCarePlanReferrals
         }
 
         try {
-            $activity = $this->ownedActivity((int) $requestRecord->basedOnId);
+            $activity = $this->ownedActivityByBasedOnUuid($requestRecord->basedOn?->value);
             if (!$activity) {
                 throw new \RuntimeException('Призначення для направлення не знайдено');
             }

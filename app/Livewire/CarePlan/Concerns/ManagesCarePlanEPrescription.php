@@ -113,7 +113,7 @@ trait ManagesCarePlanEPrescription
             return;
         }
 
-        $issuedQty = \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::where('based_on_id', $activity->id)
+        $issuedQty = \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::whereHas('basedOn', fn ($q) => $q->where('value', $activity->uuid))
             ->whereNotIn('status', \App\Repositories\MedicalEvents\MedicalEventsRequestStatuses::EXCLUDED_FROM_ISSUED_SUM)
             ->sum('medication_qty');
 
@@ -199,10 +199,13 @@ trait ManagesCarePlanEPrescription
             ? (string) $this->ePrescriptionEligibleEncounters[0]['id']
             : '';
 
+        // eHealth MedicationRequest expects a drug id; activity.productReference is INNM dosage.
+        $resolvedMedicationId = (string) ($this->ePrescriptionSelectedProduct['id'] ?? $activity->productReference);
+
         $this->ePrescriptionForm = [
             'activity_id' => $activity->id,
             'encounter_id' => $defaultEncounterId,
-            'medication_id' => $activity->productReference,
+            'medication_id' => $resolvedMedicationId,
             'started_at' => now()->toDateString(),
             'duration' => 10,
             'ended_at' => '',
@@ -467,8 +470,8 @@ trait ManagesCarePlanEPrescription
                 return;
             }
 
-            $activityIds = $this->carePlan->activities->pluck('id')->toArray();
-            $localRequests = \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::whereIn('based_on_id', $activityIds)->get();
+            $activityUuids = $this->carePlan->activities->pluck('uuid')->toArray();
+            $localRequests = \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::whereHas('basedOn', fn ($q) => $q->whereIn('value', $activityUuids))->get();
 
             if ($localRequests->isEmpty()) {
                 $this->flashOutcome('info', 'Немає виписаних рецептів для синхронізації у цьому плані лікування');

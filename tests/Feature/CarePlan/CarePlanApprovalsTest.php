@@ -10,6 +10,7 @@ use App\Models\Employee\Employee;
 use App\Models\Relations\Party;
 use App\Models\User;
 use App\Models\Person\Person;
+use App\Services\MedicalEvents\CarePlanApprovalService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -369,5 +370,103 @@ class CarePlanApprovalsTest extends TestCase
             app(\App\Services\MedicalEvents\CarePlanApprovalService::class)
                 ->resolveAccessLevel($carePlan, $activeLegalEntity)
         );
+    }
+
+    public function test_pending_approval_row_offers_revoke(): void
+    {
+        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+
+        $legalEntity = LegalEntity::create([
+            'uuid' => (string) Str::uuid(),
+            'status' => 'ACTIVE',
+            'sync_status' => 'COMPLETED',
+            'legal_entity_type_id' => $typeId,
+            'is_active' => true,
+        ]);
+        $this->instance('legalEntity', $legalEntity);
+
+        $party = Party::create([
+            'uuid' => (string) Str::uuid(),
+            'first_name' => 'Doctor',
+            'last_name' => 'Who',
+            'tax_id' => '1234567890',
+            'birth_date' => '1970-01-01',
+            'gender' => 'MALE',
+        ]);
+
+        $user = User::create([
+            'uuid' => (string) Str::uuid(),
+            'email' => 'revoke_'.Str::random(6).'@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'party_id' => $party->id,
+        ]);
+
+        $employee = Employee::create([
+            'uuid' => (string) Str::uuid(),
+            'full_name' => 'Dr. Active',
+            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
+            'status' => \App\Enums\Status::APPROVED->value,
+            'legal_entity_id' => $legalEntity->id,
+            'is_active' => true,
+            'position' => 'Doctor',
+            'start_date' => now()->format('Y-m-d'),
+            'user_id' => $user->id,
+            'party_id' => $party->id,
+        ]);
+        $user->employees()->attach($employee->id);
+
+        $person = Person::create([
+            'uuid' => (string) Str::uuid(),
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'birth_date' => '1990-01-01',
+            'gender' => 'MALE',
+            'patient_signed' => true,
+            'process_disclosure_data_consent' => true,
+        ]);
+
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $person->id,
+            'author_id' => $employee->id,
+            'legal_entity_id' => $legalEntity->id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'Pending revoke plan',
+            'status' => 'active',
+            'terms_of_service' => 'INPATIENT',
+        ]);
+
+        $identifier = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $employee->uuid]);
+        \App\Models\MedicalEvents\Sql\Approval::create([
+            'uuid' => (string) Str::uuid(),
+            'approvable_type' => CarePlan::class,
+            'approvable_id' => $carePlan->id,
+            'granted_to_id' => $identifier->id,
+            'granted_to_type' => 'employee',
+            'status' => 'pending',
+            'is_verified' => false,
+        ]);
+
+        $approvalService = Mockery::mock(CarePlanApprovalService::class)->makePartial();
+        $approvalService->shouldReceive('syncForCarePlan')->andReturnNull();
+        $approvalService->shouldReceive('skipsPatientOtp')->andReturn(true);
+        $this->instance(CarePlanApprovalService::class, $approvalService);
+
+        $mockPatientApi = Mockery::mock(\App\Classes\eHealth\Api\Person::class);
+        $this->instance(\App\Classes\eHealth\Api\Person::class, $mockPatientApi);
+        $authResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $authResponse->shouldReceive('getData')->andReturn([]);
+        $mockPatientApi->shouldReceive('getAuthMethods')->andReturn($authResponse);
+
+        $this->actingAs($user);
+        $this->grantMedicalEventAbilities($user);
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanApprovals::class, [
+            'legalEntity' => $legalEntity,
+            'carePlan' => $carePlan->fresh(),
+        ])
+            ->assertSee(__('care-plan.revoke_approval'), false)
+            ->assertSeeHtml("wire:click=\"cancelApproval");
     }
 }

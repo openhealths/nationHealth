@@ -5,34 +5,27 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Classes\eHealth\Api\ServiceRequest as ServiceRequestApi;
+use App\Classes\eHealth\EHealthResponse;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\User;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Livewire\Livewire;
-use Tests\TestCase;
 use Mockery;
+use Tests\Concerns\GrantsMedicalEventAbilities;
+use Tests\TestCase;
 
 class ReferralTest extends TestCase
 {
     use DatabaseTransactions;
+    use GrantsMedicalEventAbilities;
 
     protected User $user;
-    protected LegalEntity $legalEntity;
-    protected Employee $employee;
 
-    protected function migrateDatabases(): void
-    {
-        $this->artisan('migrate:fresh', [
-            '--path' => [
-                database_path('migrations'),
-                database_path('migrations/install'),
-                database_path('migrations/update/0_1'),
-            ],
-            '--realpath' => true,
-        ]);
-    }
+    protected LegalEntity $legalEntity;
+
+    protected Employee $employee;
 
     protected function setUp(): void
     {
@@ -49,7 +42,7 @@ class ReferralTest extends TestCase
 
         $this->user = User::create([
             'uuid' => (string) \Illuminate\Support\Str::uuid(),
-            'email' => 'ref_' . \Illuminate\Support\Str::random(6) . '@example.com',
+            'email' => 'ref_'.\Illuminate\Support\Str::random(6).'@example.com',
             'password' => \Illuminate\Support\Facades\Hash::make('password'),
             'party_id' => $party->id,
         ]);
@@ -83,37 +76,41 @@ class ReferralTest extends TestCase
         $this->grantMedicalEventAbilities($this->user);
     }
 
-    public function test_it_can_find_referral_by_requisition()
+    public function test_it_can_find_referral_by_requisition(): void
     {
-        $mockResponse = [
+        $payload = [
             'data' => [
-                ['id' => '00000000-0000-4000-8000-000000000123', 'status' => 'active']
-            ]
+                ['id' => '00000000-0000-4000-8000-000000000123', 'status' => 'active'],
+            ],
         ];
 
-        $mockApi = Mockery::mock('alias:' . ServiceRequestApi::class);
+        $mockResponse = Mockery::mock(EHealthResponse::class);
+        $mockResponse->shouldReceive('getData')->andReturn($payload);
+
+        $mockApi = Mockery::mock(ServiceRequestApi::class);
         $mockApi->shouldReceive('searchForServiceRequestsByParams')
             ->once()
             ->with(['requisition' => '1234-5678-9012-3456'])
             ->andReturn($mockResponse);
+        $this->app->instance(ServiceRequestApi::class, $mockApi);
 
-        $response = ServiceRequestApi::searchForServiceRequestsByParams(['requisition' => '1234-5678-9012-3456']);
+        $response = app(ServiceRequestApi::class)
+            ->searchForServiceRequestsByParams(['requisition' => '1234-5678-9012-3456'])
+            ->getData();
 
         $this->assertEquals('00000000-0000-4000-8000-000000000123', $response['data'][0]['id']);
     }
 
-    public function test_it_can_complete_referral()
+    public function test_it_can_complete_referral(): void
     {
         $uuid = '00000000-0000-4000-8000-000000000123';
         $encounterUuid = '00000000-0000-4000-8000-000000000456';
 
-        $mockResponse = [
-            'data' => [
-                'id' => $uuid,
-                'status' => 'completed'
-            ],
-            'status' => 'completed'
-        ];
+        $mockResponse = Mockery::mock(EHealthResponse::class);
+        $mockResponse->shouldReceive('getData')->andReturn([
+            'id' => $uuid,
+            'status' => 'completed',
+        ]);
 
         $payload = [
             'status' => 'completed',
@@ -147,7 +144,7 @@ class ReferralTest extends TestCase
             'ehealth_inserted_at' => now(),
         ]);
 
-        $mockApi = Mockery::mock('alias:' . ServiceRequestApi::class);
+        $mockApi = Mockery::mock(ServiceRequestApi::class);
         $mockApi->shouldReceive('complete')
             ->once()
             ->with($uuid, Mockery::on(static function (array $sent) use ($encounterUuid): bool {
@@ -156,6 +153,7 @@ class ReferralTest extends TestCase
                     && data_get($sent, 'based_on.0.identifier.value') === $encounterUuid;
             }))
             ->andReturn($mockResponse);
+        $this->app->instance(ServiceRequestApi::class, $mockApi);
 
         $service = app(ReferralRequestLifecycleService::class);
         $result = $service->completeReferral($uuid, $encounterUuid, 'encounter', $payload);
@@ -163,7 +161,7 @@ class ReferralTest extends TestCase
         $this->assertEquals('completed', $result['status']);
     }
 
-    public function test_referral_index_component_renders()
+    public function test_referral_index_component_renders(): void
     {
         $this->actingAs($this->user);
 

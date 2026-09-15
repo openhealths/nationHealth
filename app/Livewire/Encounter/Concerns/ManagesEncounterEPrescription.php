@@ -13,7 +13,6 @@ use App\Models\Person\Person;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 
@@ -57,7 +56,7 @@ trait ManagesEncounterEPrescription
             : EncounterStatus::tryFrom((string) $encounter->status);
 
         if ($status !== EncounterStatus::FINISHED) {
-            Session::flash('error', 'Електронний рецепт без плану лікування можна створити лише після завершення взаємодії.');
+            $this->flashOutcome('error', 'Електронний рецепт без плану лікування можна створити лише після завершення взаємодії.');
 
             return;
         }
@@ -211,7 +210,7 @@ trait ManagesEncounterEPrescription
         $packageStep = $this->resolveEncounterMedicationPackageStep($this->encounterEPrescriptionSelectedMedication);
         if ($packageStep > 0 && !$this->isEncounterMedicationQtyDivisible($medicationQty, $packageStep)) {
             $this->encounterEPrescriptionWarningMessage = "Кількість ЛЗ має бути кратною фасуванню ({$packageStep}).";
-            Session::flash('error', $this->encounterEPrescriptionWarningMessage);
+            $this->flashOutcome('error', $this->encounterEPrescriptionWarningMessage);
 
             return;
         }
@@ -235,22 +234,22 @@ trait ManagesEncounterEPrescription
             $this->actionType = 'sign_eprescription';
             $this->showSignatureModal = true;
             $infoMessage = 'Заявку на е-рецепт створено. Підпишіть КЕП.';
-            Session::flash('success', $infoMessage);
+            $this->flashOutcome('success', $infoMessage);
         } catch (EHealthValidationException $exception) {
             $exception->report();
             $this->encounterEPrescriptionWarningMessage = $exception->getTranslatedMessage();
-            Session::flash('error', $this->encounterEPrescriptionWarningMessage);
+            $this->flashOutcome('error', $this->encounterEPrescriptionWarningMessage);
         } catch (\Throwable $exception) {
             Log::error('EncounterEdit: failed to create encounter eRx: '.$exception->getMessage());
             $this->encounterEPrescriptionWarningMessage = 'Не вдалося створити заявку на рецепт: '.$exception->getMessage();
-            Session::flash('error', $this->encounterEPrescriptionWarningMessage);
+            $this->flashOutcome('error', $this->encounterEPrescriptionWarningMessage);
         }
     }
 
     public function signEncounterEPrescription(): void
     {
         if (empty($this->encounterEPrescriptionRequestIdToSign)) {
-            Session::flash('error', 'Не вибрано рецепт для підписання');
+            $this->flashOutcome('error', 'Не вибрано рецепт для підписання');
             $this->showSignatureModal = false;
             $this->actionType = null;
 
@@ -304,25 +303,25 @@ trait ManagesEncounterEPrescription
 
             $message = $result['success_message']
                 ?? 'Електронний рецепт успішно створено без плану лікування.';
-            Session::flash('success', $message);
+            $this->flashOutcome('success', $message);
             $this->showEncounterEPrescriptionDrawer = false;
             $this->encounterEPrescriptionForm = [];
             $this->encounterEPrescriptionSearchResults = [];
             $this->encounterEPrescriptionSelectedMedication = null;
         } catch (ValidationException $exception) {
             $message = $exception->validator->errors()->first() ?: 'Перевірте дані КЕП і спробуйте ще раз.';
-            Session::flash('error', $message);
+            $this->flashOutcome('error', $message);
             $this->setErrorBag($exception->validator->getMessageBag());
         } catch (EHealthValidationException $exception) {
             $exception->report();
             $message = $exception->getTranslatedMessage();
-            Session::flash('error', $message);
+            $this->flashOutcome('error', $message);
             $this->showSignatureModal = false;
             $this->actionType = null;
         } catch (\Throwable $exception) {
             Log::error('EncounterEdit: failed to sign encounter eRx: '.$exception->getMessage());
             $message = 'Не вдалося підписати рецепт: '.$exception->getMessage();
-            Session::flash('error', $message);
+            $this->flashOutcome('error', $message);
             $this->showSignatureModal = false;
             $this->actionType = null;
         }

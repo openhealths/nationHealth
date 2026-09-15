@@ -292,6 +292,24 @@ abstract class CarePlanComponent extends Component
         return $activity;
     }
 
+    /**
+     * Resolve a care-plan activity from a request's basedOn Identifier UUID.
+     */
+    protected function ownedActivityByBasedOnUuid(?string $activityUuid): \App\Models\CarePlanActivity
+    {
+        if ($activityUuid === null || $activityUuid === '') {
+            abort(404);
+        }
+
+        $activity = $this->carePlan->activities()->where('uuid', $activityUuid)->first();
+
+        if ($activity === null) {
+            abort(404);
+        }
+
+        return $activity;
+    }
+
     protected function bootCarePlan(CarePlan $carePlan): void
     {
         $this->authorize('view', $carePlan);
@@ -409,7 +427,16 @@ abstract class CarePlanComponent extends Component
 
         $medicationRequestClass = \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::class;
         $this->activePrescriptions = class_exists($medicationRequestClass)
-            ? $medicationRequestClass::whereIn('based_on_id', $this->carePlan->activities->pluck('id'))->get()->toArray()
+            ? $medicationRequestClass::with('basedOn')
+                ->whereHas('basedOn', fn ($q) => $q->whereIn('value', $this->carePlan->activities->pluck('uuid')))
+                ->get()
+                ->map(function ($record): array {
+                    $row = $record->toArray();
+                    $row['based_on_uuid'] = $record->basedOn?->value;
+
+                    return $row;
+                })
+                ->all()
             : [];
         $this->loadActiveReferrals();
 
@@ -673,7 +700,16 @@ abstract class CarePlanComponent extends Component
 
         $medicationRequestClass = \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::class;
         $this->activePrescriptions = class_exists($medicationRequestClass)
-            ? $medicationRequestClass::whereIn('based_on_id', $this->carePlan->activities->pluck('id'))->get()->toArray()
+            ? $medicationRequestClass::with('basedOn')
+                ->whereHas('basedOn', fn ($q) => $q->whereIn('value', $this->carePlan->activities->pluck('uuid')))
+                ->get()
+                ->map(function ($record): array {
+                    $row = $record->toArray();
+                    $row['based_on_uuid'] = $record->basedOn?->value;
+
+                    return $row;
+                })
+                ->all()
             : [];
 
         $this->loadActiveReferrals();
@@ -681,25 +717,26 @@ abstract class CarePlanComponent extends Component
 
     protected function loadActiveReferrals(): void
     {
-        $activityIds = $this->carePlan->activities->pluck('id');
         $serviceReferrals = [];
         $deviceReferrals = [];
+        $activityUuids = $this->carePlan->activities->pluck('uuid')->toArray();
 
         $serviceRequestClass = \App\Models\MedicalEvents\Sql\ServiceRequestRequest::class;
+        $deviceRequestClass = \App\Models\MedicalEvents\Sql\DeviceRequestRequest::class;
+
         if (class_exists($serviceRequestClass)) {
             $serviceReferrals = $serviceRequestClass::query()
-                ->with('employee')
-                ->whereIn('based_on_id', $activityIds)
+                ->with(['employee', 'basedOn', 'category', 'priority'])
+                ->whereHas('basedOn', fn ($q) => $q->whereIn('value', $activityUuids))
                 ->get()
                 ->map(fn (Model $record): array => $this->normalizeReferralForView($record, 'service_request'))
                 ->all();
         }
 
-        $deviceRequestClass = \App\Models\MedicalEvents\Sql\DeviceRequestRequest::class;
         if (class_exists($deviceRequestClass)) {
             $deviceReferrals = $deviceRequestClass::query()
-                ->with('employee')
-                ->whereIn('based_on_id', $activityIds)
+                ->with(['employee', 'basedOn', 'category', 'priority'])
+                ->whereHas('basedOn', fn ($q) => $q->whereIn('value', $activityUuids))
                 ->get()
                 ->map(fn (Model $record): array => $this->normalizeReferralForView($record, 'device_request'))
                 ->all();
@@ -713,10 +750,13 @@ abstract class CarePlanComponent extends Component
      */
     protected function normalizeReferralForView(Model $record, string $kind): array
     {
+        $category = $record->category?->text;
+        $priority = $record->priority?->text;
+
         return [
             'uuid' => $record->getAttribute('uuid'),
             'kind' => $kind,
-            'based_on_id' => $record->getAttribute('based_on_id'),
+            'based_on_uuid' => $record->basedOn?->value,
             'status' => $record->getAttribute('status'),
             'status_label' => $this->resolveReferralStatusLabel((string) $record->getAttribute('status')),
             'request_number' => $record->getAttribute('request_number'),
@@ -728,10 +768,10 @@ abstract class CarePlanComponent extends Component
             'product_code' => $kind === 'service_request'
                 ? $record->getAttribute('service_id')
                 : $record->getAttribute('device_id'),
-            'category' => $record->getAttribute('category'),
-            'category_label' => $this->referralCategoryLabel($record->getAttribute('category')),
-            'priority' => $record->getAttribute('priority'),
-            'priority_label' => $this->referralPriorityLabel($record->getAttribute('priority')),
+            'category' => $category,
+            'category_label' => $this->referralCategoryLabel($category),
+            'priority' => $priority,
+            'priority_label' => $this->referralPriorityLabel($priority),
             'note' => $record->getAttribute('note'),
             'program_id' => $record->getAttribute('program_id'),
             'employee_name' => $record->employee?->full_name ?? null,
@@ -855,16 +895,16 @@ abstract class CarePlanComponent extends Component
         return $cleaned;
     }
 
-    protected function scopeDocumentsToActivity(int $activityId): void
+    protected function scopeDocumentsToActivity(string $activityUuid): void
     {
         $this->activePrescriptions = array_values(array_filter(
             $this->activePrescriptions,
-            static fn (array $prescription): bool => (int) ($prescription['based_on_id'] ?? $prescription['basedOnId'] ?? 0) === $activityId
+            static fn (array $prescription): bool => ($prescription['based_on_uuid'] ?? null) === $activityUuid
         ));
 
         $this->activeReferrals = array_values(array_filter(
             $this->activeReferrals,
-            static fn (array $referral): bool => (int) ($referral['based_on_id'] ?? $referral['basedOnId'] ?? 0) === $activityId
+            static fn (array $referral): bool => ($referral['based_on_uuid'] ?? null) === $activityUuid
         ));
     }
 
@@ -875,16 +915,13 @@ abstract class CarePlanComponent extends Component
     protected function filterDevicePrograms(Collection $programs): Collection
     {
         $user = Auth::user();
-        if (!$user) {
-            return $programs->where('is_active', '=', true);
-        }
+        $filtered = $programs->where('is_active', '=', true);
 
-        $roles = $user->allowedRoles;
-        $mainSpeciality = $user->getMainSpeciality(legalEntity());
+        if ($user) {
+            $roles = $user->allowedRoles;
+            $mainSpeciality = $user->getMainSpeciality(legalEntity());
 
-        $filtered = $programs
-            ->where('is_active', '=', true)
-            ->filter(function (array $program) use ($roles, $user, $mainSpeciality): bool {
+            $filtered = $filtered->filter(function (array $program) use ($roles, $user, $mainSpeciality): bool {
                 $allowedEmployeeTypes = Arr::get($program, 'medical_program_settings.employee_types_to_create_request', []);
                 if (!empty($allowedEmployeeTypes) && $roles->intersect($allowedEmployeeTypes)->isEmpty()) {
                     return false;
@@ -902,6 +939,12 @@ abstract class CarePlanComponent extends Component
 
                 return true;
             });
+        }
+
+        $activityValidation = app(\App\Services\MedicalEvents\CarePlanActivityValidationService::class);
+        $filtered = $filtered->filter(
+            fn (array $program): bool => $activityValidation->providingConditionsBlockReason($this->carePlan, $program) === null
+        );
 
         if ($this->participatingDeviceProgramIds !== []) {
             $filtered = app(\App\Services\MedicalEvents\DeviceProgramParticipationGuard::class)

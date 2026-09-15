@@ -31,7 +31,7 @@ class CarePlanActivityShow extends CarePlanComponent
 
         $this->activity = $activity->load(['kindConcept.coding', 'reasonReferences', 'author.party']);
         $this->activityProductLabel = $this->resolveActivityProductLabel($activity);
-        $this->scopeDocumentsToActivity($activity->id);
+        $this->scopeDocumentsToActivity($activity->uuid);
     }
 
     protected function renderCarePlan()

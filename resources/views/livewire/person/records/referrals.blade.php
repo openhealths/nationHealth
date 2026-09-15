@@ -67,6 +67,7 @@
                     <thead class="bg-gray-50 dark:bg-gray-900/40">
                         <tr>
                             <th class="px-4 py-3 text-left font-medium">Номер</th>
+                            <th class="px-4 py-3 text-left font-medium">UUID</th>
                             <th class="px-4 py-3 text-left font-medium">Статус</th>
                             <th class="px-4 py-3 text-left font-medium">Послуга / виріб</th>
                             <th class="px-4 py-3 text-left font-medium">Кількість</th>
@@ -80,11 +81,14 @@
                             <tr wire:key="sr-{{ $referral['kind'] }}-{{ $referral['id'] ?? $referral['uuid'] }}">
                                 <td class="px-4 py-3">
                                     <div class="font-semibold text-gray-900 dark:text-white">
-                                        {{ $referral['requestNumber'] ?? '—' }}
+                                        {{ filled($referral['requestNumber'] ?? null) ? $referral['requestNumber'] : '—' }}
                                     </div>
                                     <div class="mt-0.5 text-xs text-gray-400">
                                         {{ $referral['categoryLabel'] ?? '' }}
                                     </div>
+                                </td>
+                                <td class="px-4 py-3 font-mono text-xs break-all text-gray-600 dark:text-gray-300">
+                                    {{ $referral['uuid'] ?? '—' }}
                                 </td>
                                 <td class="px-4 py-3">
                                     <span class="badge {{ $referral['statusBadge'] ?? 'badge-dark' }}">
@@ -203,7 +207,7 @@
                             </tr>
                             @if ($expandedUuid === $referral['uuid'])
                                 <tr wire:key="sr-details-{{ $referral['uuid'] }}">
-                                    <td colspan="7" class="bg-gray-50 px-4 py-3 text-sm dark:bg-gray-900/30">
+                                    <td colspan="8" class="bg-gray-50 px-4 py-3 text-sm dark:bg-gray-900/30">
                                         <div class="grid gap-3 sm:grid-cols-3">
                                             <div>
                                                 <div class="text-[10px] text-gray-400 uppercase">Пріоритет</div>
@@ -235,7 +239,7 @@
                             @endif
                         @empty
                             <tr>
-                                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                                <td colspan="8" class="px-4 py-8 text-center text-gray-500">
                                     Направлень за обраними фільтрами не знайдено.
                                 </td>
                             </tr>

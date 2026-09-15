@@ -41,6 +41,66 @@ class EHealthValidationExceptionCarePlanMessageTest extends TestCase
         );
     }
 
+    public function test_failed_to_save_signed_content_is_translated(): void
+    {
+        $exception = new EHealthValidationException([
+            'error' => [
+                'message' => 'Failed to save signed content',
+                'type' => 'internal_error',
+            ],
+        ]);
+
+        $formatted = $exception->getFormattedMessage();
+        $translated = $exception->getTranslatedMessage();
+
+        $this->assertStringContainsString(
+            __('errors.ehealth.messages.failed_to_save_signed_content'),
+            $formatted
+        );
+        $this->assertStringNotContainsString('Failed to save signed content', $formatted);
+        $this->assertStringContainsString(
+            __('errors.ehealth.messages.failed_to_save_signed_content'),
+            $translated
+        );
+        $this->assertStringNotContainsString('Failed to save signed content', $translated);
+    }
+
+    public function test_ets_insufficient_access_message_is_translated(): void
+    {
+        $exception = new EHealthValidationException([
+            'error' => [
+                'message' => '%ArgumentError{message: "errors were found at the given arguments:\n\n  * 1st argument: the table identifier refers to an ETS table with insufficient access rights\n"}',
+                'type' => 'internal_error',
+            ],
+        ]);
+
+        $formatted = $exception->getFormattedMessage();
+
+        $this->assertStringContainsString(
+            __('errors.ehealth.messages.ets_insufficient_access'),
+            $formatted
+        );
+        $this->assertStringNotContainsString('ETS table', $formatted);
+    }
+
+    public function test_unknown_internal_error_falls_back_to_ukrainian(): void
+    {
+        $exception = new EHealthValidationException([
+            'error' => [
+                'message' => 'Some obscure platform crash dump',
+                'type' => 'internal_error',
+            ],
+        ]);
+
+        $formatted = $exception->getFormattedMessage();
+
+        $this->assertStringContainsString(
+            __('errors.ehealth.messages.internal_error'),
+            $formatted
+        );
+        $this->assertStringNotContainsString('Some obscure platform crash dump', $formatted);
+    }
+
     public function test_category_mismatch_message_is_translated_with_explanation(): void
     {
         $exception = new EHealthValidationException([
