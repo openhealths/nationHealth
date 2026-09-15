@@ -418,13 +418,6 @@ trait CarePlanManager
             $activity->save();
         }
 
-        if (str_contains(strtolower((string) $activity->kind), 'device') && empty($activity->program)) {
-            $this->flashOutcome('error', __('care-plan.device_program_required_before_sign'));
-            $this->showSignatureModal = false;
-
-            return;
-        }
-
         if (method_exists($this, 'getDeviceSignReadinessWarning')) {
             $deviceWarning = $this->getDeviceSignReadinessWarning($activity);
             if ($deviceWarning !== null) {

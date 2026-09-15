@@ -20,8 +20,6 @@ trait ManagesCarePlanActivities
 {
     private const DEFAULT_MEDICATION_PROGRAM_ID = '1318eabc-1a1a-42f6-8450-61e11c19eede';
 
-    private const DEFAULT_DEVICE_PROGRAM_ID = '85953838-1834-4ed6-8bf4-3f83057380ec';
-
     public bool $confirmingActivityDeletion = false;
 
     #[Locked]
@@ -192,8 +190,8 @@ trait ManagesCarePlanActivities
         $this->selectedProgram = $activity->program ?? '';
         if ($this->selectedProgram === '') {
             $this->selectedProgram = match (true) {
-                str_contains($kindLower, 'medication') => $this->resolveMedicationProgramId(),
-                str_contains($kindLower, 'device') => $this->resolveDeviceProgramId(),
+                str_contains($kindLower, 'medication') => $this->resolveMedicationProgramId() ?? '',
+                // Keep empty for devices — program is optional.
                 default => '',
             };
         }
@@ -212,18 +210,9 @@ trait ManagesCarePlanActivities
 
     public function openMedicalDeviceSearch(): void
     {
-        if (!filled($this->selectedProgram)) {
-            $this->selectedProgram = $this->resolveDeviceProgramId() ?? '';
-            $this->activityForm['program'] = $this->selectedProgram;
-        }
-
-        if (!filled($this->selectedProgram)) {
-            session()->flash('error', __('care-plan.select_program_first'));
-
-            return;
-        }
-
-        $this->activityForm['program'] = $this->selectedProgram;
+        // Program is optional: empty selectedProgram means a device request without
+        // medical program (usable as Encounter Package based_on later).
+        $this->activityForm['program'] = filled($this->selectedProgram) ? $this->selectedProgram : null;
         $this->showMedicalDeviceDrawer = false;
         $this->showMedicalDeviceSearchDrawer = true;
         $this->searchPage = 1;
@@ -336,7 +325,8 @@ trait ManagesCarePlanActivities
         if (str_contains($kindLower, 'medication')) {
             $this->activityForm['program'] = $this->resolveMedicationProgramId();
         } elseif (str_contains($kindLower, 'device')) {
-            $this->activityForm['program'] = $this->resolveDeviceProgramId();
+            // Keep explicit empty — do not auto-pick a default device program.
+            $this->activityForm['program'] = filled($this->selectedProgram) ? $this->selectedProgram : null;
         } elseif (!empty($this->selectedProgram)) {
             $this->activityForm['program'] = $this->selectedProgram;
         }
@@ -362,17 +352,9 @@ trait ManagesCarePlanActivities
             'activityForm.reason_code' => 'nullable|string',
         ];
 
-        $tos = is_array($this->carePlan->terms_of_service)
-            ? ($this->carePlan->terms_of_service['coding'][0]['code'] ?? null)
-            : $this->carePlan->terms_of_service;
-        $isInpatient = strtoupper((string) $tos) === 'INPATIENT';
-
         $kindLower = strtolower($this->activityForm['kind']);
         if (str_contains($kindLower, 'device')) {
             $rules['activityForm.quantity'] = 'required|integer|min:1';
-            if (!$isInpatient) {
-                $rules['activityForm.program'] = 'required|string';
-            }
             $rules['activityForm.product_reference'] = 'required|uuid';
 
             $allowedCodeTypes = $this->resolveDeviceRequestAllowedCodeTypes($programId);
@@ -521,16 +503,19 @@ trait ManagesCarePlanActivities
         }
 
         if (str_contains($kindLower, 'device') && !empty($this->selectedProduct)) {
-            $guard = app(\App\Services\MedicalEvents\DeviceProgramParticipationGuard::class);
             $programForDevice = $validated['activityForm']['program']
                 ?? $this->activityForm['program']
-                ?? $this->resolveDeviceProgramId();
-            if (!$guard->deviceAllowsCarePlanActivity($this->selectedProduct, $programForDevice)) {
-                $message = __('care-plan.device_care_plan_activity_not_allowed');
-                $this->flashOutcome('error', $message);
-                $this->addError('activityForm.product_reference', $message);
+                ?? (filled($this->selectedProgram) ? $this->selectedProgram : null);
+            // Program participation constraints only apply when a medical program is chosen.
+            if (filled($programForDevice)) {
+                $guard = app(\App\Services\MedicalEvents\DeviceProgramParticipationGuard::class);
+                if (!$guard->deviceAllowsCarePlanActivity($this->selectedProduct, $programForDevice)) {
+                    $message = __('care-plan.device_care_plan_activity_not_allowed');
+                    $this->flashOutcome('error', $message);
+                    $this->addError('activityForm.product_reference', $message);
 
-                return;
+                    return;
+                }
             }
 
             $packaging = $this->selectedProduct['packaging'] ?? [];
@@ -572,9 +557,8 @@ trait ManagesCarePlanActivities
         $program = !empty($validated['activityForm']['program']) ? $validated['activityForm']['program'] : null;
         if (str_contains(strtolower($validated['activityForm']['kind']), 'medication') && empty($program)) {
             $program = $this->resolveMedicationProgramId();
-        } elseif (str_contains(strtolower($validated['activityForm']['kind']), 'device') && empty($program)) {
-            $program = $this->resolveDeviceProgramId();
         }
+        // Device program stays null when intentionally omitted (Encounter based_on path).
 
         $medicationUnit = str_contains($kindLower, 'medication')
             ? ($validated['activityForm']['quantity_code'] ?? null)
@@ -684,17 +668,13 @@ trait ManagesCarePlanActivities
     private function loadMedicalDeviceSearchResults(): void
     {
         $programId = $this->resolveDeviceProgramId();
-        if (!filled($programId)) {
-            $this->searchResults = [];
-            $this->deviceSearchTotalEntries = 0;
-            $this->deviceSearchTotalPages = 1;
-
-            return;
-        }
 
         try {
             $query = trim($this->searchQuery);
-            $filters = ['medical_program_id' => $programId];
+            $filters = [];
+            if (filled($programId)) {
+                $filters['medical_program_id'] = $programId;
+            }
 
             $modelNumber = trim($this->deviceSearchModelNumber);
             if ($modelNumber !== '') {
@@ -723,6 +703,13 @@ trait ManagesCarePlanActivities
                 function (array $device) use ($guard, $programId, $uuidQuery): bool {
                     if ($uuidQuery !== null) {
                         return $this->deviceMatchesUuid($device, $uuidQuery);
+                    }
+
+                    // Without a program, only require an active device definition.
+                    if (!filled($programId)) {
+                        $isActive = $device['is_active'] ?? $device['isActive'] ?? true;
+
+                        return filter_var($isActive, FILTER_VALIDATE_BOOLEAN);
                     }
 
                     return $guard->deviceAllowsCarePlanActivity($device, $programId);
@@ -1143,7 +1130,7 @@ trait ManagesCarePlanActivities
                 ? (string) $packaging['packaging_unit']
                 : 'piece';
             $this->activityForm['quantity_code'] = $this->normalizeDeviceUnitCode($packagingUnit);
-            $this->activityForm['program'] = $this->resolveDeviceProgramId();
+            $this->activityForm['program'] = filled($this->selectedProgram) ? $this->selectedProgram : null;
             if (is_array($packaging) && !empty($packaging['packaging_count'])) {
                 $this->activityForm['quantity'] = (int) $packaging['packaging_count'];
             }
@@ -1344,20 +1331,9 @@ trait ManagesCarePlanActivities
 
     protected function resolveDeviceProgramId(): ?string
     {
-        if (filled($this->selectedProgram)) {
-            return $this->selectedProgram;
-        }
-        $devicePrograms = array_keys($this->dictionaries['medical_programs_device'] ?? []);
-        if ($devicePrograms === []) {
-            // Do not fall back to the glucose program: it is OUTPATIENT-only and eHealth
-            // rejects it on INPATIENT care plans ("terms of service are not allowed").
-            return null;
-        }
-        if (in_array(self::DEFAULT_DEVICE_PROGRAM_ID, $devicePrograms, true)) {
-            return self::DEFAULT_DEVICE_PROGRAM_ID;
-        }
-
-        return $devicePrograms[0];
+        // Empty means an intentional device request without medical program.
+        // Do not auto-pick a default — that would block Encounter Package based_on.
+        return filled($this->selectedProgram) ? $this->selectedProgram : null;
     }
 
     private function basicDictionaryCodes(\App\Services\Dictionary\Collections\BasicDictionaryCollection $basics, array $names): array
@@ -1390,7 +1366,8 @@ trait ManagesCarePlanActivities
         $kindLower = strtolower($kind);
         $this->selectedProgram = match (true) {
             str_contains($kindLower, 'medication') => $this->resolveMedicationProgramId() ?? '',
-            str_contains($kindLower, 'device') => $this->resolveDeviceProgramId() ?? '',
+            // Device program starts empty so the user can choose one or leave none.
+            str_contains($kindLower, 'device') => '',
             default => '',
         };
     }

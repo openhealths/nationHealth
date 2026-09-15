@@ -59,7 +59,11 @@ class DeviceProgramParticipationGuard
         $warnings = [];
 
         if (empty($activity->program)) {
-            $blockingIssues[] = __('care-plan.device_program_required_before_sign');
+            // Device requests without a medical program are valid (Encounter Package based_on).
+            $deviceId = (string) ($activity->productReference ?: '');
+            if ($deviceId === '' && empty($activity->productCodeableConcept)) {
+                $blockingIssues[] = __('care-plan.device_product_reselect_required');
+            }
 
             return new DeviceActivityReadinessAssessment($blockingIssues, $warnings);
         }

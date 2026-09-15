@@ -120,6 +120,57 @@ class DeviceProgramParticipationGuardTest extends TestCase
         $this->assertSame([$programId], $participating);
     }
 
+    public function test_assess_allows_device_activity_without_medical_program(): void
+    {
+        $legalEntity = $this->createLegalEntity();
+
+        $person = Person::create([
+            'uuid' => (string) Str::uuid(),
+            'first_name' => 'Test',
+            'last_name' => 'Patient',
+            'birth_date' => '1990-01-01',
+            'gender' => 'MALE',
+            'patient_signed' => true,
+            'process_disclosure_data_consent' => true,
+        ]);
+
+        $employee = \App\Models\Employee\Employee::create([
+            'uuid' => (string) Str::uuid(),
+            'full_name' => 'Test Doctor',
+            'employee_type' => 'DOCTOR',
+            'status' => 'APPROVED',
+            'legal_entity_id' => $legalEntity->id,
+            'is_active' => true,
+            'position' => 'Doctor',
+            'start_date' => now()->format('Y-m-d'),
+        ]);
+
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $person->id,
+            'author_id' => $employee->id,
+            'legal_entity_id' => $legalEntity->id,
+            'status' => 'active',
+            'title' => 'No program plan',
+            'period_start' => now()->format('Y-m-d'),
+            'period_end' => now()->addMonth()->format('Y-m-d'),
+        ]);
+
+        $activity = CarePlanActivity::create([
+            'care_plan_id' => $carePlan->id,
+            'author_id' => $employee->id,
+            'kind' => 'device_request',
+            'status' => 'draft',
+            'program' => null,
+            'product_reference' => (string) Str::uuid(),
+        ]);
+
+        $assessment = app(DeviceProgramParticipationGuard::class)
+            ->assess($carePlan, $activity, $legalEntity);
+
+        $this->assertNull($assessment->blockingMessage());
+    }
+
     public function test_device_allows_care_plan_activity_respects_program_devices_flag(): void
     {
         $guard = app(DeviceProgramParticipationGuard::class);

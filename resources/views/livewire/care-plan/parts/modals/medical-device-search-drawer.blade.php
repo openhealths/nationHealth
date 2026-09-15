@@ -40,6 +40,10 @@
         <p class="mb-4 text-sm text-gray-600 dark:text-gray-300">
             {{ __('care-plan.program') }}: <span class="font-medium">{{ $deviceProgramName }}</span>
         </p>
+    @else
+        <p class="mb-4 text-sm text-gray-600 dark:text-gray-300">
+            {{ __('care-plan.program') }}: <span class="font-medium">{{ __('care-plan.without_medical_program') }}</span>
+        </p>
     @endif
 
     <div class="mb-4">
@@ -155,7 +159,7 @@
                     <tr>
                         <td colspan="6" class="px-4 py-8 text-center text-gray-400 italic">
                             @if ($deviceProgramId === '')
-                                {{ __('care-plan.select_program_first') }}
+                                {{ __('care-plan.device_search_no_catalog_without_program') }}
                             @elseif (empty($searchQuery) && empty($deviceSearchModelNumber))
                                 {{ __('care-plan.device_search_no_catalog') }}
                             @else
