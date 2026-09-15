@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Schema\Blueprint;
+use App\Enums\LegalEntity\ConnectionStatus;
+use Illuminate\Database\Migrations\Migration;
 
 return new class extends Migration
 {
@@ -21,6 +22,7 @@ return new class extends Migration
             $table->uuid('consumer_uuid')->nullable()->comment('MIS UUID at the eHealth side');
             $table->string('secret')->nullable()->comment('Legal Entity connection token');
             $table->string('redirect_uri')->nullable();
+            $table->string('status')->default(ConnectionStatus::ACTIVE)->comment('Connection status at the MIS side');
 
             $table->date('ehealth_inserted_at')->nullable();
             $table->date('ehealth_updated_at')->nullable();

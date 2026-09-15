@@ -134,8 +134,6 @@ class Connection extends Request
      */
     public function deleteConnection(string $clientId, string $connectionId): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateConnectionDetails(...));
-
         return parent::delete(self::URL . '/' . $clientId . '/connections/' . $connectionId);
     }
 
@@ -212,7 +210,7 @@ class Connection extends Request
 
         $clientsList = $response->getData();
 
-        $validationRules = ['*' => 'required|array'];
+        $validationRules = ['*' => 'nullable|array'];
 
         foreach ($this->getValidationConnectionRules() as $key => $rule) {
             $validationRules["*.{$key}"] = $rule;

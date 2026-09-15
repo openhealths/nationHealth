@@ -1,5 +1,5 @@
-@use(App\Enums\LegalEntity\States)
 @use(App\Models\Connection)
+@use(App\Enums\LegalEntity\ConnectionStatus)
 
 <section class="section-form"
          x-data="{
@@ -17,7 +17,7 @@
         <x-slot name="title">
             {{ __('legal-entity-connection.details_title') }} {{ $connection->uuid }}
         </x-slot>
-        @can('sync', $connection)
+        @can('syncConnection', $connection)
             <x-slot name="actions">
                 <button
                     type="button"
@@ -72,10 +72,10 @@
                     id="status"
                     class="input peer"
                     placeholder=" "
-                    value="{{ States::tryFrom($connection->legalEntity->status)->label() ?? __('forms.unknown') }}"
+                    value="{{ ConnectionStatus::tryFrom($connection->status)->label() ?? __('forms.unknown') }}"
                     disabled
                 >
-                <label for="status" class="label">{{ __('legal-entity-connection.status') }}</label>
+                <label for="status" class="label">{{ __('legal-entity-connection.status.label') }}</label>
             </div>
 
             <div class="form-group group">
@@ -131,7 +131,7 @@
             </a>
 
             {{-- TERMINATE CONNECTION --}}
-            @can('updateConnection', $connection)
+            @can('deleteConnection', $connection)
                 <button
                     type="button"
                     @click="openTerminateConnectionDrawer = true"
@@ -199,13 +199,16 @@
                 >
                     {{ __('legal-entity-connection.btn_back') }}
                 </button>
-                <button
-                    type="button"
-                    @click="window.location.href='{{ route('connection.index', ['legalEntity' => $connection->legalEntity]) }}'"
-                    class="bg-[#b91c1c] text-white hover:bg-red-800 font-medium rounded-md text-sm px-5 py-2.5 outline-none transition-colors"
-                >
-                    {{ __('legal-entity-connection.btn_terminate_connection') }}
-                </button>
+                @can('deleteConnection', $connection)
+                    <button
+                        type="button"
+                        wire:click="deleteConnection({{ $connection->id }})"
+                        {{-- @click="window.location.href='{{ route('connection.index', ['legalEntity' => $connection->legalEntity]) }}'" --}}
+                        class="bg-[#b91c1c] text-white hover:bg-red-800 font-medium rounded-md text-sm px-5 py-2.5 outline-none transition-colors cursor-pointer"
+                    >
+                        {{ __('legal-entity-connection.btn_terminate_connection') }}
+                    </button>
+                @endcan
             </div>
         </div>
     </x-dialog-drawer>

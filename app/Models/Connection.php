@@ -19,6 +19,7 @@ class Connection extends Model
         'consumer_uuid',
         'redirect_uri',
         'secret',
+        'status',
         'ehealth_inserted_at',
         'ehealth_updated_at',
     ];

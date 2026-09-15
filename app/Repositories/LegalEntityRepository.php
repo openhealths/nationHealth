@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Builder;
+use App\Enums\LegalEntity\ConnectionStatus;
 use Illuminate\Database\Eloquent\Collection;
 
 class LegalEntityRepository
@@ -321,6 +322,30 @@ class LegalEntityRepository
             $connection->legalEntity->refresh();
         } catch (Exception $exception) {
             $this->handleDatabaseErrors($exception, __('Error occurred while trying to update connection secret'), __('Error occurred while trying to update connection\'s secret'));
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Synchronize the Connection's status for a given connection when delete
+     *
+     * @param  Connection  $connection  The connection instance to update.
+     *
+     * @return bool  Returns true if the update was successful, false otherwise.
+     *
+     * @throws Exception  If a database error occurs during the update process.
+     */
+    public function syncConnectionDelete(Connection $connection): bool
+    {
+        try {
+            DB::transaction(function () use ($connection) {
+                $connection->update(['status' => ConnectionStatus::TERMINATED->value]);
+            });
+        } catch (Exception $exception) {
+            $this->handleDatabaseErrors($exception, __('Error occurred while trying to update connection termination'), __('Error occurred while trying to update connection termination'));
 
             return false;
         }

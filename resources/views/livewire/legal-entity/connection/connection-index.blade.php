@@ -1,4 +1,4 @@
-@use(App\Enums\LegalEntity\States)
+    @use(App\Enums\LegalEntity\ConnectionStatus)
 
 <div x-data="{ openGrantAccessDrawer: false, showSignatureModal: $wire.entangle('showSignatureModal') }">
     <livewire:components.x-message :key="time()" />
@@ -64,11 +64,11 @@
                                 <td class="index-table-td !whitespace-nowrap">
                                     {{-- status-alert-* classes are full-width alert blocks, use their badge-* (pill) equivalent here --}}
                                     @php
-                                        $legalEntityState = States::tryFrom($connection->legalEntity->status);
-                                        $badgeClass = str_replace('status-alert-', 'badge-', $legalEntityState?->cssClass() ?? 'status-alert-default');
+                                        $connectionStatus = ConnectionStatus::tryFrom($connection->status);
+                                        $badgeClass = str_replace('status-alert-', 'badge-', $connectionStatus?->color() ?? 'status-alert-default');
                                     @endphp
                                     <span class="{{ $badgeClass }} whitespace-nowrap">
-                                        {{ $legalEntityState?->label() ?? __('forms.unknown') }}
+                                        {{ $connectionStatus?->label() ?? __('forms.unknown') }}
                                     </span>
                                 </td>
                                 <td class="index-table-td">
