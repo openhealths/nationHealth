@@ -21,6 +21,11 @@
         vaccineSearchResults: [],
         vaccineSearchPerformed: false,
 
+        vaccineLots: @js($this->vaccineLots),
+        lotSearch: '',
+        lotSearchResults: [],
+        lotSearchPerformed: false,
+
         reasonExplanationsDictionary: $wire.dictionaries['eHealth/reason_explanations'],
         reasonNotGivenExplanationsDictionary: $wire.dictionaries['eHealth/reason_not_given_explanations'],
 
@@ -54,6 +59,44 @@
             this.vaccineSearch = { name: '', code: '', disease: ''};
             this.vaccineSearchResults = [];
             this.vaccineSearchPerformed = false;
+
+            this.lotSearch = '';
+            this.lotSearchResults = [];
+            this.lotSearchPerformed = false;
+        },
+
+        searchVaccineLots() {
+            const query = this.normalizeSearchValue(this.lotSearch);
+
+            this.lotSearchResults = this.vaccineLots.filter(
+                lot => query === '' ||
+                    this.normalizeSearchValue(lot.number).includes(query) ||
+                    this.normalizeSearchValue(lot.vaccineName).includes(query)
+            );
+
+            this.lotSearchPerformed = true;
+        },
+
+        selectVaccineLot(lot) {
+            this.selectVaccine(lot.vaccineCode);
+
+            this.modalImmunization.manufacturer = lot.manufacturer;
+            this.modalImmunization.lotNumber = lot.number;
+            this.modalImmunization.expirationDate = lot.expirationDate;
+            this.modalImmunization.doseQuantityValue = lot.doseQuantityValue;
+            this.modalImmunization.doseQuantityCode = lot.doseQuantityCode;
+            this.modalImmunization.doseQuantityUnit = lot.doseQuantityCode;
+            this.modalImmunization.routeCode = lot.routeCode;
+
+            if (this.modalImmunization.vaccinationProtocols.length === 0) {
+                this.modalImmunization.vaccinationProtocols = [
+                    new VaccinationProtocol({
+                        authorityCode: 'MoH',
+                        seriesDoses: lot.seriesDoses,
+                        targetDiseaseCodes: lot.targetDiseaseCodes
+                    })
+                ];
+            }
         },
 
         allowedTargetDiseases() {

@@ -98,7 +98,7 @@
 
                 <p
                     class="text-error text-xs"
-                    x-show="modalImmunization.doseQuantityValue < 1 && modalImmunization.notGiven === false"
+                    x-show="! modalImmunization.doseQuantityValue && modalImmunization.notGiven === false"
                 >
                     {{ __('forms.field_empty') }}
                 </p>

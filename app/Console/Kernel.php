@@ -6,6 +6,7 @@ namespace App\Console;
 
 use App\Jobs\ConfigurationMetadataSync;
 use App\Jobs\UpdateICD10TableJob;
+use App\Jobs\VaccineLotSync;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -21,6 +22,7 @@ class Kernel extends ConsoleKernel
     {
         $schedule->job(new UpdateICD10TableJob())->weekly();
         $schedule->job(new ConfigurationMetadataSync())->twiceDaily()->withoutOverlapping();
+        $schedule->job(new VaccineLotSync())->hourly()->withoutOverlapping();
     }
 
     /**

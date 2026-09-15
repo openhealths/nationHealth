@@ -259,7 +259,9 @@
                             class="modal-content h-fit w-full lg:max-w-4xl"
                         >
                             {{-- Title --}}
-                            <h3 class="modal-header" :id="$id('modal-title')">{{ __('forms.add') }}</h3>
+                            <h3 class="modal-header" :id="$id('modal-title')">
+                                {{ __('immunizations.new_vaccination_protocol') }}
+                            </h3>
 
                             {{-- Content --}}
                             <form>
@@ -286,6 +288,8 @@
                                                 >
                                                     <option
                                                         :value="targetDisease.code"
+                                                        :selected="targetDisease.code ===
+                                                        modalVaccinationProtocol.targetDiseaseCodes[index]"
                                                         :disabled="isTargetDiseaseAlreadySelected(
                                                             targetDisease.code,
                                                             index,
