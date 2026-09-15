@@ -818,5 +818,11 @@ return [
         'selectedProgram' => 'медична програма',
         'selectedDiagnoseGroup' => 'група діагнозів',
         'selectedForbiddenGroup' => 'обмежувальна група',
+
+        // Medical conclusions (МВТН)
+        'eventPeriodStart' => 'дата початку непрацездатності',
+        'eventPeriodEnd' => 'дата закінчення непрацездатності',
+        'treatmentViolation' => 'порушення режиму лікування',
+        'treatmentViolationDate' => 'дата порушення режиму лікування',
     ]
 ];
