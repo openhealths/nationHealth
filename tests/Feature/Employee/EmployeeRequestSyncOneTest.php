@@ -172,7 +172,67 @@ class EmployeeRequestSyncOneTest extends TestCase
         $this->instance(EmployeeRequestApi::class, $api);
 
         $matcher = Mockery::mock(EmployeeRequestMatcher::class);
-        $matcher->shouldReceive('findApprovedForRequest')->once()->andReturn(null);
+        $matcher->shouldNotReceive('findApprovedForRequest');
+        $this->instance(EmployeeRequestMatcher::class, $matcher);
+
+        $result = app(EmployeeRequestProcessor::class)->syncSinglePendingRequest($request, $legalEntity);
+
+        $this->assertSame(EmployeeRequestProcessor::OUTCOME_PENDING, $result['outcome']);
+        $this->assertSame(RequestStatus::NEW, $request->fresh()->status);
+    }
+
+    #[Test]
+    public function sync_returns_pending_when_remote_still_new_even_if_approved_employee_exists(): void
+    {
+        $legalEntity = $this->makeLegalEntity();
+        $request = $this->makePendingRequest($legalEntity);
+        session()->put(config('ehealth.api.oauth.bearer_token'), 'test-token');
+
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('validate')->once()->andReturn([
+            'uuid' => $request->uuid,
+            'status' => 'NEW',
+            // Edit flow: employee already exists, but request is not email-confirmed yet.
+            'employee_id' => (string) Str::uuid(),
+        ]);
+
+        $api = Mockery::mock(EmployeeRequestApi::class);
+        $api->shouldReceive('getDetails')->once()->with($request->uuid)->andReturn($response);
+        $this->instance(EmployeeRequestApi::class, $api);
+
+        $matcher = Mockery::mock(EmployeeRequestMatcher::class);
+        $matcher->shouldNotReceive('findApprovedForRequest');
+        $this->instance(EmployeeRequestMatcher::class, $matcher);
+
+        $processor = Mockery::mock(EmployeeRequestProcessor::class, [$matcher])->makePartial();
+        $processor->shouldAllowMockingProtectedMethods();
+        $processor->shouldNotReceive('applyApprovedRequest');
+
+        $result = $processor->syncSinglePendingRequest($request, $legalEntity);
+
+        $this->assertSame(EmployeeRequestProcessor::OUTCOME_PENDING, $result['outcome']);
+        $this->assertSame(RequestStatus::NEW, $request->fresh()->status);
+    }
+
+    #[Test]
+    public function sync_returns_pending_when_remote_still_signed(): void
+    {
+        $legalEntity = $this->makeLegalEntity();
+        $request = $this->makePendingRequest($legalEntity);
+        session()->put(config('ehealth.api.oauth.bearer_token'), 'test-token');
+
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('validate')->once()->andReturn([
+            'uuid' => $request->uuid,
+            'status' => 'SIGNED',
+        ]);
+
+        $api = Mockery::mock(EmployeeRequestApi::class);
+        $api->shouldReceive('getDetails')->once()->with($request->uuid)->andReturn($response);
+        $this->instance(EmployeeRequestApi::class, $api);
+
+        $matcher = Mockery::mock(EmployeeRequestMatcher::class);
+        $matcher->shouldNotReceive('findApprovedForRequest');
         $this->instance(EmployeeRequestMatcher::class, $matcher);
 
         $result = app(EmployeeRequestProcessor::class)->syncSinglePendingRequest($request, $legalEntity);

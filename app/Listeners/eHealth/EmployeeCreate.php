@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\DB;
 use App\Enums\Employee\RequestStatus;
 use App\Enums\Employee\RevisionStatus;
 use App\Models\Employee\EmployeeRequest;
+use App\Models\LegalEntity;
 use App\Services\Employee\EmployeeRequestMatcher;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 
@@ -133,9 +134,19 @@ class EmployeeCreate
             return;
         }
 
+        // One list call: uuid → remote status. Missing uuids stay pending until later sync.
+        $remoteRequestStatuses = $this->fetchRemoteRequestStatusMap($event->legalEntity);
+
         $matched = 0;
 
-        DB::transaction(function () use ($user, $employees, $employeeRequests, $event, &$matched) {
+        DB::transaction(function () use (
+            $user,
+            $employees,
+            $employeeRequests,
+            $event,
+            $remoteRequestStatuses,
+            &$matched
+        ) {
             foreach ($employees as $eHealthEmployee) {
                 $employeeRequest = $this->findMatchingLocalRequest($employeeRequests, $eHealthEmployee);
 
@@ -150,6 +161,52 @@ class EmployeeCreate
                     continue;
                 }
 
+                // Pending edit: never apply from "employee is APPROVED" alone — use list status first.
+                if (
+                    $employeeRequest->status !== RequestStatus::APPROVED
+                    && $employeeRequest->isPendingEhealth()
+                    && filled($employeeRequest->employeeId)
+                ) {
+                    $action = $this->resolvePendingEditAction(
+                        $remoteRequestStatuses->get($employeeRequest->uuid)
+                    );
+
+                    if ($action === 'skip') {
+                        Log::info('[EmployeeCreate] Pending edit skipped on login (still NEW/SIGNED or not on list page).', [
+                            'user_id' => $user->id,
+                            'request_id' => $employeeRequest->id,
+                            'request_uuid' => $employeeRequest->uuid,
+                            'list_status' => $remoteRequestStatuses->get($employeeRequest->uuid),
+                        ]);
+
+                        continue;
+                    }
+
+                    if ($action === 'reject' || $action === 'expire') {
+                        $newStatus = $action === 'reject' ? RequestStatus::REJECTED : RequestStatus::EXPIRED;
+                        $employeeRequest->update([
+                            'status' => $newStatus,
+                            'applied_at' => now(),
+                        ]);
+                        $employeeRequest->revision?->update(['status' => RevisionStatus::OUTDATED]);
+
+                        Log::info('[EmployeeCreate] Pending edit marked terminal from list status.', [
+                            'user_id' => $user->id,
+                            'request_id' => $employeeRequest->id,
+                            'status' => $newStatus->value,
+                        ]);
+
+                        continue;
+                    }
+
+                    // 'apply' — remote list says APPROVED; fall through to sync apply below.
+                    Log::info('[EmployeeCreate] Pending edit APPROVED on list; applying now.', [
+                        'user_id' => $user->id,
+                        'request_id' => $employeeRequest->id,
+                        'request_uuid' => $employeeRequest->uuid,
+                    ]);
+                }
+
                 // If the employee type is OWNER, we need to check if the current owner is different from the one in EHealth.
                 if ($eHealthEmployee['employee_type'] === Role::OWNER->value) {
                     $currOwner = $event->legalEntity->getOwner();
@@ -162,13 +219,13 @@ class EmployeeCreate
                         if ($currentOwnerUser) {
                             Repository::legalEntity()->disableOldOwner($currentOwnerUser, $event->legalEntity);
                         } else {
-                             Log::error('[EmployeeCreate] User not found for current owner.', [
-                                'user_id' => $currOwner->userId,
-                                'legal_entity_uuid' => $event->legalEntity->uuid,
-                                'employee_uuid' => $eHealthEmployee['uuid'] ?? null,
+                            Log::error('[EmployeeCreate] User not found for current owner.', [
+                               'user_id' => $currOwner->userId,
+                               'legal_entity_uuid' => $event->legalEntity->uuid,
+                               'employee_uuid' => $eHealthEmployee['uuid'] ?? null,
                             ]);
 
-                            throw new RuntimeException( __('auth.login.error.owner_replacement.current_owner_user_not_found'));
+                            throw new RuntimeException(__('auth.login.error.owner_replacement.current_owner_user_not_found'));
                         }
                     }
                 }
@@ -269,6 +326,86 @@ class EmployeeCreate
             ->filter(fn ($taxId) => is_string($taxId) && $taxId !== '')
             ->unique()
             ->values();
+    }
+
+    /**
+     * One EmployeeRequest list page (page_size_max). Fresh approvals tend to appear first.
+     * Absence from the map means "unknown" — skip apply on login; later sync can pick it up.
+     *
+     * @return Collection<string, string> uuid => remote status
+     */
+    private function fetchRemoteRequestStatusMap(LegalEntity $legalEntity): Collection
+    {
+        try {
+            $filters = [
+                'page_size' => (int) config('ehealth.api.page_size_max', 500),
+            ];
+
+            if (filled($legalEntity->edrpou)) {
+                $filters['edrpou'] = $legalEntity->edrpou;
+            }
+
+            $page = EHealth::employeeRequest()
+                ->getMany($filters, 1)
+                ->validate();
+
+            /** @var Collection<string, string> $statuses */
+            $statuses = collect($page)
+                ->filter(static fn ($row): bool => is_array($row) && is_string($row['uuid'] ?? null))
+                ->mapWithKeys(static function (array $row): array {
+                    $status = $row['status'] ?? null;
+                    $statusValue = $status instanceof \BackedEnum ? $status->value : $status;
+
+                    return is_string($statusValue) && $statusValue !== ''
+                        ? [$row['uuid'] => $statusValue]
+                        : [];
+                });
+
+            Log::info('[EmployeeCreate] Loaded remote EmployeeRequest status map.', [
+                'legal_entity_id' => $legalEntity->id,
+                'count' => $statuses->count(),
+            ]);
+
+            return $statuses;
+        } catch (Throwable $e) {
+            Log::warning('[EmployeeCreate] EmployeeRequest list failed; pending edits will be skipped on login.', [
+                'legal_entity_id' => $legalEntity->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return collect();
+        }
+    }
+
+    /**
+     * Decide how to handle a pending edit given an optional status from the list page.
+     * Login never queues jobs — missing/unknown statuses are skipped until later sync.
+     *
+     * @return 'apply'|'skip'|'reject'|'expire'
+     */
+    private function resolvePendingEditAction(?string $remoteStatus): string
+    {
+        if ($remoteStatus === null || $remoteStatus === '') {
+            return 'skip';
+        }
+
+        if (EmployeeRequestMatcher::isRemoteStillPending($remoteStatus)) {
+            return 'skip';
+        }
+
+        if ($remoteStatus === 'REJECTED') {
+            return 'reject';
+        }
+
+        if ($remoteStatus === 'EXPIRED') {
+            return 'expire';
+        }
+
+        if ($remoteStatus === RequestStatus::APPROVED->value) {
+            return 'apply';
+        }
+
+        return 'skip';
     }
 
     /**
