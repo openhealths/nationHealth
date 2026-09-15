@@ -147,16 +147,25 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             $dbData['quantity_code'] = strtolower($activity->quantityCode ?: 'piece');
         }
 
-        $mapper = Fhir::deviceRequest();
-        $prequalifyPayload = $mapper->toPrequalifyPayload(
-            $dbData,
-            $uuids,
-            $carePlan->uuid,
-            (string) $activity->uuid
-        );
-        $this->runPrequalify(
-            EHealth::deviceRequest()->prequalify($carePlan->person->uuid, $prequalifyPayload)
-        );
+        // Prefer activity program when the form left it blank.
+        if (empty($dbData['program_id']) && !empty($activity->program)) {
+            $dbData['program_id'] = $activity->program;
+        }
+
+        // PreQualify schema requires $.programs; Create Device Request allows optional program.
+        // Mirror service_request: only prequalify when a medical program is present.
+        if (!empty($dbData['program_id'])) {
+            $mapper = Fhir::deviceRequest();
+            $prequalifyPayload = $mapper->toPrequalifyPayload(
+                $dbData,
+                $uuids,
+                $carePlan->uuid,
+                (string) $activity->uuid
+            );
+            $this->runPrequalify(
+                EHealth::deviceRequest()->prequalify($carePlan->person->uuid, $prequalifyPayload)
+            );
+        }
 
         return $this->persistLocalDraft($dbData, $carePlan->personId, 'device_request');
     }
@@ -219,8 +228,8 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
 
         $dbData['device_id'] = $formData['device_id'] ?? null;
         $dbData['device_code_type'] = $formData['device_code_type'] ?? 'DEVICE_DEFINITION';
-        $mapper = Fhir::deviceRequest();
-        if ($personUuid) {
+        if ($personUuid && !empty($dbData['program_id'])) {
+            $mapper = Fhir::deviceRequest();
             $prequalifyPayload = $mapper->toPrequalifyPayload(
                 $dbData,
                 $uuids,
