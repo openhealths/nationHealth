@@ -20,7 +20,7 @@ class DeviceDispenseMapper implements FhirMapperContract
             'quantity' => [
                 'value' => (int) $data['quantity'],
                 'system' => 'device_unit',
-                'code' => 'piece'
+                'code' => $data['quantityCode'] ?? 'piece'
             ]
         ];
 
@@ -112,6 +112,7 @@ class DeviceDispenseMapper implements FhirMapperContract
             'whenHandedOverDate' => convertToAppDateFormat($whenHandedOver),
             'whenHandedOverTime' => $whenHandedOver ? CarbonImmutable::parse($whenHandedOver)->format('H:i') : '',
             'quantity' => (int) data_get($detail, 'quantity.value', 1),
+            'quantityCode' => data_get($detail, 'quantity.code', 'piece'),
             'deviceSelectionType' => data_get($detail, 'device.identifier.value') ? 'model' : 'type',
             'deviceCode' => data_get($detail, 'deviceCode.coding.0.code', ''),
             'deviceDefinitionId' => data_get($detail, 'device.identifier.value', ''),

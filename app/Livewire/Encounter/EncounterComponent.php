@@ -12,6 +12,7 @@ use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Person\ClinicalImpressionStatus;
 use App\Enums\Person\ImmunizationStatus;
 use App\Enums\Person\ObservationStatus;
+use App\Enums\Person\DeviceRequestStatus;
 use App\Enums\Person\ServiceRequestStatus;
 use App\Enums\Status;
 use App\Exceptions\EHealth\EHealthConnectionException;
@@ -287,7 +288,7 @@ class EncounterComponent extends Component
     public array $patientDevices = [];
 
     /**
-     * 
+     *
      *
      * @var array
      */
@@ -694,9 +695,8 @@ class EncounterComponent extends Component
 
         $this->setPatientData();
 
-        if ($this->personId !== null) {
-            $this->deviceRequests = MedicalEventsRepository::deviceRequest()->searchByPersonId($this->personId);
-        }
+        // Active Device Requests come from eHealth (FHIR status=active), not local job rows.
+        $this->loadActiveDeviceRequests();
 
         // set division ID if only one exist
         if (count($this->divisions) === 1) {
@@ -704,6 +704,122 @@ class EncounterComponent extends Component
         }
 
         $this->getEpisodes();
+    }
+
+    /**
+     * Fetch active Device Requests available as based_on for Device Dispense.
+     *
+     * Local device_request_requests often store async job status (`processed`), which is not
+     * the FHIR DeviceRequest status required by eHealth for Encounter Package dispenses.
+     */
+    public function loadActiveDeviceRequests(): void
+    {
+        $this->deviceRequests = [];
+
+        if ($this->personId === null || $this->patientUuid === null) {
+            return;
+        }
+
+        try {
+            $items = [];
+            $page = 1;
+
+            do {
+                $response = EHealth::deviceRequest()->getBySearchParams($this->patientUuid, [
+                    // ABAC: search is allowed only for requests of the current legal entity.
+                    'requester_legal_entity' => legalEntity()->uuid,
+                    'status' => DeviceRequestStatus::ACTIVE->value,
+                    'page' => $page,
+                ]);
+
+                $items = [...$items, ...$response->validate()];
+                $page++;
+            } while ($response->isNotLast());
+
+            $this->deviceRequests = collect($items)
+                ->map(function (array $request): ?array {
+                    $deviceCode = data_get($request, 'code.coding.0.code');
+                    $deviceDefinitionId = data_get($request, 'code_reference.identifier.value');
+                    $deviceSelectionType = $deviceDefinitionId ? 'model' : 'type';
+                    $deviceId = $deviceDefinitionId ?: $deviceCode;
+
+                    if (!$deviceId) {
+                        return null;
+                    }
+
+                    $itemName = data_get($request, 'code_reference.display_value');
+
+                    if (!$itemName && $deviceDefinitionId) {
+                        $itemName = data_get(
+                            collect($this->dictionaries['custom/device_definitions'])->firstWhere('id', $deviceDefinitionId),
+                            'name'
+                        );
+                    }
+
+                    if (!$itemName && $deviceCode) {
+                        $itemName = $this->dictionaries['device_definition_classification_type'][$deviceCode] ?? $deviceCode;
+                    }
+
+                    $quantity = data_get($request, 'quantity.value');
+
+                    return [
+                        'uuid' => data_get($request, 'uuid'),
+                        'requestNumber' => data_get($request, 'requisition') ?: data_get($request, 'uuid'),
+                        'status' => data_get($request, 'status'),
+                        'intent' => data_get($request, 'intent'),
+                        'itemName' => $itemName ?: __('device-dispenses.medical_device'),
+                        'deviceId' => $deviceId,
+                        'deviceSelectionType' => $deviceSelectionType,
+                        'quantityValue' => $quantity !== null ? (int) $quantity : null,
+                        'quantityCode' => data_get($request, 'quantity.code'),
+                        'programId' => data_get($request, 'program.identifier.value'),
+                        'carePlanUuid' => data_get($request, 'based_on.identifier.value'),
+                        'dispenseValidTo' => data_get($request, 'dispense_valid_to'),
+                    ];
+                })
+                ->filter()
+                ->values()
+                ->toArray();
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while loading active Device Requests');
+        }
+    }
+
+    /**
+     * Load remaining quantity (and unit) for a selected Device Request.
+     *
+     * @return array{remainingQuantity: mixed, quantityCode: mixed}
+     */
+    public function loadDeviceRequestDetails(string $deviceRequestId): array
+    {
+        if ($this->patientUuid === null || !collect($this->deviceRequests)->contains('uuid', $deviceRequestId)) {
+            return [];
+        }
+
+        try {
+            $request = EHealth::deviceRequest()
+                ->getById($this->patientUuid, $deviceRequestId)
+                ->getData();
+
+            $details = [
+                'remainingQuantity' => data_get($request, 'remaining_quantity.value'),
+                'quantityCode' => data_get($request, 'quantity.code'),
+            ];
+
+            $index = collect($this->deviceRequests)->search(
+                static fn (array $item): bool => $item['uuid'] === $deviceRequestId
+            );
+
+            if ($index !== false) {
+                $this->deviceRequests[$index] = array_merge($this->deviceRequests[$index], $details);
+            }
+
+            return $details;
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while loading Device Request details');
+
+            return [];
+        }
     }
 
     /**

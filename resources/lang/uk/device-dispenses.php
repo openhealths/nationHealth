@@ -32,6 +32,10 @@ return [
     'procedure_id' => 'ID процедури',
     'legal_entity' => 'СГУСОЗ',
     'created_at' => 'Дата створення запису',
+    'no_active_device_requests' => 'Активних призначень на медичні вироби не знайдено в ЕСОЗ.',
+    'no_device_requests_without_program' => 'Усі знайдені призначення мають медичну програму. У взаємодії ЗОЗ їх не можна вказати в based_on (помилка ЕСОЗ: Device request with program can not be referenced). Видайте без призначення або оформіть відпуск в аптеці.',
+    'based_on_optional_hint' => 'Поле необовʼязкове: можна видати виріб без е-запиту. Призначення з медпрограмою сюди не підставляються.',
+    'procedure_optional_hint' => 'Необовʼязково. Зʼявляться процедури, додані в цю ж взаємодію.',
     'status' => [
         'in_progress' => 'В роботі',
         'completed' => 'Завершено',
@@ -42,10 +46,12 @@ return [
         'canceled' => 'Скасовано'
     ],
     'validation' => [
-        'device_request_not_available' => 'Обране призначення на медичний виріб недоступне для видачі.',
+        'device_request_not_available' => 'Обране призначення недоступне для видачі у взаємодії (має бути active, intent=order і без медичної програми).',
         'procedure_not_found' => 'Обрана процедура відсутня у взаємодії.',
         'employee_not_found' => 'Обраного працівника не знайдено.',
         'division_not_found' => 'Обране МНП не знайдено.',
-        'device_definition_not_found' => 'Обрану модель медичного виробу не знайдено.'
+        'device_definition_not_found' => 'Обрану модель медичного виробу не знайдено.',
+        'device_not_matching_request' => 'Обраний медичний виріб не відповідає призначенню.',
+        'quantity_exceeds_remaining' => 'Кількість виданих медичних виробів перевищує доступний залишок за призначенням.'
     ]
 ];
