@@ -24,6 +24,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Domain / eHealth verbose logging
+    |--------------------------------------------------------------------------
+    |
+    | When false (recommended on production), DomainLogger suppresses info/debug
+    | breadcrumbs and EHealthRequest skips per-request debug dumps. Errors and
+    | warnings still flow through normal channels.
+    |
+    */
+
+    'domain_verbose' => (bool) env('LOG_DOMAIN_VERBOSE', env('APP_ENV') === 'local'),
+
+    'ehealth_requests' => (bool) env('LOG_EHEALTH_REQUESTS', env('APP_ENV') === 'local'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Deprecations Log Channel
     |--------------------------------------------------------------------------
     |
@@ -71,7 +86,7 @@ return [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
-            'days' => 14,
+            'days' => (int) env('LOG_DAYS', 14),
             'replace_placeholders' => true,
         ],
 

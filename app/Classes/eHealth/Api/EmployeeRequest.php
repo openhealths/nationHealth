@@ -16,8 +16,9 @@ use Illuminate\Support\Arr;
 use App\Models\Division;
 use App\Models\LegalEntity;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
-use Log;
+use App\Logging\DomainLogger;
 use RuntimeException;
 use Validator;
 
@@ -205,9 +206,9 @@ class EmployeeRequest extends EHealthRequest
      */
     protected function validateMany(EHealthResponse $response): array
     {
-        Log::info('[EHealth API] Received EmployeeRequest list structure:', [
+        // Count only — raw_payload dumped tens of KB per page on every sync/list validate.
+        DomainLogger::info('[EHealth API] Received EmployeeRequest list structure:', [
             'count' => count($response->getData()),
-            'raw_payload' => $response->json()
         ]);
 
         $transformedData = [];

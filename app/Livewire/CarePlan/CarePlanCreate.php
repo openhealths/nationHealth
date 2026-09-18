@@ -15,6 +15,7 @@ use App\Models\EmployeeRole;
 use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
 use App\Repositories\CarePlanRepository;
 use App\Services\MedicalEvents\CarePlanApprovalService;
+use App\Logging\DomainLogger;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -970,15 +971,16 @@ class CarePlanCreate extends BasePatientComponent
                 }
             }
 
-            Log::info('CarePlan: creation result details', [
+            // Keys only — full finalResponse inflated happy-path care plan logs.
+            DomainLogger::info('CarePlan: creation result details', [
                 'carePlanUuid' => $carePlanUuid,
                 'approvalId' => $this->approvalId,
-                'finalResponse' => $finalResponse,
+                'finalResponseKeys' => is_array($finalResponse) ? array_keys($finalResponse) : null,
             ]);
 
             session()->flash('success', 'План лікування успішно створено.');
 
-            Log::info('CarePlan: creation job finished', [
+            DomainLogger::info('CarePlan: creation job finished', [
                 'status' => $carePlanStatus,
                 'approvalId' => $this->approvalId
             ]);

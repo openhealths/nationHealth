@@ -13,7 +13,7 @@ use App\Traits\BatchLegalEntityQueries;
 use GuzzleHttp\Promise\PromiseInterface;
 use App\Classes\eHealth\EHealthResponse;
 use Illuminate\Queue\Middleware\RateLimited;
-use Illuminate\Support\Facades\Log;
+use App\Logging\DomainLogger;
 use Spatie\Permission\PermissionRegistrar;
 
 class EmployeeSync extends EHealthJob
@@ -42,10 +42,12 @@ class EmployeeSync extends EHealthJob
     protected function processResponse(?EHealthResponse $response): void
     {
         if ($response) {
-            Log::info('[EHealth Sync] Received Employee data structure:', [
+            $pageData = $response->json('data');
+            // Summary only — full page JSON previously inflated sync logs by MBs.
+            DomainLogger::info('[EHealth Sync] Received Employee data structure:', [
                 'legal_entity_id' => $this->legalEntity->id,
                 'page' => $this->page,
-                'data' => $response->json('data')
+                'count' => is_array($pageData) ? count($pageData) : 0,
             ]);
         }
 

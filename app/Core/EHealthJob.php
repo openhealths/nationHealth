@@ -114,9 +114,9 @@ abstract class EHealthJob implements ShouldQueue
 
     public function handle(): void
     {
-        echo "Processing Job: " . static::BATCH_NAME . " Page: " . $this->page . ' is First Login: ' . ($this->isFirstLogin ? 'Yes' : 'No') . PHP_EOL;
-        echo "Start from user: " . ($this->user ? $this->user->id : 'No user found') . PHP_EOL;
-        echo "Legal Entity ID: " . ($this->legalEntity ? $this->legalEntity->id : 'No legal entity found') . PHP_EOL;
+        $this->jobStdout('Processing Job: ' . static::BATCH_NAME . ' Page: ' . $this->page . ' is First Login: ' . ($this->isFirstLogin ? 'Yes' : 'No'));
+        $this->jobStdout('Start from user: ' . ($this->user ? $this->user->id : 'No user found'));
+        $this->jobStdout('Legal Entity ID: ' . ($this->legalEntity ? $this->legalEntity->id : 'No legal entity found'));
 
         if (static::BATCH_NAME !== CompleteSync::BATCH_NAME) {
             $this->setEntityStatus(JobStatus::PROCESSING);
@@ -130,11 +130,11 @@ abstract class EHealthJob implements ShouldQueue
 
         $rdata = $response?->json();
 
-        echo "Response PAGE: " . (data_get($rdata, 'paging.page_number') ?? 'N/A') . " of " . (data_get($rdata, 'paging.total_pages') ?? 'N/A') . PHP_EOL;
+        $this->jobStdout('Response PAGE: ' . (data_get($rdata, 'paging.page_number') ?? 'N/A') . ' of ' . (data_get($rdata, 'paging.total_pages') ?? 'N/A'));
 
         // Check if there are more pages to process
         if ($response?->isNotLast()) {
-            echo "Scheduling next page job: " . static::BATCH_NAME . " Page: " . $this->page . " Next Page: " . ($this->page + 1) . PHP_EOL;
+            $this->jobStdout('Scheduling next page job: ' . static::BATCH_NAME . ' Page: ' . $this->page . ' Next Page: ' . ($this->page + 1));
             $this->batch()
                 ?->add(new static(legalEntity: $this->legalEntity, page: $this->page + 1, isFirstLogin: $this->isFirstLogin, nextEntity: $this->nextEntity, standalone: $this->standalone)
                     ->delay(now()->addSeconds(self::RATE_LIMIT_DELAY)));
@@ -145,7 +145,7 @@ abstract class EHealthJob implements ShouldQueue
         $nextJob = $this->getNextEntityJob();
 
         if ($nextJob !== null) {
-            echo "Scheduling next job: " . $nextJob::BATCH_NAME . " from " . static::BATCH_NAME.  PHP_EOL;
+            $this->jobStdout('Scheduling next job: ' . $nextJob::BATCH_NAME . ' from ' . static::BATCH_NAME);
 
             $syncEntity = $this->batch()->options['sync_entity'] ?? null;
 
@@ -153,7 +153,7 @@ abstract class EHealthJob implements ShouldQueue
                 $syncEntity !== static::ENTITY
                 && ($nextJob::BATCH_NAME === CompleteSync::BATCH_NAME || $nextJob::ENTITY !== static::ENTITY)
             ) {
-                echo "Job COMPLETED: " . static::BATCH_NAME . PHP_EOL;
+                $this->jobStdout('Job COMPLETED: ' . static::BATCH_NAME);
 
                 $this->setEntityStatus(JobStatus::COMPLETED);
             }
@@ -184,7 +184,7 @@ abstract class EHealthJob implements ShouldQueue
             'user_id' => $olduser?->id,
         ]);
 
-        echo "Job FAILED: " . static::BATCH_NAME . " Exception type: " . $exception::class . " Code: " . $exception->getCode() . " Error: " . $exception->getMessage() . PHP_EOL;
+        $this->jobStdout('Job FAILED: ' . static::BATCH_NAME . ' Exception type: ' . $exception::class . ' Code: ' . $exception->getCode() . ' Error: ' . $exception->getMessage());
 
         // Set entity status based on error code
         if (!in_array($exception->getCode(), static::ERR_TO_RETRY, true)) {
@@ -196,7 +196,7 @@ abstract class EHealthJob implements ShouldQueue
         }
 
         $this->user = $this->getUserWithActiveSession($olduser);
-        echo "Retrying with new user: " . ($this->user ? $this->user->id : 'No user found') . PHP_EOL;
+        $this->jobStdout('Retrying with new user: ' . ($this->user ? $this->user->id : 'No user found'));
 
         if ($this->user) {
             $this->token = $this->getToken();
@@ -235,7 +235,9 @@ abstract class EHealthJob implements ShouldQueue
                         // Clean up failed jobs from previous batch to avoid clutter
                         DB::table('failed_jobs')->whereIn('uuid', $failedJobUuids)->delete();
 
-                        echo "Cleaned up failed jobs from previous batch: " . implode(', ', $failedJobUuids) . PHP_EOL;
+                        if (config('app.debug')) {
+                            echo 'Cleaned up failed jobs from previous batch: ' . implode(', ', $failedJobUuids) . PHP_EOL;
+                        }
                     }
                 })->dispatch();
 
@@ -243,7 +245,7 @@ abstract class EHealthJob implements ShouldQueue
         } else {
             $this->setEntityStatus(JobStatus::PAUSED);
 
-            echo "Job PAUSED due to error code: " . $exception->getCode() . PHP_EOL;
+            $this->jobStdout('Job PAUSED due to error code: ' . $exception->getCode());
 
             // Notifications should be last in the failed() method beacuse it stopped job working
             // TODO: find out why notification stopped job's working
@@ -354,7 +356,7 @@ abstract class EHealthJob implements ShouldQueue
             )
             ->get();
 
-        echo "Found " . $users->count() . " users with active sessions for legal entity {$legalEntity->id}" . PHP_EOL;
+        $this->jobStdout('Found ' . $users->count() . ' users with active sessions for legal entity ' . $legalEntity->id);
 
         // $users here is a Collection of User models. $userKey is the key/index of the first user that has the required scope/permission
         $userKey = empty($this->requiredScope())
@@ -417,4 +419,17 @@ abstract class EHealthJob implements ShouldQueue
      * }
      */
     abstract protected function getAdditionalMiddleware(): array;
+
+    /**
+     * Worker stdout diagnostics — only when APP_DEBUG is on so production
+     * container logs are not flooded by sync pagination chatter.
+     */
+    protected function jobStdout(string $message): void
+    {
+        if (!config('app.debug')) {
+            return;
+        }
+
+        echo $message . PHP_EOL;
+    }
 }

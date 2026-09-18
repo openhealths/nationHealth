@@ -73,9 +73,12 @@ abstract class EHealthRequest extends PendingRequest
      */
     public function send(string $method, string $url, array $options = []): EHealthResponse|Response
     {
-        Log::debug("eHealth Request: {$method} {$url}", [
-            'options' => $this->sanitizeOptionsForLog($options),
-        ]);
+        // Gate high-volume per-request dumps; keep error paths below always on.
+        if (config('logging.ehealth_requests')) {
+            Log::debug("eHealth Request: {$method} {$url}", [
+                'options' => $this->sanitizeOptionsForLog($options),
+            ]);
+        }
 
         try {
             $response = parent::send($method, $url, $options);
