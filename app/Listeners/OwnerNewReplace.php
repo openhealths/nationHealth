@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Listeners;
 
 use App\Core\Arr;
@@ -69,14 +71,15 @@ class OwnerNewReplace
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while getting employees data');
 
-            throw new RuntimeException( __('auth.login.error.owner_replacement.new_owner_employees_not_found'));
+            throw new RuntimeException(__('auth.login.error.owner_replacement.new_owner_employees_not_found'));
         }
 
         $newOwner = Arr::first($data);
 
         $oldOwner = Employee::activeOwners($legalEntityId)->first();
 
-        if ($oldOwner->uuid === $newOwner['uuid']) {
+        // Fresh LE create: no local OWNER yet — must not read uuid on null.
+        if ($oldOwner && $oldOwner->uuid === ($newOwner['uuid'] ?? null)) {
             return;
         }
 
@@ -85,7 +88,7 @@ class OwnerNewReplace
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while getting new owner details');
 
-            throw new RuntimeException( __('auth.login.error.owner_replacement.new_owner_details_not_found'));
+            throw new RuntimeException(__('auth.login.error.owner_replacement.new_owner_details_not_found'));
         }
 
         if (empty($newOwnerDetails)) {
@@ -110,14 +113,14 @@ class OwnerNewReplace
 
         DB::transaction(function () use ($user, $newOwnerDetails, $event, $timeNow, $partyData, $phonesData, $documentsData, $legalEntityId, $oldOwner) {
             $newEmployee = Employee::updateOrCreate(
-                        ['uuid' => $newOwnerDetails['uuid']],
-                        array_merge($newOwnerDetails, [
+                ['uuid' => $newOwnerDetails['uuid']],
+                array_merge($newOwnerDetails, [
                             'legal_entity_id' => $legalEntityId,
                             'legal_entity_uuid' => $event->legalEntity->uuid,
                             'inserted_at' => $timeNow,
                             'user_id' => $user->id
                         ])
-                    );
+            );
 
             app(PermissionRegistrar::class)->forgetCachedPermissions();
 
@@ -159,13 +162,13 @@ class OwnerNewReplace
                     if ($currentOwnerUser) {
                         Repository::legalEntity()->disableOldOwner($currentOwnerUser, $event->legalEntity);
                     } else {
-                            Log::error('[OwnerNewReplace] User not found for current owner.', [
-                            'user_id' => $oldOwner->userId,
-                            'legal_entity_uuid' => $event->legalEntity->uuid,
-                            'employee_uuid' => $newEmployee->uuid ?? null,
+                        Log::error('[OwnerNewReplace] User not found for current owner.', [
+                        'user_id' => $oldOwner->userId,
+                        'legal_entity_uuid' => $event->legalEntity->uuid,
+                        'employee_uuid' => $newEmployee->uuid ?? null,
                         ]);
 
-                        throw new RuntimeException( __('auth.login.error.owner_replacement.current_owner_user_not_found'));
+                        throw new RuntimeException(__('auth.login.error.owner_replacement.current_owner_user_not_found'));
                     }
                 }
             }
@@ -184,7 +187,7 @@ class OwnerNewReplace
             if (!$user?->party) {
                 Log::error('[OwnerNewReplace] User does not have an associated Party after processing new Employee.', ['user_id' => $user->id, 'legal_entity_uuid' => $event->legalEntity->uuid, 'employee_uuid' => $newEmployee->uuid ?? null]);
 
-                throw new RuntimeException( __('auth.login.error.owner_replacement.new_owner_party_not_found'));
+                throw new RuntimeException(__('auth.login.error.owner_replacement.new_owner_party_not_found'));
             }
         });
 

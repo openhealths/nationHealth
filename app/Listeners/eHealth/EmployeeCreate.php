@@ -37,9 +37,13 @@ class EmployeeCreate
 
         $employeeRequests = EmployeeRequest::with('revision')
             ->where('email', $user->email)
+            // Same email can exist across legal entities — never mix foreign LE revisions into this login.
+            ->where('legal_entity_id', $event->legalEntity->id)
             ->where(
                 fn (EloquentBuilder $q) => $q
-                    // Pending eHealth decision: NEW + uuid (current keep-NEW) or legacy SIGNED
+                    // Pending eHealth decision: NEW + uuid (current keep-NEW) or legacy SIGNED.
+                    // Do not gate on applied_at: LE create stamps applied_at while status stays NEW
+                    // (see LegalEntity::createEmployeeRequest) — first OWNER login must still match.
                     ->where(fn (EloquentBuilder $query) => $query->pendingEhealth())
                     // Sync for requests approved through our system and synced before user's first login
                     ->orWhere(
