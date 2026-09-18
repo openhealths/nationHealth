@@ -202,6 +202,7 @@ return [
     'prescription_requests' => 'Заявки на рецепти',
     'referrals' => 'Направлення',
     'medical_reports' => 'Медичні висновки',
+    'add_medical_report' => 'Додати медичний висновок',
     'care_plans' => 'Плани лікування',
 
     // Diagnoses
@@ -343,5 +344,8 @@ return [
         'confidant_requests_list_updated' => 'Список даних про запити на створення законних представників оновлено.',
         'confidant_requests_list_update_failed' => 'Помилка при синхронізації запитів на створення законних представників.',
         'sync_auth_methods_and_try_again' => 'Будь ласка, синхронізуйте методи автентифікації та спробуйте знову.'
-    ]
+    ],
+
+    // Medical conclusions — МВН / МВТН (ТВ 3.8)
+    'compositions' => 'Медичні висновки',
 ];
