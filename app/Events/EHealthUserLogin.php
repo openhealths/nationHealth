@@ -26,6 +26,7 @@ class EHealthUserLogin
      * @param  User  $user  The user model.
      * @param  LegalEntity  $legalEntity  The legal entity context.
      * @param  string  $authUserUUID  The user's UUID from the eHealth token.
+     * @param  list<string>  $scopes  OAuth token details.scope (not Spatie-merged ACL).
      */
     public function __construct(
         public User $user,

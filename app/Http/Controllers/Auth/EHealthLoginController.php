@@ -139,14 +139,16 @@ class EHealthLoginController extends Controller
         );
 
         // OAuth may return scopes for a single selected role; merge with permissions
-        // from all roles assigned to the user in this legal entity (team).
+        // from all roles assigned to the user in this legal entity (team) for Spatie ACL.
         $loginScopes = $this->resolveLoginScopes($user, $ehealthScopes);
 
         $user->syncPermissions($loginScopes);
-        app(TokenStorage::class)->storeScopesFromUserPermissions($user);
+        // Session API gates (e.g. party_verification bulk) must mirror the bearer token,
+        // not the Spatie merge — otherwise MIS can queue list sync without :read on the token.
+        app(TokenStorage::class)->storeScopes($ehealthScopes);
 
         try {
-            EHealthUserLogin::dispatch($user, $legalEntity, $authUserUUID, $loginScopes, $this->isFirstLogin, $loginedGuard);
+            EHealthUserLogin::dispatch($user, $legalEntity, $authUserUUID, $ehealthScopes, $this->isFirstLogin, $loginedGuard);
         } catch (Throwable $exception) {
             $message = $exception->getMessage() ?: '';
 
@@ -164,7 +166,7 @@ class EHealthLoginController extends Controller
         if (!$user->party) {
             Session::put('selected_legal_entity_uuid', $legalEntity->uuid);
             $user->syncPermissions($loginScopes);
-            app(TokenStorage::class)->storeScopesFromUserPermissions($user);
+            app(TokenStorage::class)->storeScopes($ehealthScopes);
 
             return Redirect::route('party.verify');
         }
@@ -173,7 +175,7 @@ class EHealthLoginController extends Controller
             Log::info(__('auth.login.success.user_auth', [], 'en'), ['User ID' => $user->id]);
 
             $user->syncPermissions($loginScopes);
-            app(TokenStorage::class)->storeScopesFromUserPermissions($user);
+            app(TokenStorage::class)->storeScopes($ehealthScopes);
 
             return Redirect::route('dashboard', [$legalEntity])->with(
                 'success',
