@@ -4,12 +4,25 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan\Concerns;
 
+use App\Classes;
 use App\Classes\eHealth\EHealth;
+use App\Enums\CarePlanStatus;
+use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Models\CarePlanActivity;
+use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Repositories\CarePlanActivityRepository;
+use App\Repositories\MedicalEvents\MedicalEventsRequestStatuses;
 use App\Services\MedicalEvents\CarePlanActivityEHealthGuard;
+use App\Services\MedicalEvents\CarePlanActivityLifecycleService;
+use App\Services\MedicalEvents\MedicalRequestOwnership;
+use App\Services\MedicalEvents\MedicationRequestLifecycleService;
+use Carbon\Carbon;
+use Exception;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 
 trait ManagesCarePlanEPrescription
 {
@@ -17,7 +30,15 @@ trait ManagesCarePlanEPrescription
     {
         $this->authorizeCarePlanWrite();
 
-        $activity = $this->ownedActivity($activityId);
+        try {
+            $activity = $this->ownedActivity($activityId);
+        } catch (ModelNotFoundException) {
+            $this->flashOutcome('error', __('care-plan.document_context_unavailable'));
+            $this->showSignatureModal = false;
+            $this->actionType = '';
+
+            return;
+        }
 
         $activityStatus = strtolower(is_array($activity->status)
             ? ($activity->status['coding'][0]['code'] ?? ($activity->status['text'] ?? ''))
@@ -27,7 +48,7 @@ trait ManagesCarePlanEPrescription
 
         if ($this->isTerminalCarePlan) {
             $this->flashOutcome('error', __('care-plan.cannot_mutate_terminal_care_plan', [
-                'status' => \App\Enums\CarePlanStatus::labelFor($this->carePlan->status),
+                'status' => CarePlanStatus::labelFor($this->carePlan->status),
             ]));
 
             return;
@@ -47,7 +68,7 @@ trait ManagesCarePlanEPrescription
 
         try {
             app(CarePlanActivityEHealthGuard::class)->assertRegisteredInEHealth($this->carePlan, $activity);
-        } catch (\RuntimeException $exception) {
+        } catch (RuntimeException $exception) {
             $this->flashOutcome('error', $exception->getMessage());
 
             return;
@@ -69,7 +90,7 @@ trait ManagesCarePlanEPrescription
                 }
                 $this->ePrescriptionMultiples = $multiples;
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::warning('CarePlanShow: failed to fetch drug details: ' . $e->getMessage());
         }
 
@@ -96,7 +117,7 @@ trait ManagesCarePlanEPrescription
         $this->ePrescriptionAuthMethods = [];
         try {
             $this->ePrescriptionAuthMethods = EHealth::person()->getAuthMethods($this->carePlan->person->uuid)->getData();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('e_health_errors')->error('CarePlanShow: failed to fetch patient auth methods', [
                 'care_plan_id' => $this->carePlan->id,
                 'activity_id' => $activity->id,
@@ -113,8 +134,8 @@ trait ManagesCarePlanEPrescription
             return;
         }
 
-        $issuedQty = \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::where('based_on_id', $activity->id)
-            ->whereNotIn('status', \App\Repositories\MedicalEvents\MedicalEventsRequestStatuses::EXCLUDED_FROM_ISSUED_SUM)
+        $issuedQty = MedicationRequestRequest::whereHas('basedOn', fn ($q) => $q->where('value', $activity->uuid))
+            ->whereNotIn('status', MedicalEventsRequestStatuses::EXCLUDED_FROM_ISSUED_SUM)
             ->sum('medication_qty');
 
         $activityQty = $activity->quantity;
@@ -123,7 +144,7 @@ trait ManagesCarePlanEPrescription
             : max(0.0, (float) $activityQty - (float) $issuedQty);
 
         try {
-            $eHealthActivity = app(\App\Services\MedicalEvents\CarePlanActivityLifecycleService::class)->getDetails(
+            $eHealthActivity = app(CarePlanActivityLifecycleService::class)->getDetails(
                 (string) $this->carePlan->person->uuid,
                 (string) $this->carePlan->uuid,
                 (string) $activity->uuid
@@ -132,7 +153,7 @@ trait ManagesCarePlanEPrescription
             if ($eHealthRemaining !== null) {
                 $this->ePrescriptionRemainingQty = max(0.0, (float) $eHealthRemaining);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::warning('CarePlanShow: failed to fetch eHealth activity remaining qty: ' . $e->getMessage());
         }
 
@@ -171,9 +192,9 @@ trait ManagesCarePlanEPrescription
         $this->ePrescriptionRemainingQtyWarningMessage = '';
         $this->ePrescriptionSelectedActivity = $activity->toArray();
 
-        $employeeContext = app(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class)
+        $employeeContext = app(MedicationRequestLifecycleService::class)
             ->resolveEmployeeContext($this->carePlan, null, Auth::user()?->activeDoctorEmployee()?->id);
-        $eligibleEncounters = app(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class)
+        $eligibleEncounters = app(MedicationRequestLifecycleService::class)
             ->findEligibleEncountersForEPrescription(
                 (int) $this->carePlan->person_id,
                 $employeeContext['employee_uuid'] ?? null
@@ -183,7 +204,7 @@ trait ManagesCarePlanEPrescription
             ->map(static function ($encounter): array {
                 $endedAt = $encounter->period?->end;
                 $dateLabel = $endedAt
-                    ? \Carbon\Carbon::parse($endedAt)->format('d.m.Y H:i')
+                    ? Carbon::parse($endedAt)->format('d.m.Y H:i')
                     : ($encounter->created_at?->format('d.m.Y H:i') ?? '');
 
                 return [
@@ -199,10 +220,13 @@ trait ManagesCarePlanEPrescription
             ? (string) $this->ePrescriptionEligibleEncounters[0]['id']
             : '';
 
+        // eHealth MedicationRequest expects a drug id; activity.productReference is INNM dosage.
+        $resolvedMedicationId = (string) ($this->ePrescriptionSelectedProduct['id'] ?? $activity->productReference);
+
         $this->ePrescriptionForm = [
             'activity_id' => $activity->id,
             'encounter_id' => $defaultEncounterId,
-            'medication_id' => $activity->productReference,
+            'medication_id' => $resolvedMedicationId,
             'started_at' => now()->toDateString(),
             'duration' => 10,
             'ended_at' => '',
@@ -256,7 +280,7 @@ trait ManagesCarePlanEPrescription
         }
 
         try {
-            $start = \Carbon\Carbon::createFromFormat('Y-m-d', $this->ePrescriptionForm['started_at']);
+            $start = Carbon::createFromFormat('Y-m-d', $this->ePrescriptionForm['started_at']);
             $duration = (int) $this->ePrescriptionForm['duration'];
 
             if ($duration < 1) {
@@ -272,7 +296,7 @@ trait ManagesCarePlanEPrescription
 
             $end = $start->copy()->addDays($duration - 1);
             $this->ePrescriptionForm['ended_at'] = $end->toDateString();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Invalid date format
         }
     }
@@ -359,19 +383,19 @@ trait ManagesCarePlanEPrescription
         }
 
         if (!$this->ePrescriptionSkipTreatmentPeriod) {
-            $lastActivePrescription = \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::where('person_id', $this->carePlan->person_id)
+            $lastActivePrescription = MedicationRequestRequest::where('person_id', $this->carePlan->person_id)
                 ->where('medication_id', $this->ePrescriptionForm['medication_id'])
                 ->whereIn('status', ['active', 'signed'])
                 ->orderBy('ended_at', 'desc')
                 ->first();
 
             if ($lastActivePrescription && $lastActivePrescription->endedAt) {
-                $lastEnd = \Carbon\Carbon::parse($lastActivePrescription->endedAt);
+                $lastEnd = Carbon::parse($lastActivePrescription->endedAt);
                 $today = now();
                 $remainingDays = $today->diffInDays($lastEnd, false);
 
                 if ($remainingDays > 0) {
-                    $prevDuration = $lastActivePrescription->startedAt ? \Carbon\Carbon::parse($lastActivePrescription->startedAt)->diffInDays($lastEnd) + 1 : 10;
+                    $prevDuration = $lastActivePrescription->startedAt ? Carbon::parse($lastActivePrescription->startedAt)->diffInDays($lastEnd) + 1 : 10;
                     $allowedDaysBeforeEnd = $prevDuration >= 21 ? 7 : 3;
 
                     if ($remainingDays > $allowedDaysBeforeEnd) {
@@ -423,11 +447,11 @@ trait ManagesCarePlanEPrescription
     public function submitEPrescriptionRequest(): void
     {
         try {
-            $employeeContext = app(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class)
+            $employeeContext = app(MedicationRequestLifecycleService::class)
                 ->resolveEmployeeContext($this->carePlan, null, Auth::user()?->activeDoctorEmployee()?->id);
             $activity = $this->ownedActivity((int) $this->ePrescriptionForm['activity_id']);
 
-            $uuid = app(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class)->createCarePlanDraft(
+            $uuid = app(MedicationRequestLifecycleService::class)->createCarePlanDraft(
                 $this->carePlan,
                 $activity,
                 $this->ePrescriptionForm,
@@ -439,10 +463,12 @@ trait ManagesCarePlanEPrescription
             $this->flashOutcome('success', 'Заявку на е-рецепт створено. Підпишіть КЕП.');
             $this->openSignatureModal('sign_eprescription');
 
+        } catch (ModelNotFoundException) {
+            $this->flashOutcome('error', __('care-plan.document_context_unavailable'));
         } catch (EHealthValidationException $exception) {
             $exception->report();
             $this->flashOutcome('error', $exception->getTranslatedMessage());
-        } catch (\App\Exceptions\EHealth\EHealthResponseException $e) {
+        } catch (EHealthResponseException $e) {
             if ($e->getCode() === 403 || $e->response->status() === 403) {
                 Log::warning('CarePlanShow: 403 access denied when submitting ePrescription. Prompting for approval.');
                 $this->flashOutcome('warning', 'Відсутній доступ до медичних даних. Будь ласка, надішліть запит на доступ пацієнту.');
@@ -451,7 +477,7 @@ trait ManagesCarePlanEPrescription
                 Log::error('CarePlanShow: failed to create ePrescription API error: ' . $e->getMessage());
                 $this->flashOutcome('error', 'Не вдалося створити заявку на рецепт: ' . $e->getMessage());
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('CarePlanShow: failed to create ePrescription: ' . $e->getMessage());
             $this->flashOutcome('error', 'Не вдалося створити заявку на рецепт: ' . $e->getMessage());
         }
@@ -467,8 +493,8 @@ trait ManagesCarePlanEPrescription
                 return;
             }
 
-            $activityIds = $this->carePlan->activities->pluck('id')->toArray();
-            $localRequests = \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::whereIn('based_on_id', $activityIds)->get();
+            $activityUuids = $this->carePlan->activities->pluck('uuid')->toArray();
+            $localRequests = MedicationRequestRequest::whereHas('basedOn', fn ($q) => $q->whereIn('value', $activityUuids))->get();
 
             if ($localRequests->isEmpty()) {
                 $this->flashOutcome('info', 'Немає виписаних рецептів для синхронізації у цьому плані лікування');
@@ -479,7 +505,7 @@ trait ManagesCarePlanEPrescription
             $updatedCount = 0;
 
             // Check active/completed medication requests in eHealth
-            $activeResponse = \App\Classes\eHealth\Api\MedicationRequest::getBySearchParams((string) $personUuid, []);
+            $activeResponse = Classes\eHealth\Api\MedicationRequest::getBySearchParams((string) $personUuid, []);
             $activeItems = $activeResponse['data'] ?? ($activeResponse[0] ?? []);
 
             if (is_array($activeItems)) {
@@ -514,7 +540,7 @@ trait ManagesCarePlanEPrescription
             }
 
             // Check draft/rejected requests in eHealth
-            $draftResponse = \App\Classes\eHealth\Api\MedicationRequest::getRequestsBySearchParams((string) $personUuid, []);
+            $draftResponse = Classes\eHealth\Api\MedicationRequest::getRequestsBySearchParams((string) $personUuid, []);
             $draftItems = $draftResponse['data'] ?? ($draftResponse[0] ?? []);
 
             if (is_array($draftItems)) {
@@ -535,7 +561,7 @@ trait ManagesCarePlanEPrescription
             $this->refreshCarePlan();
             $this->flashOutcome('success', "Синхронізовано з ЕСОЗ. Оновлено статусів: {$updatedCount}");
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('ManagesCarePlanEPrescription sync error: ' . $e->getMessage());
             $this->flashOutcome('error', 'Помилка при синхронізації з ЕСОЗ: ' . $e->getMessage());
         }
@@ -552,11 +578,11 @@ trait ManagesCarePlanEPrescription
 
         $this->authorizeCarePlanWrite();
 
-        $requestRecord = app(\App\Services\MedicalEvents\MedicalRequestOwnership::class)
-            ->medicationForPerson((string) $this->ePrescriptionRequestIdToSign, (int) $this->carePlan->personId);
-
         try {
-            $result = app(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class)->signPrescription(
+            $requestRecord = app(MedicalRequestOwnership::class)
+                ->medicationForPerson((string) $this->ePrescriptionRequestIdToSign, (int) $this->carePlan->personId);
+
+            $result = app(MedicationRequestLifecycleService::class)->signPrescription(
                 $this->carePlan,
                 $requestRecord,
                 array_merge($this->form, [
@@ -584,13 +610,19 @@ trait ManagesCarePlanEPrescription
             $this->showSignatureModal = false;
             $this->refreshCarePlan();
 
+        } catch (ModelNotFoundException) {
+            $this->flashOutcome('error', __('care-plan.document_context_unavailable'));
+            $this->showSignatureModal = false;
+            $this->actionType = '';
+
+            return;
         } catch (EHealthValidationException $e) {
             $e->report();
             $translatedMsg = $e->getTranslatedMessage();
             Log::error('CarePlanShow: failed to sign E-Prescription validation: ' . $translatedMsg);
             $this->flashOutcome('error', $translatedMsg);
             $this->showSignatureModal = false;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('CarePlanShow: failed to sign E-Prescription: ' . $e->getMessage());
             $this->flashOutcome('error', 'Помилка при підписанні рецепту: ' . $e->getMessage());
             $this->showSignatureModal = false;
@@ -601,24 +633,30 @@ trait ManagesCarePlanEPrescription
     {
         $this->authorizeCarePlanWrite();
 
-        $requestRecord = app(\App\Services\MedicalEvents\MedicalRequestOwnership::class)
-            ->medicationForPerson($requestId, (int) $this->carePlan->personId);
-
         try {
+            $requestRecord = app(MedicalRequestOwnership::class)
+                ->medicationForPerson($requestId, (int) $this->carePlan->personId);
+
             if (in_array(strtolower((string) $requestRecord->status), ['new', 'draft'], true)) {
-                app(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class)->rejectPrescription($this->carePlan, $requestRecord);
+                app(MedicationRequestLifecycleService::class)->rejectPrescription($this->carePlan, $requestRecord);
                 $this->refreshCarePlan();
                 $this->flashOutcome('success', 'Електронний рецепт успішно відхилено.');
             } else {
                 $this->ePrescriptionRequestIdToSign = $requestId;
                 $this->openSignatureModal('reject_prescription');
             }
+        } catch (ModelNotFoundException) {
+            $this->flashOutcome('error', __('care-plan.document_context_unavailable'));
+            $this->showSignatureModal = false;
+            $this->actionType = '';
+
+            return;
         } catch (EHealthValidationException $e) {
             $e->report();
             $translatedMsg = $e->getTranslatedMessage();
             Log::error('CarePlanShow: failed to reject prescription validation: ' . $translatedMsg);
             $this->flashOutcome('error', $translatedMsg);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('CarePlanShow: failed to reject prescription: ' . $e->getMessage());
             $this->flashOutcome('error', 'Не вдалося відхилити рецепт: ' . $e->getMessage());
         }
@@ -635,11 +673,11 @@ trait ManagesCarePlanEPrescription
 
         $this->authorizeCarePlanWrite();
 
-        $requestRecord = app(\App\Services\MedicalEvents\MedicalRequestOwnership::class)
-            ->medicationForPerson((string) $this->ePrescriptionRequestIdToSign, (int) $this->carePlan->personId);
-
         try {
-            app(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class)->rejectPrescription(
+            $requestRecord = app(MedicalRequestOwnership::class)
+                ->medicationForPerson((string) $this->ePrescriptionRequestIdToSign, (int) $this->carePlan->personId);
+
+            app(MedicationRequestLifecycleService::class)->rejectPrescription(
                 $this->carePlan,
                 $requestRecord,
                 array_merge($this->form, ['signer_tax_id' => Auth::user()?->party?->taxId]),
@@ -650,13 +688,19 @@ trait ManagesCarePlanEPrescription
             $this->refreshCarePlan();
             $this->flashOutcome('success', 'Електронний рецепт успішно відхилено.');
 
+        } catch (ModelNotFoundException) {
+            $this->flashOutcome('error', __('care-plan.document_context_unavailable'));
+            $this->showSignatureModal = false;
+            $this->actionType = '';
+
+            return;
         } catch (EHealthValidationException $e) {
             $e->report();
             $translatedMsg = $e->getTranslatedMessage();
             Log::error('CarePlanShow: failed to reject prescription validation: ' . $translatedMsg);
             $this->flashOutcome('error', $translatedMsg);
             $this->showSignatureModal = false;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('CarePlanShow: failed to reject prescription: ' . $e->getMessage());
             $errorMsg = 'Не вдалося відхилити рецепт: ' . $e->getMessage();
             $this->flashOutcome('error', $errorMsg);
@@ -667,17 +711,23 @@ trait ManagesCarePlanEPrescription
     public function resendPrescriptionSms(string $prescriptionId): void
     {
         $this->authorizeCarePlanWrite();
-        app(\App\Services\MedicalEvents\MedicalRequestOwnership::class)
-            ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
-
         try {
-            $response = app(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class)->resendSms($this->carePlan->person->uuid, $prescriptionId);
+            app(MedicalRequestOwnership::class)
+                ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
+
+            $response = app(MedicationRequestLifecycleService::class)->resendSms($this->carePlan->person->uuid, $prescriptionId);
             if ($response->successful()) {
                 $this->flashOutcome('success', 'СМС з кодом погашення успішно надіслано повторно пацієнту.');
             } else {
                 $this->flashOutcome('error', 'Не вдалося повторно надіслати СМС: ' . json_encode($response->getData()));
             }
-        } catch (\Exception $e) {
+        } catch (ModelNotFoundException) {
+            $this->flashOutcome('error', __('care-plan.document_context_unavailable'));
+            $this->showSignatureModal = false;
+            $this->actionType = '';
+
+            return;
+        } catch (Exception $e) {
             Log::error('CarePlanShow: failed to resend SMS: ' . $e->getMessage());
             $this->flashOutcome('error', 'Помилка надсилання СМС: ' . $e->getMessage());
         }
@@ -685,11 +735,11 @@ trait ManagesCarePlanEPrescription
 
     public function loadPrintoutForm(string $prescriptionId): string
     {
-        app(\App\Services\MedicalEvents\MedicalRequestOwnership::class)
-            ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
-
         try {
-            $printout = app(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class)->fetchPrintoutFromEhealth(
+            app(MedicalRequestOwnership::class)
+                ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
+
+            $printout = app(MedicationRequestLifecycleService::class)->fetchPrintoutFromEhealth(
                 $this->carePlan->person->uuid,
                 $prescriptionId
             );
@@ -707,7 +757,7 @@ trait ManagesCarePlanEPrescription
 
             $ehealthData = is_array($printout) ? $printout : null;
 
-            $this->printableContent = app(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class)->buildFallbackPrintoutHtml(
+            $this->printableContent = app(MedicationRequestLifecycleService::class)->buildFallbackPrintoutHtml(
                 $this->carePlan,
                 $prescriptionId,
                 $this->ePrescriptionForm['signature_text'] ?? null,
@@ -717,7 +767,13 @@ trait ManagesCarePlanEPrescription
             $this->dispatch('printoutLoaded');
 
             return $this->printableContent;
-        } catch (\Exception $e) {
+        } catch (ModelNotFoundException) {
+            $this->flashOutcome('error', __('care-plan.document_context_unavailable'));
+            $this->showSignatureModal = false;
+            $this->actionType = '';
+
+            return '';
+        } catch (Exception $e) {
             Log::error('CarePlanShow: failed to load printout form: ' . $e->getMessage());
             $this->flashOutcome('error', 'Не вдалося завантажити форму пам’ятки.');
 
@@ -728,7 +784,7 @@ trait ManagesCarePlanEPrescription
     /**
      * @return array<string, mixed>|null
      */
-    protected function resolveDrugForActivity(\App\Models\CarePlanActivity $activity): ?array
+    protected function resolveDrugForActivity(CarePlanActivity $activity): ?array
     {
         if (empty($activity->productReference)) {
             return null;
@@ -783,7 +839,7 @@ trait ManagesCarePlanEPrescription
      * Livewire AJAX does not remount the layout toast, so pair session flash with a
      * flashMessage dispatch and scroll the drawer to the invalid field.
      */
-    private function failEPrescriptionField(string $message, string $field): void
+    protected function failEPrescriptionField(string $message, string $field): void
     {
         $this->ePrescriptionWarningMessage = $message;
         $this->addError($field, $message);
@@ -795,17 +851,23 @@ trait ManagesCarePlanEPrescription
     {
         $this->authorizeCarePlanWrite();
 
-        $requestRecord = app(\App\Services\MedicalEvents\MedicalRequestOwnership::class)
-            ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
-
         try {
-            app(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class)->block($this->carePlan->person->uuid, $prescriptionId, [
+            $requestRecord = app(MedicalRequestOwnership::class)
+                ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
+
+            app(MedicationRequestLifecycleService::class)->block($this->carePlan->person->uuid, $prescriptionId, [
                 'status_reason' => 'Призупинення або блокування призначення',
             ]);
             $requestRecord->update(['status' => 'blocked']);
             $this->refreshCarePlan();
             $this->flashOutcome('success', 'Рецепт успішно заблоковано в ЕСОЗ.');
-        } catch (\Exception $e) {
+        } catch (ModelNotFoundException) {
+            $this->flashOutcome('error', __('care-plan.document_context_unavailable'));
+            $this->showSignatureModal = false;
+            $this->actionType = '';
+
+            return;
+        } catch (Exception $e) {
             Log::error('CarePlanShow: failed to block prescription: ' . $e->getMessage());
             $this->flashOutcome('error', 'Помилка блокування рецепту: ' . $e->getMessage());
         }
@@ -815,15 +877,21 @@ trait ManagesCarePlanEPrescription
     {
         $this->authorizeCarePlanWrite();
 
-        $requestRecord = app(\App\Services\MedicalEvents\MedicalRequestOwnership::class)
-            ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
-
         try {
-            app(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class)->unblock($this->carePlan->person->uuid, $prescriptionId, []);
+            $requestRecord = app(MedicalRequestOwnership::class)
+                ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
+
+            app(MedicationRequestLifecycleService::class)->unblock($this->carePlan->person->uuid, $prescriptionId, []);
             $requestRecord->update(['status' => 'active']);
             $this->refreshCarePlan();
             $this->flashOutcome('success', 'Рецепт успішно розблоковано в ЕСОЗ.');
-        } catch (\Exception $e) {
+        } catch (ModelNotFoundException) {
+            $this->flashOutcome('error', __('care-plan.document_context_unavailable'));
+            $this->showSignatureModal = false;
+            $this->actionType = '';
+
+            return;
+        } catch (Exception $e) {
             Log::error('CarePlanShow: failed to unblock prescription: ' . $e->getMessage());
             $this->flashOutcome('error', 'Помилка розблокування рецепту: ' . $e->getMessage());
         }
@@ -831,11 +899,11 @@ trait ManagesCarePlanEPrescription
 
     public function checkDispenseHistory(string $prescriptionId): void
     {
-        app(\App\Services\MedicalEvents\MedicalRequestOwnership::class)
-            ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
-
         try {
-            $dispenses = app(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class)->getDispenseHistory($this->carePlan->person->uuid, $prescriptionId);
+            app(MedicalRequestOwnership::class)
+                ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
+
+            $dispenses = app(MedicationRequestLifecycleService::class)->getDispenseHistory($this->carePlan->person->uuid, $prescriptionId);
             $items = $dispenses['data'] ?? ($dispenses[0] ?? []);
 
             if (empty($items) || !is_array($items)) {
@@ -847,7 +915,13 @@ trait ManagesCarePlanEPrescription
             $count = count($items);
             $latestStatus = $items[0]['status'] ?? 'невідомо';
             $this->flashOutcome('success', "Знайдено {$count} записів відпуску ліків в аптеці. Останній статус: {$latestStatus}.");
-        } catch (\Exception $e) {
+        } catch (ModelNotFoundException) {
+            $this->flashOutcome('error', __('care-plan.document_context_unavailable'));
+            $this->showSignatureModal = false;
+            $this->actionType = '';
+
+            return;
+        } catch (Exception $e) {
             Log::warning('CarePlanShow: check dispense history returned 404 or error: ' . $e->getMessage());
             if (str_contains($e->getMessage(), '404') || str_contains(strtolower($e->getMessage()), 'not found')) {
                 $this->flashOutcome('info', 'Погашень (відпуску ліків) за цим рецептом в ЕСОЗ наразі не виявлено (аптеки ще не відпускали ліки за цим номером).');

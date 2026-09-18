@@ -6,8 +6,13 @@ namespace App\Repositories\MedicalEvents;
 
 use App\Enums\Person\MedicationRequestStatus;
 use App\Models\CarePlanActivity;
+use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
+use App\Repositories\MedicalEvents\Concerns\ResolvesRequestFhirRefs;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Throwable;
 
 /**
@@ -15,6 +20,8 @@ use Throwable;
  */
 class MedicationRequestRepository extends BaseRepository
 {
+    use ResolvesRequestFhirRefs;
+
     public function __construct(MedicationRequestRequest $model)
     {
         parent::__construct($model);
@@ -31,10 +38,12 @@ class MedicationRequestRepository extends BaseRepository
     public function store(array $data, int $personId): int
     {
         return DB::transaction(function () use ($data, $personId) {
+            $fhirRefs = $this->resolveRequestFhirRefs($data);
+
             $request = $this->model->updateOrCreate(
                 ['uuid' => $data['uuid'] ?? $data['id']],
                 [
-                'employee_id' => $data['employee_id'],
+                'employee_id' => $data['employee_id'] ?? null,
                 'person_id' => $personId,
                 'division_id' => $data['division_id'] ?? null,
                 'status' => $data['status'],
@@ -44,16 +53,18 @@ class MedicationRequestRepository extends BaseRepository
                 'medication_id' => $data['medication_id'],
                 'medication_qty' => $data['medication_qty'],
                 'medication_program_id' => $data['medication_program_id'] ?? null,
-                'intent' => $data['intent'] ?? 'order',
-                'category' => $data['category'] ?? null,
-                'based_on_id' => $data['based_on_id'] ?? null,
-                'context_id' => $data['context_id'] ?? null,
-                'priority' => $data['priority'] ?? null,
+                'intent_id' => $fhirRefs['intent_id'],
+                'category_id' => $fhirRefs['category_id'],
+                'based_on_id' => $fhirRefs['based_on_id'],
+                'context_id' => $fhirRefs['context_id'],
+                'priority_id' => $fhirRefs['priority_id'],
                 'prior_prescription_id' => $data['prior_prescription_id'] ?? null,
                 'container_dosage' => $data['container_dosage'] ?? null,
                 'note' => $data['note'] ?? null,
                 'inform_with' => $data['inform_with'] ?? null,
                 'ehealth_payload' => $data['ehealth_payload'] ?? null,
+                'source' => $data['source'] ?? MedicationRequestRequest::SOURCE_LOCAL,
+                'resource_type' => MedicationRequestRequest::TYPE_REQUEST,
                 ]
             );
 
@@ -127,7 +138,7 @@ class MedicationRequestRepository extends BaseRepository
     {
         $query = $this->model
             ->newQuery()
-            ->with(['dosageInstructions.doseRate'])
+            ->with(['dosageInstructions.doseRate', 'basedOn', 'context', 'category'])
             ->where('person_id', $personId);
 
         $status = trim((string) ($filters['status'] ?? ''));
@@ -148,28 +159,58 @@ class MedicationRequestRepository extends BaseRepository
             $query->whereDate('ended_at', '<=', $filters['ended_at_to']);
         }
 
+        $source = $filters['source'] ?? null;
+        if ($source !== null) {
+            $query->where('source', $source);
+        }
+
+        if (isset($filters['resource_type'])) {
+            $query->where('resource_type', $filters['resource_type']);
+        }
+        if (!empty($filters['request_number'])) {
+            $query->where('request_number', 'like', '%'.$filters['request_number'].'%');
+        }
+
         $requests = $query
             ->orderByDesc('started_at')
             ->orderByDesc('id')
             ->get();
 
-        $activityIds = $requests
-            ->pluck('basedOnId')
-            ->filter(static fn ($id): bool => (int) $id > 0)
+        $activityUuids = $requests
+            ->map(fn ($r) => $r->basedOn?->value)
+            ->filter()
             ->unique()
             ->values()
             ->all();
 
-        $carePlanIdsByActivity = $activityIds === []
+        $carePlanIdsByActivityUuid = $activityUuids === []
             ? []
             : CarePlanActivity::query()
-                ->whereIn('id', $activityIds)
-                ->pluck('care_plan_id', 'id')
-                ->map(static fn ($id): int => (int) $id)
+                ->whereIn('uuid', $activityUuids)
+                ->get(['id', 'uuid', 'care_plan_id'])
+                ->keyBy('uuid')
+                ->all();
+
+        $encounterUuids = $requests
+            ->map(fn ($r) => $r->context?->value)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $encounterIdsByUuid = $encounterUuids === []
+            ? []
+            : Encounter::query()
+                ->whereIn('uuid', $encounterUuids)
+                ->pluck('id', 'uuid')
                 ->all();
 
         return $requests
-            ->map(fn (MedicationRequestRequest $request): array => $this->toPatientRegistryRow($request, $carePlanIdsByActivity))
+            ->map(fn (MedicationRequestRequest $request): array => $this->toPatientRegistryRow(
+                $request,
+                $carePlanIdsByActivityUuid,
+                $encounterIdsByUuid
+            ))
             ->all();
     }
 
@@ -196,7 +237,7 @@ class MedicationRequestRepository extends BaseRepository
      *     carePlanId: int|null
      * }
      */
-    public function toPatientRegistryRow(MedicationRequestRequest $request, array $carePlanIdsByActivity = []): array
+    public function toPatientRegistryRow(MedicationRequestRequest $request, array $carePlanIdsByActivityUuid = [], array $encounterIdsByUuid = []): array
     {
         $payload = is_array($request->ehealthPayload) ? $request->ehealthPayload : [];
         $status = strtolower((string) $request->status);
@@ -223,19 +264,23 @@ class MedicationRequestRepository extends BaseRepository
             ?: ''
         );
 
-        $category = strtolower((string) ($request->category ?: data_get($payload, 'category') ?: ''));
+        $categoryValue = $request->category?->text ?: data_get($payload, 'category') ?: '';
+        $category = strtolower((string) $categoryValue);
         $categoryLabel = match ($category) {
             'community' => 'Амбулаторно',
             'inpatient' => 'Стаціонар',
             default => $category !== '' ? $category : '—',
         };
 
-        $activityId = $request->basedOnId !== null ? (int) $request->basedOnId : null;
-        $encounterId = $request->contextId !== null ? (int) $request->contextId : null;
-        $carePlanId = ($activityId !== null && $activityId > 0)
-            ? (int) ($carePlanIdsByActivity[$activityId] ?? 0)
-            : 0;
-        $carePlanId = $carePlanId > 0 ? $carePlanId : null;
+        $activityUuid = $request->basedOn?->value;
+        $encounterUuid = $request->context?->value;
+
+        $activityData = $activityUuid ? ($carePlanIdsByActivityUuid[$activityUuid] ?? null) : null;
+        $activityId = $activityData ? $activityData->id : null;
+        $carePlanId = $activityData ? $activityData->carePlanId : null;
+
+        $encounterId = $encounterUuid ? ($encounterIdsByUuid[$encounterUuid] ?? null) : null;
+
         $basisLabel = match (true) {
             $activityId !== null && $activityId > 0 => 'План лікування',
             $encounterId !== null && $encounterId > 0 => 'Взаємодія',
@@ -285,11 +330,84 @@ class MedicationRequestRepository extends BaseRepository
         return $this->model->newQuery()->where('uuid', $uuid)->first();
     }
 
-    public function sumIssuedQuantityByActivity(int $activityId): float
+    public function sumIssuedQuantityByActivity(string $activityUuid): float
     {
         return (float) $this->model->newQuery()
-            ->where('based_on_id', $activityId)
+            ->whereHas('basedOn', fn ($q) => $q->where('value', $activityUuid))
             ->where('status', '!=', MedicationRequestStatus::ENTERED_IN_ERROR->value)
             ->sum('medication_qty');
+    }
+
+    /**
+     * Cache a patient-scoped eHealth request or prescription without replacing local-only details.
+     * Resource type is supplied by the API endpoint used for the search; source records its origin.
+     *
+     * @param  array<string, mixed>  $eHealthData  Raw payload from GET /persons/{id}/medication_requests or similar.
+     * @param  int  $personId  Local person ID.
+     * @return MedicationRequestRequest
+     */
+    public function upsertFromEHealth(
+        array $eHealthData,
+        int $personId,
+        string $resourceType = MedicationRequestRequest::TYPE_PRESCRIPTION
+    ): MedicationRequestRequest {
+        $uuid = $eHealthData['id'] ?? $eHealthData['uuid'] ?? null;
+
+        if (!is_string($uuid) || !Str::isUuid($uuid)) {
+            throw new InvalidArgumentException('eHealth medication record must have a UUID.');
+        }
+        if (!in_array($resourceType, [MedicationRequestRequest::TYPE_REQUEST, MedicationRequestRequest::TYPE_PRESCRIPTION], true)) {
+            throw new InvalidArgumentException('Unknown medication resource type.');
+        }
+
+        return DB::transaction(function () use ($eHealthData, $personId, $resourceType, $uuid) {
+            $request = $this->model->newQuery()->where('uuid', $uuid)->lockForUpdate()->first();
+            if ($request !== null && (int) $request->personId !== $personId) {
+                throw (new ModelNotFoundException())->setModel(MedicationRequestRequest::class);
+            }
+
+            if ($request === null) {
+                $request = $this->model->newInstance([
+                    'uuid' => $uuid,
+                    'person_id' => $personId,
+                    'source' => MedicationRequestRequest::SOURCE_EHEALTH,
+                    'status' => 'unknown',
+                ]);
+            } elseif ($request->source === MedicationRequestRequest::SOURCE_LOCAL && $resourceType !== MedicationRequestRequest::TYPE_REQUEST) {
+                throw new InvalidArgumentException('A local request cannot be overwritten by a prescription.');
+            }
+
+            // List responses are partial; do not erase the local author, references or medication details.
+            $request->fill(array_filter([
+                'status' => $eHealthData['status'] ?? null,
+                'request_number' => $eHealthData['request_number'] ?? $eHealthData['requisition'] ?? null,
+                'started_at' => $eHealthData['started_at'] ?? null,
+                'ended_at' => $eHealthData['ended_at'] ?? null,
+                'medication_id' => $eHealthData['medication_id'] ?? data_get($eHealthData, 'medication_info.id'),
+                'medication_qty' => $eHealthData['medication_qty'] ?? null,
+                'medication_program_id' => $eHealthData['medical_program_id'] ?? data_get($eHealthData, 'medical_program.id'),
+            ], static fn ($value) => $value !== null));
+            $request->resourceType = $resourceType;
+            // Replace supplied arrays as a whole, so removed dosage entries cannot survive a refresh.
+            $request->ehealthPayload = array_replace($request->ehealthPayload ?? [], $eHealthData);
+            $request->save();
+
+            return $request;
+        });
+    }
+
+    /**
+     * Search locally-stored eHealth-sourced MedicationRequests for a patient
+     * (these are the signed prescriptions, as opposed to request-requests which are drafts).
+     *
+     * @param  int  $personId
+     * @param  array<string, mixed>  $filters
+     * @return list<array<string, mixed>>
+     */
+    public function searchEHealthPrescriptionsByPersonId(int $personId, array $filters = []): array
+    {
+        return $this->searchByPersonId($personId, array_merge($filters, [
+            'resource_type' => MedicationRequestRequest::TYPE_PRESCRIPTION,
+        ]));
     }
 }

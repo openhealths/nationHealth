@@ -1,82 +1,76 @@
 {{-- Medical Devices Drawer (single teleport root — Alpine moves only firstElementChild) --}}
 <template x-teleport="body">
-    <div x-show="showMedicalDeviceDrawer"
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         x-cloak
-         class="fixed inset-0"
-         style="z-index: 39;"
-         role="dialog"
-         aria-modal="true"
-         aria-labelledby="medical-devices-drawer-label"
-     >
-        <div class="absolute inset-0 bg-gray-900/50"
-             aria-hidden="true"
-             @click="showMedicalDeviceDrawer = false"
-        ></div>
+    <div
+        x-show="showMedicalDeviceDrawer"
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        x-cloak
+        class="fixed inset-0"
+        style="z-index: 39"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="medical-devices-drawer-label"
+    >
+        <div class="absolute inset-0 bg-gray-900/50" aria-hidden="true" @click="showMedicalDeviceDrawer = false"></div>
 
-        <div id="medical-devices-drawer-right"
-             x-transition:enter="transition ease-out duration-300"
-             x-transition:enter-start="translate-x-full"
-             x-transition:enter-end="translate-x-0"
-             x-transition:leave="transition ease-in duration-200"
-             x-transition:leave-start="translate-x-0"
-             x-transition:leave-end="translate-x-full"
-             class="absolute top-0 right-0 z-10 h-screen pt-20 p-4 overflow-y-auto bg-white w-4/5 dark:bg-gray-800 shadow-2xl"
-             tabindex="-1"
+        <div
+            id="medical-devices-drawer-right"
+            x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="translate-x-full"
+            x-transition:enter-end="translate-x-0"
+            x-transition:leave="transition ease-in duration-200"
+            x-transition:leave-start="translate-x-0"
+            x-transition:leave-end="translate-x-full"
+            class="absolute top-0 right-0 z-10 h-screen w-4/5 overflow-y-auto bg-white p-4 pt-20 shadow-2xl dark:bg-gray-800"
+            tabindex="-1"
         >
-        <h3 class="modal-header" id="medical-devices-drawer-label">
-            {{ __('care-plan.new_medical_device_prescription') }}
-        </h3>
+            <h3 class="modal-header" id="medical-devices-drawer-label">
+                {{ __('care-plan.new_medical_device_prescription') }}
+            </h3>
 
-        {{-- Content --}}
-        <form>
-            {{-- Program Selection Section --}}
-            <fieldset class="fieldset">
-                <legend class="legend">
-                    {{ __('care-plan.program_selection') }}
-                </legend>
+            {{-- Content --}}
+            <form>
+                {{-- Program Selection Section --}}
+                <fieldset class="fieldset">
+                    <legend class="legend">{{ __('care-plan.program_selection') }}</legend>
 
-                <div class="form-row-3">
-                    <div class="form-group group">
-                        <label for="medical_device_program" class="label">
-                            {{ __('care-plan.program') }}*
-                        </label>
-                        <select id="medical_device_program"
+                    <div class="form-row-3">
+                        <div class="form-group group">
+                            <label for="medical_device_program" class="label"> {{ __('care-plan.program') }} </label>
+                            <select
+                                id="medical_device_program"
                                 name="medical_device_program"
                                 class="input-select peer"
                                 wire:model.live="selectedProgram"
-                        >
-                            <option value="">{{ __('care-plan.select_program_first') }}</option>
-                            @foreach(($dictionaries['medical_programs_device'] ?? $dictionaries['medical_programs'] ?? []) as $id => $name)
-                                <option value="{{ $id }}">{{ $name }}</option>
-                            @endforeach
-                        </select>
+                            >
+                                <option value="">{{ __('care-plan.without_medical_program') }}</option>
+                                @foreach (($dictionaries['medical_programs_device'] ?? $dictionaries['medical_programs'] ?? []) as $id => $name)
+                                    <option value="{{ $id }}">{{ $name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
                     </div>
-                </div>
-            </fieldset>
+                </fieldset>
 
-            <div class="mt-6 flex justify-start gap-3">
-                <button type="button"
+                <div class="mt-6 flex justify-start gap-3">
+                    <button
+                        type="button"
                         class="button-minor"
                         aria-controls="medical-devices-drawer-right"
                         @click="showMedicalDeviceDrawer = false"
-                >
-                    {{ __('forms.cancel') }}
-                </button>
+                    >
+                        {{ __('forms.cancel') }}
+                    </button>
 
-                <button type="button"
-                        class="button-primary"
-                        wire:click="openMedicalDeviceSearch"
-                >
-                    {{ __('forms.continue') }}
-                </button>
-            </div>
-        </form>
+                    <button type="button" class="button-primary" wire:click="openMedicalDeviceSearch">
+                        {{ __('forms.continue') }}
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </template>

@@ -11,12 +11,20 @@ use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthJobTimeoutException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
-use App\Repositories\CarePlanRepository;
+use App\Models\MedicalEvents\Mongo\CarePlanActivity;
 use App\Repositories\CarePlanActivityRepository;
+use App\Repositories\CarePlanRepository;
+use App\Repositories\MedicalEvents\Repository;
+use App\Services\MedicalEvents\CarePlanActivityLifecycleService;
 use App\Services\MedicalEvents\CarePlanApprovalService;
+use App\Services\MedicalEvents\CarePlanLifecycleGateService;
+use App\Services\MedicalEvents\CarePlanLifecycleService;
+use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 trait CarePlanManager
 {
@@ -128,7 +136,7 @@ trait CarePlanManager
         }
 
         if ($this->actionType === 'cancel') {
-            $planCancelBlock = app(\App\Services\MedicalEvents\CarePlanLifecycleGateService::class)
+            $planCancelBlock = app(CarePlanLifecycleGateService::class)
                 ->planCancelBlockReason($this->carePlan);
 
             if ($planCancelBlock !== null) {
@@ -171,7 +179,7 @@ trait CarePlanManager
                 Auth::user()->party->taxId
             );
 
-            $finalResponse = app(\App\Services\MedicalEvents\CarePlanLifecycleService::class)->cancel(
+            $finalResponse = app(CarePlanLifecycleService::class)->cancel(
                 $this->carePlan->person->uuid,
                 $this->carePlan->uuid,
                 [
@@ -219,7 +227,7 @@ trait CarePlanManager
 
             $this->flashOutcome('error', $msg);
             $this->showSignatureModal = false;
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             Log::error('CarePlanShow: unexpected error: ' . $exception->getMessage(), [
                 'exception' => $exception,
                 'actionType' => $this->actionType,
@@ -232,7 +240,7 @@ trait CarePlanManager
         }
     }
 
-    private function signPlan(CarePlanRepository $repository): void
+    protected function signPlan(CarePlanRepository $repository): void
     {
         $legalEntity = legalEntity();
 
@@ -275,7 +283,7 @@ trait CarePlanManager
                 Auth::user()->party->taxId
             );
 
-            $finalResponse = app(\App\Services\MedicalEvents\CarePlanLifecycleService::class)
+            $finalResponse = app(CarePlanLifecycleService::class)
                 ->submitSignedCreate($this->carePlan->person->uuid, $signedContent);
 
             $entity = $finalResponse['result'][0] ?? ($finalResponse['result'] ?? $finalResponse);
@@ -314,7 +322,7 @@ trait CarePlanManager
                 : __('care-plan.ehealth_error_prefix') . $exception->getMessage();
             $this->flashOutcome('error', $msg);
             $this->showSignatureModal = false;
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             Log::error('CarePlanShow: unexpected error: ' . $exception->getMessage());
             $this->flashOutcome('error', __('care-plan.unexpected_error'));
             $this->showSignatureModal = false;
@@ -334,7 +342,7 @@ trait CarePlanManager
             return;
         }
 
-        $blockReason = app(\App\Services\MedicalEvents\CarePlanLifecycleGateService::class)
+        $blockReason = app(CarePlanLifecycleGateService::class)
             ->planCompleteBlockReason($this->carePlan);
 
         if ($blockReason !== null) {
@@ -354,7 +362,7 @@ trait CarePlanManager
         ];
 
         try {
-            $finalResponse = app(\App\Services\MedicalEvents\CarePlanLifecycleService::class)->complete(
+            $finalResponse = app(CarePlanLifecycleService::class)->complete(
                 $this->carePlan->person->uuid,
                 $this->carePlan->uuid,
                 [
@@ -390,13 +398,13 @@ trait CarePlanManager
                 ? $exception->getFormattedMessage()
                 : __('care-plan.ehealth_error_prefix') . $exception->getMessage();
             $this->flashOutcome('error', $msg);
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             Log::error('CarePlanShow: unexpected error: ' . $exception->getMessage());
             $this->flashOutcome('error', __('care-plan.unexpected_error'));
         }
     }
 
-    private function signActivity(CarePlanRepository $repository, CarePlanActivityRepository $activityRepository): void
+    protected function signActivity(CarePlanRepository $repository, CarePlanActivityRepository $activityRepository): void
     {
         if (!$this->activityToSign) {
             $this->flashOutcome('error', __('care-plan.no_activity_selected'));
@@ -414,15 +422,8 @@ trait CarePlanManager
         }
 
         if (empty($activity->uuid)) {
-            $activity->uuid = \Illuminate\Support\Str::uuid()->toString();
+            $activity->uuid = Str::uuid()->toString();
             $activity->save();
-        }
-
-        if (str_contains(strtolower((string) $activity->kind), 'device') && empty($activity->program)) {
-            $this->flashOutcome('error', __('care-plan.device_program_required_before_sign'));
-            $this->showSignatureModal = false;
-
-            return;
         }
 
         if (method_exists($this, 'getDeviceSignReadinessWarning')) {
@@ -452,7 +453,7 @@ trait CarePlanManager
             );
             Log::info('CarePlanActivity: Signing key succeeded');
 
-            $finalResponse = app(\App\Services\MedicalEvents\CarePlanActivityLifecycleService::class)
+            $finalResponse = app(CarePlanActivityLifecycleService::class)
                 ->submitSignedCreate(
                     $this->carePlan->person->uuid,
                     $this->carePlan->uuid,
@@ -486,8 +487,8 @@ trait CarePlanManager
             // Store to Mongo
             /*
             try {
-                \App\Models\MedicalEvents\Mongo\CarePlanActivity::create($finalResponse);
-            } catch (\Exception $e) {
+                CarePlanActivity::create($finalResponse);
+            } catch (Exception $e) {
                 Log::warning('Failed to save CarePlanActivity to Mongo: ' . $e->getMessage());
             }
             */
@@ -499,7 +500,7 @@ trait CarePlanManager
 
             // Sync parent Care Plan to catch status transition (e.g., Draft -> Active) triggered by activity creation
             try {
-                $planData = app(\App\Services\MedicalEvents\CarePlanLifecycleService::class)
+                $planData = app(CarePlanLifecycleService::class)
                     ->getDetails($this->carePlan->person->uuid, $this->carePlan->uuid);
                 $repository->syncCarePlans(
                     ['data' => [$planData]],
@@ -507,7 +508,7 @@ trait CarePlanManager
                     Auth::user()?->getCarePlanWriterEmployee($this->carePlan->terms_of_service)?->id
                 );
                 $activityRepository->syncActivities($this->carePlan->person, $this->carePlan);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::warning('CarePlanShow: failed to sync plan status or activities after activity creation: ' . $e->getMessage());
             }
 
@@ -536,7 +537,7 @@ trait CarePlanManager
                 : __('care-plan.ehealth_error_prefix') . $exception->getMessage();
             $this->flashOutcome('error', $msg);
             $this->showSignatureModal = false;
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             Log::error('CarePlanActivity: unexpected error: ' . $exception->getMessage(), [
                 'exception' => $exception
             ]);
@@ -545,7 +546,7 @@ trait CarePlanManager
         }
     }
 
-    private function signStatusActivity(CarePlanActivityRepository $activityRepository): void
+    protected function signStatusActivity(CarePlanActivityRepository $activityRepository): void
     {
         if (!$this->activityToSign) {
             $this->flashOutcome('error', __('care-plan.no_activity_selected'));
@@ -559,7 +560,7 @@ trait CarePlanManager
             return;
         }
 
-        $openDocsBlock = app(\App\Services\MedicalEvents\CarePlanLifecycleGateService::class)
+        $openDocsBlock = app(CarePlanLifecycleGateService::class)
             ->activityStatusChangeBlockReason($activity, (string) $this->actionType);
 
         if ($openDocsBlock !== null) {
@@ -658,7 +659,7 @@ trait CarePlanManager
                 }
             }
 
-            $activityLifecycle = app(\App\Services\MedicalEvents\CarePlanActivityLifecycleService::class);
+            $activityLifecycle = app(CarePlanActivityLifecycleService::class);
             $finalResponse = $this->actionType === 'complete_activity'
                 ? $activityLifecycle->complete(
                     $this->carePlan->person->uuid,
@@ -684,7 +685,7 @@ trait CarePlanManager
 
             if ($this->actionType === 'complete_activity') {
                 if ($this->outcomeCode) {
-                    $code = \App\Repositories\MedicalEvents\Repository::codeableConcept()->store([
+                    $code = Repository::codeableConcept()->store([
                         'coding' => [
                             [
                                 'system' => 'eHealth/care_plan_activity_outcomes',
@@ -699,7 +700,7 @@ trait CarePlanManager
                 if (!empty($this->outcomeReferences)) {
                     $ids = [];
                     foreach ($this->outcomeReferences as $uuid) {
-                        $identifier = \App\Repositories\MedicalEvents\Repository::identifier()->store($uuid);
+                        $identifier = Repository::identifier()->store($uuid);
                         $ids[] = $identifier->id;
                     }
                     $activity->outcomeReferences()->sync($ids);
@@ -723,7 +724,7 @@ trait CarePlanManager
             ]);
             $this->flashOutcome('error', $exception->getTranslatedMessage());
             $this->showSignatureModal = false;
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             Log::error('CarePlanActivityStatus: error: ' . $exception->getMessage());
             $this->flashOutcome('error', $exception->getMessage());
             $this->showSignatureModal = false;
@@ -742,16 +743,23 @@ trait CarePlanManager
             return;
         }
 
+        $service = app(CarePlanApprovalService::class);
+        if ($service->skipsPatientOtp($this->carePlan)) {
+            $this->createApproval('');
+
+            return;
+        }
+
         try {
             $this->authMethods = EHealth::person()->getAuthMethods($this->carePlan->person->uuid)->getData();
             $this->showMethodSelectionModal = true;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('CarePlanShow: failed to load auth methods: ' . $e->getMessage());
             $this->flashOutcome('error', 'Не вдалося завантажити методи аутентифікації');
         }
     }
 
-    protected function isCarePlanAlreadyCancelledError(\Throwable $exception): bool
+    protected function isCarePlanAlreadyCancelledError(Throwable $exception): bool
     {
         if ($exception instanceof EHealthValidationException) {
             return $exception->isCarePlanAlreadyCancelled();
@@ -800,7 +808,7 @@ trait CarePlanManager
     protected function createApproval(string $methodUuid): void
     {
         try {
-            $employeeUuid = Auth::user()?->getCarePlanWriterEmployee($this->carePlan->terms_of_service)?->uuid;
+            $employeeUuid = Auth::user()?->getCarePlanWriterEmployee($this->carePlan->termsOfService)?->uuid;
 
             if (!$employeeUuid) {
                 $this->flashOutcome('error', 'Не вдалося визначити лікаря для створення дозволу.');
@@ -808,12 +816,13 @@ trait CarePlanManager
                 return;
             }
 
-            $result = app(CarePlanApprovalService::class)->create(
+            $service = app(CarePlanApprovalService::class);
+            $result = $service->create(
                 carePlan: $this->carePlan,
                 patientUuid: $this->carePlan->person->uuid,
                 employeeUuid: $employeeUuid,
                 accessLevel: 'write',
-                authorizeWith: $methodUuid ?: null,
+                authorizeWith: $service->skipsPatientOtp($this->carePlan) ? null : ($methodUuid ?: null),
                 user: Auth::user(),
                 bearerToken: session()->get(config('ehealth.api.oauth.bearer_token')),
             );
@@ -828,7 +837,7 @@ trait CarePlanManager
 
             $this->approvalId = $result->approvalId;
 
-            if ($result->requiresOtp()) {
+            if ($result->requiresOtp() && !$service->skipsPatientOtp($this->carePlan)) {
                 $this->currentAuthMethod = $result->authMethod ?? $this->currentAuthMethod;
                 $this->openAuthModal();
 
@@ -836,8 +845,13 @@ trait CarePlanManager
             }
 
             $this->syncPlanStatus();
-            $this->flashOutcome('success', 'План лікування успішно активовано.');
-        } catch (\Exception $e) {
+            $this->flashOutcome(
+                'success',
+                $service->skipsPatientOtp($this->carePlan)
+                    ? __('care-plan.approval_inpatient_granted')
+                    : 'План лікування успішно активовано.'
+            );
+        } catch (Exception $e) {
             Log::error('CarePlanShow: failed to create approval: ' . $e->getMessage());
             $this->flashOutcome('error', 'Не вдалося створити запит на дозвіл: ' . $e->getMessage());
         }
@@ -868,7 +882,8 @@ trait CarePlanManager
             $this->approvalId = $status->approvalId;
         }
 
-        if ($status->requiresOtp()) {
+        $service = app(CarePlanApprovalService::class);
+        if ($status->requiresOtp() && !$service->skipsPatientOtp($this->carePlan)) {
             $this->currentAuthMethod = $status->authMethod ?? $this->currentAuthMethod;
             $this->openAuthModal();
 
@@ -876,7 +891,12 @@ trait CarePlanManager
         }
 
         $this->syncPlanStatus();
-        $this->flashOutcome('success', 'План лікування успішно активовано.');
+        $this->flashOutcome(
+            'success',
+            $service->skipsPatientOtp($this->carePlan)
+                ? __('care-plan.approval_inpatient_granted')
+                : 'План лікування успішно активовано.'
+        );
     }
 
     public function verify(): void
@@ -904,7 +924,7 @@ trait CarePlanManager
                 $this->syncPlanStatus();
                 $this->flashOutcome('success', 'План лікування успішно активовано.');
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('CarePlanLifecycle: failed to verify approval: ' . $e->getMessage());
             $this->addError('verificationCode', 'Невірний код підтвердження або помилка сервісу');
         }
@@ -919,7 +939,7 @@ trait CarePlanManager
             app(CarePlanApprovalService::class)->resendSms($this->carePlan->person->uuid, $this->approvalId);
             $this->smsResent = true;
             $this->flashOutcome('success', 'SMS надіслано повторно');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('CarePlanLifecycle: failed to resend SMS: ' . $e->getMessage());
             $message = str_contains($e->getMessage(), 'ACL')
                 ? __('care-plan.sms_resend_acl_error')
@@ -946,18 +966,18 @@ trait CarePlanManager
         $this->flashOutcome('success', __('care-plan.data_synced'));
     }
 
-    private function buildCarePlanStatusChangePayload(array $statusReasonCodeableConcept): array
+    protected function buildCarePlanStatusChangePayload(array $statusReasonCodeableConcept): array
     {
         // Fetch the original care plan from eHealth GET details endpoint.
         // Signing the exact returned payload ensures cryptographic match with the server database state.
-        $planData = app(\App\Services\MedicalEvents\CarePlanLifecycleService::class)
+        $planData = app(CarePlanLifecycleService::class)
             ->getDetails($this->carePlan->person->uuid, $this->carePlan->uuid);
         if (isset($planData['data']) && is_array($planData['data'])) {
             $planData = $planData['data'];
         }
 
         if (!$planData || !is_array($planData)) {
-            throw new \Exception('Не вдалося отримати актуальний стан плану лікування з ЕСОЗ.');
+            throw new Exception('Не вдалося отримати актуальний стан плану лікування з ЕСОЗ.');
         }
 
         $payloadForSign = $planData;
@@ -974,7 +994,7 @@ trait CarePlanManager
     public function syncPlanStatus(): bool
     {
         try {
-            $planData = app(\App\Services\MedicalEvents\CarePlanLifecycleService::class)
+            $planData = app(CarePlanLifecycleService::class)
                 ->getDetails($this->carePlan->person->uuid, $this->carePlan->uuid);
             app(CarePlanRepository::class)->syncCarePlans(
                 ['data' => [$planData]],
@@ -990,7 +1010,7 @@ trait CarePlanManager
             $this->dispatch('refreshApprovals');
 
             return true;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::warning('CarePlanShow: failed to sync plan status: ' . $e->getMessage());
 
             return false;

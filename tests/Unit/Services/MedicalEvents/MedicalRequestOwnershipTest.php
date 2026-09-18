@@ -6,6 +6,8 @@ namespace Tests\Unit\Services\MedicalEvents;
 
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
@@ -18,6 +20,51 @@ use Tests\TestCase;
 class MedicalRequestOwnershipTest extends TestCase
 {
     use DatabaseTransactions;
+
+    public function test_encounter_ownership_uses_identifier_uuid_instead_of_its_database_id(): void
+    {
+        [$person, $employee] = $this->personAndEmployee();
+        $context = Identifier::create(['value' => (string) Str::uuid()]);
+        $request = MedicationRequestRequest::create([
+            'uuid' => (string) Str::uuid(),
+            'employee_id' => $employee->id,
+            'person_id' => $person->id,
+            'context_id' => $context->id,
+            'status' => 'new',
+            'medication_id' => 'INN-1',
+            'medication_qty' => 1,
+        ]);
+        $encounter = (new Encounter())->forceFill([
+            'id' => $context->id + 100,
+            'uuid' => $context->value,
+            'person_id' => $person->id,
+        ]);
+
+        $this->assertTrue(app(MedicalRequestOwnership::class)
+            ->medicationForEncounter($request->uuid, $encounter)->is($request));
+
+        // An accidental numeric ID match must not authorize a different encounter of the same patient.
+        $encounter->id = $context->id;
+        $encounter->uuid = (string) Str::uuid();
+        $this->expectException(ModelNotFoundException::class);
+        app(MedicalRequestOwnership::class)->medicationForEncounter($request->uuid, $encounter);
+    }
+
+    public function test_encounter_ownership_rejects_a_request_without_context(): void
+    {
+        [$person, $employee] = $this->personAndEmployee();
+        $request = ServiceRequestRequest::create([
+            'uuid' => (string) Str::uuid(),
+            'employee_id' => $employee->id,
+            'person_id' => $person->id,
+            'status' => 'new',
+            'service_id' => '37003-00',
+        ]);
+        $encounter = new Encounter(['uuid' => (string) Str::uuid(), 'person_id' => $person->id]);
+
+        $this->expectException(ModelNotFoundException::class);
+        app(MedicalRequestOwnership::class)->serviceForEncounter($request->uuid, $encounter);
+    }
 
     public function test_it_returns_a_request_that_belongs_to_the_person(): void
     {

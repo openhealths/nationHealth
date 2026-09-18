@@ -36,6 +36,9 @@ class CarePlanLifecycleTest extends TestCase
     {
         parent::setUp();
 
+        config(['cipher.api.domain' => 'https://cipher.invalid']);
+        \Illuminate\Support\Facades\Cache::put('knedp_certificate_authority', [], 60);
+
         // Setup initial data
         $this->person = Person::create([
             'uuid' => (string) Str::uuid(),
@@ -476,6 +479,56 @@ class CarePlanLifecycleTest extends TestCase
         ]);
     }
 
+    public function test_create_device_activity_without_medical_program(): void
+    {
+        $this->actingAs($this->user);
+
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id,
+            'period_start' => now()->format('Y-m-d'),
+            'title' => 'Device Without Program Plan',
+            'status' => 'draft',
+        ]);
+
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
+
+        $activityCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $activityCreateResponse->shouldReceive('getData')->andReturn(['id' => (string) Str::uuid(), 'status' => 'scheduled']);
+        $activityCreateResponse->shouldReceive('getStatusCode')->andReturn(201);
+        $mockActivityApi->shouldReceive('create')->andReturn($activityCreateResponse);
+
+        $deviceUuid = (string) Str::uuid();
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+            ->call('initActivityForm', 'device_request')
+            ->assertSet('selectedProgram', '')
+            ->call('selectProduct', [
+                'id' => $deviceUuid,
+                'code' => 'DEV-NO-PROGRAM',
+                'name' => 'Strips without program',
+                'is_active' => true,
+                'packaging' => ['packaging_count' => 50, 'packaging_unit' => 'piece'],
+            ], 'device_request')
+            ->assertSet('activityForm.program', null)
+            ->set('activityForm.product_reference', $deviceUuid)
+            ->set('activityForm.quantity', 50)
+            ->set('activityForm.scheduled_period_start', now()->format('d.m.Y'))
+            ->set('activityForm.scheduled_period_end', now()->addMonths(3)->format('d.m.Y'))
+            ->call('saveActivity')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('care_plan_activities', [
+            'care_plan_id' => $carePlan->id,
+            'product_reference' => $deviceUuid,
+            'quantity' => 50,
+            'program' => null,
+        ]);
+    }
+
     public function test_cancel_and_complete_care_plan_activity(): void
     {
         $this->actingAs($this->user);
@@ -739,7 +792,7 @@ class CarePlanLifecycleTest extends TestCase
             ->assertSet('activityForm.program', '1318eabc-1a1a-42f6-8450-61e11c19eede');
     }
 
-    public function test_init_device_activity_form_prefers_default_device_program(): void
+    public function test_init_device_activity_form_leaves_program_empty(): void
     {
         $this->actingAs($this->user);
 
@@ -749,7 +802,7 @@ class CarePlanLifecycleTest extends TestCase
             'author_id' => $this->employee->id,
             'legal_entity_id' => $this->employee->legal_entity_id,
             'period_start' => now()->format('Y-m-d'),
-            'title' => 'Device Program Default Plan',
+            'title' => 'Device Program Optional Plan',
             'status' => 'draft',
         ]);
 
@@ -763,9 +816,9 @@ class CarePlanLifecycleTest extends TestCase
 
         $component
             ->call('initActivityForm', 'device_request')
-            ->assertSet('selectedProgram', '85953838-1834-4ed6-8bf4-3f83057380ec')
-            ->assertSet('activityForm.program', '85953838-1834-4ed6-8bf4-3f83057380ec')
-            ->assertSee('85953838-1834-4ed6-8bf4-3f83057380ec', false);
+            ->assertSet('selectedProgram', '')
+            ->assertSet('activityForm.program', '')
+            ->assertSee(__('care-plan.without_medical_program'));
     }
 
     public function test_draft_activity_can_be_deleted(): void
@@ -958,6 +1011,7 @@ class CarePlanLifecycleTest extends TestCase
 
         Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
             ->call('initActivityForm', 'device_request')
+            ->set('selectedProgram', '85953838-1834-4ed6-8bf4-3f83057380ec')
             ->call('openMedicalDeviceSearch')
             ->assertSet('showMedicalDeviceSearchDrawer', true)
             ->assertSet('deviceSearchTotalEntries', 2)
@@ -1052,6 +1106,7 @@ class CarePlanLifecycleTest extends TestCase
 
         Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
             ->call('initActivityForm', 'device_request')
+            ->set('selectedProgram', '85953838-1834-4ed6-8bf4-3f83057380ec')
             ->call('openMedicalDeviceSearch')
             ->assertDontSee('Accu-Chek Active тест-смужки')
             ->set('searchQuery', $targetId)

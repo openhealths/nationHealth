@@ -35,6 +35,9 @@ class CarePlanShowActionsTest extends TestCase
     {
         parent::setUp();
 
+        config(['cipher.api.domain' => 'https://cipher.invalid']);
+        \Illuminate\Support\Facades\Cache::put('knedp_certificate_authority', [], 60);
+
         $this->person = Person::create([
             'uuid' => (string) Str::uuid(),
             'first_name' => 'Action',
@@ -111,6 +114,83 @@ class CarePlanShowActionsTest extends TestCase
             ->assertDontSee(__('care-plan.complete_care_plan'));
     }
 
+    public function test_unknown_activity_shows_session_and_livewire_error_without_opening_signature(): void
+    {
+        $this->actingAs($this->user);
+        $plan = $this->makeSignedNewPlan();
+        $message = __('care-plan.document_context_unavailable');
+
+        $component = Livewire::test(CarePlanShow::class, ['carePlan' => $plan]);
+        $component->instance()->openSignatureModal('cancel_activity', PHP_INT_MAX);
+        $this->assertSame($message, session('error'));
+        $component->call('openSignatureModal', 'cancel_activity', PHP_INT_MAX)
+            ->assertSet('showSignatureModal', false)
+            ->assertDispatched('flashMessage', ['message' => $message, 'type' => 'error']);
+        // Livewire clears new session flash on a non-redirecting AJAX response.
+        $this->assertNull(session('error'));
+        $this->assertFalse(session()->has('success'));
+
+        // The mounted toast receives the Livewire event; a fresh mount reads session flash.
+        session()->forget('error');
+        Livewire::test(\App\Livewire\Components\FlashMessage::class)
+            ->dispatch('flashMessage', ['message' => $message, 'type' => 'error'])
+            ->assertSet('type', 'error')
+            ->assertSee($message);
+        session()->flash('error', $message);
+        Livewire::test(\App\Livewire\Components\FlashMessage::class)->assertSee($message);
+    }
+
+    public function test_referral_without_based_on_shows_a_local_error_and_preserves_draft(): void
+    {
+        $this->actingAs($this->user);
+        $plan = $this->makeSignedNewPlan();
+        $draft = \App\Models\MedicalEvents\Sql\ServiceRequestRequest::create([
+            'uuid' => (string) Str::uuid(), 'employee_id' => $this->employee->id,
+            'person_id' => $this->person->id, 'status' => 'new', 'service_id' => '37003-00',
+        ]);
+
+        Livewire::test(CarePlanShow::class, ['carePlan' => $plan])
+            ->call('openSignatureModal', 'sign_servicerequest', null, $draft->uuid)
+            ->call('signReferral')
+            ->assertSet('showSignatureModal', false)
+            ->assertDispatched('flashMessage', [
+                'message' => __('care-plan.document_context_unavailable'), 'type' => 'error',
+            ]);
+        $this->assertSame('new', $draft->fresh()->status);
+        $this->assertNull($draft->fresh()->basedOnId);
+        $this->assertFalse(session()->has('success'));
+    }
+
+    public function test_referral_sync_checks_ownership_for_the_requested_resource_kind(): void
+    {
+        $this->actingAs($this->user);
+        $plan = $this->makeSignedNewPlan();
+        $uuid = (string) Str::uuid();
+        \App\Models\MedicalEvents\Sql\ServiceRequestRequest::create([
+            'uuid' => $uuid, 'employee_id' => $this->employee->id,
+            'person_id' => $this->person->id, 'status' => 'new', 'service_id' => '37003-00',
+        ]);
+        $otherPerson = Person::create([
+            'uuid' => (string) Str::uuid(), 'birth_date' => '1990-01-01', 'gender' => 'MALE',
+            'patient_signed' => true, 'process_disclosure_data_consent' => true,
+        ]);
+        $device = \App\Models\MedicalEvents\Sql\DeviceRequestRequest::create([
+            'uuid' => $uuid, 'employee_id' => $this->employee->id,
+            'person_id' => $otherPerson->id, 'status' => 'new', 'device_id' => (string) Str::uuid(),
+        ]);
+        $lifecycle = \Mockery::mock(\App\Services\MedicalEvents\ReferralRequestLifecycleService::class);
+        $lifecycle->shouldNotReceive('syncReferralFromRemote');
+        $this->instance(\App\Services\MedicalEvents\ReferralRequestLifecycleService::class, $lifecycle);
+
+        Livewire::test(CarePlanShow::class, ['carePlan' => $plan])
+            ->call('syncReferralFromEHealth', $uuid, 'device_request')
+            ->assertDispatched('flashMessage', [
+                'message' => __('care-plan.document_context_unavailable'), 'type' => 'error',
+            ]);
+        $this->assertSame('new', $device->fresh()->status);
+        $this->assertSame($otherPerson->id, $device->fresh()->personId);
+    }
+
     public function test_new_plan_with_active_approval_for_current_doctor_shows_cancel_and_complete(): void
     {
         $this->actingAs($this->user);
@@ -159,6 +239,75 @@ class CarePlanShowActionsTest extends TestCase
         Livewire::test(CarePlanShow::class, ['carePlan' => $this->makeSignedNewPlan()])
             ->assertSee(__('forms.synchronise_with_eHealth'))
             ->assertSee(__('care-plan.new_prescription'));
+    }
+
+    public function test_cancel_modal_shows_the_required_status_reason_select(): void
+    {
+        $this->actingAs($this->user);
+
+        $carePlan = $this->makeSignedNewPlan();
+        $this->grantApproval($carePlan, $this->employee, ApprovalStatus::ACTIVE->value);
+
+        Livewire::test(CarePlanShow::class, ['carePlan' => $carePlan->fresh()])
+            ->call('openSignatureModal', 'cancel')
+            ->assertSet('showSignatureModal', true)
+            ->assertSet('actionType', 'cancel')
+            ->assertSee(__('care-plan.status_reason'), false)
+            ->assertSeeHtml('wire:model="statusReason"')
+            ->assertSeeHtml('id="statusReason"');
+    }
+
+    public function test_inpatient_activate_skips_auth_method_modal_and_creates_approval_without_otp(): void
+    {
+        $this->actingAs($this->user);
+
+        $carePlan = $this->makeSignedNewPlan();
+        $carePlan->update(['terms_of_service' => 'INPATIENT']);
+
+        $response = \Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $response->shouldReceive('getStatusCode')->andReturn(201);
+        $response->shouldReceive('getData')->andReturn([
+            'id' => (string) Str::uuid(),
+        ]);
+
+        $api = \Mockery::mock(\App\Classes\eHealth\Api\Approval::class);
+        $api->shouldReceive('createApproval')
+            ->once()
+            ->with(
+                $this->person->uuid,
+                \Mockery::on(static fn (array $payload): bool => !array_key_exists('authorize_with', $payload))
+            )
+            ->andReturn($response);
+        $this->instance(\App\Classes\eHealth\Api\Approval::class, $api);
+
+        Livewire::test(CarePlanShow::class, ['carePlan' => $carePlan->fresh()])
+            ->call('openMethodSelectionModal')
+            ->assertSet('showMethodSelectionModal', false)
+            ->assertSet('showAuthModal', false)
+            ->assertDispatched('flashMessage');
+    }
+
+    public function test_outpatient_activate_opens_auth_method_modal(): void
+    {
+        $this->actingAs($this->user);
+
+        $carePlan = $this->makeSignedNewPlan();
+        $carePlan->update(['terms_of_service' => 'OUTPATIENT']);
+
+        $authResponse = \Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $authResponse->shouldReceive('getData')->andReturn([
+            ['id' => (string) Str::uuid(), 'type' => 'OTP', 'phone_number' => '+380000000000'],
+        ]);
+
+        $personApi = \Mockery::mock(\App\Classes\eHealth\Api\Person::class);
+        $personApi->shouldReceive('getAuthMethods')
+            ->andReturn($authResponse);
+        $this->instance(\App\Classes\eHealth\Api\Person::class, $personApi);
+
+        Livewire::test(CarePlanShow::class, ['carePlan' => $carePlan->fresh()])
+            ->call('openMethodSelectionModal')
+            ->assertSet('showMethodSelectionModal', true)
+            ->assertSet('showAuthModal', false);
     }
 
     public function test_cancel_sign_without_kep_flashes_an_error_the_doctor_can_see(): void

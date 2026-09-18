@@ -1,6 +1,6 @@
 @php
     $linkedPrescriptions = collect($activePrescriptions)->filter(function ($item) use ($activity) {
-        return (int) ($item['based_on_id'] ?? $item['basedOnId'] ?? 0) === (int) $activity->id;
+        return $activity->uuid && ($item['based_on_uuid'] ?? null) === $activity->uuid;
     });
 @endphp
 

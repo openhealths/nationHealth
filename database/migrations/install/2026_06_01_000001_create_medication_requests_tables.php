@@ -31,26 +31,28 @@ return new class extends Migration
             Schema::create('medication_request_requests', static function (Blueprint $table) {
                 $table->id();
                 $table->uuid('uuid')->unique();
-                $table->foreignId('employee_id')->constrained('employees');
+                $table->foreignId('employee_id')->nullable()->constrained('employees');
                 $table->foreignId('person_id')->constrained('persons');
                 $table->foreignId('division_id')->nullable()->constrained('divisions');
                 $table->string('status');
                 $table->string('request_number')->nullable();
                 $table->timestamp('started_at')->nullable();
                 $table->timestamp('ended_at')->nullable();
-                $table->string('medication_id'); // INN-based or product code
-                $table->decimal('medication_qty', 15, 2);
+                $table->string('medication_id')->nullable(); // External search results may omit medication details.
+                $table->decimal('medication_qty', 15, 2)->nullable();
                 $table->string('medication_program_id')->nullable();
-                $table->string('intent');
-                $table->string('category')->nullable();
-                $table->foreignId('based_on_id')->nullable()->constrained('care_plan_activities');
-                $table->foreignId('context_id')->nullable()->constrained('encounters');
-                $table->string('priority')->nullable();
+                $table->foreignId('intent_id')->nullable()->constrained('codings');
+                $table->foreignId('category_id')->nullable()->constrained('codeable_concepts');
+                $table->foreignId('based_on_id')->nullable()->constrained('identifiers');
+                $table->foreignId('context_id')->nullable()->constrained('identifiers');
+                $table->foreignId('priority_id')->nullable()->constrained('codeable_concepts');
                 $table->foreignId('prior_prescription_id')->nullable()->constrained('medication_request_requests');
                 $table->string('container_dosage')->nullable();
                 $table->text('note')->nullable();
                 $table->string('inform_with')->nullable();
                 $table->json('ehealth_payload')->nullable();
+                $table->string('source')->default('local'); // 'local' = drafted here, 'ehealth' = synced from ЄСОЗ
+                $table->string('resource_type')->default('medication_request_request');
                 $table->timestamps();
             });
         }

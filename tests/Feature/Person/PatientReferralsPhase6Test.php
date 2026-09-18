@@ -7,6 +7,8 @@ namespace Tests\Feature\Person;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\User;
@@ -107,6 +109,34 @@ class PatientReferralsPhase6Test extends TestCase
         $this->actingAs($this->user);
     }
 
+    public function test_upstream_procedure_and_encounter_lookups_work_with_fhir_request_references(): void
+    {
+        $repo = app(ServiceRequestRequestRepository::class);
+        $uuid = (string) Str::uuid();
+        $id = $repo->store([
+            'uuid' => $uuid,
+            'employee_id' => $this->employee->id,
+            'status' => 'active',
+            'request_number' => '0000-TEST-FHIR-PROCEDURE',
+            'service_id' => '37003-00',
+            'context_uuid' => $this->encounter->uuid,
+            'category' => 'diagnostic_procedure',
+        ], $this->person->id);
+
+        $record = ServiceRequestRequest::findOrFail($id);
+        $this->assertSame($this->encounter->uuid, $record->context->value);
+        $this->assertSame([$uuid], $repo->getByPersonIdAndStatus($this->person->id, 'active', ['uuid'])->pluck('uuid')->all());
+        $this->assertTrue($repo->getByPersonIdAndStatus($this->person->id, 'draft')->isEmpty());
+        $this->assertTrue($repo->getByPersonIdAndStatus($this->person->id + 1000, 'active')->isEmpty());
+
+        $procedure = ['basedOn' => [['identifier' => ['value' => $uuid]]]];
+        $encounter = ['incomingReferral' => ['identifier' => ['value' => $uuid]]];
+        $this->assertSame('0000-TEST-FHIR-PROCEDURE', $repo->procedureReferralLabel($procedure));
+        $numbers = $repo->requestNumbersForEncounters([$encounter]);
+        $this->assertSame([$uuid => '0000-TEST-FHIR-PROCEDURE'], $numbers);
+        $this->assertSame('0000-TEST-FHIR-PROCEDURE', $repo->encounterReferralLabel($encounter, $numbers));
+    }
+
     public function test_repository_filters_by_status_and_period(): void
     {
         ServiceRequestRequest::create([
@@ -121,7 +151,7 @@ class PatientReferralsPhase6Test extends TestCase
             'ended_at' => '2026-02-10',
             'intent' => 'order',
             'category' => 'procedure',
-            'context_id' => $this->encounter->id,
+            'context_id' => Identifier::create(['value' => $this->encounter->uuid])->id,
         ]);
 
         ServiceRequestRequest::create([
@@ -134,8 +164,8 @@ class PatientReferralsPhase6Test extends TestCase
             'started_at' => '2026-03-01',
             'ended_at' => '2026-03-20',
             'intent' => 'order',
-            'category' => 'diagnostic_procedure',
-            'context_id' => $this->encounter->id,
+            'category_id' => CodeableConcept::create(['text' => 'diagnostic_procedure'])->id,
+            'context_id' => Identifier::create(['value' => $this->encounter->uuid])->id,
         ]);
 
         $repo = app(ServiceRequestRequestRepository::class);
@@ -169,8 +199,8 @@ class PatientReferralsPhase6Test extends TestCase
             'started_at' => '2026-08-12',
             'ended_at' => '2026-11-12',
             'intent' => 'order',
-            'category' => 'diagnostic_procedure',
-            'context_id' => $this->encounter->id,
+            'category_id' => CodeableConcept::create(['text' => 'diagnostic_procedure'])->id,
+            'context_id' => Identifier::create(['value' => $this->encounter->uuid])->id,
             'priority' => 'routine',
             'note' => 'обстеження',
         ]);
@@ -179,6 +209,7 @@ class PatientReferralsPhase6Test extends TestCase
 
         $this->assertCount(1, $rows);
         $this->assertSame($uuid, $rows[0]['uuid']);
+        $this->assertSame('', $rows[0]['requestNumber']);
         $this->assertTrue($rows[0]['canSign']);
         $this->assertFalse($rows[0]['canOperate']);
         $this->assertFalse($rows[0]['canRecall']);
@@ -187,5 +218,31 @@ class PatientReferralsPhase6Test extends TestCase
         $this->assertSame('Діагностична процедура', $rows[0]['categoryLabel']);
         $this->assertSame('12.08.2026 — 12.11.2026', $rows[0]['periodLabel']);
         $this->assertSame('service_request', $rows[0]['kind']);
+    }
+
+    public function test_registry_row_keeps_requisition_separate_from_uuid(): void
+    {
+        $uuid = (string) Str::uuid();
+        ServiceRequestRequest::create([
+            'uuid' => $uuid,
+            'employee_id' => $this->employee->id,
+            'person_id' => $this->person->id,
+            'status' => 'active',
+            'request_number' => '0000-SMS1-NUMB-ER01',
+            'service_id' => (string) Str::uuid(),
+            'quantity' => 1,
+            'started_at' => '2026-09-01',
+            'ended_at' => '2026-12-01',
+            'intent' => 'order',
+            'category_id' => CodeableConcept::create(['text' => 'diagnostic_procedure'])->id,
+            'context_id' => Identifier::create(['value' => $this->encounter->uuid])->id,
+        ]);
+
+        $rows = app(ServiceRequestRequestRepository::class)->searchByPersonId($this->person->id);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('0000-SMS1-NUMB-ER01', $rows[0]['requestNumber']);
+        $this->assertSame($uuid, $rows[0]['uuid']);
+        $this->assertNotSame($rows[0]['requestNumber'], $rows[0]['uuid']);
     }
 }

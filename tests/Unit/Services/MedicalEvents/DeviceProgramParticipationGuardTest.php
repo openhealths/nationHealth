@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\MedicalEvents;
 
+use App\Classes\eHealth\Api\DeviceDefinition;
+use App\Classes\eHealth\EHealthResponse;
 use App\Enums\Contract\ContractStatus;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
@@ -11,13 +13,59 @@ use App\Models\Contracts\Contract;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
 use App\Services\MedicalEvents\DeviceProgramParticipationGuard;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
+use Mockery;
 use Tests\TestCase;
 
 class DeviceProgramParticipationGuardTest extends TestCase
 {
     use DatabaseTransactions;
+
+    public function test_catalog_lookup_continues_to_the_second_page(): void
+    {
+        $api = Mockery::mock(DeviceDefinition::class);
+        $api->shouldReceive('getMany')->once()->with([
+            'medical_program_id' => 'program', 'page_size' => 300, 'page' => 1,
+        ])->andReturn(new EHealthResponse(new Response(200, [], json_encode([
+            'data' => [['id' => 'other-device']],
+            'paging' => ['page_number' => 1, 'total_pages' => 2],
+        ]))));
+        $api->shouldReceive('getMany')->once()->with([
+            'medical_program_id' => 'program', 'page_size' => 300, 'page' => 2,
+        ])->andReturn(new EHealthResponse(new Response(200, [], json_encode([
+            'data' => [['id' => 'target-device', 'is_active' => true]],
+            'paging' => ['page_number' => 2, 'total_pages' => 2],
+        ]))));
+        $this->instance(DeviceDefinition::class, $api);
+
+        $this->assertTrue(app(DeviceProgramParticipationGuard::class)
+            ->isDeviceInProgramCatalog('program', 'target-device'));
+    }
+
+    public function test_incomplete_catalog_pagination_is_a_lookup_warning_not_a_missing_device(): void
+    {
+        $api = Mockery::mock(DeviceDefinition::class);
+        $api->shouldReceive('getMany')->once()->andReturn(new EHealthResponse(new Response(200, [], json_encode([
+            'data' => [['id' => 'other-device']],
+            'paging' => ['page_number' => 1],
+        ]))));
+        $this->instance(DeviceDefinition::class, $api);
+        $dictionary = Mockery::mock(\App\Services\Dictionary\DictionaryManager::class);
+        $dictionary->shouldReceive('medicalPrograms')->andReturn(collect());
+        $this->instance(\App\Services\Dictionary\DictionaryManager::class, $dictionary);
+        $guard = Mockery::mock(DeviceProgramParticipationGuard::class)->makePartial();
+        $guard->shouldReceive('resolveParticipatingProgramIds')->once()->andReturn(['program']);
+        $activity = new CarePlanActivity(['program' => 'program', 'product_reference' => 'target-device']);
+
+        $assessment = $guard->assess(new CarePlan(), $activity, new LegalEntity());
+
+        $this->assertSame([], $assessment->blockingIssues);
+        $this->assertSame([__('care-plan.device_catalog_lookup_failed', [
+            'device_id' => 'target-device', 'program_id' => 'program',
+        ])], $assessment->warnings);
+    }
 
     protected function migrateDatabases(): void
     {
@@ -118,6 +166,57 @@ class DeviceProgramParticipationGuardTest extends TestCase
             ->resolveParticipatingProgramIds($legalEntity, false);
 
         $this->assertSame([$programId], $participating);
+    }
+
+    public function test_assess_allows_device_activity_without_medical_program(): void
+    {
+        $legalEntity = $this->createLegalEntity();
+
+        $person = Person::create([
+            'uuid' => (string) Str::uuid(),
+            'first_name' => 'Test',
+            'last_name' => 'Patient',
+            'birth_date' => '1990-01-01',
+            'gender' => 'MALE',
+            'patient_signed' => true,
+            'process_disclosure_data_consent' => true,
+        ]);
+
+        $employee = \App\Models\Employee\Employee::create([
+            'uuid' => (string) Str::uuid(),
+            'full_name' => 'Test Doctor',
+            'employee_type' => 'DOCTOR',
+            'status' => 'APPROVED',
+            'legal_entity_id' => $legalEntity->id,
+            'is_active' => true,
+            'position' => 'Doctor',
+            'start_date' => now()->format('Y-m-d'),
+        ]);
+
+        $carePlan = CarePlan::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $person->id,
+            'author_id' => $employee->id,
+            'legal_entity_id' => $legalEntity->id,
+            'status' => 'active',
+            'title' => 'No program plan',
+            'period_start' => now()->format('Y-m-d'),
+            'period_end' => now()->addMonth()->format('Y-m-d'),
+        ]);
+
+        $activity = CarePlanActivity::create([
+            'care_plan_id' => $carePlan->id,
+            'author_id' => $employee->id,
+            'kind' => 'device_request',
+            'status' => 'draft',
+            'program' => null,
+            'product_reference' => (string) Str::uuid(),
+        ]);
+
+        $assessment = app(DeviceProgramParticipationGuard::class)
+            ->assess($carePlan, $activity, $legalEntity);
+
+        $this->assertNull($assessment->blockingMessage());
     }
 
     public function test_device_allows_care_plan_activity_respects_program_devices_flag(): void

@@ -35,6 +35,9 @@ class CarePlanLifecycleGatesTest extends TestCase
     {
         parent::setUp();
 
+        config(['cipher.api.domain' => 'https://cipher.invalid']);
+        \Illuminate\Support\Facades\Cache::put('knedp_certificate_authority', [], 60);
+
         $this->person = Person::create([
             'uuid' => (string) Str::uuid(),
             'first_name' => 'Gate',
@@ -117,6 +120,12 @@ class CarePlanLifecycleGatesTest extends TestCase
             'author_id' => $this->employee->id,
         ]);
 
+        $basedOnId = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $activity->uuid])->id;
+        $intentId = \App\Models\MedicalEvents\Sql\Coding::firstOrCreate([
+            'code' => 'order',
+            'system' => 'http://hl7.org/fhir/request-intent',
+        ])->id;
+
         MedicationRequestRequest::create([
             'uuid' => (string) Str::uuid(),
             'employee_id' => $this->employee->id,
@@ -124,8 +133,9 @@ class CarePlanLifecycleGatesTest extends TestCase
             'status' => 'active',
             'medication_id' => 'INN-101',
             'medication_qty' => 10,
-            'intent' => 'order',
-            'based_on_id' => $activity->id,
+            'intent_id' => $intentId,
+            'based_on_id' => $basedOnId,
+            'source' => MedicationRequestRequest::SOURCE_LOCAL,
         ]);
 
         Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
@@ -162,6 +172,13 @@ class CarePlanLifecycleGatesTest extends TestCase
             'author_id' => $this->employee->id,
         ]);
 
+        $basedOnId = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $activity->uuid])->id;
+        $intentId = \App\Models\MedicalEvents\Sql\Coding::firstOrCreate([
+            'code' => 'order',
+            'system' => 'http://hl7.org/fhir/request-intent',
+        ])->id;
+        $priorityId = \App\Models\MedicalEvents\Sql\CodeableConcept::firstOrCreate(['text' => 'routine'])->id;
+
         ServiceRequestRequest::create([
             'uuid' => (string) Str::uuid(),
             'employee_id' => $this->employee->id,
@@ -169,9 +186,9 @@ class CarePlanLifecycleGatesTest extends TestCase
             'status' => 'in-progress',
             'service_id' => '59300-00',
             'quantity' => 1,
-            'intent' => 'order',
-            'based_on_id' => $activity->id,
-            'priority' => 'routine',
+            'intent_id' => $intentId,
+            'based_on_id' => $basedOnId,
+            'priority_id' => $priorityId,
         ]);
 
         Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
@@ -238,6 +255,12 @@ class CarePlanLifecycleGatesTest extends TestCase
             'author_id' => $this->employee->id,
         ]);
 
+        $basedOnId = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $activity->uuid])->id;
+        $intentId = \App\Models\MedicalEvents\Sql\Coding::firstOrCreate([
+            'code' => 'order',
+            'system' => 'http://hl7.org/fhir/request-intent',
+        ])->id;
+
         MedicationRequestRequest::create([
             'uuid' => (string) Str::uuid(),
             'employee_id' => $this->employee->id,
@@ -245,8 +268,9 @@ class CarePlanLifecycleGatesTest extends TestCase
             'status' => 'rejected',
             'medication_id' => 'INN-101',
             'medication_qty' => 10,
-            'intent' => 'order',
-            'based_on_id' => $activity->id,
+            'intent_id' => $intentId,
+            'based_on_id' => $basedOnId,
+            'source' => MedicationRequestRequest::SOURCE_LOCAL,
         ]);
 
         Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])

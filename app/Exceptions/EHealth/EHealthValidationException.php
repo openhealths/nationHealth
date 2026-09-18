@@ -6,6 +6,7 @@ namespace App\Exceptions\EHealth;
 
 use App\Core\Arr;
 use App\Enums\CarePlanStatus;
+use App\Enums\EHealth\ErrorType;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 
@@ -67,14 +68,23 @@ class EHealthValidationException extends EHealthException
      */
     public function getFormattedMessage(): string
     {
-        $type = $this->details['error']['type'] ?? null;
+        $type = ErrorType::fromPayload($this->details['error']['type'] ?? null);
         $errorMessage = $this->details['error']['message'] ?? null;
 
         $translated = match (true) {
-            $type === 'validation_failed' => '',
+            $type === ErrorType::VALIDATION_FAILED => '',
             is_string($errorMessage) => $this->translateTopLevelMessage($errorMessage),
             default => $this->getMessage()
         };
+
+        // Prefer a Ukrainian platform message over raw English internals from eHealth.
+        if (
+            $type === ErrorType::INTERNAL_ERROR
+            && is_string($errorMessage)
+            && ($translated === '' || $translated === $errorMessage)
+        ) {
+            $translated = __('errors.ehealth.messages.internal_error');
+        }
 
         $message = 'Помилка від ЕСОЗ:' . ($translated !== '' ? ' ' . $translated : '');
 
@@ -267,8 +277,12 @@ class EHealthValidationException extends EHealthException
 
         if (empty($errorList)) {
             $mainMessage = Arr::get($this->details, 'error.message') ?? Arr::get($this->details, 'message') ?? '';
+            $errorType = ErrorType::fromPayload(Arr::get($this->details, 'error.type'));
             if (!empty($mainMessage)) {
                 $errorList = $this->translateTopLevelMessage((string) $mainMessage);
+                if ($errorType === ErrorType::INTERNAL_ERROR && $errorList === $mainMessage) {
+                    $errorList = __('errors.ehealth.messages.internal_error');
+                }
             }
         }
 
@@ -293,6 +307,18 @@ class EHealthValidationException extends EHealthException
 
         if (str_contains($message, 'At least one of action references, diagnostic reports or procedures should reference the same service')) {
             return __('errors.ehealth.messages.referral_service_mismatch');
+        }
+
+        if (str_contains($message, 'Failed to save signed content')) {
+            return __('errors.ehealth.messages.failed_to_save_signed_content');
+        }
+
+        // Elixir ETS crash while the async job stores the signed package (preprod/platform).
+        if (
+            str_contains($message, 'ETS table with insufficient access rights')
+            || (str_contains($message, 'ArgumentError') && str_contains($message, 'ETS'))
+        ) {
+            return __('errors.ehealth.messages.ets_insufficient_access');
         }
 
         if (preg_match('/^Care plan in status (\S+) cannot be cancelled$/i', $message, $matches) === 1) {

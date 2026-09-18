@@ -88,8 +88,9 @@ final class MedicalRequestOwnership
         /** @var T $record */
         $record = $this->owned($class, $uuid, $personId);
 
-        $contextId = $record->contextId ?? null;
-        if ($contextId !== null && (int) $contextId !== (int) $encounter->id) {
+        // context_id identifies a FHIR Identifier, not the local Encounter row.
+        $contextUuid = $record->context?->value;
+        if (!$contextUuid || $contextUuid !== $encounter->uuid) {
             throw (new ModelNotFoundException())->setModel($class, [$uuid]);
         }
 
@@ -131,7 +132,7 @@ final class MedicalRequestOwnership
             ->exists();
 
         if (!$belongs) {
-            abort(404);
+            throw (new ModelNotFoundException())->setModel(Employee::class);
         }
     }
 }

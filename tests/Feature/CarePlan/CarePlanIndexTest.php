@@ -22,6 +22,14 @@ class CarePlanIndexTest extends TestCase
 {
     use DatabaseTransactions;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['cipher.api.domain' => 'https://cipher.invalid']);
+        \Illuminate\Support\Facades\Cache::put('knedp_certificate_authority', [], 60);
+    }
+
     protected function migrateDatabases()
     {
         $this->artisan('migrate:fresh', [

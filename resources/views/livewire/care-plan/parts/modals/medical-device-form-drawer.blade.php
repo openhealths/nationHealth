@@ -92,6 +92,7 @@
                     <label class="label" for="device_program_edit"> {{ __('care-plan.program') }} </label>
                     @if (!empty($activityForm['id']))
                         <select id="device_program_edit" class="input-select peer" wire:model.live="selectedProgram">
+                            <option value="">{{ __('care-plan.without_medical_program') }}</option>
                             @foreach (($dictionaries['medical_programs_device'] ?? $dictionaries['medical_programs'] ?? []) as $id => $name)
                                 <option value="{{ $id }}">{{ $name }}</option>
                             @endforeach
@@ -100,7 +101,7 @@
                         <input
                             type="text"
                             class="input cursor-not-allowed bg-gray-50 dark:bg-gray-700"
-                            value="{{ !empty($activityForm['program']) ? ($dictionaries['medical_programs'][$activityForm['program']] ?? $activityForm['program']) : __('care-plan.medical_guarantees_program') }}"
+                            value="{{ !empty($activityForm['program']) ? ($dictionaries['medical_programs_device'][$activityForm['program']] ?? $dictionaries['medical_programs'][$activityForm['program']] ?? $activityForm['program']) : __('care-plan.without_medical_program') }}"
                             disabled
                         />
                     @endif
@@ -399,7 +400,11 @@
                 {{ __('forms.cancel') }}
             </button>
 
-            <button type="submit" class="button-primary">{{ __('forms.save') }}</button>
+            <button type="submit" class="button-primary-outline">{{ __('forms.save') }}</button>
+
+            <button type="button" class="button-primary" wire:click="saveActivityAndSign">
+                {{ __('forms.save_and_sign') }}
+            </button>
         </div>
     </form>
 </div>

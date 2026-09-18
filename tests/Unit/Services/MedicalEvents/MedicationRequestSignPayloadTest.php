@@ -9,6 +9,10 @@ use App\Models\CarePlanActivity;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
+use App\Models\MedicalEvents\Sql\Coding;
+use App\Classes\eHealth\Api\Patient\MedicationRequest as MedicationRequestApi;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\Person\Person;
 use App\Models\User;
@@ -128,10 +132,10 @@ class MedicationRequestSignPayloadTest extends TestCase
             'status' => 'new',
             'medication_id' => 'INN-101',
             'medication_qty' => 10.0,
-            'intent' => 'order',
-            'category' => 'community',
-            'based_on_id' => $activity->id,
-            'context_id' => $encounter->id,
+            'intent_id' => Coding::create(['code' => 'order', 'system' => 'http://hl7.org/fhir/request-intent'])->id,
+            'category_id' => CodeableConcept::create(['text' => 'community'])->id,
+            'based_on_id' => Identifier::create(['value' => $activity->uuid])->id,
+            'context_id' => Identifier::create(['value' => $encounter->uuid])->id,
             'ehealth_payload' => null,
             'started_at' => now()->toDateString(),
             'ended_at' => now()->addDays(14)->toDateString(),
@@ -149,9 +153,10 @@ class MedicationRequestSignPayloadTest extends TestCase
             'max_dose_per_period' => 1.0,
         ]);
 
-        $mockApi = Mockery::mock('alias:' . \App\Classes\eHealth\Api\MedicationRequest::class);
+        $mockApi = Mockery::mock(MedicationRequestApi::class);
         $mockApi->shouldReceive('getRequestsBySearchParams')
             ->andThrow(new \RuntimeException('remote payload unavailable'));
+        $this->instance(MedicationRequestApi::class, $mockApi);
 
         $service = app(MedicationRequestLifecycleService::class);
         $method = new ReflectionMethod($service, 'buildSignPayload');
