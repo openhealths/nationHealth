@@ -17,7 +17,7 @@
                     </div>
                     <h3 class="mb-2 text-lg font-bold text-gray-900 dark:text-gray-100">Взаємодію успішно створено</h3>
                     <p class="text-sm text-gray-500 dark:text-gray-400">
-                        Бажаєте одразу погасити прив'язане направлення?
+                        Направлення вже взято в роботу. Бажаєте одразу його погасити?
                     </p>
                 </div>
 

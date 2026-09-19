@@ -17,8 +17,10 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Enums\Person\EncounterStatus;
+use App\Enums\Person\ServiceRequestStatus;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\EncounterPackageBuilder;
+use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use App\Traits\EnsuresEntityExists;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
@@ -182,7 +184,7 @@ class EncounterCreate extends EncounterComponent
      *
      * @return void
      */
-    public function sign(): void
+    public function sign(ReferralRequestLifecycleService $referralLifecycle): void
     {
         if (Auth::user()->cannot('create', Encounter::class)) {
             Session::flash('error', __('encounters.policy.create'));
@@ -299,12 +301,26 @@ class EncounterCreate extends EncounterComponent
             $this->showSignatureModal = false;
 
             if (($this->form->encounter['referralType'] ?? '') === 'electronic' && !empty($this->form->encounter['referralNumber'])) {
-                $this->referralToRedeemUuid = $this->resolveReferralUuid($this->form->encounter['referralNumber']);
+                $this->referralToRedeemUuid = $this->resolveReferralUuid($this->form->encounter['referralNumber']) ?? '';
                 $this->createdEncounterUuidForRedeem = $encounterUuid;
-                if ($this->referralToRedeemUuid) {
+
+                if ($this->referralToRedeemUuid !== '') {
+                    // Use (and program qualify) must finish before the redeem modal offers complete only.
+                    try {
+                        $this->ensureReferralTakenIntoWork($referralLifecycle, $this->referralToRedeemUuid);
+                    } catch (Throwable $exception) {
+                        Session::flash(
+                            'error',
+                            'Взаємодію створено, але не вдалося взяти направлення в роботу: '.$exception->getMessage()
+                        );
+                        $this->redirectAfterCreate($createdEncounterId);
+
+                        return;
+                    }
+
                     $this->showReferralRedeemModal = true;
 
-                    return; // Prevent redirect, show modal
+                    return;
                 }
             }
 
@@ -444,10 +460,50 @@ class EncounterCreate extends EncounterComponent
         }
     }
 
-    public function redeemReferral(\App\Services\MedicalEvents\ReferralRequestLifecycleService $service): void
+    /**
+     * Take an active electronic referral into work (eHealth use) before the redeem modal.
+     * Program qualify stays inside takeIntoWork — not on the «Погасити» action.
+     */
+    private function ensureReferralTakenIntoWork(ReferralRequestLifecycleService $service, string $referralUuid): void
+    {
+        $local = Repository::serviceRequest()->findByUuid($referralUuid);
+        $status = strtolower((string) ($local?->status ?? ''));
+
+        if ($status === ServiceRequestStatus::IN_PROGRESS->value) {
+            return;
+        }
+
+        $needsTakeIntoWork = $local === null
+            || $status === ''
+            || $status === ServiceRequestStatus::ACTIVE->value;
+
+        if (!$needsTakeIntoWork) {
+            return;
+        }
+
+        $employee = Auth::user()?->employees()
+            ->where('legal_entity_id', legalEntity()->id)
+            ->first();
+
+        if ($employee === null) {
+            throw new \RuntimeException('Не знайдено співробітника для взяття направлення в роботу.');
+        }
+
+        $service->takeIntoWork(
+            $referralUuid,
+            $employee,
+            $this->patientUuid ?: null,
+            array_filter([
+                'program_id' => $local?->programId,
+            ])
+        );
+    }
+
+    public function redeemReferral(ReferralRequestLifecycleService $service): void
     {
         try {
             if ($this->referralToRedeemUuid && $this->createdEncounterUuidForRedeem) {
+                // Referral must already be in_progress (ensured after sign).
                 $service->completeReferral($this->referralToRedeemUuid, $this->createdEncounterUuidForRedeem);
                 Session::flash('success', 'Направлення успішно погашено!');
             }
