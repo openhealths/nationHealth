@@ -23,6 +23,7 @@ enum Status: string
     case EXPIRED = 'EXPIRED';
     case REORGANIZED = 'REORGANIZED';
     case ENTERED_IN_ERROR = 'ENTERED_IN_ERROR';
+    case CONNECTED = 'CONNECTED';
 
     public function label(): string
     {
@@ -40,6 +41,7 @@ enum Status: string
             self::REORGANIZED => __('forms.status.reorganized'),
             self::ENTERED_IN_ERROR => __('forms.status.entered_in_error'),
             self::EXPIRED => __('forms.status.expired'),
+            self::CONNECTED => __('forms.status.connected')
         };
     }
 
@@ -47,7 +49,7 @@ enum Status: string
     {
         return match ($this) {
             self::APPROVED, self::ACTIVE => 'badge-green',
-            self::NEW, self::SIGNED, self::UNSYNCED, self::REORGANIZED => 'badge-yellow',
+            self::NEW, self::SIGNED, self::UNSYNCED, self::REORGANIZED, self::CONNECTED => 'badge-yellow',
             self::DRAFT, self::REJECTED, self::DISMISSED, self::STOPPED,
             self::INACTIVE, self::ENTERED_IN_ERROR, self::EXPIRED => 'badge-red',
         };

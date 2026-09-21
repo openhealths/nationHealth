@@ -6,6 +6,7 @@ namespace App\Listeners;
 
 use Throwable;
 use App\Enums\JobStatus;
+use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Jobs\DivisionSync;
 use App\Jobs\EmployeeSync;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\Log;
 use App\Jobs\PartyVerificationSync;
 use Illuminate\Support\Facades\Auth;
 use App\Jobs\EmployeeRequestsSyncAll;
+use App\Jobs\LegalEntityDetailsSync;
 use App\Notifications\SyncNotification;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -117,11 +119,19 @@ class FirstLoginOwnerSynchronization implements ShouldQueue
             isFirstLogin: true
         );
 
-        $initialJob = new DivisionSync(
+        $nextJob= new DivisionSync(
             legalEntity: $event->legalEntity,
             nextEntity: $nextJob,
             isFirstLogin: true
         );
+
+        $initialJob = $event->legalEntity->status === Status::NEW->value
+            ? new LegalEntityDetailsSync(
+                legalEntity: $event->legalEntity,
+                nextEntity: $nextJob,
+                isFirstLogin: true
+            )
+            : $nextJob;
 
         Bus::batch([$initialJob])
             ->name('FirstLoginSync')

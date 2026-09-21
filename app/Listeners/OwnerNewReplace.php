@@ -28,7 +28,7 @@ class OwnerNewReplace
         $legalEntityId = $event->legalEntity->id;
 
         // This need to be user with roles and permissions loaded
-        setPermissionsTeamId($event->legalEntity->id);
+        setPermissionsTeamId($legalEntityId);
 
         Auth::shouldUse($event->guard);
 

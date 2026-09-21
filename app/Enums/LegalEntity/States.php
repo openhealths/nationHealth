@@ -17,6 +17,7 @@ enum States: string
     case SUSPENDED = 'SUSPENDED';
     case CLOSED = 'CLOSED';
     case REORGANIZED = 'REORGANIZED';
+    case NEW = 'NEW';
 
     public function label(): string
     {
@@ -25,6 +26,7 @@ enum States: string
             self::SUSPENDED => __('forms.status.suspended'),
             self::CLOSED => __('forms.status.non_active'),
             self::REORGANIZED => __('forms.status.reorganized'),
+            self::NEW => __('forms.status.new'),
         };
     }
 
@@ -35,6 +37,7 @@ enum States: string
             self::SUSPENDED => 'status-alert-yellow',
             self::CLOSED => 'status-alert-red',
             self::REORGANIZED => 'status-alert-red',
+            self::NEW => 'status-alert-blue',
         };
     }
 }

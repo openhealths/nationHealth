@@ -122,6 +122,7 @@ return [
             'hour' => 149
         ],
         'legal_entity_legators' => 2,
+        'legal_entity_by_id' => 200,
         'person_authentication_method' => 20,
         'remote_job' => 1399
     ],
