@@ -462,6 +462,7 @@ return [
         'cancelled' => 'Скасовано',
         'revoked' => 'Відкликано',
         'terminated' => 'Припинено',
+        'connected' => 'Під\'єднано'
     ],
 
     // Reorganization types

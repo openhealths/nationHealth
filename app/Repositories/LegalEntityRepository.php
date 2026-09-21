@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use Throwable;
 use Exception;
 use App\Core\Arr;
 use App\Models\User;
@@ -14,6 +15,7 @@ use App\Models\Connection;
 use App\Models\LegalEntity;
 use App\Traits\LogsExceptions;
 use App\Models\LegalEntityType;
+use App\Enums\LegalEntity\States;
 use App\Models\Employee\Employee;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -25,6 +27,37 @@ use Illuminate\Database\Eloquent\Collection;
 class LegalEntityRepository
 {
     use LogsExceptions;
+
+    /**
+     * Initialize a legal entity with its initial connection data.
+     *
+     * @param  string  $uuid  The legal entity UUID.
+     * @param  string  $name  The legal entity name.
+     * @param  string|null  $secret  The optional client secret.
+     *
+     * @return LegalEntity|null The created legal entity, or null when initialization fails.
+     */
+    public function initLegalEntity(string $uuid, int $type, string $name, ?string $secret = null): ?LegalEntity
+    {
+        try {
+            DB::transaction(function () use ($uuid, $type, $name, $secret) {
+                new LegalEntity([
+                    'uuid' => $uuid,
+                    'client_id' => $uuid,
+                    'client_secret' => $secret,
+                    'status' => States::NEW->value,
+                    'legal_entity_type_id' => $type,
+                    'edr' => [
+                        'name' => $name
+                    ]
+                ])->save();
+            });
+        } catch (Throwable $err) {
+            return null;
+        }
+
+        return LegalEntity::where('uuid', $uuid)->first();
+    }
 
     /**
      * Get all legal entities founded in the system.
@@ -45,7 +78,7 @@ class LegalEntityRepository
         $legalEntityList = LegalEntity::listByFields()
             ->when(!empty($legalEntityIds), fn (Builder $query) => $query->whereIn('id', $legalEntityIds))
             ->get()
-            ->groupBy(fn (LegalEntity $item) => data_get($item, 'edr.name') ?: data_get($item, 'edr.public_name'))
+            ->groupBy(fn (LegalEntity $item) => data_get($item, 'edr.name') ?: (data_get($item, 'edr.public_name') ?? $item->uuid))
             ->map(fn (Collection $group) => $group->each->makeHidden(['edr'])) // Hide unnecessary fields
             ->toArray();
 
@@ -66,6 +99,10 @@ class LegalEntityRepository
 
                 if ($data['status'] === Status::REORGANIZED->value) {
                     $name .= " (" . Status::REORGANIZED->value . ")";
+                }
+
+                if ($data['status'] === Status::NEW->value) {
+                    $name .= " (" . Status::CONNECTED->value . ")";
                 }
 
                 $result[] = ['id' => $data['id'], 'uuid' => $data['uuid'], 'name' => $name];
