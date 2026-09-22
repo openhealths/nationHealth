@@ -95,7 +95,8 @@ class FirstLoginOwnerSynchronization implements ShouldQueue
             isFirstLogin: true
         );
 
-        // Run after EmployeeSync so parties already exist locally for cache updates.
+        // Bulk list requires party_verification:read on the OAuth token (event scopes),
+        // not merely on Spatie role permissions — otherwise GET /parties/verifications returns 403.
         if (PartyVerificationBulkAccess::canBulkSync($event->scopes)) {
             $nextJob = new PartyVerificationSync(
                 legalEntity: $event->legalEntity,

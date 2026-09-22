@@ -8,7 +8,6 @@ use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Models\LegalEntity;
-use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -50,22 +49,6 @@ class TokenStorage
     {
         Session::put($this->tokenScopesKey, array_values(array_filter($scopes)));
         Session::save();
-    }
-
-    /**
-     * Persist permission names currently stored on the user in model_has_permissions.
-     * Call after syncPermissions() so session scopes match all assigned role capabilities.
-     */
-    public function storeScopesFromUserPermissions(User $user): void
-    {
-        $this->storeScopes(
-            $user->getDirectPermissions()
-                ->pluck('name')
-                ->filter(static fn ($name) => is_string($name) && $name !== '')
-                ->unique()
-                ->values()
-                ->all()
-        );
     }
 
     /**

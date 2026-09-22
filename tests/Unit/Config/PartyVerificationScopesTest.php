@@ -49,13 +49,27 @@ class PartyVerificationScopesTest extends TestCase
     }
 
     #[Test]
-    public function non_hr_roles_except_owner_do_not_include_party_verification_read(): void
+    public function owner_and_reorganization_owner_include_party_verification_read(): void
     {
-        // OWNER may carry party_verification:read in upstream scopes; bulk sync is gated by token scope,
-        // not by HR role (see PartyVerificationBulkAccess / login listener).
+        foreach (['OWNER', 'REORGANIZATION_OWNER'] as $role) {
+            $scopes = config("ehealth.roles.{$role}");
+
+            $this->assertIsArray($scopes, "Role {$role} must be configured");
+            $this->assertContains(
+                'party_verification:read',
+                $scopes,
+                "party_verification:read must be present for {$role} role"
+            );
+        }
+    }
+
+    #[Test]
+    public function non_bulk_roles_do_not_include_party_verification_read(): void
+    {
+        // Bulk list is gated by OAuth token scope; only HR / OWNER / REORGANIZATION_OWNER advertise :read.
         $rolesWithoutBulkRead = collect(config('ehealth.roles'))
             ->keys()
-            ->diff(['HR', 'OWNER']);
+            ->diff(['HR', 'OWNER', 'REORGANIZATION_OWNER']);
 
         foreach ($rolesWithoutBulkRead as $role) {
             $scopes = config("ehealth.roles.{$role}");

@@ -19,8 +19,9 @@ use Throwable;
 
 /**
  * On subsequent logins (max once per 24h per LE), queue party verification bulk list sync
- * only when token scopes include party_verification:read. Role (HR/OWNER/ADMIN) is not checked —
- * ADMIN without that scope is skipped and never calls the list API.
+ * only when the OAuth bearer token scopes include party_verification:read.
+ * Role (HR/OWNER/ADMIN) is not checked — ADMIN without that scope is skipped.
+ * Gate on event/token scopes only (not Spatie-merged ACL permissions).
  */
 class PartyVerificationSyncStatusOnLogin
 {
@@ -37,6 +38,7 @@ class PartyVerificationSyncStatusOnLogin
 
         $legalEntity = $event->legalEntity;
 
+        // Event scopes are the OAuth token details.scope from login (not Spatie merge).
         if (!PartyVerificationBulkAccess::canBulkSync($event->scopes)) {
             Log::info('Party verification sync skipped: missing party_verification:read on token.', [
                 'legal_entity_id' => $legalEntity->id,
