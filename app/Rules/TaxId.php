@@ -189,6 +189,12 @@ class TaxId implements ValidationRule, DataAwareRule
         $existingPartyId = Arr::get($this->data, 'existingPartyId')
             ?? $this->user?->party?->id;
 
+        // PositionAdd / edit of an existing party: that party's own ІПН is never a
+        // conflict, even when other Party rows in the same LE share the same tax_id.
+        if ($existingPartyId && $this->partyOwnsTaxId((int) $existingPartyId, $taxId)) {
+            return false;
+        }
+
         return Party::query()
             ->where('tax_id', $taxId)
             ->when($existingPartyId, fn ($query, $partyId) => $query->where('id', '!=', $partyId))
@@ -196,6 +202,14 @@ class TaxId implements ValidationRule, DataAwareRule
                 'employees',
                 fn ($query) => $query->where('legal_entity_id', $legalEntity->id)
             )
+            ->exists();
+    }
+
+    private function partyOwnsTaxId(int $partyId, string $taxId): bool
+    {
+        return Party::query()
+            ->whereKey($partyId)
+            ->where('tax_id', $taxId)
             ->exists();
     }
 
