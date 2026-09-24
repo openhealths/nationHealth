@@ -10,6 +10,7 @@ use App\Enums\User\Role;
 use App\Models\LegalEntity;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Session;
 
 class LegalEntityPolicy
 {
@@ -18,6 +19,12 @@ class LegalEntityPolicy
      */
     public function access(User $user, LegalEntity $currentEntity): Response
     {
+        // The session is only ever authorized by eHealth for the single legal entity used at login,
+        // so an employee record in another legal entity must not grant access to it here.
+        if ($currentEntity->uuid !== Session::get('ehealth_legal_entity_uuid')) {
+            return Response::denyWithStatus(404);
+        }
+
         $legalEntitiesIds = cache()->memo()->remember(
             "user_le_ids:$user->id",
             now()->addMinutes(5),
