@@ -4,7 +4,8 @@
     x-data="{
         deviceDispenses: $wire.entangle('deviceDispenseForm.deviceDispenses'),
         procedures: $wire.entangle('procedureForm.procedures'),
-        deviceRequests: @js($deviceRequests),
+        // Entangle so Alpine sees eHealth-loaded requests after mount / refresh.
+        deviceRequests: $wire.entangle('deviceRequests'),
         deviceTypesDictionary: $wire.dictionaries['device_definition_classification_type'],
         deviceDefinitions: $wire.dictionaries['custom/device_definitions'],
         employee: @js($deviceDispenseEmployee),
@@ -14,13 +15,125 @@
         newDeviceDispense: false,
         openDeviceDispenseDrawer: false,
         item: 0,
+        loadingDeviceRequests: false,
 
         activeDeviceRequests() {
-            return this.deviceRequests.filter((deviceRequest) => String(deviceRequest.status).toLowerCase() === 'active' && ! deviceRequest.programId);
+            // eHealth Encounter Package rejects based_on pointing at a Device Request with a medical program.
+            return (this.deviceRequests || []).filter(
+                (deviceRequest) =>
+                    String(deviceRequest.status).toLowerCase() === 'active' &&
+                    deviceRequest.intent === 'order' &&
+                    ! deviceRequest.programId
+            );
+        },
+
+        programDeviceRequests() {
+            return (this.deviceRequests || []).filter(
+                (deviceRequest) =>
+                    String(deviceRequest.status).toLowerCase() === 'active' &&
+                    deviceRequest.intent === 'order' &&
+                    !!deviceRequest.programId
+            );
+        },
+
+        selectedDeviceRequest() {
+            return (this.deviceRequests || []).find(
+                (deviceRequest) => deviceRequest.uuid === this.modalDeviceDispense.basedOnId
+            ) || null;
+        },
+
+        async syncDeviceRequest() {
+            const deviceRequest = this.selectedDeviceRequest();
+
+            this.modalDeviceDispense.deviceSelectionType = '';
+            this.modalDeviceDispense.deviceCode = '';
+            this.modalDeviceDispense.deviceDefinitionId = '';
+            this.modalDeviceDispense.quantityCode = 'piece';
+            this.modalDeviceDispense.remainingQuantity = null;
+
+            if (! deviceRequest) {
+                return;
+            }
+
+            const details = await $wire.loadDeviceRequestDetails(deviceRequest.uuid);
+
+            if (details?.remainingQuantity !== null && details?.remainingQuantity !== undefined) {
+                deviceRequest.remainingQuantity = Number(details.remainingQuantity);
+                this.modalDeviceDispense.remainingQuantity = Number(details.remainingQuantity);
+            }
+
+            this.modalDeviceDispense.quantityCode =
+                details?.quantityCode || deviceRequest.quantityCode || 'piece';
+            this.modalDeviceDispense.deviceSelectionType = deviceRequest.deviceSelectionType;
+
+            if (deviceRequest.deviceSelectionType === 'model') {
+                this.modalDeviceDispense.deviceDefinitionId = deviceRequest.deviceId;
+
+                return;
+            }
+
+            this.modalDeviceDispense.deviceCode = deviceRequest.deviceId;
+        },
+
+        onDeviceSelectionTypeChange() {
+            const deviceRequest = this.selectedDeviceRequest();
+
+            this.modalDeviceDispense.deviceCode = '';
+            this.modalDeviceDispense.deviceDefinitionId = '';
+
+            if (! deviceRequest) {
+                return;
+            }
+
+            if (deviceRequest.deviceSelectionType === 'model') {
+                this.modalDeviceDispense.deviceSelectionType = 'model';
+                this.modalDeviceDispense.deviceDefinitionId = deviceRequest.deviceId;
+
+                return;
+            }
+
+            if (this.modalDeviceDispense.deviceSelectionType === 'type') {
+                this.modalDeviceDispense.deviceCode = deviceRequest.deviceId;
+            }
+        },
+
+        deviceTypeOptions() {
+            const deviceRequest = this.selectedDeviceRequest();
+            const options = Object.entries(this.deviceTypesDictionary || {});
+
+            if (! deviceRequest) {
+                return options.map(([value, label]) => ({ value, label }));
+            }
+
+            if (deviceRequest.deviceSelectionType === 'model') {
+                return [];
+            }
+
+            return options
+                .filter(([value]) => value === deviceRequest.deviceId)
+                .map(([value, label]) => ({ value, label }));
+        },
+
+        deviceDefinitionOptions() {
+            const deviceRequest = this.selectedDeviceRequest();
+
+            if (! deviceRequest) {
+                return this.deviceDefinitions || [];
+            }
+
+            if (deviceRequest.deviceSelectionType === 'model') {
+                return (this.deviceDefinitions || []).filter(
+                    (deviceDefinition) => deviceDefinition.id === deviceRequest.deviceId
+                );
+            }
+
+            return (this.deviceDefinitions || []).filter(
+                (deviceDefinition) => (deviceDefinition.typeCodes || []).includes(deviceRequest.deviceId)
+            );
         },
 
         carePlanId(id) {
-            const deviceRequest = this.deviceRequests.find((request) => request.uuid === id);
+            const deviceRequest = (this.deviceRequests || []).find((request) => request.uuid === id);
 
             return deviceRequest?.carePlanUuid || deviceRequest?.carePlanId || '-';
         },
@@ -47,6 +160,10 @@
 
         deviceSelectionTypeName(deviceDispense) {
             return deviceDispense.deviceSelectionType === 'model' ? '{{ __('device-dispenses.model') }}' : '{{ __('device-dispenses.type') }}';
+        },
+
+        deviceRequestOptionLabel(deviceRequest) {
+            return [deviceRequest.requestNumber, deviceRequest.itemName].filter(Boolean).join(' — ');
         },
 
         supportingInfoName(supporting) {
@@ -80,10 +197,19 @@
             return statuses[status] || '-';
         },
 
-        createDeviceDispense() {
+        async createDeviceDispense() {
+            this.loadingDeviceRequests = true;
+
+            try {
+                await $wire.loadActiveDeviceRequests();
+            } finally {
+                this.loadingDeviceRequests = false;
+            }
+
             this.newDeviceDispense = true;
             this.modalDeviceDispense = new DeviceDispense();
             this.modalDeviceDispense.performerId = this.employee.uuid || '';
+            this.modalDeviceDispense.performerName = this.employee.name || '';
             this.modalDeviceDispense.locationId = $wire.form.encounter.divisionId || '';
             this.modalDeviceDispense.whenHandedOverDate = $wire.form.encounter.periodDate || '';
             this.modalDeviceDispense.whenHandedOverTime = $wire.form.encounter.periodStart || '';
@@ -116,6 +242,8 @@
                 this.modalDeviceDispense.whenHandedOverTime &&
                 Number.isInteger(Number(this.modalDeviceDispense.quantity)) &&
                 Number(this.modalDeviceDispense.quantity) > 0 &&
+                (this.modalDeviceDispense.remainingQuantity === null ||
+                    Number(this.modalDeviceDispense.quantity) <= Number(this.modalDeviceDispense.remainingQuantity)) &&
                 this.modalDeviceDispense.deviceSelectionType &&
                 (this.modalDeviceDispense.deviceSelectionType !== 'type' || this.modalDeviceDispense.deviceCode) &&
                 (this.modalDeviceDispense.deviceSelectionType !== 'model' || this.modalDeviceDispense.deviceDefinitionId);
@@ -349,6 +477,7 @@
                     <div class="form-group group">
                         <select
                             x-model="modalDeviceDispense.basedOnId"
+                            @change="syncDeviceRequest()"
                             id="deviceDispenseBasedOn"
                             class="input-select peer"
                         >
@@ -356,17 +485,36 @@
                             <template x-for="deviceRequest in activeDeviceRequests()" :key="deviceRequest.uuid">
                                 <option
                                     :value="deviceRequest.uuid"
-                                    x-text="
-                                        [deviceRequest.requestNumber, deviceRequest.itemName]
-                                            .filter(Boolean)
-                                            .join(' — ')
-                                    "
+                                    x-text="deviceRequestOptionLabel(deviceRequest)"
                                 ></option>
                             </template>
                         </select>
                         <label for="deviceDispenseBasedOn" class="label">
                             {{ __('device-dispenses.prescription_erequest') }}
                         </label>
+                        <p class="mt-1 text-sm text-gray-500">{{ __('device-dispenses.based_on_optional_hint') }}</p>
+                        <p
+                            x-show="
+                                ! loadingDeviceRequests &&
+                                activeDeviceRequests().length === 0 &&
+                                programDeviceRequests().length === 0
+                            "
+                            x-cloak
+                            class="mt-1 text-sm text-gray-500"
+                        >
+                            {{ __('device-dispenses.no_active_device_requests') }}
+                        </p>
+                        <p
+                            x-show="
+                                ! loadingDeviceRequests &&
+                                activeDeviceRequests().length === 0 &&
+                                programDeviceRequests().length > 0
+                            "
+                            x-cloak
+                            class="mt-1 text-sm text-amber-600 dark:text-amber-400"
+                        >
+                            {{ __('device-dispenses.no_device_requests_without_program') }}
+                        </p>
                     </div>
 
                     <div class="form-group group">
@@ -380,7 +528,8 @@
                                 <option :value="procedure.uuid" x-text="procedureLabel(procedure)"></option>
                             </template>
                         </select>
-                        <label for="deviceDispenseProcedure" class="label"> {{ __('procedures.link') }} </label>
+                        <label for="deviceDispenseProcedure" class="label">{{ __('procedures.link') }}</label>
+                        <p class="mt-1 text-sm text-gray-500">{{ __('device-dispenses.procedure_optional_hint') }}</p>
                     </div>
                 </div>
 
@@ -453,6 +602,7 @@
                             type="number"
                             min="1"
                             step="1"
+                            :max="modalDeviceDispense.remainingQuantity"
                             id="deviceDispenseQuantity"
                             class="input peer"
                             placeholder=" "
@@ -476,10 +626,7 @@
                     <div class="form-group group">
                         <select
                             x-model="modalDeviceDispense.deviceSelectionType"
-                            @change="
-                                modalDeviceDispense.deviceCode = '';
-                                modalDeviceDispense.deviceDefinitionId = '';
-                            "
+                            @change="onDeviceSelectionTypeChange()"
                             id="deviceDispenseSelectionType"
                             class="input-select peer"
                             required
@@ -503,9 +650,9 @@
                                     required
                                 >
                                     <option value="">{{ __('forms.select') }}</option>
-                                    @foreach ($this->dictionaries['device_definition_classification_type'] as $code => $classificationType)
-                                        <option value="{{ $code }}">{{ $classificationType }}</option>
-                                    @endforeach
+                                    <template x-for="option in deviceTypeOptions()" :key="option.value">
+                                        <option :value="option.value" x-text="option.label"></option>
+                                    </template>
                                 </select>
                                 <label for="deviceDispenseDeviceType" class="label">
                                     {{ __('device-dispenses.device_type') }}
@@ -522,7 +669,10 @@
                                     required
                                 >
                                     <option value="">{{ __('forms.select') }}</option>
-                                    <template x-for="deviceDefinition in deviceDefinitions" :key="deviceDefinition.id">
+                                    <template
+                                        x-for="deviceDefinition in deviceDefinitionOptions()"
+                                        :key="deviceDefinition.id"
+                                    >
                                         <option :value="deviceDefinition.id" x-text="deviceDefinition.name"></option>
                                     </template>
                                 </select>
@@ -598,6 +748,8 @@
             this.whenHandedOverDate = '';
             this.whenHandedOverTime = '';
             this.quantity = 1;
+            this.quantityCode = 'piece';
+            this.remainingQuantity = null;
             this.deviceSelectionType = '';
             this.deviceCode = '';
             this.deviceDefinitionId = '';
