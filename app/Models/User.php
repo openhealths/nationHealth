@@ -10,6 +10,8 @@ use App\Enums\Status;
 use App\Enums\User\Role;
 use InvalidArgumentException;
 use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
+use App\Enums\Composition\CompositionCategory;
+use App\Enums\Composition\CompositionType;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
 use App\Models\Employee\Employee;
@@ -511,6 +513,69 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Employee this user would author a medical conclusion as.
+     *
+     * Candidates are this party's DOCTOR/SPECIALIST records in the current legal entity
+     * — login merges every role's scopes, so the session is not a single employee.
+     * When a type is given, only the roles TV 3.8 permits for that conclusion here
+     * are considered.
+     *
+     * A birth conclusion is further restricted by position
+     * (EMAL_VALIDATION_AUTHOR_CATEGORIES_BY_POSITION: P5, P6, P8, P34, P103). Among
+     * those, an employee linked to this user is preferred so a pediatrician login is
+     * not overwritten by an earlier endocrinologist record on the same party.
+     */
+    public function getCompositionAuthorEmployee(?CompositionType $type = null): ?Employee
+    {
+        $roles = $type === null
+            ? [Role::DOCTOR, Role::SPECIALIST]
+            : $type->allowedAuthorRoles(legalEntity()?->type?->name);
+
+        if ($roles === []) {
+            return null;
+        }
+
+        $candidates = $this->getWriterEmployeeCandidates(...$roles);
+        $linked = $this->linkedEmployeesAmong($candidates);
+        $pool = $linked->isNotEmpty() ? $linked : $candidates;
+
+        if ($type === CompositionType::NEWBORN) {
+            $allowedPositions = CompositionCategory::LIVE_BIRTH->allowedAuthorPositions();
+            $matching = $this->employeesWithAuthorPositions($pool, $allowedPositions);
+
+            // Same party may hold an endocrinologist (P56) and a paediatrician (P8).
+            // Login merges scopes, so we must pick by position, not by first SPECIALIST.
+            if ($matching->isEmpty() && $linked->isNotEmpty()) {
+                $matching = $this->employeesWithAuthorPositions($candidates, $allowedPositions);
+            }
+
+            if ($matching->isEmpty()) {
+                return null;
+            }
+
+            $pool = $matching;
+        }
+
+        return $pool->first();
+    }
+
+    /**
+     * Every employee of this user that may act on a medical conclusion here.
+     *
+     * Authorship is compared against all of them, because the conclusion may have been
+     * authored under a different one of this user's roles than the one currently in play.
+     *
+     * @return array<int, string>
+     */
+    public function getCompositionEmployeeUuids(): array
+    {
+        return $this->getWriterEmployeeCandidates(Role::DOCTOR, Role::SPECIALIST)
+            ->pluck('uuid')
+            ->filter()
+            ->all();
+    }
+
+    /**
      * Get main speciality for this user within a legal entity.
      *
      * @param  LegalEntity  $legalEntity
@@ -633,6 +698,57 @@ class User extends Authenticatable implements MustVerifyEmail
     protected function getWriterEmployeeByRolePriority(Role ...$priorityRoles): ?Employee
     {
         return $this->getWriterEmployeeCandidates(...$priorityRoles)->first();
+    }
+
+    /**
+     * Employees in $candidates that belong to this user (pivot or employees.user_id).
+     *
+     * @param  Collection<int, Employee>  $candidates
+     * @return Collection<int, Employee>
+     */
+    private function linkedEmployeesAmong(Collection $candidates): Collection
+    {
+        if ($candidates->isEmpty()) {
+            return $candidates;
+        }
+
+        $legalEntityId = legalEntity()?->id;
+
+        if ($legalEntityId === null) {
+            return $candidates;
+        }
+
+        $linkedIds = $this->employees()
+            ->where('employees.legal_entity_id', $legalEntityId)
+            ->pluck('employees.id')
+            ->merge(
+                Employee::query()
+                    ->where('user_id', $this->id)
+                    ->where('legal_entity_id', $legalEntityId)
+                    ->pluck('id')
+            )
+            ->unique()
+            ->all();
+
+        return $candidates
+            ->filter(static fn (Employee $employee): bool => in_array($employee->id, $linkedIds, true))
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, Employee>  $employees
+     * @param  list<string>  $positions
+     * @return Collection<int, Employee>
+     */
+    private function employeesWithAuthorPositions(Collection $employees, array $positions): Collection
+    {
+        return $employees
+            ->filter(static fn (Employee $employee): bool => in_array(
+                (string) $employee->position,
+                $positions,
+                true
+            ))
+            ->values();
     }
 
     /**

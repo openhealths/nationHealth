@@ -139,12 +139,21 @@
                             {{ __('clinical-impressions.plural') }}
                         </a>
 
-                        <a
-                            href="javascript:void(0)"
-                            class="summary-tab summary-tab-inactive cursor-not-allowed opacity-60"
-                        >
-                            {{ __('patients.medical_reports') }}
-                        </a>
+                        @can('viewAny', \App\Models\MedicalEvents\Sql\Composition::class)
+                            <a
+                                href="{{ route("$routePrefix.compositions", [legalEntity(), $routeParamKey => $recordId]) }}"
+                                class="summary-tab {{ request()->routeIs("$routePrefix.compositions") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                            >
+                                {{ __('patients.medical_reports') }}
+                            </a>
+                        @else
+                            <a
+                                href="javascript:void(0)"
+                                class="summary-tab summary-tab-inactive cursor-not-allowed opacity-60"
+                            >
+                                {{ __('patients.medical_reports') }}
+                            </a>
+                        @endcan
 
                         @if ($prepersonId)
                             <a

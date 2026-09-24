@@ -185,7 +185,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 return;
             }
-            datepickerEl._datepicker_initialized = true;
 
             Datepicker.locales.uk = uk.uk;
 
@@ -205,16 +204,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 }));
             }
 
-            new Datepicker(datepickerEl, {
-                defaultViewDate: datepickerEl.value,
-                minDate: minDate,
-                maxDate: maxDate,
-                format: format,
-                language: 'uk',
-                autohide: true,
-                showOnFocus: true
-            });
+            // Mark only after a successful construct — a bad min/max date used to throw,
+            // leave the flag set, and skip both the picker and the dd.mm.yyyy mask forever.
+            try {
+                new Datepicker(datepickerEl, {
+                    defaultViewDate: datepickerEl.value || todayDate,
+                    minDate: minDate || undefined,
+                    maxDate: maxDate || undefined,
+                    format: format,
+                    language: 'uk',
+                    autohide: true,
+                    showOnFocus: true
+                });
+            } catch (error) {
+                console.warn('Datepicker init failed, falling back to mask only', error);
+                attachDateMask(datepickerEl);
+                return;
+            }
 
+            datepickerEl._datepicker_initialized = true;
             datepickerEl.setAttribute('data-initialized', 'true');
             datepickerEl.addEventListener('changeDate', () => {
                 const inputEvent = new InputEvent('input', {
@@ -260,6 +268,31 @@ document.addEventListener('DOMContentLoaded', () => {
         initDefaultDatepickerMasks();
     });
     observer.observe(document.body, { childList: true, subtree: true });
+
+    // Livewire often morphs inputs in place and leaves a stale init flag without a picker.
+    const rebindAfterMorph = () => {
+        document.querySelectorAll('.datepicker-input').forEach((el) => {
+            if (el._datepicker_initialized && !el.datepicker) {
+                delete el._datepicker_initialized;
+                el.removeAttribute('data-initialized');
+                el.removeAttribute('data-date-mask');
+            }
+        });
+        initDatepickers();
+        initDefaultDatepickerMasks();
+    };
+
+    document.addEventListener('livewire:init', () => {
+        Livewire.hook('morph.updated', () => {
+            requestAnimationFrame(rebindAfterMorph);
+        });
+    });
+
+    if (window.Livewire) {
+        Livewire.hook('morph.updated', () => {
+            requestAnimationFrame(rebindAfterMorph);
+        });
+    }
 });
 
 
@@ -404,7 +437,6 @@ function initThemeToggle() {
     }
 }
 
-// After Livewire SPA navigation
 document.addEventListener('livewire:navigated', () => {
     initThemeToggle();
 });

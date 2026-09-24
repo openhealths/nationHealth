@@ -202,6 +202,7 @@ return [
     'prescription_requests' => 'Заявки на рецепти',
     'referrals' => 'Направлення',
     'medical_reports' => 'Медичні висновки',
+    'add_medical_report' => 'Додати медичний висновок',
     'care_plans' => 'Плани лікування',
 
     // Diagnoses

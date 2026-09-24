@@ -27,6 +27,8 @@ use Illuminate\Validation\ValidationException;
 use App\Livewire\Encounter\Concerns\ManagesEncounterEPrescription;
 use App\Livewire\Encounter\Concerns\ManagesEncounterReferrals;
 use App\Livewire\Encounter\Concerns\ResolvesEncounterStandaloneContext;
+use App\Models\MedicalEvents\Sql\Composition;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Throwable;
 
@@ -55,6 +57,49 @@ class EncounterEdit extends EncounterComponent
     public bool $canBeCancelled;
 
     public EncounterCancellationForm $cancellationForm;
+
+    /**
+     * Where "add medical conclusion" from this encounter should send the doctor.
+     *
+     * Primary care always opens МВТН. Outpatient on a preperson prefers МВН when the
+     * specialist may issue one, otherwise falls back to МВТН for unidentified patients.
+     */
+    #[Computed]
+    public function createCompositionFromEncounterUrl(): ?string
+    {
+        if (blank($this->encounterUuid)) {
+            return null;
+        }
+
+        $query = http_build_query(['encounter' => $this->encounterId]);
+
+        if ($this->prepersonId !== null) {
+            if (Auth::user()->can('createNewborn', Composition::class)) {
+                return route('prepersons.compositions.newborn.create', [
+                    legalEntity(),
+                    'preperson' => $this->prepersonId,
+                ]).'?'.$query;
+            }
+
+            if (Auth::user()->can('createTempDisability', Composition::class)) {
+                return route('prepersons.compositions.temp-disability.create', [
+                    legalEntity(),
+                    'preperson' => $this->prepersonId,
+                ]).'?'.$query;
+            }
+
+            return null;
+        }
+
+        if (!Auth::user()->can('createTempDisability', Composition::class)) {
+            return null;
+        }
+
+        return route('persons.compositions.temp-disability.create', [
+            legalEntity(),
+            'person' => $this->personId,
+        ]).'?'.$query;
+    }
 
     public function mount(LegalEntity $legalEntity, int $encounterId, ?Person $person = null, ?Preperson $preperson = null): void
     {

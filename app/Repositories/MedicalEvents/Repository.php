@@ -120,4 +120,9 @@ final class Repository
     {
         return app(DeviceRequestRequestRepository::class);
     }
+
+    public static function composition(): CompositionRepository
+    {
+        return app(CompositionRepository::class);
+    }
 }
