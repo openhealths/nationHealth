@@ -99,8 +99,9 @@
             @if (legalEntity() && Auth::user()->cannot('limitedAction', LegalEntity::class))
                 @can('viewAny', Connection::class)
                     <li>
-                        <a href="{{ route('connection.index', [legalEntity()]) }}"
-                        class="menu-item-simple {{ request()->routeIs('legal-entity-connection.*') ? 'menu-item-active' : '' }}"
+                        <a
+                            href="{{ route('connection.index', [legalEntity()]) }}"
+                            class="menu-item-simple {{ request()->routeIs('connection.*') ? 'menu-item-active' : '' }}"
                         >
                             @icon('connection-two-way')
                             <span>{{ __('Зв\'язки МІС та СГуСОЗ') }}</span>
@@ -522,6 +523,19 @@
                     </ul>
                 </li>
             @endif
+
+              {{-- Create connection for unauthorized (by eHealth) user --}}
+              @if (!legalEntity() && Auth::user()->can('limitedAction', LegalEntity::class))
+                    <li>
+                        <a
+                            href="{{ route('connection.create') }}"
+                            class="menu-item-simple {{ request()->routeIs('connection.*') ? 'menu-item-active' : '' }}"
+                        >
+                            @icon('connection-two-way')
+                            <span>{{ __('Зв\'язки МІС та СГуСОЗ') }}</span>
+                        </a>
+                    </li>
+              @endif
         </ul>
     </div>
 </aside>

@@ -28,7 +28,7 @@ class OwnerNewReplace
         $legalEntityId = $event->legalEntity->id;
 
         // This need to be user with roles and permissions loaded
-        setPermissionsTeamId($event->legalEntity->id);
+        setPermissionsTeamId($legalEntityId);
 
         Auth::shouldUse($event->guard);
 
@@ -51,10 +51,6 @@ class OwnerNewReplace
         // Order-independent equality check
         $scopesMatch = empty(array_diff($ownerScopes, $event->scopes)) && empty(array_diff($event->scopes, $ownerScopes));
 
-        if ($role !== Role::OWNER->value) {
-            return;
-        }
-
         // If OWNER by role but not by permissions, we don't need to do anything
         if (!$scopesMatch) {
             return;
@@ -76,7 +72,7 @@ class OwnerNewReplace
 
         $oldOwner = Employee::activeOwners($legalEntityId)->first();
 
-        if ($oldOwner->uuid === $newOwner['uuid']) {
+        if ($oldOwner?->uuid === $newOwner['uuid']) {
             return;
         }
 
