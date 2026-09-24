@@ -17,6 +17,7 @@ use App\Models\LegalEntity;
 use App\Repositories\Repository;
 use App\Traits\BatchLegalEntityQueries;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -72,7 +73,7 @@ class EmployeeRequestProcessor
             case 'REJECTED':
                 $request->update([
                     'status' => LocalStatus::REJECTED,
-                    'applied_at' => now(),
+                    'applied_at' => $this->remoteAppliedAt($remoteData),
                 ]);
                 $request->revision?->update(['status' => RevisionStatus::OUTDATED]);
 
@@ -84,7 +85,7 @@ class EmployeeRequestProcessor
             case 'EXPIRED':
                 $request->update([
                     'status' => LocalStatus::EXPIRED,
-                    'applied_at' => now(),
+                    'applied_at' => $this->remoteAppliedAt($remoteData),
                 ]);
                 $request->revision?->update(['status' => RevisionStatus::OUTDATED]);
 
@@ -111,20 +112,25 @@ class EmployeeRequestProcessor
                 ];
         }
 
-        // Prefer employee_id from request details; otherwise search APPROVED employees like EmployeeCreate.
+        // Get EmployeeRequest Data has no employee_id — resolve via local edit link or Employee list search.
         $taxId = data_get($request->revision?->data, 'party.tax_id');
-        $employeeUuid = $remoteData['employee_id'] ?? null;
         $remoteEmployee = null;
+        $employeeUuid = null;
 
-        if (is_string($taxId) && $taxId !== '') {
+        if (filled($request->employeeId)) {
+            $employeeUuid = Employee::whereKey($request->employeeId)->value('uuid');
+        }
+
+        if ($employeeUuid === null && is_string($taxId) && $taxId !== '') {
             $remoteEmployee = $this->matcher->findApprovedForRequest(
                 $request,
                 $taxId,
                 $legalEntity->uuid
             );
+            $employeeUuid = is_string($remoteEmployee['uuid'] ?? null) ? $remoteEmployee['uuid'] : null;
         }
 
-        if ($remoteEmployee === null && !is_string($employeeUuid)) {
+        if ($employeeUuid === null) {
             return [
                 'outcome' => self::OUTCOME_FAILED,
                 'message' => __('employees.sync.no_employees_found'),
@@ -132,14 +138,8 @@ class EmployeeRequestProcessor
         }
 
         $applyPayload = array_merge($remoteData, $remoteEmployee ?? []);
-        if ($remoteEmployee !== null) {
-            $applyPayload['employee_id'] = $remoteEmployee['uuid'];
-            $applyPayload['status'] = $remoteEmployee['status'] ?? Status::APPROVED->value;
-        } elseif (is_string($employeeUuid)) {
-            $applyPayload['employee_id'] = $employeeUuid;
-            $applyPayload['status'] = Status::APPROVED->value;
-        }
-
+        $applyPayload['employee_id'] = $employeeUuid;
+        $applyPayload['status'] = $remoteEmployee['status'] ?? Status::APPROVED->value;
         $applyPayload['legal_entity_id'] = $applyPayload['legal_entity_id'] ?? $legalEntity->uuid;
 
         $this->applyApprovedRequest($request, $applyPayload);
@@ -279,16 +279,70 @@ class EmployeeRequestProcessor
             // 10. Assign Roles to User
             $this->assignUserRoles($employee, $request->legalEntityId, $request->userId);
 
-            // 11. Finalize Request Status
+            // 11. Finalize Request Status (applied_at/inserted_at = remote updated_at for role windows)
+            $appliedAt = $this->remoteAppliedAt($eHealthData);
+            if (blank($employee->insertedAt)) {
+                $employee->insertedAt = $appliedAt;
+                $employee->save();
+            }
+
             $request->update([
-                                 'status' => LocalStatus::APPROVED,
-                                 'applied_at' => now(),
-                             ]);
+                'status' => LocalStatus::APPROVED,
+                'applied_at' => $appliedAt,
+                'inserted_at' => $appliedAt,
+            ]);
 
             if ($request->revision) {
                 $request->revision->update(['status' => RevisionStatus::APPLIED]);
             }
+
+            $this->markOlderPendingEditsSuperseded($request);
         });
+    }
+
+    /**
+     * After a newer edit is applied, close older still-pending edits for the same employee
+     * in this LE so login/sync cannot re-apply yesterday's phones/documents.
+     */
+    public function markOlderPendingEditsSuperseded(EmployeeRequest $applied): void
+    {
+        if (blank($applied->employeeId) || blank($applied->legalEntityId)) {
+            return;
+        }
+
+        $olderPending = EmployeeRequest::query()
+            ->with('revision')
+            ->filterByLegalEntityId((int) $applied->legalEntityId)
+            ->where('employee_id', $applied->employeeId)
+            ->where('id', '!=', $applied->id)
+            ->pendingEhealth()
+            ->whereNotNull('uuid')
+            ->where(function ($query) use ($applied): void {
+                $query->where('created_at', '<', $applied->created_at)
+                    ->orWhere(function ($inner) use ($applied): void {
+                        $inner->where('created_at', $applied->created_at)
+                            ->where('id', '<', $applied->id);
+                    });
+            })
+            ->get();
+
+        foreach ($olderPending as $oldRequest) {
+            $oldRequest->update([
+                'status' => LocalStatus::EXPIRED,
+                'applied_at' => now(),
+            ]);
+            $oldRequest->revision?->update(['status' => RevisionStatus::OUTDATED]);
+        }
+    }
+
+    /**
+     * eHealth request updated_at is the authoritative applied_at for terminal statuses.
+     */
+    private function remoteAppliedAt(array $remoteData): Carbon
+    {
+        return filled($remoteData['updated_at'] ?? null)
+            ? Carbon::parse($remoteData['updated_at'])
+            : now();
     }
 
     /**
@@ -301,6 +355,44 @@ class EmployeeRequestProcessor
         $remote = $this->matcher->findApprovedForRequest($request, $taxId, legalEntity()->uuid);
 
         return $remote['uuid'] ?? null;
+    }
+
+    /**
+     * Among approved local requests, keep only the newest per employee_id.
+     * Creates (no employee_id) are kept individually. Older superseded edits are returned separately.
+     *
+     * @param  Collection<int, EmployeeRequest>  $approvedRequests
+     * @return array{apply: Collection<int, EmployeeRequest>, superseded: Collection<int, EmployeeRequest>}
+     */
+    public function partitionLatestApprovedPerEmployee(Collection $approvedRequests): array
+    {
+        $sorted = $approvedRequests
+            ->sortBy(fn (EmployeeRequest $request): array => [
+                $request->created_at?->timestamp ?? 0,
+                $request->id,
+            ])
+            ->values();
+
+        $apply = collect();
+        $superseded = collect();
+
+        foreach ($sorted->groupBy(
+            fn (EmployeeRequest $request): string => filled($request->employeeId)
+                ? 'employee-'.$request->employeeId
+                : 'create-'.$request->id
+        ) as $group) {
+            /** @var Collection<int, EmployeeRequest> $group */
+            $latest = $group->last();
+            $apply->push($latest);
+            $superseded = $superseded->merge($group->filter(
+                fn (EmployeeRequest $request): bool => $request->id !== $latest->id
+            ));
+        }
+
+        return [
+            'apply' => $apply->values(),
+            'superseded' => $superseded->values(),
+        ];
     }
 
     /**
@@ -321,16 +413,17 @@ class EmployeeRequestProcessor
         }
 
         $localPendingRequests = EmployeeRequest::query()
-            ->where('legal_entity_id', $legalEntity->id)
-            ->whereNull('applied_at')
+            ->filterByLegalEntityId($legalEntity->id)
+            ->pendingEhealth()
             ->whereIn('uuid', $eHealthRequests->keys())
             ->with(['revision', 'employee', 'party', 'division'])
-            ->cursor();
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get();
 
-        $approvedCount = 0;
+        $approvedLocals = collect();
 
         foreach ($localPendingRequests as $localRequest) {
-
             $remoteRequestData = $eHealthRequests->get($localRequest->uuid);
 
             if (!$remoteRequestData) {
@@ -348,14 +441,10 @@ class EmployeeRequestProcessor
 
             try {
                 if ($remoteStatus === 'APPROVED') {
-                    // Pass the specific item data, not the whole array
-                    $this->applyApprovedRequest($localRequest, $remoteRequestData);
-                    $approvedCount++;
-                    Log::info(
-                        "[EmployeeRequestProcessor] Request APPROVED and applied successfully. Request ID: {$localRequest->id}"
-                    );
-
-                } elseif (in_array($remoteStatus, ['REJECTED', 'EXPIRED'])) {
+                    // Keep payload only in the batch map ($eHealthRequests). Do not setAttribute a
+                    // pseudo-column — Eloquent update() would try to persist it and abort PG.
+                    $approvedLocals->push($localRequest);
+                } elseif (in_array($remoteStatus, ['REJECTED', 'EXPIRED'], true)) {
                     $newStatus = match ($remoteStatus) {
                         'REJECTED' => LocalStatus::REJECTED,
                         'EXPIRED' => LocalStatus::EXPIRED,
@@ -363,15 +452,11 @@ class EmployeeRequestProcessor
                     };
 
                     if ($newStatus) {
-                        $localRequest->update(
-                            [
-                                'status' => $newStatus,
-                                'applied_at' => now(),
-                            ]
-                        );
-                        $localRequest->revision?->update(
-                            ['status' => RevisionStatus::OUTDATED]
-                        );
+                        $localRequest->update([
+                            'status' => $newStatus,
+                            'applied_at' => now(),
+                        ]);
+                        $localRequest->revision?->update(['status' => RevisionStatus::OUTDATED]);
 
                         Log::info(
                             "[EmployeeRequestProcessor] Request status updated to {$newStatus->value}. Request ID: {$localRequest->id}"
@@ -380,14 +465,42 @@ class EmployeeRequestProcessor
                 }
             } catch (\Throwable $e) {
                 Log::error(
-                    "[EmployeeRequestProcessor] Failed to process request ID {$localRequest->id}: " . $e->getMessage(),
+                    "[EmployeeRequestProcessor] Failed to process request ID {$localRequest->id}: ".$e->getMessage(),
+                    ['exception' => $e]
+                );
+            }
+        }
+
+        $partition = $this->partitionLatestApprovedPerEmployee($approvedLocals);
+
+        foreach ($partition['superseded'] as $supersededRequest) {
+            try {
+                // Remote APPROVED but superseded by a newer edit for the same employee — close without applying content.
+                $supersededRequest->update([
+                    'status' => LocalStatus::APPROVED,
+                    'applied_at' => now(),
+                ]);
+                $supersededRequest->revision?->update(['status' => RevisionStatus::OUTDATED]);
+            } catch (\Throwable) {
+                // Soft-fail: newer apply still proceeds; older row can be cleaned on next sync.
+            }
+        }
+
+        foreach ($partition['apply'] as $localRequest) {
+            try {
+                $remoteRequestData = $eHealthRequests->get($localRequest->uuid);
+                $this->applyApprovedRequest($localRequest, $remoteRequestData);
+            } catch (\Throwable $e) {
+                Log::error(
+                    "[EmployeeRequestProcessor] Failed to process request ID {$localRequest->id}: ".$e->getMessage(),
                     ['exception' => $e]
                 );
             }
         }
 
         // Logic to insert missing requests from eHealth that don't exist locally
-        $localEmployeeRequestUuids = EmployeeRequest::where('legal_entity_id', $legalEntity->id)
+        $localEmployeeRequestUuids = EmployeeRequest::query()
+            ->filterByLegalEntityId($legalEntity->id)
             ->pluck('uuid')
             ->toArray();
 
