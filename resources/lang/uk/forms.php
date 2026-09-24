@@ -105,6 +105,7 @@ return [
     'select_type' => 'Оберіть тип',
     'select_filter' => 'Оберіть фільтр',
     'select_user_email' => 'Оберіть email',
+    'position_add_email_hint' => 'Оберіть існуючий email зі списку або введіть новий',
     'success_response' => 'Запит виконано успішно',
     'empty' => 'Пусто',
     'important' => 'Важливо',

@@ -119,7 +119,54 @@ class EmployeeCustomPositionAndEmailTest extends TestCase
     }
 
     #[Test]
-    public function existing_tax_id_in_legal_entity_asks_to_add_a_position(): void
+    public function existing_tax_id_in_legal_entity_asks_to_add_a_position_without_new_email(): void
+    {
+        [$legalEntity] = $this->createTwoLegalEntities();
+        $this->instance('legalEntity', $legalEntity);
+
+        $party = Party::create([
+            'uuid' => (string) Str::uuid(),
+            'first_name' => 'Іван',
+            'last_name' => 'Коваленко',
+            'tax_id' => '3212312312',
+            'birth_date' => '1990-01-01',
+            'gender' => 'MALE',
+        ]);
+
+        Employee::create([
+            'uuid' => (string) Str::uuid(),
+            'full_name' => 'Коваленко Іван',
+            'employee_type' => Role::DOCTOR->value,
+            'status' => Status::APPROVED->value,
+            'legal_entity_id' => $legalEntity->id,
+            'is_active' => true,
+            'position' => 'P1',
+            'start_date' => now()->format('Y-m-d'),
+            'party_id' => $party->id,
+        ]);
+
+        $validator = Validator::make(
+            [
+                'party' => [
+                    'noTaxId' => false,
+                    'taxId' => '3212312312',
+                    'email' => '',
+                ],
+            ],
+            [
+                'party.taxId' => ['required', 'string', new TaxId()],
+            ]
+        );
+
+        $this->assertTrue($validator->fails());
+        $this->assertStringContainsString(
+            'додайте посаду',
+            (string) $validator->errors()->first('party.taxId')
+        );
+    }
+
+    #[Test]
+    public function existing_tax_id_allows_create_when_email_is_new(): void
     {
         [$legalEntity] = $this->createTwoLegalEntities();
         $this->instance('legalEntity', $legalEntity);
@@ -158,11 +205,7 @@ class EmployeeCustomPositionAndEmailTest extends TestCase
             ]
         );
 
-        $this->assertTrue($validator->fails());
-        $this->assertStringContainsString(
-            'додайте посаду',
-            (string) $validator->errors()->first('party.taxId')
-        );
+        $this->assertFalse($validator->fails());
     }
 
     /**
