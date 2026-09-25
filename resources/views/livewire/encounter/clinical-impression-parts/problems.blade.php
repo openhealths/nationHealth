@@ -4,16 +4,27 @@
     {{-- This required for table overflow scrolling --}}
     <fieldset
         class="fieldset"
-        {{-- Binding Problem to Alpine, it will be re-used in the modal.
-                Note that it's necessary for modal to work properly --}}
         x-data="{
             openModal: false,
-            modalProblem: new Problem(),
-            newProblem: false,
-            item: 0,
-            searchResults: [],
-            selectedProblemIds: [],
+
+            isProblemAdded(recordId) {
+                return modalClinicalImpression.problems.some((problem) => problem.id === recordId);
+            },
+
+            addProblem(record) {
+                if (this.isProblemAdded(record.id)) {
+                    return;
+                }
+
+                modalClinicalImpression.problems = modalClinicalImpression.problems.concat({
+                    id: record.id,
+                    ehealthInsertedAt: record.ehealthInsertedAt,
+                    codeCode: record.codeCode,
+                    description: record.description,
+                });
+            },
         }"
+        @clinical-impression-problem-selected.window="addProblem($event.detail.record)"
     >
         <legend class="legend">
             <h2>{{ __('clinical-impressions.problems') }}</h2>
@@ -34,7 +45,12 @@
                         <td
                             class="td-input"
                             x-text="
-                                `${problem.codeCode} - ${$wire.dictionaries['eHealth/ICD10_AM/condition_codes'][problem.codeCode] || $wire.dictionaries['eHealth/ICPC2/condition_codes'][problem.codeCode]}`
+                                `${problem.codeCode} - ${
+                                    $wire.dictionaries['eHealth/ICD10_AM/condition_codes'][problem.codeCode] ||
+                                    $wire.dictionaries['eHealth/ICPC2/condition_codes'][problem.codeCode] ||
+                                    problem.description ||
+                                    ''
+                                }`
                             "
                         ></td>
                         <td class="td-input">
@@ -106,27 +122,6 @@
                                         {{-- Center a dropdown panel --}}
                                     >
                                         <button
-                                            @click="
-                                                item = index;
-                                                modalProblem = new Problem(problem);
-                                                newProblem = false;
-                                                if ($wire.problems.length > 0) {
-                                                    searchResults = JSON.parse(JSON.stringify($wire.problems));
-                                                    openModal = true;
-                                                } else {
-                                                    $wire.searchProblems().then(() => {
-                                                        searchResults = JSON.parse(JSON.stringify($wire.problems));
-                                                        openModal = true;
-                                                    });
-                                                }
-                                            "
-                                            @click.prevent
-                                            class="dropdown-button"
-                                        >
-                                            {{ __('forms.edit') }}
-                                        </button>
-
-                                        <button
                                             class="dropdown-button dropdown-delete"
                                             @click.prevent="
                                                 modalClinicalImpression.problems.splice(index, 1);
@@ -146,25 +141,7 @@
 
         <div>
             {{-- Button to trigger the modal --}}
-            <button
-                @click.prevent="
-                    newProblem = true;
-                    modalProblem = new Problem();
-                    selectedProblemIds = [];
-                    if ($wire.problems.length > 0) {
-                        searchResults = JSON.parse(JSON.stringify($wire.problems));
-                        openModal = true;
-                    } else {
-                        $wire.searchProblems().then(() => {
-                            searchResults = JSON.parse(JSON.stringify($wire.problems));
-                            openModal = true;
-                        });
-                    }
-                "
-                class="item-add my-5"
-            >
-                {{ __('forms.add') }}
-            </button>
+            <button @click.prevent="openModal = true" class="item-add my-5">{{ __('forms.add') }}</button>
 
             {{-- Modal --}}
             <template x-teleport="body">
@@ -199,103 +176,19 @@
                             <h3 class="modal-header" :id="$id('modal-title')">{{ __('forms.add') }}</h3>
 
                             {{-- Content --}}
-                            <form>
-                                {{-- A table that shows the results of the found data --}}
-                                <template x-if="searchResults.length > 0">
-                                    <div class="table-container">
-                                        <div class="overflow-visible">
-                                            <table class="table-base">
-                                                <thead class="table-header">
-                                                    <tr>
-                                                        <th scope="col" class="th-input">{{ __('forms.date') }}</th>
-                                                        <th scope="col" class="th-input">
-                                                            {{ __('medical-events.code_and_name') }}
-                                                        </th>
-                                                        <th scope="col" class="th-input">{{ __('forms.action') }}</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <template x-for="problem in searchResults" :key="problem.id">
-                                                        <tr class="border-b dark:border-gray-700">
-                                                            <th scope="row" class="table-cell-primary">
-                                                                <div
-                                                                    class="text-base"
-                                                                    x-text="problem.ehealthInsertedAt || ''"
-                                                                ></div>
-                                                            </th>
-                                                            <td
-                                                                class="td-input"
-                                                                x-text="
-                                                                    `${problem.codeCode} - ${$wire.dictionaries['eHealth/ICD10_AM/condition_codes'][problem.codeCode] || $wire.dictionaries['eHealth/ICPC2/condition_codes'][problem.codeCode]}`
-                                                                "
-                                                            ></td>
-                                                            <td class="td-input">
-                                                                <button
-                                                                    @click.prevent="
-                                                                        const id = problem.id;
-                                                                        const index = selectedProblemIds.indexOf(id);
+                            <livewire:encounter.medical-record-search
+                                :patient-uuid="$patientUuid"
+                                selection-event="clinical-impression-problem-selected"
+                                is-added-check="isProblemAdded"
+                                fixed-record-type="condition"
+                                :key="'clinical-impression-problem-search'"
+                            />
 
-                                                                        if (index === -1) {
-                                                                            selectedProblemIds.push(id);
-                                                                        } else {
-                                                                            selectedProblemIds.splice(index, 1); // toggle off
-                                                                        }
-                                                                    "
-                                                                    class="button-primary w-28"
-                                                                    x-text="selectedProblemIds.includes(problem.id)
-                                                                        ? '{{ __('medical-events.added') }}'
-                                                                        : '{{ __('forms.add') }}'"
-                                                                ></button>
-                                                            </td>
-                                                        </tr>
-                                                    </template>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </template>
-
-                                <template x-if="searchResults.length <= 0">
-                                    <p class="default-p">{{ __('forms.nothing_found') }}</p>
-                                </template>
-
-                                {{-- Action buttons --}}
-                                <div class="mt-6 flex justify-between space-x-2">
-                                    <button
-                                        @click.prevent
-                                        type="button"
-                                        @click="openModal = false"
-                                        class="button-minor"
-                                    >
-                                        {{ __('forms.cancel') }}
-                                    </button>
-
-                                    <button
-                                        @click.prevent
-                                        @click="
-                                                const existingIds = modalClinicalImpression.problems.map(problem => problem.id);
-
-                                                {{-- Get only the new problems that are not already in the array --}}
-                                                const newProblems = searchResults
-                                                    .filter(problem => selectedProblemIds.includes(problem.id) && ! existingIds.includes(problem.id))
-                                                    .map(problem => ({
-                                                        id: problem.id,
-                                                        ehealthInsertedAt: problem.ehealthInsertedAt,
-                                                        codeCode: problem.codeCode,
-                                                    }));
-
-                                                {{-- Add them to the array --}}
-                                                modalClinicalImpression.problems = modalClinicalImpression.problems.concat(newProblems);
-
-                                                openModal = false;
-                                                searchResults = [];
-                                            "
-                                        class="button-primary"
-                                    >
-                                        {{ __('forms.save') }}
-                                    </button>
-                                </div>
-                            </form>
+                            <div class="mt-6 flex justify-between space-x-2">
+                                <button type="button" @click="openModal = false" class="button-minor cursor-pointer">
+                                    {{ __('forms.close') }}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -303,16 +196,3 @@
         </div>
     </fieldset>
 </div>
-
-<script>
-    /**
-     * Representation of the user's personal Problems
-     */
-    class Problem {
-        constructor(obj = null) {
-            if (obj) {
-                Object.assign(this, JSON.parse(JSON.stringify(obj)));
-            }
-        }
-    }
-</script>

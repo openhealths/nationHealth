@@ -534,6 +534,7 @@
 
                         <div class="form-group group" x-show="! modalDeviceDispense.deviceSelectionType" x-cloak>
                             <select
+                                id="deviceDispenseDevicePlaceholder"
                                 class="input-select peer !cursor-not-allowed !text-gray-500 dark:!text-gray-400"
                                 disabled
                             >
@@ -541,7 +542,10 @@
                                     {{ __('device-dispenses.select_device_type_or_model_first') }}
                                 </option>
                             </select>
-                            <label class="label">{{ __('device-dispenses.device_type') }}</label>
+                            <label
+                                for="deviceDispenseDevicePlaceholder"
+                                class="label"
+                            >{{ __('device-dispenses.device_type') }}</label>
                         </div>
                     </div>
                 </div>

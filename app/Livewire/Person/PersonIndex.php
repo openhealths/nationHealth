@@ -248,9 +248,10 @@ class PersonIndex extends Component
      *
      * @param  string  $patientId
      * @param  string  $routeName
+     * @param  array  $parameters  Extra route parameters, e.g. the query string
      * @return void
      */
-    public function redirectTo(string $patientId, string $routeName): void
+    public function redirectTo(string $patientId, string $routeName, array $parameters = []): void
     {
         if (uuid_is_valid($patientId)) {
             // IF UUID is valid, then find for it in DB
@@ -270,9 +271,9 @@ class PersonIndex extends Component
                 }
             }
 
-            $this->redirectRoute($routeName, [legalEntity(), 'person' => $person->id]);
+            $this->redirectRoute($routeName, [legalEntity(), 'person' => $person->id, ...$parameters]);
         } else {
-            $this->redirectRoute($routeName, [legalEntity(), 'person' => $patientId]);
+            $this->redirectRoute($routeName, [legalEntity(), 'person' => $patientId, ...$parameters]);
         }
     }
 

@@ -853,6 +853,10 @@
                         <button
                             type="button"
                             @click.prevent="
+                                {{-- The empty property row is only offered to fill in, it is not a property of the device --}}
+                                modalDevice.properties = modalDevice.properties.filter(
+                                    (property) => property.code || property.valueType,
+                                );
                                 newDevice !== false ? devices.push(modalDevice) : (devices[item] = modalDevice);
                                 openDeviceDrawer = false;
                             "
@@ -861,7 +865,14 @@
                                 modalDevice.typeCode?.trim?.() &&
                                 modalDevice.status?.trim?.() &&
                                 modalDevice.names.every((name) => name.type?.trim?.() && name.value?.trim?.()) &&
-                                (modalDevice.primarySource || modalDevice.reportOriginCode?.trim?.())
+                                (modalDevice.primarySource || modalDevice.reportOriginCode?.trim?.()) &&
+                                modalDevice.properties.every(
+                                    (property) =>
+                                        ! property.code ||
+                                        ! [null, undefined, ''].includes(
+                                            property[DEVICE_PROPERTY_VALUE_KEYS[property.valueType]],
+                                        ),
+                                )
                             )"
                         >
                             {{ __('forms.add') }}

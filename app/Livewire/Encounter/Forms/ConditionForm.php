@@ -6,7 +6,6 @@ namespace App\Livewire\Encounter\Forms;
 
 use App\Enums\Person\ConditionVerificationStatus;
 use App\Enums\User\Role;
-use App\Models\Relations\Speciality;
 use App\Rules\AfterOrEqualDateTime;
 use App\Rules\InDictionary;
 use App\Rules\PrimarySourceRequiredForAssistant;
@@ -67,13 +66,20 @@ class ConditionForm extends Form
                 $this->codeAllowedForAsserterSpeciality()
             ],
             // for edit page
-            'conditions.*.uuid' => ['nullable', 'uuid'],
+            'conditions.*.uuid' => ['required_if_accepted:conditions.*.isRegistered', 'nullable', 'uuid'],
+            'conditions.*.isRegistered' => ['nullable', 'boolean'],
             'conditions.*.primarySource' => [
+                'exclude_if:conditions.*.isRegistered,true',
                 'required_with:conditions',
                 'boolean',
                 new PrimarySourceRequiredForAssistant()
             ],
-            'conditions.*.reportOriginCode' => ['nullable', 'string', 'required_if:conditions.*.primarySource,false'],
+            'conditions.*.reportOriginCode' => [
+                'exclude_if:conditions.*.isRegistered,true',
+                'nullable',
+                'string',
+                'required_if:conditions.*.primarySource,false'
+            ],
             'conditions.*.codeCode' => [
                 'required_with:conditions',
                 'string',
@@ -86,19 +92,23 @@ class ConditionForm extends Form
                 $this->codeSystemAllowedForEncounterClass()
             ],
             'conditions.*.clinicalStatus' => [
+                'exclude_if:conditions.*.isRegistered,true',
                 'required_with:conditions',
                 'string',
                 new InDictionary('eHealth/condition_clinical_statuses')
             ],
             'conditions.*.verificationStatus' => Rule::forEach(function (mixed $value, string $attribute): array {
+                $index = (int) explode('.', $attribute)[1];
+
                 $rules = [
+                    "exclude_if:conditions.$index.isRegistered,true",
                     'required_with:conditions',
                     'string',
                     new InDictionary('eHealth/condition_verification_statuses')
                 ];
 
                 // A condition the encounter lists among its diagnoses has to stay active
-                if (isset($this->encounter()['diagnoses'][(int) explode('.', $attribute)[1]])) {
+                if (isset($this->encounter()['diagnoses'][$index])) {
                     $rules[] = Rule::notIn([ConditionVerificationStatus::ENTERED_IN_ERROR->value]);
                 }
 
@@ -111,6 +121,7 @@ class ConditionForm extends Form
             ],
             'conditions.*.bodySites.*.code' => ['nullable', 'string', new InDictionary('eHealth/body_sites')],
             'conditions.*.onsetDate' => [
+                'exclude_if:conditions.*.isRegistered,true',
                 'required_with:conditions',
                 'before:tomorrow',
                 'date',
@@ -118,9 +129,11 @@ class ConditionForm extends Form
             ],
             'conditions.*.onsetTime' => Rule::forEach(
                 function (mixed $value, string $attribute): array {
-                    $onsetDate = $this->conditions[(int) explode('.', $attribute)[1]]['onsetDate'] ?? '';
+                    $index = (int) explode('.', $attribute)[1];
+                    $onsetDate = $this->conditions[$index]['onsetDate'] ?? '';
 
                     return [
+                        "exclude_if:conditions.$index.isRegistered,true",
                         'required_with:conditions',
                         'date_format:H:i',
                         new PastDateTime($onsetDate),
@@ -207,6 +220,10 @@ class ConditionForm extends Form
     private function psychiatryEvidenceProvided(): Closure
     {
         return static function (string $attribute, mixed $value, Closure $fail): void {
+            if (data_get($value, 'isRegistered') === true) {
+                return;
+            }
+
             $codeCode = data_get($value, 'codeCode');
             $psychiatryCodes = config('ehealth.psychiatry_icpc2_diagnoses_evidence_check', []);
 
@@ -336,26 +353,9 @@ class ConditionForm extends Form
 
             $codeCode = data_get($value, 'codeCode');
 
-            $allowedSpecialities = collect(config('ehealth.icd10am_speciality_conditions_allowed', []))
-                ->filter(static fn (array $codes): bool => in_array($codeCode, $codes, true))
-                ->keys();
-
-            // A code no speciality list mentions is open to every asserter
-            if ($allowedSpecialities->isEmpty()) {
-                return;
+            if (in_array($codeCode, $asserter->forbiddenIcd10ConditionCodes(), true)) {
+                $fail(__('conditions.validation.speciality_condition_code_forbidden', ['code' => $codeCode]));
             }
-
-            $hasAllowedSpeciality = $asserter
-                ->loadMissing('specialities')
-                ->specialities
-                ->where('specialityOfficio', true)
-                ->contains(static fn (Speciality $speciality): bool => $allowedSpecialities->contains($speciality->speciality));
-
-            if ($hasAllowedSpeciality) {
-                return;
-            }
-
-            $fail(__('conditions.validation.speciality_condition_code_forbidden', ['code' => $codeCode]));
         };
     }
 

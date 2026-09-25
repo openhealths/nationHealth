@@ -3,6 +3,8 @@
 <div
     class="p-4 sm:p-8"
     id="conditions-section"
+    @condition-evidence-selected.window="addEvidence($event.detail.record)"
+    @registered-condition-selected.window="selectRegisteredCondition($event.detail.record)"
     x-data="{
         conditions: $wire.entangle('conditionForm.conditions'),
         diagnoses: $wire.entangle('form.encounter.diagnoses'),
@@ -13,7 +15,27 @@
         showDuplicateCodeWarning: false,
         conditionMode: 'create',
 
+        conditionToSave() {
+            if (this.conditionMode !== 'select') {
+                return this.modalCondition;
+            }
+
+            return {
+                uuid: this.registeredCondition?.id,
+                isRegistered: true,
+                fromEpisode: this.registeredCondition?.fromEpisode === true,
+                codeCode: this.registeredCondition?.codeCode,
+                codeSystem: this.registeredCondition?.codeSystem,
+                clinicalStatus: this.registeredCondition?.clinicalStatus,
+                verificationStatus: this.registeredCondition?.verificationStatus,
+                onsetDate: this.registeredCondition?.onsetDate,
+                episodeName: this.registeredCondition?.episodeName,
+            };
+        },
+
         saveCondition(bypassWarning = false) {
+            const conditionToSave = this.conditionToSave();
+
             if (this.modalDiagnosis.roleCode === 'primary') {
                 const matchingPrimaryCount = this.diagnoses.filter((diagnose, index) => {
                     if (this.newCondition === false && index === this.item) return false;
@@ -29,8 +51,8 @@
 
                 if (
                     episodePrimaryCode &&
-                    this.modalCondition.codeCode !== episodePrimaryCode &&
-                    !bypassWarning
+                    conditionToSave.codeCode !== episodePrimaryCode &&
+                    ! bypassWarning
                 ) {
                     this.showPrimaryChangeWarning = true;
                     return;
@@ -44,8 +66,8 @@
                 this.conditions.some(
                     (condition, index) =>
                         ! (this.newCondition === false && index === this.item) &&
-                        condition.codeSystem === this.modalCondition.codeSystem &&
-                        condition.codeCode === this.modalCondition.codeCode &&
+                        condition.codeSystem === conditionToSave.codeSystem &&
+                        condition.codeCode === conditionToSave.codeCode &&
                         exclusiveRoleCodes.includes(this.diagnoses[index]?.roleCode) &&
                         this.diagnoses[index].roleCode !== this.modalDiagnosis.roleCode,
                 );
@@ -55,8 +77,14 @@
                 return;
             }
 
-            const condition = JSON.parse(JSON.stringify(this.modalCondition));
+            const condition = JSON.parse(JSON.stringify(conditionToSave));
             const diagnosis = JSON.parse(JSON.stringify(this.modalDiagnosis));
+
+            if (condition.isRegistered && condition.codeSystem === 'eHealth/ICD10_AM/condition_codes') {
+                this.icd10Descriptions[condition.codeCode] =
+                    $wire.dictionaries['eHealth/ICD10_AM/condition_codes'][condition.codeCode] ||
+                    this.registeredCondition?.description;
+            }
 
             if (this.newCondition) {
                 this.conditions.push(condition);
@@ -82,6 +110,27 @@
         newCondition: false,
         openConditionDrawer: false,
         openConditionSearchDrawer: false,
+        registeredCondition: null,
+
+        registeredConditionLabel(record) {
+            const name =
+                $wire.dictionaries['eHealth/ICD10_AM/condition_codes'][record.codeCode] ||
+                $wire.dictionaries['eHealth/ICPC2/condition_codes'][record.codeCode] ||
+                record.description ||
+                '';
+
+            return `${record.codeCode} ${name}`;
+        },
+
+        isRegisteredConditionSelected(recordId) {
+            return this.registeredCondition?.id === recordId;
+        },
+
+        selectRegisteredCondition(record) {
+            this.registeredCondition = JSON.parse(JSON.stringify(record));
+            this.openConditionSearchDrawer = false;
+        },
+
         item: 0,
         conditionCodesDictionary: $wire.dictionaries['eHealth/ICPC2/condition_codes'],
         diagnosisRolesDictionary: $wire.dictionaries['eHealth/diagnosis_roles'],
@@ -97,34 +146,11 @@
         },
 
         openEvidenceDrawer: false,
-        evidenceSelectedType: '',
-        evidenceSelectedEpisodeId: '',
-        evidenceIsLoading: false,
-        evidenceSearchResults: [],
 
-        fetchEvidenceRecords() {
-            if (! this.evidenceSelectedType) {
-                this.evidenceSearchResults = [];
-                return;
-            }
-            this.evidenceIsLoading = true;
-            $wire
-                .searchConditionsOrObservations(this.evidenceSelectedType)
-                .then(() => {
-                    this.evidenceSearchResults = JSON.parse(JSON.stringify($wire.evidenceDetails || []));
-                })
-                .finally(() => {
-                    this.evidenceIsLoading = false;
-                });
+        isEvidenceAdded(recordId) {
+            return (this.modalCondition?.evidenceDetails ?? []).some((detail) => detail.id === recordId);
         },
-        filteredEvidenceRecords() {
-            return this.evidenceSearchResults.filter((rec) => {
-                if (this.evidenceSelectedEpisodeId && rec.episodeId) {
-                    return rec.episodeId === this.evidenceSelectedEpisodeId;
-                }
-                return true;
-            });
-        },
+
         addEvidence(record) {
             if (this.modalCondition) {
                 if (! this.modalCondition.evidenceDetails) {
@@ -138,7 +164,8 @@
                             id: record.id,
                             ehealthInsertedAt: record.ehealthInsertedAt,
                             codeCode: record.codeCode,
-                            type: this.evidenceSelectedType,
+                            type: record.type,
+                            description: record.description,
                         },
                     ];
                 }
@@ -215,16 +242,6 @@
         },
 
         init() {
-            this.$watch('evidenceSelectedType', () => this.fetchEvidenceRecords());
-            this.$watch('openEvidenceDrawer', (val) => {
-                if (val) {
-                    this.evidenceSelectedType = '';
-                    this.evidenceSelectedEpisodeId = '';
-                    this.evidenceSearchResults = [];
-                    this.fetchEvidenceRecords();
-                }
-            });
-
             const icd10Codes = this.conditions
                 .filter(
                     (condition) => condition.codeSystem === 'eHealth/ICD10_AM/condition_codes' && condition.codeCode,
@@ -316,6 +333,10 @@
                                         item = index;
                                         modalCondition = new Condition(condition);
                                         modalDiagnosis = new Diagnosis(diagnoses[index]);
+                                        conditionMode = condition.isRegistered ? 'select' : 'create';
+                                        registeredCondition = condition.isRegistered
+                                            ? { ...condition, id: condition.uuid }
+                                            : null;
                                         newCondition = false;
                                         showPrimaryChangeWarning = false;
                                         openConditionDrawer = true;
@@ -371,6 +392,10 @@
                                                 item = index;
                                                 modalCondition = new Condition(condition);
                                                 modalDiagnosis = new Diagnosis(diagnoses[index]);
+                                                conditionMode = condition.isRegistered ? 'select' : 'create';
+                                                registeredCondition = condition.isRegistered
+                                                    ? { ...condition, id: condition.uuid }
+                                                    : null;
                                                 newCondition = false;
                                                 showPrimaryChangeWarning = false;
                                                 openConditionDrawer = true;
@@ -442,6 +467,8 @@
                     newCondition = true; {{-- We are adding a new condition --}}
                     modalCondition = new Condition(null, encounter); {{-- Replace the data of the previous condition with a new one--}}
                     modalDiagnosis = new Diagnosis();
+                    conditionMode = 'create';
+                    registeredCondition = null;
                     showPrimaryChangeWarning = false;
                     openConditionDrawer = true;
                 "
@@ -495,620 +522,632 @@
                     <div x-show="conditionMode === 'create'" class="space-y-6">
                         <div class="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2">
                             <div>
-                            <label
-                                for="codingSystem"
-                                class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                            >
-                                {{ __('conditions.coding_system') }}<span class="text-red-600"> *</span>
-                            </label>
-                            <div class="relative">
-                                <select
-                                    x-model="modalCondition.codeSystem"
-                                    @change="modalCondition.codeCode = ''"
-                                    id="codingSystem"
-                                    class="input-select w-full appearance-none bg-none"
-                                    required
+                                <label
+                                    for="codingSystem"
+                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                                 >
-                                    <option value="">
-                                        {{ __('forms.select') }} {{ __('conditions.coding_system') }}*
-                                    </option>
-                                    <option
-                                        value="eHealth/ICPC2/condition_codes"
-                                        x-show="
-                                            encounter.classCode === 'PHC' &&
-                                            ($wire.allowedConditionCodesBySystem['eHealth/ICPC2/condition_codes']
-                                                ?.length ?? 1) > 0
-                                        "
+                                    {{ __('conditions.coding_system') }}<span class="text-red-600"> *</span>
+                                </label>
+                                <div class="relative">
+                                    <select
+                                        x-model="modalCondition.codeSystem"
+                                        @change="modalCondition.codeCode = ''"
+                                        id="codingSystem"
+                                        class="input-select w-full appearance-none bg-none"
+                                        required
                                     >
-                                        ICPC-2
-                                    </option>
-                                    <option
-                                        value="eHealth/ICD10_AM/condition_codes"
-                                        x-show="
-                                            ($wire.allowedConditionCodesBySystem['eHealth/ICD10_AM/condition_codes']
-                                                ?.length ?? 1) > 0
-                                        "
-                                    >
-                                        ICD-10 AM
-                                    </option>
-                                </select>
-                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
-                            </div>
+                                        <option value="">
+                                            {{ __('forms.select') }} {{ __('conditions.coding_system') }}*
+                                        </option>
+                                        <option
+                                            value="eHealth/ICPC2/condition_codes"
+                                            x-show="
+                                                encounter.classCode === 'PHC' &&
+                                                ($wire.allowedConditionCodesBySystem['eHealth/ICPC2/condition_codes']
+                                                    ?.length ?? 1) > 0
+                                            "
+                                        >
+                                            {{ __('conditions.icpc-2') }}
+                                        </option>
+                                        <option
+                                            value="eHealth/ICD10_AM/condition_codes"
+                                            x-show="
+                                                ($wire.allowedConditionCodesBySystem['eHealth/ICD10_AM/condition_codes']
+                                                    ?.length ?? 1) > 0
+                                            "
+                                        >
+                                            {{ __('conditions.icd-10') }}
+                                        </option>
+                                    </select>
+                                    @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                                </div>
 
-                            {{-- ICPC-2 exists only in primary health care, so outside it the switch always
+                                {{-- ICPC-2 exists only in primary health care, so outside it the switch always
                                 offers ICD-10 and hides once it is already the chosen system --}}
-                            <button
-                                type="button"
-                                x-show="
-                                    encounter.classCode === 'PHC' ||
-                                    modalCondition.codeSystem !== 'eHealth/ICD10_AM/condition_codes'
-                                "
-                                @click="
-                                    modalCondition.codeSystem =
-                                        encounter.classCode === 'PHC' &&
-                                        modalCondition.codeSystem !== 'eHealth/ICPC2/condition_codes'
-                                            ? 'eHealth/ICPC2/condition_codes'
-                                            : 'eHealth/ICD10_AM/condition_codes';
-                                    modalCondition.codeCode = '';
-                                "
-                                class="mt-2.5 block text-left text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                            >
-                                <span
-                                    x-text="
+                                <button
+                                    type="button"
+                                    x-show="
+                                        encounter.classCode === 'PHC' ||
+                                        modalCondition.codeSystem !== 'eHealth/ICD10_AM/condition_codes'
+                                    "
+                                    @click="
+                                        modalCondition.codeSystem =
+                                            encounter.classCode === 'PHC' &&
+                                            modalCondition.codeSystem !== 'eHealth/ICPC2/condition_codes'
+                                                ? 'eHealth/ICPC2/condition_codes'
+                                                : 'eHealth/ICD10_AM/condition_codes';
+                                        modalCondition.codeCode = '';
+                                    "
+                                    class="mt-2.5 block text-left text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                >
+                                    <span
+                                        x-text="
                                         encounter.classCode === 'PHC' &&
                                         modalCondition.codeSystem !== 'eHealth/ICPC2/condition_codes'
                                             ? '{{ __('conditions.add_icpc2_code') }}'
                                             : '{{ __('conditions.add_icd10_code') }}'
                                     "
-                                ></span>
-                            </button>
-                        </div>
-
-                        <div>
-                            <div x-show="modalCondition.codeSystem === 'eHealth/ICPC2/condition_codes'">
-                                <label
-                                    for="conditionReasonCode"
-                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                                >
-                                    {{ __('medical-events.icpc2_status_code') }}<span class="text-red-600"> *</span>
-                                </label>
-                                <div class="relative">
-                                    <x-select2
-                                        modelPath="modalCondition.codeCode"
-                                        dictionaryName="eHealth/ICPC2/condition_codes"
-                                        id="conditionReasonCode"
-                                        class="input w-full"
-                                    />
-                                    @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
-                                </div>
+                                    ></span>
+                                </button>
                             </div>
 
-                            <div
-                                x-show="modalCondition.codeSystem === 'eHealth/ICD10_AM/condition_codes'"
-                                x-data="{
-                                    selected: null,
-                                    results: $wire.entangle('results'),
-                                    showResults: false,
-                                }"
-                                class="relative"
-                            >
-                                <label
-                                    for="icd10Code"
-                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                                >
-                                    {{ __('conditions.icd-10') }}<span class="text-red-600"> *</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    @input.debounce.300ms="
-                                        let value = $event.target.value;
-                                        modalCondition.codeCode = value;
-                                        let isEnglish = /^[a-zA-Z0-9.]+$/.test(value);
-
-                                        if ((isEnglish && value.length >= 1) || (! isEnglish && value.length >= 3)) {
-                                            $wire.searchICD10(value);
-                                            showResults = true;
-                                        } else {
-                                            showResults = false;
-                                        }
-                                    "
-                                    @focus="if ((modalCondition.codeCode?.length ?? 0) >= 1) showResults = true;"
-                                    @click.away="showResults = false"
-                                    :value="modalCondition.codeCode && icd10Descriptions[modalCondition.codeCode]
-                                        ? modalCondition.codeCode + ' - ' + icd10Descriptions[modalCondition.codeCode]
-                                        : modalCondition.codeCode"
-                                    id="icd10Code"
-                                    class="input w-full"
-                                    placeholder="{{ __('forms.select') }}"
-                                    autocomplete="off"
-                                />
+                            <div>
+                                <div x-show="modalCondition.codeSystem === 'eHealth/ICPC2/condition_codes'">
+                                    <label
+                                        for="conditionReasonCode"
+                                        class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                                    >
+                                        {{ __('medical-events.icpc2_status_code') }}<span class="text-red-600"> *</span>
+                                    </label>
+                                    <div class="relative">
+                                        <x-select2
+                                            modelPath="modalCondition.codeCode"
+                                            dictionaryName="eHealth/ICPC2/condition_codes"
+                                            id="conditionReasonCode"
+                                            class="input w-full"
+                                        />
+                                        @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                                    </div>
+                                </div>
 
                                 <div
-                                    x-show="showResults && results.length > 0"
-                                    class="absolute top-full left-0 z-10 max-h-80 w-full overflow-auto overscroll-contain rounded-lg border border-gray-200 bg-white p-1.5 shadow-lg dark:bg-gray-800"
+                                    x-show="modalCondition.codeSystem === 'eHealth/ICD10_AM/condition_codes'"
+                                    x-data="{
+                                        selected: null,
+                                        results: $wire.entangle('results'),
+                                        showResults: false,
+                                    }"
+                                    class="relative"
                                 >
-                                    <ul>
-                                        <template x-for="(result, index) in results" :key="index">
-                                            <li
-                                                class="group flex w-full cursor-pointer items-center rounded-md px-2 py-1.5 transition-colors dark:bg-gray-800 dark:text-white"
-                                                @click="
-                                                    selected = result;
-                                                    modalCondition.codeCode = result.code;
-                                                    icd10Descriptions[result.code] = result.description;
-                                                    showResults = false;
-                                                "
-                                            >
-                                                <span x-text="result.code + ' - ' + result.description"></span>
-                                            </li>
-                                        </template>
-                                    </ul>
-                                </div>
-
-                                <p x-show="showResults && results.length == 0" class="px-2 py-1.5 text-gray-600">
-                                    {{ __('forms.nothing_found') }}
-                                </p>
-
-                                <x-forms.loading />
-                            </div>
-
-                            <div x-show="! modalCondition.codeSystem">
-                                <label
-                                    for="conditionCodePlaceholder"
-                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                                >
-                                    {{ __('conditions.code') }}<span class="text-red-600"> *</span>
-                                </label>
-                                <div class="relative">
+                                    <label
+                                        for="icd10Code"
+                                        class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                                    >
+                                        {{ __('conditions.icd-10') }}<span class="text-red-600"> *</span>
+                                    </label>
                                     <input
                                         type="text"
-                                        id="conditionCodePlaceholder"
-                                        disabled
-                                        class="input w-full cursor-not-allowed opacity-50"
-                                        placeholder="{{ __('conditions.choose_coding_system') }}"
+                                        @input.debounce.300ms="
+                                            let value = $event.target.value;
+                                            modalCondition.codeCode = value;
+                                            let isEnglish = /^[a-zA-Z0-9.]+$/.test(value);
+
+                                            if ((isEnglish && value.length >= 1) || (! isEnglish && value.length >= 3)) {
+                                                $wire.searchICD10(value);
+                                                showResults = true;
+                                            } else {
+                                                showResults = false;
+                                            }
+                                        "
+                                        @focus="if ((modalCondition.codeCode?.length ?? 0) >= 1) showResults = true;"
+                                        @click.away="showResults = false"
+                                        :value="modalCondition.codeCode && icd10Descriptions[modalCondition.codeCode]
+                                            ? modalCondition.codeCode +
+                                              ' - ' +
+                                              icd10Descriptions[modalCondition.codeCode]
+                                            : modalCondition.codeCode"
+                                        id="icd10Code"
+                                        class="input w-full"
+                                        placeholder="{{ __('forms.select') }}"
+                                        autocomplete="off"
                                     />
+
+                                    <div
+                                        x-show="showResults && results.length > 0"
+                                        class="absolute top-full left-0 z-10 max-h-80 w-full overflow-auto overscroll-contain rounded-lg border border-gray-200 bg-white p-1.5 shadow-lg dark:bg-gray-800"
+                                    >
+                                        <ul>
+                                            <template x-for="(result, index) in results" :key="index">
+                                                <li
+                                                    class="group flex w-full cursor-pointer items-center rounded-md px-2 py-1.5 transition-colors dark:bg-gray-800 dark:text-white"
+                                                    @click="
+                                                        selected = result;
+                                                        modalCondition.codeCode = result.code;
+                                                        icd10Descriptions[result.code] = result.description;
+                                                        showResults = false;
+                                                    "
+                                                >
+                                                    <span x-text="result.code + ' - ' + result.description"></span>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </div>
+
+                                    <p x-show="showResults && results.length == 0" class="px-2 py-1.5 text-gray-600">
+                                        {{ __('forms.nothing_found') }}
+                                    </p>
+
+                                    <x-forms.loading />
+                                </div>
+
+                                <div x-show="! modalCondition.codeSystem">
+                                    <label
+                                        for="conditionCodePlaceholder"
+                                        class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                                    >
+                                        {{ __('conditions.code') }}<span class="text-red-600"> *</span>
+                                    </label>
+                                    <div class="relative">
+                                        <input
+                                            type="text"
+                                            id="conditionCodePlaceholder"
+                                            disabled
+                                            class="input w-full cursor-not-allowed opacity-50"
+                                            placeholder="{{ __('conditions.choose_coding_system') }}"
+                                        />
+                                        @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label
+                                    for="diagnoseCode"
+                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                                >
+                                    {{ __('conditions.role') }}<span class="text-red-600"> *</span>
+                                </label>
+                                <div class="relative">
+                                    <select
+                                        x-model="modalDiagnosis.roleCode"
+                                        id="diagnoseCode"
+                                        class="input-select w-full appearance-none bg-none"
+                                        type="text"
+                                        required
+                                    >
+                                        <option value="" selected>{{ __('forms.select') }}</option>
+                                        @foreach ($this->dictionaries['eHealth/diagnosis_roles'] as $key => $diagnosisRole)
+                                            <option value="{{ $key }}">{{ $diagnosisRole }}</option>
+                                        @endforeach
+                                    </select>
                                     @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
                                 </div>
                             </div>
-                        </div>
 
-                        <div>
-                            <label
-                                for="diagnoseCode"
-                                class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                            >
-                                {{ __('conditions.role') }}<span class="text-red-600"> *</span>
-                            </label>
-                            <div class="relative">
-                                <select
-                                    x-model="modalDiagnosis.roleCode"
-                                    id="diagnoseCode"
-                                    class="input-select w-full appearance-none bg-none"
-                                    type="text"
-                                    required
+                            <div>
+                                <label
+                                    for="verificationStatus"
+                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                                 >
-                                    <option value="" selected>{{ __('forms.select') }}</option>
-                                    @foreach ($this->dictionaries['eHealth/diagnosis_roles'] as $key => $diagnosisRole)
-                                        <option value="{{ $key }}">{{ $diagnosisRole }}</option>
-                                    @endforeach
-                                </select>
-                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
-                            </div>
-                        </div>
-
-                        <div>
-                            <label
-                                for="verificationStatus"
-                                class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                            >
-                                {{ __('conditions.verification_status') }}<span class="text-red-600"> *</span>
-                            </label>
-                            <div class="relative">
-                                <select
-                                    x-model="modalCondition.verificationStatus"
-                                    id="verificationStatus"
-                                    class="input-select w-full appearance-none bg-none"
-                                    type="text"
-                                    required
-                                >
-                                    <option value="" selected>{{ __('forms.select') }}</option>
-                                    @foreach ($this->dictionaries['eHealth/condition_verification_statuses'] as $key => $verificationStatus)
-                                        @if ($key === ConditionVerificationStatus::ENTERED_IN_ERROR->value)
-                                            {{-- A condition added to the encounter as a diagnosis has to stay
+                                    {{ __('conditions.verification_status') }}<span class="text-red-600"> *</span>
+                                </label>
+                                <div class="relative">
+                                    <select
+                                        x-model="modalCondition.verificationStatus"
+                                        id="verificationStatus"
+                                        class="input-select w-full appearance-none bg-none"
+                                        type="text"
+                                        required
+                                    >
+                                        <option value="" selected>{{ __('forms.select') }}</option>
+                                        @foreach ($this->dictionaries['eHealth/condition_verification_statuses'] as $key => $verificationStatus)
+                                            @if ($key === ConditionVerificationStatus::ENTERED_IN_ERROR->value)
+                                                {{-- A condition added to the encounter as a diagnosis has to stay
                                                  active, so the status stays out of reach unless the condition
                                                  already carries it. The option itself is always in the DOM, since
                                                  x-model reads it before any x-if of its own would run and would
                                                  otherwise fall back to an empty select --}}
-                                            <option
-                                                value="{{ $key }}"
-                                                :disabled="modalCondition.verificationStatus !== '{{ $key }}'"
-                                            >
-                                                {{ $verificationStatus }}
-                                            </option>
+                                                <option
+                                                    value="{{ $key }}"
+                                                    :disabled="modalCondition.verificationStatus !== '{{ $key }}'"
+                                                >
+                                                    {{ $verificationStatus }}
+                                                </option>
 
-                                            @continue
-                                        @endif
+                                                @continue
+                                            @endif
 
-                                        <option value="{{ $key }}">{{ $verificationStatus }}</option>
-                                    @endforeach
-                                </select>
-                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                                            <option value="{{ $key }}">{{ $verificationStatus }}</option>
+                                        @endforeach
+                                    </select>
+                                    @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                                </div>
                             </div>
-                        </div>
 
-                        <div>
-                            <label
-                                for="clinicalStatus"
-                                class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                            >
-                                {{ __('conditions.clinical_status') }}<span class="text-red-600"> *</span>
-                            </label>
-                            <div class="relative">
-                                <select
-                                    x-model="modalCondition.clinicalStatus"
-                                    id="clinicalStatus"
-                                    class="input-select w-full appearance-none bg-none"
-                                    type="text"
-                                    required
+                            <div>
+                                <label
+                                    for="clinicalStatus"
+                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                                 >
-                                    <option value="" selected>{{ __('forms.select') }}</option>
-                                    @foreach ($this->dictionaries['eHealth/condition_clinical_statuses'] as $key => $clinicalStatus)
-                                        <option value="{{ $key }}">{{ $clinicalStatus }}</option>
-                                    @endforeach
-                                </select>
-                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
-                            </div>
-                        </div>
-
-                        <div></div>
-
-                        <div>
-                            <label
-                                for="onsetDate"
-                                class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                            >
-                                {{ __('conditions.onset_date') }}<span class="text-red-600"> *</span>
-                            </label>
-                            <div class="relative">
-                                <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center pl-1">
-                                    @icon('calendar-week', 'w-4 h-4 text-gray-400')
+                                    {{ __('conditions.clinical_status') }}<span class="text-red-600"> *</span>
+                                </label>
+                                <div class="relative">
+                                    <select
+                                        x-model="modalCondition.clinicalStatus"
+                                        id="clinicalStatus"
+                                        class="input-select w-full appearance-none bg-none"
+                                        type="text"
+                                        required
+                                    >
+                                        <option value="" selected>{{ __('forms.select') }}</option>
+                                        @foreach ($this->dictionaries['eHealth/condition_clinical_statuses'] as $key => $clinicalStatus)
+                                            <option value="{{ $key }}">{{ $clinicalStatus }}</option>
+                                        @endforeach
+                                    </select>
+                                    @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
                                 </div>
-                                <input
-                                    x-model="modalCondition.onsetDate"
-                                    :datepicker-max-date="encounter.periodDate"
-                                    type="text"
-                                    name="onsetDate"
-                                    id="onsetDate"
-                                    class="datepicker-input input w-full pl-7"
-                                    autocomplete="off"
-                                    required
-                                />
                             </div>
-                        </div>
 
-                        <div>
-                            <label for="onsetTime" class="mb-1 block text-xs">
-                                &nbsp;<span class="sr-only">{{ __('forms.time') }}</span>
-                            </label>
-                            <div class="relative">
-                                <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center pl-1">
-                                    @icon('mingcute-time-fill', 'w-4 h-4 text-gray-400')
+                            <div></div>
+
+                            <div>
+                                <label
+                                    for="onsetDate"
+                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                                >
+                                    {{ __('conditions.onset_date') }}<span class="text-red-600"> *</span>
+                                </label>
+                                <div class="relative">
+                                    <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center pl-1">
+                                        @icon('calendar-week', 'w-4 h-4 text-gray-400')
+                                    </div>
+                                    <input
+                                        x-model="modalCondition.onsetDate"
+                                        :datepicker-max-date="encounter.periodDate"
+                                        type="text"
+                                        name="onsetDate"
+                                        id="onsetDate"
+                                        class="datepicker-input input w-full pl-7"
+                                        autocomplete="off"
+                                        required
+                                    />
                                 </div>
-                                <input
-                                    x-model="modalCondition.onsetTime"
-                                    type="text"
-                                    name="onsetTime"
-                                    id="onsetTime"
-                                    class="timepicker-uk input w-full cursor-pointer pl-7"
-                                    autocomplete="off"
-                                    required
-                                />
                             </div>
-                            <p class="text-error mt-1 text-xs" x-show="conditionOnsetAfterEncounterEnd()" x-cloak>
-                                {{ __('conditions.onset_after_encounter_end') }}
-                            </p>
-                        </div>
 
-                        <div>
-                            <label
-                                for="assertedDate"
-                                class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                            >
-                                {{ __('conditions.entry_date') }}<span class="text-red-600"> *</span>
-                            </label>
-                            <div class="relative">
-                                <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center pl-1">
-                                    @icon('calendar-week', 'w-4 h-4 text-gray-400')
+                            <div>
+                                <label for="onsetTime" class="mb-1 block text-xs">
+                                    &nbsp;<span class="sr-only">{{ __('forms.time') }}</span>
+                                </label>
+                                <div class="relative">
+                                    <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center pl-1">
+                                        @icon('mingcute-time-fill', 'w-4 h-4 text-gray-400')
+                                    </div>
+                                    <input
+                                        x-model="modalCondition.onsetTime"
+                                        type="text"
+                                        name="onsetTime"
+                                        id="onsetTime"
+                                        class="timepicker-uk input w-full cursor-pointer pl-7"
+                                        autocomplete="off"
+                                        required
+                                    />
                                 </div>
-                                <input
-                                    x-model="modalCondition.assertedDate"
-                                    :datepicker-min-date="encounter.periodDate"
-                                    :datepicker-max-date="encounter.periodDate"
-                                    type="text"
-                                    name="assertedDate"
-                                    id="assertedDate"
-                                    class="datepicker-input input w-full pl-7"
-                                    autocomplete="off"
-                                    required
-                                />
+                                <p class="text-error mt-1 text-xs" x-show="conditionOnsetAfterEncounterEnd()" x-cloak>
+                                    {{ __('conditions.onset_after_encounter_end') }}
+                                </p>
                             </div>
-                        </div>
 
-                        <div>
-                            <label for="assertedTime" class="mb-1 block text-xs">
-                                &nbsp;<span class="sr-only">{{ __('forms.time') }}</span>
-                            </label>
-                            <div class="relative">
-                                <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center pl-1">
-                                    @icon('mingcute-time-fill', 'w-4 h-4 text-gray-400')
+                            <div>
+                                <label
+                                    for="assertedDate"
+                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                                >
+                                    {{ __('conditions.entry_date') }}<span class="text-red-600"> *</span>
+                                </label>
+                                <div class="relative">
+                                    <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center pl-1">
+                                        @icon('calendar-week', 'w-4 h-4 text-gray-400')
+                                    </div>
+                                    <input
+                                        x-model="modalCondition.assertedDate"
+                                        :datepicker-min-date="encounter.periodDate"
+                                        :datepicker-max-date="encounter.periodDate"
+                                        type="text"
+                                        name="assertedDate"
+                                        id="assertedDate"
+                                        class="datepicker-input input w-full pl-7"
+                                        autocomplete="off"
+                                        required
+                                    />
                                 </div>
-                                <input
-                                    x-model="modalCondition.assertedTime"
-                                    type="text"
-                                    name="assertedTime"
-                                    id="assertedTime"
-                                    class="timepicker-uk input w-full cursor-pointer pl-7"
-                                    autocomplete="off"
-                                    required
-                                />
                             </div>
-                            <p
-                                class="text-error mt-1 text-xs"
-                                x-show="conditionAssertedOutsideEncounterPeriod()"
-                                x-cloak
-                            >
-                                {{ __('conditions.asserted_outside_encounter_period') }}
-                            </p>
-                        </div>
 
-                        <div class="col-span-1 space-y-4 md:col-span-2">
-                            <template x-for="(bodySite, bsIndex) in modalCondition.bodySites" :key="bsIndex">
-                                <div class="grid grid-cols-1 items-end gap-x-8 gap-y-4 md:grid-cols-2">
-                                    <div>
-                                        <label
-                                            :for="`conditionBodySite${bsIndex}`"
-                                            class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                                            :class="{ 'sr-only': bsIndex > 0 }"
-                                        >
-                                            {{ __('conditions.body_sites') }}
-                                        </label>
-                                        <div class="relative">
-                                            <select
-                                                x-model="bodySite.code"
-                                                :id="`conditionBodySite${bsIndex}`"
-                                                class="input-select w-full appearance-none bg-none"
+                            <div>
+                                <label for="assertedTime" class="mb-1 block text-xs">
+                                    &nbsp;<span class="sr-only">{{ __('forms.time') }}</span>
+                                </label>
+                                <div class="relative">
+                                    <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center pl-1">
+                                        @icon('mingcute-time-fill', 'w-4 h-4 text-gray-400')
+                                    </div>
+                                    <input
+                                        x-model="modalCondition.assertedTime"
+                                        type="text"
+                                        name="assertedTime"
+                                        id="assertedTime"
+                                        class="timepicker-uk input w-full cursor-pointer pl-7"
+                                        autocomplete="off"
+                                        required
+                                    />
+                                </div>
+                                <p
+                                    class="text-error mt-1 text-xs"
+                                    x-show="conditionAssertedOutsideEncounterPeriod()"
+                                    x-cloak
+                                >
+                                    {{ __('conditions.asserted_outside_encounter_period') }}
+                                </p>
+                            </div>
+
+                            <div class="col-span-1 space-y-4 md:col-span-2">
+                                <template x-for="(bodySite, bsIndex) in modalCondition.bodySites" :key="bsIndex">
+                                    <div class="grid grid-cols-1 items-end gap-x-8 gap-y-4 md:grid-cols-2">
+                                        <div>
+                                            <label
+                                                :for="`conditionBodySite${bsIndex}`"
+                                                class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                                                :class="{ 'sr-only': bsIndex > 0 }"
                                             >
-                                                <option value="" selected>{{ __('forms.select') }}</option>
-                                                @foreach ($this->dictionaries['eHealth/body_sites'] as $key => $bodySiteName)
-                                                    <option value="{{ $key }}">{{ $bodySiteName }}</option>
-                                                @endforeach
-                                            </select>
-                                            @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                                                {{ __('conditions.body_sites') }}
+                                            </label>
+                                            <div class="relative">
+                                                <select
+                                                    x-model="bodySite.code"
+                                                    :id="`conditionBodySite${bsIndex}`"
+                                                    class="input-select w-full appearance-none bg-none"
+                                                >
+                                                    <option value="" selected>{{ __('forms.select') }}</option>
+                                                    @foreach ($this->dictionaries['eHealth/body_sites'] as $key => $bodySiteName)
+                                                        <option value="{{ $key }}">{{ $bodySiteName }}</option>
+                                                    @endforeach
+                                                </select>
+                                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                                            </div>
+                                        </div>
+                                        <div class="flex h-10 items-center">
+                                            <button
+                                                type="button"
+                                                @click="modalCondition.bodySites.splice(bsIndex, 1)"
+                                                class="flex shrink-0 cursor-pointer items-center justify-center text-gray-500 transition-colors hover:text-red-600 dark:text-gray-400 dark:hover:text-red-500"
+                                            >
+                                                <svg
+                                                    class="h-5 w-5"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    stroke-width="2"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <path
+                                                        stroke-linecap="round"
+                                                        stroke-linejoin="round"
+                                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                    />
+                                                </svg>
+                                            </button>
                                         </div>
                                     </div>
-                                    <div class="flex h-10 items-center">
-                                        <button
-                                            type="button"
-                                            @click="modalCondition.bodySites.splice(bsIndex, 1)"
-                                            class="flex shrink-0 cursor-pointer items-center justify-center text-gray-500 transition-colors hover:text-red-600 dark:text-gray-400 dark:hover:text-red-500"
-                                        >
-                                            <svg
-                                                class="h-5 w-5"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <path
-                                                    stroke-linecap="round"
-                                                    stroke-linejoin="round"
-                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                                />
-                                            </svg>
-                                        </button>
-                                    </div>
+                                </template>
+                                <button
+                                    type="button"
+                                    @click="
+                                        if (! modalCondition.bodySites) modalCondition.bodySites = [];
+                                        modalCondition.bodySites.push({ code: '' });
+                                    "
+                                    class="mt-3 flex items-center gap-1.5 text-xs font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                >
+                                    <span>{{ __('conditions.add_body_part') }}</span>
+                                </button>
+                            </div>
+
+                            <div>
+                                <label
+                                    for="severityCondition"
+                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                                >
+                                    {{ __('conditions.severity_of_the_condition') }}
+                                </label>
+                                <div class="relative">
+                                    <select
+                                        x-model="modalCondition.severityCode"
+                                        id="severityCondition"
+                                        class="input-select w-full appearance-none bg-none"
+                                        type="text"
+                                        required
+                                    >
+                                        <option value="" selected>{{ __('forms.select') }}</option>
+                                        @foreach ($this->dictionaries['eHealth/condition_severities'] as $key => $conditionSeverity)
+                                            <option value="{{ $key }}">{{ $conditionSeverity }}</option>
+                                        @endforeach
+                                    </select>
+                                    @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
                                 </div>
-                            </template>
-                            <button
-                                type="button"
-                                @click="
-                                    if (! modalCondition.bodySites) modalCondition.bodySites = [];
-                                    modalCondition.bodySites.push({ code: '' });
-                                "
-                                class="mt-3 flex items-center gap-1.5 text-xs font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                            >
-                                <span>{{ __('conditions.add_body_part') }}</span>
-                            </button>
-                        </div>
+                            </div>
 
-                        <div>
-                            <label
-                                for="severityCondition"
-                                class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                            >
-                                {{ __('conditions.severity_of_the_condition') }}
-                            </label>
-                            <div class="relative">
-                                <select
-                                    x-model="modalCondition.severityCode"
-                                    id="severityCondition"
-                                    class="input-select w-full appearance-none bg-none"
-                                    type="text"
-                                    required
+                            <div>
+                                <label
+                                    for="rank"
+                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                                 >
-                                    <option value="" selected>{{ __('forms.select') }}</option>
-                                    @foreach ($this->dictionaries['eHealth/condition_severities'] as $key => $conditionSeverity)
-                                        <option value="{{ $key }}">{{ $conditionSeverity }}</option>
-                                    @endforeach
-                                </select>
-                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                                    {{ __('conditions.rank') }}
+                                </label>
+                                <div class="relative">
+                                    <select
+                                        x-model.number="modalDiagnosis.rank"
+                                        id="rank"
+                                        class="input-select w-full appearance-none bg-none"
+                                        type="text"
+                                        required
+                                    >
+                                        <option selected>{{ __('forms.select') }}</option>
+                                        @for ($i = 1; $i <= 10; $i++)
+                                            <option value="{{ $i }}">{{ $i }}</option>
+                                        @endfor
+                                    </select>
+                                    @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                                </div>
+                            </div>
+
+                            <div>
+                                <label
+                                    for="stageCondition"
+                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                                >
+                                    {{ __('conditions.stage') }}
+                                </label>
+                                <div class="relative">
+                                    <select
+                                        x-model="modalCondition.stageCode"
+                                        id="stageCondition"
+                                        class="input-select w-full appearance-none bg-none"
+                                    >
+                                        <option value="" selected>{{ __('forms.select') }}</option>
+                                        @foreach ($this->dictionaries['eHealth/condition_stages'] as $key => $conditionStage)
+                                            <option value="{{ $key }}">{{ $conditionStage }}</option>
+                                        @endforeach
+                                    </select>
+                                    @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                                </div>
                             </div>
                         </div>
-
-                        <div>
-                            <label for="rank" class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                                {{ __('conditions.rank') }}
-                            </label>
-                            <div class="relative">
-                                <select
-                                    x-model.number="modalDiagnosis.rank"
-                                    id="rank"
-                                    class="input-select w-full appearance-none bg-none"
-                                    type="text"
-                                    required
-                                >
-                                    <option selected>{{ __('forms.select') }}</option>
-                                    @for ($i = 1; $i <= 10; $i++)
-                                        <option value="{{ $i }}">{{ $i }}</option>
-                                    @endfor
-                                </select>
-                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
-                            </div>
-                        </div>
-
-                        <div>
-                            <label
-                                for="stageCondition"
-                                class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                            >
-                                {{ __('conditions.stage') }}
-                            </label>
-                            <div class="relative">
-                                <select
-                                    x-model="modalCondition.stageCode"
-                                    id="stageCondition"
-                                    class="input-select w-full appearance-none bg-none"
-                                >
-                                    <option value="" selected>{{ __('forms.select') }}</option>
-                                    @foreach ($this->dictionaries['eHealth/condition_stages'] as $key => $conditionStage)
-                                        <option value="{{ $key }}">{{ $conditionStage }}</option>
-                                    @endforeach
-                                </select>
-                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
-                            </div>
-                        </div>
-                    </div>
                     </div>
                 </fieldset>
 
                 <div x-show="conditionMode === 'create'" class="space-y-6">
+                    <div class="mt-10 flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
+                        <div class="flex flex-wrap items-center gap-6">
+                            <span class="text-sm font-bold text-gray-900 dark:text-white">
+                                {{ __('conditions.primary_source') }}
+                            </span>
 
-                <div class="mt-10 flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
-                    <div class="flex flex-wrap items-center gap-6">
-                        <span class="text-sm font-bold text-gray-900 dark:text-white">
-                            {{ __('conditions.primary_source') }}
-                        </span>
-
-                        <div class="flex items-center gap-2">
-                            <input
-                                x-model.boolean="modalCondition.primarySource"
-                                @change="
-                                    modalCondition.primarySource = true;
-                                    modalCondition.asserterText = '';
-                                "
-                                id="conditionSourcePerformer"
-                                type="radio"
-                                value="true"
-                                name="primarySource"
-                                class="default-radio cursor-pointer text-blue-600 focus:ring-blue-500"
-                                :checked="modalCondition.primarySource === true"
-                            />
-                            <label
-                                for="conditionSourcePerformer"
-                                class="cursor-pointer text-sm font-medium text-gray-900 dark:text-gray-300"
-                            >
-                                {{ __('medical-events.performer') }}
-                            </label>
-                        </div>
-
-                        @unless (auth()->user()->isAssistantOnly())
                             <div class="flex items-center gap-2">
                                 <input
                                     x-model.boolean="modalCondition.primarySource"
                                     @change="
-                                        modalCondition.primarySource = false;
+                                        modalCondition.primarySource = true;
                                         modalCondition.asserterText = '';
                                     "
-                                    id="otherSource"
+                                    id="conditionSourcePerformer"
                                     type="radio"
-                                    value="false"
+                                    value="true"
                                     name="primarySource"
                                     class="default-radio cursor-pointer text-blue-600 focus:ring-blue-500"
-                                    :checked="modalCondition.primarySource === false"
+                                    :checked="modalCondition.primarySource === true"
                                 />
                                 <label
-                                    for="otherSource"
+                                    for="conditionSourcePerformer"
                                     class="cursor-pointer text-sm font-medium text-gray-900 dark:text-gray-300"
                                 >
-                                    {{ __('medical-events.other_source') }}
+                                    {{ __('medical-events.performer') }}
                                 </label>
                             </div>
-                        @endunless
-                    </div>
 
-                    <div class="max-w-md flex-1">
-                        <label for="conditionAsserterText" class="sr-only">{{ __('conditions.asserter_name') }}</label>
-                        <input
-                            type="text"
-                            id="conditionAsserterText"
-                            x-model="modalCondition.asserterText"
-                            :disabled="modalCondition.primarySource === true"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 p-2 px-3 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:disabled:bg-gray-800"
-                            placeholder="{{ __('conditions.asserter_name') }}"
-                        />
-                    </div>
-                </div>
+                            @unless (auth()->user()->isAssistantOnly())
+                                <div class="flex items-center gap-2">
+                                    <input
+                                        x-model.boolean="modalCondition.primarySource"
+                                        @change="
+                                            modalCondition.primarySource = false;
+                                            modalCondition.asserterText = '';
+                                        "
+                                        id="otherSource"
+                                        type="radio"
+                                        value="false"
+                                        name="primarySource"
+                                        class="default-radio cursor-pointer text-blue-600 focus:ring-blue-500"
+                                        :checked="modalCondition.primarySource === false"
+                                    />
+                                    <label
+                                        for="otherSource"
+                                        class="cursor-pointer text-sm font-medium text-gray-900 dark:text-gray-300"
+                                    >
+                                        {{ __('medical-events.other_source') }}
+                                    </label>
+                                </div>
+                            @endunless
+                        </div>
 
-                <div x-show="modalCondition.primarySource === false" class="mt-6 space-y-6 transition-all">
-                    <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                        <div>
+                        <div class="max-w-md flex-1">
                             <label
-                                for="conditionReportOrigin"
-                                class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                            >
-                                {{ __('medical-events.information_source') }}
-                            </label>
-                            <div class="relative">
-                                <select
-                                    x-model="modalCondition.reportOriginCode"
-                                    id="conditionReportOrigin"
-                                    class="input-select w-full appearance-none bg-none"
-                                    required
-                                >
-                                    <option selected value="">{{ __('forms.select') }}</option>
-                                    @foreach ($this->dictionaries['eHealth/report_origins'] as $key => $reportOrigin)
-                                        <option value="{{ $key }}">{{ $reportOrigin }}</option>
-                                    @endforeach
-                                </select>
-                                @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
-                            </div>
+                                for="conditionAsserterText"
+                                class="sr-only"
+                            >{{ __('conditions.asserter_name') }}</label>
+                            <input
+                                type="text"
+                                id="conditionAsserterText"
+                                x-model="modalCondition.asserterText"
+                                :disabled="modalCondition.primarySource === true"
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 p-2 px-3 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:disabled:bg-gray-800"
+                                placeholder="{{ __('conditions.asserter_name') }}"
+                            />
                         </div>
                     </div>
 
-                    @include('livewire.encounter.condition-parts.evidence-codes')
-                    @include('livewire.encounter.condition-parts.evidence-details')
-                </div>
+                    <div x-show="modalCondition.primarySource === false" class="mt-6 space-y-6 transition-all">
+                        <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                            <div>
+                                <label
+                                    for="conditionReportOrigin"
+                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                                >
+                                    {{ __('medical-events.information_source') }}
+                                </label>
+                                <div class="relative">
+                                    <select
+                                        x-model="modalCondition.reportOriginCode"
+                                        id="conditionReportOrigin"
+                                        class="input-select w-full appearance-none bg-none"
+                                        required
+                                    >
+                                        <option selected value="">{{ __('forms.select') }}</option>
+                                        @foreach ($this->dictionaries['eHealth/report_origins'] as $key => $reportOrigin)
+                                            <option value="{{ $key }}">{{ $reportOrigin }}</option>
+                                        @endforeach
+                                    </select>
+                                    @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                                </div>
+                            </div>
+                        </div>
 
-                <div x-show="modalCondition.primarySource === true" class="mt-8 transition-all">
-                    <div class="form-group group">
-                        <label for="doctorComment" class="mb-3 block text-sm font-bold text-gray-900 dark:text-white">
-                            {{ __('conditions.asserter_text') }}
-                        </label>
-                        <textarea
-                            rows="4"
-                            x-model="modalCondition.asserterText"
-                            id="doctorComment"
-                            name="doctorComment"
-                            class="textarea w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                            placeholder="{{ __('forms.write_comment_here') }}"
-                        ></textarea>
+                        @include('livewire.encounter.condition-parts.evidence-codes')
+                        @include('livewire.encounter.condition-parts.evidence-details')
+                    </div>
+
+                    <div x-show="modalCondition.primarySource === true" class="mt-8 transition-all">
+                        <div class="form-group group">
+                            <label
+                                for="doctorComment"
+                                class="mb-3 block text-sm font-bold text-gray-900 dark:text-white"
+                            >
+                                {{ __('conditions.asserter_text') }}
+                            </label>
+                            <textarea
+                                rows="4"
+                                x-model="modalCondition.asserterText"
+                                id="doctorComment"
+                                name="doctorComment"
+                                class="textarea w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                placeholder="{{ __('forms.write_comment_here') }}"
+                            ></textarea>
+                        </div>
                     </div>
                 </div>
-                    </div>
 
-                    <div x-show="conditionMode === 'select'" x-cloak class="space-y-6">
-                        <fieldset @disabled($isReadonly) @class(['pointer-events-none' => $isReadonly])>
+                <div x-show="conditionMode === 'select'" x-cloak class="space-y-6">
+                    <fieldset @disabled($isReadonly) @class(['pointer-events-none' => $isReadonly])>
                         <fieldset class="rounded-lg border border-gray-200 p-6 dark:border-gray-700">
-                            <legend class="text-sm font-bold text-gray-900 dark:text-white px-2">Пошук раніше зареєстрованого стану</legend>
+                            <legend class="px-2 text-sm font-bold text-gray-900 dark:text-white">
+                                Пошук раніше зареєстрованого стану
+                            </legend>
 
                             <div class="mt-2 flex flex-col gap-4">
                                 <div class="index-table-wrapper">
@@ -1122,22 +1161,41 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr class="index-table-tr">
-                                                <td class="index-table-td-primary">08.05.2025</td>
-                                                <td class="index-table-td">A98 Підтримання здоров'я / Профілактика</td>
-                                                <td class="index-table-td">Назва епізоду</td>
-                                                <td class="index-table-td-actions">
-                                                    <button type="button" class="text-gray-500 hover:text-red-600">
-                                                        @icon('trash', 'w-5 h-5')
-                                                    </button>
-                                                </td>
-                                            </tr>
+                                            <template x-if="registeredCondition">
+                                                <tr class="index-table-tr">
+                                                    <td
+                                                        class="index-table-td-primary"
+                                                        x-text="registeredCondition.onsetDate"
+                                                    ></td>
+                                                    <td
+                                                        class="index-table-td"
+                                                        x-text="registeredConditionLabel(registeredCondition)"
+                                                    ></td>
+                                                    <td
+                                                        class="index-table-td"
+                                                        x-text="registeredCondition.episodeName"
+                                                    ></td>
+                                                    <td class="index-table-td-actions">
+                                                        <button
+                                                            type="button"
+                                                            @click="registeredCondition = null"
+                                                            class="cursor-pointer text-gray-500 hover:text-red-600"
+                                                        >
+                                                            @icon('trash', 'w-5 h-5')
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            </template>
                                         </tbody>
                                     </table>
                                 </div>
 
                                 <div>
-                                    <button @click.prevent="openConditionSearchDrawer = true" type="button" class="flex items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                                    <button
+                                        @click.prevent="openConditionSearchDrawer = true"
+                                        type="button"
+                                        class="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                    >
                                         <span>+ Знайти стан</span>
                                     </button>
                                 </div>
@@ -1146,7 +1204,10 @@
 
                         <div class="mt-6 grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2">
                             <div>
-                                <label for="diagnoseCodeSelect" class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                                <label
+                                    for="diagnoseCodeSelect"
+                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                                >
                                     {{ __('conditions.role') }}<span class="text-red-600"> *</span>
                                 </label>
                                 <div class="relative">
@@ -1166,7 +1227,10 @@
                             </div>
 
                             <div>
-                                <label for="rankSelect" class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                                <label
+                                    for="rankSelect"
+                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                                >
                                     {{ __('conditions.rank') }}
                                 </label>
                                 <div class="relative">
@@ -1185,8 +1249,8 @@
                                 </div>
                             </div>
                         </div>
-                        </fieldset>
-                    </div>
+                    </fieldset>
+                </div>
 
                 <p class="mt-6 text-sm text-gray-400 dark:text-gray-500">{{ __('forms.form_required_note') }}</p>
 
@@ -1200,26 +1264,28 @@
                             openEvidenceDrawer = false;
                             openConditionDrawer = false;
                         "
-                        class="button-primary-outline-red"
+                        class="button-minor cursor-pointer"
                     >
-                        <span>{{ $isReadonly ? __('forms.close') : __('forms.delete') }}</span>
+                        {{ __('forms.close') }}
                     </button>
 
                     @unless ($isReadonly)
                         <button
                             @click.prevent="saveCondition()"
                             class="cursor-pointer rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                            :disabled="! (
-                                modalCondition.clinicalStatus.trim() &&
-                                modalCondition.verificationStatus.trim() &&
-                                modalCondition.codeCode.trim() &&
-                                modalDiagnosis.roleCode &&
-                                modalCondition.onsetDate?.trim() &&
-                                modalCondition.onsetTime?.trim() &&
-                                modalCondition.assertedDate?.trim() &&
-                                modalCondition.assertedTime?.trim() &&
-                                conditionDatesAreValid()
-                            )"
+                            :disabled="conditionMode === 'select'
+                                ? ! (registeredCondition && modalDiagnosis.roleCode)
+                                : ! (
+                                      modalCondition.clinicalStatus.trim() &&
+                                      modalCondition.verificationStatus.trim() &&
+                                      modalCondition.codeCode.trim() &&
+                                      modalDiagnosis.roleCode &&
+                                      modalCondition.onsetDate?.trim() &&
+                                      modalCondition.onsetTime?.trim() &&
+                                      modalCondition.assertedDate?.trim() &&
+                                      modalCondition.assertedTime?.trim() &&
+                                      conditionDatesAreValid()
+                                  )"
                         >
                             <span x-text="saveConditionLabel()"></span>
                         </button>
@@ -1235,7 +1301,7 @@
                     <template x-if="showDuplicateCodeWarning">
                         <p
                             class="text-error"
-                            x-text="'{{ __('conditions.validation.diagnosis_code_in_several_roles') }}'.replace(':code', modalCondition.codeCode)"
+                            x-text="'{{ __('conditions.validation.diagnosis_code_in_several_roles') }}'.replace(':code', conditionToSave().codeCode)"
                         ></p>
                     </template>
                 </div>
@@ -1247,12 +1313,12 @@
         x-cloak
         x-show="showPrimaryChangeWarning"
         class="fixed inset-0 z-[60] overflow-y-auto px-4 py-6 sm:px-0"
-        style="display: none;"
+        style="display: none"
     >
         <div class="fixed inset-0 flex items-center justify-center">
             <div
                 x-show="showPrimaryChangeWarning"
-                class="fixed inset-0 bg-gray-500/75 dark:bg-gray-900/80 transition-opacity"
+                class="fixed inset-0 bg-gray-500/75 transition-opacity dark:bg-gray-900/80"
                 x-on:click="showPrimaryChangeWarning = false"
                 x-transition:enter="ease-out duration-300"
                 x-transition:enter-start="opacity-0"
@@ -1265,7 +1331,7 @@
             <div
                 x-show="showPrimaryChangeWarning"
                 x-on:click.stop
-                class="relative z-10 w-full sm:max-w-2xl bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-auto transform transition-all"
+                class="relative z-10 w-full transform overflow-auto rounded-lg bg-white shadow-xl transition-all sm:max-w-2xl dark:bg-gray-800"
                 x-trap.inert.noscroll="showPrimaryChangeWarning"
                 x-transition:enter="ease-out duration-300"
                 x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
@@ -1275,26 +1341,24 @@
                 x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             >
                 <div class="px-8 py-8">
-                    <p class="font-bold text-gray-900 dark:text-gray-100 mb-6 text-lg">
+                    <p class="mb-6 text-lg font-bold text-gray-900 dark:text-gray-100">
                         {!! __('conditions.new_primary_diagnose') !!}
                     </p>
 
                     <div class="mb-2">
-                        <label for="modalEpisodeName" class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                        <label
+                            for="modalEpisodeName"
+                            class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                        >
                             {{ __('encounters.episode_name') }}
                         </label>
                         <div class="form-group group">
-                            <input
-                                type="text"
-                                id="modalEpisodeName"
-                                x-model="episodeName"
-                                class="input peer w-full"
-                            />
+                            <input type="text" id="modalEpisodeName" x-model="episodeName" class="input peer w-full" />
                         </div>
                     </div>
                 </div>
 
-                <div class="px-8 pb-8 flex justify-start space-x-4">
+                <div class="flex justify-start space-x-4 px-8 pb-8">
                     <button type="button" class="button-minor" @click="showPrimaryChangeWarning = false">
                         {{ __('forms.cancel') }}
                     </button>
@@ -1316,67 +1380,15 @@
     >
         <x-slot name="title">{{ __('encounters.search_medical_records') }}</x-slot>
 
-        <div class="mt-2 mb-4 flex items-center gap-1.5 pl-1 font-bold text-gray-900 dark:text-gray-100">
-            @icon('search-outline', 'w-5 h-5 text-gray-800 dark:text-gray-200')
-            <span class="text-base">{{ __('forms.search') }}</span>
-        </div>
-
-        <div class="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div class="form-group group">
-                <input type="text" id="conditionSearchCode" class="input peer w-full" placeholder=" ">
-                <label for="conditionSearchCode" class="label">{{ __('conditions.code') }}</label>
-            </div>
-
-            <div class="form-group group">
-                <select id="conditionSearchEpisode" class="input-select peer w-full">
-                    <option value="" selected>Підтримання здоров'я/профілактика (діючий) від 8.05.2025</option>
-                </select>
-                <label for="conditionSearchEpisode" class="label">{{ __('episodes.label') }}</label>
-            </div>
-
-            <div class="form-group group">
-                <div class="datepicker-wrapper">
-                    <input
-                        type="text"
-                        name="conditionSearchDate"
-                        id="conditionSearchDate"
-                        class="daterangepicker-uk with-leading-icon input peer w-full"
-                        placeholder=" "
-                        autocomplete="off"
-                    />
-                    <label for="conditionSearchDate" class="wrapped-label">
-                        {{ __('conditions.condition_start_date') }}
-                    </label>
-                </div>
-            </div>
-        </div>
-
-        <div class="relative mt-8">
-            <div class="index-table-wrapper">
-                <table class="index-table">
-                    <thead class="index-table-thead">
-                        <tr>
-                            <th scope="col" class="index-table-th">ДАТА</th>
-                            <th scope="col" class="index-table-th">КОД ТА НАЗВА</th>
-                            <th scope="col" class="index-table-th">ЕПІЗОД</th>
-                            <th scope="col" class="index-table-th text-center">ДІЯ</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr class="index-table-tr">
-                            <td class="index-table-td-primary">08.05.2025</td>
-                            <td class="index-table-td">A98 Підтримання здоров'я / Профілактика</td>
-                            <td class="index-table-td">Назва епізоду</td>
-                            <td class="index-table-td-actions">
-                                <button type="button" class="text-gray-500 hover:text-blue-600">
-                                    @icon('plus-circle', 'w-6 h-6')
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <livewire:encounter.medical-record-search
+            :patient-uuid="$patientUuid"
+            selection-event="registered-condition-selected"
+            is-added-check="isRegisteredConditionSelected"
+            :episodes="$episodes"
+            fixed-record-type="condition"
+            :with-condition-filters="true"
+            :key="'registered-condition-search'"
+        />
 
         <div class="mt-6 flex justify-start space-x-2">
             <button type="button" @click="openConditionSearchDrawer = false" class="button-minor">
@@ -1395,106 +1407,13 @@
     >
         <x-slot name="title">{{ __('encounters.search_medical_records') }}</x-slot>
 
-        <div class="mt-2 mb-4 flex items-center gap-1.5 pl-1 font-bold text-gray-900 dark:text-gray-100">
-            @icon('search-outline', 'w-5 h-5 text-gray-800 dark:text-gray-200')
-            <span class="text-base">{{ __('forms.search') }}</span>
-        </div>
-
-        <div class="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div class="form-group group">
-                <select x-model="evidenceSelectedType" id="evidenceDrawerSelectedType" class="input-select peer w-full">
-                    <option value="" selected>{{ __('forms.select') }}</option>
-                    <option value="condition">{{ __('conditions.condition_or_diagnosis') }}</option>
-                    <option value="observation">{{ __('conditions.evidence_observations') }}</option>
-                </select>
-                <label for="evidenceDrawerSelectedType" class="label">
-                    {{ mb_ucfirst(__('medical-events.medical_records_type')) }}
-                </label>
-            </div>
-
-            <div class="form-group group">
-                <select x-model="evidenceSelectedEpisodeId" id="evidenceDrawerSelectedEpisode" class="input-select peer w-full">
-                    <option value="" selected>{{ __('forms.select') }}</option>
-                    <template x-for="ep in encounter.episodes" :key="ep.id">
-                        <option :value="ep.id" x-text="`${ep.name} від ${ep.date}`"></option>
-                    </template>
-                </select>
-                <label for="evidenceDrawerSelectedEpisode" class="label">
-                    {{ __('episodes.label') }}
-                </label>
-            </div>
-        </div>
-
-        <div class="relative">
-            <div
-                x-show="evidenceIsLoading"
-                class="absolute inset-0 z-10 flex items-center justify-center bg-white/70 dark:bg-gray-800/70"
-                x-cloak
-            >
-                <x-forms.loading />
-            </div>
-
-            <table class="table-input w-inherit">
-                <thead class="thead-input">
-                    <tr>
-                        <th scope="col" class="th-input">{{ __('forms.date') }}</th>
-                        <th scope="col" class="th-input">{{ __('forms.type') }}</th>
-                        <th scope="col" class="th-input">{{ __('medical-events.code_and_name') }}</th>
-                        <th scope="col" class="th-input text-center">{{ __('forms.action') }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template x-for="record in filteredEvidenceRecords()" :key="record.id">
-                        <tr class="border-b border-gray-200 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800/40">
-                            <td
-                                class="td-input text-[14px] text-gray-900 dark:text-gray-300"
-                                x-text="record.ehealthInsertedAt || ''"
-                            ></td>
-                            <td
-                                class="td-input text-[14px] text-gray-900 dark:text-gray-300"
-                                x-text="evidenceSelectedType === 'condition' ? '{{ __('conditions.condition_or_diagnosis') }}' : '{{ __('conditions.evidence_observations') }}'"
-                            ></td>
-                            <td
-                                class="td-input text-[14px] text-gray-900 dark:text-white"
-                                x-text="
-                                    `${record.codeCode} - ${
-                                        $wire.dictionaries['eHealth/LOINC/observation_codes'][record.codeCode] ||
-                                        $wire.dictionaries['eHealth/ICF/classifiers'][record.codeCode] ||
-                                        $wire.dictionaries['eHealth/ICD10_AM/condition_codes'][record.codeCode] ||
-                                        $wire.dictionaries['eHealth/ICPC2/condition_codes'][record.codeCode]
-                                    }`
-                                "
-                            ></td>
-                            <td class="td-input text-center">
-                                <template x-if="! modalCondition.evidenceDetails.some((d) => d.id === record.id)">
-                                    <button
-                                        type="button"
-                                        @click="addEvidence(record)"
-                                        class="inline-flex cursor-pointer items-center justify-center text-sm font-medium text-gray-900 transition-colors hover:text-blue-600 dark:text-white dark:hover:text-blue-400"
-                                    >
-                                        @icon('plus', 'w-5 h-5')
-                                    </button>
-                                </template>
-                                <template x-if="modalCondition.evidenceDetails.some((d) => d.id === record.id)">
-                                    <span class="inline-flex items-center text-sm font-medium text-green-600 dark:text-green-400">
-                                        @icon('check-circle', 'w-5 h-5')
-                                        {{ __('medical-events.added') }}
-                                    </span>
-                                </template>
-                            </td>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
-
-            <div
-                x-show="! evidenceIsLoading && filteredEvidenceRecords().length === 0"
-                class="py-8 text-center text-gray-500 dark:text-gray-400"
-                x-cloak
-            >
-                {{ __('forms.nothing_found') }}
-            </div>
-        </div>
+        <livewire:encounter.medical-record-search
+            :patient-uuid="$patientUuid"
+            selection-event="condition-evidence-selected"
+            is-added-check="isEvidenceAdded"
+            :episodes="$episodes"
+            :key="'condition-evidence-search'"
+        />
 
         <div class="mt-6 flex justify-between space-x-2">
             <button type="button" @click="openEvidenceDrawer = false" class="button-minor">
@@ -1511,8 +1430,9 @@
     class Condition {
         constructor(obj = null, encounter = null) {
             const now = new Date();
-            const [yyyy, mm, dd] = now.toISOString().split('T')[0].split('-');
-            const formattedDate = `${dd}.${mm}.${yyyy}`;
+            const dd = String(now.getDate()).padStart(2, '0');
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const formattedDate = `${dd}.${mm}.${now.getFullYear()}`;
             const formattedTime = now.toLocaleTimeString('uk-UA', {
                 hour: '2-digit',
                 minute: '2-digit',

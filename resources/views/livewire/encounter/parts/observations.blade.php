@@ -340,7 +340,7 @@
                 @click.prevent="
                     openModal = true;
                     newObservation = true;
-                    modalObservation = new Observation();
+                    modalObservation = new Observation(null, $wire.form.encounter);
                 "
                 class="item-add my-5"
             >
@@ -500,15 +500,19 @@
             },
         ];
 
-        constructor(obj = null) {
+        constructor(obj = null, encounter = null) {
             const now = new Date();
-            const [yyyy, mm, dd] = now.toISOString().split('T')[0].split('-');
-            const formattedDate = `${dd}.${mm}.${yyyy}`;
-            const formattedTime = now.toLocaleTimeString('uk-UA', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false,
-            });
+            const dd = String(now.getDate()).padStart(2, '0');
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            // The observation is registered within the encounter, so it defaults to the encounter end
+            const formattedDate = encounter?.periodDate || `${dd}.${mm}.${now.getFullYear()}`;
+            const formattedTime =
+                (encounter?.periodDate && encounter?.periodEnd) ||
+                now.toLocaleTimeString('uk-UA', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                });
 
             this.issuedDate = formattedDate;
             this.issuedTime = formattedTime;

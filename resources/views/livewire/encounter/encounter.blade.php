@@ -12,7 +12,7 @@
         ['id' => 'hospitalization', 'label' => __('encounters.hospitalization.label'), 'icon' => 'medical-instrument-ambulance-bed', 'view' => 'livewire.encounter.parts.hospitalization', 'showWhen' => "\$wire.form.encounter.classCode === 'INPATIENT'"],
         ['id' => 'conditions', 'label' => __('patients.diagnoses'), 'icon' => 'file', 'view' => 'livewire.encounter.parts.conditions'],
         ['id' => 'reasons', 'label' => __('encounters.reasons_for_visit'), 'icon' => 'person', 'view' => 'livewire.encounter.parts.reasons'],
-        ['id' => 'actions', 'label' => __('forms.actions'), 'icon' => 'check-box', 'view' => 'livewire.encounter.parts.actions'],
+        ['id' => 'actions', 'label' => __('forms.actions'), 'icon' => 'check-box', 'view' => 'livewire.encounter.parts.actions', 'showWhen' => "\$wire.form.encounter.classCode === 'PHC'"],
         ['id' => 'additional-data', 'label' => __('encounters.additional_data'), 'icon' => 'Edit3', 'view' => 'livewire.encounter.parts.additional-data'],
         ['id' => 'observations', 'label' => __('observations.label'), 'icon' => 'heart', 'view' => 'livewire.encounter.parts.observations', 'holdsCancellableRecords' => true],
         ['id' => 'immunizations', 'label' => __('immunizations.plural'), 'icon' => 'shield', 'view' => 'livewire.encounter.parts.immunizations', 'holdsCancellableRecords' => true],
@@ -467,7 +467,7 @@
                             <button
                                 type="submit"
                                 @click="
-                                    $wire.set('actionType', null);
+                                    $wire.set('actionType', null, false);
                                     $wire.showSignatureModal = true;
                                 "
                                 class="button-primary"

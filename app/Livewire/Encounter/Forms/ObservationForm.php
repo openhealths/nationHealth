@@ -177,7 +177,7 @@ class ObservationForm extends Form
             ],
             'observations.*.reportOriginCode' => Rule::forEach(function (mixed $value, string $attribute) {
                 $index = (int)explode('.', $attribute)[1];
-                $primarySource = $this->observations[$index]['primarySource'];
+                $primarySource = $this->observations[$index]['primarySource'] ?? true;
 
                 return [
                     Rule::requiredIf($primarySource === false),

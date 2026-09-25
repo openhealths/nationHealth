@@ -4,9 +4,20 @@
         class="fieldset"
         x-data="{
             openModal: false,
-            selectedReasonReferenceType: '',
-            selectedReasonReferenceIds: [],
+
+            isReasonReferenceAdded(recordId) {
+                return modalProcedure.reasonReferences.some((reasonReference) => reasonReference.id === recordId);
+            },
+
+            addReasonReference(record) {
+                if (this.isReasonReferenceAdded(record.id)) {
+                    return;
+                }
+
+                modalProcedure.reasonReferences = modalProcedure.reasonReferences.concat(record);
+            },
         }"
+        @procedure-reason-reference-selected.window="addReasonReference($event.detail.record)"
     >
         <legend class="legend">
             <h2>{{ __('procedures.reason_for_performing') }}</h2>
@@ -31,7 +42,9 @@
                                     $wire.dictionaries['eHealth/ICD10_AM/condition_codes'][reasonReference.codeCode] ||
                                     $wire.dictionaries['eHealth/LOINC/observation_codes'][reasonReference.codeCode] ||
                                     $wire.dictionaries['eHealth/ICF/classifiers'][reasonReference.codeCode] ||
-                                    $wire.dictionaries['eHealth/ICPC2/condition_codes'][reasonReference.codeCode]
+                                    $wire.dictionaries['eHealth/ICPC2/condition_codes'][reasonReference.codeCode] ||
+                                    reasonReference.description ||
+                                    ''
                                 }`
                             "
                         ></td>
@@ -123,17 +136,7 @@
 
         <div>
             {{-- Button to trigger the modal --}}
-            <button
-                @click.prevent="
-                    openModal = true;
-                    selectedReasonReferenceType = '';
-                    selectedReasonReferenceIds = [];
-                    $wire.reasonReferenceResults = [];
-                "
-                class="item-add my-5"
-            >
-                {{ __('forms.add') }}
-            </button>
+            <button @click.prevent="openModal = true" class="item-add my-5">{{ __('forms.add') }}</button>
 
             {{-- Modal --}}
             <template x-teleport="body">
@@ -167,150 +170,18 @@
                             <h3 class="modal-header" :id="$id('modal-title')">{{ __('forms.add') }}</h3>
 
                             {{-- Content --}}
-                            <form>
-                                <div class="form-row-modal">
-                                    <div class="form-group group">
-                                        <label for="reasonReferenceType" class="sr-only">{{ __('forms.type') }}</label>
-                                        <select
-                                            id="reasonReferenceType"
-                                            class="input-modal peer"
-                                            x-model="selectedReasonReferenceType"
-                                            @change="
-                                                $wire.reasonReferenceResults = [];
-                                                selectedReasonReferenceIds = [];
-                                            "
-                                        >
-                                            <option value="" selected>
-                                                {{ __('forms.select') }} {{ mb_strtolower(__('forms.type')) }}
-                                            </option>
-                                            <option value="condition">{{ __('conditions.label') }}</option>
-                                            <option value="observation">{{ __('observations.label') }}</option>
-                                        </select>
-                                    </div>
+                            <livewire:encounter.medical-record-search
+                                :patient-uuid="$patientUuid"
+                                selection-event="procedure-reason-reference-selected"
+                                is-added-check="isReasonReferenceAdded"
+                                :key="'procedure-reason-reference-search'"
+                            />
 
-                                    {{-- Search button --}}
-                                    <div>
-                                        <button
-                                            @click.prevent="$wire.searchReasonReferences(selectedReasonReferenceType)"
-                                            class="button-primary flex items-center gap-2"
-                                            :disabled="! selectedReasonReferenceType"
-                                        >
-                                            @icon('search', 'w-4 h-4')
-                                            <span>{{ __('forms.search') }}</span>
-                                        </button>
-                                    </div>
-
-                                    <x-forms.loading />
-                                </div>
-
-                                <template x-if="$wire.reasonReferenceResults.length > 0">
-                                    <div class="table-container">
-                                        <div class="overflow-visible">
-                                            <table class="table-base">
-                                                <thead class="table-header">
-                                                    <tr>
-                                                        <th scope="col" class="th-input">{{ __('forms.date') }}</th>
-                                                        <th scope="col" class="th-input">
-                                                            {{ __('medical-events.code_and_name') }}
-                                                        </th>
-                                                        <th scope="col" class="th-input">{{ __('forms.action') }}</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <template
-                                                        x-for="result in $wire.reasonReferenceResults"
-                                                        :key="result.id"
-                                                    >
-                                                        <tr class="border-b dark:border-gray-700">
-                                                            <th scope="row" class="table-cell-primary">
-                                                                <div
-                                                                    class="text-base"
-                                                                    x-text="result.ehealthInsertedAt || ''"
-                                                                ></div>
-                                                            </th>
-                                                            <td
-                                                                class="td-input"
-                                                                x-text="
-                                                                    `${result.codeCode} - ${
-                                                                        $wire.dictionaries[
-                                                                            'eHealth/ICD10_AM/condition_codes'
-                                                                        ][result.codeCode] ||
-                                                                        $wire.dictionaries[
-                                                                            'eHealth/LOINC/observation_codes'
-                                                                        ][result.codeCode] ||
-                                                                        $wire.dictionaries['eHealth/ICF/classifiers'][
-                                                                            result.codeCode
-                                                                        ] ||
-                                                                        $wire.dictionaries[
-                                                                            'eHealth/ICPC2/condition_codes'
-                                                                        ][result.codeCode]
-                                                                    }`
-                                                                "
-                                                            ></td>
-                                                            <td class="td-input">
-                                                                <button
-                                                                    @click.prevent="
-                                                                        const id = result.id;
-                                                                        const index =
-                                                                            selectedReasonReferenceIds.indexOf(id);
-
-                                                                        if (index === -1) {
-                                                                            selectedReasonReferenceIds.push(id);
-                                                                        } else {
-                                                                            selectedReasonReferenceIds.splice(index, 1);
-                                                                        }
-                                                                    "
-                                                                    class="button-primary w-28"
-                                                                    x-text="selectedReasonReferenceIds.includes(result.id)
-                                                                        ? '{{ __('medical-events.added') }}'
-                                                                        : '{{ __('forms.add') }}'"
-                                                                ></button>
-                                                            </td>
-                                                        </tr>
-                                                    </template>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </template>
-
-                                <template x-if="$wire.reasonReferenceResults.length <= 0">
-                                    <p class="default-p">{{ __('forms.nothing_found') }}</p>
-                                </template>
-
-                                {{-- Action buttons --}}
-                                <div class="mt-6 flex justify-between space-x-2">
-                                    <button
-                                        @click.prevent
-                                        type="button"
-                                        @click="openModal = false"
-                                        class="button-minor"
-                                    >
-                                        {{ __('forms.cancel') }}
-                                    </button>
-
-                                    <button
-                                        @click.prevent
-                                        @click="
-                                            const existingIds = modalProcedure.reasonReferences.map((r) => r.id);
-
-                                            const newReferences = $wire.reasonReferenceResults.filter(
-                                                (r) =>
-                                                    selectedReasonReferenceIds.includes(r.id) &&
-                                                    ! existingIds.includes(r.id),
-                                            );
-
-                                            modalProcedure.reasonReferences =
-                                                modalProcedure.reasonReferences.concat(newReferences);
-
-                                            openModal = false;
-                                        "
-                                        class="button-primary"
-                                    >
-                                        {{ __('forms.save') }}
-                                    </button>
-                                </div>
-                            </form>
+                            <div class="mt-6 flex justify-between space-x-2">
+                                <button type="button" @click="openModal = false" class="button-minor cursor-pointer">
+                                    {{ __('forms.close') }}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

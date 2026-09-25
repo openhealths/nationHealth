@@ -2,12 +2,7 @@
     class="space-y-6 p-5"
     x-data="{
         showReferencesDrawer: false,
-        selectedType: '',
-        searchQuery: '',
         selectedReferences: $wire.entangle('form.encounter.supportingInfo'),
-        allRecords: [],
-        medicalRecordsLoading: false,
-        hasSearchedMedicalRecords: false,
 
         init() {
             this.selectedReferences = (this.selectedReferences ?? []).filter(reference => reference?.uuid && reference?.type);
@@ -15,80 +10,45 @@
 
         openReferencesDrawer() {
             this.showReferencesDrawer = true;
-            this.selectedType = '';
-            this.searchQuery = '';
-            this.allRecords = [];
-            this.medicalRecordsLoading = false;
-            this.hasSearchedMedicalRecords = false;
         },
 
-        loadMedicalRecords() {
-            if (this.selectedType === '') {
-                this.allRecords = [];
-                this.medicalRecordsLoading = false;
-                this.hasSearchedMedicalRecords = false;
-
-                return;
-            }
-
-            this.medicalRecordsLoading = true;
-            this.hasSearchedMedicalRecords = true;
-            this.allRecords = [];
-
-            const typeLabels = {
-                condition: '{{ __("conditions.condition_or_diagnosis") }}',
-                observation: '{{ __("observations.medical_label") }}',
-                diagnosticReport: '{{ __("diagnostic-reports.label") }}',
-            };
-
-            $wire.searchSupportingInfo(this.selectedType)
-                .then(() => {
-                    const dicts = $wire.dictionaries;
-                    const lookupName = (code) =>
-                        dicts['eHealth/ICPC2/condition_codes']?.[code] ||
-                        dicts['eHealth/ICD10_AM/condition_codes']?.[code] ||
-                        dicts['eHealth/LOINC/observation_codes']?.[code] ||
-                        dicts['eHealth/custom/observation_codes']?.[code] ||
-                        dicts['eHealth/ICF/classifiers']?.[code] ||
-                        '';
-
-                    this.allRecords = ($wire.supportingInfoResults ?? []).map(result => ({
-                        uuid: result.uuid,
-                        type: result.type,
-                        typeLabel: typeLabels[this.selectedType] || result.type,
-                        code: result.code,
-                        name: lookupName(result.code),
-                        date: result.ehealthInsertedAt,
-                    }));
-                })
-                .finally(() => {
-                    this.medicalRecordsLoading = false;
-                });
+        isReferenceAdded(recordId) {
+            return this.selectedReferences.some((reference) => reference.uuid === recordId);
         },
 
         addReference(record) {
-            const alreadySelected = this.selectedReferences.some(
-                reference => reference.uuid === record.uuid && reference.type === record.type
-            );
+            const typeLabels = {
+                condition: '{{ __("conditions.condition_or_diagnosis") }}',
+                observation: '{{ __("observations.medical_label") }}',
+                diagnostic_report: '{{ __("diagnostic-reports.label") }}',
+            };
 
-            if (!alreadySelected) {
+            const dictionaries = $wire.dictionaries;
+            const name =
+                dictionaries['eHealth/ICPC2/condition_codes']?.[record.code] ||
+                dictionaries['eHealth/ICD10_AM/condition_codes']?.[record.code] ||
+                dictionaries['eHealth/LOINC/observation_codes']?.[record.code] ||
+                dictionaries['eHealth/custom/observation_codes']?.[record.code] ||
+                dictionaries['eHealth/ICF/classifiers']?.[record.code] ||
+                record.description ||
+                '';
+
+            if (! this.isReferenceAdded(record.uuid)) {
                 this.selectedReferences = [...this.selectedReferences, {
                     uuid: record.uuid,
                     type: record.type,
-                    typeLabel: record.typeLabel,
+                    typeLabel: typeLabels[record.type] || record.type,
                     code: record.code,
-                    name: record.name,
-                    date: record.date,
+                    name: name,
+                    date: record.ehealthInsertedAt,
                 }];
             }
 
             this.showReferencesDrawer = false;
-            this.searchQuery = '';
         },
 
         cancelSelection() {
             this.showReferencesDrawer = false;
-            this.searchQuery = '';
         },
 
         removeReference(uuid, type) {
@@ -96,25 +56,8 @@
                 reference => !(reference.uuid === uuid && reference.type === type)
             );
         },
-
-        filteredRecords() {
-            return this.allRecords.filter((record) => {
-                if (this.searchQuery) {
-                    const query = this.searchQuery.toLowerCase();
-                    const matchesSearch = [record.code, record.name, record.typeLabel]
-                        .filter(Boolean)
-                        .some((value) => String(value).toLowerCase().includes(query));
-
-                    if (!matchesSearch) {
-                        return false;
-                    }
-                }
-
-                return true;
-            });
-        },
-
      }"
+    @encounter-supporting-info-selected.window="addReference($event.detail.record)"
 >
     <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
         <div class="form-group group">
@@ -443,7 +386,7 @@
                         x-show="index > 0"
                         x-cloak
                         @click="removeService(index)"
-                        class="absolute top-3 right-0 text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500"
+                        class="absolute top-3 right-0 cursor-pointer text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
                     >
                         @icon('delete', 'w-6 h-6')
                     </button>
@@ -512,7 +455,7 @@
                         x-show="! coAuthor.locked && ! {{ $isReadonly ? 'true' : 'false' }}"
                         x-cloak
                         @click="removeCoAuthor(index)"
-                        class="absolute top-3 right-0 text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500"
+                        class="absolute top-3 right-0 cursor-pointer text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
                     >
                         @icon('delete', 'w-6 h-6')
                     </button>
@@ -589,7 +532,7 @@
                                 <button
                                     type="button"
                                     @click="removeReference(ref.uuid, ref.type)"
-                                    class="p-1 text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500"
+                                    class="cursor-pointer p-1 text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
                                 >
                                     @icon('delete', 'w-5 h-5')
                                 </button>

@@ -10,7 +10,13 @@
         item: 0,
         dictionary: $wire.dictionaries['eHealth/ICPC2/actions'],
     }"
-    x-show="$wire.form.encounter.classCode === 'PHC'"
+    {{-- Actions are allowed only in primary health care, so the ones picked before the class was changed are dropped
+        here instead of being rejected on submission --}}
+    x-effect="
+        if ($wire.form.encounter.classCode !== 'PHC' && actions.length > 0) {
+            actions = [];
+        }
+    "
 >
     <div class="space-y-4">
         <template x-for="(action, index) in actions" :key="index">

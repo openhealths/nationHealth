@@ -194,9 +194,11 @@ class EncounterCreate extends EncounterComponent
 
         $this->initializeComponent();
 
-        if (request()->query('type') === 'discharge') {
-            $this->presetDischarge();
-        }
+        match (request()->query('type')) {
+            'discharge' => $this->presetDischarge(),
+            'hospitalization_refusal' => $this->presetHospitalizationRefusal(),
+            default => null
+        };
 
         $this->setDefaultDate();
 
@@ -204,25 +206,39 @@ class EncounterCreate extends EncounterComponent
     }
 
     /**
-     * Fill in the interaction class and type a patient discharge is always submitted with,
+     * Fix the interaction class and type a patient discharge is always submitted with,
      * and bind the interaction to the episode the patient was hospitalized within.
      *
      * @return void
      */
     protected function presetDischarge(): void
     {
-        if (!isset($this->dictionaries['eHealth/encounter_classes']['INPATIENT'])) {
+        if (!in_array('discharge', $this->encounterClassTypes['INPATIENT'] ?? [], true)) {
             return;
         }
 
         $this->form->encounter['classCode'] = 'INPATIENT';
-        $this->adjustEncounterTypes();
+        $this->form->encounter['typeCode'] = 'discharge';
+        $this->isDischarge = true;
+        $this->episodeType = 'existing';
+    }
 
-        if (isset($this->dictionaries['eHealth/encounter_types']['discharge'])) {
-            $this->form->encounter['typeCode'] = 'discharge';
+    /**
+     * Fix the interaction class and type a hospitalization refusal is always submitted with,
+     * and open a new episode for it.
+     *
+     * @return void
+     */
+    protected function presetHospitalizationRefusal(): void
+    {
+        if (!in_array('service_delivery_location', $this->encounterClassTypes['AMB'] ?? [], true)) {
+            return;
         }
 
-        $this->episodeType = 'existing';
+        $this->form->encounter['classCode'] = 'AMB';
+        $this->form->encounter['typeCode'] = 'service_delivery_location';
+        $this->isHospitalizationRefusal = true;
+        $this->episodeType = 'new';
     }
 
     /**
@@ -264,6 +280,18 @@ class EncounterCreate extends EncounterComponent
 
         $formattedData = $this->packageBuilder->build($validated, $this->episodeType, Status::DRAFT);
         $formattedData['encounter']['status'] = EncounterStatus::DRAFT->value;
+
+        try {
+            $this->syncRegisteredConditions($validated['conditions'] ?? []);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while getting registered conditions');
+
+            return;
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Failed to store registered conditions');
+
+            return;
+        }
 
         try {
             $encounterId = $this->storeValidatedData($formattedData);
@@ -343,6 +371,20 @@ class EncounterCreate extends EncounterComponent
         $formattedData = $this->packageBuilder->build($validatedData, $this->episodeType);
 
         try {
+            $this->syncRegisteredConditions($validatedData['conditions'] ?? []);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while getting registered conditions');
+            $this->showSignatureModal = false;
+
+            return;
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Failed to store registered conditions');
+            $this->showSignatureModal = false;
+
+            return;
+        }
+
+        try {
             $createdEncounterId = $this->storeValidatedData($formattedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Failed to store validated data');
@@ -355,16 +397,6 @@ class EncounterCreate extends EncounterComponent
 
         // Remove display_value from incoming_referral before sending to eHealth (schema rejects it)
         unset($formattedData['encounter']['incoming_referral']['display_value']);
-
-        try {
-            $this->validateEncounterPerformer($formattedData);
-        } catch (ValidationException $exception) {
-            Session::flash('error', $exception->validator->errors()->first());
-
-            $this->setErrorBag($exception->validator->getMessageBag());
-
-            return;
-        }
 
         if ($this->episodeType === 'new') {
             $this->createEpisode($formattedData['episode']);
@@ -406,7 +438,7 @@ class EncounterCreate extends EncounterComponent
                 $this->patient()
             );
 
-            Session::flash('success', __('Взаємодію успішно створено та надіслано до ЕСОЗ.'));
+            Session::flash('success', __('encounters.messages.created_and_sent'));
             $this->showSignatureModal = false;
 
             if (($this->form->encounter['referralType'] ?? '') === 'electronic' && !empty($this->form->encounter['referralNumber'])) {
@@ -420,7 +452,6 @@ class EncounterCreate extends EncounterComponent
             }
 
             $this->redirectAfterCreate($createdEncounterId);
-
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while submitting encounter');
             $this->showSignatureModal = false;
@@ -566,10 +597,10 @@ class EncounterCreate extends EncounterComponent
                 }
 
                 $service->completeReferral($this->referralToRedeemUuid, $this->createdEncounterUuidForRedeem);
-                Session::flash('success', __('Направлення успішно погашено!'));
+                Session::flash('success', __('encounters.messages.referral_redeemed'));
             }
-        } catch (Exception $e) {
-            Session::flash('error', __('Не вдалося погасити направлення: ') . $e->getMessage());
+        } catch (\Exception $e) {
+            Session::flash('error', __('encounters.messages.referral_redeem_error', ['message' => $e->getMessage()]));
         }
 
         $this->showReferralRedeemModal = false;

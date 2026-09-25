@@ -88,12 +88,12 @@
                     this.modalProcedure.performedPeriodEndTime = '';
                 }
           }"
-          @procedure-service-selected.window="selectProcedureService($event.detail.service)"
+        @procedure-service-selected.window="selectProcedureService($event.detail.service)"
     >
         <fieldset @disabled($isReadonly) @class(['pointer-events-none opacity-80' => $isReadonly])>
             @include('livewire.encounter.procedure-parts.main-information', ['context' => 'procedure'])
             @include('livewire.encounter.procedure-parts.additional-information', ['context' => 'procedure'])
-            @include('livewire.encounter.procedure-parts.reason-references', ['wireProp' => 'reasonReferenceResults'])
+            @include('livewire.encounter.procedure-parts.reason-references')
             @include('livewire.encounter.procedure-parts.used-codes')
             @if (!empty(data_get($this->form->procedure, 'encounterId')))
                 @include('livewire.encounter.procedure-parts.complication-details', ['context' => 'procedure'])
@@ -117,11 +117,7 @@
                 />
 
                 <div class="mt-8">
-                    <button
-                        type="button"
-                        @click="openServiceCatalog = false"
-                        class="button-minor"
-                    >
+                    <button type="button" @click="openServiceCatalog = false" class="button-minor">
                         {{ __('forms.cancel') }}
                     </button>
                 </div>

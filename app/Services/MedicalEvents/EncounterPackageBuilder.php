@@ -53,9 +53,16 @@ class EncounterPackageBuilder
      */
     public function toFhir(array $data, array $uuids): array
     {
-        $fhirConditions = collect($data['conditions'] ?? [])
+        $conditions = collect($data['conditions'] ?? []);
+
+        // A previously registered condition is only referenced by its diagnosis, it is not sent again
+        $fhirConditions = $conditions
             ->map(
                 function (array $condition, int $index) use ($data, $uuids): array {
+                    if ($condition['isRegistered'] ?? false) {
+                        return ['id' => $condition['uuid']];
+                    }
+
                     if (isset($data['encounter']['diagnoses'][$index])) {
                         $condition['clinicalStatus'] = ConditionClinicalStatus::ACTIVE->value;
                     }
@@ -159,7 +166,10 @@ class EncounterPackageBuilder
 
         return [
             'encounter' => Fhir::encounter()->toFhir($encounterData, $fhirConditions, $uuids),
-            'conditions' => $fhirConditions,
+            'conditions' => collect($fhirConditions)
+                ->reject(static fn (array $condition, int $index): bool => $conditions[$index]['isRegistered'] ?? false)
+                ->values()
+                ->toArray(),
             'immunizations' => $fhirImmunizations,
             'diagnosticReports' => $fhirDiagnosticReports,
             'observations' => $fhirObservations,

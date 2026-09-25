@@ -196,8 +196,7 @@
             <button
                 @click.prevent="
                     newClinicalImpression = true; {{-- We are adding a new clinicalImpression --}}
-                    modalClinicalImpression = new ClinicalImpression(); {{-- Replace the data of the previous clinicalImpression with a new one--}}
-                    $wire.problems = [];
+                    modalClinicalImpression = new ClinicalImpression(null, $wire.form.encounter); {{-- Replace the data of the previous clinicalImpression with a new one--}}
                     $wire.findings = [];
                     openClinicalImpressionDrawer = true;
                 "
@@ -250,12 +249,17 @@
      * Representation of the user's personal clinicalImpression
      */
     class ClinicalImpression {
-        constructor(obj = null) {
+        constructor(obj = null, encounter = null) {
+            // Without the encounter period at hand, the same default period the encounter gets:
+            // ending now, starting a quarter of an hour earlier within the day
             const now = new Date();
-            const endTime = new Date(now.getTime() + 15 * 60 * 1000);
+            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const startTime = new Date(Math.max(now.getTime() - 15 * 60 * 1000, startOfDay.getTime()));
             const toFormattedDate = (date) => {
-                const [yyyy, mm, dd] = date.toISOString().split('T')[0].split('-');
-                return `${dd}.${mm}.${yyyy}`;
+                const dd = String(date.getDate()).padStart(2, '0');
+                const mm = String(date.getMonth() + 1).padStart(2, '0');
+
+                return `${dd}.${mm}.${date.getFullYear()}`;
             };
             const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
 
@@ -267,10 +271,15 @@
             this.problems = [];
             this.findings = [];
             this.supportingInfo = [];
-            this.effectivePeriodStartDate = toFormattedDate(now);
-            this.effectivePeriodStartTime = now.toLocaleTimeString('uk-UA', timeOptions);
-            this.effectivePeriodEndDate = toFormattedDate(endTime);
-            this.effectivePeriodEndTime = endTime.toLocaleTimeString('uk-UA', timeOptions);
+            // The clinical impression is made within the encounter, so it defaults to the encounter period
+            const encounterDate = encounter?.periodDate;
+
+            this.effectivePeriodStartDate = encounterDate || toFormattedDate(startTime);
+            this.effectivePeriodStartTime =
+                (encounterDate && encounter?.periodStart) || startTime.toLocaleTimeString('uk-UA', timeOptions);
+            this.effectivePeriodEndDate = encounterDate || toFormattedDate(now);
+            this.effectivePeriodEndTime =
+                (encounterDate && encounter?.periodEnd) || now.toLocaleTimeString('uk-UA', timeOptions);
 
             if (obj) {
                 Object.assign(this, JSON.parse(JSON.stringify(obj)));

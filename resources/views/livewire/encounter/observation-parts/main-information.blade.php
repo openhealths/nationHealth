@@ -641,7 +641,7 @@
 
                 <div class="form-row-modal">
                     <div
-                        x-init="
+                        x-effect="
                             if (! modalObservation.components[1]) {
                                 modalObservation.components[1] = {
                                     codeCode: 'nature_of_change_in_body_structure',
@@ -715,7 +715,7 @@
 
                 <div class="form-row-modal">
                     <div
-                        x-init="
+                        x-effect="
                             if (! modalObservation.components[2]) {
                                 modalObservation.components[2] = {
                                     codeCode: 'anatomical_localization',
@@ -868,7 +868,7 @@
 
                 <div class="form-row-modal">
                     <div
-                        x-init="
+                        x-effect="
                             if (! modalObservation.components[1]) {
                                 modalObservation.components[1] = {
                                     codeCode: 'capacity',

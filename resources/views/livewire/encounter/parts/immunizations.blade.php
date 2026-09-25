@@ -524,7 +524,7 @@
                 @click.prevent="
                     openModal = true;
                     newImmunization = true;
-                    modalImmunization = new Immunization();
+                    modalImmunization = new Immunization(null, $wire.form.encounter);
                     resetVaccineSearch();
                 "
                 class="item-add my-5"
@@ -672,13 +672,17 @@
      * Representation of the user's personal immunization
      */
     class Immunization {
-        constructor(obj = null) {
+        constructor(obj = null, encounter = null) {
             this.uuid = crypto.randomUUID();
             const now = new Date();
-            const [yyyy, mm, dd] = now.toISOString().split('T')[0].split('-');
+            const dd = String(now.getDate()).padStart(2, '0');
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
 
-            this.date = `${dd}.${mm}.${yyyy}`;
-            this.time = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
+            // The immunization is given within the encounter, so it defaults to the encounter end
+            this.date = encounter?.periodDate || `${dd}.${mm}.${now.getFullYear()}`;
+            this.time =
+                (encounter?.periodDate && encounter?.periodEnd) ||
+                now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', hour12: false });
             this.notGiven = false;
             this.vaccineCode = '';
             this.primarySource = true;

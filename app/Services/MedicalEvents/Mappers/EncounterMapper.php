@@ -82,7 +82,7 @@ class EncounterMapper implements FhirMapperContract
             'type' => FhirResource::make()->coding('eHealth/encounter_types', $data['typeCode'])
                 ->toCodeableConcept(),
             'performer' => FhirResource::make()->coding('eHealth/resources', 'employee')
-                ->toIdentifier($uuids['employee'])
+                ->toIdentifier($data['performerId'])
         ];
 
         if ($data['referralType'] === 'electronic') {
@@ -249,6 +249,7 @@ class EncounterMapper implements FhirMapperContract
         return [
             'classCode' => data_get($data, 'class.code'),
             'typeCode' => data_get($data, 'type.coding.0.code'),
+            'performerId' => data_get($data, 'performer.identifier.value', ''),
             'divisionId' => data_get($data, 'division.identifier.value', ''),
             'priorityCode' => data_get($data, 'priority.coding.0.code', ''),
             'periodDate' => convertToAppDateFormat(data_get($data, 'period.start')),

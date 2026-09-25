@@ -152,10 +152,13 @@
             >
                 <x-slot name="title">{{ __('conditions.new_evidence_condition') }}</x-slot>
 
-                <form class="space-y-6 mt-4">
-                    <div class="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2 mb-6">
+                <form class="mt-4 space-y-6">
+                    <div class="mb-6 grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2">
                         <div>
-                            <label for="evidenceCode" class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                            <label
+                                for="evidenceCode"
+                                class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                            >
                                 {{ __('medical-events.icpc2_status_code') }}<span class="text-red-600"> *</span>
                             </label>
                             <div class="relative">
@@ -171,12 +174,7 @@
                     </div>
 
                     <div class="mt-6 flex space-x-2">
-                        <button
-                            type="button"
-                            @click.prevent
-                            @click="openModal = false"
-                            class="button-minor"
-                        >
+                        <button type="button" @click.prevent @click="openModal = false" class="button-minor">
                             {{ __('forms.cancel') }}
                         </button>
 
@@ -195,7 +193,6 @@
                                 }
 
                                 openModal = false;
-                                showPrimaryChangeWarning = true;
                             "
                             class="button-primary"
                             :disabled="! modalEvidenceCode.code.trim()"

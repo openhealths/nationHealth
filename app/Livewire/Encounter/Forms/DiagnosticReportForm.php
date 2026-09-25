@@ -11,6 +11,7 @@ use App\Enums\User\Role;
 use App\Models\Employee\Employee;
 use App\Models\Equipment;
 use App\Rules\InDictionary;
+use App\Rules\MedicalEvents\PaperReferralRules;
 use App\Rules\PrimarySourceRequiredForAssistant;
 use App\Rules\PastDateTime;
 use Carbon\CarbonImmutable;
@@ -116,7 +117,7 @@ class DiagnosticReportForm extends Form
                 new InDictionary('eHealth/report_origins')
             ],
             'diagnosticReports.*.reportOriginText' => ['nullable', 'string'],
-            ...$this->paperReferralRules('diagnosticReports.*'),
+            ...PaperReferralRules::for('diagnosticReports.*', $this->diagnosticReports),
             'diagnosticReports.*.isReferralAvailable' => ['nullable', 'boolean'],
             'diagnosticReports.*.referralType' => Rule::forEach(
                 function (mixed $value, string $attribute): array {
@@ -419,82 +420,5 @@ class DiagnosticReportForm extends Form
         return collect($this->component->form->encounter['participant'] ?? [])->contains(
             static fn (array $participant): bool => ($participant['uuid'] ?? '') === $employeeUuid
         );
-    }
-
-    /**
-     * Rules for paper referral data.
-     *
-     * @param  string  $prefix  e.g. 'diagnosticReports.*'
-     * @return array
-     */
-    private function paperReferralRules(string $prefix): array
-    {
-        return [
-            "$prefix.paperReferralRequisition" => ['nullable', 'string', 'max:255'],
-            "$prefix.paperReferralRequesterEmployeeName" => Rule::forEach(
-                function (mixed $value, string $attribute): array {
-                    return [
-                        ...$this->paperReferralPresence($attribute),
-                        'string',
-                        'max:255'
-                    ];
-                }
-            ),
-            "$prefix.paperReferralRequesterLegalEntityEdrpou" => Rule::forEach(
-                function (mixed $value, string $attribute): array {
-                    return [...$this->paperReferralPresence($attribute), 'digits_between:8,10'];
-                }
-            ),
-            "$prefix.paperReferralRequesterLegalEntityName" => Rule::forEach(
-                function (mixed $value, string $attribute): array {
-                    return [
-                        Rule::prohibitedIf($this->referralTypeOf($attribute) === 'electronic'),
-                        'nullable',
-                        'string',
-                        'max:255'
-                    ];
-                }
-            ),
-            "$prefix.paperReferralServiceRequestDate" => Rule::forEach(
-                function (mixed $value, string $attribute): array {
-                    return [
-                        ...$this->paperReferralPresence($attribute),
-                        'date_format:' . config('app.date_format')
-                    ];
-                }
-            ),
-            "$prefix.paperReferralNote" => ['nullable', 'string']
-        ];
-    }
-
-    /**
-     * Presence rules for a paper referral field the eHealth schema lists as required: it has to be filled in
-     * for a paper referral and cannot be filled in for an electronic one.
-     *
-     * @param  string  $attribute
-     * @return array
-     */
-    private function paperReferralPresence(string $attribute): array
-    {
-        $referralType = $this->referralTypeOf($attribute);
-
-        return [
-            Rule::requiredIf($referralType === 'paper'),
-            Rule::prohibitedIf($referralType === 'electronic'),
-            'nullable'
-        ];
-    }
-
-    /**
-     * Referral type of the diagnostic report the validated attribute belongs to.
-     *
-     * @param  string  $attribute
-     * @return string
-     */
-    private function referralTypeOf(string $attribute): string
-    {
-        $index = (int) explode('.', $attribute)[1];
-
-        return (string) ($this->diagnosticReports[$index]['referralType'] ?? '');
     }
 }

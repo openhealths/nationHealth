@@ -105,7 +105,7 @@
         },
         
         parseProcedureDateTime(date, time) {
-            if (!date || !time) {
+            if (! date || ! time) {
                 return null;
             }
 
@@ -136,7 +136,7 @@
                 this.encounter.periodEnd
             );
 
-            if (!encounterStart || !encounterEnd) {
+            if (! encounterStart || ! encounterEnd) {
                 return false;
             }
 
@@ -156,7 +156,7 @@
             return false;
         }
       }"
-      @procedure-service-selected.window="selectProcedureService($event.detail.service)"
+    @procedure-service-selected.window="selectProcedureService($event.detail.service)"
 >
     <div class="space-y-4">
         <template x-for="(procedure, index) in procedures" :key="index">
@@ -374,7 +374,7 @@
             <button
                 @click.prevent="
                     newProcedure = true;
-                    modalProcedure = new Procedure();
+                    modalProcedure = new Procedure(null, $wire.form.encounter);
                     openProcedureDrawer = true;
                 "
                 class="item-add my-5"
@@ -411,9 +411,11 @@
                                     openProcedureDrawer = false;
                                 "
                                 class="button-primary"
-                                :disabled="!(modalProcedure.categoryCode.trim() && modalProcedure.codeValue.trim() 
-                                    && (modalProcedure.primarySource !== true || modalProcedure.performerEmployeeId)) || procedurePerformedOutsideEncounterPeriod()
-                                "
+                                :disabled="! (
+                                    modalProcedure.categoryCode.trim() &&
+                                    modalProcedure.codeValue.trim() &&
+                                    (modalProcedure.primarySource !== true || modalProcedure.performerEmployeeId)
+                                ) || procedurePerformedOutsideEncounterPeriod()"
                             >
                                 {{ __('forms.save') }}
                             </button>
@@ -441,11 +443,7 @@
                 />
 
                 <div class="mt-8">
-                    <button
-                        type="button"
-                        @click="openServiceCatalog = false"
-                        class="button-minor"
-                    >
+                    <button type="button" @click="openServiceCatalog = false" class="button-minor">
                         {{ __('forms.cancel') }}
                     </button>
                 </div>
@@ -459,13 +457,15 @@
      * Representation of the user's personal procedure
      */
     class Procedure {
-        constructor(obj = null) {
+        constructor(obj = null, encounter = null) {
             this.uuid = crypto.randomUUID();
             const now = new Date();
             const startTime = new Date(now.getTime() - 15 * 60 * 1000);
             const toFormattedDate = (date) => {
-                const [yyyy, mm, dd] = date.toISOString().split('T')[0].split('-');
-                return `${dd}.${mm}.${yyyy}`;
+                const dd = String(date.getDate()).padStart(2, '0');
+                const mm = String(date.getMonth() + 1).padStart(2, '0');
+
+                return `${dd}.${mm}.${date.getFullYear()}`;
             };
             const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
 
@@ -491,10 +491,15 @@
             this.reasonReferences = [];
             this.usedCodes = [];
             this.complicationDetails = [];
-            this.performedPeriodStartDate = toFormattedDate(startTime);
-            this.performedPeriodStartTime = startTime.toLocaleTimeString('uk-UA', timeOptions);
-            this.performedPeriodEndDate = toFormattedDate(now);
-            this.performedPeriodEndTime = now.toLocaleTimeString('uk-UA', timeOptions);
+            // The procedure is performed within the encounter, so it defaults to the encounter period
+            const encounterDate = encounter?.periodDate;
+
+            this.performedPeriodStartDate = encounterDate || toFormattedDate(startTime);
+            this.performedPeriodStartTime =
+                (encounterDate && encounter?.periodStart) || startTime.toLocaleTimeString('uk-UA', timeOptions);
+            this.performedPeriodEndDate = encounterDate || toFormattedDate(now);
+            this.performedPeriodEndTime =
+                (encounterDate && encounter?.periodEnd) || now.toLocaleTimeString('uk-UA', timeOptions);
             this.performerEmployeeId = '';
             this.performedType = 'period';
             this.performedDate = '';

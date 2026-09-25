@@ -351,4 +351,50 @@ class Employee extends BaseEmployee
             })
             ->exists();
     }
+
+    /**
+     * Condition codes per code system the employee is allowed to use, restricted by the employee type.
+     * Key absent means no restriction; empty array means the system is forbidden; non-empty array lists the allowed codes.
+     *
+     * @return array
+     */
+    public function allowedConditionCodesBySystem(): array
+    {
+        $employeeTypeRestrictions = config("ehealth.employee_type_conditions_allowed.$this->employeeType");
+
+        if ($employeeTypeRestrictions === null) {
+            return [];
+        }
+
+        return [
+            'eHealth/ICD10_AM/condition_codes' => $employeeTypeRestrictions['eHealth/ICD10_AM/condition_codes'] ?? [],
+            'eHealth/ICPC2/condition_codes' => $employeeTypeRestrictions['eHealth/ICPC2/condition_codes'] ?? []
+        ];
+    }
+
+    /**
+     * ICD-10 AM condition codes reserved for specialities the employee does not hold as officio.
+     * A code listed for several specialities stays allowed when the employee holds any of them.
+     *
+     * @return array
+     */
+    public function forbiddenIcd10ConditionCodes(): array
+    {
+        $specialityCodes = config('ehealth.icd10am_speciality_conditions_allowed', []);
+
+        $heldSpecialities = $this->loadMissing('specialities')
+            ->specialities
+            ->where('specialityOfficio', true)
+            ->pluck('speciality')
+            ->all();
+
+        $allowedCodes = collect($specialityCodes)->only($heldSpecialities)->flatten();
+
+        return collect($specialityCodes)
+            ->flatten()
+            ->unique()
+            ->diff($allowedCodes)
+            ->values()
+            ->all();
+    }
 }

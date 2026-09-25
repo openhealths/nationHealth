@@ -144,12 +144,10 @@
             );
 
             const toFormattedDate = (date) => {
-                const [yyyy, mm, dd] = date
-                    .toISOString()
-                    .split('T')[0]
-                    .split('-');
+                const dd = String(date.getDate()).padStart(2, '0');
+                const mm = String(date.getMonth() + 1).padStart(2, '0');
 
-                return `${dd}.${mm}.${yyyy}`;
+                return `${dd}.${mm}.${date.getFullYear()}`;
             };
 
             const timeOptions = {
@@ -181,26 +179,22 @@
             }
 
             if (type === 'period') {
+                // The report is registered within the encounter, so the period defaults to the encounter period
+                const encounter = $wire.form.encounter;
+                const encounterDate = encounter?.periodDate;
+
                 this.modalDiagnosticReport.effectiveDate = '';
                 this.modalDiagnosticReport.effectiveTime = '';
 
-                this.modalDiagnosticReport.effectivePeriodStartDate =
-                    toFormattedDate(startTime);
+                this.modalDiagnosticReport.effectivePeriodStartDate = encounterDate || toFormattedDate(startTime);
 
                 this.modalDiagnosticReport.effectivePeriodStartTime =
-                    startTime.toLocaleTimeString(
-                        'uk-UA',
-                        timeOptions
-                    );
+                    (encounterDate && encounter?.periodStart) || startTime.toLocaleTimeString('uk-UA', timeOptions);
 
-                this.modalDiagnosticReport.effectivePeriodEndDate =
-                    toFormattedDate(now);
+                this.modalDiagnosticReport.effectivePeriodEndDate = encounterDate || toFormattedDate(now);
 
                 this.modalDiagnosticReport.effectivePeriodEndTime =
-                    now.toLocaleTimeString(
-                        'uk-UA',
-                        timeOptions
-                    );
+                    (encounterDate && encounter?.periodEnd) || now.toLocaleTimeString('uk-UA', timeOptions);
 
                 return;
             }
@@ -213,7 +207,7 @@
             this.modalDiagnosticReport.effectivePeriodEndTime = '';
         }
      }"
-     @diagnostic-report-service-selected.window="selectDiagnosticReportService($event.detail.service)"
+    @diagnostic-report-service-selected.window="selectDiagnosticReportService($event.detail.service)"
 >
     {{-- Show saved data in table --}}
     <div class="space-y-4">
@@ -417,7 +411,7 @@
             x-cloak
             @click.prevent="
                 newDiagnosticReport = true;
-                modalDiagnosticReport = new DiagnosticReport(null, conditionPerformer.uuid);
+                modalDiagnosticReport = new DiagnosticReport(null, conditionPerformer.uuid, $wire.form.encounter);
                 selectedServiceFromCatalog = null;
                 issuedDateTimeInvalid = false;
                 openDiagnosticReportDrawer = true;
@@ -449,7 +443,8 @@
                                 }
 
                                 modalDiagnosticReport.specimenIds = modalDiagnosticReport.specimenIds.filter(Boolean);
-                                modalDiagnosticReport.performerEmployeeIds = modalDiagnosticReport.performerEmployeeIds.filter(Boolean);
+                                modalDiagnosticReport.performerEmployeeIds =
+                                    modalDiagnosticReport.performerEmployeeIds.filter(Boolean);
 
                                 newDiagnosticReport !== false
                                     ? diagnosticReports.push(modalDiagnosticReport)
@@ -459,12 +454,10 @@
                             "
                             class="button-primary"
                             :disabled="! (
-                                String(modalDiagnosticReport.categoryCode ?? '').trim()
-                                && String(modalDiagnosticReport.codeValue ?? '').trim()
-                                && (
-                                    ! ['diagnostic_procedure', 'imaging'].includes(modalDiagnosticReport.categoryCode)
-                                    || String(modalDiagnosticReport.resultsInterpreterEmployeeId ?? '').trim()
-                                )
+                                String(modalDiagnosticReport.categoryCode ?? '').trim() &&
+                                String(modalDiagnosticReport.codeValue ?? '').trim() &&
+                                (! ['diagnostic_procedure', 'imaging'].includes(modalDiagnosticReport.categoryCode) ||
+                                    String(modalDiagnosticReport.resultsInterpreterEmployeeId ?? '').trim())
                             )"
                         >
                             {{ __('forms.save') }}
@@ -493,11 +486,7 @@
             />
 
             <div class="mt-8">
-                <button
-                    type="button"
-                    @click="openServiceCatalog = false"
-                    class="button-minor"
-                >
+                <button type="button" @click="openServiceCatalog = false" class="button-minor">
                     {{ __('forms.cancel') }}
                 </button>
             </div>
@@ -510,12 +499,14 @@
      * Representation of the user's personal diagnostic report.
      */
     class DiagnosticReport {
-        constructor(obj = null, defaultPerformerEmployeeId = '') {
+        constructor(obj = null, defaultPerformerEmployeeId = '', encounter = null) {
             const now = new Date();
             const startTime = new Date(now.getTime() - 15 * 60 * 1000);
             const toFormattedDate = (date) => {
-                const [yyyy, mm, dd] = date.toISOString().split('T')[0].split('-');
-                return `${dd}.${mm}.${yyyy}`;
+                const dd = String(date.getDate()).padStart(2, '0');
+                const mm = String(date.getMonth() + 1).padStart(2, '0');
+
+                return `${dd}.${mm}.${date.getFullYear()}`;
             };
             const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
 
@@ -544,12 +535,17 @@
             this.usedReferences = [];
             this.specimenIds = [];
             this.resultsInterpreterEmployeeId = '';
-            this.issuedDate = toFormattedDate(now);
-            this.issuedTime = now.toLocaleTimeString('uk-UA', timeOptions);
-            this.effectivePeriodStartDate = toFormattedDate(startTime);
-            this.effectivePeriodStartTime = startTime.toLocaleTimeString('uk-UA', timeOptions);
-            this.effectivePeriodEndDate = toFormattedDate(now);
-            this.effectivePeriodEndTime = now.toLocaleTimeString('uk-UA', timeOptions);
+            // The report is registered within the encounter, so it defaults to the encounter period
+            const encounterDate = encounter?.periodDate;
+
+            this.issuedDate = encounterDate || toFormattedDate(now);
+            this.issuedTime = (encounterDate && encounter?.periodEnd) || now.toLocaleTimeString('uk-UA', timeOptions);
+            this.effectivePeriodStartDate = encounterDate || toFormattedDate(startTime);
+            this.effectivePeriodStartTime =
+                (encounterDate && encounter?.periodStart) || startTime.toLocaleTimeString('uk-UA', timeOptions);
+            this.effectivePeriodEndDate = encounterDate || toFormattedDate(now);
+            this.effectivePeriodEndTime =
+                (encounterDate && encounter?.periodEnd) || now.toLocaleTimeString('uk-UA', timeOptions);
 
             if (obj) {
                 Object.assign(this, JSON.parse(JSON.stringify(obj)));

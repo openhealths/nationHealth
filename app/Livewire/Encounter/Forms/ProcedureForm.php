@@ -11,6 +11,7 @@ use App\Enums\Status;
 use App\Models\Employee\Employee;
 use App\Models\Equipment;
 use App\Rules\InDictionary;
+use App\Rules\MedicalEvents\PaperReferralRules;
 use App\Rules\PrimarySourceRequiredForAssistant;
 use App\Rules\PastDateTime;
 use App\Rules\AfterOrEqualDateTime;
@@ -132,7 +133,7 @@ class ProcedureForm extends Form
             ),
             'procedures.*.reportOriginCode' => Rule::forEach(function (mixed $value, string $attribute) {
                 $index = (int)explode('.', $attribute)[1];
-                $primarySource = $this->procedures[$index]['primarySource'];
+                $primarySource = $this->procedures[$index]['primarySource'] ?? true;
 
                 return [
                     Rule::requiredIf($primarySource === false),
@@ -270,8 +271,7 @@ class ProcedureForm extends Form
                 }
             ),
             'procedures.*.note' => ['nullable', 'string'],
-            'procedures.*.paperReferralRequisition' => ['nullable', 'string', 'max:255'],
-            'procedures.*.paperReferralNote' => ['nullable', 'string'],
+            ...PaperReferralRules::for('procedures.*', $this->procedures),
             'procedures.*.isReferralAvailable' => ['nullable', 'boolean'],
             'procedures.*.referralType' => Rule::forEach(function (mixed $value, string $attribute) {
                 $index = (int)explode('.', $attribute)[1];
@@ -298,68 +298,6 @@ class ProcedureForm extends Form
                     'nullable',
                     'string',
                     'max:255',
-                ];
-            }),
-            'procedures.*.paperReferralRequesterEmployeeName' => Rule::forEach(
-                function (mixed $value, string $attribute) {
-                    $index = (int)explode('.', $attribute)[1];
-                    $procedure = $this->procedures[$index] ?? [];
-
-                    $isPaperReferral = ($procedure['referralType'] ?? '') === 'paper';
-                    $isElectronicReferral = ($procedure['referralType'] ?? '') === 'electronic';
-
-                    return [
-                        Rule::requiredIf($isPaperReferral),
-                        Rule::prohibitedIf($isElectronicReferral),
-                        'nullable',
-                        'string',
-                        'max:255',
-                    ];
-                }
-            ),
-            'procedures.*.paperReferralRequesterLegalEntityEdrpou' => Rule::forEach(
-                function (mixed $value, string $attribute) {
-                    $index = (int)explode('.', $attribute)[1];
-                    $procedure = $this->procedures[$index] ?? [];
-
-                    $isPaperReferral = ($procedure['referralType'] ?? '') === 'paper';
-                    $isElectronicReferral = ($procedure['referralType'] ?? '') === 'electronic';
-
-                    return [
-                        Rule::requiredIf($isPaperReferral),
-                        Rule::prohibitedIf($isElectronicReferral),
-                        'nullable',
-                        'digits_between:8,10',
-                    ];
-                }
-            ),
-            'procedures.*.paperReferralRequesterLegalEntityName' => Rule::forEach(
-                function (mixed $value, string $attribute) {
-                    $index = (int)explode('.', $attribute)[1];
-                    $procedure = $this->procedures[$index] ?? [];
-
-                    $isElectronicReferral = ($procedure['referralType'] ?? '') === 'electronic';
-
-                    return [
-                        Rule::prohibitedIf($isElectronicReferral),
-                        'nullable',
-                        'string',
-                        'max:255',
-                    ];
-                }
-            ),
-            'procedures.*.paperReferralServiceRequestDate' => Rule::forEach(function (mixed $value, string $attribute) {
-                $index = (int)explode('.', $attribute)[1];
-                $procedure = $this->procedures[$index] ?? [];
-
-                $isPaperReferral = ($procedure['referralType'] ?? '') === 'paper';
-                $isElectronicReferral = ($procedure['referralType'] ?? '') === 'electronic';
-
-                return [
-                    Rule::requiredIf($isPaperReferral),
-                    Rule::prohibitedIf($isElectronicReferral),
-                    'nullable',
-                    'date_format:' . config('app.date_format')
                 ];
             }),
             'procedures.*.usedCodes' => ['nullable', 'array'],

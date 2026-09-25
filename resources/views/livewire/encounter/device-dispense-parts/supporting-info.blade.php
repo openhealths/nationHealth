@@ -4,17 +4,20 @@
         class="fieldset"
         x-data="{
             openModal: false,
-            selectedSupportingInfoType: '',
-            selectedSupportingInfoEpisodeId: '',
-            selectedSupportingInfoIds: [],
-            episodes: @js($episodes),
-            episodeLabel(episode) {
-                const name = episode.name || episode.code || episode.uuid || '-';
-                const date = episode.startDate || episode.periodStart || '';
 
-                return date ? `${name} — ${date}` : name;
+            isSupportingInfoAdded(recordId) {
+                return modalDeviceDispense.supportingInfo.some((supporting) => supporting.uuid === recordId);
+            },
+
+            addSupportingInfo(record) {
+                if (this.isSupportingInfoAdded(record.uuid)) {
+                    return;
+                }
+
+                modalDeviceDispense.supportingInfo = modalDeviceDispense.supportingInfo.concat(record);
             },
         }"
+        @device-dispense-supporting-info-selected.window="addSupportingInfo($event.detail.record)"
     >
         <legend class="legend">
             <h2>{{ __('device-dispenses.supporting_info') }}</h2>
@@ -39,7 +42,8 @@
                                     const dictName =
                                         $wire.dictionaries['eHealth/LOINC/observation_codes'][supporting.code] ||
                                         $wire.dictionaries['eHealth/ICF/classifiers'][supporting.code] ||
-                                        $wire.dictionaries['eHealth/ICPC2/condition_codes'][supporting.code];
+                                        $wire.dictionaries['eHealth/ICPC2/condition_codes'][supporting.code] ||
+                                        supporting.description;
 
                                     if (dictName) {
                                         return `${supporting.code} - ${dictName}`;
@@ -140,18 +144,7 @@
 
         <div>
             {{-- Button to trigger the modal --}}
-            <button
-                @click.prevent="
-                    openModal = true;
-                    selectedSupportingInfoType = '';
-                    selectedSupportingInfoEpisodeId = '';
-                    selectedSupportingInfoIds = [];
-                    $wire.supportingInfoResults = [];
-                "
-                class="item-add my-5"
-            >
-                {{ __('forms.add') }}
-            </button>
+            <button @click.prevent="openModal = true" class="item-add my-5">{{ __('forms.add') }}</button>
 
             {{-- Modal --}}
             <template x-teleport="body">
@@ -185,196 +178,21 @@
                             <h3 class="modal-header" :id="$id('modal-title')">{{ __('forms.add') }}</h3>
 
                             {{-- Content --}}
-                            <form>
-                                <div class="mb-4 flex items-start gap-4">
-                                    <div class="form-group group min-w-0 flex-1">
-                                        <label for="deviceDispenseSupportingInfoType" class="sr-only">
-                                            {{ __('device-dispenses.supporting_info') }}
-                                        </label>
-                                        <select
-                                            x-model="selectedSupportingInfoType"
-                                            id="deviceDispenseSupportingInfoType"
-                                            @change="
-                                                $wire.supportingInfoResults = [];
-                                                selectedSupportingInfoIds = [];
-                                            "
-                                            class="input-modal peer"
-                                        >
-                                            <option value="" selected>
-                                                {{ __('forms.select') }} {{ __('device-dispenses.supporting_info') }}
-                                            </option>
-                                            <option value="condition">{{ __('conditions.plural') }}</option>
-                                            <option value="observation">{{ __('observations.plural') }}</option>
-                                            <option value="diagnosticReport">
-                                                {{ __('diagnostic-reports.plural') }}
-                                            </option>
-                                            <option value="procedure">{{ __('procedures.plural') }}</option>
-                                            <option value="encounter">{{ __('encounters.plural') }}</option>
-                                            <option value="episodes">{{ __('episodes.plural') }}</option>
-                                        </select>
-                                    </div>
+                            <livewire:encounter.supporting-info-search
+                                :patient-uuid="$patientUuid"
+                                selection-event="device-dispense-supporting-info-selected"
+                                is-added-check="isSupportingInfoAdded"
+                                :record-types="['condition', 'observation', 'diagnosticReport', 'procedure', 'encounter', 'episodes']"
+                                :episodes="$episodes"
+                                :with-episode-filter="true"
+                                :key="'device-dispense-supporting-info-search'"
+                            />
 
-                                    <div class="form-group group min-w-0 flex-1">
-                                        <label for="deviceDispenseSupportingInfoEpisode" class="sr-only">
-                                            {{ __('device-dispenses.select_episode_filter') }}
-                                        </label>
-                                        <select
-                                            x-model="selectedSupportingInfoEpisodeId"
-                                            id="deviceDispenseSupportingInfoEpisode"
-                                            @change="
-                                                $wire.supportingInfoResults = [];
-                                                selectedSupportingInfoIds = [];
-                                            "
-                                            class="input-modal peer"
-                                        >
-                                            <option value="">{{ __('device-dispenses.select_episode_filter') }}</option>
-
-                                            <template x-for="episode in episodes" :key="episode.uuid">
-                                                <option :value="episode.uuid" x-text="episodeLabel(episode)"></option>
-                                            </template>
-                                        </select>
-                                    </div>
-
-                                    <div class="shrink-0">
-                                        <button
-                                            @click.prevent="
-                                                $wire.searchSupportingInfo(
-                                                    selectedSupportingInfoType,
-                                                    selectedSupportingInfoEpisodeId || null,
-                                                )
-                                            "
-                                            class="button-primary flex items-center gap-2 whitespace-nowrap"
-                                            :disabled="! selectedSupportingInfoType"
-                                        >
-                                            @icon('search', 'w-4 h-4')
-                                            <span>{{ __('forms.search') }}</span>
-                                        </button>
-                                    </div>
-
-                                    <div class="shrink-0">
-                                        <x-forms.loading />
-                                    </div>
-                                </div>
-
-                                <template x-if="$wire.supportingInfoResults.length > 0">
-                                    <div class="table-container">
-                                        <div class="overflow-visible">
-                                            <table class="table-base">
-                                                <thead class="table-header">
-                                                    <tr>
-                                                        <th scope="col" class="th-input">{{ __('forms.date') }}</th>
-                                                        <th scope="col" class="th-input">
-                                                            {{ __('medical-events.code_and_name') }}
-                                                        </th>
-                                                        <th scope="col" class="th-input">{{ __('forms.action') }}</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <template
-                                                        x-for="result in $wire.supportingInfoResults"
-                                                        :key="result.uuid"
-                                                    >
-                                                        <tr class="border-b dark:border-gray-700">
-                                                            <th scope="row" class="table-cell-primary">
-                                                                <div
-                                                                    class="text-base"
-                                                                    x-text="result.ehealthInsertedAt || ''"
-                                                                ></div>
-                                                            </th>
-                                                            <td
-                                                                class="td-input"
-                                                                x-text="
-                                                                    (() => {
-                                                                        const dictName =
-                                                                            $wire.dictionaries[
-                                                                                'eHealth/LOINC/observation_codes'
-                                                                            ][result.code] ||
-                                                                            $wire.dictionaries[
-                                                                                'eHealth/ICF/classifiers'
-                                                                            ][result.code] ||
-                                                                            $wire.dictionaries[
-                                                                                'eHealth/ICPC2/condition_codes'
-                                                                            ][result.code];
-
-                                                                        if (dictName) {
-                                                                            return `${result.code} - ${dictName}`;
-                                                                        }
-
-                                                                        const service = Object.values(
-                                                                            $wire.dictionaries['custom/services'],
-                                                                        ).find((service) => service.id === result.code);
-                                                                        return service
-                                                                            ? `${service.code} / ${service.name}`
-                                                                            : result.code;
-                                                                    })()
-                                                                "
-                                                            ></td>
-                                                            <td class="td-input">
-                                                                <button
-                                                                    @click.prevent="
-                                                                        const id = result.uuid;
-                                                                        const index =
-                                                                            selectedSupportingInfoIds.indexOf(id);
-
-                                                                        if (index === -1) {
-                                                                            selectedSupportingInfoIds.push(id);
-                                                                        } else {
-                                                                            selectedSupportingInfoIds.splice(index, 1);
-                                                                        }
-                                                                    "
-                                                                    class="button-primary w-28"
-                                                                    x-text="selectedSupportingInfoIds.includes(result.uuid)
-                                                                        ? '{{ __('medical-events.added') }}'
-                                                                        : '{{ __('forms.add') }}'"
-                                                                ></button>
-                                                            </td>
-                                                        </tr>
-                                                    </template>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </template>
-
-                                <template x-if="$wire.supportingInfoResults.length <= 0">
-                                    <p class="default-p">{{ __('forms.nothing_found') }}</p>
-                                </template>
-
-                                {{-- Action buttons --}}
-                                <div class="mt-6 flex justify-between space-x-2">
-                                    <button
-                                        @click.prevent
-                                        type="button"
-                                        @click="openModal = false"
-                                        class="button-minor"
-                                    >
-                                        {{ __('forms.cancel') }}
-                                    </button>
-
-                                    <button
-                                        @click.prevent
-                                        @click="
-                                            const existingIds = modalDeviceDispense.supportingInfo.map(
-                                                (supportingInfo) => supportingInfo.uuid,
-                                            );
-
-                                            const newItems = $wire.supportingInfoResults.filter(
-                                                (result) =>
-                                                    selectedSupportingInfoIds.includes(result.uuid) &&
-                                                    ! existingIds.includes(result.uuid),
-                                            );
-
-                                            modalDeviceDispense.supportingInfo =
-                                                modalDeviceDispense.supportingInfo.concat(newItems);
-
-                                            openModal = false;
-                                        "
-                                        class="button-primary"
-                                    >
-                                        {{ __('forms.save') }}
-                                    </button>
-                                </div>
-                            </form>
+                            <div class="mt-6 flex justify-between space-x-2">
+                                <button type="button" @click="openModal = false" class="button-minor cursor-pointer">
+                                    {{ __('forms.close') }}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

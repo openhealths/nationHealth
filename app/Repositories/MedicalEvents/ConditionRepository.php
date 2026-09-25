@@ -232,7 +232,8 @@ class ConditionRepository extends BaseRepository
     }
 
     /**
-     * Sync condition data and related data by deleting and creating.
+     * Update the given conditions with their related data, or create the ones not stored yet.
+     * Conditions left out of the given data are kept as they are.
      *
      * @param  Person|Preperson  $patient
      * @param  array  $validatedData

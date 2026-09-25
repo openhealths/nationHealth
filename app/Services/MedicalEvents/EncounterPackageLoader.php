@@ -50,9 +50,12 @@ class EncounterPackageLoader
             ->filter()
             ->values();
 
+        $encounterConditions = Repository::condition()->get($encounter['uuid']);
+        $encounterConditionIds = collect($encounterConditions)->pluck('uuid');
+
         $conditions = array_merge(
             Repository::condition()->getByUuids($conditionIds->toArray()),
-            Repository::condition()->get($encounter['uuid'])
+            $encounterConditions
         );
 
         $conditionsById = collect($conditions)->keyBy('uuid');
@@ -79,7 +82,11 @@ class EncounterPackageLoader
         return $conditionIds
             ->merge($conditionsById->keys()->diff($conditionIds))
             ->map(static fn (string $conditionId): array => $conditionsById->get($conditionId))
-            ->map(static fn (array $condition): array => Fhir::condition()->fromFhir($condition, $detailsMap))
+            ->map(static fn (array $condition): array => [
+                ...Fhir::condition()->fromFhir($condition, $detailsMap),
+                // A diagnosis may reference a condition registered before this encounter
+                'isRegistered' => !$encounterConditionIds->contains($condition['uuid'])
+            ])
             ->values()
             ->toArray();
     }

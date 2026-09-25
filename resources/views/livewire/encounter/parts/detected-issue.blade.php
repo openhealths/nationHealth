@@ -560,9 +560,6 @@
 
                         <div class="form-row-2" x-show="modalDetectedIssue.primarySource === false" x-cloak>
                             <div class="form-group group">
-                                <label for="detectedIssueReportOrigin" class="sr-only">
-                                    {{ __('medical-events.information_source') }}
-                                </label>
                                 <select
                                     x-model="modalDetectedIssue.reportOriginCode"
                                     id="detectedIssueReportOrigin"
@@ -577,7 +574,10 @@
                                         <option value="{{ $code }}">{{ $reportOrigin }}</option>
                                     @endforeach
                                 </select>
-                                <label class="label">{{ __('medical-events.source_link') }}</label>
+                                <label
+                                    for="detectedIssueReportOrigin"
+                                    class="label"
+                                >{{ __('medical-events.source_link') }}</label>
                             </div>
                         </div>
                     </div>

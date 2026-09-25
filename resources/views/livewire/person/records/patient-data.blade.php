@@ -91,10 +91,15 @@
                                 {{ __('patients.discharge_patient') }}
                             </a>
                         @endcan
-                        <a href="#" class="dropdown-item">
-                            @icon('cancel', 'w-4 h-4 text-gray-500 shrink-0')
-                            {{ __('patients.hospitalization_refusal') }}
-                        </a>
+                        @can('create', Encounter::class)
+                            <a
+                                href="{{ route('encounter.create', [legalEntity(), 'person' => $personId, 'type' => 'hospitalization_refusal']) }}"
+                                class="dropdown-item"
+                            >
+                                @icon('cancel', 'w-4 h-4 text-gray-500 shrink-0')
+                                {{ __('patients.hospitalization_refusal') }}
+                            </a>
+                        @endcan
                     </div>
                 </div>
             </div>

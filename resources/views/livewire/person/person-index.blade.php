@@ -347,21 +347,27 @@
                                                             </a>
                                                         @endcan
 
-                                                        <a
-                                                            class="dropdown-item"
-                                                            @click="close($refs.button)"
-                                                        >
-                                                            @icon('hospital-bed', 'w-5 h-5 text-gray-500')
-                                                            {{ __('patients.discharge_patient') }}
-                                                        </a>
+                                                        @can('create', Encounter::class)
+                                                            <a
+                                                                wire:click="redirectTo('{{ $patient['id'] }}', 'encounter.create', { type: 'discharge' })"
+                                                                class="dropdown-item"
+                                                                @click="close($refs.button)"
+                                                            >
+                                                                @icon('hospital-bed', 'w-5 h-5 text-gray-500')
+                                                                {{ __('patients.discharge_patient') }}
+                                                            </a>
+                                                        @endcan
 
-                                                        <a
-                                                            class="dropdown-item"
-                                                            @click="close($refs.button)"
-                                                        >
-                                                            @icon('cancel', 'w-5 h-5 text-gray-500')
-                                                            {{ __('patients.hospitalization_refusal') }}
-                                                        </a>
+                                                        @can('create', Encounter::class)
+                                                            <a
+                                                                wire:click="redirectTo('{{ $patient['id'] }}', 'encounter.create', { type: 'hospitalization_refusal' })"
+                                                                class="dropdown-item"
+                                                                @click="close($refs.button)"
+                                                            >
+                                                                @icon('cancel', 'w-5 h-5 text-gray-500')
+                                                                {{ __('patients.hospitalization_refusal') }}
+                                                            </a>
+                                                        @endcan
                                                     </div>
                                                 </div>
                                             @endif

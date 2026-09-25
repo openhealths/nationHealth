@@ -85,6 +85,7 @@ class EncounterEdit extends EncounterComponent
         }
 
         $this->form->encounter = $package['encounter'];
+        $this->isDischarge = ($package['encounter']['typeCode'] ?? null) === 'discharge';
         $this->conditionForm->conditions = $package['conditions'];
         $this->immunizationForm->immunizations = $package['immunizations'];
         $this->diagnosticReportForm->diagnosticReports = $package['diagnosticReports'];
@@ -157,6 +158,18 @@ class EncounterEdit extends EncounterComponent
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
             $this->dispatch('scroll-to-error');
+
+            return null;
+        }
+
+        try {
+            $this->syncRegisteredConditions($validated['conditions'] ?? []);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while getting registered conditions');
+
+            return null;
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Failed to store registered conditions');
 
             return null;
         }
@@ -292,16 +305,6 @@ class EncounterEdit extends EncounterComponent
         unset($formattedData['encounter']['incoming_referral']['display_value']);
 
         try {
-            $this->validateEncounterPerformer($formattedData);
-        } catch (ValidationException $exception) {
-            Session::flash('error', $exception->validator->errors()->first());
-
-            $this->setErrorBag($exception->validator->getMessageBag());
-
-            return;
-        }
-
-        try {
             $signedContent = new CipherRequest()->signData(
                 $formattedData,
                 $validated['knedp'],
@@ -331,7 +334,7 @@ class EncounterEdit extends EncounterComponent
             }
 
             if (!$jobId) {
-                throw new \RuntimeException('Не вдалося отримати Job ID від ЕСОЗ.');
+                throw new \RuntimeException(__('encounters.messages.job_id_not_received'));
             }
 
             $jobApi = EHealth::job();
@@ -363,7 +366,7 @@ class EncounterEdit extends EncounterComponent
             $syncData = EHealth::encounter()->getById($this->patientUuid, $encounterUuid)->validate();
             Repository::encounter()->sync($this->patient(), [$syncData]);
 
-            Session::flash('success', 'Взаємодію успішно підписано та надіслано до ЕСОЗ.');
+            Session::flash('success', __('encounters.messages.signed_and_sent'));
             $this->showSignatureModal = false;
 
             if ($this->prepersonId !== null) {

@@ -149,6 +149,7 @@ class DeviceForm extends Form
             'devices.*.properties.*' => [
                 'array',
                 static function (string $attribute, mixed $value, Closure $fail): void {
+                    $position = (int) explode('.', $attribute)[1] + 1;
                     $provided = array_filter(
                         [
                             'valueCodeableConceptCode',
@@ -162,13 +163,13 @@ class DeviceForm extends Form
                     );
 
                     if ($provided === []) {
-                        $fail(__('devices.validation.property_value_required'));
+                        $fail(__('devices.validation.property_value_required', ['position' => $position]));
 
                         return;
                     }
 
                     if (count($provided) > 1) {
-                        $fail(__('devices.validation.property_single_value'));
+                        $fail(__('devices.validation.property_single_value', ['position' => $position]));
                     }
                 }
             ],

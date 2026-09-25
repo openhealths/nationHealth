@@ -7,7 +7,6 @@ namespace App\Livewire\Procedure;
 use App\Classes\eHealth\EHealth;
 use App\Classes\Cipher\Api\CipherRequest;
 use App\Core\Arr;
-use App\Enums\Person\ObservationStatus;
 use App\Enums\Person\ServiceRequestStatus;
 use App\Enums\Status;
 use App\Enums\User\Role;
@@ -99,13 +98,6 @@ class ProcedureComponent extends Component
      * @var string
      */
     public string $employeeFullName;
-
-    /**
-     * Search results for reason references (conditions or observations).
-     *
-     * @var array
-     */
-    public array $reasonReferenceResults = [];
 
     /**
      * List of employees available as procedure performers.
@@ -406,65 +398,6 @@ class ProcedureComponent extends Component
         }
 
         return $this->prepareFormattedData($validated, $this->procedureUuid);
-    }
-
-    /**
-     * Search conditions or observations to use as Procedure reason references.
-     *
-     * @param  string  $type  Reference type: condition or observation.
-     * @return void
-     */
-    public function searchReasonReferences(string $type): void
-    {
-        try {
-            $this->reasonReferenceResults = $this->fetchConditionsOrObservations($type);
-        } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle('Error while getting procedure reason references');
-        }
-    }
-
-    /**
-     * Fetch patient conditions or observations from eHealth.
-     *
-     * @param  string  $type  Reference type: condition or observation.
-     * @return array
-     * @throws EHealthConnectionException|EHealthException
-     */
-    private function fetchConditionsOrObservations(string $type): array
-    {
-        $api = $type === 'observation' ? EHealth::observation() : EHealth::condition();
-
-        $response = $api->getBySearchParams(
-            $this->patientUuid,
-            ['managing_organization_id' => legalEntity()->uuid]
-        );
-
-        $results = collect($response->validate())
-            ->when($type === 'observation', fn ($collection) => $collection->filter(
-                static fn (array $item) => data_get($item, 'status') !== ObservationStatus::ENTERED_IN_ERROR->value
-            ))
-            ->map(static function (array $item) use ($type) {
-                $date = data_get($item, 'ehealth_inserted_at');
-
-                if ($type === 'condition') {
-                    $date ??= data_get($item, 'asserted_date');
-                    $date ??= data_get($item, 'onset_date');
-                }
-
-                return [
-                    'id' => data_get($item, 'uuid'),
-                    'ehealthInsertedAt' => $date ? convertToAppDateFormat($date) : null,
-                    'codeCode' => data_get($item, 'code.coding.0.code'),
-                    'codeSystem' => data_get($item, 'code.coding.0.system'),
-                    'type' => $type,
-                ];
-            })
-            ->values()
-            ->all();
-
-        $this->loadIcd10Descriptions($results);
-
-        return $results;
     }
 
     /**
