@@ -181,8 +181,9 @@
                                 class="form-group group"
                                 x-data="{
                                     showReferrals: false,
-                                    referralNumber: '',
-                                    referrals: @js($availableReferrals ?? []),
+                                    referralExhausted: false,
+                                    referralNumber: modalDiagnosticReport.referralNumber ?? '',
+                                    referrals: @js($context === 'encounter' && !($isReadonly ?? false) ? [] : ($availableReferrals ?? [])),
 
                                     init() {
                                         const selectedReferral = this.referrals.find(
@@ -207,6 +208,31 @@
                                             .toUpperCase();
                                     },
 
+                                    async searchReferrals() {
+                                        const value = this.normalize(this.referralNumber);
+
+                                        this.referralExhausted = false;
+                                        modalDiagnosticReport.basedOnIdentifier = '';
+                                        modalDiagnosticReport.categoryCode = '';
+                                        modalDiagnosticReport.codeValue = '';
+                                        selectedServiceFromCatalog = null;
+
+                                        if (!value) {
+                                            this.referrals = [];
+                                            this.showReferrals = false;
+                                            return;
+                                        }
+
+                                        const referrals = await $wire.searchElectronicReferrals(value);
+
+                                        if (value !== this.normalize(this.referralNumber)) {
+                                            return;
+                                        }
+
+                                        this.referrals = referrals;
+                                        this.showReferrals = true;
+                                    },
+
                                     get filteredReferrals() {
                                         const value = this.normalize(this.referralNumber);
 
@@ -220,8 +246,13 @@
                                     },
 
                                     applyReferral(referral) {
-                                        if (!referral?.isDiagnosticReportAllowed) {
+                                        this.referralExhausted = referral?.isExhausted === true;
+
+                                        if (this.referralExhausted || !referral?.isDiagnosticReportAllowed) {
                                             modalDiagnosticReport.basedOnIdentifier = '';
+                                            modalDiagnosticReport.categoryCode = '';
+                                            modalDiagnosticReport.codeValue = '';
+                                            selectedServiceFromCatalog = null;
 
                                             return;
                                         }
@@ -232,29 +263,23 @@
                                         selectedServiceFromCatalog = referral.service;
                                     },
 
-                                    syncReferral() {
-                                        const value = this.normalize(this.referralNumber);
-
-                                        const referral = this.referrals.find(
-                                            item => this.normalize(item.requisition) === value
-                                        );
-
-                                        this.applyReferral(referral);
-                                    },
-
                                     selectReferral(referral) {
                                         this.referralNumber = referral.requisition;
+                                        modalDiagnosticReport.referralNumber = referral.requisition;
                                         this.applyReferral(referral);
                                         this.showReferrals = false;
                                     },
 
                                     clearReferral() {
                                         this.referralNumber = '';
+                                        this.referralExhausted = false;
+                                        modalDiagnosticReport.referralNumber = '';
                                         modalDiagnosticReport.basedOnIdentifier = '';
                                         modalDiagnosticReport.categoryCode = '';
                                         modalDiagnosticReport.codeValue = '';
                                         selectedServiceFromCatalog = null;
-                                        this.showReferrals = true;
+                                        this.referrals = [];
+                                        this.showReferrals = false;
                                     }
                                 }"
                                 @click.outside="showReferrals = false"
@@ -263,12 +288,11 @@
                                     <input
                                         x-model="referralNumber"
                                         @unless ($isReadonly ?? false)
-                                            @focus="showReferrals = true"
-                                            @input="
-                                                referralNumber = $el.value.toUpperCase();
-                                                syncReferral();
-                                                showReferrals = true;
-                                            "
+                                        @focus="if (referrals.length > 0) showReferrals = true"
+                                        @input.debounce.1000ms="
+                                            referralNumber = $el.value.toUpperCase();
+                                            searchReferrals();
+                                        "
                                         @endunless
                                         type="text"
                                         id="diagnosticReportBasedOnIdentifier"
@@ -302,18 +326,25 @@
                                             <button
                                                 type="button"
                                                 @click="selectReferral(referral)"
-                                                :disabled="!referral.isDiagnosticReportAllowed"
-                                                :class="referral.isDiagnosticReportAllowed ? 'hover:bg-gray-100 dark:hover:bg-gray-700' : 'cursor-not-allowed'"
+                                                :disabled="referral.isExhausted || !referral.isDiagnosticReportAllowed"
+                                                :class="!referral.isExhausted && referral.isDiagnosticReportAllowed ? 'hover:bg-gray-100 dark:hover:bg-gray-700' : 'cursor-not-allowed'"
                                                 class="w-full rounded-md px-3 py-2 text-left"
                                             >
                                                 <div
-                                                    :class="referral.isDiagnosticReportAllowed ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'"
+                                                    :class="!referral.isExhausted && referral.isDiagnosticReportAllowed ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'"
                                                     class="font-medium"
                                                     x-text="referral.requisition"
                                                 ></div>
 
                                                 <div
-                                                    x-show="!referral.isDiagnosticReportAllowed"
+                                                    x-show="referral.isExhausted"
+                                                    class="mt-1 text-xs text-gray-400 dark:text-gray-500"
+                                                >
+                                                    {{ __('medical-events.referral.exhausted') }}
+                                                </div>
+
+                                                <div
+                                                    x-show="!referral.isExhausted && !referral.isDiagnosticReportAllowed"
                                                     class="mt-1 text-xs text-gray-400 dark:text-gray-500"
                                                 >
                                                     {{ __('diagnostic-reports.validation.referral_not_allowed') }}

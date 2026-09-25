@@ -48,6 +48,7 @@ use App\Services\MedicalEvents\Fhir;
 use App\Services\Dictionary\Mappers\ImmunizationDictionaryMapper;
 use App\Services\MedData\MedData;
 use App\Traits\FormTrait;
+use App\Traits\SearchesElectronicReferrals;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -55,10 +56,12 @@ use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Carbon\CarbonImmutable;
+use Throwable;
 
 class EncounterComponent extends Component
 {
     use FormTrait;
+    use SearchesElectronicReferrals;
     use WithFileUploads;
 
     public Form $form;
@@ -532,6 +535,51 @@ class EncounterComponent extends Component
         $this->adjustEncounterTypes();
     }
 
+    protected function storePackageElectronicReferralsIfMissing(): void
+    {
+        if ($this->personId === null) {
+            return;
+        }
+
+        $this->storeElectronicReferralsFromRecords(
+            $this->procedureForm->procedures,
+            Auth::user()->getProcedureWriterEmployee()
+        );
+
+        $this->storeElectronicReferralsFromRecords(
+            $this->diagnosticReportForm->diagnosticReports,
+            Auth::user()->getDiagnosticReportWriterEmployee()
+        );
+    }
+
+    private function storeElectronicReferralsFromRecords(array $records, ?Employee $employee): void {
+        if ($employee === null) {
+            return;
+        }
+
+        foreach ($records as $record) {
+            if (($record['referralType'] ?? null) !== 'electronic') {
+                continue;
+            }
+
+            $uuid = data_get($record, 'basedOnIdentifier');
+            $requestNumber = data_get($record, 'referralNumber');
+            $serviceId = data_get($record, 'codeValue');
+
+            if (blank($uuid) || blank($requestNumber) || blank($serviceId)) {
+                continue;
+            }
+
+            MedicalEventsRepository::serviceRequest()->storeExternalIfMissing([
+                'uuid' => (string) $uuid,
+                'request_number' => (string) $requestNumber,
+                'service_id' => (string) $serviceId,
+                'employee_id' => $employee->id,
+                'division_id' => $employee->divisionId,
+            ], $this->personId);
+        }
+    }
+
     /**
      * Load available patient referrals from the local database.
      */
@@ -553,7 +601,7 @@ class EncounterComponent extends Component
 
         // category is a CodeableConcept relation (category_id), not a string column
         $this->availableReferrals = MedicalEventsRepository::serviceRequest()
-            ->getByPersonIdAndStatus($this->personId, ServiceRequestStatus::PROCESSED->value, ['uuid', 'request_number', 'service_id', 'category_id'])
+            ->getByPersonIdAndStatus($this->personId, ServiceRequestStatus::ACTIVE->value, ['uuid', 'request_number', 'service_id', 'category_id'])
             ->loadMissing('category')
             ->map(static function (ServiceRequestRequest $referral) use ($services, $procedureCategories, $diagnosticReportCategories): array {
                 $service = $services->firstWhere('id', $referral->serviceId);
@@ -646,7 +694,7 @@ class EncounterComponent extends Component
      *
      * @return void
      */
-    protected function initializeComponent(): void
+    protected function initializeComponent(bool $loadEpisodes = true): void
     {
         $authUser = Auth::user();
         $encounterWriterEmployee = $authUser->getEncounterWriterEmployee();
@@ -767,7 +815,9 @@ class EncounterComponent extends Component
             $this->form->encounter['divisionId'] = $this->divisions[0]['uuid'];
         }
 
-        $this->getEpisodes();
+        if ($loadEpisodes) {
+            $this->getEpisodes();
+        }
     }
 
     /**

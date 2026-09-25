@@ -38,6 +38,7 @@ return [
         'author' => 'Автор',
         'edrpou_of_the_issuing_institution' => 'ЄДРПОУ закладу, що виписав',
         'name_of_the_institution_that_issued_it' => 'Найменування закладу, що виписав',
+        'exhausted' => 'Це електронне направлення вже вичерпано.',
         'notes' => 'Нотатки',
         'number' => 'Номер',
         'date' => 'Дата'

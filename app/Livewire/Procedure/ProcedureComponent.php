@@ -8,18 +8,18 @@ use App\Classes\eHealth\EHealth;
 use App\Classes\Cipher\Api\CipherRequest;
 use App\Core\Arr;
 use App\Enums\Person\ObservationStatus;
-use App\Enums\Person\ServiceRequestStatus;
 use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Livewire\Procedure\Forms\ProcedureForm as Form;
 use App\Repositories\MedicalEvents\Repository;
-use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
 use App\Models\Equipment;
 use App\Models\Preperson;
+use App\Models\MedicalEvents\Sql\Procedure;
+use App\Traits\SearchesElectronicReferrals;
 use App\Services\MedicalEvents\Fhir;
 use App\Traits\FormTrait;
 use App\Exceptions\EHealth\EHealthConnectionException;
@@ -38,6 +38,7 @@ use Throwable;
 class ProcedureComponent extends Component
 {
     use FormTrait;
+    use SearchesElectronicReferrals;
     use WithFileUploads;
 
     public Form $form;
@@ -116,8 +117,6 @@ class ProcedureComponent extends Component
 
     public array $availableReferrals = [];
 
-    public bool $referralsLoaded = false;
-
     public bool $showSignatureModal = false;
 
     #[Locked]
@@ -167,10 +166,6 @@ class ProcedureComponent extends Component
         $this->employeeFullName = Auth::user()->getProcedureWriterEmployee()->fullName;
 
         $this->setPatientData();
-
-        if (request()->routeIs('*procedure.create')) {
-            $this->loadAvailableReferrals();
-        }
 
         // Get all active divisions of current legal entity
         $this->divisions = $legalEntity->divisions()
@@ -231,43 +226,29 @@ class ProcedureComponent extends Component
             ->toArray();
     }
 
-    protected function loadAvailableReferrals(): void
+    protected function storeElectronicReferralIfMissing(): void
     {
-        if ($this->referralsLoaded) {
+        if ($this->personId === null || data_get($this->form->procedure, 'referralType') !== 'electronic') {
             return;
         }
 
-        if ($this->personId === null) {
-            $this->referralsLoaded = true;
+        $uuid = data_get($this->form->procedure, 'basedOnIdentifier');
+        $requestNumber = data_get($this->form->procedure, 'referralNumber');
+        $serviceId = data_get($this->form->procedure, 'codeValue');
 
+        if (blank($uuid) || blank($requestNumber) || blank($serviceId)) {
             return;
         }
 
-        $services = collect($this->dictionaries['custom/services'] ?? []);
-        $procedureCategories = array_keys($this->dictionaries['eHealth/procedure_categories'] ?? []);
+        $employee = Auth::user()->getProcedureWriterEmployee();
 
-        // category is a CodeableConcept relation (category_id), not a string column
-        $this->availableReferrals = Repository::serviceRequest()
-            ->getByPersonIdAndStatus($this->personId, ServiceRequestStatus::PROCESSED->value, ['uuid', 'request_number', 'service_id', 'category_id'])
-            ->loadMissing('category')
-            ->map(static function (ServiceRequestRequest $referral) use ($services, $procedureCategories): array {
-                $service = $services->firstWhere('id', $referral->serviceId);
-                $category = strtolower((string) ($referral->category?->text ?? ''));
-
-                return [
-                    'id' => $referral->uuid,
-                    'requisition' => $referral->requestNumber ?: $referral->uuid,
-                    'category' => $category !== ''
-                        ? __('care-plan.referral_category.'.$category)
-                        : __('procedures.electronic_referral'),
-                    'service' => $service,
-                    'isProcedureAllowed' => $service !== null && in_array($service['category'] ?? null, $procedureCategories, true),
-                ];
-            })
-            ->values()
-            ->toArray();
-
-        $this->referralsLoaded = true;
+        Repository::serviceRequest()->storeExternalIfMissing([
+            'uuid' => (string) $uuid,
+            'request_number' => (string) $requestNumber,
+            'service_id' => (string) $serviceId,
+            'employee_id' => $employee->id,
+            'division_id' => $employee->divisionId,
+        ], $this->personId);
     }
 
     public function openSignatureModal(array $procedureData): void

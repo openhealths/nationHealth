@@ -76,8 +76,9 @@
                             class="form-group group"
                             x-data="{
                                 showReferrals: false,
-                                referralNumber: '',
-                                referrals: @js($availableReferrals ?? []),
+                                referralExhausted: false,
+                                referralNumber: modalProcedure.referralNumber ?? '',
+                                referrals: @js($context === 'encounter' && !($isReadonly ?? false) ? [] : ($availableReferrals ?? [])),
 
                                 init() {
                                     const selectedReferral = this.referrals.find(
@@ -100,6 +101,32 @@
                                         .toUpperCase();
                                 },
 
+                                async searchReferrals() {
+                                    const value = this.normalize(this.referralNumber);
+                                    this.referralExhausted = false;
+
+                                    modalProcedure.basedOnIdentifier = '';
+                                    modalProcedure.categoryCode = '';
+                                    modalProcedure.codeValue = '';
+                                    selectedServiceFromCatalog = null;
+
+                                    if (!value) {
+                                        this.referrals = [];
+                                        this.showReferrals = false;
+
+                                        return;
+                                    }
+
+                                    const referrals = await $wire.searchElectronicReferrals(value);
+
+                                    if (value !== this.normalize(this.referralNumber)) {
+                                        return;
+                                    }
+
+                                    this.referrals = referrals;
+                                    this.showReferrals = true;
+                                },
+
                                 get filteredReferrals() {
                                     const value = this.normalize(this.referralNumber);
 
@@ -113,8 +140,14 @@
                                 },
 
                                 applyReferral(referral) {
-                                    if (!referral?.isProcedureAllowed) {
+                                    this.referralExhausted = referral?.isExhausted === true;
+
+                                    if (this.referralExhausted || !referral?.isProcedureAllowed) {
                                         modalProcedure.basedOnIdentifier = '';
+                                        modalProcedure.categoryCode = '';
+                                        modalProcedure.codeValue = '';
+                                        selectedServiceFromCatalog = null;
+
                                         return;
                                     }
 
@@ -124,29 +157,23 @@
                                     selectedServiceFromCatalog = referral.service;
                                 },
 
-                                syncReferral() {
-                                    const value = this.normalize(this.referralNumber);
-
-                                    const referral = this.referrals.find(
-                                        item => this.normalize(item.requisition) === value
-                                    );
-
-                                    this.applyReferral(referral);
-                                },
-
                                 selectReferral(referral) {
                                     this.referralNumber = referral.requisition;
+                                    modalProcedure.referralNumber = referral.requisition;
                                     this.applyReferral(referral);
                                     this.showReferrals = false;
                                 },
 
                                 clearReferral() {
                                     this.referralNumber = '';
+                                    modalProcedure.referralNumber = '';
                                     modalProcedure.basedOnIdentifier = '';
                                     modalProcedure.categoryCode = '';
                                     modalProcedure.codeValue = '';
                                     selectedServiceFromCatalog = null;
-                                    this.showReferrals = true;
+                                    this.referrals = [];
+                                    this.showReferrals = false;
+                                    this.referralExhausted = false;
                                 }
                             }"
                             @click.outside="showReferrals = false"
@@ -155,12 +182,11 @@
                                 <input
                                     x-model="referralNumber"
                                     @unless ($isReadonly ?? false)
-                                        @focus="showReferrals = true"
-                                        @input="
-                                            referralNumber = $el.value.toUpperCase();
-                                            syncReferral();
-                                            showReferrals = true;
-                                        "
+                                    @focus="if (referrals.length > 0) showReferrals = true"
+                                    @input.debounce.1000ms="
+                                        referralNumber = $el.value.toUpperCase();
+                                        searchReferrals();
+                                    "
                                     @endunless
                                     type="text"
                                     name="basedOnIdentifier"
@@ -195,18 +221,25 @@
                                         <button
                                             type="button"
                                             @click="selectReferral(referral)"
-                                            :disabled="!referral.isProcedureAllowed"
-                                            :class="referral.isProcedureAllowed ? 'hover:bg-gray-100 dark:hover:bg-gray-700' : 'cursor-not-allowed'"
+                                            :disabled="referral.isExhausted || !referral.isProcedureAllowed"
+                                            :class="!referral.isExhausted && referral.isProcedureAllowed ? 'hover:bg-gray-100 dark:hover:bg-gray-700' : 'cursor-not-allowed'"
                                             class="w-full rounded-md px-3 py-2 text-left"
                                         >
                                             <div
-                                                :class="referral.isProcedureAllowed ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'"
+                                                :class="!referral.isExhausted && referral.isProcedureAllowed ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'"
                                                 class="font-medium"
                                                 x-text="referral.requisition"
                                             ></div>
 
                                             <div
-                                                x-show="!referral.isProcedureAllowed"
+                                                x-show="referral.isExhausted"
+                                                class="mt-1 text-xs text-gray-400 dark:text-gray-500"
+                                            >
+                                                {{ __('medical-events.referral.exhausted') }}
+                                            </div>
+
+                                            <div
+                                                x-show="!referral.isExhausted && !referral.isProcedureAllowed"
                                                 class="mt-1 text-xs text-gray-400 dark:text-gray-500"
                                             >
                                                 {{ __('procedures.validation.referral_not_allowed') }}

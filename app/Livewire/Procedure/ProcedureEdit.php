@@ -8,7 +8,6 @@ use App\Core\Arr;
 use App\Models\Division;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Procedure;
-use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
@@ -77,9 +76,7 @@ class ProcedureEdit extends ProcedureComponent
             $this->form->procedure['isReferralAvailable'] = true;
             $this->form->procedure['referralType'] = 'electronic';
 
-            $this->loadSelectedElectronicReferral(
-                $this->form->procedure['basedOnIdentifier']
-            );
+            $this->form->procedure['referralNumber'] = $this->loadSelectedElectronicReferral($this->form->procedure['basedOnIdentifier']);
         }
 
         $divisionUuid = data_get($this->form->procedure, 'divisionId');
@@ -95,25 +92,29 @@ class ProcedureEdit extends ProcedureComponent
         $this->loadIcd10Descriptions($this->form->procedure['reasonReferences'] ?? []);
     }
 
-    private function loadSelectedElectronicReferral(string $uuid): void
+    protected function loadSelectedElectronicReferral(string $uuid): string
     {
-        $referral = ServiceRequestRequest::query()
-            ->where('uuid', $uuid)
-            ->first();
+        $referral = Repository::serviceRequest()->findByUuid($uuid);
 
         if ($referral === null) {
-            return;
+            return '';
         }
+
+        $services = collect($this->dictionaries['custom/services'] ?? []);
+        $procedureCategories = array_keys($this->dictionaries['eHealth/procedure_categories'] ?? []);
+        $service = $services->firstWhere('id', $referral->serviceId);
 
         $this->availableReferrals = [
             [
                 'id' => $referral->uuid,
-                'requisition' => $referral->requestNumber ?: $referral->uuid,
-                'category' => $referral->category ?: __('procedures.electronic_referral'),
+                'requisition' => $referral->requestNumber ?? '',
+                'category' => $referral->category ? __('care-plan.referral_category.'.$referral->category) : __('procedures.electronic_referral'),
+                'service' => $service,
+                'isProcedureAllowed' => $service !== null && in_array($service['category'] ?? null, $procedureCategories, true),
             ],
         ];
 
-        $this->referralsLoaded = true;
+        return $referral->requestNumber ?? '';
     }
 
     /**
@@ -122,6 +123,8 @@ class ProcedureEdit extends ProcedureComponent
     protected function persist(array $formattedData): int
     {
         return DB::transaction(function () use ($formattedData) {
+            $this->storeElectronicReferralIfMissing();
+            
             Repository::procedure()->sync($this->patient(), [$this->fhirToSync($formattedData)]);
 
             return $this->procedureId;

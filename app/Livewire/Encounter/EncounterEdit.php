@@ -64,7 +64,6 @@ class EncounterEdit extends EncounterComponent
             $this->personId = $person->id;
         }
 
-        $this->initializeComponent();
         $this->encounterId = $encounterId;
 
         $encounterModel = Encounter::withRelationships()->whereId($encounterId)->firstOrFail();
@@ -74,6 +73,7 @@ class EncounterEdit extends EncounterComponent
 
         $encounter = $encounterModel->toArray();
         $this->isReadonly = $encounter['status'] !== EncounterStatus::DRAFT->value;
+        $this->initializeComponent(loadEpisodes: !$this->isReadonly);
 
         $package = Fhir::encounterPackageLoader()->load($encounter);
 
@@ -90,9 +90,6 @@ class EncounterEdit extends EncounterComponent
         $this->diagnosticReportForm->diagnosticReports = $package['diagnosticReports'];
         $this->observationForm->observations = $package['observations'];
         $this->procedureForm->procedures = $package['procedures'];
-        if ($this->isReadonly) {
-            $this->loadProcedureReferralsForView($package['procedures']);
-        }
         $this->deviceDispenseForm->deviceDispenses = $package['deviceDispenses'];
         $this->specimenForm->specimens = $package['specimens'];
         $this->deviceForm->devices = $package['devices'];
@@ -101,6 +98,11 @@ class EncounterEdit extends EncounterComponent
         $this->clinicalImpressionForm->clinicalImpressions = $package['clinicalImpressions'];
 
         if ($this->isReadonly) {
+            $this->loadSelectedReferralsForView([
+                ...$package['procedures'],
+                ...$package['diagnosticReports'],
+            ]);
+
             $basedOnIds = collect($package['detectedIssues'])
                 ->pluck('basedOnId')
                 ->filter()
@@ -184,6 +186,7 @@ class EncounterEdit extends EncounterComponent
         $fhirClinicalImpressions = $fhir['clinicalImpressions'];
 
         try {
+            $this->storePackageElectronicReferralsIfMissing();
             Repository::encounter()->sync($this->patient(), [$this->fhirToSync($fhirEncounter)]);
             Repository::condition()->sync($this->patient(), array_map($this->fhirToSync(...), $fhirConditions));
             Repository::immunization()->sync($this->patient(), array_map($this->fhirToSync(...), $fhirImmunizations));
@@ -405,9 +408,9 @@ class EncounterEdit extends EncounterComponent
         $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
     }
 
-    private function loadProcedureReferralsForView(array $procedures): void
+    private function loadSelectedReferralsForView(array $records): void
     {
-        $referralIds = collect($procedures)
+        $referralIds = collect($records)
             ->pluck('basedOnIdentifier')
             ->filter()
             ->unique()
@@ -428,13 +431,13 @@ class EncounterEdit extends EncounterComponent
             ->map(static function (string $referralId) use ($referrals): ?array {
                 $referral = $referrals->get($referralId);
 
-                if ($referral === null) {
+                if ($referral === null || blank($referral->requestNumber)) {
                     return null;
                 }
 
                 return [
                     'id' => $referral->uuid,
-                    'requisition' => $referral->requestNumber ?: $referral->uuid,
+                    'requisition' => $referral->requestNumber,
                 ];
             })
             ->filter()

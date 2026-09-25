@@ -4,12 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\DiagnosticReport;
 
-use App\Models\LegalEntity;
-use App\Models\Person\Person;
-use App\Models\Preperson;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
-use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
-use App\Enums\Person\ServiceRequestStatus;
 use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -18,59 +13,6 @@ use Throwable;
 
 class DiagnosticReportCreate extends DiagnosticReportComponent
 {
-    public function mount(
-        LegalEntity $legalEntity,
-        ?Person $person = null,
-        ?Preperson $preperson = null
-    ): void {
-        parent::mount($legalEntity, $person, $preperson);
-
-        $this->loadAvailableReferrals();
-    }
-
-    protected function loadAvailableReferrals(): void
-    {
-        if ($this->referralsLoaded) {
-            return;
-        }
-
-        if ($this->personId === null) {
-            $this->referralsLoaded = true;
-
-            return;
-        }
-
-        $services = collect($this->dictionaries['custom/services'] ?? []);
-        $diagnosticReportCategories = array_keys($this->dictionaries['eHealth/diagnostic_report_categories'] ?? []);
-
-        $this->availableReferrals = Repository::serviceRequest()
-            ->getByPersonIdAndStatus(
-                $this->personId,
-                ServiceRequestStatus::PROCESSED->value,
-                ['uuid', 'request_number', 'service_id', 'category_id']
-            )
-            ->loadMissing('category')
-            ->map(static function (ServiceRequestRequest $referral) use ($services, $diagnosticReportCategories): array {
-                $service = $services->firstWhere('id', $referral->serviceId);
-                $category = strtolower((string) ($referral->category?->text ?? ''));
-
-                return [
-                    'id' => $referral->uuid,
-                    'requisition' => $referral->requestNumber ?: $referral->uuid,
-                    'category' => $category !== ''
-                        ? __('care-plan.referral_category.'.$category)
-                        : __('encounters.electronic_referral'),
-                    'service' => $service,
-                    'isDiagnosticReportAllowed' => $service !== null
-                        && in_array($service['category'] ?? null, $diagnosticReportCategories, true),
-                ];
-            })
-            ->values()
-            ->toArray();
-
-        $this->referralsLoaded = true;
-    }
-
     /**
      * Validate and save data.
      *
@@ -120,6 +62,8 @@ class DiagnosticReportCreate extends DiagnosticReportComponent
     protected function persist(array $formattedData): int
     {
         return DB::transaction(function () use ($formattedData) {
+            $this->storeElectronicReferralIfMissing();
+
             $diagnosticReportId = Repository::diagnosticReport()
                 ->store([$formattedData['diagnosticReport']], $this->patient());
 

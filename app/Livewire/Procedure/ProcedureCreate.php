@@ -72,6 +72,7 @@ class ProcedureCreate extends ProcedureComponent
     protected function persist(array $formattedData): int
     {
         return DB::transaction(function () use ($formattedData) {
+            $this->storeElectronicReferralIfMissing();
             $this->processReasonReferences($formattedData);
 
             return Repository::procedure()->store([$formattedData], $this->patient());

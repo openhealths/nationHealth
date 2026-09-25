@@ -433,7 +433,7 @@
 
         <form>
             <fieldset @disabled($isReadonly) @class(['pointer-event-none' => $isReadonly])>
-                @include('livewire.encounter.diagnostic-report-parts.main-information')
+                @include('livewire.encounter.diagnostic-report-parts.main-information', ['context' => 'encounter'])
                 @include('livewire.encounter.diagnostic-report-parts.additional-information', ['context' => 'diagnostic-report', 'isEncounterContext' => true])
 
                 <div class="mt-6 flex justify-between space-x-2">

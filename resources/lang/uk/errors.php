@@ -30,6 +30,7 @@ return [
         'validation_error_header' => 'eHealth відхилив запит через невірні дані. Будь ласка, виправте:',
         'messages' => [
             'required property' => 'відсутнє',
+            'electronic_referral_search_failed' => 'Не вдалося виконати пошук електронних направлень в ЕСОЗ. Спробуйте ще раз.',
             'schema does not allow additional properties' => 'містить недійсні дані',
             'type mismatch' => 'невідповідність типу даних.',
             'does not match pattern' => 'не відповідає очікуваному формату.',

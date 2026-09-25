@@ -55,8 +55,7 @@ class DiagnosticReportEdit extends DiagnosticReportComponent
         if (!empty($diagnosticReportData['basedOnIdentifier'])) {
             $diagnosticReportData['isReferralAvailable'] = true;
             $diagnosticReportData['referralType'] = 'electronic';
-
-            $this->loadSelectedElectronicReferral($diagnosticReportData['basedOnIdentifier']);
+            $diagnosticReportData['referralNumber'] = $this->loadSelectedElectronicReferral($diagnosticReportData['basedOnIdentifier']);
         }
 
         $selectedEmployeeIds = collect($diagnosticReportData['performerEmployeeIds'] ?? [])
@@ -117,12 +116,12 @@ class DiagnosticReportEdit extends DiagnosticReportComponent
             ->toArray();
     }
 
-    protected function loadSelectedElectronicReferral(string $uuid): void
+    protected function loadSelectedElectronicReferral(string $uuid): string
     {
         $referral = Repository::serviceRequest()->findByUuid($uuid);
 
         if ($referral === null) {
-            return;
+            return '';
         }
 
         $referral->loadMissing('category');
@@ -150,7 +149,7 @@ class DiagnosticReportEdit extends DiagnosticReportComponent
             ],
         ];
 
-        $this->referralsLoaded = true;
+        return $referral->requestNumber ?? '';
     }
 
     /**
@@ -177,6 +176,8 @@ class DiagnosticReportEdit extends DiagnosticReportComponent
     protected function syncValidatedData(array $formattedData): void
     {
         DB::transaction(function () use ($formattedData) {
+            $this->storeElectronicReferralIfMissing();
+
             Repository::diagnosticReport()->sync(
                 $this->patient(),
                 [$this->fhirToSync($formattedData['diagnosticReport'])]

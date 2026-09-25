@@ -261,6 +261,32 @@ class ServiceRequestRequestRepository extends BaseRepository
         return $this->model->newQuery()->where('uuid', $uuid)->first();
     }
 
+    /**
+     * @param  array{
+     *     uuid: string,
+     *     request_number: string,
+     *     service_id: string,
+     *     employee_id: int,
+     *     division_id?: int|null
+     * }  $data
+     */
+    public function storeExternalIfMissing(array $data, int $personId): void
+    {
+        if ($this->findByUuid($data['uuid']) !== null) {
+            return;
+        }
+
+        $this->store([
+            'uuid' => $data['uuid'],
+            'employee_id' => $data['employee_id'],
+            'division_id' => $data['division_id'] ?? null,
+            'status' => ServiceRequestStatus::ACTIVE->value,
+            'request_number' => $data['request_number'],
+            'service_id' => $data['service_id'],
+            'intent' => 'order',
+        ], $personId);
+    }
+
     public function sumIssuedQuantityByActivity(string $activityUuid): float
     {
         return (float) $this->model->newQuery()

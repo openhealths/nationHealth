@@ -22,11 +22,14 @@ use App\Models\Equipment;
 use App\Models\Icd10;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Specimen;
+use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\ObservationConfigRepository;
 use App\Repositories\Repository;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Traits\FormTrait;
+use App\Traits\SearchesElectronicReferrals;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -41,6 +44,7 @@ use Throwable;
 abstract class DiagnosticReportComponent extends Component
 {
     use FormTrait;
+    use SearchesElectronicReferrals;
     use WithFileUploads;
 
     public Form $form;
@@ -161,13 +165,6 @@ abstract class DiagnosticReportComponent extends Component
      * @var array
      */
     public array $availableReferrals = [];
-
-    /**
-     * Indicates whether electronic referrals have already been loaded.
-     *
-     * @var bool
-     */
-    public bool $referralsLoaded = false;
 
     /**
      * List of patient's available specimens.
@@ -307,6 +304,31 @@ abstract class DiagnosticReportComponent extends Component
             ])
             ->values()
             ->toArray();
+    }
+
+    protected function storeElectronicReferralIfMissing(): void
+    {
+        if ($this->personId === null || data_get($this->form->diagnosticReport, 'referralType') !== 'electronic') {
+            return;
+        }
+
+        $uuid = data_get($this->form->diagnosticReport, 'basedOnIdentifier');
+        $requestNumber = data_get($this->form->diagnosticReport, 'referralNumber');
+        $serviceId = data_get($this->form->diagnosticReport, 'codeValue');
+
+        if (blank($uuid) || blank($requestNumber) || blank($serviceId)) {
+            return;
+        }
+
+        $employee = Auth::user()->getDiagnosticReportWriterEmployee();
+
+        MedicalEventsRepository::serviceRequest()->storeExternalIfMissing([
+            'uuid' => (string) $uuid,
+            'request_number' => (string) $requestNumber,
+            'service_id' => (string) $serviceId,
+            'employee_id' => $employee->id,
+            'division_id' => $employee->divisionId,
+        ], $this->personId);
     }
 
     /**

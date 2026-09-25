@@ -655,7 +655,7 @@ class User extends Authenticatable implements MustVerifyEmail
                     ->orWhereDate('end_date', '>', today())
             )
             ->whereIn('employee_type', $roleValues)
-            ->get(['id', 'uuid', 'party_id', 'employee_type', 'position'])
+            ->get(['id', 'uuid', 'party_id', 'employee_type', 'position', 'division_id'])
             ->each(fn (Employee $employee) => $employee->setRelation('party', $this->party));
 
         return ($employees ?? collect())->sortBy(

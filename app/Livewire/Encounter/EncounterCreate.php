@@ -463,6 +463,7 @@ class EncounterCreate extends EncounterComponent
     {
         return DB::transaction(function () use ($formattedData) {
             $createdEncounterId = Repository::encounter()->store($formattedData['encounter'], $this->patient());
+            $this->storePackageElectronicReferralsIfMissing();
 
             if (isset($formattedData['episode'])) {
                 Repository::episode()->store($formattedData['episode'], $this->patient(), $createdEncounterId);
