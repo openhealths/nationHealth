@@ -49,7 +49,7 @@
 
             {{-- Show the 'Show more' button if there are more options --}}
             <div x-show="canLoadMore()" class="px-2 py-1 text-center">
-                <button @click="loadMore" class="text-blue-500 hover:text-blue-700 text-sm">
+                <button type="button" @click.prevent="loadMore" class="text-blue-500 hover:text-blue-700 text-sm">
                     {{ __('general.show_more') }} (<span x-text="remainingCount()"></span> {{ __('general.remain') }})
                 </button>
             </div>
@@ -75,6 +75,13 @@
 
             highlightCache: new Map(),
             lastSearchTerm: '',
+
+            getDisplayText(option) {
+                if (dictionaryKey === 'SPECIALITY_TYPE') {
+                    return option.label;
+                }
+                return `[${option.code ?? option.value}] – ${option.label}`;
+            },
 
             init() {
                 this.watchSelected();
@@ -142,7 +149,7 @@
 
                             const selectedOption = this.optionsMap.get(this.selected);
                             if (selectedOption) {
-                                this.search = `[${selectedOption.code ?? selectedOption.value}] – ${selectedOption.label}`;
+                                this.search = this.getDisplayText(selectedOption);
                             } else if (this.selected) {
                                 this.selected = '';
                                 this.search = '';
@@ -191,7 +198,7 @@
                             const selectedOption = this.optionsMap.get(this.selected);
 
                             if (selectedOption) {
-                                this.search = `[${selectedOption.code ?? selectedOption.value}] - ${selectedOption.label}`;
+                                this.search = this.getDisplayText(selectedOption);
                             } else if (this.selected) {
                                 this.selected = '';
                                 this.search = '';
@@ -224,7 +231,7 @@
                     if (this.selected && !this.search) {
                         const opt = this.optionsMap.get(this.selected);
                         if (opt) {
-                            this.search = `[${opt.code ?? opt.value}] – ${opt.label}`;
+                            this.search = this.getDisplayText(opt);
                         }
                     }
 
@@ -328,12 +335,12 @@
 
             selectOption(option) {
                 this.selected = option.value;
-                this.search = `[${option.code ?? option.value}] – ${option.label}`;
+                this.search = this.getDisplayText(option);
                 this.hideOptions();
             },
 
             highlightedText(option) {
-                const text = `[${option.code ?? option.value}] – ${option.label}`;
+                const text = this.getDisplayText(option);
                 const searchTerm = this.search.toLowerCase().trim();
 
                 if (!searchTerm) return text;
@@ -376,7 +383,7 @@
                     const opt = this.optionsMap.get(value);
 
                     if (opt) {
-                        this.search = `[${opt.code ?? opt.value}] – ${opt.label}`;
+                        this.search = this.getDisplayText(opt);
                     }
                 });
             }
