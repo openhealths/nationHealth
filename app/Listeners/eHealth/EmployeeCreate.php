@@ -35,7 +35,7 @@ class EmployeeCreate
     {
         $user = $event->user;
 
-        $employeeRequests = EmployeeRequest::with('revision')
+        $employeeRequests = EmployeeRequest::with(['revision', 'employee'])
             ->where('legal_entity_id', $event->legalEntity->id)
             ->where('email', $user->email)
             ->where(
@@ -80,6 +80,8 @@ class EmployeeCreate
             'request_ids' => $employeeRequests->pluck('id')->all(),
             'statuses' => $employeeRequests->map(fn (EmployeeRequest $r) => $r->status?->value)->all(),
         ]);
+
+        $restoredPartyId = $this->restorePartyFromExistingEmployee($user, $employeeRequests, $event->legalEntity->id);
 
         $taxIds = $this->collectTaxIds($employeeRequests);
 
@@ -137,6 +139,7 @@ class EmployeeCreate
             $employees,
             $employeeRequests,
             $event,
+            $restoredPartyId,
             &$matched
         ) {
             // Exclude pending edits before matching: their revision often has new party names /
@@ -245,7 +248,13 @@ class EmployeeCreate
                     $dataFromRevision['science_degree'] ?? null
                 );
 
-                if (!$user->partyId && $newEmployee->partyId) {
+                // A local edit can restore the old Party before matching. If this
+                // same request resolves to a canonical Party, carry that link forward.
+                $wasRestoredFromThisRequest = $restoredPartyId !== null
+                    && $user->partyId === $restoredPartyId
+                    && $employeeRequest->partyId === $restoredPartyId;
+
+                if ($newEmployee->partyId && (!$user->partyId || $wasRestoredFromThisRequest)) {
                     $user->partyId = $newEmployee->partyId;
                     $user->save();
 
@@ -289,6 +298,50 @@ class EmployeeCreate
         if ($user?->party) {
             Repository::party()->syncUserEmployeesAndRoles($user->party, $event->legalEntity);
         }
+    }
+
+    /**
+     * Owner edits through LegalEntity can have a new email and NULL start_date.
+     * Restore the existing employee identity even when its pending revision is
+     * skipped on login. This does not apply the revision or approve the request.
+     *
+     * @param  Collection<int, EmployeeRequest>  $employeeRequests
+     */
+    private function restorePartyFromExistingEmployee(User $user, Collection $employeeRequests, int $legalEntityId): ?int
+    {
+        if ($user->partyId) {
+            return null;
+        }
+
+        $partyIds = $employeeRequests
+            ->filter(function (EmployeeRequest $request) use ($legalEntityId): bool {
+                $employee = $request->employee;
+
+                return $request->partyId !== null
+                    && $employee !== null
+                    && $employee->legalEntityId === $legalEntityId
+                    && $employee->partyId === $request->partyId
+                    && in_array($employee->status, [Status::APPROVED, Status::REORGANIZED], true);
+            })
+            ->pluck('party_id')->unique()->values();
+
+        if ($partyIds->count() !== 1) {
+            return null;
+        }
+
+        $partyId = $partyIds->first();
+        $updated = User::whereKey($user->id)->whereNull('party_id')->update(['party_id' => $partyId]);
+        $user->refresh();
+
+        if (!$updated) {
+            return null;
+        }
+
+        Log::info('[EmployeeCreate] Restored User Party from an existing employee edit.', [
+            'user_id' => $user->id, 'party_id' => $partyId,
+        ]);
+
+        return $partyId;
     }
 
     /**

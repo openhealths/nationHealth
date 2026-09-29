@@ -11,6 +11,10 @@ use App\Enums\Employee\RequestStatus;
 use App\Enums\Employee\RevisionStatus;
 use App\Events\EHealthUserLogin;
 use App\Listeners\eHealth\EmployeeCreate;
+use App\Livewire\LegalEntity\EditLegalEntity;
+use Illuminate\Support\Facades\Auth;
+use ReflectionMethod;
+use ReflectionProperty;
 use App\Models\Employee\Employee;
 use App\Models\Employee\EmployeeRequest;
 use App\Models\LegalEntity;
@@ -234,7 +238,13 @@ class EmployeePartyIdentityTest extends TestCase
         $this->assertNull($user->fresh()->partyId);
     }
 
-    public function test_login_links_employee_request_and_new_user_to_remote_party(): void
+    public static function linkedRequests(): array
+    {
+        return ['new employee request' => [false], 'existing employee request' => [true]];
+    }
+
+    #[DataProvider('linkedRequests')]
+    public function test_login_links_employee_request_and_new_user_to_remote_party(bool $existingEmployee): void
     {
         $user = User::create(['email' => 'employee878@example.test', 'password' => 'test']);
         $legalEntity = $this->legalEntity();
@@ -242,6 +252,10 @@ class EmployeePartyIdentityTest extends TestCase
         $canonical = $this->party((string) Str::uuid());
         $request = $this->request($legalEntity, $old, $user->email);
         $employee = $this->model(Employee::class, $old);
+        if ($existingEmployee) {
+            $employee->update(['legal_entity_id' => $legalEntity->id, 'status' => 'APPROVED']);
+            $request->update(['employee_id' => $employee->id, 'status' => RequestStatus::APPROVED]);
+        }
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('validate')->once()->andReturn([[
             'uuid' => $employee->uuid, 'status' => 'APPROVED', 'position' => 'P1',
@@ -256,6 +270,126 @@ class EmployeePartyIdentityTest extends TestCase
         $this->assertSame($canonical->id, $request->fresh()->partyId);
         $this->assertSame($canonical->id, $user->fresh()->partyId);
         $this->assertSame(RequestStatus::APPROVED, $request->fresh()->status);
+    }
+
+    /** Create the request through the actual Legal Entity owner-edit persistence path. */
+    private function ownerEdit(bool $changeEmail = true): array
+    {
+        $legalEntity = $this->legalEntity();
+        $party = $this->party((string) Str::uuid());
+        $originalUser = User::create([
+            'email' => 'original-owner@example.test', 'password' => 'test', 'party_id' => $party->id,
+        ]);
+        $employee = $this->model(Employee::class, $party);
+        $employee->update([
+            'employee_type' => 'OWNER', 'status' => 'APPROVED', 'is_active' => true,
+            'legal_entity_id' => $legalEntity->id, 'legal_entity_uuid' => $legalEntity->uuid,
+            'user_id' => $originalUser->id,
+        ]);
+        $user = $changeEmail
+            ? User::create(['email' => 'new-owner-email@example.test', 'password' => 'test'])
+            : $originalUser;
+        Auth::shouldUse('ehealth');
+        Auth::guard('ehealth')->setUser($originalUser);
+        $this->instance('legalEntity', $legalEntity);
+        $component = new EditLegalEntity();
+        (new ReflectionProperty($component, 'legalEntity'))->setValue($component, $legalEntity);
+        $uuid = (string) Str::uuid();
+        (new ReflectionMethod($component, 'createEmployeeRequest'))->invoke($component, $legalEntity, [
+            'employee_id' => $employee->id,
+            'owner' => [
+                'employee_id' => $employee->uuid, 'party_id' => $party->id,
+                'position' => 'P1', 'email' => $user->email, 'first_name' => 'Test',
+                'last_name' => 'Updated', 'gender' => 'MALE', 'birth_date' => '1990-01-01',
+                'tax_id' => '1111111111', 'no_tax_id' => false, 'documents' => [], 'phones' => [],
+            ],
+        ], $uuid);
+        $request = EmployeeRequest::where('uuid', $uuid)->firstOrFail();
+        $this->assertNull($request->startDate);
+        $this->assertSame($employee->id, $request->employeeId);
+        $this->assertSame($party->id, $request->partyId);
+        $this->assertSame(RequestStatus::NEW, $request->status);
+        $this->assertSame(RevisionStatus::SENT, $request->revision->status);
+
+        return [$user, $legalEntity, $employee, $request, $party];
+    }
+
+    public static function ownerEmailChanges(): array
+    {
+        return ['new email' => [true], 'same email' => [false]];
+    }
+
+    #[DataProvider('ownerEmailChanges')]
+    public function test_owner_edit_retains_party_link_even_without_remote_match(bool $changeEmail): void
+    {
+        [$user, $legalEntity, $employee, $request, $party] = $this->ownerEdit($changeEmail);
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('validate')->once()->andReturn([]);
+        $api = Mockery::mock(EmployeeApi::class);
+        $api->shouldReceive('getMany')->once()->andReturn($response);
+        $this->instance(EmployeeApi::class, $api);
+
+        (new EmployeeCreate())->handle($this->event($user, $legalEntity));
+
+        $this->assertSame($party->id, $user->fresh()->partyId);
+        $this->assertSame('Person', $employee->fresh()->party->lastName);
+        $this->assertSame(RequestStatus::NEW, $request->fresh()->status);
+        $this->assertSame(RevisionStatus::SENT, $request->revision->fresh()->status);
+    }
+
+    public function test_owner_email_edit_restores_party_when_remote_owner_already_exists(): void
+    {
+        [$user, $legalEntity, $employee, $request, $party] = $this->ownerEdit();
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('validate')->once()->andReturn([[
+            'uuid' => $employee->uuid, 'status' => 'APPROVED', 'position' => 'P1',
+            'employee_type' => 'OWNER', 'start_date' => '2026-01-01',
+            'party' => ['uuid' => $party->uuid, 'tax_id' => '1111111111', 'first_name' => 'Test', 'last_name' => 'Person', 'second_name' => null],
+        ]]);
+        $api = Mockery::mock(EmployeeApi::class);
+        $api->shouldReceive('getMany')->once()->andReturn($response);
+        $this->instance(EmployeeApi::class, $api);
+
+        (new EmployeeCreate())->handle($this->event($user, $legalEntity));
+
+        $this->assertSame($party->id, $user->fresh()->partyId);
+        $this->assertSame('Person', $employee->fresh()->party->lastName);
+        $this->assertSame($employee->id, $request->fresh()->employeeId);
+        $this->assertSame($party->id, $request->fresh()->partyId);
+    }
+
+    public static function invalidEditLinks(): array
+    {
+        return [['different party'], ['different legal entity'], ['ambiguous parties'], ['existing user party']];
+    }
+
+    #[DataProvider('invalidEditLinks')]
+    public function test_early_link_does_not_reassign_unverified_or_existing_identity(string $case): void
+    {
+        [$user, $legalEntity, $employee, $request, $party] = $this->ownerEdit();
+        if ($case === 'different party') {
+            $request->update(['party_id' => $this->party()->id]);
+        } elseif ($case === 'different legal entity') {
+            $employee->update(['legal_entity_id' => $this->legalEntity()->id]);
+        } elseif ($case === 'ambiguous parties') {
+            $otherParty = $this->party();
+            $otherEmployee = $this->model(Employee::class, $otherParty);
+            $otherEmployee->update(['legal_entity_id' => $legalEntity->id, 'status' => 'APPROVED']);
+            $otherRequest = $this->request($legalEntity, $otherParty, $user->email);
+            $otherRequest->update(['employee_id' => $otherEmployee->id]);
+        } else {
+            $user->update(['party_id' => $this->party()->id]);
+        }
+        $originalPartyId = $user->partyId;
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('validate')->andReturn([]);
+        $api = Mockery::mock(EmployeeApi::class);
+        $api->shouldReceive('getMany')->andReturn($response);
+        $this->instance(EmployeeApi::class, $api);
+
+        (new EmployeeCreate())->handle($this->event($user, $legalEntity));
+
+        $this->assertSame($originalPartyId, $user->fresh()->partyId);
     }
 
     public function test_processor_copies_resolved_party_to_existing_request(): void
