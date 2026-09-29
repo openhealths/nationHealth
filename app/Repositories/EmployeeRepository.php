@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
-use Log;
 use Throwable;
-use App\Core\Arr;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
 use App\Models\Employee\Employee;
@@ -14,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use App\Enums\Employee\RequestStatus;
 use App\Models\Employee\EmployeeRequest;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\UniqueConstraintViolationException;
 
 readonly class EmployeeRepository
 {
@@ -119,49 +118,50 @@ readonly class EmployeeRepository
     }
 
     /**
-     * The logic behind the party update or create is as follows:
-     * 1. Check party by UUID. Possible scenario: the party already exists in the system
-     * 2. If user already has a party, update it.
-     * 3. If user does not have a party, but there is a party with the same UUID, update it and establish the relation.
-     * 4. If neither of the above, create a new party and establish the relation.
+     * Resolve the incoming identity without changing another Party's UUID.
+     * Missing UUIDs identify only the Party already linked to this model.
      */
     protected function updatePartyByUuid(Employee|EmployeeRequest $model, array $party): void
     {
         unset($party['email']);
-        $partyUuid = Arr::get($party, 'uuid');
-        $partyByUuid = Party::where('uuid', $partyUuid)->first();
 
-        // If the model doesn't have a party and party doesn't exist, create new one. It's a brand-new person
-        if (!$partyByUuid && !$model->party) {
-            $newParty = new Party($party);
-            $newParty->save();
-            $model->party()->associate($newParty)->save();
+        // Serialize updates to this employee/request and ignore stale loaded relations.
+        // Do not refresh the whole caller: it can contain unsaved employee attributes.
+        $storedModel = $model->newQuery()->whereKey($model->getKey())->lockForUpdate()->firstOrFail();
+        $currentParty = $storedModel->party;
+        $partyUuid = $party['uuid'] ?? null;
 
-            // If the model doesn't have a related party but the party already exists, update it and relate - the scenario of a new employee with already created person/party
-        } elseif ($partyByUuid && !$model->party) {
-            $partyByUuid->update($party);
-            $model->party()->associate($partyByUuid)->save();
+        if (is_string($partyUuid) && trim($partyUuid) !== '') {
+            $resolvedParty = Party::where('uuid', $partyUuid)->first();
 
-            // The model already has a related party, update it and change the UUID - the case when eHealth creates another party, probably merge scenario
-        } elseif (!$partyByUuid && $model->party) {
-            $model->party()->update($party);
-
-            // Both the model and the party exist, check if they are the same
-        } elseif ($partyByUuid && $model->party) {
-
-            // uuid is the same, just update
-            if ($partyByUuid->uuid === $model->party->uuid) {
-                $model->party()->update($party);
-            } else {
-                // Different uuid, need to merge the results, prioritizing the eHealth data
-                $model->party()->update($party);
-
-                Log::warning('Potential party merge scenario detected', [
-                    'model_party_uuid' => $model->party->uuid,
-                    'ehealth_party_uuid' => $partyByUuid->uuid,
-                    'updated_with_ehealth_data' => true
-                ]);
+            // Preserve links to a local draft when this is its first remote identity.
+            if (!$resolvedParty && $currentParty && !$currentParty->uuid) {
+                $currentParty = Party::whereKey($currentParty->id)->lockForUpdate()->firstOrFail();
+                if (!$currentParty->uuid) {
+                    try {
+                        DB::transaction(fn () => $currentParty->fill($party)->save());
+                        $resolvedParty = $currentParty;
+                    } catch (UniqueConstraintViolationException) {
+                        // Another employee sync claimed the UUID. The savepoint keeps
+                        // PostgreSQL usable so we can associate its canonical Party.
+                        $resolvedParty = Party::where('uuid', $partyUuid)->firstOrFail();
+                    }
+                }
             }
+
+            // Laravel also recovers competing inserts inside our transaction.
+            $resolvedParty ??= Party::firstOrCreate(['uuid' => $partyUuid], $party);
+            $resolvedParty = Party::whereKey($resolvedParty->id)->lockForUpdate()->firstOrFail();
+            $resolvedParty->fill($party)->save();
+        } else {
+            // Never query WHERE uuid IS NULL or erase an already known identity.
+            unset($party['uuid']);
+            $resolvedParty = $currentParty ?? new Party();
+            $resolvedParty->fill($party)->save();
         }
+
+        // associate() also replaces the cached relation used by documents/phones sync.
+        $model->party()->associate($resolvedParty);
+        $model->save();
     }
 }

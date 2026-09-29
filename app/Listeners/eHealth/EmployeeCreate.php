@@ -36,6 +36,7 @@ class EmployeeCreate
         $user = $event->user;
 
         $employeeRequests = EmployeeRequest::with('revision')
+            ->where('legal_entity_id', $event->legalEntity->id)
             ->where('email', $user->email)
             ->where(
                 fn (EloquentBuilder $q) => $q
@@ -79,17 +80,6 @@ class EmployeeCreate
             'request_ids' => $employeeRequests->pluck('id')->all(),
             'statuses' => $employeeRequests->map(fn (EmployeeRequest $r) => $r->status?->value)->all(),
         ]);
-
-        $requestWithParty = $employeeRequests->whereNotNull('party_id')->first();
-
-        if ($requestWithParty) {
-            $user->party()->associate($requestWithParty->partyId);
-            $user->save();
-            $user->refresh();
-            Log::info('[EmployeeCreate] Associated new User with existing Party.', ['user_id' => $user->id, 'party_id' => $requestWithParty->partyId]);
-        } else {
-            Log::info('[EmployeeCreate] No party_id found on any EmployeeRequest. Will try eHealth employee sync.', ['user_id' => $user->id]);
-        }
 
         $taxIds = $this->collectTaxIds($employeeRequests);
 

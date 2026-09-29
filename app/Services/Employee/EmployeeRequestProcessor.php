@@ -256,18 +256,10 @@ class EmployeeRequestProcessor
 
             Log::info("[EmployeeRequestProcessor] Employee Saved. ID: {$employee->id}");
 
-            // 8. Link Request to Employee
-            if ($request->employeeId !== $employee->id) {
-                $request->update([
-                                     'employee_id' => $employee->id,
-                                     'party_id' => $employee->partyId ?? $request->partyId,
-                                 ]);
-            }
-
             // 9. Update Details (Party, Documents, Phones...)
             Repository::employee()->updateDetails(
                 $employee,
-                $mappedLocalData['party'],
+                array_merge($mappedLocalData['party'], Arr::only($eHealthData['party'] ?? [], ['uuid'])),
                 $mappedLocalData['documents'],
                 $mappedLocalData['phones'],
                 $mappedLocalData['educations'] ?? null,
@@ -275,6 +267,12 @@ class EmployeeRequestProcessor
                 $mappedLocalData['qualifications'] ?? null,
                 $mappedLocalData['scienceDegree'] ?? null
             );
+
+            // Resolve the Party before copying its foreign key to the request.
+            $request->update([
+                'employee_id' => $employee->id,
+                'party_id' => $employee->partyId,
+            ]);
 
             // 10. Assign Roles to User
             $this->assignUserRoles($employee, $request->legalEntityId, $request->userId);
