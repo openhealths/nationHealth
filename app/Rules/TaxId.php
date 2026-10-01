@@ -166,7 +166,11 @@ class TaxId implements ValidationRule, DataAwareRule
             return;
         }
 
-        if (!\is_bool($value) && !$this->isOwner && $this->taxIdAlreadyUsedInLegalEntity((string) $value)) {
+        // Allow a new User login when email is brand-new, even if this tax_id
+        // already has an employee in the current legal entity.
+        $emailIsNew = filled($this->email) && $this->user === null;
+
+        if (!\is_bool($value) && !$this->isOwner && !$emailIsNew && $this->taxIdAlreadyUsedInLegalEntity((string) $value)) {
             $fail(__('validation.employee.tax_id_already_used'));
 
             return;
