@@ -99,6 +99,7 @@ return [
     // Field names for :attribute in validation messages
     'attributes' => [
         'primarySource' => 'джерело інформації спостереження',
+        'performerEmployeeId' => 'виконавець спостереження',
         'reportOriginCode' => 'посилання на джерело спостереження',
         'reportOriginText' => 'опис джерела спостереження',
         'categorySystem' => 'система кодування спостереження',

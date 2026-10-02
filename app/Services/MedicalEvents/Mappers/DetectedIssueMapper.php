@@ -39,7 +39,7 @@ class DetectedIssueMapper implements FhirMapperContract
         if ($data['primarySource']) {
             $result['author'] = FhirResource::make()
                 ->coding('eHealth/resources', 'employee')
-                ->toIdentifier($uuids['employee']);
+                ->toIdentifier($data['authorEmployeeId'] ?? $uuids['employee']);
         } else {
             $result['author'] = (object) [];
         }
@@ -94,6 +94,7 @@ class DetectedIssueMapper implements FhirMapperContract
             'implicatedId' => data_get($data, 'implicated.identifier.value', ''),
             'basedOnId' => data_get($data, 'basedOn.identifier.value', ''),
             'primarySource' => data_get($data, 'primarySource', true),
+            'authorEmployeeId' => data_get($data, 'author.identifier.value', ''),
             'reportOriginCode' => data_get($data, 'reportOrigin.coding.0.code', ''),
         ];
     }

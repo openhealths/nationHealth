@@ -6,13 +6,13 @@ namespace App\Livewire\Encounter\Forms;
 
 use App\Enums\Person\ConditionVerificationStatus;
 use App\Enums\User\Role;
+use App\Models\Employee\Employee;
 use App\Rules\AfterOrEqualDateTime;
 use App\Rules\InDictionary;
 use App\Rules\PrimarySourceRequiredForAssistant;
 use App\Rules\PastDateTime;
 use Carbon\CarbonImmutable;
 use Closure;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Livewire\Form;
 
@@ -74,6 +74,22 @@ class ConditionForm extends Form
                 'boolean',
                 new PrimarySourceRequiredForAssistant()
             ],
+            'conditions.*.asserterEmployeeId' => Rule::forEach(function (mixed $value, string $attribute): array {
+                $condition = $this->conditions[(int) explode('.', $attribute)[1]] ?? [];
+                $isPrimarySource = ($condition['primarySource'] ?? true) === true;
+
+                // A condition registered earlier is only referenced, so its asserter is not chosen here
+                if (($condition['isRegistered'] ?? false) === true) {
+                    return ['nullable'];
+                }
+
+                return [
+                    Rule::requiredIf($isPrimarySource),
+                    Rule::prohibitedIf(!$isPrimarySource),
+                    'nullable',
+                    'uuid'
+                ];
+            }),
             'conditions.*.reportOriginCode' => [
                 'exclude_if:conditions.*.isRegistered,true',
                 'nullable',
@@ -142,6 +158,7 @@ class ConditionForm extends Form
                 }
             ),
             'conditions.*.assertedDate' => [
+                'exclude_if:conditions.*.isRegistered,true',
                 'nullable',
                 'before:tomorrow',
                 'date',
@@ -149,9 +166,11 @@ class ConditionForm extends Form
             ],
             'conditions.*.assertedTime' => Rule::forEach(
                 function (mixed $value, string $attribute): array {
-                    $assertedDate = $this->conditions[(int) explode('.', $attribute)[1]]['assertedDate'] ?? '';
+                    $index = (int) explode('.', $attribute)[1];
+                    $assertedDate = $this->conditions[$index]['assertedDate'] ?? '';
 
                     return [
+                        "exclude_if:conditions.$index.isRegistered,true",
                         'nullable',
                         'date_format:H:i',
                         new AfterOrEqualDateTime(
@@ -256,11 +275,16 @@ class ConditionForm extends Form
     private function asserterEmployeeAllowed(): Closure
     {
         return function (string $attribute, mixed $value, Closure $fail): void {
-            if (data_get($value, 'primarySource') !== true) {
+            // A condition registered earlier is only referenced, and an empty asserter is reported by its own rule
+            if (
+                data_get($value, 'primarySource') !== true
+                || data_get($value, 'isRegistered') === true
+                || empty($value['asserterEmployeeId'])
+            ) {
                 return;
             }
 
-            $asserter = Auth::user()->getEncounterWriterEmployee($this->encounter()['classCode'] ?? null);
+            $asserter = $this->asserter($value);
 
             if ($asserter === null) {
                 $fail(__('conditions.validation.asserter_employee_not_found'));
@@ -298,7 +322,7 @@ class ConditionForm extends Form
                 return;
             }
 
-            $asserter = Auth::user()->getEncounterWriterEmployee($this->encounter()['classCode'] ?? null);
+            $asserter = $this->asserter($value);
 
             if ($asserter === null) {
                 return;
@@ -345,7 +369,7 @@ class ConditionForm extends Form
                 return;
             }
 
-            $asserter = Auth::user()->getEncounterWriterEmployee($this->encounter()['classCode'] ?? null);
+            $asserter = $this->asserter($value);
 
             if ($asserter === null) {
                 return;
@@ -402,5 +426,23 @@ class ConditionForm extends Form
     private function encounter(): array
     {
         return $this->component->form->encounter;
+    }
+
+    /**
+     * Active employee of the current legal entity chosen as the asserter of the condition.
+     *
+     * @param  array  $condition
+     * @return Employee|null
+     */
+    private function asserter(array $condition): ?Employee
+    {
+        if (data_get($condition, 'isRegistered') === true || empty($condition['asserterEmployeeId'])) {
+            return null;
+        }
+
+        return Employee::whereUuid($condition['asserterEmployeeId'])
+            ->whereLegalEntityId(legalEntity()->id)
+            ->active()
+            ->first();
     }
 }

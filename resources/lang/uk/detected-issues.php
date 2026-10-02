@@ -49,6 +49,7 @@ return [
     // Field names for :attribute in validation messages
     'attributes' => [
         'subjectId' => 'Медичний виріб',
+        'authorEmployeeId' => 'Медичний працівник, який виявив проблему',
         'status' => 'Статус запису',
         'identifiedDate' => 'Дата та час виявлення',
         'identifiedTime' => 'Дата та час виявлення',

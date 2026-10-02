@@ -76,7 +76,8 @@ class ObservationMapper implements FhirMapperContract
             $result['performer'] = [
                 FhirResource::make()
                     ->coding('eHealth/resources', 'employee')
-                    ->toIdentifier($uuids['employee'])
+                    // An observation of a diagnostic report has no performer to choose, so its writer performs it
+                    ->toIdentifier(($data['performerEmployeeId'] ?? '') ?: $uuids['employee'])
             ];
         } else {
             $result['reportOrigin'] = FhirResource::make()
@@ -236,6 +237,7 @@ class ObservationMapper implements FhirMapperContract
             'categorySystem' => $categorySystem,
             'codeSystem' => data_get($data, 'code.coding.0.system'),
             'primarySource' => data_get($data, 'primarySource'),
+            'performerEmployeeId' => data_get($data, 'performer.0.identifier.value', data_get($data, 'performer.identifier.value', '')),
             'reportOriginCode' => data_get($data, 'reportOrigin.coding.0.code', ''),
             'categoryCode' => data_get($data, 'categories.0.coding.0.code'),
             'codeCode' => data_get($data, 'code.coding.0.code'),

@@ -41,7 +41,7 @@ class ClinicalImpressionMapper implements FhirMapperContract
             ],
             'assessor' => FhirResource::make()
                 ->coding('eHealth/resources', 'employee')
-                ->toIdentifier($uuids['employee'])
+                ->toIdentifier($data['assessorEmployeeId'] ?? $uuids['employee'])
         ];
 
         if (!empty($data['description'])) {
@@ -136,6 +136,7 @@ class ClinicalImpressionMapper implements FhirMapperContract
             'uuid' => data_get($data, 'uuid'),
             'status' => data_get($data, 'status', Status::COMPLETED->value),
             'codeCode' => data_get($data, 'code.coding.0.code'),
+            'assessorEmployeeId' => data_get($data, 'assessor.identifier.value', ''),
             'description' => data_get($data, 'description', ''),
             'effectivePeriodStartDate' => data_get($data, 'effectivePeriodStartDate', ''),
             'effectivePeriodStartTime' => data_get($data, 'effectivePeriodStartTime', ''),

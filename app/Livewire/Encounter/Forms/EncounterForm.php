@@ -678,8 +678,21 @@ class EncounterForm extends BaseForm
                 ])
             );
 
+        $observationPerformerUuids = collect($this->component->observationForm->observations)
+            ->filter(static fn (array $observation): bool => ($observation['primarySource'] ?? false) === true)
+            ->pluck('performerEmployeeId');
+
+        $conditionAsserterUuids = collect($this->component->conditionForm->conditions)
+            ->filter(
+                static fn (array $condition): bool => ($condition['primarySource'] ?? false) === true
+                    && ($condition['isRegistered'] ?? false) !== true
+            )
+            ->pluck('asserterEmployeeId');
+
         $requiredParticipantUuids = $procedurePerformerUuids
             ->merge($diagnosticReportPerformerUuids)
+            ->merge($observationPerformerUuids)
+            ->merge($conditionAsserterUuids)
             ->push($this->encounter['performerId'] ?? null)
             ->when(
                 $encounterWriterEmployeeUuid !== null,

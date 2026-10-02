@@ -6,6 +6,7 @@ namespace App\Livewire\Encounter\Forms;
 
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Equipment\Status as EquipmentStatus;
+use App\Models\Employee\Employee;
 use App\Models\Equipment;
 use App\Rules\AfterOrEqualDateTime;
 use App\Rules\InDictionary;
@@ -14,7 +15,6 @@ use App\Rules\PastDateTime;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Livewire\Form;
 
@@ -64,9 +64,8 @@ class ObservationForm extends Form
             'observations.*' => [
                 'array',
                 function (string $attribute, mixed $value, Closure $fail): void {
-                    // The mapper names the writer employee as the performer, but only of an observation made here
-                    if (data_get($value, 'primarySource') === true) {
-                        $this->validatePerformer($fail);
+                    if (data_get($value, 'primarySource') === true && !empty($value['performerEmployeeId'])) {
+                        $this->validatePerformer($value['performerEmployeeId'], $fail);
                     }
                 }
             ],
@@ -175,6 +174,16 @@ class ObservationForm extends Form
                 'boolean',
                 new PrimarySourceRequiredForAssistant()
             ],
+            'observations.*.performerEmployeeId' => Rule::forEach(function (mixed $value, string $attribute): array {
+                $isPrimarySource = ($this->observations[(int) explode('.', $attribute)[1]]['primarySource'] ?? true) === true;
+
+                return [
+                    Rule::requiredIf($isPrimarySource),
+                    Rule::prohibitedIf(!$isPrimarySource),
+                    'nullable',
+                    'uuid'
+                ];
+            }),
             'observations.*.reportOriginCode' => Rule::forEach(function (mixed $value, string $attribute) {
                 $index = (int)explode('.', $attribute)[1];
                 $primarySource = $this->observations[$index]['primarySource'] ?? true;
@@ -307,12 +316,13 @@ class ObservationForm extends Form
      * The performer has to be an employee allowed to record observations and taking part in the encounter
      * the observation is written in.
      *
+     * @param  string  $employeeId
      * @param  Closure  $fail
      * @return void
      */
-    private function validatePerformer(Closure $fail): void
+    private function validatePerformer(string $employeeId, Closure $fail): void
     {
-        $performer = Auth::user()->getEncounterWriterEmployee($this->component->form->encounter['classCode'] ?? null);
+        $performer = Employee::whereUuid($employeeId)->whereLegalEntityId(legalEntity()->id)->active()->first();
 
         if ($performer === null) {
             $fail(__('observations.validation.performer_employee_not_found'));

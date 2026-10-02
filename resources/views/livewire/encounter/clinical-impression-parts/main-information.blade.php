@@ -1,6 +1,29 @@
 <fieldset class="fieldset">
     <legend class="legend">{{ __('forms.main_information') }}</legend>
 
+    <div class="form-row-modal">
+        <div class="form-group group">
+            <label for="clinicalImpressionAssessorEmployee" class="sr-only">
+                {{ __('medical-events.performer_employee') }}
+            </label>
+            <select
+                x-model="modalClinicalImpression.assessorEmployeeId"
+                id="clinicalImpressionAssessorEmployee"
+                class="input-select peer"
+                required
+            >
+                <option value="" selected>
+                    {{ __('forms.select') }} {{ mb_strtolower(__('medical-events.performer_employee')) }} *
+                </option>
+                @foreach ($employees as $employee)
+                    <option value="{{ $employee['uuid'] }}">
+                        {{ $employee['name'] }} — {{ $this->dictionaries['POSITION'][$employee['position']] ?? $employee['position'] }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+    </div>
+
     {{-- Code --}}
     <div class="form-row-modal" x-data="{ openModal: false }">
         <div class="form-group group">

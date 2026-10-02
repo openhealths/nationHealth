@@ -525,6 +525,7 @@
                     openModal = true;
                     newImmunization = true;
                     modalImmunization = new Immunization(null, $wire.form.encounter);
+                    modalImmunization.performerEmployeeId = $wire.form.encounter.performerId;
                     resetVaccineSearch();
                 "
                 class="item-add my-5"
@@ -686,6 +687,7 @@
             this.notGiven = false;
             this.vaccineCode = '';
             this.primarySource = true;
+            this.performerEmployeeId = '';
             this.reasons = [{ code: '' }];
             this.reasonNotGivenCode = '';
             this.reportOriginCode = '';

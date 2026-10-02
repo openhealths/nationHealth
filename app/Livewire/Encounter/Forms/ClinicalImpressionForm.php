@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Encounter\Forms;
 
+use App\Enums\Status;
+use App\Models\Employee\Employee;
 use App\Rules\AfterOrEqualDateTime;
 use App\Rules\InDictionary;
 use App\Rules\PastDateTime;
@@ -60,6 +62,14 @@ class ClinicalImpressionForm extends Form
                 'string',
                 'max:255',
                 new InDictionary('eHealth/clinical_impression_patient_categories')
+            ],
+            'clinicalImpressions.*.assessorEmployeeId' => [
+                'required_with:clinicalImpressions',
+                'uuid',
+                Rule::exists(Employee::class, 'uuid')
+                    ->where('legal_entity_id', legalEntity()->id)
+                    ->where('status', Status::APPROVED->value)
+                    ->where('is_active', true)
             ],
             'clinicalImpressions.*.description' => ['nullable', 'string', 'max:1000'],
             'clinicalImpressions.*.effectivePeriodStartDate' => [

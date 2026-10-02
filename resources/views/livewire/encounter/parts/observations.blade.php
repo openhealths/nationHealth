@@ -341,6 +341,9 @@
                     openModal = true;
                     newObservation = true;
                     modalObservation = new Observation(null, $wire.form.encounter);
+                    @if ($isEncounterContext)
+                        modalObservation.performerEmployeeId = $wire.form.encounter.performerId;
+                    @endif
                 "
                 class="item-add my-5"
             >
@@ -467,6 +470,7 @@
         codeSystem = 'eHealth/LOINC/observation_codes';
         dictionaryName = '';
         primarySource = true;
+        performerEmployeeId = '';
         reportOriginCode = '';
         categoryCode = '';
         codeCode = '';

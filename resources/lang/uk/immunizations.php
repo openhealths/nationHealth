@@ -85,6 +85,7 @@ return [
     // Field names for :attribute in validation messages
     'attributes' => [
         'primarySource' => 'джерело інформації вакцинації',
+        'performerEmployeeId' => 'виконавець вакцинації',
         'notGiven' => 'чи була проведена вакцинація',
         'vaccineCode' => 'код та назва вакцини',
         'date' => 'дата вакцинації',

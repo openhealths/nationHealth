@@ -77,6 +77,7 @@
                     @change="
                         modalImmunization.notGiven = true;
                         modalImmunization.primarySource = true;
+                        modalImmunization.performerEmployeeId ||= $wire.form.encounter.performerId;
                     "
                     id="no"
                     type="radio"
@@ -183,6 +184,7 @@
             <div class="flex items-center">
                 <input
                     x-model.boolean="modalImmunization.primarySource"
+                    @change="modalImmunization.performerEmployeeId ||= $wire.form.encounter.performerId"
                     id="immunizationSourcePerformer"
                     type="radio"
                     value="true"
@@ -201,6 +203,7 @@
             <div class="flex items-center">
                 <input
                     x-model.boolean="modalImmunization.primarySource"
+                    @change="modalImmunization.performerEmployeeId = ''"
                     id="immunizationSourcePatient"
                     type="radio"
                     value="false"
@@ -252,6 +255,32 @@
                         placeholder="{{ __('forms.write_comment_here') }}"
                     ></textarea>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="modalImmunization.primarySource === true">
+        <div class="form-row-modal">
+            <div>
+                <label for="immunizationPerformerEmployee" class="label-modal">
+                    {{ __('medical-events.performer_employee') }}
+                </label>
+                <select
+                    class="input-modal"
+                    x-model="modalImmunization.performerEmployeeId"
+                    id="immunizationPerformerEmployee"
+                >
+                    <option value="" selected>{{ __('forms.select') }}</option>
+                    @foreach ($employees as $employee)
+                        <option value="{{ $employee['uuid'] }}">
+                            {{ $employee['name'] }} — {{ $this->dictionaries['POSITION'][$employee['position']] ?? $employee['position'] }}
+                        </option>
+                    @endforeach
+                </select>
+
+                <p class="text-error text-xs" x-show="! modalImmunization.performerEmployeeId">
+                    {{ __('forms.field_empty') }}
+                </p>
             </div>
         </div>
     </div>

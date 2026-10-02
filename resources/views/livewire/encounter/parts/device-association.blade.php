@@ -1,6 +1,5 @@
 @php
     use App\Enums\DeviceAssociation\Status as DeviceAssociationStatus;
-    use App\Models\MedicalEvents\Sql\DeviceAssociation;
 @endphp
 
 <div
@@ -219,19 +218,17 @@
 
     <div>
         @unless ($isReadonly ?? false)
-            @can('create', DeviceAssociation::class)
-                <button
-                    type="button"
-                    @click.prevent="
-                        newAssociation = true;
-                        modalAssociation = new DeviceAssociation();
-                        openDeviceAssociationDrawer = true;
-                    "
-                    class="item-add my-5 mt-5 flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                >
-                    {{ __('device-associations.add') }}
-                </button>
-            @endcan
+            <button
+                type="button"
+                @click.prevent="
+                    newAssociation = true;
+                    modalAssociation = new DeviceAssociation();
+                    openDeviceAssociationDrawer = true;
+                "
+                class="item-add my-5 mt-5 flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+                {{ __('device-associations.add') }}
+            </button>
         @endunless
     </div>
 

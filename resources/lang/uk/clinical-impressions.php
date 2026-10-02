@@ -54,6 +54,7 @@ return [
     // Field names for :attribute in validation messages
     'attributes' => [
         'codeCode' => 'код клінічної оцінки',
+        'assessorEmployeeId' => 'медичний працівник, який провів клінічну оцінку',
         'description' => 'опис клінічної оцінки',
         'effectivePeriodStartDate' => 'дата початку клінічної оцінки',
         'effectivePeriodStartTime' => 'час початку клінічної оцінки',

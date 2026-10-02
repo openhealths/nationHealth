@@ -17,6 +17,7 @@ return [
     'information_source' => 'Джерело інформації',
     'other_source' => 'Інше джерело',
     'performer' => 'Виконавець',
+    'performer_employee' => 'Медичний працівник',
     'source_link' => 'Посилання на джерело',
     'code_and_name' => 'Код та назва',
     'added' => 'Додано',

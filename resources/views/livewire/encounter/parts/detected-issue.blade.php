@@ -91,6 +91,7 @@
             this.previousDetectedIssues = [];
 
             this.modalDetectedIssue = new DetectedIssue();
+            this.modalDetectedIssue.authorEmployeeId = $wire.form.encounter.performerId;
             this.modalDetectedIssue.identifiedDate = $wire.form.encounter.periodDate || '';
             this.modalDetectedIssue.identifiedTime = $wire.form.encounter.periodStart || '';
 
@@ -131,6 +132,10 @@
             }
 
             if (this.modalDetectedIssue.primarySource === false && ! this.modalDetectedIssue.reportOriginCode) {
+                return false;
+            }
+
+            if (this.modalDetectedIssue.primarySource === true && ! this.modalDetectedIssue.authorEmployeeId) {
                 return false;
             }
 
@@ -536,7 +541,10 @@
                                         type="radio"
                                         name="detectedIssuePrimarySource"
                                         x-model.boolean="modalDetectedIssue.primarySource"
-                                        @change="modalDetectedIssue.reportOriginCode = ''"
+                                        @change="
+                                            modalDetectedIssue.reportOriginCode = '';
+                                            modalDetectedIssue.authorEmployeeId ||= $wire.form.encounter.performerId;
+                                        "
                                         value="true"
                                         class="default-radio"
                                     />
@@ -549,12 +557,34 @@
                                             type="radio"
                                             name="detectedIssuePrimarySource"
                                             x-model.boolean="modalDetectedIssue.primarySource"
+                                            @change="modalDetectedIssue.authorEmployeeId = ''"
                                             value="false"
                                             class="default-radio"
                                         />
                                         <span class="text-sm">{{ __('medical-events.other_source') }}</span>
                                     </label>
                                 @endunless
+                            </div>
+                        </div>
+
+                        <div class="form-row-2" x-show="modalDetectedIssue.primarySource === true">
+                            <div class="form-group group">
+                                <select
+                                    x-model="modalDetectedIssue.authorEmployeeId"
+                                    id="detectedIssueAuthorEmployee"
+                                    class="input-select peer"
+                                    :required="modalDetectedIssue.primarySource === true"
+                                >
+                                    <option value="">{{ __('forms.select') }}</option>
+                                    @foreach ($employees as $employee)
+                                        <option value="{{ $employee['uuid'] }}">
+                                            {{ $employee['name'] }} — {{ $this->dictionaries['POSITION'][$employee['position']] ?? $employee['position'] }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <label for="detectedIssueAuthorEmployee" class="label">
+                                    {{ __('medical-events.performer_employee') }}
+                                </label>
                             </div>
                         </div>
 
@@ -621,6 +651,7 @@
             this.implicatedId = '';
             this.basedOnId = '';
             this.primarySource = true;
+            this.authorEmployeeId = '';
             this.reportOriginCode = '';
 
             if (obj) {

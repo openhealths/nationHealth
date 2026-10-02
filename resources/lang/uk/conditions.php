@@ -104,6 +104,7 @@ return [
     // Field names for :attribute in validation messages
     'attributes' => [
         'primarySource' => 'первинне джерело діагнозу',
+        'asserterEmployeeId' => 'медичний працівник, який встановив діагноз',
         'reportOriginCode' => 'джерело інформації діагнозу',
         'codeCode' => 'джерело інформації діагнозу',
         'codeSystem' => 'код стану діагнозу',

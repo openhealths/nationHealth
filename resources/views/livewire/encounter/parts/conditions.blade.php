@@ -242,9 +242,19 @@
         },
 
         init() {
+            this.fetchMissingIcd10Descriptions();
+
+            // The diagnosis of a chosen episode is added on the server, after the section has been initialized
+            this.$watch('conditions', () => this.fetchMissingIcd10Descriptions());
+        },
+
+        fetchMissingIcd10Descriptions() {
             const icd10Codes = this.conditions
                 .filter(
-                    (condition) => condition.codeSystem === 'eHealth/ICD10_AM/condition_codes' && condition.codeCode,
+                    (condition) =>
+                        condition.codeSystem === 'eHealth/ICD10_AM/condition_codes' &&
+                        condition.codeCode &&
+                        ! this.icd10Descriptions[condition.codeCode],
                 )
                 .map((condition) => condition.codeCode);
 
@@ -466,6 +476,7 @@
             @click.prevent="
                     newCondition = true; {{-- We are adding a new condition --}}
                     modalCondition = new Condition(null, encounter); {{-- Replace the data of the previous condition with a new one--}}
+                    modalCondition.asserterEmployeeId = $wire.form.encounter.performerId;
                     modalDiagnosis = new Diagnosis();
                     conditionMode = 'create';
                     registeredCondition = null;
@@ -1035,6 +1046,7 @@
                                     @change="
                                         modalCondition.primarySource = true;
                                         modalCondition.asserterText = '';
+                                        modalCondition.asserterEmployeeId ||= $wire.form.encounter.performerId;
                                     "
                                     id="conditionSourcePerformer"
                                     type="radio"
@@ -1058,6 +1070,7 @@
                                         @change="
                                             modalCondition.primarySource = false;
                                             modalCondition.asserterText = '';
+                                            modalCondition.asserterEmployeeId = '';
                                         "
                                         id="otherSource"
                                         type="radio"
@@ -1122,7 +1135,33 @@
                         @include('livewire.encounter.condition-parts.evidence-details')
                     </div>
 
-                    <div x-show="modalCondition.primarySource === true" class="mt-8 transition-all">
+                    <div x-show="modalCondition.primarySource === true" class="mt-8 space-y-6 transition-all">
+                        <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                            <div>
+                                <label
+                                    for="conditionAsserterEmployee"
+                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                                >
+                                    {{ __('medical-events.performer_employee') }}
+                                </label>
+                                <div class="relative">
+                                    <select
+                                        x-model="modalCondition.asserterEmployeeId"
+                                        id="conditionAsserterEmployee"
+                                        class="input-select w-full appearance-none bg-none"
+                                    >
+                                        <option value="" selected>{{ __('forms.select') }}</option>
+                                        @foreach ($employees as $employee)
+                                            <option value="{{ $employee['uuid'] }}">
+                                                {{ $employee['name'] }} — {{ $this->dictionaries['POSITION'][$employee['position']] ?? $employee['position'] }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="form-group group">
                             <label
                                 for="doctorComment"
@@ -1454,6 +1493,7 @@
             this.severityCode = '';
             this.stageCode = '';
             this.asserterText = '';
+            this.asserterEmployeeId = '';
             this.reportOriginCode = '';
             this.evidenceCodes = [];
             this.evidenceDetails = [];

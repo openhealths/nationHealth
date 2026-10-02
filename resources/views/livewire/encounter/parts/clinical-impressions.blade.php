@@ -197,6 +197,7 @@
                 @click.prevent="
                     newClinicalImpression = true; {{-- We are adding a new clinicalImpression --}}
                     modalClinicalImpression = new ClinicalImpression(null, $wire.form.encounter); {{-- Replace the data of the previous clinicalImpression with a new one--}}
+                    modalClinicalImpression.assessorEmployeeId = $wire.form.encounter.performerId;
                     $wire.findings = [];
                     openClinicalImpressionDrawer = true;
                 "
@@ -264,6 +265,7 @@
             const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
 
             this.codeCode = '';
+            this.assessorEmployeeId = '';
             this.description = '';
             this.note = '';
             this.summary = '';

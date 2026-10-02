@@ -40,7 +40,7 @@ class ImmunizationMapper implements FhirMapperContract
         if ($data['primarySource']) {
             $result['performer'] = FhirResource::make()
                 ->coding('eHealth/resources', 'employee')
-                ->toIdentifier($uuids['employee']);
+                ->toIdentifier($data['performerEmployeeId'] ?? $uuids['employee']);
         } else {
             $result['reportOrigin'] = FhirResource::make()
                 ->coding('eHealth/immunization_report_origins', $data['reportOriginCode'])
@@ -142,6 +142,7 @@ class ImmunizationMapper implements FhirMapperContract
             'uuid' => data_get($data, 'uuid'),
             'status' => data_get($data, 'status', ImmunizationStatus::COMPLETED->value),
             'primarySource' => data_get($data, 'primarySource'),
+            'performerEmployeeId' => data_get($data, 'performer.identifier.value', ''),
             'notGiven' => $notGiven,
             'vaccineCode' => data_get($data, 'vaccineCode.coding.0.code'),
             'date' => CarbonImmutable::createFromFormat(config('app.date_format') . ' H:i', data_get($data, 'date'))->format(config('app.date_format')),

@@ -5,7 +5,12 @@
         <h2 class="default-p font-bold">{{ __('medical-events.information_source') }}</h2>
         <div class="flex items-center">
             <input
-                @change="modalObservation.primarySource = true"
+                @change="
+                    modalObservation.primarySource = true;
+                    @if ($isEncounterContext)
+                        modalObservation.performerEmployeeId ||= $wire.form.encounter.performerId;
+                    @endif
+                "
                 x-model.boolean="modalObservation.primarySource"
                 id="observationSourcePerformer"
                 type="radio"
@@ -22,7 +27,10 @@
         @unless (auth()->user()->isAssistantOnly())
             <div class="flex items-center">
                 <input
-                    @change="modalObservation.primarySource = false"
+                    @change="
+                        modalObservation.primarySource = false;
+                        modalObservation.performerEmployeeId = '';
+                    "
                     x-model.boolean="modalObservation.primarySource"
                     id="observationSourcePatient"
                     type="radio"
@@ -45,6 +53,34 @@
             codeableConceptValues: $wire.entangle('codeableConceptValues'),
         }"
     >
+        @if ($isEncounterContext)
+            <div x-show="modalObservation.primarySource === true">
+                <div class="form-row-modal">
+                    <div>
+                        <label for="observationPerformerEmployee" class="label-modal">
+                            {{ __('medical-events.performer_employee') }}
+                        </label>
+                        <select
+                            class="input-modal"
+                            x-model="modalObservation.performerEmployeeId"
+                            id="observationPerformerEmployee"
+                        >
+                            <option value="" selected>{{ __('forms.select') }}</option>
+                            @foreach ($employees as $employee)
+                                <option value="{{ $employee['uuid'] }}">
+                                    {{ $employee['name'] }} — {{ $this->dictionaries['POSITION'][$employee['position']] ?? $employee['position'] }}
+                                </option>
+                            @endforeach
+                        </select>
+
+                        <p class="text-error text-xs" x-show="! modalObservation.performerEmployeeId">
+                            {{ __('forms.field_empty') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <div x-show="modalObservation.primarySource === false">
             <div class="form-row-modal">
                 <div>

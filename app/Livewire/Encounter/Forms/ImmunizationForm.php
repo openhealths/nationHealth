@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Encounter\Forms;
 
+use App\Enums\Status;
+use App\Models\Employee\Employee;
 use App\Rules\InDictionary;
 use App\Rules\PastDateTime;
 use App\Services\Dictionary\Mappers\ImmunizationDictionaryMapper;
@@ -100,6 +102,20 @@ class ImmunizationForm extends Form
                     $notGiven === false ? 'prohibited' : 'nullable',
                     'string',
                     new InDictionary('eHealth/reason_not_given_explanations')
+                ];
+            }),
+            'immunizations.*.performerEmployeeId' => Rule::forEach(function (mixed $value, string $attribute): array {
+                $isPrimarySource = ($this->immunizations[(int) explode('.', $attribute)[1]]['primarySource'] ?? null) === true;
+
+                return [
+                    Rule::requiredIf($isPrimarySource),
+                    Rule::prohibitedIf(!$isPrimarySource),
+                    'nullable',
+                    'uuid',
+                    Rule::exists(Employee::class, 'uuid')
+                        ->where('legal_entity_id', legalEntity()->id)
+                        ->where('status', Status::APPROVED->value)
+                        ->where('is_active', true)
                 ];
             }),
             'immunizations.*.reportOriginCode' => Rule::forEach(function (mixed $value, string $attribute) {

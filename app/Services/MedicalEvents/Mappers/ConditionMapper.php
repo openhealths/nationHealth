@@ -38,7 +38,7 @@ class ConditionMapper implements FhirMapperContract
                 FhirResource::make()
                     ->coding('eHealth/resources', 'employee')
                     ->toIdentifier(
-                        $uuids['employee'],
+                        $data['asserterEmployeeId'] ?? $uuids['employee'],
                         $data['asserterText'] ?? ''
                     ),
             ];
@@ -139,6 +139,7 @@ class ConditionMapper implements FhirMapperContract
                 data_get($data, 'bodySites', [])
             ),
             'stageCode' => data_get($data, 'stage.summary.coding.0.code', ''),
+            'asserterEmployeeId' => data_get($data, 'asserter.0.identifier.value', data_get($data, 'asserter.identifier.value', '')),
             'asserterText' => data_get($data, 'asserter.0.identifier.type.text', data_get($data, 'asserter.identifier.type.text', '')),
             'reportOriginCode' => data_get($data, 'reportOrigin.coding.0.code', ''),
             'evidenceCodes' => array_map(

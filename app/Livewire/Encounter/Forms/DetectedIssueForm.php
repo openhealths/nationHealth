@@ -8,6 +8,8 @@ use App\Rules\AfterOrEqualDateTime;
 use App\Rules\InDictionary;
 use App\Rules\PrimarySourceRequiredForAssistant;
 use App\Enums\DetectedIssue\Status;
+use App\Enums\Status as EmployeeStatus;
+use App\Models\Employee\Employee;
 use App\Models\MedicalEvents\Sql\DetectedIssue;
 use Carbon\CarbonImmutable;
 use Closure;
@@ -85,6 +87,22 @@ class DetectedIssueForm extends Form
                 'boolean',
                 new PrimarySourceRequiredForAssistant()
             ],
+            'detectedIssues.*.authorEmployeeId' => Rule::forEach(
+                function (mixed $value, string $attribute): array {
+                    $isPrimarySource = ($this->detectedIssues[(int) explode('.', $attribute)[1]]['primarySource'] ?? true) === true;
+
+                    return [
+                        Rule::requiredIf($isPrimarySource),
+                        Rule::prohibitedIf(!$isPrimarySource),
+                        'nullable',
+                        'uuid',
+                        Rule::exists(Employee::class, 'uuid')
+                            ->where('legal_entity_id', legalEntity()->id)
+                            ->where('status', EmployeeStatus::APPROVED->value)
+                            ->where('is_active', true)
+                    ];
+                }
+            ),
             'detectedIssues.*.reportOriginCode' => Rule::forEach(
                 function (mixed $value, string $attribute): array {
                     $index = (int) explode('.', $attribute)[1];
