@@ -45,7 +45,7 @@ trait StatusTrait
         }
 
         try {
-            $validated = $this->validate($this->rulesForChangingStatus($equipment->uuid));
+            $validated = $this->validate($this->rulesForChangingStatus($equipment));
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
@@ -129,21 +129,23 @@ trait StatusTrait
         }
     }
 
-    protected function rulesForChangingStatus(string $uuid): array
+    protected function rulesForChangingStatus(Equipment $equipment): array
     {
         return [
             'status' => [
                 'required',
                 'string',
                 Rule::in(Status::INACTIVE, Status::ENTERED_IN_ERROR),
+                // Only active equipment can become inactive
+                function ($attribute, $value, $fail) use ($equipment) {
+                    if ($value === Status::INACTIVE->value && $equipment->status !== Status::ACTIVE) {
+                        $fail(__('equipments.validation.invalid_status_transition'));
+                    }
+                },
                 // If status changes to inactive then availability_status on device must be any but available
-                function ($attribute, $value, $fail) use ($uuid) {
-                    if ($value === Status::INACTIVE->value) {
-                        $availability = Equipment::whereUuid($uuid)->value('availability_status');
-
-                        if ($availability === AvailabilityStatus::AVAILABLE) {
-                            $fail(__('validation.attributes.statusIncorrect'));
-                        }
+                function ($attribute, $value, $fail) use ($equipment) {
+                    if ($value === Status::INACTIVE->value && $equipment->availabilityStatus === AvailabilityStatus::AVAILABLE) {
+                        $fail(__('validation.attributes.statusIncorrect'));
                     }
                 }
             ],
