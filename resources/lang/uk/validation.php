@@ -837,5 +837,11 @@ return [
             'quantity' => 'Кількість',
             'goal' => 'Очікуваний результат',
         ],
+
+        // Medical conclusions (МВТН)
+        'eventPeriodStart' => 'дата початку непрацездатності',
+        'eventPeriodEnd' => 'дата закінчення непрацездатності',
+        'treatmentViolation' => 'порушення режиму лікування',
+        'treatmentViolationDate' => 'дата порушення режиму лікування',
     ]
 ];

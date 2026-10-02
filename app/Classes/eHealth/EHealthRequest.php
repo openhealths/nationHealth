@@ -112,7 +112,7 @@ abstract class EHealthRequest extends PendingRequest
     /**
      * Remove sensitive and too-large values from HTTP client logs.
      */
-    private function sanitizeOptionsForLog(array $options): array
+    protected function sanitizeOptionsForLog(array $options): array
     {
         if (isset($options['json']) && is_array($options['json'])) {
             $json = $options['json'];
@@ -121,6 +121,11 @@ abstract class EHealthRequest extends PendingRequest
                 if (isset($json[$signedKey]) && is_string($json[$signedKey])) {
                     $json[$signedKey] = '[base64_signed_content_redacted length=' . strlen($json[$signedKey]) . ']';
                 }
+            }
+
+            // Composition sign/cancel carry the PKCS#7 blob in `data`.
+            if (isset($json['data']) && is_string($json['data']) && strlen($json['data']) > 512) {
+                $json['data'] = '[base64_signed_content_redacted length=' . strlen($json['data']) . ']';
             }
 
             $options['json'] = $json;
