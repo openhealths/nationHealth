@@ -195,6 +195,15 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             'supporting_info' => $formData['supporting_info'] ?? null,
             'based_on_uuid' => null,
             'context_uuid' => $encounter->uuid,
+            'performer' => ($formData['category'] ?? null) === 'transfer_of_care'
+                ? ($formData['performer'] ?? null)
+                : null,
+            'location_reference' => ($formData['category'] ?? null) === 'transfer_of_care'
+                ? ($formData['location_reference'] ?? null)
+                : null,
+            'performer_type' => ($formData['category'] ?? null) === 'transfer_of_care'
+                ? ($formData['performer_type'] ?? null)
+                : null,
         ];
 
         $personUuid = \App\Models\Person\Person::find($encounter->person_id)?->uuid;
@@ -616,6 +625,9 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             $dbData['quantity_system'] = $activity?->quantitySystem ?: 'SERVICE_UNIT';
             $dbData['quantity_code'] = $activity?->quantityCode ?: 'PIECE';
             $dbData['service_id'] = $requestRecord->serviceId ?: $activity?->productReference;
+            $dbData['performer'] = $requestRecord->performerLegalEntityUuid;
+            $dbData['location_reference'] = $requestRecord->locationReferenceUuid;
+            $dbData['performer_type'] = $requestRecord->performerType;
 
             return $dbData;
         }

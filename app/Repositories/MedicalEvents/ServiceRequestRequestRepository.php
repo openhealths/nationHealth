@@ -70,11 +70,44 @@ class ServiceRequestRequestRepository extends BaseRepository
                     'reason_reference' => $data['reason_reference'] ?? null,
                     'inform_with' => $data['inform_with'] ?? null,
                     'supporting_info' => $data['supporting_info'] ?? null,
+                    ...$this->transferPerformerAttributes($data),
                 ]
             );
 
             return (int) $request->id;
         });
+    }
+
+    /**
+     * Persist transfer-of-care performer fields only when the caller supplied them.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, string|null>
+     */
+    private function transferPerformerAttributes(array $data): array
+    {
+        $attributes = [];
+
+        if (array_key_exists('performer', $data)) {
+            $attributes['performer_legal_entity_uuid'] = $this->nullableString($data['performer']);
+        }
+
+        if (array_key_exists('location_reference', $data)) {
+            $attributes['location_reference_uuid'] = $this->nullableString($data['location_reference']);
+        }
+
+        if (array_key_exists('performer_type', $data)) {
+            $attributes['performer_type'] = $this->nullableString($data['performer_type']);
+        }
+
+        return $attributes;
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        $text = is_string($value) ? trim($value) : '';
+
+        return $text !== '' ? $text : null;
     }
 
     /**

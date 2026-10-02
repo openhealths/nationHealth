@@ -8,7 +8,10 @@ use App\Enums\Person\EncounterStatus;
 use App\Livewire\Encounter\Concerns\ManagesEncounterEPrescription;
 use App\Livewire\Encounter\Concerns\ManagesEncounterReferrals;
 use App\Livewire\Encounter\Concerns\ResolvesEncounterStandaloneContext;
+use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\EncounterHospitalization;
+use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
@@ -125,6 +128,78 @@ class EncounterStandalonePhase6Test extends TestCase
         $this->assertSame('diagnostic_procedure', $harness->encounterReferralForm['category']);
     }
 
+    public function test_transfer_discharge_defaults_category_and_performer(): void
+    {
+        $destination = (string) Str::uuid();
+        $divisionId = (string) Str::uuid();
+        $this->mockDestinationDivisions([[
+            'id' => $divisionId,
+            'legal_entity_id' => $destination,
+            'name' => 'Приймальне відділення',
+            'type' => 'CLINIC',
+            'status' => 'ACTIVE',
+        ]]);
+
+        $encounter = $this->createTransferEncounter($destination);
+        $harness = $this->makeHarness($encounter->id);
+        $harness->openEncounterReferralDrawer();
+
+        $this->assertTrue($harness->showEncounterReferralDrawer);
+        $this->assertTrue($harness->encounterReferralIsTransfer);
+        $this->assertSame('transfer_of_care', $harness->encounterReferralForm['category']);
+        $this->assertSame($destination, $harness->encounterReferralForm['performer']);
+        $this->assertSame([$divisionId], $harness->encounterReferralAllowedDivisionIds);
+
+        $serviceId = (string) Str::uuid();
+        $harness->encounterReferralServiceResults = [[
+            'id' => $serviceId,
+            'code' => '37003-00',
+            'name' => 'Обстеження',
+            'category' => 'diagnostic_procedure',
+        ]];
+        $harness->selectEncounterReferralService($serviceId);
+
+        $this->assertSame('transfer_of_care', $harness->encounterReferralForm['category']);
+    }
+
+    public function test_transfer_of_care_is_rejected_without_transfer_general(): void
+    {
+        $encounter = $this->createEncounter(EncounterStatus::FINISHED->value);
+        $harness = $this->makeHarness($encounter->id);
+        $harness->openEncounterReferralDrawer();
+        $harness->encounterReferralForm['category'] = 'transfer_of_care';
+        $harness->encounterReferralForm['service_id'] = (string) Str::uuid();
+
+        $harness->validateEncounterReferral();
+
+        $this->assertNull($harness->encounterReferralRequestIdToSign);
+        $this->assertTrue($harness->showEncounterReferralDrawer);
+        $this->assertSame(
+            __('Електронне направлення на переведення можна створити лише для завершеної виписки з результатом «Переведено в інший ЗОЗ».'),
+            $harness->encounterReferralWarningMessage
+        );
+    }
+
+    public function test_transfer_draft_is_not_created_without_a_destination_division(): void
+    {
+        $destination = (string) Str::uuid();
+        $this->mockDestinationDivisions([]);
+
+        $encounter = $this->createTransferEncounter($destination);
+        $harness = $this->makeHarness($encounter->id);
+        $harness->openEncounterReferralDrawer();
+        $harness->encounterReferralForm['service_id'] = (string) Str::uuid();
+
+        $harness->validateEncounterReferral();
+
+        $this->assertNull($harness->encounterReferralRequestIdToSign);
+        $this->assertTrue($harness->showEncounterReferralDrawer);
+        $this->assertSame(
+            __('Немає активного підрозділу закладу, до якого переводять пацієнта.'),
+            $harness->encounterReferralWarningMessage
+        );
+    }
+
     public function test_legacy_drafts_without_context_show_an_error_and_remain_unchanged(): void
     {
         $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
@@ -192,6 +267,52 @@ class EncounterStandalonePhase6Test extends TestCase
             'type_id' => $ccId,
             'ehealth_inserted_at' => now(),
         ]);
+    }
+
+    private function createTransferEncounter(string $destinationUuid): Encounter
+    {
+        $classId = Coding::create([
+            'code' => 'INPATIENT',
+            'system' => 'eHealth/encounter_classes',
+        ])->id;
+        $identifierId = Identifier::create(['value' => (string) Str::uuid()])->id;
+        $ccId = \App\Models\MedicalEvents\Sql\CodeableConcept::create()->id;
+        $destinationId = Identifier::create(['value' => $destinationUuid])->id;
+        $dispositionId = Coding::create([
+            'code' => 'transfer_general',
+            'system' => 'eHealth/encounter_discharge_disposition',
+        ])->id;
+
+        $encounter = Encounter::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'status' => EncounterStatus::FINISHED->value,
+            'episode_id' => $identifierId,
+            'class_id' => $classId,
+            'type_id' => $ccId,
+            'ehealth_inserted_at' => now(),
+        ]);
+
+        EncounterHospitalization::create([
+            'encounter_id' => $encounter->id,
+            'destination_id' => $destinationId,
+            'discharge_disposition_id' => $dispositionId,
+        ]);
+
+        return $encounter;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function mockDestinationDivisions(array $rows): void
+    {
+        $psr = new \GuzzleHttp\Psr7\Response(200, ['Content-Type' => 'application/json'], json_encode(['data' => $rows]));
+        $response = new \App\Classes\eHealth\EHealthResponse(new \Illuminate\Http\Client\Response($psr));
+
+        $api = \Mockery::mock(\App\Classes\eHealth\Api\Division::class);
+        $api->shouldReceive('getMany')->andReturn($response);
+        $this->instance(\App\Classes\eHealth\Api\Division::class, $api);
     }
 }
 

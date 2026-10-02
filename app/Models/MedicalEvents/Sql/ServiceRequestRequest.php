@@ -38,6 +38,9 @@ class ServiceRequestRequest extends Model
         'reason_reference',
         'inform_with',
         'supporting_info',
+        'performer_legal_entity_uuid',
+        'location_reference_uuid',
+        'performer_type',
     ];
 
     protected $casts = [

@@ -48,6 +48,40 @@ class ServiceRequestMapperTest extends TestCase
         $this->assertArrayHasKey('requester_employee', $payload);
         $this->assertSame($programId, $payload['program']['identifier']['value']);
         $this->assertSame('medical_program', $payload['program']['identifier']['type']['coding'][0]['code']);
+        $this->assertArrayNotHasKey('performer', $payload);
+        $this->assertArrayNotHasKey('location_reference', $payload);
+    }
+
+    #[Test]
+    public function transfer_of_care_includes_performer_and_location_only_for_that_category(): void
+    {
+        $performer = (string) Str::uuid();
+        $division = (string) Str::uuid();
+        $data = $this->serviceData((string) Str::uuid(), (string) Str::uuid());
+        $data['category'] = 'transfer_of_care';
+        $data['performer'] = $performer;
+        $data['location_reference'] = $division;
+        $data['performer_type'] = 'THERAPIST';
+
+        $payload = (new ServiceRequestMapper())->toCreateSignedContent($data, $this->uuids());
+
+        $this->assertSame($performer, $payload['performer']['identifier']['value']);
+        $this->assertSame('legal_entity', $payload['performer']['identifier']['type']['coding'][0]['code']);
+        $this->assertSame($division, $payload['location_reference']['identifier']['value']);
+        $this->assertSame('division', $payload['location_reference']['identifier']['type']['coding'][0]['code']);
+        $this->assertSame('THERAPIST', $payload['performer_type']['coding'][0]['code']);
+        $this->assertSame('SPECIALITY_TYPE', $payload['performer_type']['coding'][0]['system']);
+
+        $diagnostic = $this->serviceData((string) Str::uuid(), (string) Str::uuid());
+        $diagnostic['performer'] = $performer;
+        $diagnostic['location_reference'] = $division;
+        $diagnostic['performer_type'] = 'THERAPIST';
+
+        $plain = (new ServiceRequestMapper())->toCreateSignedContent($diagnostic, $this->uuids());
+
+        $this->assertArrayNotHasKey('performer', $plain);
+        $this->assertArrayNotHasKey('location_reference', $plain);
+        $this->assertArrayNotHasKey('performer_type', $plain);
     }
 
     /**

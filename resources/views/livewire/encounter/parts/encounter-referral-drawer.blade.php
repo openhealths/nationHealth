@@ -45,12 +45,7 @@
                                 @click.prevent="openServiceCatalog = true"
                                 class="inline-flex shrink-0 cursor-pointer items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                             >
-                                <svg
-                                    class="h-5 w-5"
-                                    viewBox="0 0 16 16"
-                                    fill="none"
-                                    aria-hidden="true"
-                                >
+                                <svg class="h-5 w-5" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                                     <path
                                         d="M8 4.667C8 3.96 7.719 3.281 7.219 2.781 6.719 2.281 6.041 2 5.333 2H1.333V12H6c.53 0 1.039.21 1.414.586.375.375.586.884.586 1.414M8 4.667V14m0-9.333c0-.707.281-1.386.781-1.886.5-.5 1.179-.781 1.886-.781h4V12h-4.667c-.53 0-1.039.21-1.414.586-.375.375-.586.884-.586 1.414"
                                         stroke="currentColor"
@@ -111,6 +106,7 @@
                             id="encounterReferralCategory"
                             class="input-select peer w-full"
                             wire:model="encounterReferralForm.category"
+                            @disabled($encounterReferralIsTransfer)
                         >
                             @foreach (__('encounters.referral_category') as $code => $label)
                                 <option value="{{ $code }}">{{ $label }}</option>
@@ -119,6 +115,45 @@
                             <option value="transfer_of_care">{{ __('encounters.referral_category.transfer') }}</option>
                         </select>
                     </div>
+                    @if ($encounterReferralIsTransfer)
+                        <div class="form-group group md:col-span-2">
+                            <label for="encounterReferralPerformer" class="label required"
+                                >Заклад, до якого переводять</label>
+                            <input
+                                type="text"
+                                id="encounterReferralPerformer"
+                                class="input peer w-full"
+                                value="{{ $encounterReferralPerformerName }}"
+                                readonly
+                            />
+                        </div>
+                        <div class="form-group group">
+                            <label for="encounterReferralLocation" class="label required">Підрозділ виконавця</label>
+                            <select
+                                id="encounterReferralLocation"
+                                class="input-select peer w-full"
+                                wire:model="encounterReferralForm.location_reference"
+                            >
+                                <option value="">Оберіть підрозділ</option>
+                                @foreach ($encounterReferralDivisions as $division)
+                                    <option value="{{ $division['id'] }}">{{ $division['name'] }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group group">
+                            <label for="encounterReferralPerformerType" class="label">Спеціальність виконавця</label>
+                            <select
+                                id="encounterReferralPerformerType"
+                                class="input-select peer w-full"
+                                wire:model="encounterReferralForm.performer_type"
+                            >
+                                <option value="">Не обрано</option>
+                                @foreach ($encounterReferralSpecialities as $code => $label)
+                                    <option value="{{ $code }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
                     <div class="form-group group">
                         <label for="encounterReferralProgram" class="label">Програма</label>
                         <select
@@ -252,11 +287,7 @@
             />
 
             <div class="mt-8">
-                <button
-                    type="button"
-                    @click="openServiceCatalog = false"
-                    class="button-minor"
-                >
+                <button type="button" @click="openServiceCatalog = false" class="button-minor">
                     {{ __('forms.cancel') }}
                 </button>
             </div>
