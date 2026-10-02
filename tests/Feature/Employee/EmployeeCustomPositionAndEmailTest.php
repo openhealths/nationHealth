@@ -165,6 +165,62 @@ class EmployeeCustomPositionAndEmailTest extends TestCase
         );
     }
 
+    #[Test]
+    public function existing_party_own_tax_id_passes_even_when_duplicate_parties_share_it(): void
+    {
+        [$legalEntity] = $this->createTwoLegalEntities();
+        $this->instance('legalEntity', $legalEntity);
+
+        $partyA = Party::create([
+            'uuid' => (string) Str::uuid(),
+            'first_name' => 'Іван',
+            'last_name' => 'Коваленко',
+            'tax_id' => '3212312312',
+            'birth_date' => '1990-01-01',
+            'gender' => 'MALE',
+        ]);
+
+        $partyB = Party::create([
+            'uuid' => (string) Str::uuid(),
+            'first_name' => 'Петро',
+            'last_name' => 'Коваленко',
+            'tax_id' => '3212312312',
+            'birth_date' => '1991-01-01',
+            'gender' => 'MALE',
+        ]);
+
+        foreach ([$partyA, $partyB] as $party) {
+            Employee::create([
+                'uuid' => (string) Str::uuid(),
+                'full_name' => $party->lastName . ' ' . $party->firstName,
+                'employee_type' => Role::DOCTOR->value,
+                'status' => Status::APPROVED->value,
+                'legal_entity_id' => $legalEntity->id,
+                'is_active' => true,
+                'position' => 'P1',
+                'start_date' => now()->format('Y-m-d'),
+                'party_id' => $party->id,
+            ]);
+        }
+
+        // PositionAdd hydrates existingPartyId for the party being edited.
+        $validator = Validator::make(
+            [
+                'existingPartyId' => $partyA->id,
+                'party' => [
+                    'noTaxId' => false,
+                    'taxId' => '3212312312',
+                    'email' => 'position-add@example.com',
+                ],
+            ],
+            [
+                'party.taxId' => ['required', 'string', new TaxId()],
+            ]
+        );
+
+        $this->assertFalse($validator->fails(), (string) $validator->errors());
+    }
+
     /**
      * @return array{0: LegalEntity, 1: LegalEntity}
      */
