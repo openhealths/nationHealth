@@ -132,9 +132,8 @@ Route::prefix('persons')->whereNumber(['person', 'personRequest', 'personId', 'e
                     ->name('prescription-requests.view');
                 Route::get('/{person}/referrals', PatientReferrals::class)->name('referrals');
                 Route::get('/{person}/observations', ObservationIndex::class)->name('observations');
-                Route::get('/{person}/observations/{observationId}', ObservationView::class)
-                    ->whereNumber('observationId')
-                    ->withoutScopedBindings()
+                Route::get('/{person}/observations/{observation:id}', ObservationView::class)
+                    ->whereNumber('observation')
                     ->name('observations.view');
                 Route::get('/{person}/immunizations', ImmunizationIndex::class)->name('immunizations');
                 Route::get('/{person}/conditions', ConditionIndex::class)->name('conditions');
@@ -278,10 +277,9 @@ Route::prefix('prepersons')
         Route::get('/{preperson}/observations', ObservationIndex::class)
             ->can('view', 'preperson')
             ->name('observations');
-        Route::get('/{preperson}/observations/{observationId}', ObservationView::class)
+        Route::get('/{preperson}/observations/{observation:id}', ObservationView::class)
             ->can('view', 'preperson')
-            ->whereNumber('observationId')
-            ->withoutScopedBindings()
+            ->whereNumber('observation')
             ->name('observations.view');
         Route::get('/{preperson}/immunizations', ImmunizationIndex::class)
             ->can('view', 'preperson')

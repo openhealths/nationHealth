@@ -197,6 +197,38 @@ class ObservationIndex extends BasePatientComponent
         $this->resetPage();
     }
 
+    /**
+     * Open the page of an observation found through the eHealth search, storing it first when it is not in the database yet.
+     *
+     * @param  string  $observationId
+     * @return void
+     */
+    public function view(string $observationId): void
+    {
+        $observation = Observation::forPatient($this->patient())->whereUuid($observationId)->first()
+            ?? $this->storeSearchedObservation($observationId);
+
+        if ($observation === null) {
+            return;
+        }
+
+        if ($this->prepersonId !== null) {
+            $this->redirectRoute(
+                'prepersons.observations.view',
+                [legalEntity(), 'preperson' => $this->prepersonId, 'observation' => $observation->id],
+                navigate: true
+            );
+
+            return;
+        }
+
+        $this->redirectRoute(
+            'persons.observations.view',
+            [legalEntity(), 'person' => $this->personId, 'observation' => $observation->id],
+            navigate: true
+        );
+    }
+
     public function resetFilters(): void
     {
         $this->reset([
@@ -251,6 +283,33 @@ class ObservationIndex extends BasePatientComponent
     }
 
     /**
+     * Store an observation found through the eHealth search, so that it has a page to open.
+     *
+     * @param  string  $observationId
+     * @return Observation|null
+     */
+    protected function storeSearchedObservation(string $observationId): ?Observation
+    {
+        try {
+            $response = EHealth::observation()->getById($this->uuid, $observationId);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while loading the observation');
+
+            return null;
+        }
+
+        try {
+            Repository::observation()->sync($this->patient(), [$response->validate()]);
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Error while storing the observation');
+
+            return null;
+        }
+
+        return Observation::forPatient($this->patient())->whereUuid($observationId)->first();
+    }
+
+    /**
      * Paginate locally stored (synced) observations straight from the database.
      *
      * @return LengthAwarePaginator
@@ -262,7 +321,10 @@ class ObservationIndex extends BasePatientComponent
             ->recentlyUpdatedFirst()
             ->paginate(config('pagination.per_page'));
 
-        $paginator->setCollection(collect(Arr::toCamelCase($paginator->getCollection()->toArray())));
+        // The id is hidden on the model but the list links to the observation page by it
+        $paginator->setCollection(
+            collect(Arr::toCamelCase($paginator->getCollection()->makeVisible('id')->toArray()))
+        );
 
         return $paginator;
     }

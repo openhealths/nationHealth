@@ -357,6 +357,7 @@ class ObservationRepository extends BaseRepository
                 );
                 $bodySite = $this->syncCodeableConcept($existing, $data['body_site'] ?? null, 'bodySite');
                 $method = $this->syncCodeableConcept($existing, $data['method'] ?? null, 'method');
+                $basedOn = $this->syncIdentifier($existing, data_get($data, 'based_on.0'), 'basedOn');
 
                 $observationData = [
                     $ownerColumn => $ownerId,
@@ -371,6 +372,7 @@ class ObservationRepository extends BaseRepository
                     'interpretation_id' => $interpretation?->id,
                     'body_site_id' => $bodySite?->id,
                     'method_id' => $method?->id,
+                    'based_on_id' => $basedOn?->id,
                     'effective_date_time' => $data['effective_date_time'] ?? null,
                     'issued' => $data['issued'],
                     'primary_source' => $data['primary_source'],

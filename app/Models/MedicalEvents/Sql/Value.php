@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
+use Carbon\CarbonImmutable;
 use Eloquence\Behaviours\HasCamelCasing;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -41,6 +43,47 @@ class Value extends Model
         'created_at',
         'updated_at'
     ];
+
+    /**
+     * Readable form of the value, whichever of the plain value types it holds.
+     * A coded value has no label here, its name comes from the dictionary of its coding system.
+     *
+     * @return Attribute
+     */
+    protected function label(): Attribute
+    {
+        return Attribute::make(
+            get: function (): ?string {
+                if ($this->valueQuantity) {
+                    return collect([
+                        $this->valueQuantity->comparator,
+                        $this->valueQuantity->value,
+                        $this->valueQuantity->unit ?? $this->valueQuantity->code
+                    ])->filter(static fn (mixed $part): bool => filled($part))->implode(' ');
+                }
+
+                if (filled($this->valueString)) {
+                    return $this->valueString;
+                }
+
+                if ($this->valueBoolean !== null) {
+                    return $this->valueBoolean ? __('forms.yes') : __('forms.no');
+                }
+
+                if ($this->valueDateTime) {
+                    return CarbonImmutable::parse($this->valueDateTime, 'UTC')
+                        ->setTimezone(config('app.timezone'))
+                        ->format(config('app.date_format') . ' H:i');
+                }
+
+                if ($this->valueTime) {
+                    return substr($this->valueTime, 0, 5);
+                }
+
+                return null;
+            }
+        );
+    }
 
     public function observation(): BelongsTo
     {

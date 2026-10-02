@@ -311,13 +311,29 @@
                                             :id="$id('dropdown-button')"
                                             class="absolute right-0 z-50 mt-2 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-md dark:border-gray-600 dark:bg-gray-700"
                                         >
-                                            <a
-                                                href="{{ $prepersonId ? route('prepersons.observations.view', [legalEntity(), 'preperson' => $prepersonId, 'observationId' => data_get($observation, 'id') ?? 999999]) : route('persons.observations.view', [legalEntity(), 'person' => $personId, 'observationId' => data_get($observation, 'id') ?? 999999]) }}"
-                                                class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                                            >
-                                                @icon('eye', 'w-5 h-5 text-gray-600 dark:text-gray-300')
-                                                {{ __('forms.view_details') }}
-                                            </a>
+                                            @if (data_get($observation, 'id'))
+                                                <a
+                                                    href="{{
+                                                        $prepersonId
+                                                        ? route('prepersons.observations.view', [legalEntity(), 'preperson' => $prepersonId, 'observation' => data_get($observation, 'id')])
+                                                        : route('persons.observations.view', [legalEntity(), 'person' => $personId, 'observation' => data_get($observation, 'id')])
+                                                    }}"
+                                                    class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                >
+                                                    @icon('eye', 'w-5 h-5 text-gray-600 dark:text-gray-300')
+                                                    {{ __('forms.view_details') }}
+                                                </a>
+                                            @else
+                                                {{-- Found through the eHealth search: the record is stored on the way to its page --}}
+                                                <button
+                                                    type="button"
+                                                    wire:click="view('{{ data_get($observation, 'uuid') }}')"
+                                                    class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                >
+                                                    @icon('eye', 'w-5 h-5 text-gray-600 dark:text-gray-300')
+                                                    {{ __('forms.view_details') }}
+                                                </button>
+                                            @endif
 
                                             @if ($status !== ObservationStatus::ENTERED_IN_ERROR)
                                                 <button

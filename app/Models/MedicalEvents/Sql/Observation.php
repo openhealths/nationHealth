@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Support\Str;
 
 class Observation extends Model
 {
@@ -152,6 +153,34 @@ class Observation extends Model
             get: fn (): string => $this->effectivePeriod?->end
                 ? CarbonImmutable::parse($this->effectivePeriod->end)->format('H:i')
                 : '',
+        );
+    }
+
+    protected function ehealthInsertedDate(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => Str::before((string) $this->ehealthInsertedAt, ' ')
+        );
+    }
+
+    protected function ehealthInsertedTime(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => Str::after((string) $this->ehealthInsertedAt, ' ')
+        );
+    }
+
+    protected function ehealthUpdatedDate(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => Str::before((string) $this->ehealthUpdatedAt, ' ')
+        );
+    }
+
+    protected function ehealthUpdatedTime(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => Str::after((string) $this->ehealthUpdatedAt, ' ')
         );
     }
 
@@ -334,7 +363,8 @@ class Observation extends Model
             'specimen.type.coding',
             'device.type.coding',
             'basedOn.type.coding',
-            'referenceRanges',
+            'referenceRanges.low',
+            'referenceRanges.high',
             'components.code.coding',
             'components.interpretation.coding',
             'components.value.valueQuantity',
@@ -344,7 +374,8 @@ class Observation extends Model
             'components.value.valueRatio.numerator',
             'components.value.valueRatio.denominator',
             'components.value.valueSampledData',
-            'components.referenceRanges'
+            'components.referenceRanges.low',
+            'components.referenceRanges.high'
         ]);
     }
 }

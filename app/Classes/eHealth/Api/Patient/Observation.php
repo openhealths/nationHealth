@@ -200,7 +200,7 @@ class Observation extends PatientApiBase
             ValidationRuleBuilder::identifierCollectionRules('performer'),
             ValidationRuleBuilder::identifierRules('specimen'),
             ValidationRuleBuilder::identifierRules('device'),
-            ValidationRuleBuilder::identifierRules('based_on'),
+            ValidationRuleBuilder::identifierCollectionRules('based_on'),
 
             // Codeable concept relationships
             ValidationRuleBuilder::codeableConceptRules('code', true),

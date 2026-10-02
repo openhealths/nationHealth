@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models\MedicalEvents\Sql;
 
 use Eloquence\Behaviours\HasCamelCasing;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -35,6 +36,30 @@ class ReferenceRange extends Model
         'created_at',
         'updated_at'
     ];
+
+    /**
+     * Readable form of the range: its own text, or the bounds with the unit.
+     *
+     * @return Attribute
+     */
+    protected function label(): Attribute
+    {
+        return Attribute::make(
+            get: function (): ?string {
+                if (filled($this->text)) {
+                    return $this->text;
+                }
+
+                if ($this->low === null && $this->high === null) {
+                    return null;
+                }
+
+                $unit = $this->high?->unit ?? $this->low?->unit;
+
+                return trim($this->low?->value . ' – ' . $this->high?->value . ' ' . $unit);
+            }
+        );
+    }
 
     public function observation(): BelongsTo
     {
