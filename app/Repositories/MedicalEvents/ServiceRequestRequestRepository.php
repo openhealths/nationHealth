@@ -357,12 +357,12 @@ class ServiceRequestRequestRepository extends BaseRepository
      * @param  array<int, string>  $columns
      * @return Collection<int, ServiceRequestRequest>
      */
-    public function getByPersonIdAndStatus(int $personId, string $status, array $columns = ['*']): Collection
+    public function getByPersonIdAndStatus(int $personId, string|array $status, array $columns = ['*']): Collection
     {
         return $this->model
             ->newQuery()
             ->where('person_id', $personId)
-            ->where('status', $status)
+            ->whereIn('status', (array) $status)
             ->get($columns);
     }
 

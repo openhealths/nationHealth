@@ -572,7 +572,11 @@ class EncounterComponent extends Component
 
         // category is a CodeableConcept relation (category_id), not a string column
         $this->availableReferrals = MedicalEventsRepository::serviceRequest()
-            ->getByPersonIdAndStatus($this->personId, ServiceRequestStatus::ACTIVE->value, ['uuid', 'request_number', 'service_id', 'category_id'])
+            ->getByPersonIdAndStatus(
+                $this->personId,
+                [ServiceRequestStatus::ACTIVE->value, ServiceRequestStatus::IN_PROGRESS->value],
+                ['uuid', 'request_number', 'service_id', 'category_id']
+            )
             ->loadMissing('category')
             ->map(static function (ServiceRequestRequest $referral) use ($services, $procedureCategories, $diagnosticReportCategories): array {
                 $service = $services->firstWhere('id', $referral->serviceId);

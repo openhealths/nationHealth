@@ -54,11 +54,50 @@ class EncounterStandalonePhase6Test extends TestCase
 
         $encounter = $this->createEncounter(EncounterStatus::FINISHED->value);
         $harness = $this->makeHarness($encounter->id);
+        $harness->addError('encounterEPrescriptionForm.medication_id', 'Old medication error');
+        $harness->addError('encounterReferralForm.service_id', 'Unrelated referral error');
 
         $harness->openEncounterEPrescriptionDrawer();
 
         $this->assertTrue($harness->showEncounterEPrescriptionDrawer);
         $this->assertSame('1', $harness->encounterEPrescriptionForm['medication_qty']);
+        $this->assertFalse($harness->getErrorBag()->has('encounterEPrescriptionForm.medication_id'));
+        $this->assertTrue($harness->getErrorBag()->has('encounterReferralForm.service_id'));
+    }
+
+    public function test_eprescription_validation_errors_clear_only_for_the_updated_field(): void
+    {
+        $harness = new EncounterStandaloneHarness();
+        $harness->addError('encounterEPrescriptionForm.signature_text', 'Required');
+        $harness->addError('encounterEPrescriptionForm.medication_id', 'Required');
+        $harness->encounterEPrescriptionWarningMessage = 'Old warning';
+
+        $harness->updatedEncounterEPrescriptionForm('Take daily', 'signature_text');
+
+        $this->assertFalse($harness->getErrorBag()->has('encounterEPrescriptionForm.signature_text'));
+        $this->assertTrue($harness->getErrorBag()->has('encounterEPrescriptionForm.medication_id'));
+        $this->assertSame('', $harness->encounterEPrescriptionWarningMessage);
+    }
+
+    public function test_eprescription_closing_and_medication_selection_clear_stale_errors(): void
+    {
+        $harness = new EncounterStandaloneHarness();
+        $medicationId = (string) Str::uuid();
+        $harness->encounterEPrescriptionSearchResults = [[
+            'id' => $medicationId, 'packages' => [['package_min_qty' => 10]],
+        ]];
+        $harness->addError('encounterEPrescriptionForm.medication_id', 'Required');
+        $harness->addError('encounterEPrescriptionForm.medication_qty', 'Invalid');
+        $harness->addError('encounterEPrescriptionForm.signature_text', 'Required');
+        $harness->addError('encounterReferralForm.service_id', 'Required');
+
+        $harness->selectEncounterEPrescriptionMedication($medicationId);
+
+        $this->assertFalse($harness->getErrorBag()->has('encounterEPrescriptionForm.medication_id'));
+        $this->assertFalse($harness->getErrorBag()->has('encounterEPrescriptionForm.medication_qty'));
+        $this->assertTrue($harness->getErrorBag()->has('encounterEPrescriptionForm.signature_text'));
+        $harness->closeEncounterEPrescriptionDrawer();
+        $this->assertSame(['encounterReferralForm.service_id'], $harness->getErrorBag()->keys());
     }
 
     public function test_referral_drawer_opens_for_finished_encounter(): void
@@ -198,7 +237,7 @@ class EncounterStandalonePhase6Test extends TestCase
 /**
  * Lightweight host for encounter standalone traits (avoids full EncounterEdit mount).
  */
-class EncounterStandaloneHarness
+class EncounterStandaloneHarness extends \Livewire\Component
 {
     use ResolvesEncounterStandaloneContext;
     use ManagesEncounterEPrescription;
@@ -213,7 +252,7 @@ class EncounterStandaloneHarness
     /** @var list<array{0: string, 1: mixed}> */
     public array $dispatched = [];
 
-    public function dispatch(string $event, mixed ...$params): Event
+    public function dispatch($event, ...$params): Event
     {
         $this->dispatched[] = [$event, $params[0] ?? null];
 
