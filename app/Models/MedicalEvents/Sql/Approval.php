@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
+use App\Enums\Person\ApprovalStatus;
 use App\Models\EhealthLink;
 use App\Models\Employee\Employee;
+use App\Models\LegalEntity;
+use App\Models\Person\Person;
+use App\Models\Preperson;
+use App\Models\User;
 use App\Services\Dictionary\DictionaryManager;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Builder;
@@ -173,6 +178,76 @@ class Approval extends Model
     protected function isVerified(Builder $query): Builder
     {
         return $query->where('is_verified', true);
+    }
+
+    /**
+     * Active approvals on the patient's data granted to one of the user's employees in the legal entity, which open
+     * all the patient's data.
+     *
+     * @param  Builder  $query
+     * @param  Person|Preperson  $patient
+     * @param  User  $user
+     * @param  LegalEntity  $legalEntity
+     * @return Builder
+     */
+    #[Scope]
+    protected function grantingAccessTo(Builder $query, Person|Preperson $patient, User $user, LegalEntity $legalEntity): Builder
+    {
+        return $query->isAlive($patient)
+            ->isVerified()
+            ->whereStatus(ApprovalStatus::ACTIVE)
+            ->grantedToEmployees($user, $legalEntity);
+    }
+
+    /**
+     * Active approvals on the resource granted to one of the user's employees in the legal entity or to the legal
+     * entity itself, which open that resource.
+     *
+     * @param  Builder  $query
+     * @param  Model  $resource
+     * @param  User  $user
+     * @param  LegalEntity  $legalEntity
+     * @return Builder
+     */
+    #[Scope]
+    protected function grantingResourceAccessTo(Builder $query, Model $resource, User $user, LegalEntity $legalEntity): Builder
+    {
+        return $query->isAlive($resource)
+            ->isVerified()
+            ->whereStatus(ApprovalStatus::ACTIVE)
+            ->where(
+                static fn (Builder $approval): Builder => $approval
+                    ->grantedToEmployees($user, $legalEntity)
+                    ->orWhere(
+                        static fn (Builder $toLegalEntity): Builder => $toLegalEntity
+                            ->whereGrantedToType('legal_entity')
+                            ->whereHas(
+                                'grantedTo',
+                                static fn (Builder $identifier): Builder => $identifier->whereValue($legalEntity->uuid)
+                            )
+                    )
+            );
+    }
+
+    /**
+     * Filter approvals granted to one of the user's employees in the legal entity.
+     *
+     * @param  Builder  $query
+     * @param  User  $user
+     * @param  LegalEntity  $legalEntity
+     * @return Builder
+     */
+    #[Scope]
+    protected function grantedToEmployees(Builder $query, User $user, LegalEntity $legalEntity): Builder
+    {
+        return $query->whereGrantedToType('employee')
+            ->whereHas(
+                'grantedTo',
+                static fn (Builder $identifier): Builder => $identifier->whereIn(
+                    'value',
+                    Employee::forUserInLegalEntity($user, $legalEntity)->select('uuid')
+                )
+            );
     }
 
     #[Scope]

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Episode;
 
+use App\Classes\eHealth\EHealth;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\Person\Records\BasePatientComponent;
 use App\Models\Employee\Employee;
 use App\Models\Icd10;
@@ -14,27 +17,36 @@ use App\Models\MedicalEvents\Sql\EpisodeCurrentDiagnosis;
 use App\Models\MedicalEvents\Sql\EpisodeDiagnosesHistoryItem;
 use App\Models\Person\Person;
 use App\Models\Preperson;
+use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Session;
+use Livewire\Attributes\Locked;
+use Throwable;
 
 class EpisodeView extends BasePatientComponent
 {
     /**
-     * Episode being displayed.
+     * ID of the episode being displayed.
      *
-     * @var Episode
+     * @var int
      */
-    protected Episode $episode;
-
-    public string $careManagerName = '';
-
-    public string $managingOrganizationName = '';
+    #[Locked]
+    public int $episodeId;
 
     /**
-     * Current diagnosis with the primary role.
+     * eHealth ID of the episode, kept so that a refresh does not have to read the record to find it.
      *
-     * @var EpisodeCurrentDiagnosis|null
+     * @var string
      */
-    protected ?EpisodeCurrentDiagnosis $currentMainDiagnosis = null;
+    #[Locked]
+    public string $episodeUuid;
+
+    /**
+     * Request-scoped memoized episode.
+     *
+     * @var Episode|null
+     */
+    private ?Episode $episodeModel = null;
 
     protected array $dictionaryNames = [
         'eHealth/episode_types',
@@ -52,7 +64,7 @@ class EpisodeView extends BasePatientComponent
     protected array $icd10Descriptions = [];
 
     /**
-     * Bind the route models and load the episode being displayed.
+     * Bind the route models and remember the episode being displayed.
      *
      * @param  LegalEntity  $legalEntity
      * @param  Person|null  $person
@@ -70,45 +82,41 @@ class EpisodeView extends BasePatientComponent
 
         $this->getDictionary();
 
-        $this->episode = $episode->load([
-            'type',
-            'period',
-            'managingOrganization',
-            'careManager',
-            'statusReason.coding',
-            'currentDiagnoses.condition',
-            'currentDiagnoses.code.coding',
-            'currentDiagnoses.role.coding',
-            'diagnosesHistory.diagnoses.condition',
-            'diagnosesHistory.diagnoses.code.coding',
-            'diagnosesHistory.diagnoses.role.coding'
-        ]);
-        $this->currentMainDiagnosis = $this->episode->currentDiagnoses
-            ->first(static fn (EpisodeCurrentDiagnosis $diagnosis): bool
-                => $diagnosis->role?->coding->first()?->code === 'primary');
+        $this->episodeId = $episode->id;
+        $this->episodeUuid = $episode->uuid;
+    }
 
-        $icd10Codes = $this->episode->currentDiagnoses
-            ->concat($this->episode->diagnosesHistory->flatMap->diagnoses)
-            ->map(static fn (EpisodeCurrentDiagnosis|EpisodeDiagnosesHistoryItem $diagnosis): ?Coding
-                => $diagnosis->code->coding->first())
-            ->filter(static fn (?Coding $coding): bool
-                => $coding?->system === 'eHealth/ICD10_AM/condition_codes')
-            ->pluck('code')
-            ->unique();
+    /**
+     * Refresh the episode from eHealth, so that the page shows the record as it stands there now.
+     * Access is checked by the route's can middleware, which Livewire applies to every request of the component.
+     *
+     * @return void
+     */
+    public function sync(): void
+    {
+        try {
+            $response = EHealth::episode()->getById($this->uuid, $this->episodeUuid);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while synchronizing the episode');
 
-        $this->icd10Descriptions = $icd10Codes->isEmpty()
-            ? []
-            : Icd10::whereIn('code', $icd10Codes)->pluck('description', 'code')->toArray();
+            return;
+        }
 
-        $organization = $this->episode->managingOrganization;
+        // Stored under the episode's own owner, as an episode of a merged person or preperson stays with that record
+        $owner = $this->episode()->preperson ?? $this->episode()->person;
 
-        $this->managingOrganizationName = $organization?->displayValue
-            ?: LegalEntity::firstWhere('uuid', $organization?->value)?->name ?? '';
+        try {
+            Repository::episode()->syncFull($owner, [$response->validate()]);
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing the episode');
 
-        $careManager = $this->episode->careManager;
+            return;
+        }
 
-        $this->careManagerName = $careManager?->displayValue
-            ?: Employee::with('party')->firstWhere('uuid', $careManager?->value)?->party?->fullName ?? '';
+        // Drop the memoized model so that the page renders what has just been stored
+        $this->episodeModel = null;
+
+        Session::flash('success', __('episodes.messages.record_synced_successfully'));
     }
 
     /**
@@ -134,11 +142,70 @@ class EpisodeView extends BasePatientComponent
         return trim($coding->code . ' - ' . $description, ' -');
     }
 
+    /**
+     * Resolve the episode being displayed. Loaded again on later requests, where Livewire hydrates without mount().
+     *
+     * @return Episode
+     */
+    protected function episode(): Episode
+    {
+        return $this->episodeModel ??= Episode::with([
+            'type',
+            'period',
+            'managingOrganization',
+            'careManager',
+            'statusReason.coding',
+            'currentDiagnoses.condition',
+            'currentDiagnoses.code.coding',
+            'currentDiagnoses.role.coding',
+            'diagnosesHistory.diagnoses.condition',
+            'diagnosesHistory.diagnoses.code.coding',
+            'diagnosesHistory.diagnoses.role.coding'
+        ])
+            ->whereId($this->episodeId)
+            ->firstOrFail();
+    }
+
+    /**
+     * ICD-10 descriptions of the episode's current and past diagnoses, keyed by code.
+     *
+     * @param  Episode  $episode
+     * @return array
+     */
+    protected function icd10Descriptions(Episode $episode): array
+    {
+        $icd10Codes = $episode->currentDiagnoses
+            ->concat($episode->diagnosesHistory->flatMap->diagnoses)
+            ->map(static fn (EpisodeCurrentDiagnosis|EpisodeDiagnosesHistoryItem $diagnosis): ?Coding
+                => $diagnosis->code->coding->first())
+            ->filter(static fn (?Coding $coding): bool
+                => $coding?->system === 'eHealth/ICD10_AM/condition_codes')
+            ->pluck('code')
+            ->unique();
+
+        return $icd10Codes->isEmpty()
+            ? []
+            : Icd10::whereIn('code', $icd10Codes)->pluck('description', 'code')->toArray();
+    }
+
     public function render(): View
     {
+        $episode = $this->episode();
+
+        $this->icd10Descriptions = $this->icd10Descriptions($episode);
+
+        $organization = $episode->managingOrganization;
+        $careManager = $episode->careManager;
+
         return view('livewire.episode.episode-view')->with([
-            'episode' => $this->episode,
-            'currentMainDiagnosis' => $this->currentMainDiagnosis
+            'episode' => $episode,
+            'currentMainDiagnosis' => $episode->currentDiagnoses
+                ->first(static fn (EpisodeCurrentDiagnosis $diagnosis): bool
+                    => $diagnosis->role?->coding->first()?->code === 'primary'),
+            'managingOrganizationName' => $organization?->displayValue
+                ?: LegalEntity::firstWhere('uuid', $organization?->value)?->name ?? '',
+            'careManagerName' => $careManager?->displayValue
+                ?: Employee::with('party')->firstWhere('uuid', $careManager?->value)?->party?->fullName ?? ''
         ]);
     }
 }

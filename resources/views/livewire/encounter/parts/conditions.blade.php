@@ -547,7 +547,7 @@
                                                     ?.length ?? 1) > 0
                                             "
                                         >
-                                            {{ __('conditions.icpc-2') }}
+                                            {{ __('medical-events.icpc_2') }}
                                         </option>
                                         <option
                                             value="eHealth/ICD10_AM/condition_codes"
@@ -556,7 +556,7 @@
                                                     ?.length ?? 1) > 0
                                             "
                                         >
-                                            {{ __('conditions.icd-10') }}
+                                            {{ __('medical-events.icd_10') }}
                                         </option>
                                     </select>
                                     @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
@@ -623,7 +623,7 @@
                                         for="icd10Code"
                                         class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                                     >
-                                        {{ __('conditions.icd-10') }}<span class="text-red-600"> *</span>
+                                        {{ __('medical-events.icd_10') }}<span class="text-red-600"> *</span>
                                     </label>
                                     <input
                                         type="text"

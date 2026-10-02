@@ -16,6 +16,14 @@
     use App\Models\MedicalEvents\Sql\Encounter;
     use App\Models\Person\Person;
     use App\Models\Relations\PersonVerificationDetail;
+    use Illuminate\Http\Request;
+    use Livewire\Livewire;
+
+    // A Livewire action runs on its own endpoint, so the page's route is found again from the URL it was sent from
+    $currentRoute = Livewire::isLivewireRequest()
+        ? rescue(static fn () => app('router')->getRoutes()->match(Request::create(Livewire::originalUrl())), null, false)
+        : request()->route();
+    $isCurrentRoute = static fn (string $name): bool => (bool) $currentRoute?->named($name);
 
     $routePrefix = !is_null($prepersonId) ? 'prepersons' : 'persons';
     $routeParamKey = !is_null($prepersonId) ? 'preperson' : 'person';
@@ -57,7 +65,7 @@
                     <div class="summary-nav-row">
                         <a
                             href="{{ route("$routePrefix.patient-data", [legalEntity(), $routeParamKey => $recordId]) }}"
-                            class="summary-tab {{ ($activeTab === 'patient-data' || request()->routeIs("$routePrefix.patient-data")) ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                            class="summary-tab {{ ($activeTab === 'patient-data' || $isCurrentRoute("$routePrefix.patient-data")) ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                         >
                             {{ __('patients.patient_data') }}
                         </a>
@@ -66,7 +74,7 @@
                             @can('view', PersonVerificationDetail::class)
                                 <a
                                     href="{{ route('persons.verification', [legalEntity(), 'person' => $personId]) }}"
-                                    class="summary-tab {{ ($activeTab === 'verification' || request()->routeIs('persons.verification')) ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                                    class="summary-tab {{ ($activeTab === 'verification' || $isCurrentRoute('persons.verification')) ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                                 >
                                     {{ __('patient-verifications.label') }}
                                 </a>
@@ -76,7 +84,7 @@
                         @can('view', Person::class)
                             <a
                                 href="{{ route("$routePrefix.summary", [legalEntity(), $routeParamKey => $recordId]) }}"
-                                class="summary-tab {{ request()->routeIs("$routePrefix.summary") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                                class="summary-tab {{ $isCurrentRoute("$routePrefix.summary") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                             >
                                 {{ __('patients.summary') }}
                             </a>
@@ -84,28 +92,28 @@
 
                         <a
                             href="{{ route("$routePrefix.episodes", [legalEntity(), $routeParamKey => $recordId]) }}"
-                            class="summary-tab {{ request()->routeIs("$routePrefix.episodes") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                            class="summary-tab {{ $isCurrentRoute("$routePrefix.episodes") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                         >
                             {{ __('episodes.plural') }}
                         </a>
 
                         <a
                             href="{{ route("$routePrefix.observations", [legalEntity(), $routeParamKey => $recordId]) }}"
-                            class="summary-tab {{ request()->routeIs("$routePrefix.observations") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                            class="summary-tab {{ $isCurrentRoute("$routePrefix.observations") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                         >
                             {{ __('observations.label') }}
                         </a>
 
                         <a
                             href="{{ route("$routePrefix.immunizations", [legalEntity(), $routeParamKey => $recordId]) }}"
-                            class="summary-tab {{ request()->routeIs("$routePrefix.immunizations") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                            class="summary-tab {{ $isCurrentRoute("$routePrefix.immunizations") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                         >
                             {{ __('immunizations.plural') }}
                         </a>
 
                         <a
                             href="{{ route("$routePrefix.conditions", [legalEntity(), $routeParamKey => $recordId]) }}"
-                            class="summary-tab {{ request()->routeIs("$routePrefix.conditions") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                            class="summary-tab {{ $isCurrentRoute("$routePrefix.conditions") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                         >
                             {{ __('conditions.plural') }}
                         </a>
@@ -120,7 +128,7 @@
                         @else
                             <a
                                 href="{{ route('persons.medication-requests', [legalEntity(), 'person' => $personId]) }}"
-                                class="summary-tab {{ request()->routeIs('persons.medication-requests') ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                                class="summary-tab {{ $isCurrentRoute('persons.medication-requests') ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                             >
                                 {{ __('patients.prescriptions') }}
                             </a>
@@ -128,7 +136,7 @@
 
                         <a
                             href="{{ route("$routePrefix.diagnostic-reports", [legalEntity(), $routeParamKey => $recordId]) }}"
-                            class="summary-tab {{ request()->routeIs("$routePrefix.diagnostic-reports") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                            class="summary-tab {{ $isCurrentRoute("$routePrefix.diagnostic-reports") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                         >
                             {{ __('diagnostic-reports.plural') }}
                         </a>
@@ -137,7 +145,7 @@
                     <div class="summary-nav-row">
                         <a
                             href="{{ route("$routePrefix.clinical-impressions", [legalEntity(), $routeParamKey => $recordId]) }}"
-                            class="summary-tab {{ request()->routeIs("$routePrefix.clinical-impressions") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                            class="summary-tab {{ $isCurrentRoute("$routePrefix.clinical-impressions") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                         >
                             {{ __('clinical-impressions.plural') }}
                         </a>
@@ -159,7 +167,7 @@
                         @else
                             <a
                                 href="{{ route('persons.referrals', [legalEntity(), 'person' => $personId]) }}"
-                                class="summary-tab {{ request()->routeIs('persons.referrals') ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                                class="summary-tab {{ $isCurrentRoute('persons.referrals') ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                             >
                                 {{ __('patients.referrals') }}
                             </a>
@@ -168,7 +176,7 @@
                         @can('viewAny', DeviceAssociation::class)
                             <a
                                 href="{{ route("$routePrefix.device-associations", [legalEntity(), $routeParamKey => $recordId]) }}"
-                                class="summary-tab {{ request()->routeIs("$routePrefix.device-associations") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                                class="summary-tab {{ $isCurrentRoute("$routePrefix.device-associations") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                             >
                                 {{ __('device-associations.label') }}
                             </a>
@@ -184,7 +192,7 @@
                         @else
                             <a
                                 href="{{ route('persons.care-plans', [legalEntity(), 'person' => $personId]) }}"
-                                class="summary-tab {{ request()->routeIs('persons.care-plans') ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                                class="summary-tab {{ $isCurrentRoute('persons.care-plans') ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                             >
                                 {{ __('patients.care_plans') }}
                             </a>
@@ -192,14 +200,14 @@
 
                         <a
                             href="{{ route("$routePrefix.encounters", [legalEntity(), $routeParamKey => $recordId]) }}"
-                            class="summary-tab {{ request()->routeIs("$routePrefix.encounters") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                            class="summary-tab {{ $isCurrentRoute("$routePrefix.encounters") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                         >
                             {{ __('encounters.plural') }}
                         </a>
 
                         <a
                             href="{{ route("$routePrefix.procedures", [legalEntity(), $routeParamKey => $recordId]) }}"
-                            class="summary-tab {{ request()->routeIs("$routePrefix.procedures") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                            class="summary-tab {{ $isCurrentRoute("$routePrefix.procedures") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                         >
                             {{ __('procedures.plural') }}
                         </a>
@@ -208,14 +216,14 @@
                     <div class="summary-nav-row">
                         <a
                             href="{{ route("$routePrefix.devices", [legalEntity(), $routeParamKey => $recordId]) }}"
-                            class="summary-tab {{ request()->routeIs("$routePrefix.devices") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                            class="summary-tab {{ $isCurrentRoute("$routePrefix.devices") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                         >
                             {{ __('care-plan.medical_devices') }}
                         </a>
 
                         <a
                             href="{{ Route::has("$routePrefix.device-dispenses") ? route("$routePrefix.device-dispenses", [legalEntity(), $routeParamKey => $recordId]) : 'javascript:void(0)' }}"
-                            class="summary-tab {{ request()->routeIs("$routePrefix.device-dispenses") ? 'summary-tab-active' : 'summary-tab-inactive' }} {{ !Route::has("$routePrefix.device-dispenses") ? 'cursor-not-allowed opacity-60' : '' }}"
+                            class="summary-tab {{ $isCurrentRoute("$routePrefix.device-dispenses") ? 'summary-tab-active' : 'summary-tab-inactive' }} {{ !Route::has("$routePrefix.device-dispenses") ? 'cursor-not-allowed opacity-60' : '' }}"
                         >
                             {{ __('device-dispenses.label') }}
                         </a>
@@ -223,7 +231,7 @@
                         @can('viewAny', DetectedIssue::class)
                             <a
                                 href="{{ route("$routePrefix.device-issues", [legalEntity(), $routeParamKey => $recordId]) }}"
-                                class="summary-tab {{ request()->routeIs("$routePrefix.device-issues") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                                class="summary-tab {{ $isCurrentRoute("$routePrefix.device-issues") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                             >
                                 {{ __('detected-issues.label') }}
                             </a>
@@ -231,14 +239,14 @@
 
                         <a
                             href="{{ route("$routePrefix.prescription-requests", [legalEntity(), $routeParamKey => $recordId]) }}"
-                            class="summary-tab {{ request()->routeIs("$routePrefix.prescription-requests") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                            class="summary-tab {{ $isCurrentRoute("$routePrefix.prescription-requests") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                         >
                             {{ __('patients.prescription_requests') }}
                         </a>
 
                         <a
                             href="{{ route("$routePrefix.specimens", [legalEntity(), $routeParamKey => $recordId]) }}"
-                            class="summary-tab {{ request()->routeIs("$routePrefix.specimens") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                            class="summary-tab {{ $isCurrentRoute("$routePrefix.specimens") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                         >
                             {{ __('specimens.sidebar_title') }}
                         </a>

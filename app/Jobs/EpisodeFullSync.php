@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Core\EHealthJob;
+use App\Models\Declaration;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Classes\eHealth\EHealth;
@@ -42,12 +44,15 @@ class EpisodeFullSync extends EHealthJob
      */
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse
     {
+        $hasPatientAccess = Declaration::grantingAccessTo($this->patient(), $this->user, $this->legalEntity)->exists()
+            || Approval::grantingAccessTo($this->patient(), $this->user, $this->legalEntity)->exists();
+
         return EHealth::episode()
             ->withToken($token)
-            ->getBySearchParams($this->patientUuid, [
-                'managing_organization_id' => $this->legalEntity->uuid,
+            ->getBySearchParams($this->patientUuid, array_filter([
+                'managing_organization_id' => $hasPatientAccess ? null : $this->legalEntity->uuid,
                 'page' => $this->page
-            ]);
+            ]));
     }
 
     /**
@@ -63,11 +68,19 @@ class EpisodeFullSync extends EHealthJob
             return;
         }
 
-        $patient = $this->prepersonId !== null
+        Repository::episode()->syncFull($this->patient(), $validatedData);
+    }
+
+    /**
+     * Patient the batch was started for.
+     *
+     * @return Person|Preperson
+     */
+    protected function patient(): Person|Preperson
+    {
+        return $this->prepersonId !== null
             ? Preperson::findOrFail($this->prepersonId)
             : Person::findOrFail($this->personId);
-
-        Repository::episode()->syncFull($patient, $validatedData);
     }
 
     /**

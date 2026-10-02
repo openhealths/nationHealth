@@ -5,23 +5,47 @@ declare(strict_types=1);
 namespace App\Policies;
 
 use App\Enums\Episode\Status;
+use App\Models\Declaration;
 use App\Models\Employee\Employee;
+use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Episode;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
 
-class EpisodePolicy
+readonly class EpisodePolicy
 {
     /**
-     * Determine whether the user can view the episode.
+     * Determine whether the user can search the episodes.
      */
-    public function view(User $user): Response
+    public function viewAny(User $user): Response
     {
         if ($user->cannot('episode:read')) {
             return Response::denyWithStatus(404);
         }
 
         return Response::allow();
+    }
+
+    /**
+     * Determine whether the user can view the episode of the patient: one of the episodes the user may read, or
+     * the patient's episode with an approval on it, whichever legal entity manages it.
+     */
+    public function view(User $user, Episode $episode, Person|Preperson $patient): Response
+    {
+        if ($user->cannot('episode:read')) {
+            return Response::denyWithStatus(404);
+        }
+
+        $hasPatientAccess = Declaration::grantingAccessTo($patient, $user, legalEntity())->exists()
+            || Approval::grantingAccessTo($patient, $user, legalEntity())->exists();
+
+        $isReadable = Episode::readableFor($patient, $hasPatientAccess)->whereKey($episode->id)->exists()
+            || (Approval::grantingResourceAccessTo($episode, $user, legalEntity())->exists()
+                && Episode::forPatient($patient)->whereKey($episode->id)->exists());
+
+        return $isReadable ? Response::allow() : Response::denyWithStatus(404);
     }
 
     /**

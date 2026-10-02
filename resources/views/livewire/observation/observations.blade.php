@@ -49,14 +49,16 @@
                     <select
                         x-model="dictionary"
                         @change="filterCode = ''"
+                        name="codeSystem"
+                        id="codeSystem"
                         class="input-select peer mb-1 w-full text-sm"
                     >
                         <option value="" selected>{{ __('forms.select') }}</option>
-                        <option value="loinc">LOINC</option>
-                        <option value="custom">LOINC додатковий</option>
-                        <option value="icf">ICF</option>
+                        <option value="loinc">{{ __('observations.loinc') }}</option>
+                        <option value="custom">{{ __('observations.loinc_custom') }}</option>
+                        <option value="icf">{{ __('observations.icf') }}</option>
                     </select>
-                    <label class="label">{{ __('observations.code_system') }}</label>
+                    <label for="codeSystem" class="label">{{ __('observations.code_system') }}</label>
                 </div>
 
                 <div class="form-group group" x-show="dictionary">
@@ -87,7 +89,12 @@
                         />
                     </div>
 
-                    <label class="label">{{ __('observations.code') }}</label>
+                    <label
+                        :for="{ loinc: 'filterCodeLoinc', custom: 'filterCodeCustom', icf: 'filterCodeIcf' }[
+                            dictionary
+                        ]"
+                        class="label"
+                    >{{ __('observations.code') }}</label>
                 </div>
             </div>
 

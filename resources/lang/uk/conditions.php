@@ -24,8 +24,6 @@ return [
     'coding_system' => 'Система кодувань',
     'role' => 'Тип',
     'rank' => 'Пріоритет',
-    'icd-10' => 'МКХ-10',
-    'icpc-2' => 'ICPC-2',
     'clinical_status' => 'Клінічний статус',
     'verification_status' => 'Статус верифікації',
     'entry_date' => 'Дата внесення',

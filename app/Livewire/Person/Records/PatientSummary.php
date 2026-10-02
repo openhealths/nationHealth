@@ -19,6 +19,7 @@ use App\Jobs\ObservationSync;
 use App\Jobs\ConditionSync;
 use App\Jobs\DiagnosticReportSync;
 use App\Jobs\DeviceSync;
+use App\Models\Declaration;
 use App\Models\Icd10;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\ClinicalImpression;
@@ -307,8 +308,10 @@ class PatientSummary extends BasePatientComponent
         $this->setPaginatedRecords(
             'episodes',
             Episode::with(['period', 'managingOrganization.type.coding', 'careManager.type.coding'])
-                ->forPatient($this->patient())
-                ->forLegalEntity(),
+                ->readableFor(
+                    $this->patient(),
+                    Declaration::grantingAccessTo($this->patient(), Auth::user(), legalEntity())->exists()
+                ),
             'episodes',
             visible: ['id']
         );
@@ -829,7 +832,7 @@ class PatientSummary extends BasePatientComponent
             return;
         }
 
-        $this->mergedPersons = MergedPerson::wherePersonId($this->personId)
+        $this->mergedPersons = $this->patient()->mergedPersons()
             ->whereStatus(MergedPersonStatus::MERGED)
             ->with(['mergedPerson.names', 'mergedPreperson:id,external_id'])
             ->get()
@@ -856,11 +859,11 @@ class PatientSummary extends BasePatientComponent
      */
     public function updatedSelectedMergedPerson(string $mergedUuid): void
     {
-        if ($mergedUuid === '') {
+        if ($mergedUuid === '' || $this->personId === null) {
             return;
         }
 
-        $mergedPerson = MergedPerson::wherePersonId($this->personId)->whereMergedUuid($mergedUuid)->first();
+        $mergedPerson = $this->patient()->mergedPersons()->whereMergedUuid($mergedUuid)->first();
 
         if ($mergedPerson === null) {
             return;

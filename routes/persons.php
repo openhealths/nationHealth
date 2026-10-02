@@ -109,12 +109,12 @@ Route::prefix('persons')->whereNumber(['person', 'personRequest', 'personId', 'e
                     ->can('create', Specimen::class)
                     ->whereNumber('specimenId')
                     ->name('specimens.edit');
-                Route::get('/{person}/episodes', EpisodeIndex::class)->can('view', Episode::class)->name('episodes');
+                Route::get('/{person}/episodes', EpisodeIndex::class)->can('viewAny', Episode::class)->name('episodes');
                 Route::get('/{person}/episodes/create', EpisodeCreate::class)
                     ->can('create', Episode::class)
                     ->name('episodes.create');
                 Route::get('/{person}/episodes/{episode:id}', EpisodeView::class)
-                    ->can('view', Episode::class)
+                    ->can('view', ['episode', 'person'])
                     ->whereNumber('episode')
                     ->name('episodes.view');
                 Route::get('/{person}/episodes/{episode:id}/edit', EpisodeEdit::class)
@@ -249,13 +249,17 @@ Route::prefix('prepersons')
             ->can('view', Specimen::class)
             ->whereNumber('specimen')
             ->name('specimens.view');
-        Route::get('/{preperson}/episodes', EpisodeIndex::class)->can('view', 'preperson')->name('episodes');
+        Route::get('/{preperson}/episodes', EpisodeIndex::class)
+            ->can('view', 'preperson')
+            ->can('viewAny', Episode::class)
+            ->name('episodes');
         Route::get('/{preperson}/episodes/create', EpisodeCreate::class)
             ->can('view', 'preperson')
             ->can('create', Episode::class)
             ->name('episodes.create');
         Route::get('/{preperson}/episodes/{episode:id}', EpisodeView::class)
             ->can('view', 'preperson')
+            ->can('view', ['episode', 'preperson'])
             ->whereNumber('episode')
             ->name('episodes.view');
         Route::get('/{preperson}/episodes/{episode:id}/edit', EpisodeEdit::class)

@@ -14,6 +14,7 @@ use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\DeviceAssociation;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Specimen;
+use App\Models\MergedPerson;
 use App\Models\Relations\ConfidantPerson;
 use App\Models\Relations\PersonName;
 use App\Models\Relations\PersonVerificationDetail;
@@ -68,6 +69,16 @@ class Person extends BasePerson
     public function deviceAssociations(): HasMany
     {
         return $this->hasMany(DeviceAssociation::class);
+    }
+
+    /**
+     * Persons and prepersons merged into this person.
+     *
+     * @return HasMany
+     */
+    public function mergedPersons(): HasMany
+    {
+        return $this->hasMany(MergedPerson::class);
     }
 
     public function declarations(): HasMany

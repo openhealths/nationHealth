@@ -24,7 +24,7 @@
             {{ __('patients.data_access') }}
         </button>
 
-        @can('view', Episode::class)
+        @can('viewAny', Episode::class)
             <button
                 wire:click.prevent="sync"
                 type="button"
@@ -56,13 +56,15 @@
                     <select
                         x-model="dictionary"
                         @change="filterCode = ''"
+                        name="codeSystem"
+                        id="codeSystem"
                         class="input-select peer mb-1 w-full text-sm"
                     >
                         <option value="" selected>{{ __('forms.select') }}</option>
-                        <option value="icd10">ICD-10-AM</option>
-                        <option value="icpc2">ICPC-2</option>
+                        <option value="icd10">{{ __('medical-events.icd_10') }}</option>
+                        <option value="icpc2">{{ __('medical-events.icpc_2') }}</option>
                     </select>
-                    <label class="label">{{ __('episodes.code_system') }}</label>
+                    <label for="codeSystem" class="label">{{ __('episodes.code_system') }}</label>
                 </div>
 
                 <div class="form-group group" x-show="dictionary">
@@ -109,7 +111,10 @@
                             class="input-select peer w-full"
                         />
                     </div>
-                    <label class="label">{{ __('episodes.code') }}</label>
+                    <label
+                        :for="dictionary === 'icd10' ? 'filterCodeIcd10' : 'filterCodeIcpc2'"
+                        class="label"
+                    >{{ __('episodes.code') }}</label>
                 </div>
 
                 <div class="form-group group">

@@ -27,6 +27,8 @@ return [
     'duplicate_code_warning' => 'Такий код вже існує',
     'equipment_search' => 'Пошук обладнання',
     'equipment_add' => 'Додати обладнання',
+    'icd_10' => 'МКХ-10',
+    'icpc_2' => 'ICPC-2',
 
     // Referral a record is based on, filled the same way for every record that accepts one
     'referral' => [

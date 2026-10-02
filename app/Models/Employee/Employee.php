@@ -6,6 +6,7 @@ namespace App\Models\Employee;
 
 use Carbon\Carbon;
 use App\Models\User;
+use App\Models\LegalEntity;
 use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Models\Declaration;
@@ -113,14 +114,27 @@ class Employee extends BaseEmployee
     #[Scope]
     protected function active(Builder $query): Builder
     {
-        return $query->whereStatus(Status::APPROVED)
-            ->whereIsActive(true);
+        return $query->whereStatus(Status::APPROVED)->whereIsActive(true);
     }
 
     #[Scope]
     protected function forParty(Builder $query, int $partyId): Builder
     {
         return $query->wherePartyId($partyId);
+    }
+
+    /**
+     * Scope to the employees the user works as in the legal entity.
+     *
+     * @param  Builder  $query
+     * @param  User  $user
+     * @param  LegalEntity  $legalEntity
+     * @return Builder
+     */
+    #[Scope]
+    protected function forUserInLegalEntity(Builder $query, User $user, LegalEntity $legalEntity): Builder
+    {
+        return $query->forParty($user->partyId)->whereLegalEntityId($legalEntity->id);
     }
 
     public function scopeEmployeeInstance(Builder $query, int $userId, string $legalEntityUUID, array $roles, bool $isInclude = false): void
