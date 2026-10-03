@@ -15,10 +15,7 @@ use App\Models\MedicalEvents\Mongo\CarePlanActivity;
 use App\Repositories\CarePlanActivityRepository;
 use App\Repositories\CarePlanRepository;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\CarePlanActivityLifecycleService;
 use App\Services\MedicalEvents\CarePlanApprovalService;
-use App\Services\MedicalEvents\CarePlanLifecycleGateService;
-use App\Services\MedicalEvents\CarePlanLifecycleService;
 use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -137,8 +134,7 @@ trait CarePlanManager
         }
 
         if ($this->actionType === 'cancel') {
-            $planCancelBlock = app(CarePlanLifecycleGateService::class)
-                ->planCancelBlockReason($this->carePlan);
+            $planCancelBlock = $this->planCancelBlockReason($this->carePlan);
 
             if ($planCancelBlock !== null) {
                 Session::flash('error', $planCancelBlock);
@@ -180,7 +176,7 @@ trait CarePlanManager
                 Auth::user()->party->taxId
             );
 
-            $finalResponse = app(CarePlanLifecycleService::class)->cancel(
+            $finalResponse = EHealth::carePlan()->cancelAndResolve(
                 $this->carePlan->person->uuid,
                 $this->carePlan->uuid,
                 [
@@ -284,8 +280,7 @@ trait CarePlanManager
                 Auth::user()->party->taxId
             );
 
-            $finalResponse = app(CarePlanLifecycleService::class)
-                ->submitSignedCreate($this->carePlan->person->uuid, $signedContent);
+            $finalResponse = EHealth::carePlan()->createSignedAndResolve($this->carePlan->person->uuid, $signedContent);
 
             $entity = $finalResponse['result'][0] ?? ($finalResponse['result'] ?? $finalResponse);
             if (!is_array($entity)) {
@@ -343,8 +338,7 @@ trait CarePlanManager
             return;
         }
 
-        $blockReason = app(CarePlanLifecycleGateService::class)
-            ->planCompleteBlockReason($this->carePlan);
+        $blockReason = $this->planCompleteBlockReason($this->carePlan);
 
         if ($blockReason !== null) {
             Session::flash('error', $blockReason);
@@ -363,7 +357,7 @@ trait CarePlanManager
         ];
 
         try {
-            $finalResponse = app(CarePlanLifecycleService::class)->complete(
+            $finalResponse = EHealth::carePlan()->completeAndResolve(
                 $this->carePlan->person->uuid,
                 $this->carePlan->uuid,
                 [
@@ -454,8 +448,7 @@ trait CarePlanManager
             );
             Log::info('CarePlanActivity: Signing key succeeded');
 
-            $finalResponse = app(CarePlanActivityLifecycleService::class)
-                ->submitSignedCreate(
+            $finalResponse = EHealth::carePlanActivity()->createSignedAndResolve(
                     $this->carePlan->person->uuid,
                     $this->carePlan->uuid,
                     $signedContent
@@ -501,8 +494,7 @@ trait CarePlanManager
 
             // Sync parent Care Plan to catch status transition (e.g., Draft -> Active) triggered by activity creation
             try {
-                $planData = app(CarePlanLifecycleService::class)
-                    ->getDetails($this->carePlan->person->uuid, $this->carePlan->uuid);
+                $planData = EHealth::carePlan()->getDetails($this->carePlan->person->uuid, $this->carePlan->uuid)->getData();
                 $repository->syncCarePlans(
                     ['data' => [$planData]],
                     $this->carePlan->person_id,
@@ -561,8 +553,7 @@ trait CarePlanManager
             return;
         }
 
-        $openDocsBlock = app(CarePlanLifecycleGateService::class)
-            ->activityStatusChangeBlockReason($activity, (string) $this->actionType);
+        $openDocsBlock = $this->activityStatusChangeBlockReason($activity, (string) $this->actionType);
 
         if ($openDocsBlock !== null) {
             Session::flash('error', $openDocsBlock);
@@ -660,15 +651,15 @@ trait CarePlanManager
                 }
             }
 
-            $activityLifecycle = app(CarePlanActivityLifecycleService::class);
+            $activityApi = EHealth::carePlanActivity();
             $finalResponse = $this->actionType === 'complete_activity'
-                ? $activityLifecycle->complete(
+                ? $activityApi->completeAndResolve(
                     $this->carePlan->person->uuid,
                     $this->carePlan->uuid,
                     $activity->uuid,
                     $payloadData
                 )
-                : $activityLifecycle->cancel(
+                : $activityApi->cancelAndResolve(
                     $this->carePlan->person->uuid,
                     $this->carePlan->uuid,
                     $activity->uuid,
@@ -971,8 +962,7 @@ trait CarePlanManager
     {
         // Fetch the original care plan from eHealth GET details endpoint.
         // Signing the exact returned payload ensures cryptographic match with the server database state.
-        $planData = app(CarePlanLifecycleService::class)
-            ->getDetails($this->carePlan->person->uuid, $this->carePlan->uuid);
+        $planData = EHealth::carePlan()->getDetails($this->carePlan->person->uuid, $this->carePlan->uuid)->getData();
         if (isset($planData['data']) && is_array($planData['data'])) {
             $planData = $planData['data'];
         }
@@ -995,8 +985,7 @@ trait CarePlanManager
     public function syncPlanStatus(): bool
     {
         try {
-            $planData = app(CarePlanLifecycleService::class)
-                ->getDetails($this->carePlan->person->uuid, $this->carePlan->uuid);
+            $planData = EHealth::carePlan()->getDetails($this->carePlan->person->uuid, $this->carePlan->uuid)->getData();
             app(CarePlanRepository::class)->syncCarePlans(
                 ['data' => [$planData]],
                 $this->carePlan->person_id,

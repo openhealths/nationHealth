@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\MedicalEvents;
 
+use App\Classes\eHealth\Api\Job;
 use App\Classes\eHealth\EHealthResponse;
 use Closure;
 use Illuminate\Support\Facades\Log;
@@ -19,7 +20,7 @@ use Throwable;
 abstract class EHealthRequestLifecycleService
 {
     public function __construct(
-        protected readonly EHealthJobResolver $jobResolver,
+        protected readonly Job $jobApi,
     ) {
     }
 
@@ -57,7 +58,7 @@ abstract class EHealthRequestLifecycleService
     {
         $data = $response instanceof EHealthResponse ? $response->getData() : $response;
 
-        $this->jobResolver->assertPrequalifyValid($this->jobResolver->resolve($data));
+        $this->jobApi->assertPrequalifyValid($this->jobApi->resolve($data));
     }
 
     /**

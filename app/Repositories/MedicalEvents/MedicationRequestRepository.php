@@ -8,9 +8,11 @@ use App\Enums\Person\MedicationRequestStatus;
 use App\Models\CarePlanActivity;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
+use App\Repositories\MedicalEvents\Concerns\FindsOpenActivityRequests;
+use App\Repositories\MedicalEvents\Concerns\FindsOwnedRequests;
 use App\Repositories\MedicalEvents\Concerns\ResolvesRequestFhirRefs;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Throwable;
@@ -21,6 +23,8 @@ use Throwable;
 class MedicationRequestRepository extends BaseRepository
 {
     use ResolvesRequestFhirRefs;
+    use FindsOpenActivityRequests;
+    use FindsOwnedRequests;
 
     public function __construct(MedicationRequestRequest $model)
     {

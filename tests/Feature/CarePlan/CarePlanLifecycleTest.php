@@ -7,14 +7,13 @@ namespace Tests\Feature\CarePlan;
 use App\Classes\eHealth\Api\Approval;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
-use App\Models\Person\Person;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\Person\Person;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Livewire\Livewire;
-use Tests\TestCase;
-use Mockery;
-
 use Illuminate\Support\Str;
+use Livewire\Livewire;
+use Mockery;
+use Tests\TestCase;
 
 class CarePlanLifecycleTest extends TestCase
 {
@@ -153,11 +152,11 @@ class CarePlanLifecycleTest extends TestCase
         $activityUuid = (string) Str::uuid();
         $approvalId = (string) Str::uuid(); // Use different ID for internal approval ID if needed
 
-        $mockCarePlanApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlan::class);
+        $mockCarePlanApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlan::class)->makePartial();
         $mockApprovalApi = Mockery::mock(\App\Classes\eHealth\Api\Approval::class);
         $mockPatientApi = Mockery::mock(\App\Classes\eHealth\Api\Person::class);
-        $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class);
-        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class)->makePartial();
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class)->makePartial();
         $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
 
         // Bind mocks to container
@@ -338,7 +337,7 @@ class CarePlanLifecycleTest extends TestCase
         $condition = \App\Models\MedicalEvents\Sql\Condition::first();
 
         // Bind mock APIs to satisfy dependencies
-        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class)->makePartial();
         $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
 
         $activityCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
@@ -381,7 +380,7 @@ class CarePlanLifecycleTest extends TestCase
 
         $condition = \App\Models\MedicalEvents\Sql\Condition::first();
 
-        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class)->makePartial();
         $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
 
         $activityCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
@@ -435,7 +434,7 @@ class CarePlanLifecycleTest extends TestCase
             'status' => 'draft',
         ]);
 
-        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class)->makePartial();
         $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
 
         $activityCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
@@ -493,7 +492,7 @@ class CarePlanLifecycleTest extends TestCase
             'status' => 'draft',
         ]);
 
-        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class)->makePartial();
         $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
 
         $activityCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
@@ -553,9 +552,9 @@ class CarePlanLifecycleTest extends TestCase
             'author_id' => $this->employee->id,
         ]);
 
-        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class)->makePartial();
         $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
-        $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class);
+        $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class)->makePartial();
 
         $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
         $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
@@ -621,10 +620,10 @@ class CarePlanLifecycleTest extends TestCase
         $this->actingAs($this->user);
         $carePlanUuid = (string) Str::uuid();
 
-        $mockCarePlanApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlan::class);
+        $mockCarePlanApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlan::class)->makePartial();
         $mockApprovalApi = Mockery::mock(\App\Classes\eHealth\Api\Approval::class);
         $mockPatientApi = Mockery::mock(\App\Classes\eHealth\Api\Person::class);
-        $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class);
+        $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class)->makePartial();
         $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
 
         $this->instance(\App\Classes\eHealth\Api\CarePlan::class, $mockCarePlanApi);

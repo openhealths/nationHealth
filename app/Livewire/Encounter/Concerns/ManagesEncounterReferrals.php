@@ -8,14 +8,16 @@ use App\Classes\eHealth\EHealth;
 use App\Enums\MedicalProgram\Type as MedicalProgramType;
 use App\Enums\Person\EncounterStatus;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Livewire\Concerns\MedicalEvents\Referral\SelectsReferralApi;
+use App\Mapping\EHealth\Referral\ServiceRequestInput;
+use App\Mapping\EHealth\Referral\ServiceRequestPayloads;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
+use App\Repositories\MedicalEvents\Repository;
 use App\Services\Dictionary\ServiceSearch;
-use App\Services\MedicalEvents\InformWith;
-use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
-use App\Services\MedicalEvents\MedicalRequestOwnership;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -27,6 +29,7 @@ use Throwable;
 
 trait ManagesEncounterReferrals
 {
+    use SelectsReferralApi;
     // Uses ResolvesEncounterStandaloneContext via EncounterEdit.
 
     public bool $showEncounterReferralDrawer = false;
@@ -86,7 +89,7 @@ trait ManagesEncounterReferrals
             'program_id' => $this->resolveDefaultEncounterReferralProgramId(),
             'note' => '',
             'patient_instruction' => '',
-            'inform_with' => InformWith::formValue($this->encounterReferralAuthMethods[0] ?? []),
+            'inform_with' => $this->authenticationMethodFormValue($this->encounterReferralAuthMethods[0] ?? []),
             'reason_reference' => [],
         ];
 
@@ -252,11 +255,11 @@ trait ManagesEncounterReferrals
         }
 
         try {
-            $requestRecord = app(MedicalRequestOwnership::class)
-                ->serviceForEncounter(
-                    (string) $this->encounterReferralRequestIdToSign,
-                    $encounter
-                );
+            $requestRecord = Repository::serviceRequest()->findOwnedForEncounter(
+                (string) $this->encounterReferralRequestIdToSign,
+                $encounter,
+                legalEntity()?->id
+            );
 
             $validated = $this->form->validate($this->form->signingRules());
             $person = Person::find($encounter->person_id);
@@ -280,7 +283,9 @@ trait ManagesEncounterReferrals
                 'legal_entity_uuid' => $employeeContext['legal_entity_uuid'],
             ];
 
-            $signPayload = (new ServiceRequestMapper())->toCreateSignedContent($dbData, $uuids, null, null);
+            $signPayload = app(ServiceRequestPayloads::class)->signedCreate(
+                ServiceRequestInput::fromArray($dbData, $uuids, CarbonImmutable::now())
+            );
 
             $signedContent = signatureService()->signData(
                 $signPayload,
@@ -290,7 +295,7 @@ trait ManagesEncounterReferrals
                 Auth::user()->party->taxId
             );
 
-            $finalResponse = $lifecycle->submitSignedCreate('service_request', $person->uuid, $signedContent);
+            $finalResponse = $this->referralApi('service_request')->createSignedAndResolve($person->uuid, $signedContent);
 
             $dbData = $lifecycle->persistAfterSignedCreate(
                 $dbData,
@@ -402,5 +407,29 @@ trait ManagesEncounterReferrals
         }
 
         return (string) ($this->encounterReferralPrograms[0]['id'] ?? '');
+    }
+
+    /**
+     * Select option value for Livewire forms. Accepts snapshots that still
+     * only have `uuid` from before `raw` was added.
+     *
+     * @param  array{raw?: string, uuid?: string, type?: string, phone_number?: string}  $method
+     */
+    protected function authenticationMethodFormValue(array $method): string
+    {
+        $raw = trim((string) ($method['raw'] ?? ''));
+        if ($raw !== '') {
+            return $raw;
+        }
+
+        $uuid = trim((string) ($method['uuid'] ?? ''));
+        if ($uuid === '') {
+            return '';
+        }
+
+        $type = (string) ($method['type'] ?? '');
+        $phone = (string) ($method['phone_number'] ?? '');
+
+        return ($type !== '' || $phone !== '') ? "{$uuid}|{$type}|{$phone}" : $uuid;
     }
 }

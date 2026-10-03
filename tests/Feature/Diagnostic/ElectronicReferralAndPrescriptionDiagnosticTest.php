@@ -271,7 +271,7 @@ class ElectronicReferralAndPrescriptionDiagnosticTest extends TestCase
             ],
         ]);
 
-        $jobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class);
+        $jobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class)->makePartial();
         $jobApi->shouldReceive('getDetails')
             ->andReturn($this->responseWithData(['status' => 'pending']));
         $jobApi->shouldReceive('getDetailsByHref')

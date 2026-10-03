@@ -10,7 +10,7 @@ use App\Enums\Person\EncounterStatus;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
-use App\Services\MedicalEvents\MedicalRequestOwnership;
+use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
@@ -272,11 +272,11 @@ trait ManagesEncounterEPrescription
         }
 
         try {
-            $requestRecord = app(MedicalRequestOwnership::class)
-                ->medicationForEncounter(
-                    (string) $this->encounterEPrescriptionRequestIdToSign,
-                    $encounter
-                );
+            $requestRecord = Repository::medicationRequest()->findOwnedForEncounter(
+                (string) $this->encounterEPrescriptionRequestIdToSign,
+                $encounter,
+                legalEntity()?->id
+            );
 
             $validated = $this->form->validate($this->form->signingRules());
 

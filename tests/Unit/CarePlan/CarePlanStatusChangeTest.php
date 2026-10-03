@@ -12,16 +12,18 @@ use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
-use App\Services\MedicalEvents\CarePlanLifecycleGateService;
+use Tests\Support\CarePlanStatusChangeHarness;
+use App\Enums\CarePlan\ActivityStatus;
+use App\Repositories\CarePlanActivityRepository;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
-class CarePlanLifecycleGateServiceTest extends TestCase
+class CarePlanStatusChangeTest extends TestCase
 {
     use DatabaseTransactions;
 
-    private CarePlanLifecycleGateService $service;
+    private CarePlanStatusChangeHarness $component;
 
     private Employee $employee;
 
@@ -31,7 +33,7 @@ class CarePlanLifecycleGateServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->service = new CarePlanLifecycleGateService();
+        $this->component = new CarePlanStatusChangeHarness();
 
         $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
             ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
@@ -131,13 +133,13 @@ class CarePlanLifecycleGateServiceTest extends TestCase
             'source' => MedicationRequestRequest::SOURCE_LOCAL,
         ]);
 
-        $open = $this->service->findOpenDocumentsForActivity($activity);
+        $open = app(CarePlanActivityRepository::class)->findOpenDocuments($activity);
 
         $this->assertCount(4, $open);
-        $this->assertTrue($this->service->hasOpenDocumentsForActivity($activity));
+        $this->assertTrue(app(CarePlanActivityRepository::class)->findOpenDocuments($activity) !== []);
 
-        $cancelReason = $this->service->activityStatusChangeBlockReason($activity, 'cancel_activity');
-        $completeReason = $this->service->activityStatusChangeBlockReason($activity, 'complete_activity');
+        $cancelReason = $this->component->activityStatusChangeBlockReason($activity, 'cancel_activity');
+        $completeReason = $this->component->activityStatusChangeBlockReason($activity, 'complete_activity');
 
         $this->assertNotNull($cancelReason);
         $this->assertStringContainsString('Неможливо відмінити призначення', $cancelReason);
@@ -169,8 +171,8 @@ class CarePlanLifecycleGateServiceTest extends TestCase
             ]);
         }
 
-        $this->assertSame([], $this->service->findOpenDocumentsForActivity($activity));
-        $this->assertNull($this->service->activityStatusChangeBlockReason($activity, 'cancel_activity'));
+        $this->assertSame([], app(CarePlanActivityRepository::class)->findOpenDocuments($activity));
+        $this->assertNull($this->component->activityStatusChangeBlockReason($activity, 'cancel_activity'));
     }
 
     public function test_blocks_plan_cancel_for_scheduled_in_progress_or_completed_activities(): void
@@ -209,14 +211,14 @@ class CarePlanLifecycleGateServiceTest extends TestCase
             'author_id' => $this->employee->id,
         ]);
 
-        $reason = $this->service->planCancelBlockReason($carePlan->fresh('activities'));
+        $reason = $this->component->planCancelBlockReason($carePlan->fresh('activities'));
 
         $this->assertNotNull($reason);
         $this->assertStringContainsString('Неможливо відмінити план лікування', $reason);
         $this->assertStringContainsString('Заплановано', $reason);
 
         $carePlan->activities()->where('status', 'scheduled')->update(['status' => 'cancelled']);
-        $this->assertNull($this->service->planCancelBlockReason($carePlan->fresh('activities')));
+        $this->assertNull($this->component->planCancelBlockReason($carePlan->fresh('activities')));
 
         CarePlanActivity::create([
             'uuid' => (string) Str::uuid(),
@@ -226,7 +228,7 @@ class CarePlanLifecycleGateServiceTest extends TestCase
             'author_id' => $this->employee->id,
         ]);
 
-        $completedBlock = $this->service->planCancelBlockReason($carePlan->fresh('activities'));
+        $completedBlock = $this->component->planCancelBlockReason($carePlan->fresh('activities'));
         $this->assertNotNull($completedBlock);
         $this->assertStringContainsString('Завершено', $completedBlock);
     }
@@ -237,13 +239,13 @@ class CarePlanLifecycleGateServiceTest extends TestCase
         $carePlan->update(['status' => 'active']);
         $carePlan->activities()->update(['status' => 'in_progress']);
 
-        $reason = $this->service->planCompleteBlockReason($carePlan->fresh('activities'));
+        $reason = $this->component->planCompleteBlockReason($carePlan->fresh('activities'));
 
         $this->assertNotNull($reason);
         $this->assertStringContainsString('Неможливо завершити план лікування', $reason);
         $this->assertStringContainsString('Синхронізувати з ЕСОЗ', $reason);
-        $this->assertFalse($this->service->isFinalActivityStatus('processed'));
-        $this->assertFalse($this->service->isFinalActivityStatus('in_progress'));
+        $this->assertFalse(ActivityStatus::fromStored('processed')?->isFinalForPlanCompletion() === true);
+        $this->assertFalse(ActivityStatus::fromStored('in_progress')?->isFinalForPlanCompletion() === true);
     }
 
     public function test_blocks_plan_complete_when_the_only_activity_is_processed_job_status(): void
@@ -252,7 +254,7 @@ class CarePlanLifecycleGateServiceTest extends TestCase
         $carePlan->update(['status' => 'active']);
         $carePlan->activities()->update(['status' => 'processed']);
 
-        $reason = $this->service->planCompleteBlockReason($carePlan->fresh('activities'));
+        $reason = $this->component->planCompleteBlockReason($carePlan->fresh('activities'));
 
         $this->assertNotNull($reason);
         $this->assertStringContainsString(__('care-plan.status.processed'), $reason);
@@ -264,7 +266,7 @@ class CarePlanLifecycleGateServiceTest extends TestCase
         $carePlan->update(['status' => 'active']);
         $carePlan->activities()->update(['status' => 'completed']);
 
-        $this->assertNull($this->service->planCompleteBlockReason($carePlan->fresh('activities')));
+        $this->assertNull($this->component->planCompleteBlockReason($carePlan->fresh('activities')));
 
         CarePlanActivity::create([
             'uuid' => (string) Str::uuid(),
@@ -274,7 +276,7 @@ class CarePlanLifecycleGateServiceTest extends TestCase
             'author_id' => $this->employee->id,
         ]);
 
-        $this->assertNull($this->service->planCompleteBlockReason($carePlan->fresh('activities')));
+        $this->assertNull($this->component->planCompleteBlockReason($carePlan->fresh('activities')));
     }
 
     public function test_blocks_plan_complete_when_every_activity_is_cancelled(): void
@@ -283,7 +285,7 @@ class CarePlanLifecycleGateServiceTest extends TestCase
         $carePlan->update(['status' => 'active']);
         $carePlan->activities()->update(['status' => 'cancelled']);
 
-        $reason = $this->service->planCompleteBlockReason($carePlan->fresh('activities'));
+        $reason = $this->component->planCompleteBlockReason($carePlan->fresh('activities'));
 
         $this->assertSame(__('care-plan.cannot_complete_plan_no_completed_activity'), $reason);
     }
@@ -293,7 +295,7 @@ class CarePlanLifecycleGateServiceTest extends TestCase
         [$carePlan] = $this->createPlanWithActivity();
         $carePlan->update(['status' => 'cancelled']);
 
-        $reason = $this->service->planCancelBlockReason($carePlan->fresh());
+        $reason = $this->component->planCancelBlockReason($carePlan->fresh());
 
         $this->assertSame(
             __('care-plan.cannot_mutate_terminal_care_plan', [

@@ -16,6 +16,30 @@ use Illuminate\Validation\ValidationException;
 
 class CarePlanActivityRepository
 {
+    /** @return list<array{type: string, status: string, uuid: string|null}> */
+    public function findOpenDocuments(CarePlanActivity $activity): array
+    {
+        $documents = [];
+        foreach (MedicalEventsRepository::medicationRequest()->findOpenForActivity($activity) as $request) {
+            $status = strtolower((string) $request->status);
+            $documents[] = [
+                'type' => in_array($status, ['new', 'draft', 'signed'], true) ? 'medication_request_request' : 'medication_request',
+                'status' => $status,
+                'uuid' => $request->uuid,
+            ];
+        }
+        foreach ([
+            'service_request' => MedicalEventsRepository::serviceRequest(),
+            'device_request' => MedicalEventsRepository::deviceRequest(),
+        ] as $type => $repository) {
+            foreach ($repository->findOpenForActivity($activity) as $request) {
+                $documents[] = ['type' => $type, 'status' => strtolower((string) $request->status), 'uuid' => $request->uuid];
+            }
+        }
+
+        return $documents;
+    }
+
     public function findById(int $id): ?CarePlanActivity
     {
         return CarePlanActivity::find($id);

@@ -2,16 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Services\MedicalEvents;
+namespace Tests\Unit\Classes\EHealth\Api;
 
 use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
 use App\Classes\eHealth\EHealthResponse;
-use App\Services\MedicalEvents\CarePlanLifecycleService;
-use App\Services\MedicalEvents\EHealthJobResolver;
+use App\Classes\eHealth\Api\Job;
 use Mockery;
 use Tests\TestCase;
 
-class CarePlanLifecycleServiceTest extends TestCase
+class CarePlanResolvedWritesTest extends TestCase
 {
     public function test_submit_signed_create_posts_and_resolves_the_job(): void
     {
@@ -25,7 +24,7 @@ class CarePlanLifecycleServiceTest extends TestCase
 
         $this->bindResolver(['job_id' => 'job-1'], ['id' => 'care-plan-uuid', 'status' => 'new']);
 
-        $result = app(CarePlanLifecycleService::class)->submitSignedCreate('person-uuid', 'signed');
+        $result = app(CarePlanApi::class)->createSignedAndResolve('person-uuid', 'signed');
 
         $this->assertSame('care-plan-uuid', $result['id']);
         $this->assertSame('new', $result['status']);
@@ -37,7 +36,7 @@ class CarePlanLifecycleServiceTest extends TestCase
         $this->bindCarePlanApi('cancel', ['person-uuid', 'plan-uuid', $payload], ['job_id' => 'job-2']);
         $this->bindResolver(['job_id' => 'job-2'], ['status' => 'cancelled']);
 
-        $result = app(CarePlanLifecycleService::class)->cancel('person-uuid', 'plan-uuid', $payload);
+        $result = app(CarePlanApi::class)->cancelAndResolve('person-uuid', 'plan-uuid', $payload);
 
         $this->assertSame('cancelled', $result['status']);
     }
@@ -48,7 +47,7 @@ class CarePlanLifecycleServiceTest extends TestCase
         $this->bindCarePlanApi('complete', ['person-uuid', 'plan-uuid', $payload], ['job_id' => 'job-3']);
         $this->bindResolver(['job_id' => 'job-3'], ['status' => 'completed']);
 
-        $result = app(CarePlanLifecycleService::class)->complete('person-uuid', 'plan-uuid', $payload);
+        $result = app(CarePlanApi::class)->completeAndResolve('person-uuid', 'plan-uuid', $payload);
 
         $this->assertSame('completed', $result['status']);
     }
@@ -62,7 +61,7 @@ class CarePlanLifecycleServiceTest extends TestCase
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('getData')->once()->andReturn($jobEnvelope);
 
-        $api = Mockery::mock(CarePlanApi::class);
+        $api = Mockery::mock(CarePlanApi::class)->makePartial();
         $api->shouldReceive($method)->once()->with(...$expectedArgs)->andReturn($response);
 
         $this->instance(CarePlanApi::class, $api);
@@ -74,8 +73,8 @@ class CarePlanLifecycleServiceTest extends TestCase
      */
     private function bindResolver(array $envelope, array $resolved): void
     {
-        $resolver = Mockery::mock(EHealthJobResolver::class);
+        $resolver = Mockery::mock(Job::class);
         $resolver->shouldReceive('resolve')->once()->with($envelope)->andReturn($resolved);
-        $this->app->instance(EHealthJobResolver::class, $resolver);
+        $this->app->instance(Job::class, $resolver);
     }
 }

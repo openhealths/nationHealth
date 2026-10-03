@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan;
 
+use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
@@ -215,8 +216,7 @@ class CarePlanUpdate extends CarePlanCreate
                 Auth::user()->party->taxId
             );
 
-            $finalResponse = app(\App\Services\MedicalEvents\CarePlanLifecycleService::class)
-                ->submitSignedCreate($this->patientUuid, $signedContent);
+            $finalResponse = EHealth::carePlan()->createSignedAndResolve($this->patientUuid, $signedContent);
 
             if (($finalResponse['status'] ?? null) === 'failed') {
                 throw new \App\Exceptions\EHealth\EHealthValidationException($finalResponse);

@@ -7,11 +7,15 @@ namespace App\Repositories\MedicalEvents;
 use App\Enums\Person\ServiceRequestStatus;
 use App\Models\CarePlanActivity;
 use App\Models\Employee\Employee;
+use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+use App\Repositories\MedicalEvents\Concerns\FindsOpenActivityRequests;
+use App\Repositories\MedicalEvents\Concerns\FindsOwnedRequests;
 use App\Repositories\MedicalEvents\Concerns\ResolvesRequestFhirRefs;
 use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
 use Throwable;
@@ -22,6 +26,17 @@ use Throwable;
 class ServiceRequestRequestRepository extends BaseRepository
 {
     use ResolvesRequestFhirRefs;
+    use FindsOpenActivityRequests;
+    use FindsOwnedRequests;
+
+    public function findOwnedReferralByPerson(string $uuid, int $personId, ?int $legalEntityId): ServiceRequestRequest|DeviceRequestRequest
+    {
+        try {
+            return $this->findOwnedByPerson($uuid, $personId, $legalEntityId);
+        } catch (ModelNotFoundException) {
+            return Repository::deviceRequest()->findOwnedByPerson($uuid, $personId, $legalEntityId);
+        }
+    }
 
     public function __construct(ServiceRequestRequest $model)
     {

@@ -6,7 +6,8 @@ namespace App\Services\MedicalEvents\Mappers;
 
 use App\Contracts\FhirMapperContract;
 use App\Services\MedicalEvents\FhirResource;
-use App\Services\MedicalEvents\InformWith;
+use App\Mapping\EHealth\Referral\ServiceRequestInput;
+use App\Mapping\EHealth\Referral\ServiceRequestPayloads;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 
@@ -116,98 +117,17 @@ class ServiceRequestMapper implements FhirMapperContract
      */
     public function toPrequalifyPayload(array $data, array $uuids, ?string $carePlanUuid = null, ?string $activityUuid = null): array
     {
-        $serviceRequest = [
-            'status' => 'active',
-            'intent' => $data['intent'] ?? 'order',
-            'priority' => $data['priority'] ?? 'routine',
-            'code' => [
-                'identifier' => [
-                    'type' => [
-                        'coding' => [[
-                            'system' => 'eHealth/resources',
-                            'code' => 'service',
-                        ]],
-                    ],
-                    'value' => $data['service_id'],
-                ],
-            ],
-            'requester_employee' => $this->resourceIdentifier('employee', (string) $uuids['employee_uuid']),
-            'requester_legal_entity' => $this->resourceIdentifier('legal_entity', (string) $uuids['legal_entity_uuid']),
-        ];
-
-        if (!empty($carePlanUuid) && !empty($activityUuid)) {
-            $serviceRequest['based_on'] = [
-                $this->resourceIdentifier('care_plan', $carePlanUuid),
-                $this->resourceIdentifier('activity', $activityUuid),
-            ];
-        }
-
-        if (!empty($uuids['encounter_uuid'])) {
-            $serviceRequest['context'] = $this->resourceIdentifier('encounter', (string) $uuids['encounter_uuid']);
-        } elseif (!empty($uuids['episode_uuid'])) {
-            $serviceRequest['context'] = $this->resourceIdentifier('episode_of_care', (string) $uuids['episode_uuid']);
-        }
-
-        if (!empty($data['category'])) {
-            $serviceRequest['category'] = [
-                'coding' => [
-                    $this->mapCategoryCoding((string) $data['category']),
-                ],
-            ];
-        }
-
-        if (isset($data['quantity'])) {
-            $serviceRequest['quantity'] = $this->mapQuantity(
-                (float) $data['quantity'],
-                $data['quantity_system'] ?? null,
-                $data['quantity_code'] ?? null,
-            );
-        }
-
-        $occurrence = $this->mapOccurrence($data);
-        if ($occurrence !== null) {
-            $serviceRequest = array_merge($serviceRequest, $occurrence);
-        }
-
-        $supportingInfo = $this->normalizeSupportingInfo($data['supporting_info'] ?? null);
-        if (!empty($supportingInfo)) {
-            $serviceRequest['supporting_info'] = $this->mapSupportingInfo($supportingInfo);
-        }
-
-        $reasonReference = $this->normalizeSupportingInfo($data['reason_reference'] ?? null);
-        if (!empty($reasonReference)) {
-            $serviceRequest['reason_reference'] = $this->mapSupportingInfo($reasonReference);
-        }
-
-        if (!empty($data['patient_instruction'])) {
-            $serviceRequest['patient_instruction'] = (string) $data['patient_instruction'];
-        }
-
-        $authMethodId = InformWith::authMethodId($data['inform_with'] ?? null);
-        if ($authMethodId !== null) {
-            $serviceRequest['inform_with'] = ['auth_method_id' => $authMethodId];
-        }
-
-        $payload = [
-            'service_request' => array_filter($serviceRequest, static fn ($value) => $value !== null),
-        ];
-
-        if (!empty($data['program_id'])) {
-            $payload['programs'] = [
-                $this->resourceIdentifier('medical_program', (string) $data['program_id']),
-            ];
-        }
-
-        return $payload;
+        return app(ServiceRequestPayloads::class)->prequalify(ServiceRequestInput::fromArray(
+            $data,
+            $uuids,
+            CarbonImmutable::now(),
+            $carePlanUuid,
+            $activityUuid,
+        ));
     }
 
     /**
-     * Build payload for Create Service Request API (signed PKCS#7 content).
-     *
-     * @param  array<string, mixed>  $data
-     * @param  array<string, string|null>  $uuids
-     * @return array{service_request: array<string, mixed>, programs?: list<array<string, mixed>>}
-     *
+     * Keep the legacy envelope until its remaining callers migrate to the flat signed contract.
      */
     public function toCreateSignedPayload(array $data, array $uuids, ?string $carePlanUuid = null, ?string $activityUuid = null): array
     {
@@ -219,139 +139,18 @@ class ServiceRequestMapper implements FhirMapperContract
     }
 
     /**
-     * Flat Service Request for PKCS#7 signing (API-007-062-0002).
-     *
-     * PreQualify uses the envelope `{service_request, programs[]}`. Create signs the
-     * Service Request itself, so `programs` is an illegal additional property.
-     * Medical program goes as singular `program` Reference, like Device Request.
-     *
-     * @param  array<string, mixed>  $data
-     * @param  array<string, string|null>  $uuids
-     * @return array<string, mixed>
+     * Compatibility entry point; signed-create mapping has a single implementation.
      */
     public function toCreateSignedContent(array $data, array $uuids, ?string $carePlanUuid = null, ?string $activityUuid = null): array
     {
-        $wrapped = $this->toCreateSignedPayload($data, $uuids, $carePlanUuid, $activityUuid);
-        $content = $wrapped['service_request'];
-        unset($content['authored_on'], $content['programs']);
-
-        if (!empty($data['program_id'])) {
-            $content['program'] = $this->resourceIdentifier('medical_program', (string) $data['program_id']);
-        }
-
-        return $content;
+        return app(ServiceRequestPayloads::class)->signedCreate(ServiceRequestInput::fromArray(
+            $data,
+            $uuids,
+            CarbonImmutable::now(),
+            $carePlanUuid,
+            $activityUuid,
+        ));
     }
-
-    /**
-     * @return array{system: string, code: string}
-     */
-    private function mapCategoryCoding(string $category): array
-    {
-        return [
-            'system' => self::CATEGORY_SYSTEM,
-            'code' => $category,
-        ];
-    }
-
-    /**
-     * @return array{value: float, system: string, code: string}
-     */
-    private function mapQuantity(float $quantity, ?string $system = null, ?string $code = null): array
-    {
-        return [
-            'value' => $quantity,
-            'system' => $system ?: 'SERVICE_UNIT',
-            'code' => $code ?: 'PIECE',
-        ];
-    }
-
-    /**
-     * @param  list<array{type?: string, uuid?: string}>  $supportingInfo
-     * @return list<array<string, mixed>>
-     */
-    private function mapSupportingInfo(array $supportingInfo): array
-    {
-        $mapped = [];
-
-        foreach ($supportingInfo as $ref) {
-            if (!empty($ref['uuid']) && !empty($ref['type'])) {
-                $mapped[] = $this->resourceIdentifier(strtolower($ref['type']), $ref['uuid']);
-            }
-        }
-
-        return $mapped;
-    }
-
-    /**
-     * @return list<array{type?: string, uuid?: string}>
-     */
-    private function normalizeSupportingInfo(mixed $supportingInfo): array
-    {
-        if (is_string($supportingInfo)) {
-            $decoded = json_decode($supportingInfo, true);
-            $supportingInfo = is_array($decoded) ? $decoded : [];
-        }
-
-        if (!is_array($supportingInfo)) {
-            return [];
-        }
-
-        return array_values(array_filter($supportingInfo, static fn (mixed $item): bool => is_array($item)));
-    }
-
-    /**
-     * @return array{identifier: array{type: array{coding: list<array<string, string>>}, value: string}}
-     */
-    private function resourceIdentifier(string $code, string $value): array
-    {
-        return [
-            'identifier' => [
-                'type' => [
-                    'coding' => [[
-                        'system' => 'eHealth/resources',
-                        'code' => $code,
-                    ]],
-                ],
-                'value' => $value,
-            ],
-        ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     * @return array{occurrence_period: array{start: string, end: string}}|null
-     */
-    private function mapOccurrence(array $data): ?array
-    {
-        if (empty($data['started_at']) && empty($data['ended_at'])) {
-            return null;
-        }
-
-        $minStart = CarbonImmutable::now()->addHour();
-        $start = !empty($data['started_at'])
-            ? CarbonImmutable::parse($data['started_at'])
-            : $minStart;
-
-        if ($start->lessThan($minStart)) {
-            $start = $minStart;
-        }
-
-        $end = !empty($data['ended_at'])
-            ? CarbonImmutable::parse($data['ended_at'])
-            : $start->addMonths(3);
-
-        if ($end->lessThanOrEqualTo($start)) {
-            $end = $start->addDay();
-        }
-
-        return [
-            'occurrence_period' => [
-                'start' => $start->utc()->format('Y-m-d\TH:i:s.000\Z'),
-                'end' => $end->endOfDay()->utc()->format('Y-m-d\TH:i:s.000\Z'),
-            ],
-        ];
-    }
-
     /**
      * Convert FHIR structure (from eHealth) to flat application format.
      */

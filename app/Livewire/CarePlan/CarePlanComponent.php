@@ -10,6 +10,9 @@ use App\Enums\CarePlanStatus;
 use App\Enums\MedicalProgram\Type;
 use App\Enums\Person\ServiceRequestStatus;
 use App\Enums\User\Role;
+use App\Livewire\Concerns\MedicalEvents\Activity\VerifiesCarePlanActivityRegistration;
+use App\Livewire\Concerns\MedicalEvents\CarePlan\ValidatesCarePlanStatusChanges;
+use App\Livewire\Concerns\MedicalEvents\Referral\SelectsReferralApi;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\Employee\Employee;
@@ -21,7 +24,6 @@ use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Services\Dictionary\DictionaryManager;
 use App\Services\MedicalEvents\CarePlanActivityValidationService;
-use App\Services\MedicalEvents\CarePlanLifecycleGateService;
 use App\Services\MedicalEvents\DeviceProgramParticipationGuard;
 use App\Traits\InteractsWithApprovals;
 use Carbon\Carbon;
@@ -43,6 +45,9 @@ abstract class CarePlanComponent extends Component
 {
     use WithFileUploads;
     use InteractsWithApprovals;
+    use VerifiesCarePlanActivityRegistration;
+    use SelectsReferralApi;
+    use ValidatesCarePlanStatusChanges;
 
     // Everything the server derives is #[Locked]: it is sent to the browser on every request
     // and would otherwise come back whatever the client made of it. Only properties bound with
@@ -602,8 +607,7 @@ abstract class CarePlanComponent extends Component
         if (in_array($actionType, ['cancel_activity', 'complete_activity'], true) && $activityId) {
 
             if ($activity) {
-                $blockReason = app(CarePlanLifecycleGateService::class)
-                    ->activityStatusChangeBlockReason($activity, $actionType);
+                $blockReason = $this->activityStatusChangeBlockReason($activity, $actionType);
 
                 if ($blockReason !== null) {
                     Session::flash('error', $blockReason);
@@ -614,8 +618,7 @@ abstract class CarePlanComponent extends Component
         }
 
         if ($actionType === 'cancel') {
-            $blockReason = app(CarePlanLifecycleGateService::class)
-                ->planCancelBlockReason($this->carePlan);
+            $blockReason = $this->planCancelBlockReason($this->carePlan);
 
             if ($blockReason !== null) {
                 Session::flash('error', $blockReason);
@@ -625,8 +628,7 @@ abstract class CarePlanComponent extends Component
         }
 
         if ($actionType === 'complete') {
-            $blockReason = app(CarePlanLifecycleGateService::class)
-                ->planCompleteBlockReason($this->carePlan);
+            $blockReason = $this->planCompleteBlockReason($this->carePlan);
 
             if ($blockReason !== null) {
                 Session::flash('error', $blockReason);

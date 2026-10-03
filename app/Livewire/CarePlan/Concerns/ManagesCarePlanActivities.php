@@ -12,7 +12,6 @@ use App\Repositories\CarePlanRepository;
 use App\Services\Dictionary\Collections\BasicDictionaryCollection;
 use App\Services\Dictionary\ServiceSearch;
 use App\Services\MedicalEvents\CarePlanActivityValidationService;
-use App\Services\MedicalEvents\CarePlanLifecycleService;
 use App\Services\MedicalEvents\DeviceProgramParticipationGuard;
 use Exception;
 use Illuminate\Support\Arr;
@@ -1256,8 +1255,7 @@ trait ManagesCarePlanActivities
         }
 
         try {
-            $planData = app(CarePlanLifecycleService::class)
-                ->getDetails($this->carePlan->person->uuid, $this->carePlan->uuid);
+            $planData = EHealth::carePlan()->getDetails($this->carePlan->person->uuid, $this->carePlan->uuid)->getData();
             $repository->syncCarePlans(
                 ['data' => [$planData]],
                 $this->carePlan->person_id,

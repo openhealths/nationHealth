@@ -1,0 +1,68 @@
+{
+    "empty": [],
+    "snake": {
+        "uuid": "remote-id",
+        "status": "active",
+        "request_number": "primary",
+        "started_at": "2026-09-30",
+        "ended_at": "2026-10-30",
+        "quantity": 0.0,
+        "program_id": "program-id",
+        "intent": "order",
+        "category": "procedure",
+        "priority": "routine",
+        "note": "note",
+        "patient_instruction": "instruction",
+        "inform_with": {
+            "auth_method_id": "auth-id"
+        },
+        "supporting_info": [
+            {
+                "type": "condition",
+                "uuid": "condition-id"
+            }
+        ]
+    },
+    "camel": {
+        "uuid": "legacy-id",
+        "request_number": "legacy-number",
+        "started_at": "2026-09-30",
+        "ended_at": "2026-10-01",
+        "quantity": 2,
+        "category": "laboratory",
+        "note": "legacy-note",
+        "patient_instruction": "snake loses",
+        "supporting_info": [
+            {
+                "type": "condition",
+                "uuid": "condition-id"
+            }
+        ],
+        "device_id": "legacy-service"
+    },
+    "partial": {
+        "uuid": "remote-id",
+        "status": "active"
+    },
+    "empty_values": {
+        "quantity": 0,
+        "inform_with": []
+    },
+    "malformed_references": [],
+    "aliases_precedence": {
+        "uuid": "fallback-id",
+        "request_number": "req",
+        "started_at": "2026-10-01"
+    },
+    "flat_dates": {
+        "started_at": "2026-09-30",
+        "ended_at": "2026-10-01"
+    },
+    "device_definition": {
+        "uuid": "device-id",
+        "device_id": "definition-id"
+    },
+    "classification": {
+        "device_id": "classification-code"
+    }
+}

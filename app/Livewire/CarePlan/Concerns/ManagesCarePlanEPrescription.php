@@ -6,15 +6,14 @@ namespace App\Livewire\CarePlan\Concerns;
 
 use App\Classes\eHealth\EHealth;
 use App\Enums\CarePlanStatus;
+use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\CarePlanActivity;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Repositories\CarePlanActivityRepository;
 use App\Repositories\MedicalEvents\MedicalEventsRequestStatuses;
-use App\Services\MedicalEvents\CarePlanActivityEHealthGuard;
-use App\Services\MedicalEvents\CarePlanActivityLifecycleService;
-use App\Services\MedicalEvents\MedicalRequestOwnership;
+use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use Carbon\Carbon;
 use Exception;
@@ -67,9 +66,13 @@ trait ManagesCarePlanEPrescription
         }
 
         try {
-            app(CarePlanActivityEHealthGuard::class)->assertRegisteredInEHealth($this->carePlan, $activity);
+            $this->assertCarePlanActivityRegistered($this->carePlan, $activity);
         } catch (RuntimeException $exception) {
             Session::flash('error', $exception->getMessage());
+
+            return;
+        } catch (EHealthException $exception) {
+            $exception->handle('Care-plan activity registration check failed');
 
             return;
         }
@@ -144,11 +147,11 @@ trait ManagesCarePlanEPrescription
             : max(0.0, (float) $activityQty - (float) $issuedQty);
 
         try {
-            $eHealthActivity = app(CarePlanActivityLifecycleService::class)->getDetails(
+            $eHealthActivity = EHealth::carePlanActivity()->getDetails(
                 (string) $this->carePlan->person->uuid,
                 (string) $this->carePlan->uuid,
                 (string) $activity->uuid
-            );
+            )->getData();
             $eHealthRemaining = data_get($eHealthActivity, 'detail.remaining_quantity.value');
             if ($eHealthRemaining !== null) {
                 $this->ePrescriptionRemainingQty = max(0.0, (float) $eHealthRemaining);
@@ -577,8 +580,7 @@ trait ManagesCarePlanEPrescription
         $this->authorizeCarePlanWrite();
 
         try {
-            $requestRecord = app(MedicalRequestOwnership::class)
-                ->medicationForPerson((string) $this->ePrescriptionRequestIdToSign, (int) $this->carePlan->personId);
+            $requestRecord = Repository::medicationRequest()->findOwnedByPerson((string) $this->ePrescriptionRequestIdToSign, (int) $this->carePlan->personId, legalEntity()?->id);
 
             $result = app(MedicationRequestLifecycleService::class)->signPrescription(
                 $this->carePlan,
@@ -632,8 +634,7 @@ trait ManagesCarePlanEPrescription
         $this->authorizeCarePlanWrite();
 
         try {
-            $requestRecord = app(MedicalRequestOwnership::class)
-                ->medicationForPerson($requestId, (int) $this->carePlan->personId);
+            $requestRecord = Repository::medicationRequest()->findOwnedByPerson($requestId, (int) $this->carePlan->personId, legalEntity()?->id);
 
             if (in_array(strtolower((string) $requestRecord->status), ['new', 'draft'], true)) {
                 app(MedicationRequestLifecycleService::class)->rejectPrescription($this->carePlan, $requestRecord);
@@ -672,8 +673,7 @@ trait ManagesCarePlanEPrescription
         $this->authorizeCarePlanWrite();
 
         try {
-            $requestRecord = app(MedicalRequestOwnership::class)
-                ->medicationForPerson((string) $this->ePrescriptionRequestIdToSign, (int) $this->carePlan->personId);
+            $requestRecord = Repository::medicationRequest()->findOwnedByPerson((string) $this->ePrescriptionRequestIdToSign, (int) $this->carePlan->personId, legalEntity()?->id);
 
             app(MedicationRequestLifecycleService::class)->rejectPrescription(
                 $this->carePlan,
@@ -710,8 +710,7 @@ trait ManagesCarePlanEPrescription
     {
         $this->authorizeCarePlanWrite();
         try {
-            app(MedicalRequestOwnership::class)
-                ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
+            Repository::medicationRequest()->findOwnedByPerson($prescriptionId, (int) $this->carePlan->personId, legalEntity()?->id);
 
             $response = app(MedicationRequestLifecycleService::class)->resendSms($this->carePlan->person->uuid, $prescriptionId);
             if ($response->successful()) {
@@ -734,8 +733,7 @@ trait ManagesCarePlanEPrescription
     public function loadPrintoutForm(string $prescriptionId): string
     {
         try {
-            app(MedicalRequestOwnership::class)
-                ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
+            Repository::medicationRequest()->findOwnedByPerson($prescriptionId, (int) $this->carePlan->personId, legalEntity()?->id);
 
             $printout = app(MedicationRequestLifecycleService::class)->fetchPrintoutFromEhealth(
                 $this->carePlan->person->uuid,
@@ -849,8 +847,7 @@ trait ManagesCarePlanEPrescription
         $this->authorizeCarePlanWrite();
 
         try {
-            $requestRecord = app(MedicalRequestOwnership::class)
-                ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
+            $requestRecord = Repository::medicationRequest()->findOwnedByPerson($prescriptionId, (int) $this->carePlan->personId, legalEntity()?->id);
 
             app(MedicationRequestLifecycleService::class)->block($this->carePlan->person->uuid, $prescriptionId, [
                 'status_reason' => 'Призупинення або блокування призначення',
@@ -875,8 +872,7 @@ trait ManagesCarePlanEPrescription
         $this->authorizeCarePlanWrite();
 
         try {
-            $requestRecord = app(MedicalRequestOwnership::class)
-                ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
+            $requestRecord = Repository::medicationRequest()->findOwnedByPerson($prescriptionId, (int) $this->carePlan->personId, legalEntity()?->id);
 
             app(MedicationRequestLifecycleService::class)->unblock($this->carePlan->person->uuid, $prescriptionId, []);
             $requestRecord->update(['status' => 'active']);
@@ -897,8 +893,7 @@ trait ManagesCarePlanEPrescription
     public function checkDispenseHistory(string $prescriptionId): void
     {
         try {
-            app(MedicalRequestOwnership::class)
-                ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
+            Repository::medicationRequest()->findOwnedByPerson($prescriptionId, (int) $this->carePlan->personId, legalEntity()?->id);
 
             $dispenses = app(MedicationRequestLifecycleService::class)->getDispenseHistory($this->carePlan->person->uuid, $prescriptionId);
             $items = $dispenses['data'] ?? ($dispenses[0] ?? []);

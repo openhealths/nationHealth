@@ -129,6 +129,16 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
         $patientApi = Mockery::mock(PatientServiceRequest::class)->makePartial();
         $patientApi->shouldReceive('prequalify')
             ->once()
+            ->withArgs(function (string $personUuid, array $payload) use ($serviceId, $programId): bool {
+                $this->assertSame($this->person->uuid, $personUuid);
+                $this->assertSame($serviceId, $payload['service_request']['code']['identifier']['value']);
+                $this->assertSame($this->encounter->uuid, $payload['service_request']['context']['identifier']['value']);
+                $this->assertSame($programId, $payload['programs'][0]['identifier']['value']);
+                $this->assertArrayNotHasKey('based_on', $payload['service_request']);
+                $this->assertArrayNotHasKey('id', $payload['service_request']);
+
+                return true;
+            })
             ->andReturn($prequalifyResponse);
         $this->app->instance(PatientServiceRequest::class, $patientApi);
 
@@ -160,7 +170,6 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
             'uuid' => $draftUuid,
             'service_id' => $serviceId,
             'program_id' => $programId,
-            'context_id' => $this->encounter->id,
             'person_id' => $this->person->id,
             'employee_id' => $this->employee->id,
         ]);
@@ -168,5 +177,6 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
         $local = ServiceRequestRequest::query()->where('uuid', $draftUuid)->first();
         $this->assertNotNull($local);
         $this->assertNull($local->basedOnId);
+        $this->assertSame($this->encounter->uuid, $local->context->value);
     }
 }

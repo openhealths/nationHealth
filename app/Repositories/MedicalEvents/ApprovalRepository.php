@@ -4,26 +4,38 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
-use Throwable;
-use Carbon\Carbon;
-use App\Enums\Person\ApprovalStatus;
 use App\Classes\eHealth\EHealth;
+use App\Enums\Person\ApprovalStatus;
+use App\Models\CarePlan;
 use App\Models\EhealthJob;
 use App\Models\EhealthLink;
 use App\Models\MedicalEvents\Mongo\Approval as MongoApproval;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Database\Eloquent\Model;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Relations\AuthenticationMethod;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * @property Approval $model
  */
 class ApprovalRepository extends BaseRepository
 {
+    public function findOwnedForCarePlan(CarePlan $carePlan, string $uuid): Approval
+    {
+        $approval = $carePlan->approvals()->where('uuid', $uuid)->first();
+        if (!$approval instanceof Approval) {
+            throw (new ModelNotFoundException())->setModel(Approval::class, [$uuid]);
+        }
+
+        return $approval;
+    }
+
     protected const int SMS_CODE_ALIVE_MINUTES = 14;
 
     protected string $employeeUuid;

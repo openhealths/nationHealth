@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Services\MedicalEvents;
+namespace Tests\Unit\Classes\EHealth\Api;
 
 use App\Classes\eHealth\Api\Job;
 use App\Classes\eHealth\EHealthResponse;
 use App\Exceptions\EHealth\EHealthJobTimeoutException;
 use App\Exceptions\EHealth\EHealthValidationException;
-use App\Services\MedicalEvents\EHealthJobResolver;
+
 use Mockery;
 use Tests\TestCase;
 
@@ -17,8 +17,35 @@ use Tests\TestCase;
  * raise instead of returning an unresolved or failed job — otherwise the local record
  * is marked as accepted while eHealth rejected it or never finished.
  */
-class EHealthJobResolverTest extends TestCase
+class JobResolutionTest extends TestCase
 {
+    public function test_polling_uses_the_returned_href_only_after_a_404(): void
+    {
+        $api = Mockery::mock(Job::class)->makePartial();
+        $exception = new \App\Exceptions\EHealth\EHealthResponseException(new EHealthResponse(
+            new \GuzzleHttp\Psr7\Response(404, [], '{"error":{"message":"Not found"}}')
+        ));
+        $api->shouldReceive('getDetails')->once()->with('job-123')->andThrow($exception);
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('getData')->once()->andReturn(['status' => 'processed']);
+        $api->shouldReceive('getDetailsByHref')->once()->with('/jobs/job-123')->andReturn($response);
+
+        $this->assertSame(['status' => 'processed'], $api->resolve(['links' => [['href' => '/jobs/job-123']]]));
+    }
+
+    public function test_polling_does_not_hide_transport_failures_with_a_fallback(): void
+    {
+        $api = Mockery::mock(Job::class)->makePartial();
+        $exception = new \App\Exceptions\EHealth\EHealthResponseException(new EHealthResponse(
+            new \GuzzleHttp\Psr7\Response(503, [], '{"error":{"message":"Unavailable"}}')
+        ));
+        $api->shouldReceive('getDetails')->once()->with('job-123')->andThrow($exception);
+        $api->shouldReceive('getDetailsByHref')->never();
+        $this->expectExceptionObject($exception);
+
+        $api->resolve($this->jobResponse());
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -31,7 +58,7 @@ class EHealthJobResolverTest extends TestCase
     {
         $response = ['id' => 'abc', 'status' => 'active'];
 
-        $this->assertSame($response, (new EHealthJobResolver())->resolve($response));
+        $this->assertSame($response, app(Job::class)->resolve($response));
     }
 
     public function test_it_polls_until_the_job_leaves_the_pending_state(): void
@@ -42,7 +69,7 @@ class EHealthJobResolverTest extends TestCase
             ['status' => 'processed', 'id' => 'created-uuid'],
         ]);
 
-        $result = (new EHealthJobResolver())->resolve($this->jobResponse());
+        $result = app(Job::class)->resolve($this->jobResponse());
 
         $this->assertSame('processed', $result['status']);
         $this->assertSame('created-uuid', $result['id']);
@@ -56,7 +83,7 @@ class EHealthJobResolverTest extends TestCase
 
         $this->expectException(\App\Exceptions\EHealth\EHealthValidationException::class);
 
-        (new EHealthJobResolver())->resolve($this->jobResponse());
+        app(Job::class)->resolve($this->jobResponse());
     }
 
     public function test_it_keeps_polling_accepted_jobs_until_they_time_out(): void
@@ -69,7 +96,7 @@ class EHealthJobResolverTest extends TestCase
 
         $this->expectException(EHealthJobTimeoutException::class);
 
-        (new EHealthJobResolver())->resolve($this->jobResponse());
+        app(Job::class)->resolve($this->jobResponse());
     }
 
     public function test_it_polls_a_bare_job_id(): void
@@ -78,7 +105,7 @@ class EHealthJobResolverTest extends TestCase
             ['status' => 'processed', 'id' => 'from-job-id'],
         ]);
 
-        $result = (new EHealthJobResolver())->resolve(['job_id' => 'job-123']);
+        $result = app(Job::class)->resolve(['job_id' => 'job-123']);
 
         $this->assertSame('from-job-id', $result['id']);
     }
@@ -92,7 +119,7 @@ class EHealthJobResolverTest extends TestCase
         ]);
 
         try {
-            (new EHealthJobResolver())->resolve($this->jobResponse());
+            app(Job::class)->resolve($this->jobResponse());
             $this->fail('An unresolved job must not be reported as success.');
         } catch (EHealthJobTimeoutException $exception) {
             $this->assertSame('job-123', $exception->jobId);
@@ -109,7 +136,7 @@ class EHealthJobResolverTest extends TestCase
 
         $this->expectException(EHealthValidationException::class);
 
-        (new EHealthJobResolver())->resolve($this->jobResponse());
+        app(Job::class)->resolve($this->jobResponse());
     }
 
     public function test_a_failed_job_carries_its_ehealth_error_through(): void
@@ -119,7 +146,7 @@ class EHealthJobResolverTest extends TestCase
         ]);
 
         try {
-            (new EHealthJobResolver())->resolve($this->jobResponse());
+            app(Job::class)->resolve($this->jobResponse());
             $this->fail('A failed job must raise.');
         } catch (EHealthValidationException $exception) {
             $this->assertArrayHasKey('invalid', $exception->getDetails()['error']);
@@ -130,7 +157,7 @@ class EHealthJobResolverTest extends TestCase
     {
         $this->expectException(EHealthValidationException::class);
 
-        (new EHealthJobResolver())->assertPrequalifyValid([
+        app(Job::class)->assertPrequalifyValid([
             'data' => [
                 ['status' => 'VALID'],
                 ['status' => 'INVALID', 'rejection_reason' => 'Programme exhausted'],
@@ -140,7 +167,7 @@ class EHealthJobResolverTest extends TestCase
 
     public function test_assert_prequalify_valid_accepts_valid_programs(): void
     {
-        (new EHealthJobResolver())->assertPrequalifyValid([
+        app(Job::class)->assertPrequalifyValid([
             'data' => [['status' => 'VALID']],
         ]);
 
@@ -160,7 +187,7 @@ class EHealthJobResolverTest extends TestCase
      */
     private function fakeJobApi(array $statuses): void
     {
-        $jobApi = Mockery::mock(Job::class);
+        $jobApi = Mockery::mock(Job::class)->makePartial();
 
         foreach ($statuses as $status) {
             $response = Mockery::mock(EHealthResponse::class);

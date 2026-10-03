@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Services\MedicalEvents\Mappers;
 
 use App\Contracts\FhirMapperContract;
+use App\Mapping\Transforms\AuthMethodId;
 use App\Services\MedicalEvents\FhirResource;
-use App\Services\MedicalEvents\InformWith;
 use Illuminate\Support\Str;
 
 class MedicationRequestMapper implements FhirMapperContract
@@ -224,7 +224,7 @@ class MedicationRequestMapper implements FhirMapperContract
             $request['dosage_instruction'] = $this->mapDosageInstructionsForCreate($data['dosage_instructions']);
         }
 
-        $authMethodId = InformWith::authMethodId($data['inform_with'] ?? null);
+        $authMethodId = AuthMethodId::extract($data['inform_with'] ?? null);
         if ($authMethodId !== null) {
             $request['inform_with'] = $authMethodId;
         }

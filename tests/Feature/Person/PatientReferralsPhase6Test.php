@@ -4,22 +4,28 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Person;
 
+use App\Classes\eHealth\Api\Patient\ServiceRequest as PatientServiceRequest;
+use App\Classes\eHealth\EHealthResponse;
 use App\Enums\Person\ServiceRequestStatus;
-use App\Livewire\DiagnosticReport\DiagnosticReportCreate;
 use App\Livewire\DiagnosticReport\DiagnosticReportEdit;
 use App\Livewire\Encounter\EncounterComponent;
+use App\Livewire\Person\Records\PatientReferrals;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Identifier;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\User;
 use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
+use App\Services\SignatureService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
+use Mockery;
 use ReflectionMethod;
 use Tests\TestCase;
 
@@ -157,7 +163,7 @@ class PatientReferralsPhase6Test extends TestCase
             ServiceRequestRequest::create([
                 'uuid' => $uuid, 'person_id' => $this->person->id,
                 'employee_id' => $this->employee->id,
-                'status' => ServiceRequestStatus::PROCESSED->value,
+                'status' => ServiceRequestStatus::ACTIVE->value,
                 'service_id' => $serviceId, 'category_id' => $categoryId,
             ]);
             if ($category !== null) {
@@ -187,15 +193,10 @@ class PatientReferralsPhase6Test extends TestCase
             $this->assertSame($referral['id'], $referral['requisition']);
         }
 
-        $create = new DiagnosticReportCreate();
-        $create->personId = $this->person->id;
-        $create->dictionaries = $component->dictionaries;
-        (new ReflectionMethod(DiagnosticReportCreate::class, 'loadAvailableReferrals'))->invoke($create);
-        $this->assertCount(3, $create->availableReferrals);
-
         $edit = new DiagnosticReportEdit();
         $edit->dictionaries = $component->dictionaries;
-        foreach ($create->availableReferrals as $referral) {
+        // DiagnosticReportCreate now searches eHealth directly (#865); only edit restores a local selection.
+        foreach ($component->availableReferrals as $referral) {
             [$category, , $reportAllowed] = $expected[$referral['id']];
             $this->assertSame($category === null
                 ? __('encounters.electronic_referral')
@@ -203,8 +204,9 @@ class PatientReferralsPhase6Test extends TestCase
             $this->assertSame($reportAllowed, $referral['isDiagnosticReportAllowed']);
             (new ReflectionMethod(DiagnosticReportEdit::class, 'loadSelectedElectronicReferral'))
                 ->invoke($edit, $referral['id']);
-            $this->assertSame([$referral], $edit->availableReferrals);
-            $this->assertTrue($edit->referralsLoaded);
+            $diagnosticReferral = $referral;
+            unset($diagnosticReferral['isProcedureAllowed']);
+            $this->assertSame([$diagnosticReferral], $edit->availableReferrals);
         }
     }
 
@@ -315,5 +317,59 @@ class PatientReferralsPhase6Test extends TestCase
         $this->assertSame('0000-SMS1-NUMB-ER01', $rows[0]['requestNumber']);
         $this->assertSame($uuid, $rows[0]['uuid']);
         $this->assertNotSame($rows[0]['requestNumber'], $rows[0]['uuid']);
+    }
+
+    public function test_registry_signs_the_flat_service_request_and_preserves_encounter_identifier(): void
+    {
+        $uuid = (string) Str::uuid();
+        $serviceId = (string) Str::uuid();
+        $this->user->employees()->attach($this->employee->id);
+        app(ServiceRequestRequestRepository::class)->store([
+            'uuid' => $uuid,
+            'employee_id' => $this->employee->id,
+            'status' => 'draft',
+            'service_id' => $serviceId,
+            'quantity' => 1.0,
+            'context_uuid' => $this->encounter->uuid,
+            'started_at' => '2026-09-01',
+            'ended_at' => '2026-12-01',
+        ], $this->person->id);
+
+        $signature = Mockery::mock(SignatureService::class);
+        $signature->shouldReceive('getCertificateAuthorities')->andReturn([]);
+        $signature->shouldReceive('signData')->once()->withArgs(function (array $payload) use ($uuid, $serviceId): bool {
+            $this->assertSame($uuid, $payload['id']);
+            $this->assertSame($serviceId, $payload['code']['identifier']['value']);
+            $this->assertSame($this->encounter->uuid, $payload['context']['identifier']['value']);
+            $this->assertSame($this->employee->uuid, $payload['requester_employee']['identifier']['value']);
+            $this->assertArrayNotHasKey('service_request', $payload);
+            $this->assertArrayNotHasKey('based_on', $payload);
+
+            return true;
+        })->andReturn('synthetic-signature');
+        $this->instance(SignatureService::class, $signature);
+
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('getData')->andReturn(['id' => $uuid, 'status' => 'active', 'requisition' => 'SR-REGISTRY']);
+        $api = Mockery::mock(PatientServiceRequest::class)->makePartial();
+        $api->shouldReceive('createSigned')->once()->with($this->person->uuid, [
+            'signed_data' => 'synthetic-signature',
+            'signed_data_encoding' => 'base64',
+        ])->andReturn($response);
+        $this->instance(PatientServiceRequest::class, $api);
+
+        Livewire::test(PatientReferrals::class, ['legalEntity' => $this->legalEntity, 'person' => $this->person, 'preperson' => null])
+            ->call('openSign', $uuid, 'service_request')
+            ->set('form.password', 'test-password')
+            ->set('form.knedp', 'test-knedp')
+            ->set('form.keyContainerUpload', UploadedFile::fake()->create('test.dat', 10))
+            ->call('sign')
+            ->assertHasNoErrors()
+            ->assertSet('showSignatureModal', false);
+
+        $request = ServiceRequestRequest::where('uuid', $uuid)->firstOrFail();
+        $this->assertSame('active', $request->status);
+        $this->assertSame('SR-REGISTRY', $request->requestNumber);
+        $this->assertSame($this->encounter->uuid, $request->context->value);
     }
 }

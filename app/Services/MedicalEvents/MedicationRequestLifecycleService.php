@@ -252,7 +252,7 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
 
         // resolve() raises on a failed or unresolved job, so nothing below runs unless
         // eHealth accepted the draft.
-        $finalCreateResponse = $this->jobResolver->resolve($createResponse);
+        $finalCreateResponse = $this->jobApi->resolve($createResponse);
 
         $dbData['request_number'] = $finalCreateResponse['request_number'] ?? ($finalCreateResponse['requisition'] ?? ($finalCreateResponse['data']['request_number'] ?? null));
         $dbData['uuid'] = $finalCreateResponse['id'] ?? ($finalCreateResponse['data']['id'] ?? $dbData['uuid']);
@@ -335,7 +335,7 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
 
         $response = MedicationRequest::signMedicationRequest($requestRecord->uuid, $payload);
 
-        $finalResponse = $this->jobResolver->resolve($response);
+        $finalResponse = $this->jobApi->resolve($response);
         $result = $finalResponse['data'] ?? $finalResponse;
 
         $requestRecord->update(['status' => MedicationRequestStatus::ACTIVE->value]);
@@ -424,7 +424,7 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
 
         $response = MedicationRequest::rejectMedicationRequest($activeId, $payload);
 
-        $finalResponse = $this->jobResolver->resolve($response);
+        $finalResponse = $this->jobApi->resolve($response);
         $result = $finalResponse['data'] ?? $finalResponse;
 
         // eHealth can echo the pre-reject status back, so an active answer still means rejected here.

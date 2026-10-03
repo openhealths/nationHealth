@@ -12,8 +12,8 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\CarePlan;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\CarePlanApprovalService;
-use App\Services\MedicalEvents\MedicalRequestOwnership;
 use App\Traits\FormTrait;
 use App\Traits\InteractsWithApprovals;
 use Exception;
@@ -481,8 +481,7 @@ class CarePlanApprovals extends Component
 
         $this->authorize('manage', $this->currentCarePlan());
         try {
-            app(MedicalRequestOwnership::class)
-                ->approvalForCarePlan($this->currentCarePlan(), $approvalUuid);
+            Repository::approval()->findOwnedForCarePlan($this->currentCarePlan(), $approvalUuid);
             app(CarePlanApprovalService::class)
                 ->deactivate($this->patientUuid, $approvalUuid);
             Session::flash('success', __('care-plan.approval_cancelled'));

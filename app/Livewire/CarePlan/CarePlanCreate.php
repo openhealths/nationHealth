@@ -18,8 +18,8 @@ use App\Livewire\CarePlan\Forms\CarePlanForm;
 use App\Livewire\CarePlan\Forms\PatientSearchForm;
 use App\Livewire\Person\Records\BasePatientComponent;
 use App\Models\CarePlan;
-use App\Models\EmployeeRole;
 use App\Models\Employee\Employee;
+use App\Models\EmployeeRole;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\Encounter;
@@ -28,7 +28,6 @@ use App\Models\Person\Person;
 use App\Repositories\CarePlanRepository;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\CarePlanApprovalService;
-use App\Services\MedicalEvents\CarePlanLifecycleService;
 use App\Traits\InteractsWithApprovals;
 use Carbon\Carbon;
 use Exception;
@@ -945,8 +944,7 @@ class CarePlanCreate extends BasePatientComponent
                 Auth::user()->party->taxId
             );
 
-            $finalResponse = app(CarePlanLifecycleService::class)
-                ->submitSignedCreate($this->uuid, $signedContent);
+            $finalResponse = EHealth::carePlan()->createSignedAndResolve($this->uuid, $signedContent);
 
             $carePlanUuid = $this->carePlanUuid;
             if (!$carePlanUuid && isset($finalResponse['links']) && is_array($finalResponse['links'])) {
@@ -1115,8 +1113,7 @@ class CarePlanCreate extends BasePatientComponent
                     $localCarePlan = CarePlan::where('uuid', $generatedUuid)->first();
 
                     if (!$localCarePlan) {
-                        $carePlanData = app(CarePlanLifecycleService::class)
-                            ->getDetails($this->patientUuid ?: $this->uuid, $generatedUuid);
+                        $carePlanData = EHealth::carePlan()->getDetails($this->patientUuid ?: $this->uuid, $generatedUuid)->getData();
 
                         $carePlanStatus = $carePlanData['status'] ?? CarePlanStatus::PENDING->value;
                         if ($carePlanStatus === 'processed') {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\MedicalEvents;
 
+use App\Classes\eHealth\Api\Job;
 use App\Classes\eHealth\EHealth;
 use App\Models\Employee\Employee;
 use Illuminate\Support\Arr;
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\Log;
 
 class MedicationDispenseLifecycleService
 {
-    public function __construct(private readonly EHealthJobResolver $jobResolver)
+    public function __construct(private readonly Job $jobApi)
     {
     }
 
@@ -153,7 +154,7 @@ class MedicationDispenseLifecycleService
             'signed_content_encoding' => 'base64',
         ]);
 
-        $final = $this->jobResolver->resolve($processed->getData());
+        $final = $this->jobApi->resolve($processed->getData());
 
         return is_array($final) ? $final : (array) $processed->getData();
     }

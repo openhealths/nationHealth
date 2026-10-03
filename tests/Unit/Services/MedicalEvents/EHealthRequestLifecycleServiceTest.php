@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\MedicalEvents;
 
+use App\Classes\eHealth\Api\Job;
 use App\Contracts\EHealthRequestLifecycleContract;
 use App\Services\MedicalEvents\DeviceRequestLifecycleService;
-use App\Services\MedicalEvents\EHealthJobResolver;
 use App\Services\MedicalEvents\EHealthRequestLifecycleService;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use Illuminate\Support\Facades\Log;
@@ -79,7 +79,7 @@ class EHealthRequestLifecycleServiceTest extends TestCase
 
     private function makeLifecycle(): EHealthRequestLifecycleService
     {
-        return new class(Mockery::mock(EHealthJobResolver::class)) extends EHealthRequestLifecycleService
+        return new class(Mockery::mock(Job::class)) extends EHealthRequestLifecycleService
         {
             protected function requestType(): string
             {

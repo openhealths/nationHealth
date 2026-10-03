@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api\Patient;
 
+use App\Classes\eHealth\Api\Concerns\ResolvesSignedPatientRequests;
 use App\Classes\eHealth\Api\ServiceRequest as ServiceRequestExecutorApi;
+use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthResponse;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
@@ -16,6 +18,17 @@ use Illuminate\Validation\ValidationException;
 
 class ServiceRequest extends PatientApiBase
 {
+    use ResolvesSignedPatientRequests;
+
+    public function recallAndResolve(string $patientId, string $id, array $payload): array
+    {
+        if (trim((string) ($payload['explanatory_letter'] ?? '')) === '') {
+            throw new \InvalidArgumentException(__('care-plan.referral_recall_letter_required'));
+        }
+
+        return EHealth::job()->resolve($this->recall($patientId, $id, $payload)->getData());
+    }
+
     /**
      * Create a signed Service Request in eHealth (PKCS#7).
      *
