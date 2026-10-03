@@ -10,8 +10,10 @@ use App\Models\Division;
 use App\Models\LegalEntity;
 use App\Models\Relations\Phone;
 use App\Classes\eHealth\EHealth;
+use App\Dto\Division\Ehealth as EhealthData;
 use App\Repositories\Repository;
 use App\Traits\WorkTimeUtilities;
+use Symfony\Component\ObjectMapper\ObjectMapper;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\RedirectResponse;
@@ -151,11 +153,13 @@ class DivisionCreate extends DivisionComponent
     protected function divisionCreate(Division $division): void
     {
         try {
-            $response = $this->createDivision();
+            $payload = new ObjectMapper()->map((object) $this->divisionForm->division, EhealthData::class)->toArray();
+
+            $response = EHealth::division()->create(data: $payload)->validate();
 
             // If the response is empty, it means the create failed and uncatched
             if (empty($response)) {
-                throw new Exception(static::class . 'createDivision() return empty response!');
+                throw new Exception('eHealth return empty response!');
             }
 
             $response['id'] = $division->id;
@@ -185,29 +189,6 @@ class DivisionCreate extends DivisionComponent
         session()->flash('error', __('errors.ehealth.messages.request_error'));
 
         return;
-    }
-
-    /**
-     * Prepares and sends the division data to the eHealth API for creation
-     *
-     * This method is responsible for the direct interaction with the
-     * eHealth service. It prepares the request data, ensuring that location
-     * and working hours are correctly formatted and included, and then calls
-     * the eHealth API's create endpoint.
-     *
-     * @return array The validated response data from the eHealth API
-     */
-    protected function createDivision(): array
-    {
-        $division = $this->prepareRequestData();
-
-        // If location is not set, then use the original location cause the 0 value has been removed by removeEmptyKeys method
-        $division['location'] ??= $this->divisionForm->division['location'];
-
-        // If working_hours is not set, then use the original working_hours value cause the '[]' value has been removed by removeEmptyKeys method
-        $division['working_hours'] = $this->prepareTimeToRequest($this->divisionForm->division['workingHours'], false);
-
-        return EHealth::division()->create(data: $division)->validate();
     }
 
     /**
