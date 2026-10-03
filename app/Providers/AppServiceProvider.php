@@ -17,6 +17,7 @@ use App\Jobs\EpisodeSync;
 use App\Jobs\EquipmentSync;
 use App\Jobs\HealthcareServiceSync;
 use App\Jobs\ImmunizationSync;
+use App\Jobs\LegalEntityDetailsSync;
 use App\Jobs\LegalEntitySync;
 use App\Jobs\ObservationSync;
 use App\Jobs\PersonAuthMethodSync;
@@ -199,6 +200,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for(
             'legal-entity-legators-get',
             static fn (LegalEntitySync $job) => Limit::perMinute(config('ehealth.rate_limit.legal_entity_legators'))->by($job->user->id)
+        );
+
+        RateLimiter::for(
+            'legal-entity-legal-entity-by-id',
+            static fn (LegalEntityDetailsSync $job) => Limit::perMinute(config('ehealth.rate_limit.legal_entity_by_id'))->by($job->user->id)
         );
 
         RateLimiter::for(

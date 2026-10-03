@@ -17,17 +17,35 @@ class ConnectionForm extends Form
 
     public ?string $password = null;
 
+    public ?string $taxId = null;
+
     /**
      * Validation rules required to sign data with a KEP key.
      *
      * @return array
      */
-    public function rulesForSign(): array
+    public function rulesForSign(bool $skipTaxIdValidation = false): array
     {
-        return [
+        $rules = [
             'knedp' => ['required', 'string'],
             'keyContainerUpload' => ['required', 'file', 'extensions:dat,pfx,pk8,zs2,jks,p7s'],
             'password' => ['required', 'string', 'max:255'],
+        ];
+
+        if (!$skipTaxIdValidation) {
+            $rules['taxId'] = ['required', 'string', 'max:10'];
+        }
+
+        return $rules;
+    }
+
+    public function rulesForCreate(): array
+    {
+        return [
+            'clientUuid' => ['required', 'string'],
+            'redirectUri' => ['required', 'string'],
+            'clientName' => ['required', 'string'],
+            'clientType' => ['required', 'numeric']
         ];
     }
 

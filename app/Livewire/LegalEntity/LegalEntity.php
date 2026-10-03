@@ -993,31 +993,12 @@ abstract class LegalEntity extends Component
 
             $this->legalEntity->refresh();
 
-            $this->saveLicense($data['data']['license']);
+            Repository::legalEntity()->saveLicense($data['data']['license'], $this->legalEntity);
         } catch (Exception $err) {
             throw new Exception('LegalEntity Create Error: ' . $err->getMessage());
         }
 
         return $this->legalEntity;
-    }
-
-    /**
-     * Create a new license with the provided data.
-     *
-     * @param  array  $data  The data to fill the license with.
-     */
-    protected function saveLicense(array $data): void
-    {
-        $data['ehealth_inserted_at'] = convertToYmd($data['ehealth_inserted_at']);
-        $data['ehealth_updated_at'] = convertToYmd($data['ehealth_updated_at']);
-
-        $license = License::firstOrNew(['uuid' => $data['uuid']]);
-        $license->fill($data);
-        $license->is_primary = $data['type'] === LicenseType::MSP->value || $data['type'] === LicenseType::PHARMACY->value;
-
-        if (isset($this->legalEntity)) {
-            $this->legalEntity->licenses()->save($license);
-        }
     }
 
     /**
@@ -1136,7 +1117,7 @@ abstract class LegalEntity extends Component
                 setPermissionsTeamId($this->legalEntity->id);
 
                 if (isset($response['data']['license'])) {
-                    $this->saveLicense($response['data']['license']);
+                    Repository::legalEntity()->saveLicense($response['data']['license'], $this->legalEntity);
                 }
 
                 $user = $this->createUser();

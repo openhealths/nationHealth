@@ -101,7 +101,7 @@ class LegalEntityConnectionIndex extends LegalEntityConnectionComponent
 
     public function sign()
     {
-        $this->form->validate($this->form->rulesForSign());
+        $this->form->validate($this->form->rulesForSign(skipTaxIdValidation: true));
 
         try {
             $signedData = signatureService()->signData(
@@ -167,7 +167,7 @@ class LegalEntityConnectionIndex extends LegalEntityConnectionComponent
         } catch (Throwable $err) {
             Log::error('Connection creation: cannot update client secret for Legal Entity: ', ['legalEntity' => $connection->legalEntity->id]);
 
-            session()->flash('success', 'Зв\'язок успішно встановлений!');
+            session()->flash('error', __('Помилка збереження токену (secret) для закладу'));
 
             return;
         }
