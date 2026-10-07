@@ -133,7 +133,11 @@ class DivisionFormValidationTest extends TestCase
             'non-numeric latitude' => ['location.latitude', 'invalid'],
             'non-numeric longitude' => ['location.longitude', 'invalid'],
             'invalid latitude' => ['location.latitude', 100],
-            'invalid longitude' => ['location.longitude', 100],
+            'invalid longitude' => ['location.longitude', 181],
+            'latitude above range' => ['location.latitude', 90.000001],
+            'latitude below range' => ['location.latitude', -90.000001],
+            'longitude above range' => ['location.longitude', 180.000001],
+            'longitude below range' => ['location.longitude', -180.000001],
             'missing phones' => ['phones', []],
             'missing phone type' => ['phones.0.type', ''],
             'invalid phone type' => ['phones.0.type', 'INVALID'],
@@ -155,6 +159,15 @@ class DivisionFormValidationTest extends TestCase
         $this->assertSame('', $this->divisionForm([
             'location' => ['latitude' => 0, 'longitude' => 0],
         ])->doValidation());
+    }
+
+    public function test_accepts_coordinates_at_axis_limits_and_longitudes_outside_latitude_range(): void
+    {
+        foreach ([[90, 180], [-90, -180], [0, 100], [0, -100]] as [$latitude, $longitude]) {
+            $this->assertSame('', $this->divisionForm([
+                'location' => ['latitude' => $latitude, 'longitude' => $longitude],
+            ])->doValidation());
+        }
     }
 
     public function test_rejects_duplicate_phone_types(): void

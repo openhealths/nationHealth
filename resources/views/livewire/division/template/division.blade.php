@@ -60,7 +60,7 @@
                             Livewire.hook('commit', ({ succeed }) => {
                                 succeed(() => {
                                     this.$nextTick(() => {
-                                        const firstErrorMessage = document.querySelector('.input-error')
+                                        const firstErrorMessage = document.querySelector('.input-error, .select-error, .text-error')
                                         if (firstErrorMessage !== null) {
                                             firstErrorMessage.scrollIntoView({ block: 'center', inline: 'center' });
                                         }
@@ -487,6 +487,9 @@
                                         />
                                     </div>
 
+                                @endif
+
+                                <div class="form-row-3">
                                     <div class="form-group checkbox-group"
                                         x-data="{ isMountainGroup: @js($this->divisionForm->division['mountainGroup'] ?? false) }"
                                     >
@@ -503,7 +506,7 @@
                                             {{__('forms.mountainous_status')}}
                                         </label>
                                     </div>
-                                @endif
+                                </div>
 
                                 @if(!$readonly)
                                 <div class="pt-6 mt-auto">
@@ -521,7 +524,7 @@
                                     isStoreMode: {{ $action === 'store' ? 'true' : 'false' }},
                                     init() {
                                         this.working = Object.values(this.workingHours).some(day => 
-                                            day.some(shift => (shift[0] && shift[0] !== '' && shift[0] !== '00:00') || (shift[1] && shift[1] !== '' && shift[1] !== '00:00'))
+                                            day.some(shift => (shift[0] && shift[0] !== '' && shift[0] !== '-1') || (shift[1] && shift[1] !== '' && shift[1] !== '-1'))
                                         );
                                     }
                                 }"
@@ -571,19 +574,19 @@
                                                     :key="'{{ $key }}'"
                                                     x-data="{
                                                     shift: workingHours['{{ $key }}'].length > 1,
-                                                    show_work: (workingHours['{{ $key }}'][0][0] !== '' && workingHours['{{ $key }}'][0][0] !== null && workingHours['{{ $key }}'][0][0] !== '00:00') ||
-                                                    (workingHours['{{ $key }}'][0][1] !== '' && workingHours['{{ $key }}'][0][1] !== null && workingHours['{{ $key }}'][0][1] !== '00:00') ||
+                                                    show_work: (workingHours['{{ $key }}'][0][0] !== '' && workingHours['{{ $key }}'][0][0] !== null && workingHours['{{ $key }}'][0][0] !== '-1') ||
+                                                    (workingHours['{{ $key }}'][0][1] !== '' && workingHours['{{ $key }}'][0][1] !== null && workingHours['{{ $key }}'][0][1] !== '-1') ||
                                                     '{{ $action }}' === 'store',
                                                     switchWorking(day) {
                                                     this.show_work = !this.show_work;
-                                                    this.workingHours[day] = [['00:00', '00:00']];
+                                                    this.workingHours[day] = [this.show_work ? ['00:00', '00:00'] : ['-1', '-1']];
                                                     if (! this.show_work) {
                                                     this.shift = false;
                                                     }
                                                     },
                                                     addAvailableShift(day) {
                                                     if (this.workingHours[day].length < 4) {
-                                                    this.workingHours[day].push(['00:00', '00:00']);
+                                                    this.workingHours[day].push(['-1', '-1']);
                                                     }
                                                     },
                                                     deleteShift(day, index) {
@@ -685,7 +688,8 @@
                                                                                             :id="'opened_by-' + '{{ $key }}' + '-' + shiftIndex"
                                                                                             class="input timepicker-uk text-gray-900 dark:text-white border-t-0 border-r-0 border-l-0 border-b border-gray-300 focus:ring-0 px-0 ps-8"
                                                                                             placeholder="--:--"
-                                                                                            x-model.lazy="workingHours['{{ $key }}'][shiftIndex][0]"
+                                                                                            x-bind:value="workingHours['{{ $key }}'][shiftIndex][0] === '-1' ? '00:00' : workingHours['{{ $key }}'][shiftIndex][0]"
+                                                                                            x-on:change="workingHours['{{ $key }}'][shiftIndex][0] = $event.target.value"
                                                                                             x-bind:disabled="isDisabled"
                                                                                         />
                                                                                     </div>
@@ -725,7 +729,8 @@
                                                                                             :id="'closed_by-' + '{{ $key }}' + '-' + shiftIndex"
                                                                                             class="input timepicker-uk text-gray-900 dark:text-white border-t-0 border-r-0 border-l-0 border-b border-gray-300 focus:ring-0 px-0 ps-8"
                                                                                             placeholder="--:--"
-                                                                                            x-model.lazy="workingHours['{{ $key }}'][shiftIndex][1]"
+                                                                                            x-bind:value="workingHours['{{ $key }}'][shiftIndex][1] === '-1' ? '00:00' : workingHours['{{ $key }}'][shiftIndex][1]"
+                                                                                            x-on:change="workingHours['{{ $key }}'][shiftIndex][1] = $event.target.value"
                                                                                             x-bind:disabled="isDisabled"
                                                                                         />
                                                                                     </div>

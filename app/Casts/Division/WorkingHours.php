@@ -26,7 +26,7 @@ class WorkingHours implements CastsAttributes
 
         $data = array_replace($this->workingHours, $decodedValue ?: []);
 
-        return $this->prepareWorkingHours($data, true);
+        return $this->mapLegacyDayOffValues($this->prepareWorkingHours($data, true));
     }
 
     /**
@@ -57,5 +57,25 @@ class WorkingHours implements CastsAttributes
     public function prepareWorkingHours(array $workingHours, bool $dotToColon = false): array
     {
         return $this->prepareTimeToRequest($workingHours, $dotToColon);
+    }
+
+    /**
+     * Convert the legacy eHealth day-off value to the internal sentinel.
+     *
+     * @param  array<string, array<int, array<int, string>>>  $workingHours
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    protected function mapLegacyDayOffValues(array $workingHours): array
+    {
+        return array_map(
+            fn (array $intervals) => array_map(
+                fn (array $interval) => ($interval[0] ?? null) === '00:00' && ($interval[1] ?? null) === '00:00'
+                    ? Division::getWorkingTimeTemplate()
+                    : $interval,
+                $intervals
+            ),
+            $workingHours
+        );
     }
 }
