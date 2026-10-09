@@ -101,10 +101,10 @@
                     min="1"
                     step="1"
                     placeholder=" "
-                    required
                     class="peer input text-gray-500 @error('form.party.workingExperience') input-error @enderror"
                 />
                 <label for="workingExperience" class="label">{{ __('forms.working_experience') }}</label>
+                <p class="mt-1 text-xs text-gray-500">{{ __('forms.workingExperience_hint') }}</p>
                 @error('form.party.workingExperience')
                     <p class="text-error">{{ $message }}</p>
                 @enderror
@@ -253,6 +253,7 @@
                     name="email"
                     class="peer input text-gray-500"
                     placeholder=" "
+                    required
                 />
                 <label for="email" class="label">{{ __('forms.email') }}</label>
                 @error('form.party.email')

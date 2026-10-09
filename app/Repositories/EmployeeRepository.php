@@ -132,7 +132,11 @@ readonly class EmployeeRepository
     {
         unset($party['email']);
         $partyUuid = Arr::get($party, 'uuid');
-        $partyByUuid = Party::where('uuid', $partyUuid)->first();
+        // A missing uuid must not become WHERE uuid IS NULL: that row is a different person
+        // created moments earlier, and the next hire would overwrite their name.
+        $partyByUuid = is_string($partyUuid) && $partyUuid !== ''
+            ? Party::where('uuid', $partyUuid)->first()
+            : null;
 
         // If the model doesn't have a party and party doesn't exist, create new one. It's a brand-new person
         if (!$partyByUuid && !$model->party) {

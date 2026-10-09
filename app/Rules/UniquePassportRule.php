@@ -20,7 +20,13 @@ class UniquePassportRule implements ValidationRule
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        $types = collect($value)->pluck('type');
+        $types = collect($value)->pluck('type')->filter(fn ($type) => is_string($type) && $type !== '');
+
+        if ($types->duplicates()->isNotEmpty()) {
+            $fail(__('validation.custom.document_unique'));
+
+            return;
+        }
 
         if ($types->contains('PASSPORT') && $types->contains('NATIONAL_ID')) {
             $fail(__('validation.custom.employee.passport_national_id_mutual_exclusion'));

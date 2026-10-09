@@ -31,7 +31,13 @@
     <div class="form shift-content shift-content mt-6 space-y-8">
         <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
             <div>
-                <dt class="text-gray-500">{{ __('forms.employee_uuid') }}</dt>
+                <dt class="text-gray-500">
+                    @if ($employee instanceof \App\Models\Employee\EmployeeRequest)
+                        {{ __('forms.employee_request_identifier') }}
+                    @else
+                        {{ __('forms.employee_uuid') }}
+                    @endif
+                </dt>
                 <dd class="font-mono break-all">{{ $employee->uuid ?? $employee->id }}</dd>
             </div>
             <div>

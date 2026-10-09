@@ -125,6 +125,39 @@ abstract class EmployeeComponent extends Component
         );
     }
 
+    /**
+     * Dictionary label for a stored position code. Free text is shown as entered.
+     */
+    public function positionDisplayLabel(): string
+    {
+        $code = (string) $this->form->position;
+
+        if ($code === '') {
+            return '';
+        }
+
+        return $this->dictionaries['POSITION'][$code] ?? $code;
+    }
+
+    public function updatedFormEmployeeType(): void
+    {
+        if ($this->isPositionDataLocked || $this->isCorePositionDataLocked) {
+            return;
+        }
+
+        $this->form->position = '';
+        $this->form->positionIsCustom = false;
+    }
+
+    public function updatedFormPositionIsCustom(): void
+    {
+        if ($this->isPositionDataLocked || $this->isCorePositionDataLocked) {
+            return;
+        }
+
+        $this->form->position = '';
+    }
+
     #[Computed]
     public function employeeFullName(): string
     {

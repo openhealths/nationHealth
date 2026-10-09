@@ -32,6 +32,10 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 class EmployeeForm extends Form
 {
     public string $position = '';
+
+    /** Free-text position for HR / ADMIN / RECEPTIONIST. Other types always use the dictionary. */
+    public bool $positionIsCustom = false;
+
     public string $employeeType = '';
     public string $startDate = '';
     public ?string $endDate = null;
@@ -68,6 +72,10 @@ class EmployeeForm extends Form
 
     public function rulesForSave(Component $component): array
     {
+        if (($this->party['workingExperience'] ?? null) === '') {
+            $this->party['workingExperience'] = null;
+        }
+
         $partyRules = $this->partyRules();
 
         // Specific logic for EmployeeCreate
@@ -108,9 +116,10 @@ class EmployeeForm extends Form
     {
         $customPositionAllowed = config('ehealth.employee_type_custom_position_allowed', []);
         $isCustomPositionAllowed = in_array($this->employeeType, $customPositionAllowed, true);
+        $useFreeText = $isCustomPositionAllowed && $this->positionIsCustom;
 
         $positionRules = ['required', 'string'];
-        if (!$isCustomPositionAllowed) {
+        if (!$useFreeText) {
             $positionRules[] = Rule::in($this->allowedValuesForEmployeeType('position', 'POSITION'));
         }
 
@@ -182,8 +191,8 @@ class EmployeeForm extends Form
     public function messages(): array
     {
         return [
-            'party.workingExperience.required' => __('validation.custom.party.working_experience_required'),
             'party.workingExperience.integer' => __('validation.custom.party.working_experience_integer'),
+            'party.email.ascii' => __('validation.custom.party.email_must_be_latin'),
             'party.workingExperience.gt' => __('validation.custom.party.working_experience_gt'),
             'documents.*.type.in' => __('validation.custom.employee.document_type_not_allowed'),
             'documents.min' => __('validation.custom.identity_document_required'),
@@ -203,8 +212,8 @@ class EmployeeForm extends Form
             'party.phones.*.type' => ['required', 'string', Rule::in(array_keys($this->component->dictionaries['PHONE_TYPE'] ?? []))],
             'party.taxId' => ['required', 'string', new TaxId()],
             'party.noTaxId' => ['boolean'],
-            'party.email' => ['required', 'present', 'email', new UniqueEmailInLegalEntity($this->existingPartyId)],
-            'party.workingExperience' => ['required', 'integer', 'gt:0'],
+            'party.email' => ['required', 'present', 'email', 'ascii', new UniqueEmailInLegalEntity($this->existingPartyId)],
+            'party.workingExperience' => ['nullable', 'integer', 'gt:0'],
             'party.aboutMyself' => ['nullable', 'present', 'string'],
         ];
     }
@@ -243,7 +252,31 @@ class EmployeeForm extends Form
                 }
             ],
             'documents.*.issuedBy' => ['present', 'nullable', 'string'],
-            'documents.*.issuedAt' => ['required', new DateFormat(), 'before_or_equal:today'],
+            'documents.*.issuedAt' => [
+                'required',
+                new DateFormat(),
+                'before_or_equal:today',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    $birthDate = $this->party['birthDate'] ?? null;
+
+                    if (!is_string($value) || $value === '' || !is_string($birthDate) || $birthDate === '') {
+                        return;
+                    }
+
+                    $format = (string) config('app.date_format');
+
+                    try {
+                        $issued = Carbon::createFromFormat($format, $value);
+                        $birth = Carbon::createFromFormat($format, $birthDate);
+                    } catch (\Throwable) {
+                        return;
+                    }
+
+                    if ($issued !== false && $birth !== false && $issued->startOfDay()->lt($birth->startOfDay())) {
+                        $fail(__('validation.custom.employee.document_issued_before_birth'));
+                    }
+                },
+            ],
         ];
     }
 
@@ -349,6 +382,7 @@ class EmployeeForm extends Form
     public function resetPositionFields(): void
     {
         $this->position = '';
+        $this->positionIsCustom = false;
         $this->employeeType = '';
         $this->startDate = '';
         $this->endDate = null;
@@ -375,6 +409,25 @@ class EmployeeForm extends Form
         }
 
         return $this->dictionaryKeys($dictionaryName);
+    }
+
+    /**
+     * HR / ADMIN / RECEPTIONIST may keep a value that is not a POSITION code.
+     * Anything else stays on the dictionary select.
+     */
+    private function syncPositionEntryMode(): void
+    {
+        $customPositionAllowed = config('ehealth.employee_type_custom_position_allowed', []);
+
+        if (!in_array($this->employeeType, $customPositionAllowed, true)) {
+            $this->positionIsCustom = false;
+
+            return;
+        }
+
+        $dictionaryPositions = config('ehealth.employee_type.'.$this->employeeType.'.position', []);
+        $this->positionIsCustom = $this->position !== ''
+            && !in_array($this->position, $dictionaryPositions, true);
     }
 
     /**
@@ -465,6 +518,7 @@ class EmployeeForm extends Form
         $this->startDate = convertToAppDateFormat($employee->startDate);
         $this->endDate = convertToAppDateFormat($employee->endDate);
         $this->divisionId = $employee->divisionId !== null ? (string) $employee->divisionId : null;
+        $this->syncPositionEntryMode();
 
         $this->doctor['educations'] = $employee->educations->map(function ($edu) {
             $data = Arr::toCamelCase($edu->toArray());
@@ -611,6 +665,8 @@ class EmployeeForm extends Form
             $this->party = array_merge($this->party, $partyDataFromRevision);
         }
 
+        $this->syncPositionEntryMode();
+
         // --- Phones ---
         if (!empty($revisionData['phones'])) {
             $this->party['phones'] = Arr::toCamelCase($revisionData['phones']);
@@ -726,6 +782,7 @@ class EmployeeForm extends Form
 
         unset(
             $formData['existingPartyId'],
+            $formData['positionIsCustom'],
             $formData['knedp'],
             $formData['keyContainerUpload'],
             $formData['password']

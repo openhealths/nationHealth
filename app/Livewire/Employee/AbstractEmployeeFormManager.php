@@ -290,16 +290,29 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         $employeeChunk = Arr::only($flatData, ['position', 'employee_type', 'start_date', 'end_date', 'division_id']);
         $partyChunk = Arr::only($flatData, ['last_name', 'first_name', 'second_name', 'gender', 'birth_date', 'tax_id', 'no_tax_id', 'email', 'working_experience', 'about_myself']);
 
-        // Backend enforcement: if party data is partially locked, always restore the original tax_id
-        // to prevent accidental or malicious RNOKPP changes via form manipulation.
+        // Backend enforcement: a locked party cannot swap its ІПН.
+        // Someone who refused an ІПН must stay no_tax_id, with tax_id equal to the identity document number.
+        // Forcing no_tax_id=false sends that document number as an ІПН and eHealth rejects it.
         if ($this->isPartyDataPartiallyLocked) {
-            $originalTaxId = $this->employeeRequest?->party?->tax_id
-                ?? $this->employee?->party?->tax_id
-                ?? null;
+            $party = $this->employee?->party ?? $this->employeeRequest?->party;
+            $noTaxId = (bool) ($party?->noTaxId ?? false);
 
-            if ($originalTaxId !== null) {
-                $partyChunk['tax_id'] = $originalTaxId;
-                $partyChunk['no_tax_id'] = false;
+            if ($noTaxId) {
+                $partyChunk['no_tax_id'] = true;
+                $documentNumber = $this->identityDocumentNumber($flatData['documents'] ?? []);
+
+                if ($documentNumber !== null) {
+                    $partyChunk['tax_id'] = $documentNumber;
+                } elseif (is_string($party?->taxId) && $party->taxId !== '') {
+                    $partyChunk['tax_id'] = $party->taxId;
+                }
+            } else {
+                $originalTaxId = $party?->taxId;
+
+                if (is_string($originalTaxId) && $originalTaxId !== '') {
+                    $partyChunk['tax_id'] = $originalTaxId;
+                    $partyChunk['no_tax_id'] = false;
+                }
             }
         }
 
@@ -358,6 +371,31 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         }
 
         return $result;
+    }
+
+    /**
+     * Number of the identity document that eHealth stores in tax_id when the person has no ІПН.
+     *
+     * @param  list<array<string, mixed>>  $documents
+     */
+    private function identityDocumentNumber(array $documents): ?string
+    {
+        $allowed = ['PASSPORT', 'NATIONAL_ID', 'REFUGEE_CERTIFICATE', 'PERMANENT_RESIDENCE_PERMIT'];
+
+        foreach ($documents as $document) {
+            if (!is_array($document)) {
+                continue;
+            }
+
+            $type = $document['type'] ?? null;
+            $number = $document['number'] ?? null;
+
+            if (is_string($type) && in_array($type, $allowed, true) && is_string($number) && $number !== '') {
+                return $number;
+            }
+        }
+
+        return null;
     }
 
     /**
