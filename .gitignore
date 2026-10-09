@@ -43,3 +43,6 @@ opencode.json
 /storage/personal/
 /storage/cli-testing/
 /storage/db-dumps/
+
+# Local git worktrees (never belong in a feature PR)
+.worktrees/

@@ -301,6 +301,12 @@ class EHealthValidationException extends EHealthException
 
     protected function translateTopLevelMessage(string $message): string
     {
+        $translated = EHealthException::translate($message);
+
+        if ($translated !== $message) {
+            return $translated;
+        }
+
         $exactMessages = [
             'Care plan has unfinished activities' => 'care_plan_has_unfinished_activities',
         ];
