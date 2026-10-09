@@ -316,5 +316,42 @@
                 </div>
             </template>
         </div>
+
+        <div class="mt-8">
+            <h3 class="mb-4 text-lg font-bold text-gray-900 dark:text-gray-100">{{ __('encounters.incoming_referral') }} (Fake Data)</h3>
+            <div class="overflow-x-auto">
+                <table class="table-input w-inherit">
+                    <thead class="thead-input">
+                        <tr>
+                            <th scope="col" class="th-input">{{ __('forms.date') }}</th>
+                            <th scope="col" class="th-input">{{ __('encounters.referral_number') }}</th>
+                            <th scope="col" class="th-input">{{ __('encounters.service') }}</th>
+                            <th scope="col" class="th-input text-center">{{ __('forms.status.label') }}</th>
+                            <th scope="col" class="th-input text-center">{{ __('forms.action') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-gray-200 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800/40">
+                            <td class="td-input text-[14px] text-gray-900 dark:text-gray-300">10.10.2026</td>
+                            <td class="td-input text-[14px] text-gray-900 dark:text-gray-300">1234-5678-9012-3456</td>
+                            <td class="td-input text-[14px] text-gray-900 dark:text-white">Cardiologist Consultation</td>
+                            <td class="td-input text-center"><span class="inline-flex items-center text-sm font-medium text-green-600 dark:text-green-400">Active</span></td>
+                            <td class="td-input text-center">
+                                <button type="button" class="inline-flex cursor-pointer items-center justify-center text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400">View</button>
+                            </td>
+                        </tr>
+                        <tr class="border-b border-gray-200 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800/40">
+                            <td class="td-input text-[14px] text-gray-900 dark:text-gray-300">12.10.2026</td>
+                            <td class="td-input text-[14px] text-gray-900 dark:text-gray-300">9876-5432-1098-7654</td>
+                            <td class="td-input text-[14px] text-gray-900 dark:text-white">Ultrasound</td>
+                            <td class="td-input text-center"><span class="inline-flex items-center text-sm font-medium text-gray-500">Redeemed</span></td>
+                            <td class="td-input text-center">
+                                <button type="button" class="inline-flex cursor-pointer items-center justify-center text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400">View</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>

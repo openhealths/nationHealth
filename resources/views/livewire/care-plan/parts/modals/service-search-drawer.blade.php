@@ -1,37 +1,11 @@
-{{-- Service Search Drawer Overlay --}}
-<div x-show="showServiceSearchDrawer"
-     x-transition:enter="transition ease-out duration-300"
-     x-transition:enter-start="opacity-0"
-     x-transition:enter-end="opacity-100"
-     x-transition:leave="transition ease-in duration-200"
-     x-transition:leave-start="opacity-100"
-     x-transition:leave-end="opacity-0"
-     x-cloak
-     @click="showServiceSearchDrawer = false"
-     aria-controls="service-search-drawer-right"
-     class="fixed top-0 right-0 h-screen pt-20 w-4/5 bg-gray-900/50"
-     style="z-index: 44;"
-></div>
-
-{{-- Service Search Drawer --}}
-<div id="service-search-drawer-right"
-     x-show="showServiceSearchDrawer"
-     x-transition:enter="transition ease-out duration-300"
-     x-transition:enter-start="translate-x-full"
-     x-transition:enter-end="translate-x-0"
-     x-transition:leave="transition ease-in duration-200"
-     x-transition:leave-start="translate-x-0"
-     x-transition:leave-end="translate-x-full"
-     x-cloak
-     class="fixed top-0 right-0 h-screen pt-20 p-4 overflow-y-auto bg-white dark:bg-gray-800 shadow-2xl"
-     style="z-index: 45; width: calc(80% - 30px);"
-     tabindex="-1"
-     aria-labelledby="service-search-drawer-label"
-     x-data="{ showFilter: false }"
+<x-dialog-drawer 
+    x-model="showServiceSearchDrawer" 
+    maxWidth="4/5" 
+    onCloseClick="showServiceSearchDrawer = false"
 >
-    <h3 class="modal-header" id="service-search-drawer-label">
-        {{ __('care-plan.search_service') }}
-    </h3>
+    <x-slot name="title">{{ __('care-plan.search_service') }}</x-slot>
+
+    <div x-data="{ showFilter: false }">
 
     {{-- Search Input --}}
     <div class="mb-4">
@@ -166,4 +140,5 @@
             {{ __('forms.cancel') }}
         </button>
     </div>
-</div>
+    </div>
+</x-dialog-drawer>

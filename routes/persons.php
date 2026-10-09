@@ -185,6 +185,8 @@ Route::prefix('persons')->whereNumber(['person', 'personRequest', 'personId', 'e
         Route::middleware('can:create,' . Encounter::class)->name('encounter.')->group(function () {
             Route::get('/{person}/encounter/create', EncounterCreate::class)->name('create');
             Route::get('/{person}/encounter/{encounterId}', EncounterEdit::class)->name('edit');
+            Route::get('/{person}/encounter/{encounterId}/referral/create', \App\Livewire\Encounter\EncounterReferralCreate::class)->name('referral.create');
+            Route::get('/{person}/encounter/{encounterId}/referral/review', \App\Livewire\Encounter\EncounterReferralReview::class)->name('referral.review');
         });
 
         Route::get('/{personId}/care-plan/create', CarePlanCreate::class)
@@ -335,6 +337,15 @@ Route::prefix('prepersons')
             ->can('view', 'preperson')
             ->whereNumber('encounterId')
             ->name('encounter.edit');
+        Route::get('/{preperson}/encounter/{encounterId}/referral/create', \App\Livewire\Encounter\EncounterReferralCreate::class)
+            ->can('view', 'preperson')
+            ->whereNumber('encounterId')
+            ->name('encounter.referral.create');
+
+        Route::get('/{preperson}/encounter/{encounterId}/referral/review', \App\Livewire\Encounter\EncounterReferralReview::class)
+            ->can('view', 'preperson')
+            ->whereNumber('encounterId')
+            ->name('encounter.referral.review');
 
         Route::get('/{preperson}/diagnostic-report/create', DiagnosticReportCreate::class)
             ->can('view', 'preperson')

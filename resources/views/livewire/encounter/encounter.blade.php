@@ -435,24 +435,6 @@
                             </button>
                         @endif
 
-                        @if ($this instanceof EncounterEdit)
-                            <button
-                                wire:click="openEncounterEPrescriptionDrawer"
-                                type="button"
-                                class="button-primary-outline flex items-center gap-2"
-                            >
-                                @icon('plus', 'w-4 h-4')
-                                <span>Додати рецепт</span>
-                            </button>
-                            <button
-                                wire:click="openEncounterReferralDrawer"
-                                type="button"
-                                class="button-primary-outline flex items-center gap-2"
-                            >
-                                @icon('plus', 'w-4 h-4')
-                                <span>Додати направлення</span>
-                            </button>
-                        @endif
 
                         @unless ($isReadonly)
                             <button

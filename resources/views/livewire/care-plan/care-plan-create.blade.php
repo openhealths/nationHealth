@@ -2,7 +2,7 @@
     :personId="$personId"
     :uuid="$uuid"
     :patientFullName="$patientFullName"
-    :hideNavigation="$allowsPatientChange"
+    :hideNavigation="true"
     :breadcrumbs="[
         ['label' => __('general.home') ?? 'Головна', 'url' => route('dashboard', [legalEntity()])],
         ['label' => $patientFullName ?? __('care-plan.patient') ?? 'Пацієнт']

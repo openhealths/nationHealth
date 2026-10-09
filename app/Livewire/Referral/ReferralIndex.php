@@ -21,10 +21,118 @@ class ReferralIndex extends Component
     public LegalEntity $legalEntity;
 
     public string $requisition = '';
+    public string $patient = '';
+    public array $status = [];
 
     public array $searchResults = [];
 
-    public bool $hasSearched = false;
+    public bool $hasSearched = true;
+
+    public function mount()
+    {
+        if (empty($this->searchResults)) {
+            $this->searchResults = [
+                [
+                    'id' => 'AX854-654T',
+                    'authored_on' => '2026-02-02T12:30:00Z',
+                    'code' => [
+                        'coding' => [
+                            ['code' => 'T67002 - Консультація Ендокринолога', 'display' => 'T67002 - Консультація Ендокринолога']
+                        ]
+                    ],
+                    'subject' => ['display' => 'Шевченко Т.Г. 54 р', 'identifier' => ['value' => 'mock-uuid']],
+                    'priority' => 'routine',
+                    'program' => ['display' => 'Медичних гарантій'],
+                    'status' => 'active',
+                    'program_processing_status' => 'new',
+                ],
+                [
+                    'id' => 'AX854-654T',
+                    'authored_on' => '2026-02-02T12:30:00Z',
+                    'code' => [
+                        'coding' => [
+                            ['code' => 'T67002 - Консультація Ендокринолога', 'display' => 'T67002 - Консультація Ендокринолога']
+                        ]
+                    ],
+                    'subject' => ['display' => 'Шевченко Т.Г. 54 р', 'identifier' => ['value' => 'mock-uuid']],
+                    'priority' => 'stat',
+                    'program' => ['display' => 'Медичних гарантій'],
+                    'status' => 'active',
+                    'program_processing_status' => 'new',
+                ],
+                [
+                    'id' => 'AX854-654T',
+                    'authored_on' => '2026-02-02T12:30:00Z',
+                    'code' => [
+                        'coding' => [
+                            ['code' => 'T67002 - Консультація Ендокринолога', 'display' => 'T67002 - Консультація Ендокринолога']
+                        ]
+                    ],
+                    'subject' => ['display' => 'Шевченко Т.Г. 54 р', 'identifier' => ['value' => 'mock-uuid']],
+                    'priority' => 'stat',
+                    'program' => ['display' => '-'],
+                    'status' => 'completed',
+                    'program_processing_status' => 'completed',
+                ],
+                [
+                    'id' => 'AX854-654T',
+                    'authored_on' => '2026-02-02T12:30:00Z',
+                    'code' => [
+                        'coding' => [
+                            ['code' => 'T67002 - Консультація Ендокринолога', 'display' => 'T67002 - Консультація Ендокринолога']
+                        ]
+                    ],
+                    'subject' => ['display' => 'Шевченко Т.Г. 54 р', 'identifier' => ['value' => 'mock-uuid']],
+                    'priority' => 'routine',
+                    'program' => ['display' => '-'],
+                    'status' => 'entered_in_error',
+                    'program_processing_status' => 'entered_in_error',
+                ],
+                [
+                    'id' => 'AX854-654T',
+                    'authored_on' => '2026-02-02T12:30:00Z',
+                    'code' => [
+                        'coding' => [
+                            ['code' => 'T67002 - Консультація Ендокринолога', 'display' => 'T67002 - Консультація Ендокринолога']
+                        ]
+                    ],
+                    'subject' => ['display' => 'Шевченко Т.Г. 54 р', 'identifier' => ['value' => 'mock-uuid']],
+                    'priority' => 'routine',
+                    'program' => ['display' => '-'],
+                    'status' => 'revoked',
+                    'program_processing_status' => 'revoked',
+                ],
+                [
+                    'id' => 'AX854-654T',
+                    'authored_on' => '2026-02-02T12:30:00Z',
+                    'code' => [
+                        'coding' => [
+                            ['code' => 'T67002 - Консультація Ендокринолога', 'display' => 'T67002 - Консультація Ендокринолога']
+                        ]
+                    ],
+                    'subject' => ['display' => 'Шевченко Т.Г. 54 р', 'identifier' => ['value' => 'mock-uuid']],
+                    'priority' => 'routine',
+                    'program' => ['display' => 'Медичних гарантій'],
+                    'status' => 'draft',
+                    'program_processing_status' => 'draft',
+                ],
+                [
+                    'id' => 'AX854-654T',
+                    'authored_on' => '2026-02-02T12:30:00Z',
+                    'code' => [
+                        'coding' => [
+                            ['code' => 'T67002 - Консультація Ендокринолога', 'display' => 'T67002 - Консультація Ендокринолога']
+                        ]
+                    ],
+                    'subject' => ['display' => 'Шевченко Т.Г. 54 р', 'identifier' => ['value' => 'mock-uuid']],
+                    'priority' => 'routine',
+                    'program' => ['display' => 'Медичних гарантій'],
+                    'status' => 'in_progress',
+                    'program_processing_status' => 'in_progress',
+                ],
+            ];
+        }
+    }
 
     public ?string $errorMessage = null;
 
@@ -44,6 +152,11 @@ class ReferralIndex extends Component
     public ?string $referralToCancel = null;
 
     public string $cancelExplanatoryLetter = '';
+
+    public bool $showErrorModal = false;
+    public ?string $referralToError = null;
+    public string $errorReason = '';
+    public string $errorExplanatoryLetter = '';
 
     /** @var list<string> */
     public array $emzTypes = ['encounter', 'procedure', 'diagnostic_report'];
@@ -76,6 +189,16 @@ class ReferralIndex extends Component
             $this->errorMessage = 'Помилка під час пошуку: '.$e->getMessage();
             $this->searchResults = [];
         }
+    }
+
+    public function resetFilters()
+    {
+        $this->requisition = '';
+        $this->patient = '';
+        $this->status = [];
+        $this->searchResults = [];
+        $this->hasSearched = false;
+        $this->errorMessage = null;
     }
 
     public function process(string $uuid, string $patientUuid, ReferralRequestLifecycleService $service)
@@ -119,6 +242,38 @@ class ReferralIndex extends Component
         $this->referralToCancel = $uuid;
         $this->cancelExplanatoryLetter = '';
         $this->showCancelModal = true;
+    }
+
+    public function openErrorModal(string $uuid)
+    {
+        $this->referralToError = $uuid;
+        $this->errorReason = '';
+        $this->errorExplanatoryLetter = '';
+        $this->showErrorModal = true;
+    }
+
+    public function confirmErrorUsage(ReferralRequestLifecycleService $service)
+    {
+        abort_unless(auth()->user()?->can('service_request:use'), 403);
+        $uuid = $this->referralToError;
+
+        if (empty($uuid)) {
+            return;
+        }
+
+        try {
+            // Placeholder for EHealth API logic
+            foreach ($this->searchResults as $key => $res) {
+                if ($res['id'] === $uuid) {
+                    $this->searchResults[$key]['status'] = 'entered_in_error';
+                }
+            }
+
+            $this->dispatch('notify', ['type' => 'success', 'message' => __('referrals.messages.error_marked_success')]);
+            $this->showErrorModal = false;
+        } catch (Exception $e) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => __('referrals.messages.error_prefix') . $e->getMessage()]);
+        }
     }
 
     public function confirmCancelUsage(ReferralRequestLifecycleService $service)

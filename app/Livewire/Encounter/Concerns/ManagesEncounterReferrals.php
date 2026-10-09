@@ -72,30 +72,19 @@ trait ManagesEncounterReferrals
             return;
         }
 
-        $this->loadEncounterReferralAuthMethods($encounter);
-        $this->loadEncounterReferralPrograms();
-
-        $start = now();
-        $this->encounterReferralForm = [
-            'category' => 'diagnostic_procedure',
-            'service_id' => '',
-            'priority' => 'routine',
-            'quantity' => 1,
-            'started_at' => $start->format('d.m.Y'),
-            'ended_at' => $start->copy()->addMonths(3)->format('d.m.Y'),
-            'program_id' => $this->resolveDefaultEncounterReferralProgramId(),
-            'note' => '',
-            'patient_instruction' => '',
-            'inform_with' => InformWith::formValue($this->encounterReferralAuthMethods[0] ?? []),
-            'reason_reference' => [],
-        ];
-
-        $this->encounterReferralServiceSearch = '';
-        $this->encounterReferralHasSearched = false;
-        $this->encounterReferralServiceResults = [];
-        $this->encounterReferralSelectedService = null;
-        $this->encounterReferralWarningMessage = '';
-        $this->showEncounterReferralDrawer = true;
+        if ($this->prepersonId !== null) {
+            $this->redirectRoute(
+                'prepersons.encounter.referral.create',
+                [legalEntity(), 'preperson' => $this->prepersonId, 'encounterId' => $encounter->id],
+                navigate: true
+            );
+        } else {
+            $this->redirectRoute(
+                'encounter.referral.create',
+                [legalEntity(), 'person' => $encounter->person_id, 'encounterId' => $encounter->id],
+                navigate: true
+            );
+        }
     }
 
     public function closeEncounterReferralDrawer(): void

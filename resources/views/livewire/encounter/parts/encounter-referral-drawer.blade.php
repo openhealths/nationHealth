@@ -1,18 +1,14 @@
 @if ($showEncounterReferralDrawer)
-    <div
-        wire:click="closeEncounterReferralDrawer"
-        class="fixed top-0 right-0 z-[46] h-screen bg-gray-900/50 pt-20"
-        style="width: calc(80% - 30px)"
-    ></div>
-
-    <div
-        x-data="{ openServiceCatalog: false }"
-        @encounter-referral-service-catalog-close.window="openServiceCatalog = false"
-        class="fixed top-0 right-0 z-[47] h-screen overflow-y-auto bg-white p-4 pt-20 shadow-2xl dark:bg-gray-800"
-        style="width: calc(80% - 60px)"
-        tabindex="-1"
-    >
-        <h3 class="modal-header">Виписати електронне направлення (без плану лікування)</h3>
+    <div x-data="{ open: true, openServiceCatalog: false }" @encounter-referral-service-catalog-close.window="openServiceCatalog = false">
+        <x-dialog-drawer
+            x-model="open"
+            maxWidth="4/5"
+            overlayWidth="100%"
+            stopClickPropagation="true"
+            onCloseClick="$wire.closeEncounterReferralDrawer()"
+        >
+            <x-slot name="title">Виписати електронне направлення (поза енкаунтером)</x-slot>
+            <div class="px-6 pb-6 pt-2">
 
         <form wire:submit.prevent="validateEncounterReferral" class="space-y-6">
             <fieldset class="fieldset">
@@ -259,6 +255,8 @@
                 >
                     {{ __('forms.cancel') }}
                 </button>
+            </div>
+        </x-dialog-drawer>
             </div>
         </x-dialog-drawer>
     </div>
