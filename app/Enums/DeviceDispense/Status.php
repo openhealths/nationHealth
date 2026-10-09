@@ -12,6 +12,7 @@ enum Status: string
 
     case IN_PROGRESS = 'in_progress';
     case COMPLETED = 'completed';
+    case DECLINED = 'declined';
     case STOPPED = 'stopped';
     case ENTERED_IN_ERROR = 'entered_in_error';
     case UNKNOWN = 'unknown';

@@ -24,14 +24,14 @@ return new class extends Migration
             $table->foreignId('preperson_id')->nullable()->constrained('prepersons');
             $table->foreignId('based_on_id')->nullable()->constrained('identifiers');
             $table->enum('status', Status::values());
-            $table->foreignId('performer_id')->constrained('identifiers');
-            $table->foreignId('location_id')->constrained('identifiers');
-            $table->timestamp('when_handed_over');
+            $table->foreignId('performer_id')->nullable()->constrained('identifiers');
+            $table->foreignId('location_id')->nullable()->constrained('identifiers');
+            $table->timestamp('when_handed_over')->nullable();
             $table->text('note')->nullable();
             $table->foreignId('performer_legal_entity_id')->nullable()->constrained('identifiers');
             $table->foreignId('program_id')->nullable()->constrained('identifiers');
             $table->foreignId('part_of_id')->nullable()->constrained('identifiers');
-            $table->foreignId('encounter_id')->constrained('identifiers');
+            $table->foreignId('encounter_id')->nullable()->constrained('identifiers');
             $table->uuid('context_episode_id')->nullable();
             $table->uuid('origin_episode_id')->nullable();
             $table->foreignId('status_reason_id')->nullable()->constrained('codeable_concepts');

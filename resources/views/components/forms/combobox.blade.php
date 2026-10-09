@@ -105,6 +105,7 @@
          param: '{{ $bindParam }}',
          limit: {{ (int) $limit }}
      })"
+     @reset-comboboxes.window="reset()"
 >
     <input :id="$id('input')"
            :required="{{ $isRequired ?: 'false' }}"
@@ -116,7 +117,7 @@
            aria-describedby="{{ $hasSearchError ? 'hasSearchErrorHelp' : '' }}"
            class="input {{ $hasSearchError  ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
            @focus="open = true"
-           @input="typing = true"
+           @input="typing = true; value = ''"
            @mousedown="open = !open"
            @keydown.escape.window="open = false;"
            @blur="typing = false; setTimeout(() => open = false, 100)"
@@ -218,6 +219,13 @@
                 select(label, index) {
                     this.search = label;
                     this.value = this.options.find((option, currentIndex) => currentIndex === index && option[this.param] === label)[this.valueName];
+                    this.open = false;
+                    this.typing = false;
+                },
+
+                reset() {
+                    this.search = '';
+                    this.value = '';
                     this.open = false;
                     this.typing = false;
                 }

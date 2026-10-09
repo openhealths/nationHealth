@@ -85,6 +85,7 @@ trait HandlesSyncBatch
             'specimen' => 'specimens',
             'detected_issue' => 'detected-issues',
             'device_association' => 'device-associations',
+            'device_dispense' => 'device-dispenses',
             'encounter' => 'encounters',
             'episode' => 'episodes',
             default => 'patients'

@@ -1,10 +1,39 @@
+@use(App\Enums\JobStatus)
+@use(App\Enums\DeviceDispense\Status)
+
 <x-layouts.patient
     :personId="$personId ?? null"
     :prepersonId="$prepersonId ?? null"
     :patientFullName="$patientFullName ?? ''"
     :activeTab="'device-dispenses'"
 >
-    <div class="breadcrumb-form shift-content px-4 pt-4 pb-10" x-data="{ showAdditionalParams: false }">
+<x-slot name="headerActions">
+    @php
+        $isSyncing = $syncStatus === JobStatus::PROCESSING->value;
+        $isRetryable = $syncStatus === JobStatus::PAUSED->value || $syncStatus === JobStatus::FAILED->value;
+    @endphp
+
+    <button
+        @if (!$isSyncing) wire:click="sync" @endif
+        type="button"
+        @if ($isSyncing) disabled @endif
+        class="flex items-center gap-2 whitespace-nowrap px-5 py-2 text-sm shadow-sm transition-colors
+            @if($isSyncing) button-sync-disabled cursor-not-allowed @else button-sync @endif"
+    >
+        @icon('refresh', 'w-4 h-4')
+        <span>{{ $isRetryable ? __('forms.sync_retry') : __('forms.synchronise_with_eHealth') }}</span>
+    </button>
+</x-slot>
+    <div
+        class="breadcrumb-form shift-content px-4 pt-4 pb-10"
+        x-data="{
+            showAdditionalParams: $wire.entangle('showAdditionalParams'),
+            deviceId: $wire.entangle('filterDeviceId'),
+            deviceCode: $wire.entangle('filterDeviceCode'),
+            deviceIdSearch: '',
+            deviceCodeSearch: ''
+        }"
+    >
         <h2 class="mb-6 flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
             @icon('search', 'w-5 h-5')
             <span>{{ __('device-dispenses.search') }}</span>
@@ -12,18 +41,37 @@
 
         <div class="mt-6 w-full">
             <div class="form-row-3 mb-6">
-                <div class="form-group group">
-                    <input type="text" class="input peer" wire:model.defer="filterDeviceId" placeholder=" " />
-                    <label class="label">{{ __('devices.device_id') }}</label>
-                </div>
-                <div class="form-group group">
-                    <input type="text" class="input peer" wire:model.defer="filterEncounterId" placeholder=" " />
-                    <label class="label">{{ __('patients.encounter_id') }}</label>
-                </div>
+                <x-forms.combobox
+                    :options="$devices"
+                    bind="filterDeviceId"
+                    bindValue="uuid"
+                    bindParam="name"
+                    :label="__('devices.device_id')"
+                    x-on:input="deviceIdSearch = $event.target.value"
+                    x-bind:inert="deviceCodeSearch.trim() !== '' || deviceCode !== ''"
+                    x-bind:style="deviceCodeSearch.trim() !== '' || deviceCode !== '' ? 'opacity: 0.5' : ''"
+                />
+
+                <x-forms.combobox
+                    :options="$deviceTypes"
+                    bind="filterDeviceCode"
+                    bindValue="code"
+                    bindParam="name"
+                    :label="__('device-dispenses.type')"
+                    x-on:input="deviceCodeSearch = $event.target.value"
+                    x-bind:inert="deviceIdSearch.trim() !== '' || deviceId !== ''"
+                    x-bind:style="deviceIdSearch.trim() !== '' || deviceId !== '' ? 'opacity: 0.5' : ''"
+                />
+
                 <div class="form-group group">
                     <select class="input-select peer w-full" wire:model.defer="filterStatus">
-                        <option value="">{{ __('forms.status.label') }}</option>
-                        <option value="active">{{ __('forms.status.active') }}</option>
+                        <option value="">
+                            {{ __('forms.select') }} {{ mb_strtolower(__('forms.status.label')) }}
+                        </option>
+
+                        @foreach (Status::cases() as $status)
+                            <option value="{{ $status->value }}">{{ $status->label() }}</option>
+                        @endforeach
                     </select>
                     <label class="label">{{ __('forms.status.label') }}</label>
                 </div>
@@ -42,6 +90,11 @@
                     <button
                         type="button"
                         wire:click="resetFilters"
+                        x-on:click="
+                            deviceIdSearch = '';
+                            deviceCodeSearch = '';
+                            $dispatch('reset-comboboxes');
+                        "
                         class="button-primary-outline-red px-5 py-2.5 text-sm"
                     >
                         {{ __('forms.reset_all_filters') }}
@@ -89,41 +142,55 @@
 
             <div x-show="showAdditionalParams" x-transition x-cloak>
                 <div class="form-row-3 mb-6">
-                    <div class="form-group group">
-                        <input type="text" class="input peer" wire:model.defer="filterEpisodeId" placeholder=" " />
-                        <label class="label">{{ __('episodes.id') }}</label>
-                    </div>
-                    <div class="form-group group">
-                        <input type="text" class="input peer" wire:model.defer="filterOrganization" placeholder=" " />
-                        <label class="label">{{ __('devices.legal_entity') }}</label>
-                    </div>
-                    <div class="form-group group">
-                        <select class="input-select peer w-full" wire:model.defer="filterPractitioner">
-                            <option value="">{{ __('forms.select') }}</option>
-                            <option value="1">Сидоренко І.В.</option>
-                        </select>
-                        <label class="label">{{ __('forms.employee') }}</label>
-                    </div>
+                    <x-forms.combobox
+                        :options="$episodes"
+                        bind="filterEpisodeId"
+                        bindValue="uuid"
+                        bindParam="name"
+                        :label="__('episodes.id')"
+                    />
+
+                    <x-forms.combobox
+                        :options="$organizations"
+                        bind="filterOrganization"
+                        bindValue="uuid"
+                        bindParam="name"
+                        :label="__('devices.legal_entity')"
+                    />
+
+                    <x-forms.combobox
+                        :options="$encounters"
+                        bind="filterEncounterId"
+                        bindValue="uuid"
+                        bindParam="name"
+                        :label="__('patients.encounter_id')"
+                    />
                 </div>
 
                 <div class="form-row-3 mb-6">
-                    <div class="form-group group">
-                        <input type="text" class="input peer" wire:model.defer="filterProcedureId" placeholder=" " />
-                        <label class="label">{{ __('device-dispenses.procedure_id') }}</label>
-                    </div>
-                    <div class="form-group group">
-                        <input type="text" class="input peer" wire:model.defer="filterCarePlanId" placeholder=" " />
-                        <label class="label">{{ __('device-dispenses.care_plan_id') }}</label>
-                    </div>
-                    <div class="form-group group">
-                        <input
-                            type="text"
-                            class="input peer"
-                            wire:model.defer="filterRelatedEpisodeId"
-                            placeholder=" "
-                        />
-                        <label class="label">{{ __('device-dispenses.related_prescription_episode_id') }}</label>
-                    </div>
+                    <x-forms.combobox
+                        :options="$procedures"
+                        bind="filterProcedureId"
+                        bindValue="uuid"
+                        bindParam="name"
+                        :label="__('device-dispenses.procedure_id')"
+                    />
+
+                    <x-forms.combobox
+                        :options="$carePlans"
+                        bind="filterCarePlanId"
+                        bindValue="uuid"
+                        bindParam="name"
+                        :label="__('device-dispenses.care_plan_id')"
+                    />
+
+                    <x-forms.combobox
+                        :options="$relatedEpisodes"
+                        bind="filterRelatedEpisodeId"
+                        bindValue="uuid"
+                        bindParam="name"
+                        :label="__('device-dispenses.related_prescription_episode_id')"
+                    />
                 </div>
 
                 <div class="form-row-3 mb-9">
@@ -136,7 +203,7 @@
                                 rangeText: '',
                             }"
                             x-init="
-                                if (from && to) rangeText = from + ' - ' + to;
+                                if (from && to) rangeText = from + ' — ' + to;
                                 $watch('from', (val) => {
                                     if (! val) {
                                         rangeText = '';
@@ -156,7 +223,7 @@
                             <input
                                 x-model="rangeText"
                                 @change="
-                                    const parts = $event.target.value.split(' - ');
+                                    const parts = $event.target.value.split(' — ');
                                     if (parts.length === 2) {
                                         from = parts[0];
                                         to = parts[1];
@@ -182,7 +249,7 @@
                                 rangeText: '',
                             }"
                             x-init="
-                                if (from && to) rangeText = from + ' - ' + to;
+                                if (from && to) rangeText = from + ' — ' + to;
                                 $watch('from', (val) => {
                                     if (! val) {
                                         rangeText = '';
@@ -202,7 +269,7 @@
                             <input
                                 x-model="rangeText"
                                 @change="
-                                    const parts = $event.target.value.split(' - ');
+                                    const parts = $event.target.value.split(' — ');
                                     if (parts.length === 2) {
                                         from = parts[0];
                                         to = parts[1];
@@ -219,28 +286,56 @@
                             <label class="wrapped-label">{{ __('forms.filter_created_at_range') }}</label>
                         </div>
                     </div>
+
+                    <x-forms.combobox
+                        :options="$practitioners"
+                        bind="filterPractitioner"
+                        bindValue="uuid"
+                        bindParam="name"
+                        :label="__('forms.employee')"
+                    />
                 </div>
             </div>
 
             <div class="space-y-4">
-                @forelse ($dispenses as $dispense)
+                @forelse ($this->paginatedDeviceDispenses as $dispense)
                     <div class="record-inner-card">
                         <div class="record-inner-header">
                             <div class="record-inner-checkbox-col">
                                 <input type="checkbox" class="default-checkbox h-5 w-5" />
                             </div>
 
+                            @php
+                                $deviceId = data_get($dispense, 'details.0.device.identifier.value');
+                                $deviceName = data_get($dispense, 'details.0.device.displayValue');
+                                $deviceCode = data_get($dispense, 'details.0.deviceCode.coding.0.code');
+
+                                if (!$deviceName && $deviceCode) {
+                                    $deviceName = data_get(
+                                        $this->dictionaries,
+                                        'device_definition_classification_type.' . $deviceCode
+                                    );
+                                }
+
+                                $deviceLabel = $deviceId ? __('device-dispenses.medical_device') : __('device-dispenses.type');
+                            @endphp
+
                             <div class="record-inner-column flex-1">
-                                <div class="record-inner-label">{{ __('device-dispenses.medical_device') }}</div>
+                                <div class="record-inner-label">{{ $deviceLabel }}</div>
+
                                 <div class="record-inner-value text-[16px] font-bold text-gray-900 dark:text-gray-100">
-                                    {{ $dispense['name'] }}
+                                    {{ $deviceName ?: '-' }}
                                 </div>
                             </div>
 
                             <div class="record-inner-column-bordered w-full shrink-0 md:w-36">
                                 <div class="record-inner-label">{{ __('forms.status.label') }}</div>
                                 <div>
-                                    <span class="badge-green"> {{ $dispense['status'] }} </span>
+                                    @php
+                                        $status = Status::tryFrom(data_get($dispense, 'status'));
+                                    @endphp
+
+                                    <span class="badge-green">{{ $status?->label() ?? '-' }}</span>
                                 </div>
                             </div>
 
@@ -286,13 +381,17 @@
                                         :id="$id('dropdown-button')"
                                         class="absolute right-0 z-50 mt-2 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-700"
                                     >
-                                        <a
-                                            href="javascript:void(0)"
-                                            class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                        <button
+                                            type="button"
+                                            @click="close($refs.button)"
+                                            wire:click="openDeviceDispenseView('{{ data_get($dispense, 'uuid') }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="openDeviceDispenseView"
+                                            class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
                                         >
                                             @icon('eye', 'w-5 h-5 text-gray-500')
                                             {{ __('forms.view_details') }}
-                                        </a>
+                                        </button>
 
                                         <button
                                             type="button"
@@ -316,7 +415,7 @@
                                                 {{ __('device-dispenses.date_and_time') }}
                                             </div>
                                             <div class="record-inner-value font-semibold">
-                                                {{ $dispense['dispense_date'] }}
+                                                {{ data_get($dispense, 'whenHandedOver') ?: '-' }}
                                             </div>
                                         </div>
                                         <div class="min-w-0">
@@ -324,7 +423,7 @@
                                                 {{ __('devices.legal_entity') }}
                                             </div>
                                             <div class="record-inner-value font-semibold">
-                                                {{ $dispense['organization'] }}
+                                                {{ data_get($dispense, 'performerLegalEntity.displayValue') ?: '-' }}
                                             </div>
                                         </div>
                                     </div>
@@ -334,7 +433,7 @@
                                                 {{ __('device-dispenses.procedure_id') }}
                                             </div>
                                             <div class="record-inner-value font-semibold">
-                                                {{ $dispense['procedure_id'] }}
+                                                {{ data_get($dispense, 'procedureId') ?: '-' }}
                                             </div>
                                         </div>
                                         <div class="min-w-0">
@@ -342,7 +441,7 @@
                                                 {{ __('forms.employee') }}
                                             </div>
                                             <div class="record-inner-value font-semibold">
-                                                {{ $dispense['practitioner'] }}
+                                                {{ data_get($dispense, 'performer.displayValue') ?: '-' }}
                                             </div>
                                         </div>
                                     </div>
@@ -352,7 +451,7 @@
                                                 {{ __('device-dispenses.care_plan_id') }}
                                             </div>
                                             <div class="record-inner-value font-semibold">
-                                                {{ $dispense['care_plan_id'] }}
+                                                {{ data_get($dispense, 'carePlanId') ?: '-' }}
                                             </div>
                                         </div>
                                         <div class="min-w-0">
@@ -360,7 +459,7 @@
                                                 {{ __('devices.record_creation_date') }}
                                             </div>
                                             <div class="record-inner-value font-semibold">
-                                                {{ $dispense['created_at'] }}
+                                                {{ data_get($dispense, 'createdAt') ? optional(\Carbon\Carbon::make(data_get($dispense, 'createdAt')))->format(config('app.date_format')) : '-' }}
                                             </div>
                                         </div>
                                     </div>
@@ -370,7 +469,7 @@
                                                 {{ __('device-dispenses.related_prescription_episode') }}
                                             </div>
                                             <div class="record-inner-value font-semibold">
-                                                {{ $dispense['related_episode_id'] }}
+                                                {{ data_get($dispense, 'originEpisodeId') ?: '-' }}
                                             </div>
                                         </div>
                                     </div>
@@ -382,17 +481,17 @@
                                     <div class="record-inner-label text-[10px] uppercase">
                                         {{ __('device-dispenses.id') }}
                                     </div>
-                                    <div class="record-inner-id-value">{{ $dispense['dispense_id'] }}</div>
+                                    <div class="record-inner-id-value">{{ data_get($dispense, 'uuid') ?: '-' }}</div>
                                 </div>
                                 <div class="min-w-0">
                                     <div class="record-inner-label text-[10px] uppercase">
                                         {{ __('patients.encounter_id') }}
                                     </div>
-                                    <div class="record-inner-id-value">{{ $dispense['encounter_id'] }}</div>
+                                    <div class="record-inner-id-value">{{ data_get($dispense, 'encounterId') ?: '-' }}</div>
                                 </div>
                                 <div class="min-w-0">
                                     <div class="record-inner-label text-[10px] uppercase">{{ __('episodes.id') }}</div>
-                                    <div class="record-inner-id-value">{{ $dispense['episode_id'] }}</div>
+                                    <div class="record-inner-id-value">{{ data_get($dispense, 'contextEpisodeId') ?: '-' }}</div>
                                 </div>
                             </div>
                         </div>
@@ -401,6 +500,8 @@
                     <x-nothing-found :description="null" />
                 @endforelse
             </div>
+
+            <div class="mt-8">{{ $this->paginatedDeviceDispenses->links() }}</div>
         </div>
     </div>
 </x-layouts.patient>

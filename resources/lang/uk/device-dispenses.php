@@ -21,6 +21,16 @@ return [
     'device_type' => 'Тип медичного виробу',
     'select_device_type_or_model_first' => 'Спочатку оберіть тип або конкретну модель медичного виробу',
     'device_model' => 'Модель медичного виробу',
+    'medical_device_id' => 'ID медичного виробу',
+    'dispense_details' => 'Деталі видачі',
+    'program' => 'Програма',
+    'quantity' => 'Кількість',
+    'quantity_unit' => 'Одиниця вимірювання',
+    'sell_price' => 'Ціна продажу',
+    'reimbursement_amount' => 'Сума відшкодування',
+    'discount_amount' => 'Сума знижки',
+    'status_reason' => 'Причина зміни статусу',
+    'explanatory_letter' => 'Обґрунтування',
     'additional_information' => 'Додаткова інформація',
     'supporting_info' => 'Додаткова медична інформація',
     'note' => 'Нотатка',
@@ -39,11 +49,20 @@ return [
     'status' => [
         'in_progress' => 'В роботі',
         'completed' => 'Завершено',
+        'declined' => 'Відхилено',
         'stopped' => 'Зупинено',
         'entered_in_error' => 'Введено з помилкою',
         'unknown' => 'Невідомо',
         'preparation' => 'Підготовка',
         'canceled' => 'Скасовано'
+    ],
+    'messages' => [
+        'not_found_in_db' => 'Видачу медичного виробу не знайдено в локальній базі даних.',
+        'synced_successfully' => 'Видачі медичних виробів успішно синхронізовані.',
+        'first_page_synced_successfully' => 'Перша сторінка видач медичних виробів синхронізована, решта обробляється у фоні.',
+        'sync_already_running' => 'Синхронізація видач медичних виробів вже запущена. Будь ласка, зачекайте її завершення.',
+        'sync_resume_started' => 'Відновлення попередньої синхронізації видач медичних виробів розпочато.',
+        'sync_background_dispatch_error' => 'Помилка запуску фонової синхронізації видач медичних виробів.'
     ],
     'validation' => [
         'device_request_not_available' => 'Обране призначення недоступне для видачі у взаємодії (має бути active, intent=order і без медичної програми).',

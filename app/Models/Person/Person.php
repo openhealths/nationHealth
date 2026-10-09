@@ -13,6 +13,7 @@ use App\Models\MedicalEvents\Sql\DetectedIssue;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\DeviceAssociation;
+use App\Models\MedicalEvents\Sql\DeviceDispense;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\Specimen;
@@ -87,6 +88,11 @@ class Person extends BasePerson
     public function mergedPersons(): HasMany
     {
         return $this->hasMany(MergedPerson::class);
+    }
+
+    public function deviceDispenses(): HasMany
+    {
+        return $this->hasMany(DeviceDispense::class);
     }
 
     public function declarations(): HasMany

@@ -111,6 +111,7 @@ return [
         'specimen' => 50,
         'detected_issue' => 50,
         'device_association' => 50,
+        'device_dispense' => 50,
         'employee_role' => 50,
         'party_request' => 30,
         'declaration' => [

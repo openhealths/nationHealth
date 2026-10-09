@@ -10,6 +10,7 @@ use App\Enums\Preperson\Status;
 use App\Models\MedicalEvents\Sql\DetectedIssue;
 use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\DeviceAssociation;
+use App\Models\MedicalEvents\Sql\DeviceDispense;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\Specimen;
@@ -128,6 +129,16 @@ class Preperson extends Model
     public function deviceAssociations(): HasMany
     {
         return $this->hasMany(DeviceAssociation::class);
+    }
+
+    /**
+     * Device dispenses recorded for this preperson.
+     *
+     * @return HasMany
+     */
+    public function deviceDispenses(): HasMany
+    {
+        return $this->hasMany(DeviceDispense::class);
     }
 
     /**

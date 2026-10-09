@@ -8,6 +8,7 @@ use App\Jobs\ClinicalImpressionSync;
 use App\Jobs\ConditionSync;
 use App\Jobs\DetectedIssueSync;
 use App\Jobs\DeviceAssociationSync;
+use App\Jobs\DeviceDispenseSync;
 use App\Jobs\DeviceSync;
 use App\Jobs\DiagnosticReportSync;
 use App\Jobs\EmployeeRoleSync;
@@ -193,6 +194,12 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for(
             'ehealth-device-association-get',
             static fn (DeviceAssociationSync $job) => Limit::perMinute(config('ehealth.rate_limit.device_association'))
+                ->by($job->user->id)
+        );
+
+        RateLimiter::for(
+            'ehealth-device-dispense-get',
+            static fn (DeviceDispenseSync $job) => Limit::perMinute(config('ehealth.rate_limit.device_dispense'))
                 ->by($job->user->id)
         );
 

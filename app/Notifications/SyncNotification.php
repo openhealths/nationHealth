@@ -42,7 +42,8 @@ class SyncNotification extends Notification
         'device' => 'Синхронізація медичних виробів',
         'specimen' => 'Синхронізація зразків біоматеріалу',
         'detected_issue' => 'Синхронізація виявлених проблем медичних виробів',
-        'device_association' => "Синхронізація зв'язків медичних виробів з пацієнтом"
+        'device_association' => "Синхронізація зв'язків медичних виробів з пацієнтом",
+        'device_dispense' => 'Синхронізація видач медичних виробів'
     ];
 
     /** @var array Sync action statuses mapping with Ukrainian descriptions */

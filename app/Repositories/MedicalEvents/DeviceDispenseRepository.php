@@ -8,6 +8,7 @@ use App\Models\MedicalEvents\Sql\DeviceDispense;
 use App\Models\MedicalEvents\Sql\Quantity;
 use App\Models\Person\Person;
 use App\Models\Preperson;
+use App\Services\MedicalEvents\FhirResource;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -35,9 +36,11 @@ class DeviceDispenseRepository extends BaseRepository
                     : null;
                 $performer = $this->storeIdentifier($datum['performer']);
                 $location = $this->storeIdentifier($datum['location']);
-                $performerLegalEntity = isset($datum['performerLegalEntity'])
-                    ? $this->storeIdentifier($datum['performerLegalEntity'])
-                    : null;
+                $performerLegalEntityData = FhirResource::make()
+                    ->coding('eHealth/resources', 'legal_entity')
+                    ->toIdentifier(legalEntity()->uuid);
+                $performerLegalEntityData['displayValue'] = legalEntity()->name;
+                $performerLegalEntity = $this->storeIdentifier($performerLegalEntityData);
                 $program = isset($datum['program'])
                     ? $this->storeIdentifier($datum['program'])
                     : null;
@@ -136,8 +139,8 @@ class DeviceDispenseRepository extends BaseRepository
                 $basedOn = isset($data['based_on'])
                     ? $this->syncIdentifier($existing, $data['based_on'], 'basedOn')
                     : null;
-                $performer = $this->syncIdentifier($existing, $data['performer'], 'performer');
-                $location = $this->syncIdentifier($existing, $data['location'], 'location');
+                $performer = $this->syncIdentifier($existing, $data['performer'] ?? null, 'performer');
+                $location = $this->syncIdentifier($existing, $data['location'] ?? null, 'location');
                 $performerLegalEntity = isset($data['performer_legal_entity'])
                     ? $this->syncIdentifier($existing, $data['performer_legal_entity'], 'performerLegalEntity')
                     : null;
@@ -147,7 +150,7 @@ class DeviceDispenseRepository extends BaseRepository
                 $partOf = isset($data['part_of'])
                     ? $this->syncIdentifier($existing, $data['part_of'], 'partOf')
                     : null;
-                $encounter = $this->syncIdentifier($existing, $data['encounter'], 'encounter');
+                $encounter = $this->syncIdentifier($existing, $data['encounter'] ?? null, 'encounter');
                 $statusReason = isset($data['status_reason'])
                     ? $this->syncCodeableConcept($existing, $data['status_reason'], 'statusReason')
                     : null;
@@ -156,14 +159,14 @@ class DeviceDispenseRepository extends BaseRepository
                     $ownerColumn => $ownerId,
                     'based_on_id' => $basedOn?->id,
                     'status' => $data['status'],
-                    'performer_id' => $performer->id,
-                    'location_id' => $location->id,
-                    'when_handed_over' => $data['when_handed_over'],
+                    'performer_id' => $performer?->id,
+                    'location_id' => $location?->id,
+                    'when_handed_over' => $data['when_handed_over'] ?? null,
                     'note' => $data['note'] ?? null,
                     'performer_legal_entity_id' => $performerLegalEntity?->id,
                     'program_id' => $program?->id,
                     'part_of_id' => $partOf?->id,
-                    'encounter_id' => $encounter->id,
+                    'encounter_id' => $encounter?->id,
                     'context_episode_id' => $data['context_episode_id'] ?? null,
                     'origin_episode_id' => $data['origin_episode_id'] ?? null,
                     'status_reason_id' => $statusReason?->id,
