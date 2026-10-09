@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan\Forms;
 
+use Carbon\CarbonImmutable;
 use Livewire\Form;
 
 class CarePlanForm extends Form
@@ -43,8 +44,8 @@ class CarePlanForm extends Form
             'category' => 'required|string',
             'context' => 'nullable|string',
             'title' => 'required|string',
-            'periodStart' => 'required|string',
-            'periodEnd' => 'nullable|string',
+            'periodStart' => 'required|date_format:'.config('app.date_format'),
+            'periodEnd' => 'nullable|date_format:'.config('app.date_format').'|after_or_equal:periodStart',
             'encounter' => 'nullable|string',
             'description' => 'nullable|string',
             'note' => 'nullable|string',
@@ -67,6 +68,18 @@ class CarePlanForm extends Form
         ]);
     }
 
+    public function periodStartIsoDate(): string
+    {
+        return CarbonImmutable::createFromFormat('!'.config('app.date_format'), $this->periodStart)->format('Y-m-d');
+    }
+
+    public function periodEndIsoDate(): ?string
+    {
+        return $this->periodEnd !== ''
+            ? CarbonImmutable::createFromFormat('!'.config('app.date_format'), $this->periodEnd)->format('Y-m-d')
+            : null;
+    }
+
     /**
      * Localized attribute names for validation errors.
      */
@@ -86,6 +99,16 @@ class CarePlanForm extends Form
             'knedp' => __('forms.knedp') ?? 'КНЕДП',
             'keyContainerUpload' => __('forms.key_container') ?? 'Ключ-контейнер',
             'password' => __('forms.password'),
+        ];
+    }
+
+    /**
+     * Custom validation messages.
+     */
+    public function messages(): array
+    {
+        return [
+            'periodEnd.after_or_equal' => __('care-plan.period_end_before_start'),
         ];
     }
 }

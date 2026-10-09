@@ -89,6 +89,7 @@ trait ManagesEncounterEPrescription
         $this->encounterEPrescriptionSearchResults = [];
         $this->encounterEPrescriptionSelectedMedication = null;
         $this->encounterEPrescriptionWarningMessage = '';
+        $this->resetEncounterEPrescriptionValidation();
         $this->showEncounterEPrescriptionDrawer = true;
     }
 
@@ -96,6 +97,24 @@ trait ManagesEncounterEPrescription
     {
         $this->showEncounterEPrescriptionDrawer = false;
         $this->encounterEPrescriptionWarningMessage = '';
+        $this->resetEncounterEPrescriptionValidation();
+    }
+
+    public function updatedEncounterEPrescriptionForm(mixed $value, ?string $key): void
+    {
+        if ($key !== null) {
+            $this->resetValidation('encounterEPrescriptionForm.'.$key);
+        }
+        $this->encounterEPrescriptionWarningMessage = '';
+    }
+
+    private function resetEncounterEPrescriptionValidation(): void
+    {
+        foreach ($this->getErrorBag()->keys() as $key) {
+            if (str_starts_with($key, 'encounterEPrescriptionForm.')) {
+                $this->resetValidation($key);
+            }
+        }
     }
 
     public function searchEncounterEPrescriptionMedications(): void
@@ -166,6 +185,7 @@ trait ManagesEncounterEPrescription
         }
 
         $this->encounterEPrescriptionForm['medication_id'] = $medicationId;
+        $this->resetValidation('encounterEPrescriptionForm.medication_id');
         $this->encounterEPrescriptionSelectedMedication = $selectedMedication;
         if (($selectedMedication['innm_dosage_form'] ?? '') !== '') {
             $this->encounterEPrescriptionForm['medication_unit'] = (string) $selectedMedication['innm_dosage_form'];
@@ -174,6 +194,7 @@ trait ManagesEncounterEPrescription
         $packageStep = $this->resolveEncounterMedicationPackageStep($selectedMedication);
         if ($packageStep > 0) {
             $this->encounterEPrescriptionForm['medication_qty'] = (string) $packageStep;
+            $this->resetValidation('encounterEPrescriptionForm.medication_qty');
         }
 
         // Hide the result list after pick — selected row styling was unreadable in dark mode

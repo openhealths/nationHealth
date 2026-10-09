@@ -27,6 +27,9 @@ return new class extends Migration
                 $table->string('request_number')->nullable(); // Requisition code
                 $table->timestamp('started_at')->nullable();
                 $table->timestamp('ended_at')->nullable();
+                $table->foreignId('performer_id')->nullable()->constrained('identifiers');
+                $table->foreignId('location_reference_id')->nullable()->constrained('identifiers');
+                $table->foreignId('performer_type_id')->nullable()->constrained('codeable_concepts');
                 $table->string('service_id'); // Service code or concept
                 $table->decimal('quantity', 15, 2)->default(1);
                 $table->string('program_id')->nullable();

@@ -8,7 +8,10 @@ use App\Enums\Person\EncounterStatus;
 use App\Livewire\Encounter\Concerns\ManagesEncounterEPrescription;
 use App\Livewire\Encounter\Concerns\ManagesEncounterReferrals;
 use App\Livewire\Encounter\Concerns\ResolvesEncounterStandaloneContext;
+use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\EncounterHospitalization;
+use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
@@ -54,11 +57,50 @@ class EncounterStandalonePhase6Test extends TestCase
 
         $encounter = $this->createEncounter(EncounterStatus::FINISHED->value);
         $harness = $this->makeHarness($encounter->id);
+        $harness->addError('encounterEPrescriptionForm.medication_id', 'Old medication error');
+        $harness->addError('encounterReferralForm.service_id', 'Unrelated referral error');
 
         $harness->openEncounterEPrescriptionDrawer();
 
         $this->assertTrue($harness->showEncounterEPrescriptionDrawer);
         $this->assertSame('1', $harness->encounterEPrescriptionForm['medication_qty']);
+        $this->assertFalse($harness->getErrorBag()->has('encounterEPrescriptionForm.medication_id'));
+        $this->assertTrue($harness->getErrorBag()->has('encounterReferralForm.service_id'));
+    }
+
+    public function test_eprescription_validation_errors_clear_only_for_the_updated_field(): void
+    {
+        $harness = new EncounterStandaloneHarness();
+        $harness->addError('encounterEPrescriptionForm.signature_text', 'Required');
+        $harness->addError('encounterEPrescriptionForm.medication_id', 'Required');
+        $harness->encounterEPrescriptionWarningMessage = 'Old warning';
+
+        $harness->updatedEncounterEPrescriptionForm('Take daily', 'signature_text');
+
+        $this->assertFalse($harness->getErrorBag()->has('encounterEPrescriptionForm.signature_text'));
+        $this->assertTrue($harness->getErrorBag()->has('encounterEPrescriptionForm.medication_id'));
+        $this->assertSame('', $harness->encounterEPrescriptionWarningMessage);
+    }
+
+    public function test_eprescription_closing_and_medication_selection_clear_stale_errors(): void
+    {
+        $harness = new EncounterStandaloneHarness();
+        $medicationId = (string) Str::uuid();
+        $harness->encounterEPrescriptionSearchResults = [[
+            'id' => $medicationId, 'packages' => [['package_min_qty' => 10]],
+        ]];
+        $harness->addError('encounterEPrescriptionForm.medication_id', 'Required');
+        $harness->addError('encounterEPrescriptionForm.medication_qty', 'Invalid');
+        $harness->addError('encounterEPrescriptionForm.signature_text', 'Required');
+        $harness->addError('encounterReferralForm.service_id', 'Required');
+
+        $harness->selectEncounterEPrescriptionMedication($medicationId);
+
+        $this->assertFalse($harness->getErrorBag()->has('encounterEPrescriptionForm.medication_id'));
+        $this->assertFalse($harness->getErrorBag()->has('encounterEPrescriptionForm.medication_qty'));
+        $this->assertTrue($harness->getErrorBag()->has('encounterEPrescriptionForm.signature_text'));
+        $harness->closeEncounterEPrescriptionDrawer();
+        $this->assertSame(['encounterReferralForm.service_id'], $harness->getErrorBag()->keys());
     }
 
     public function test_referral_drawer_opens_for_finished_encounter(): void
@@ -123,6 +165,146 @@ class EncounterStandalonePhase6Test extends TestCase
 
         $this->assertSame($serviceId, $harness->encounterReferralForm['service_id']);
         $this->assertSame('diagnostic_procedure', $harness->encounterReferralForm['category']);
+    }
+
+    public function test_transfer_discharge_defaults_category_and_performer(): void
+    {
+        $destination = (string) Str::uuid();
+        $divisionId = (string) Str::uuid();
+        $this->mockDestinationDivisions([[
+            'id' => $divisionId,
+            'legal_entity_id' => $destination,
+            'name' => 'Приймальне відділення',
+            'type' => 'CLINIC',
+            'status' => 'ACTIVE',
+        ]]);
+
+        $encounter = $this->createTransferEncounter($destination);
+        $harness = $this->makeHarness($encounter->id);
+        $harness->openEncounterReferralDrawer();
+
+        $this->assertTrue($harness->showEncounterReferralDrawer);
+        $this->assertTrue($harness->encounterReferralIsTransfer);
+        $this->assertSame('transfer_of_care', $harness->encounterReferralForm['category']);
+        $this->assertSame($destination, $harness->encounterReferralForm['performer']);
+        $this->assertSame([$divisionId], $harness->encounterReferralAllowedDivisionIds);
+
+        $serviceId = (string) Str::uuid();
+        $harness->encounterReferralServiceResults = [[
+            'id' => $serviceId,
+            'code' => '37003-00',
+            'name' => 'Обстеження',
+            'category' => 'diagnostic_procedure',
+        ]];
+        $harness->selectEncounterReferralService($serviceId);
+
+        $this->assertSame('transfer_of_care', $harness->encounterReferralForm['category']);
+    }
+
+    public function test_transfer_selection_clears_service_and_category_errors_without_losing_transfer(): void
+    {
+        $destination = (string) Str::uuid();
+        $this->mockDestinationDivisions([]);
+        $harness = $this->makeHarness($this->createTransferEncounter($destination)->id);
+        $harness->openEncounterReferralDrawer();
+        $service = ['id' => (string) Str::uuid(), 'category' => 'diagnostic_procedure'];
+        $harness->addError('encounterReferralForm.service_id', 'Required');
+        $harness->addError('encounterReferralForm.category', 'Required');
+        $harness->addError('encounterReferralForm.quantity', 'Required');
+        $harness->encounterReferralServiceResults = [$service];
+        $harness->selectEncounterReferralService($service['id']);
+
+        $this->assertSame('transfer_of_care', $harness->encounterReferralForm['category']);
+        $this->assertSame(['encounterReferralForm.quantity'], $harness->getErrorBag()->keys());
+        $this->assertSame([], $harness->encounterReferralServiceResults);
+        $harness->addError('encounterReferralForm.service_id', 'Required');
+        $harness->addError('encounterReferralForm.category', 'Required');
+        $harness->selectEncounterReferralServiceFromCatalog($service);
+        $this->assertSame('transfer_of_care', $harness->encounterReferralForm['category']);
+        $this->assertSame(['encounterReferralForm.quantity'], $harness->getErrorBag()->keys());
+    }
+
+    public function test_transfer_submission_rechecks_divisions_and_rejects_stale_or_forged_selection(): void
+    {
+        $destination = (string) Str::uuid();
+        $division = (string) Str::uuid();
+        $this->mockDestinationDivisions([
+            ['id' => $division, 'legal_entity_id' => (string) Str::uuid(), 'status' => 'ACTIVE', 'type' => 'CLINIC'],
+            ['id' => (string) Str::uuid(), 'legal_entity_id' => $destination, 'status' => 'INACTIVE', 'type' => 'CLINIC'],
+        ]);
+        $harness = $this->makeHarness($this->createTransferEncounter($destination)->id);
+        $harness->openEncounterReferralDrawer();
+        $harness->encounterReferralAllowedDivisionIds = [$division];
+        $harness->encounterReferralForm['location_reference'] = $division;
+        $harness->encounterReferralForm['service_id'] = (string) Str::uuid();
+        $harness->validateEncounterReferral();
+
+        $this->assertSame([], $harness->encounterReferralAllowedDivisionIds);
+        $this->assertNull($harness->encounterReferralRequestIdToSign);
+        $this->assertNotEmpty($harness->encounterReferralWarningMessage);
+    }
+
+    public function test_transfer_divisions_include_later_pages_and_exclude_inactive_or_foreign_rows(): void
+    {
+        $destination = (string) Str::uuid();
+        $division = (string) Str::uuid();
+        $api = \Mockery::mock(\App\Classes\eHealth\Api\Division::class);
+        foreach ([1 => [], 2 => [
+            ['id' => $division, 'legal_entity_id' => $destination, 'status' => 'ACTIVE', 'type' => 'CLINIC'],
+            ['id' => (string) Str::uuid(), 'legal_entity_id' => $destination, 'status' => 'ACTIVE', 'type' => 'CLINIC', 'is_active' => false],
+            ['id' => (string) Str::uuid(), 'legal_entity_id' => (string) Str::uuid(), 'status' => 'ACTIVE', 'type' => 'CLINIC'],
+            ['id' => (string) Str::uuid(), 'legal_entity_id' => $destination, 'status' => 'ACTIVE', 'type' => 'INVALID'],
+        ]] as $page => $rows) {
+            $response = new \App\Classes\eHealth\EHealthResponse(new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+                'data' => $rows,
+                'paging' => ['page_number' => $page, 'total_pages' => 2],
+            ])));
+            $api->shouldReceive('search')->once()->with($destination, $page)->andReturn($response);
+        }
+        $this->instance(\App\Classes\eHealth\Api\Division::class, $api);
+        $harness = $this->makeHarness($this->createTransferEncounter($destination)->id);
+        $harness->openEncounterReferralDrawer();
+
+        $this->assertSame([$division], $harness->encounterReferralAllowedDivisionIds);
+        $this->assertSame([$division], array_column($harness->encounterReferralDivisions, 'id'));
+    }
+
+    public function test_transfer_of_care_is_rejected_without_transfer_general(): void
+    {
+        $encounter = $this->createEncounter(EncounterStatus::FINISHED->value);
+        $harness = $this->makeHarness($encounter->id);
+        $harness->openEncounterReferralDrawer();
+        $harness->encounterReferralForm['category'] = 'transfer_of_care';
+        $harness->encounterReferralForm['service_id'] = (string) Str::uuid();
+
+        $harness->validateEncounterReferral();
+
+        $this->assertNull($harness->encounterReferralRequestIdToSign);
+        $this->assertTrue($harness->showEncounterReferralDrawer);
+        $this->assertSame(
+            __('Електронне направлення на переведення можна створити лише для завершеної виписки з результатом «Переведено в інший ЗОЗ».'),
+            $harness->encounterReferralWarningMessage
+        );
+    }
+
+    public function test_transfer_draft_is_not_created_without_a_destination_division(): void
+    {
+        $destination = (string) Str::uuid();
+        $this->mockDestinationDivisions([]);
+
+        $encounter = $this->createTransferEncounter($destination);
+        $harness = $this->makeHarness($encounter->id);
+        $harness->openEncounterReferralDrawer();
+        $harness->encounterReferralForm['service_id'] = (string) Str::uuid();
+
+        $harness->validateEncounterReferral();
+
+        $this->assertNull($harness->encounterReferralRequestIdToSign);
+        $this->assertTrue($harness->showEncounterReferralDrawer);
+        $this->assertSame(
+            __('Немає активного підрозділу закладу, до якого переводять пацієнта.'),
+            $harness->encounterReferralWarningMessage
+        );
     }
 
     public function test_legacy_drafts_without_context_show_an_error_and_remain_unchanged(): void
@@ -193,12 +375,58 @@ class EncounterStandalonePhase6Test extends TestCase
             'ehealth_inserted_at' => now(),
         ]);
     }
+
+    private function createTransferEncounter(string $destinationUuid): Encounter
+    {
+        $classId = Coding::create([
+            'code' => 'INPATIENT',
+            'system' => 'eHealth/encounter_classes',
+        ])->id;
+        $identifierId = Identifier::create(['value' => (string) Str::uuid()])->id;
+        $ccId = \App\Models\MedicalEvents\Sql\CodeableConcept::create()->id;
+        $destinationId = Identifier::create(['value' => $destinationUuid])->id;
+        $dispositionId = Coding::create([
+            'code' => 'transfer_general',
+            'system' => 'eHealth/encounter_discharge_disposition',
+        ])->id;
+
+        $encounter = Encounter::create([
+            'uuid' => (string) Str::uuid(),
+            'person_id' => $this->person->id,
+            'status' => EncounterStatus::FINISHED->value,
+            'episode_id' => $identifierId,
+            'class_id' => $classId,
+            'type_id' => $ccId,
+            'ehealth_inserted_at' => now(),
+        ]);
+
+        EncounterHospitalization::create([
+            'encounter_id' => $encounter->id,
+            'destination_id' => $destinationId,
+            'discharge_disposition_id' => $dispositionId,
+        ]);
+
+        return $encounter;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function mockDestinationDivisions(array $rows): void
+    {
+        $psr = new \GuzzleHttp\Psr7\Response(200, ['Content-Type' => 'application/json'], json_encode(['data' => $rows]));
+        $response = new \App\Classes\eHealth\EHealthResponse(new \Illuminate\Http\Client\Response($psr));
+
+        $api = \Mockery::mock(\App\Classes\eHealth\Api\Division::class);
+        $api->shouldReceive('search')->andReturn($response);
+        $this->instance(\App\Classes\eHealth\Api\Division::class, $api);
+    }
 }
 
 /**
  * Lightweight host for encounter standalone traits (avoids full EncounterEdit mount).
  */
-class EncounterStandaloneHarness
+class EncounterStandaloneHarness extends \Livewire\Component
 {
     use ResolvesEncounterStandaloneContext;
     use ManagesEncounterEPrescription;
@@ -213,7 +441,7 @@ class EncounterStandaloneHarness
     /** @var list<array{0: string, 1: mixed}> */
     public array $dispatched = [];
 
-    public function dispatch(string $event, mixed ...$params): Event
+    public function dispatch($event, ...$params): Event
     {
         $this->dispatched[] = [$event, $params[0] ?? null];
 

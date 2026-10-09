@@ -116,6 +116,87 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
         ]);
     }
 
+    public function test_transfer_draft_round_trips_fhir_references_through_storage_and_signing(): void
+    {
+        $lifecycle = app(ReferralRequestLifecycleService::class);
+        $performer = (string) Str::uuid();
+        $division = (string) Str::uuid();
+        $prequalifyResponse = Mockery::mock(EHealthResponse::class);
+        $prequalifyResponse->shouldReceive('getData')->andReturn(['data' => [['status' => 'VALID']]]);
+        $this->mock(PatientServiceRequest::class, function ($mock) use ($performer, $division, $prequalifyResponse): void {
+            $mock->shouldReceive('prequalify')->once()->withArgs(function (string $personUuid, array $payload) use ($performer, $division): bool {
+                $this->assertSame($this->person->uuid, $personUuid);
+                $this->assertSame([], $payload['programs']);
+                $this->assertSame($performer, data_get($payload, 'service_request.performer.identifier.value'));
+                $this->assertSame($division, data_get($payload, 'service_request.location_reference.identifier.value'));
+
+                return true;
+            })->andReturn($prequalifyResponse);
+        });
+        $context = $lifecycle->resolveEncounterEmployeeContext($this->encounter, $this->employee->id);
+        $uuid = $lifecycle->createEncounterDraft($this->encounter, [
+            'service_id' => (string) Str::uuid(),
+            'category' => 'transfer_of_care',
+            'performer' => $performer,
+            'location_reference' => $division,
+            'performer_type' => 'THERAPIST',
+        ], 1, $context);
+        $record = ServiceRequestRequest::where('uuid', $uuid)->firstOrFail();
+
+        $this->assertSame($performer, $record->performer->value);
+        $this->assertSame('legal_entity', data_get($record->performer->identifier, 'type.coding.0.code'));
+        $this->assertSame('eHealth/resources', data_get($record->performer->identifier, 'type.coding.0.system'));
+        $this->assertSame($division, $record->locationReference->value);
+        $this->assertSame('division', data_get($record->locationReference->identifier, 'type.coding.0.code'));
+        $this->assertSame('THERAPIST', $record->performerType->coding->first()->code);
+        $this->assertSame('SPECIALITY_TYPE', $record->performerType->coding->first()->system);
+
+        $data = $lifecycle->buildSignDbData($record, null, $this->encounter, $context);
+        $payload = (new \App\Services\MedicalEvents\Mappers\ServiceRequestMapper())->toCreateSignedContent($data, [
+            'person_uuid' => $this->person->uuid,
+            'encounter_uuid' => $this->encounter->uuid,
+            'employee_uuid' => $this->employee->uuid,
+            'legal_entity_uuid' => $this->legalEntity->uuid,
+        ]);
+        $this->assertSame($performer, data_get($payload, 'performer.identifier.value'));
+        $this->assertSame($division, data_get($payload, 'location_reference.identifier.value'));
+        $this->assertSame('THERAPIST', data_get($payload, 'performer_type.coding.0.code'));
+
+        $ids = [$record->performerId, $record->locationReferenceId, $record->performerTypeId];
+        $repository = \App\Repositories\MedicalEvents\Repository::serviceRequest();
+        $repository->store($data + ['status' => 'active'], $this->person->id);
+        $record = $record->fresh();
+        $this->assertSame($ids, [$record->performerId, $record->locationReferenceId, $record->performerTypeId]);
+
+        unset($data['performer'], $data['location_reference'], $data['performer_type']);
+        $repository->store($data + ['status' => 'active'], $this->person->id);
+        $record = $record->fresh();
+        $this->assertSame($ids, [$record->performerId, $record->locationReferenceId, $record->performerTypeId]);
+
+        $repository->store($data + ['status' => 'active', 'performer' => null, 'location_reference' => null, 'performer_type' => null], $this->person->id);
+        $record = $record->fresh();
+        $this->assertNull($record->performerId);
+        $this->assertNull($record->locationReferenceId);
+        $this->assertNull($record->performerTypeId);
+    }
+
+    public function test_transfer_schema_supports_install_upgrade_idempotence_and_rollback(): void
+    {
+        $migration = require database_path('migrations/update/0_1/2026_10_01_142000_add_transfer_fields_to_service_request_requests_table.php');
+        $columns = ['performer_id', 'location_reference_id', 'performer_type_id'];
+        $schema = \Illuminate\Support\Facades\Schema::getFacadeRoot();
+        $this->assertTrue($schema->hasColumns('service_request_requests', $columns));
+        $migration->up();
+        $migration->down();
+        foreach ($columns as $column) {
+            $this->assertFalse($schema->hasColumn('service_request_requests', $column));
+        }
+        $migration->up();
+        $migration->up();
+        $this->assertTrue($schema->hasColumns('service_request_requests', $columns));
+        $this->assertFalse($schema->hasColumn('service_request_requests', 'performer_legal_entity_uuid'));
+    }
+
     public function test_create_encounter_draft_persists_standalone_service_request_with_program(): void
     {
         $serviceId = (string) Str::uuid();
@@ -160,13 +241,13 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
             'uuid' => $draftUuid,
             'service_id' => $serviceId,
             'program_id' => $programId,
-            'context_id' => $this->encounter->id,
             'person_id' => $this->person->id,
             'employee_id' => $this->employee->id,
         ]);
 
         $local = ServiceRequestRequest::query()->where('uuid', $draftUuid)->first();
         $this->assertNotNull($local);
+        $this->assertSame($this->encounter->uuid, $local->context->value);
         $this->assertNull($local->basedOnId);
     }
 }

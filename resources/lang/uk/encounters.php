@@ -3,6 +3,30 @@
 declare(strict_types=1);
 
 return [
+    'referral_drawer_title' => 'Виписати електронне направлення (без плану лікування)',
+    'referral_service_placeholder' => 'Код або назва послуги',
+    'referral_search' => 'Пошук',
+    'referral_services_not_found' => 'Послуг за вашим запитом не знайдено.',
+    'referral_create_and_sign' => 'Створити та підписати',
+    'referral_destination' => 'Заклад, до якого переводять',
+    'referral_performer_speciality' => 'Спеціальність виконавця',
+    'referral_performer_division' => 'Підрозділ виконавця',
+    'referral_select_division' => 'Оберіть підрозділ',
+    'referral_period_and_quantity' => 'Термін дії та кількість',
+    'referral_auth_method' => 'Метод автентифікації',
+    'referral_patient_instruction' => 'Інструкція пацієнту',
+    'referral_selected_service' => 'Обрана послуга',
+    'referral_end_date' => 'Дата закінчення',
+    'referral_start_date' => 'Дата початку',
+    'referral_not_selected' => 'Не обрано',
+    'referral_category_label' => 'Категорія',
+    'referral_program_label' => 'Програма',
+    'referral_quantity_label' => 'Кількість',
+    'referral_priority_label' => 'Пріоритет',
+    'referral_additional' => 'Додатково',
+    'referral_notes' => 'Примітки',
+    'referral_cancel' => 'Скасувати',
+    'referral_service_label' => 'Послуга',
 
     /*
     |--------------------------------------------------------------------------

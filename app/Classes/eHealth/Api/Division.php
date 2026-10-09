@@ -25,6 +25,8 @@ class Division extends Request
 
     public const string URL = '/api/divisions';
 
+    private const string SEARCH_URL = '/reports/stats/divisions';
+
     public const string ACTIONS_ACTIVATE = '/actions/activate';
 
     public const string ACTIONS_DEACTIVATE = '/actions/deactivate';
@@ -54,6 +56,27 @@ class Division extends Request
         );
 
         return parent::get($url, $mergedQuery);
+    }
+
+    /**
+     * Search the public registry, including divisions of other legal entities.
+     * This response is not the administrative Get Divisions schema.
+     *
+     * @see https://ehealthmisapi1.docs.apiary.io/#reference/public.-portal-and-reports/divisions/search-divisions
+     */
+    public function search(string $legalEntityUuid, int $page = 1): PromiseInterface|EHealthResponse
+    {
+        $this->validator = null;
+
+        return parent::get(self::SEARCH_URL, [
+            'legal_entity_id' => $legalEntityUuid,
+            'north' => 90,
+            'east' => 180,
+            'south' => -90,
+            'west' => -180,
+            'page' => $page,
+            'page_size' => 100,
+        ]);
     }
 
     /**

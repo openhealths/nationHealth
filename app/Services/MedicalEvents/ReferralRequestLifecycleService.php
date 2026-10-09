@@ -195,6 +195,15 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             'supporting_info' => $formData['supporting_info'] ?? null,
             'based_on_uuid' => null,
             'context_uuid' => $encounter->uuid,
+            'performer' => ($formData['category'] ?? null) === 'transfer_of_care'
+                ? ($formData['performer'] ?? null)
+                : null,
+            'location_reference' => ($formData['category'] ?? null) === 'transfer_of_care'
+                ? ($formData['location_reference'] ?? null)
+                : null,
+            'performer_type' => ($formData['category'] ?? null) === 'transfer_of_care'
+                ? ($formData['performer_type'] ?? null)
+                : null,
         ];
 
         $personUuid = \App\Models\Person\Person::find($encounter->person_id)?->uuid;
@@ -211,7 +220,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             $dbData['service_id'] = $formData['service_id'] ?? null;
             $mapper = Fhir::serviceRequest();
 
-            if (!empty($dbData['program_id']) && $personUuid) {
+            if ($personUuid && (!empty($dbData['program_id']) || $dbData['category'] === 'transfer_of_care')) {
                 $prequalifyPayload = $mapper->toPrequalifyPayload(
                     $dbData,
                     $uuids,
@@ -616,6 +625,9 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             $dbData['quantity_system'] = $activity?->quantitySystem ?: 'SERVICE_UNIT';
             $dbData['quantity_code'] = $activity?->quantityCode ?: 'PIECE';
             $dbData['service_id'] = $requestRecord->serviceId ?: $activity?->productReference;
+            $dbData['performer'] = $requestRecord->performer?->value;
+            $dbData['location_reference'] = $requestRecord->locationReference?->value;
+            $dbData['performer_type'] = $requestRecord->performerType?->coding->first()?->code;
 
             return $dbData;
         }
@@ -838,7 +850,26 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
     public function takeIntoWork(string $referralUuid, Employee $employee, ?string $patientUuid = null, array $payload = []): array
     {
         $model = Repository::serviceRequest()->findByUuid($referralUuid);
-        $programId = $model?->programId
+        $patientUuid ??= $model?->person?->uuid;
+        if (!$patientUuid || ($model !== null && $model->person?->uuid !== $patientUuid)) {
+            throw new \InvalidArgumentException(__('Направлення не належить поточному пацієнту.'));
+        }
+
+        $remote = $this->fetchRemoteReferral($patientUuid, $referralUuid, 'service_request');
+        if (($remote['id'] ?? null) !== $referralUuid
+            || data_get($remote, 'subject.identifier.value') !== $patientUuid) {
+            throw new \InvalidArgumentException(__('Направлення не належить поточному пацієнту.'));
+        }
+
+        $status = strtolower((string) ($remote['status'] ?? ''));
+        $processingStatus = strtolower((string) ($remote['program_processing_status'] ?? ''));
+        if ($status !== ServiceRequestStatus::ACTIVE->value
+            || $processingStatus === ServiceRequestStatus::COMPLETED->value) {
+            throw new \RuntimeException(__('Направлення недоступне для взяття в роботу.'));
+        }
+
+        $programId = data_get($remote, 'program.identifier.value')
+            ?? $model?->programId
             ?? ($payload['program_id'] ?? null)
             ?? data_get($payload, 'program.identifier.value');
 
@@ -850,11 +881,16 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
 
         $payload = $this->buildTakeIntoWorkPayload($employee, $programId);
 
+        $usedByLegalEntity = data_get($remote, 'used_by_legal_entity.identifier.value');
+        $alreadyUsed = $processingStatus === ServiceRequestStatus::IN_PROGRESS->value
+            && is_string($usedByLegalEntity) && $usedByLegalEntity !== ''
+            && $usedByLegalEntity === data_get($payload, 'used_by_legal_entity.identifier.value');
+
         // Qualify must block process when program is present (TV 3.17.3.2 / 3.17.3.3.2).
-        if ($programId) {
+        if (!$alreadyUsed && $programId) {
             try {
                 $qualifyResponse = \App\Classes\eHealth\EHealth::serviceRequest()->qualify($referralUuid, [
-                    'programs' => [['id' => $programId]],
+                    'programs' => [$payload['program']],
                 ])->getData();
                 $resolvedQualify = $this->jobResolver->resolve(
                     is_array($qualifyResponse) ? $qualifyResponse : []
@@ -882,8 +918,11 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
         }
 
         // Use Service Request (взяти в роботу)
-        $response = \App\Classes\eHealth\EHealth::serviceRequest()->process($referralUuid, $payload)->getData();
-        $response = $this->jobResolver->resolve(is_array($response) ? $response : []);
+        $response = $remote;
+        if (!$alreadyUsed) {
+            $response = EHealth::serviceRequest()->process($referralUuid, $payload)->getData();
+            $response = $this->jobResolver->resolve(is_array($response) ? $response : []);
+        }
 
         // Persist status to local DB:
         // If the referral was found from eHealth search (not in our DB), upsert it with in_progress status.
@@ -897,10 +936,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             // Store a minimal record so we can track its status going forward.
             $personModel = \App\Models\Person\Person::where('uuid', $patientUuid)->first();
             if ($personModel) {
-                $responseData = $response;
-                if (isset($response['data'])) {
-                    $responseData = $response['data'];
-                }
+                $responseData = array_replace($remote, $this->extractSignedCreateEntity($response));
                 Repository::serviceRequest()->store([
                     'uuid' => $referralUuid,
                     'status' => ServiceRequestStatus::IN_PROGRESS->value,

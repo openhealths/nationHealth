@@ -70,6 +70,7 @@ class ServiceRequestRequestRepository extends BaseRepository
                     'reason_reference' => $data['reason_reference'] ?? null,
                     'inform_with' => $data['inform_with'] ?? null,
                     'supporting_info' => $data['supporting_info'] ?? null,
+                    ...$this->transferPerformerAttributes($data),
                 ]
             );
 
@@ -343,6 +344,64 @@ class ServiceRequestRequestRepository extends BaseRepository
             ->first();
     }
 
+    /**
+     * Resolve optional transfer fields to the existing FHIR Identifier/CodeableConcept tables.
+     * Omitted fields preserve a draft's references during partial response updates.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, int|null>
+     */
+    private function transferPerformerAttributes(array $data): array
+    {
+        if (!array_key_exists('performer', $data)
+            && !array_key_exists('location_reference', $data)
+            && !array_key_exists('performer_type', $data)) {
+            return [];
+        }
+
+        $existing = $this->model->newQuery()
+            ->with(['performer', 'locationReference', 'performerType.coding'])
+            ->where('uuid', $data['uuid'] ?? $data['id'])
+            ->first();
+        $attributes = [];
+
+        foreach (['performer' => 'legal_entity', 'location_reference' => 'division'] as $field => $type) {
+            if (!array_key_exists($field, $data)) {
+                continue;
+            }
+
+            $value = trim((string) ($data[$field] ?? ''));
+            $relation = $field === 'performer' ? $existing?->performer : $existing?->locationReference;
+            if ($value === '') {
+                $attributes[$field.'_id'] = null;
+            } elseif ($relation?->value === $value) {
+                $attributes[$field.'_id'] = $relation->id;
+            } else {
+                $identifier = Repository::identifier()->store($value);
+                Repository::codeableConcept()->attach($identifier, [
+                    'identifier' => ['type' => ['coding' => [['system' => 'eHealth/resources', 'code' => $type]]]],
+                ]);
+                $attributes[$field.'_id'] = $identifier->id;
+            }
+        }
+
+        if (array_key_exists('performer_type', $data)) {
+            $code = trim((string) ($data['performer_type'] ?? ''));
+            $concept = $existing?->performerType;
+            if ($code === '') {
+                $attributes['performer_type_id'] = null;
+            } elseif ($concept?->coding->first()?->code === $code) {
+                $attributes['performer_type_id'] = $concept->id;
+            } else {
+                $attributes['performer_type_id'] = Repository::codeableConcept()->store([
+                    'coding' => [['system' => 'SPECIALITY_TYPE', 'code' => $code]],
+                ])->id;
+            }
+        }
+
+        return $attributes;
+    }
+
     private function displayProgramName(mixed $programId): string
     {
         $value = trim((string) ($programId ?? ''));
@@ -357,12 +416,12 @@ class ServiceRequestRequestRepository extends BaseRepository
      * @param  array<int, string>  $columns
      * @return Collection<int, ServiceRequestRequest>
      */
-    public function getByPersonIdAndStatus(int $personId, string $status, array $columns = ['*']): Collection
+    public function getByPersonIdAndStatus(int $personId, string|array $status, array $columns = ['*']): Collection
     {
         return $this->model
             ->newQuery()
             ->where('person_id', $personId)
-            ->where('status', $status)
+            ->whereIn('status', (array) $status)
             ->get($columns);
     }
 

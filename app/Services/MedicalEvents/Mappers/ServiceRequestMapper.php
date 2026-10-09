@@ -156,6 +156,25 @@ class ServiceRequestMapper implements FhirMapperContract
             ];
         }
 
+        if (($data['category'] ?? '') === 'transfer_of_care') {
+            if (!empty($data['performer'])) {
+                $serviceRequest['performer'] = $this->resourceIdentifier('legal_entity', (string) $data['performer']);
+            }
+
+            if (!empty($data['location_reference'])) {
+                $serviceRequest['location_reference'] = $this->resourceIdentifier('division', (string) $data['location_reference']);
+            }
+
+            if (!empty($data['performer_type'])) {
+                $serviceRequest['performer_type'] = [
+                    'coding' => [[
+                        'system' => 'SPECIALITY_TYPE',
+                        'code' => (string) $data['performer_type'],
+                    ]],
+                ];
+            }
+        }
+
         if (isset($data['quantity'])) {
             $serviceRequest['quantity'] = $this->mapQuantity(
                 (float) $data['quantity'],
@@ -190,6 +209,7 @@ class ServiceRequestMapper implements FhirMapperContract
 
         $payload = [
             'service_request' => array_filter($serviceRequest, static fn ($value) => $value !== null),
+            'programs' => [],
         ];
 
         if (!empty($data['program_id'])) {

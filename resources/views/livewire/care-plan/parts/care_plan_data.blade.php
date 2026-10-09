@@ -21,7 +21,13 @@
 
     <div class="form-row-2 mt-5">
         <div class="form-group group">
-            <select id="category" name="category" class="input-select peer" wire:model="form.category" required>
+            <select
+                id="category"
+                name="category"
+                class="input-select peer @error('form.category') select-error input-error border-red-500 @enderror"
+                wire:model="form.category"
+                required
+            >
                 <option value="">{{ __('forms.select') }} ...</option>
                 @foreach ($categories as $categoryCode => $categoryName)
                     <option value="{{ $categoryCode }}">{{ $categoryName }}</option>
@@ -118,7 +124,7 @@
                     type="text"
                     name="period_end"
                     id="period_end"
-                    class="datepicker-input with-leading-icon input peer dark:text-white @error('form.periodEnd') input-error @enderror"
+                    class="datepicker-input with-leading-icon input peer dark:text-white @error('form.periodEnd') input-error border-red-500 @enderror"
                     placeholder=" "
                     autocomplete="off"
                     datepicker-autohide

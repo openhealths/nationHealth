@@ -9,7 +9,6 @@ use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Episode\Status;
 use App\Enums\Person\EncounterStatus;
-use App\Enums\Person\ServiceRequestStatus;
 use App\Exceptions\Cipher\CipherConnectionException;
 use App\Exceptions\Cipher\CipherException;
 use App\Exceptions\EHealth\EHealthConnectionException;
@@ -24,12 +23,12 @@ use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use App\Traits\EnsuresEntityExists;
 use App\Traits\SubmitsEHealthEncounter;
 use Carbon\CarbonImmutable;
-use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use RuntimeException;
 use Throwable;
 
@@ -51,6 +50,9 @@ class EncounterCreate extends EncounterComponent
      * Keeps qualify/process off the KEP signing path.
      */
     public ?string $preparedElectronicReferralUuid = null;
+
+    #[Locked]
+    public ?string $confirmedElectronicReferralUuid = null;
 
     private function resolveReferralUuid(string $referralNumber): ?string
     {
@@ -77,6 +79,12 @@ class EncounterCreate extends EncounterComponent
      */
     public function selectElectronicReferral(string $referralUuid, ReferralRequestLifecycleService $lifecycle): void
     {
+        abort_unless(Auth::user()?->can('service_request:use'), 403);
+        $this->preparedElectronicReferralUuid = null;
+        $this->confirmedElectronicReferralUuid = null;
+        $this->selectedReferralUuid = null;
+        $this->resetValidation('form.encounter.referralNumber');
+
         $referralUuid = trim($referralUuid);
         if ($referralUuid === '' || !Str::isUuid($referralUuid)) {
             return;
@@ -96,8 +104,11 @@ class EncounterCreate extends EncounterComponent
         try {
             $this->ensureReferralTakenIntoWork($lifecycle, $referralUuid);
             $this->preparedElectronicReferralUuid = $referralUuid;
+            $this->confirmedElectronicReferralUuid = $referralUuid;
         } catch (Throwable $exception) {
             $this->preparedElectronicReferralUuid = null;
+            $this->selectedReferralUuid = null;
+            $this->addError('form.encounter.referralNumber', $exception->getMessage());
             Session::flash(
                 'error',
                 __('Не вдалося взяти направлення в роботу: ').$exception->getMessage()
@@ -107,24 +118,13 @@ class EncounterCreate extends EncounterComponent
 
     /**
      * Take an active electronic referral into work (eHealth use / qualify).
-     * Idempotent when local status is already in_progress.
+     * The lifecycle verifies current eHealth processing status and executor.
      */
     private function ensureReferralTakenIntoWork(ReferralRequestLifecycleService $service, string $referralUuid): void
     {
         $local = Repository::serviceRequest()->findByUuid($referralUuid);
-        $status = strtolower((string) ($local?->status ?? ''));
-
-        if ($status === ServiceRequestStatus::IN_PROGRESS->value) {
-            return;
-        }
-
-        $needsTakeIntoWork = $local === null
-            || $status === ''
-            || $status === ServiceRequestStatus::ACTIVE->value
-            || $status === 'active';
-
-        if (!$needsTakeIntoWork) {
-            return;
+        if ($local === null || (int) $local->personId !== $this->personId) {
+            throw new RuntimeException(__('Направлення не належить поточному пацієнту.'));
         }
 
         $employee = Auth::user()?->employees()
@@ -145,7 +145,7 @@ class EncounterCreate extends EncounterComponent
         );
     }
 
-    private function resolveAllReferrals(array &$validated): void
+    private function resolveAllReferrals(array &$validated, bool $requirePreparation = false): void
     {
         if (($validated['encounter']['referralType'] ?? '') === 'electronic' && !empty($validated['encounter']['referralNumber'])) {
             $originalNumber = $validated['encounter']['referralNumber'];
@@ -154,6 +154,12 @@ class EncounterCreate extends EncounterComponent
             if ($uuid === null) {
                 throw ValidationException::withMessages([
                     'form.encounter.referralNumber' => __('encounters.messages.referral_not_found')
+                ]);
+            }
+
+            if ($requirePreparation && $this->confirmedElectronicReferralUuid !== $uuid) {
+                throw ValidationException::withMessages([
+                    'form.encounter.referralNumber' => __('Оберіть направлення зі списку та підтвердьте його взяття в роботу.'),
                 ]);
             }
 
@@ -258,13 +264,7 @@ class EncounterCreate extends EncounterComponent
             $this->syncEncounterParticipants();
             // Validating from the component runs every form of the package and collects their errors in one pass
             $validated = $this->validate();
-            try {
-                $this->resolveAllReferrals($validated);
-            } catch (Exception $e) {
-                $this->dispatch('scroll-to-error');
-
-                return;
-            }
+            $this->resolveAllReferrals($validated);
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
@@ -335,13 +335,7 @@ class EncounterCreate extends EncounterComponent
         try {
             // Validating from the component runs every form of the package and collects their errors in one pass
             $validatedData = $this->validate();
-            try {
-                $this->resolveAllReferrals($validatedData);
-            } catch (Exception $e) {
-                $this->dispatch('scroll-to-error');
-
-                return;
-            }
+            $this->resolveAllReferrals($validatedData, requirePreparation: true);
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
@@ -591,10 +585,8 @@ class EncounterCreate extends EncounterComponent
     {
         try {
             if ($this->referralToRedeemUuid && $this->createdEncounterUuidForRedeem) {
-                // use/qualify already ran on referral selection; redeem only completes.
-                // Safety net: if the doctor typed a number without picking from the list, take into work once here.
-                if ($this->preparedElectronicReferralUuid !== $this->referralToRedeemUuid) {
-                    $this->ensureReferralTakenIntoWork($service, $this->referralToRedeemUuid);
+                if ($this->confirmedElectronicReferralUuid !== $this->referralToRedeemUuid) {
+                    throw new RuntimeException(__('Направлення не було підтверджено перед підписанням взаємодії.'));
                 }
 
                 $service->completeReferral($this->referralToRedeemUuid, $this->createdEncounterUuidForRedeem);

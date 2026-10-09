@@ -19,9 +19,21 @@ class ServiceCollection extends Collection
      */
     public function flattened(): self
     {
-        return $this->flatMap(function (array $item) {
+        $items = $this->flatMap(function (array $item) {
             return $this->flattenServiceItem($item);
-        })->unique('id', true);
+        });
+        $seenIds = [];
+
+        return $items->filter(static function (array $item) use (&$seenIds): bool {
+            $id = serialize($item['id']);
+            if (isset($seenIds[$id])) {
+                return false;
+            }
+
+            $seenIds[$id] = true;
+
+            return true;
+        });
     }
 
     /**

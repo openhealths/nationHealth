@@ -17,7 +17,14 @@ trait ResolvesEncounterStandaloneContext
             return null;
         }
 
-        $encounter = Encounter::query()->with('episode')->find($this->encounterId);
+        $encounter = Encounter::query()
+            ->with([
+                'episode',
+                'class',
+                'hospitalization.dischargeDisposition',
+                'hospitalization.destination',
+            ])
+            ->find($this->encounterId);
         if ($encounter === null) {
             Session::flash('error', __('Взаємодію не знайдено.'));
 

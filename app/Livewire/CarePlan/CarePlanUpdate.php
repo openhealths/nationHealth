@@ -46,9 +46,9 @@ class CarePlanUpdate extends CarePlanCreate
         $this->form->context = $carePlan->context ?? '';
         $this->form->title = $carePlan->title ?? '';
         $this->form->intent = 'order';
-        $this->form->periodStart = $carePlan->periodStart?->format('d.m.Y') ?? '';
+        $this->form->periodStart = $carePlan->periodStart?->format(config('app.date_format')) ?? '';
         $this->form->periodStartTime = $carePlan->periodStart?->format('H:i') ?? '';
-        $this->form->periodEnd = $carePlan->periodEnd?->format('d.m.Y') ?? '';
+        $this->form->periodEnd = $carePlan->periodEnd?->format(config('app.date_format')) ?? '';
         $this->form->periodEndTime = $carePlan->periodEnd?->format('H:i') ?? '';
         $this->form->encounter = $carePlan->encounter?->uuid ?? '';
         $this->form->description = $carePlan->description ?? '';
@@ -132,9 +132,8 @@ class CarePlanUpdate extends CarePlanCreate
             'context' => $this->form->context ?: null,
             'title' => $this->form->title,
             'terms_of_service' => $this->form->termsOfService ?: null,
-            'period_start' => convertToYmd($this->form->periodStart),
-            'period_end' => !empty($this->form->periodEnd)
-                ? convertToYmd($this->form->periodEnd) : null,
+            'period_start' => $this->form->periodStartIsoDate(),
+            'period_end' => $this->form->periodEndIsoDate(),
             'encounter_id' => $encounterData['id'],
             'addresses' => $encounterData['addresses'],
             'supporting_info' => [
@@ -200,7 +199,10 @@ class CarePlanUpdate extends CarePlanCreate
 
         // Build eHealth payload via Repository
         $carePlanPayload = $repository->formatCarePlanRequest(
-            $this->form->toArray(),
+            array_replace($this->form->toArray(), [
+                'periodStart' => $this->form->periodStartIsoDate(),
+                'periodEnd' => $this->form->periodEndIsoDate(),
+            ]),
             $this->form->encounter ?: null,
             $encounterData,
             $author?->uuid
@@ -253,9 +255,8 @@ class CarePlanUpdate extends CarePlanCreate
                 'terms_of_service' => $termsOfService ?: null,
                 'category' => $this->form->category,
                 'title' => $this->form->title,
-                'period_start' => convertToYmd($this->form->periodStart),
-                'period_end' => !empty($this->form->periodEnd)
-                    ? convertToYmd($this->form->periodEnd) : null,
+                'period_start' => $this->form->periodStartIsoDate(),
+                'period_end' => $this->form->periodEndIsoDate(),
                 'encounter_id' => $encounterData['id'],
                 'addresses' => $encounterData['addresses'],
                 'supporting_info' => [

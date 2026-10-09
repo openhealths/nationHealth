@@ -38,6 +38,9 @@ class ServiceRequestRequest extends Model
         'reason_reference',
         'inform_with',
         'supporting_info',
+        'performer_id',
+        'location_reference_id',
+        'performer_type_id',
     ];
 
     protected $casts = [
@@ -76,6 +79,21 @@ class ServiceRequestRequest extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(CodeableConcept::class, 'category_id');
+    }
+
+    public function performer(): BelongsTo
+    {
+        return $this->belongsTo(Identifier::class, 'performer_id');
+    }
+
+    public function locationReference(): BelongsTo
+    {
+        return $this->belongsTo(Identifier::class, 'location_reference_id');
+    }
+
+    public function performerType(): BelongsTo
+    {
+        return $this->belongsTo(CodeableConcept::class, 'performer_type_id');
     }
 
     public function priority(): BelongsTo

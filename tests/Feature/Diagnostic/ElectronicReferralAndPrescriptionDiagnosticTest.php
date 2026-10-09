@@ -123,6 +123,7 @@ class ElectronicReferralAndPrescriptionDiagnosticTest extends TestCase
     {
         $referralUuid = (string) Str::uuid();
         $programId = (string) Str::uuid();
+        $this->mockRemoteReferral($referralUuid, $programId);
 
         ServiceRequestRequest::create([
             'uuid' => $referralUuid,
@@ -178,6 +179,7 @@ class ElectronicReferralAndPrescriptionDiagnosticTest extends TestCase
     {
         $referralUuid = (string) Str::uuid();
         $programId = (string) Str::uuid();
+        $this->mockRemoteReferral($referralUuid, $programId);
 
         $capturedPayload = null;
         $mock = Mockery::mock(ExecutorServiceRequest::class);
@@ -303,6 +305,18 @@ class ElectronicReferralAndPrescriptionDiagnosticTest extends TestCase
         $this->app->instance(ExecutorServiceRequest::class, $mock);
     }
 
+    private function mockRemoteReferral(string $uuid, string $programId): void
+    {
+        $api = Mockery::mock(PatientServiceRequest::class)->makePartial();
+        $api->shouldReceive('getById')->once()->with($this->person->uuid, $uuid)
+            ->andReturn($this->responseWithData([
+                'id' => $uuid, 'status' => 'active', 'program_processing_status' => 'new',
+                'subject' => ['identifier' => ['value' => $this->person->uuid]],
+                'program' => ['identifier' => ['value' => $programId]],
+            ]));
+        $this->instance(PatientServiceRequest::class, $api);
+    }
+
     /**
      * @param  array<string, mixed>  $data
      */
@@ -338,7 +352,7 @@ class ElectronicReferralAndPrescriptionDiagnosticTest extends TestCase
 /**
  * Lightweight host for standalone encounter referral drawer diagnostics.
  */
-class DiagnosticEncounterStandaloneHarness
+class DiagnosticEncounterStandaloneHarness extends \Livewire\Component
 {
     use ResolvesEncounterStandaloneContext;
     use ManagesEncounterEPrescription;
@@ -350,8 +364,4 @@ class DiagnosticEncounterStandaloneHarness
 
     public ?string $actionType = null;
 
-    public function dispatch(string $event, mixed ...$params): static
-    {
-        return $this;
-    }
 }
