@@ -130,6 +130,13 @@ abstract class DiagnosticReportComponent extends Component
     public array $observationValueMap;
 
     /**
+     * Components config per observation code whose configuration defines components.
+     *
+     * @var array
+     */
+    public array $observationComponentMap = [];
+
+    /**
      * List of values for codeable concept.
      *
      * @var array
@@ -193,6 +200,7 @@ abstract class DiagnosticReportComponent extends Component
         'eHealth/vaccination_covid_groups',
         'eHealth/custom/observation_codes',
         'specimen_types',
+        'eHealth/custom/observation_components',
         'POSITION'
     ];
 
@@ -371,6 +379,7 @@ abstract class DiagnosticReportComponent extends Component
         $this->observationLoincCodeMap = $observationConfigRepository->loincCodeMap();
         $this->observationCustomCodeMap = $observationConfigRepository->customCodeMap();
         $this->observationValueMap = $observationConfigRepository->valueMap();
+        $this->observationComponentMap = $observationConfigRepository->componentMap();
 
         $this->codeableConceptValues = collect($this->observationValueMap)
             ->filter(static fn (array $value) => $value[1] === 'valueCodeableConcept')

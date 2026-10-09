@@ -368,6 +368,7 @@
                         <button
                             type="button"
                             id="decrement-button"
+                            :disabled="componentMap[modalObservation.codeCode]?.calculation"
                             @click="
                                 modalObservation.valueQuantityValue = Math.max(
                                     min,
@@ -406,6 +407,7 @@
                             required
                             x-model.number="modalObservation.valueQuantityValue"
                             autocomplete="off"
+                            :readonly="componentMap[modalObservation.codeCode]?.calculation"
                             :min="min"
                             :max="max"
                             @input="
@@ -421,6 +423,7 @@
                         <button
                             type="button"
                             id="increment-button"
+                            :disabled="componentMap[modalObservation.codeCode]?.calculation"
                             @click="
                                 modalObservation.valueQuantityValue = Math.min(
                                     max,
@@ -510,6 +513,145 @@
                         {{ __('forms.field_empty') }}
                     </p>
                 </div>
+            </div>
+        </template>
+
+        {{-- Components defined by the configuration of the observation code --}}
+        <template x-if="componentMap[modalObservation.codeCode]">
+            <div
+                x-data="{
+                    get config() {
+                        return this.componentMap[this.modalObservation.codeCode];
+                    },
+
+                    syncComponents() {
+                        if (! this.config) {
+                            return;
+                        }
+
+                        const configuredCodes = this.config.components.map((configured) => configured.code);
+                        const currentCodes = this.modalObservation.components.map((component) => component.codeCode);
+
+                        if (currentCodes.join() === configuredCodes.join()) {
+                            return;
+                        }
+
+                        this.modalObservation.components = this.config.components.map((configured) => {
+                            const existing = this.modalObservation.components.find(
+                                (component) => component.codeCode === configured.code,
+                            );
+
+                            return {
+                                codeCode: configured.code,
+                                codeSystem: configured.system,
+                                valueCode: existing?.valueCode ?? '',
+                                valueSystem: configured.binding ?? '',
+                                valueQuantityValue: existing?.valueQuantityValue ?? '',
+                                valueQuantityCode: configured.unit ?? '',
+                                interpretationCode: '',
+                            };
+                        });
+                    },
+
+                    calculateValue() {
+                        if (this.config?.calculation !== 'SUM') {
+                            return;
+                        }
+
+                        const scores = this.config.scores;
+                        const components = this.modalObservation.components;
+                        const unit = this.valueMap[this.modalObservation.codeCode]?.[2] ?? '';
+                        const isRequiredAnswered = this.config.components.every(
+                            (configured, index) =>
+                                ! configured.required ||
+                                components[index]?.valueCode ||
+                                (components[index]?.valueQuantityValue ?? '') !== '',
+                        );
+
+                        this.modalObservation.valueQuantityValue = isRequiredAnswered
+                            ? components.reduce(
+                                  (sum, component) => sum + (scores[component.valueSystem]?.[component.valueCode] ?? 0),
+                                  0,
+                              )
+                            : '';
+                        this.modalObservation.valueQuantityComparator = '=';
+                        this.modalObservation.valueQuantityUnit = unit;
+                        this.modalObservation.valueQuantitySystem = 'eHealth/ucum/units';
+                        this.modalObservation.valueQuantityCode = unit;
+                    },
+                }"
+                x-effect="
+                    syncComponents();
+                    calculateValue();
+                "
+            >
+                <h3 class="default-p my-10 font-bold">{{ __('observations.components') }}</h3>
+
+                <template x-for="(configured, index) in config.components" :key="configured.code">
+                    <div class="form-row-modal">
+                        <template x-if="modalObservation.components[index]?.codeCode === configured.code">
+                            <div>
+                                <label
+                                    :for="`observationComponent${index}`"
+                                    class="label-modal"
+                                    x-text="$wire.dictionaries[configured.system]?.[configured.code]"
+                                ></label>
+
+                                <template x-if="configured.valueType === 'valueCodeableConcept'">
+                                    <select
+                                        class="input-modal"
+                                        :id="`observationComponent${index}`"
+                                        x-model="modalObservation.components[index].valueCode"
+                                    >
+                                        <option value="" selected>{{ __('forms.select') }}</option>
+                                        <template
+                                            x-for="(label, key) in $wire.dictionaries[configured.binding]"
+                                            :key="key"
+                                        >
+                                            <option
+                                                :value="key"
+                                                :selected="key === modalObservation.components[index].valueCode"
+                                                x-text="label"
+                                            ></option>
+                                        </template>
+                                    </select>
+                                </template>
+
+                                <template x-if="configured.valueType === 'valueQuantity'">
+                                    <div>
+                                        <input
+                                            type="number"
+                                            class="input-modal"
+                                            :id="`observationComponent${index}`"
+                                            :min="configured.min"
+                                            :max="configured.max"
+                                            x-model.number="modalObservation.components[index].valueQuantityValue"
+                                            autocomplete="off"
+                                        />
+                                        <p
+                                            class="mt-2 text-sm text-gray-500 dark:text-gray-400"
+                                            x-show="configured.min !== null && configured.max !== null"
+                                            x-text="
+                                                '{{ __('forms.start') }} ' + configured.min + ' {{ __('forms.end') }} ' + configured.max
+                                            "
+                                        ></p>
+                                    </div>
+                                </template>
+
+                                <p
+                                    class="text-error text-xs"
+                                    x-show="
+                                        configured.required &&
+                                        ! modalObservation.components[index].valueCode &&
+                                        modalObservation.components[index].valueQuantityValue === ''
+                                    "
+                                >
+                                    {{ __('forms.field_empty') }}
+                                </p>
+                            </div>
+                        </template>
+                    </div>
+                </template>
             </div>
         </template>
 

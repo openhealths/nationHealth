@@ -98,7 +98,13 @@ return [
     'validation' => [
         'performer_employee_not_found' => 'Працівника, вказаного як виконавця спостереження, не знайдено.',
         'performer_employee_invalid_type' => 'Тип працівника не дозволений як виконавець спостереження.',
-        'performer_not_participant' => 'Виконавець спостереження має бути учасником взаємодії.'
+        'performer_not_participant' => 'Виконавець спостереження має бути учасником взаємодії.',
+        'component_required' => "Не заповнено обов'язковий компонент «:component».",
+        'component_not_allowed' => 'Компонент «:component» не передбачений для цього коду спостереження.',
+        'component_duplicate' => 'Компонент «:component» вказано більше одного разу.',
+        'component_value_invalid' => 'Значення компонента «:component» недопустиме.',
+        'component_out_of_range' => 'Значення компонента «:component» має бути від :min до :max.',
+        'value_calculation_mismatch' => 'Значення спостереження має дорівнювати сумі балів компонентів (:sum).'
     ],
 
     // Field names for :attribute in validation messages

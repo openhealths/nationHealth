@@ -20,11 +20,13 @@ class ObservationConfig extends Model
         'binding',
         'unit',
         'value_range',
+        'settings',
         'ehealth_updated_at'
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
-        'category' => 'array'
+        'category' => 'array',
+        'settings' => 'array'
     ];
 }

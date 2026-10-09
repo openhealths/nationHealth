@@ -32,6 +32,7 @@
         item: 0,
         divisionId: @js($isEncounterContext ? data_get($this->form->encounter, 'divisionId', '') : data_get($this->form->diagnosticReport, 'divisionId', '')),
         valueMap: $wire.entangle('observationValueMap'),
+        componentMap: $wire.observationComponentMap,
         observationCategoriesDictionary: $wire.dictionaries['eHealth/observation_categories'],
         icfObservationCategoriesDictionary: $wire.dictionaries['eHealth/ICF/observation_categories'],
         observationCodesDictionary: $wire.dictionaries['eHealth/LOINC/observation_codes'],
@@ -424,6 +425,13 @@
                                                     }
                                                 });
 
+                                                if (
+                                                    modalObservation.codingSystem !== 'icf' &&
+                                                    ! componentMap[modalObservation.codeCode]
+                                                ) {
+                                                    modalObservation.components = new Observation().components;
+                                                }
+
                                                 modalObservation.dictionaryName =
                                                     $wire.observationValueMap[modalObservation.codeCode]?.[0];
 
@@ -500,6 +508,8 @@
                 codeSystem: 'eHealth/ICF/qualifiers',
                 valueCode: '',
                 valueSystem: '',
+                valueQuantityValue: '',
+                valueQuantityCode: '',
                 interpretationCode: '',
             },
         ];

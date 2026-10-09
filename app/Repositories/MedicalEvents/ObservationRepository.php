@@ -153,13 +153,17 @@ class ObservationRepository extends BaseRepository
                 if (isset($datum['components'])) {
                     foreach ($datum['components'] as $componentData) {
                         $componentCode = Repository::codeableConcept()->store($componentData['code']);
-                        $componentInterpretation = Repository::codeableConcept()->store(
-                            $componentData['interpretation']
-                        );
+
+                        $componentInterpretation = null;
+                        if (isset($componentData['interpretation'])) {
+                            $componentInterpretation = Repository::codeableConcept()->store(
+                                $componentData['interpretation']
+                            );
+                        }
 
                         $component = $observation->components()->create([
                             'code_id' => $componentCode->id,
-                            'interpretation_id' => $componentInterpretation->id
+                            'interpretation_id' => $componentInterpretation?->id
                         ]);
 
                         $this->storeValue($componentData, $component);

@@ -10,6 +10,7 @@ use App\Models\Employee\Employee;
 use App\Models\Equipment;
 use App\Rules\AfterOrEqualDateTime;
 use App\Rules\InDictionary;
+use App\Rules\MedicalEvents\ObservationComponents;
 use App\Rules\PrimarySourceRequiredForAssistant;
 use App\Rules\PastDateTime;
 use Carbon\CarbonImmutable;
@@ -248,11 +249,17 @@ class ObservationForm extends Form
             ],
             'observations.*.reactionOn' => ['nullable', 'uuid'],
             'observations.*.dictionaryName' => ['nullable', 'string'],
-            'observations.*.components' => ['nullable', 'array'],
+            'observations.*.components' => Rule::forEach(fn (mixed $value, string $attribute): array => [
+                'nullable',
+                'array',
+                new ObservationComponents($this->observations[(int)explode('.', $attribute)[1]])
+            ]),
             'observations.*.components.*.codeCode' => ['nullable', 'string'],
             'observations.*.components.*.codeSystem' => ['nullable', 'string'],
             'observations.*.components.*.valueCode' => ['nullable', 'string'],
             'observations.*.components.*.valueSystem' => ['nullable', 'string'],
+            'observations.*.components.*.valueQuantityValue' => ['nullable', 'numeric'],
+            'observations.*.components.*.valueQuantityCode' => ['nullable', 'string'],
             'observations.*.components.*.interpretationCode' => [
                 'nullable',
                 'string',

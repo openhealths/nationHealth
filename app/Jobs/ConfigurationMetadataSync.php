@@ -44,7 +44,10 @@ class ConfigurationMetadataSync implements ShouldQueue
             foreach ($resources as $resource) {
                 $changed = $this->syncResource($resource['resource'], $resource['updated_at']);
 
-                if ($resource['resource'] === self::OBSERVATION_RESOURCE && ($changed || ObservationConfig::doesntExist())) {
+                if (
+                    $resource['resource'] === self::OBSERVATION_RESOURCE
+                    && ($changed || ObservationConfig::doesntExist() || ObservationConfig::whereNull('settings')->exists())
+                ) {
                     ObservationConfigurationSync::dispatch();
                 }
             }

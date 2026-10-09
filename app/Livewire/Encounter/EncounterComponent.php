@@ -264,6 +264,13 @@ class EncounterComponent extends Component
     public array $observationValueMap;
 
     /**
+     * Components config per observation code whose configuration defines components.
+     *
+     * @var array
+     */
+    public array $observationComponentMap;
+
+    /**
      * Allowed condition codes per code system for the current user, based on employee type.
      * Key absent = no restriction; key present with empty array = system forbidden; key present with codes = allowed codes.
      *
@@ -508,6 +515,7 @@ class EncounterComponent extends Component
         'specimen_container_types',
         'specimen_container_additives',
         'fasting_statuses',
+        'eHealth/custom/observation_components',
         'POSITION'
     ];
 
@@ -533,6 +541,7 @@ class EncounterComponent extends Component
         $this->observationLoincCodeMap = $observationConfigRepository->loincCodeMap();
         $this->observationCustomCodeMap = $observationConfigRepository->customCodeMap();
         $this->observationValueMap = $observationConfigRepository->valueMap();
+        $this->observationComponentMap = $observationConfigRepository->componentMap();
 
         $this->loadCustomDictionaries();
 

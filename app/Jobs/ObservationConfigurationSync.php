@@ -30,8 +30,8 @@ class ObservationConfigurationSync implements ShouldQueue
     /**
      * Pull observation configurations and upsert them into observation_configs.
      *
-     * Fetches everything on the first run (empty table) and only records changed since the
-     * latest known updated_at on subsequent runs, via the updated_at_from date filter.
+     * Fetches everything on the first run (empty table) or while some records have no settings stored yet,
+     * and only records changed since the latest known updated_at otherwise, via the updated_at_from date filter.
      *
      * @param  ObservationConfigRepository  $observationConfigRepository
      * @return void
@@ -40,7 +40,9 @@ class ObservationConfigurationSync implements ShouldQueue
     {
         try {
             $query = [];
-            $latestUpdatedAt = ObservationConfig::max('ehealth_updated_at');
+            $latestUpdatedAt = ObservationConfig::whereNull('settings')->exists()
+                ? null
+                : ObservationConfig::max('ehealth_updated_at');
 
             if ($latestUpdatedAt !== null) {
                 $query['updated_at_from'] = Str::before($latestUpdatedAt, 'T');
@@ -85,6 +87,7 @@ class ObservationConfigurationSync implements ShouldQueue
                 'binding' => $settings['RESULT_BINDING']['check'][0] ?? null,
                 'unit' => $settings['RESULT_QUANTITY_CODES'][0]['check'][0]['code'] ?? null,
                 'value_range' => $this->mapRange($settings),
+                'settings' => $settings,
                 'ehealth_updated_at' => $item['updated_at'] ?? null
             ]
         );

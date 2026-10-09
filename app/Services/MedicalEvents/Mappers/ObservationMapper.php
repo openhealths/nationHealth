@@ -6,6 +6,7 @@ namespace App\Services\MedicalEvents\Mappers;
 
 use App\Contracts\FhirMapperContract;
 use App\Enums\Person\ObservationStatus;
+use App\Repositories\Repository;
 use App\Services\MedicalEvents\FhirResource;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
@@ -115,22 +116,48 @@ class ObservationMapper implements FhirMapperContract
 
         $result = array_merge($result, $this->buildValue($data));
 
+        $componentScores = Repository::observationConfig()->componentMap()[$data['codeCode'] ?? '']['scores'] ?? [];
+
         $fhirComponents = collect($data['components'] ?? [])
-            ->filter(fn (array $component) => !empty($component['valueCode']))
-            ->map(fn (array $component) => array_merge(
-                [
+            ->filter(
+                static fn (array $component): bool => !empty($component['valueCode'])
+                    || ($component['valueQuantityValue'] ?? '') !== ''
+            )
+            ->map(function (array $component) use ($componentScores): array {
+                $fhirComponent = [
                     'code' => FhirResource::make()
                         ->coding($component['codeSystem'] ?? 'eHealth/ICF/qualifiers', $component['codeCode'])
-                        ->toCodeableConcept(),
-                    'interpretation' => FhirResource::make()
+                        ->toCodeableConcept()
+                ];
+
+                if (!empty($component['interpretationCode'])) {
+                    $fhirComponent['interpretation'] = FhirResource::make()
                         ->coding('eHealth/observation_interpretations', $component['interpretationCode'])
-                        ->toCodeableConcept(),
-                ],
-                $this->buildValue([
-                    'valueCodeableConcept' => $component['valueCode'],
-                    'dictionaryName' => $component['valueSystem']
-                ])
-            ))
+                        ->toCodeableConcept();
+                }
+
+                $value = !empty($component['valueCode'])
+                    ? ['valueCodeableConcept' => $component['valueCode'], 'dictionaryName' => $component['valueSystem']]
+                    : [
+                        'valueQuantityValue' => $component['valueQuantityValue'],
+                        'valueQuantityComparator' => '=',
+                        'valueQuantityUnit' => $component['valueQuantityCode'],
+                        'valueQuantitySystem' => 'eHealth/ucum/units',
+                        'valueQuantityCode' => $component['valueQuantityCode']
+                    ];
+
+                $fhirComponent = array_merge($fhirComponent, $this->buildValue($value));
+
+                $score = $componentScores[$component['valueSystem'] ?? ''][$component['valueCode'] ?? ''] ?? null;
+
+                if ($score !== null) {
+                    $fhirComponent['valueCodeableConcept']['coding'][0]['extension'] = [
+                        ['code' => 'item_weight', 'valueDecimal' => $score]
+                    ];
+                }
+
+                return $fhirComponent;
+            })
             ->values()
             ->toArray();
 
@@ -163,7 +190,7 @@ class ObservationMapper implements FhirMapperContract
     {
         $value = [];
 
-        if (!empty($data['valueQuantityValue'])) {
+        if (($data['valueQuantityValue'] ?? '') !== '') {
             $value['valueQuantity'] = [
                 'value' => $data['valueQuantityValue'],
                 'comparator' => $data['valueQuantityComparator'],
@@ -307,6 +334,8 @@ class ObservationMapper implements FhirMapperContract
                     'codeSystem' => 'eHealth/ICF/qualifiers',
                     'valueCode' => '',
                     'valueSystem' => '',
+                    'valueQuantityValue' => '',
+                    'valueQuantityCode' => '',
                     'interpretationCode' => '',
                 ]
             ];
@@ -318,6 +347,8 @@ class ObservationMapper implements FhirMapperContract
                 'codeSystem' => data_get($component, 'code.coding.0.system', 'eHealth/ICF/qualifiers'),
                 'valueCode' => data_get($component, 'value.valueCodeableConcept.coding.0.code'),
                 'valueSystem' => data_get($component, 'value.valueCodeableConcept.coding.0.system'),
+                'valueQuantityValue' => data_get($component, 'value.valueQuantity.value', ''),
+                'valueQuantityCode' => data_get($component, 'value.valueQuantity.code', ''),
                 'interpretationCode' => data_get($component, 'interpretation.coding.0.code', '')
             ])
             ->toArray();

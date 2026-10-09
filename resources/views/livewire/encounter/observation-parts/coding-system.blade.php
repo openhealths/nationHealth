@@ -8,6 +8,8 @@
                 @change="
                     modalObservation.categorySystem = 'eHealth/observation_categories';
                     modalObservation.codeSystem = 'eHealth/LOINC/observation_codes';
+                    modalObservation.codeCode = '';
+                    modalObservation.components = new Observation().components;
                 "
                 id="loincDictionary"
                 type="radio"
@@ -27,6 +29,8 @@
                 @change="
                     modalObservation.categorySystem = 'eHealth/ICF/observation_categories';
                     modalObservation.codeSystem = 'eHealth/ICF/classifiers';
+                    modalObservation.codeCode = '';
+                    modalObservation.components = new Observation().components;
                 "
                 id="icfDictionary"
                 type="radio"
@@ -46,6 +50,8 @@
                 @change="
                     modalObservation.categorySystem = 'eHealth/observation_categories';
                     modalObservation.codeSystem = 'eHealth/custom/observation_codes';
+                    modalObservation.codeCode = '';
+                    modalObservation.components = new Observation().components;
                 "
                 id="customDictionary"
                 type="radio"
