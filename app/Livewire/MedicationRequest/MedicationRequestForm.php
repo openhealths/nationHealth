@@ -19,7 +19,6 @@ class MedicationRequestForm extends Component
     use WithFileUploads;
 
     #[Locked]
-    #[Locked]
     public LegalEntity $legalEntity;
 
     public string $patientId = '';

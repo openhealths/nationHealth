@@ -13,6 +13,8 @@ use App\Livewire\Employee\EmployeeIndex;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
+use App\Models\Permission;
+use App\Models\Role as ModelsRole;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -20,11 +22,19 @@ use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\MocksBasicDictionaries;
 use Tests\TestCase;
 
 class EmployeeIndexDeactivateLogoutTest extends TestCase
 {
     use DatabaseTransactions;
+    use MocksBasicDictionaries;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->mockBasicDictionaries();
+    }
 
     protected function migrateDatabases(): void
     {
@@ -42,6 +52,7 @@ class EmployeeIndexDeactivateLogoutTest extends TestCase
     public function deactivate_logs_out_when_employee_belongs_to_current_user_party(): void
     {
         [$legalEntity, $employee, $user] = $this->createDeactivateScenario(sameParty: true);
+        $this->grantEmployeeIndexAccess($user, $legalEntity);
         $this->instance('legalEntity', $legalEntity);
         $this->mockSuccessfulDeactivate();
         $this->mockLogout(shouldBeCalled: true);
@@ -58,6 +69,7 @@ class EmployeeIndexDeactivateLogoutTest extends TestCase
     public function deactivate_keeps_session_when_employee_belongs_to_another_party(): void
     {
         [$legalEntity, $employee, $user] = $this->createDeactivateScenario(sameParty: false);
+        $this->grantEmployeeIndexAccess($user, $legalEntity);
         $this->instance('legalEntity', $legalEntity);
         $this->mockSuccessfulDeactivate();
         $this->mockLogout(shouldBeCalled: false);
@@ -72,6 +84,23 @@ class EmployeeIndexDeactivateLogoutTest extends TestCase
             ->assertDispatched('flashMessage');
 
         $this->assertAuthenticatedAs($user, 'ehealth');
+    }
+
+    private function grantEmployeeIndexAccess(User $user, LegalEntity $legalEntity): void
+    {
+        if (config('permission.teams')) {
+            setPermissionsTeamId($legalEntity->id);
+        }
+
+        foreach (['employee:read', 'employee:deactivate'] as $permissionName) {
+            Permission::findOrCreate($permissionName, 'web');
+            Permission::findOrCreate($permissionName, 'ehealth');
+        }
+
+        foreach (array_keys((array) config('auth.guards')) as $guard) {
+            ModelsRole::findOrCreate(Role::ADMIN->value, $guard);
+            $user->assignRole(Role::ADMIN->value, $guard);
+        }
     }
 
     /**

@@ -51,11 +51,11 @@ class PartyVerificationScopesTest extends TestCase
     #[Test]
     public function non_hr_roles_except_owner_do_not_include_party_verification_read(): void
     {
-        // OWNER may carry party_verification:read in upstream scopes; bulk sync is gated by token scope,
-        // not by HR role (see PartyVerificationBulkAccess / login listener).
+        // OWNER / REORGANIZATION_OWNER may carry party_verification:read in upstream scopes;
+        // bulk sync is gated by token scope, not by HR role (see PartyVerificationBulkAccess / login listener).
         $rolesWithoutBulkRead = collect(config('ehealth.roles'))
             ->keys()
-            ->diff(['HR', 'OWNER']);
+            ->diff(['HR', 'OWNER', 'REORGANIZATION_OWNER']);
 
         foreach ($rolesWithoutBulkRead as $role) {
             $scopes = config("ehealth.roles.{$role}");

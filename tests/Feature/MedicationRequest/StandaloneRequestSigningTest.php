@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Mockery;
+use Tests\Concerns\MocksBasicDictionaries;
 use Tests\TestCase;
 
 /**
@@ -30,6 +31,7 @@ use Tests\TestCase;
 class StandaloneRequestSigningTest extends TestCase
 {
     use DatabaseTransactions;
+    use MocksBasicDictionaries;
 
     protected User $user;
 
@@ -52,6 +54,7 @@ class StandaloneRequestSigningTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->mockBasicDictionaries();
 
         $party = Party::create([
             'uuid' => (string) Str::uuid(),

@@ -19,13 +19,17 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Mockery;
+use Tests\Concerns\CreatesFhirRequestIdentifiers;
+use Tests\Concerns\MocksBasicDictionaries;
 use Tests\TestCase;
 use Livewire\Livewire;
 use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
 
 class ReferralLifecycleTest extends TestCase
 {
+    use CreatesFhirRequestIdentifiers;
     use DatabaseTransactions;
+    use MocksBasicDictionaries;
 
     protected Person $person;
     protected Encounter $encounter;
@@ -49,6 +53,7 @@ class ReferralLifecycleTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->mockBasicDictionaries();
 
         // 1. Create Patient
         $this->person = Person::create([
@@ -195,8 +200,8 @@ class ReferralLifecycleTest extends TestCase
             'quantity' => 2.0,
             'intent' => 'order',
             'category' => 'procedure',
-            'based_on_id' => $this->serviceActivity->id,
-            'context_id' => $this->encounter->id,
+            'based_on_uuid' => $this->serviceActivity->uuid,
+            'context_uuid' => $this->encounter->uuid,
             'priority' => 'routine',
             'note' => 'Please perform procedure ASAP',
         ];
@@ -208,8 +213,8 @@ class ReferralLifecycleTest extends TestCase
             'device_id' => 'D-707',
             'quantity' => 1.0,
             'intent' => 'order',
-            'based_on_id' => $this->deviceActivity->id,
-            'context_id' => $this->encounter->id,
+            'based_on_uuid' => $this->deviceActivity->uuid,
+            'context_uuid' => $this->encounter->uuid,
             'priority' => 'urgent',
             'note' => 'Patient needs wheelchair',
         ];
@@ -225,7 +230,7 @@ class ReferralLifecycleTest extends TestCase
             'uuid' => $serviceUuid,
             'service_id' => '59300-00',
             'person_id' => $this->person->id,
-            'based_on_id' => $this->serviceActivity->id,
+            'based_on_id' => $this->fhirIdentifierId((string) $this->serviceActivity->uuid),
         ]);
 
         $this->assertDatabaseHas('device_request_requests', [
@@ -233,7 +238,7 @@ class ReferralLifecycleTest extends TestCase
             'uuid' => $deviceUuid,
             'device_id' => 'D-707',
             'person_id' => $this->person->id,
-            'based_on_id' => $this->deviceActivity->id,
+            'based_on_id' => $this->fhirIdentifierId((string) $this->deviceActivity->uuid),
         ]);
     }
 
@@ -587,7 +592,7 @@ class ReferralLifecycleTest extends TestCase
             'uuid' => $draftUuid,
             'status' => 'draft',
             'quantity' => 3.0,
-            'based_on_id' => $this->serviceActivity->id,
+            'based_on_id' => $this->fhirIdentifierId((string) $this->serviceActivity->uuid),
         ]);
     }
 
@@ -616,7 +621,7 @@ class ReferralLifecycleTest extends TestCase
         $this->assertDatabaseHas('service_request_requests', [
             'uuid' => $draftUuid,
             'status' => 'draft',
-            'based_on_id' => $this->serviceActivity->id,
+            'based_on_id' => $this->fhirIdentifierId((string) $this->serviceActivity->uuid),
         ]);
     }
 
@@ -839,8 +844,7 @@ class ReferralLifecycleTest extends TestCase
             'service_id' => '59300-00',
             'quantity' => 1.0,
             'intent' => 'order',
-            'based_on_id' => $this->serviceActivity->id,
-            'context_id' => $this->encounter->id,
+            ...$this->fhirBasedOnContextIds((string) $this->serviceActivity->uuid, (string) $this->encounter->uuid),
             'priority' => 'routine',
             'started_at' => '2026-06-01',
             'ended_at' => '2026-09-01',
@@ -879,8 +883,6 @@ class ReferralLifecycleTest extends TestCase
         $this->assertDatabaseHas('service_request_requests', [
             'uuid' => $signedUuid,
             'employee_id' => $this->employee->id,
-            'based_on_id' => $this->serviceActivity->id,
-            'context_id' => $this->encounter->id,
             'status' => 'active',
             'request_number' => 'SR-12345678',
         ]);
@@ -901,8 +903,7 @@ class ReferralLifecycleTest extends TestCase
             'service_id' => '59300-00',
             'quantity' => 1.0,
             'intent' => 'order',
-            'based_on_id' => $this->serviceActivity->id,
-            'context_id' => $this->encounter->id,
+            ...$this->fhirBasedOnContextIds((string) $this->serviceActivity->uuid, (string) $this->encounter->uuid),
             'priority' => 'routine',
             'started_at' => '2026-06-01',
             'ended_at' => '2026-09-01',
@@ -984,8 +985,7 @@ class ReferralLifecycleTest extends TestCase
             'service_id' => '59300-00',
             'quantity' => 1.0,
             'intent' => 'order',
-            'based_on_id' => $this->serviceActivity->id,
-            'context_id' => $this->encounter->id,
+            ...$this->fhirBasedOnContextIds((string) $this->serviceActivity->uuid, (string) $this->encounter->uuid),
             'priority' => 'routine',
             'started_at' => '2026-06-01',
             'ended_at' => '2026-09-01',
@@ -1034,8 +1034,7 @@ class ReferralLifecycleTest extends TestCase
             'service_id' => '59300-00',
             'quantity' => 1.0,
             'intent' => 'order',
-            'based_on_id' => $this->serviceActivity->id,
-            'context_id' => $this->encounter->id,
+            ...$this->fhirBasedOnContextIds((string) $this->serviceActivity->uuid, (string) $this->encounter->uuid),
             'priority' => 'routine',
             'category' => 'procedure',
             'started_at' => '2026-06-01',
@@ -1048,7 +1047,7 @@ class ReferralLifecycleTest extends TestCase
         ]);
 
         $linkedReferrals = collect($component->get('activeReferrals'))
-            ->where('based_on_id', $this->serviceActivity->id);
+            ->where('based_on_uuid', $this->serviceActivity->uuid);
 
         $this->assertCount(1, $linkedReferrals);
         $referral = $linkedReferrals->first();
@@ -1074,8 +1073,7 @@ class ReferralLifecycleTest extends TestCase
             'service_id' => '59300-00',
             'quantity' => 1.0,
             'intent' => 'order',
-            'based_on_id' => $this->serviceActivity->id,
-            'context_id' => $this->encounter->id,
+            ...$this->fhirBasedOnContextIds((string) $this->serviceActivity->uuid, (string) $this->encounter->uuid),
             'priority' => 'routine',
             'started_at' => '2026-06-01',
             'ended_at' => '2026-09-01',
@@ -1165,7 +1163,7 @@ class ReferralLifecycleTest extends TestCase
 
         $mockGuard = Mockery::mock(\App\Services\MedicalEvents\DeviceProgramParticipationGuard::class);
         $mockGuard->shouldReceive('resolveParticipatingProgramIds')->andReturn([$programId]);
-        $mockGuard->shouldReceive('assess')->andReturn(new \App\Services\MedicalEvents\DeviceActivityReadinessAssessment([], []));
+        $mockGuard->shouldReceive('assess')->andReturn(new \App\Dto\MedicalEvents\DeviceActivityReadinessAssessment([], []));
         $this->instance(\App\Services\MedicalEvents\DeviceProgramParticipationGuard::class, $mockGuard);
 
         $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);

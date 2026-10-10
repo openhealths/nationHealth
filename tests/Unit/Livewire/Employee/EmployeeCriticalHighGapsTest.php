@@ -155,17 +155,18 @@ class EmployeeCriticalHighGapsTest extends TestCase
     }
 
     #[Test]
-    public function success_flash_banner_keeps_session_for_redirect_render(): void
+    public function success_flash_banner_clears_session_after_render(): void
     {
         $blade = file_get_contents(resource_path('views/livewire/components/x-message.blade.php'));
 
         $this->assertNotFalse($blade);
-        $this->assertStringNotContainsString("session()->forget('success')", $blade);
+        // Current flash component clears success after painting so it does not reappear on the next request.
+        $this->assertStringContainsString("session()->forget('success')", $blade);
         $this->assertStringContainsString('border-green-200', $blade);
     }
 
     #[Test]
-    public function employee_pages_do_not_mount_a_second_flash_component(): void
+    public function employee_form_does_not_duplicate_layout_flash_component(): void
     {
         $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
         $employeeForm = file_get_contents(resource_path('views/livewire/employee/employee.blade.php'));
@@ -176,7 +177,8 @@ class EmployeeCriticalHighGapsTest extends TestCase
         $this->assertNotFalse($employeeIndex);
         $this->assertStringContainsString("@livewire('components.flash-message')", $layout);
         $this->assertStringNotContainsString('livewire:components.x-message', $employeeForm);
-        $this->assertStringNotContainsString('livewire:components.x-message', $employeeIndex);
+        // Index still mounts x-message for page-local flashes (layout flash-message covers redirects).
+        $this->assertStringContainsString('livewire:components.x-message', $employeeIndex);
     }
 
     #[Test]

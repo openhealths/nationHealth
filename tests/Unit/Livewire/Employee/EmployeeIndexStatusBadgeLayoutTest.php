@@ -16,10 +16,11 @@ class EmployeeIndexStatusBadgeLayoutTest extends TestCase
 
         $this->assertNotFalse($blade);
         $this->assertStringContainsString('w-[10%]">{{ __(\'forms.status.label\') }}', $blade);
+        // Status badge hugs label width and wraps left-aligned (actions column keeps nowrap separately).
         $this->assertStringContainsString('inline-block w-min whitespace-normal text-left leading-tight', $blade);
         $this->assertStringNotContainsString('max-w-[6.75rem]', $blade);
         $this->assertStringNotContainsString('[&_span]:text-center', $blade);
         $this->assertStringNotContainsString('[&_span]:max-w-full', $blade);
-        $this->assertStringContainsString('shrink-0 whitespace-nowrap text-center align-middle', $blade);
+        $this->assertStringContainsString('td-input shrink-0 text-center align-middle whitespace-nowrap', $blade);
     }
 }

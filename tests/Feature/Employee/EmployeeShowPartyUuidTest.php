@@ -19,11 +19,19 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\MocksBasicDictionaries;
 use Tests\TestCase;
 
 class EmployeeShowPartyUuidTest extends TestCase
 {
     use DatabaseTransactions;
+    use MocksBasicDictionaries;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->mockBasicDictionaries();
+    }
 
     protected function migrateDatabases(): void
     {

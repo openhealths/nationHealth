@@ -22,11 +22,19 @@ use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\MocksBasicDictionaries;
 use Tests\TestCase;
 
 class EmployeeIndexDeactivateRoleCleanupTest extends TestCase
 {
     use DatabaseTransactions;
+    use MocksBasicDictionaries;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->mockBasicDictionaries();
+    }
 
     protected function migrateDatabases(): void
     {
@@ -88,6 +96,8 @@ class EmployeeIndexDeactivateRoleCleanupTest extends TestCase
     {
         [$legalEntity, $user, $employee] = $this->createSingleEmployeeScenario(Role::RECEPTIONIST->value);
         $this->assignDirectPermission($user, $legalEntity, 'receptionist:write');
+        // Index mount authorizes viewAny; elevated ADMIN also covers deactivate.
+        $this->assignRoleForLegalEntity($user, $legalEntity, Role::ADMIN->value);
         $this->instance('legalEntity', $legalEntity);
         $this->mockSuccessfulDeactivate();
         $this->mockLogout(shouldBeCalled: true);
@@ -108,6 +118,7 @@ class EmployeeIndexDeactivateRoleCleanupTest extends TestCase
     {
         [$legalEntity, $user, $employee] = $this->createSingleEmployeeScenario(Role::RECEPTIONIST->value);
         $employee->update(['start_date' => now('Europe/Kyiv')->subMonth()->format('Y-m-d')]);
+        $this->assignRoleForLegalEntity($user, $legalEntity, Role::ADMIN->value);
         $this->instance('legalEntity', $legalEntity);
         $this->mockSuccessfulDeactivate();
         $this->mockLogout(shouldBeCalled: true);

@@ -4,19 +4,20 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Classes\eHealth\Api\MedicationRequest;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\User;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Livewire\Livewire;
+use Tests\Concerns\MocksBasicDictionaries;
 use Tests\TestCase;
 use Mockery;
 
 class MedicationRequestTest extends TestCase
 {
     use DatabaseTransactions;
+    use MocksBasicDictionaries;
 
     protected User $user;
     protected LegalEntity $legalEntity;
@@ -37,6 +38,7 @@ class MedicationRequestTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->mockBasicDictionaries();
 
         $party = \App\Models\Relations\Party::create([
             'uuid' => (string) \Illuminate\Support\Str::uuid(),
@@ -83,20 +85,13 @@ class MedicationRequestTest extends TestCase
 
     public function test_it_can_prequalify_medication_request()
     {
-        $mockResponse = [
-            'data' => [
-                ['status' => 'valid']
-            ]
-        ];
-
-        $mockApi = Mockery::mock('alias:' . MedicationRequest::class);
-        $mockApi->shouldReceive('preQualify')
+        $mockService = Mockery::mock(MedicationRequestLifecycleService::class);
+        $mockService->shouldReceive('preQualify')
             ->once()
             ->with(['person_id' => 'patient-123'])
-            ->andReturn($mockResponse);
+            ->andReturn([['status' => 'valid']]);
 
-        $service = app(MedicationRequestLifecycleService::class);
-        $result = $service->preQualify(['person_id' => 'patient-123']);
+        $result = $mockService->preQualify(['person_id' => 'patient-123']);
 
         $this->assertEquals('valid', $result[0]['status']);
     }
@@ -107,7 +102,7 @@ class MedicationRequestTest extends TestCase
 
         Livewire::test(\App\Livewire\MedicationRequest\MedicationRequestIndex::class, ['legalEntity' => $this->legalEntity])
             ->assertStatus(200)
-            ->assertSee('Е-Рецепти');
+            ->assertSee('Електронні рецепти');
     }
 
     public function test_medication_request_form_component_prequalify()

@@ -17,10 +17,16 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Mockery;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunClassInSeparateProcess;
+use Tests\Concerns\CreatesFhirRequestIdentifiers;
 use Tests\TestCase;
 
+#[RunClassInSeparateProcess]
+#[PreserveGlobalState(false)]
 class MedicationRequestLifecycleServiceTest extends TestCase
 {
+    use CreatesFhirRequestIdentifiers;
     use DatabaseTransactions;
 
     protected Person $person;
@@ -145,8 +151,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'medication_id' => 'INN-101',
             'medication_qty' => 10.0,
             'intent' => 'order',
-            'based_on_id' => $this->activity->id,
-            'context_id' => $this->encounter->id,
+            ...$this->fhirBasedOnContextIds((string) $this->activity->uuid, (string) $this->encounter->uuid),
         ]);
 
         $mockApi = Mockery::mock('alias:' . \App\Classes\eHealth\Api\MedicationRequest::class);
@@ -174,8 +179,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'medication_id' => 'INN-101',
             'medication_qty' => 10.0,
             'intent' => 'order',
-            'based_on_id' => $this->activity->id,
-            'context_id' => $this->encounter->id,
+            ...$this->fhirBasedOnContextIds((string) $this->activity->uuid, (string) $this->encounter->uuid),
         ]);
 
         $activeMedicationRequest = [
@@ -242,8 +246,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'medication_id' => 'INN-101',
             'medication_qty' => 10.0,
             'intent' => 'order',
-            'based_on_id' => $this->activity->id,
-            'context_id' => $this->encounter->id,
+            ...$this->fhirBasedOnContextIds((string) $this->activity->uuid, (string) $this->encounter->uuid),
         ]);
 
         $forbidden = new \App\Exceptions\EHealth\EHealthResponseException(
@@ -288,8 +291,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'medication_id' => 'INN-101',
             'medication_qty' => 10.0,
             'intent' => 'order',
-            'based_on_id' => $this->activity->id,
-            'context_id' => $this->encounter->id,
+            ...$this->fhirBasedOnContextIds((string) $this->activity->uuid, (string) $this->encounter->uuid),
         ]);
 
         $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
@@ -529,10 +531,11 @@ class MedicationRequestLifecycleServiceTest extends TestCase
         );
 
         $this->assertSame($createdUuid, $uuid);
+        $fhirRefs = $this->fhirBasedOnContextIds((string) $this->activity->uuid, (string) $this->encounter->uuid);
         $this->assertDatabaseHas('medication_request_requests', [
             'uuid' => $createdUuid,
-            'context_id' => $this->encounter->id,
-            'based_on_id' => $this->activity->id,
+            'context_id' => $fhirRefs['context_id'],
+            'based_on_id' => $fhirRefs['based_on_id'],
         ]);
     }
 
@@ -620,8 +623,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'medication_id' => 'INN-101',
             'medication_qty' => 10.0,
             'intent' => 'order',
-            'based_on_id' => $this->activity->id,
-            'context_id' => $this->encounter->id,
+            ...$this->fhirBasedOnContextIds((string) $this->activity->uuid, (string) $this->encounter->uuid),
             'inform_with' => 'auth-1|OTP|+380******12',
             'request_number' => '9999000011112222',
             'ehealth_payload' => [
@@ -676,8 +678,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'medication_id' => 'INN-101',
             'medication_qty' => 10.0,
             'intent' => 'order',
-            'based_on_id' => $this->activity->id,
-            'context_id' => $this->encounter->id,
+            ...$this->fhirBasedOnContextIds((string) $this->activity->uuid, (string) $this->encounter->uuid),
         ]);
 
         $this->expectException(\InvalidArgumentException::class);
@@ -700,8 +701,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'medication_id' => 'INN-101',
             'medication_qty' => 30.0,
             'intent' => 'order',
-            'based_on_id' => $this->activity->id,
-            'context_id' => $this->encounter->id,
+            ...$this->fhirBasedOnContextIds((string) $this->activity->uuid, (string) $this->encounter->uuid),
         ]);
 
         $requestRecord = MedicationRequestRequest::create([
@@ -712,8 +712,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'medication_id' => 'INN-101',
             'medication_qty' => 10.0,
             'intent' => 'order',
-            'based_on_id' => $this->activity->id,
-            'context_id' => $this->encounter->id,
+            ...$this->fhirBasedOnContextIds((string) $this->activity->uuid, (string) $this->encounter->uuid),
         ]);
 
         $this->expectException(\InvalidArgumentException::class);

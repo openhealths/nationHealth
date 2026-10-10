@@ -1,0 +1,150 @@
+# Azure Pipelines — owned domain PHPUnit suites
+# Employee · Party · Care Plan · Care Plan Activity · ePrescription · Service Request
+#
+# Register in Azure DevOps: Pipelines → New → Existing Azure Pipelines YAML.
+# Database target is ALWAYS `testing` (phpunit.xml). Never mis_dev.
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - app/**
+      - tests/**
+      - database/**
+      - config/**
+      - routes/**
+      - resources/**
+      - phpunit.xml
+      - azure-pipelines.yml
+      - scripts/ci/**
+
+pr:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-24.04'
+
+variables:
+  phpVersion: '8.4'
+  COMPOSER_NO_INTERACTION: '1'
+  APP_ENV: testing
+  DB_CONNECTION: pgsql
+  DB_HOST: localhost
+  DB_PORT: '5432'
+  DB_DATABASE: testing
+  DB_USERNAME: sail
+  DB_PASSWORD: secret
+  # Placeholder for CI bootstrap; override via Azure variable group when deploying.
+  APP_KEY: base64:2fl+KtvkdphvQyVfKw9Oe3I8F6nQb0nqQmVdX6i0x0E=
+
+stages:
+  - stage: DomainTests
+    displayName: Domain PHPUnit
+    jobs:
+      - job: phpunit_domains
+        displayName: Owned domain suites
+        services:
+          postgres:
+            image: postgres:18-alpine
+            env:
+              POSTGRES_DB: testing
+              POSTGRES_USER: sail
+              POSTGRES_PASSWORD: secret
+            ports:
+              - 5432:5432
+            options: >-
+              --health-cmd "pg_isready -U sail -d testing"
+              --health-interval 10s
+              --health-timeout 5s
+              --health-retries 12
+        steps:
+          - checkout: self
+
+          - script: |
+              set -euo pipefail
+              sudo apt-get update -y
+              sudo apt-get install -y software-properties-common
+              sudo add-apt-repository -y ppa:ondrej/php
+              sudo apt-get update -y
+              sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+                php$(phpVersion)-cli \
+                php$(phpVersion)-pgsql \
+                php$(phpVersion)-mbstring \
+                php$(phpVersion)-xml \
+                php$(phpVersion)-curl \
+                php$(phpVersion)-zip \
+                php$(phpVersion)-bcmath \
+                php$(phpVersion)-intl \
+                php$(phpVersion)-gd \
+                php$(phpVersion)-sqlite3 \
+                php$(phpVersion)-redis \
+                postgresql-client \
+                unzip
+              sudo update-alternatives --set php /usr/bin/php$(phpVersion)
+              php -v
+              php -m | grep -i pdo_pgsql
+            displayName: Install PHP + pgsql
+
+          - script: |
+              set -euo pipefail
+              curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+              composer --version
+              composer install --prefer-dist --no-progress --optimize-autoloader
+            displayName: Composer install
+
+          - script: |
+              set -euo pipefail
+              cp -n .env.example .env || true
+              printf '\nAPP_ENV=testing\nDB_CONNECTION=%s\nDB_HOST=%s\nDB_PORT=%s\nDB_DATABASE=%s\nDB_USERNAME=%s\nDB_PASSWORD=%s\nAPP_KEY=%s\n' \
+                "$DB_CONNECTION" "$DB_HOST" "$DB_PORT" "$DB_DATABASE" "$DB_USERNAME" "$DB_PASSWORD" "$APP_KEY" >> .env
+              php artisan config:clear --no-interaction
+            displayName: Bootstrap .env for testing
+            env:
+              DB_CONNECTION: $(DB_CONNECTION)
+              DB_HOST: $(DB_HOST)
+              DB_PORT: $(DB_PORT)
+              DB_DATABASE: $(DB_DATABASE)
+              DB_USERNAME: $(DB_USERNAME)
+              DB_PASSWORD: $(DB_PASSWORD)
+              APP_KEY: $(APP_KEY)
+
+          - script: |
+              set -euo pipefail
+              chmod +x scripts/ci/prepare-testing-db.sh scripts/ci/run-domain-tests.sh
+              scripts/ci/prepare-testing-db.sh
+            displayName: Migrate testing DB (+ update migrations)
+            env:
+              DB_CONNECTION: $(DB_CONNECTION)
+              DB_HOST: $(DB_HOST)
+              DB_PORT: $(DB_PORT)
+              DB_DATABASE: $(DB_DATABASE)
+              DB_USERNAME: $(DB_USERNAME)
+              DB_PASSWORD: $(DB_PASSWORD)
+              APP_ENV: testing
+
+          - script: |
+              set -euo pipefail
+              scripts/ci/run-domain-tests.sh
+            displayName: PHPUnit owned domains
+            env:
+              DB_CONNECTION: $(DB_CONNECTION)
+              DB_HOST: $(DB_HOST)
+              DB_PORT: $(DB_PORT)
+              DB_DATABASE: $(DB_DATABASE)
+              DB_USERNAME: $(DB_USERNAME)
+              DB_PASSWORD: $(DB_PASSWORD)
+              APP_ENV: testing
+
+          - task: PublishTestResults@2
+            condition: always()
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: 'storage/ci/phpunit-domain-junit.xml'
+              mergeTestResults: true
+              failTaskOnFailedTests: true
+              testRunTitle: 'Domain PHPUnit'
+            displayName: Publish JUnit
