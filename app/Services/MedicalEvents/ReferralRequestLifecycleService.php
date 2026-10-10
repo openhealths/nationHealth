@@ -1009,6 +1009,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
     public function cancelUsage(string $referralUuid, string $patientId, array $payload = []): array
     {
         $response = \App\Classes\eHealth\EHealth::serviceRequest()->cancelUsage($referralUuid, $patientId, $payload)->getData();
+        $response = $this->jobResolver->resolve($response);
 
         $model = Repository::serviceRequest()->findByUuid($referralUuid);
         if ($model) {

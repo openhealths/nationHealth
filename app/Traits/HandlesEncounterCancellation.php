@@ -190,6 +190,10 @@ trait HandlesEncounterCancellation
      */
     public function cancelSelectedEncounter(): void
     {
+        if ($this->actionType !== 'cancel_encounter') {
+            return;
+        }
+
         try {
             $validated = [
                 ...$this->encounterCancellationForm()->validate(

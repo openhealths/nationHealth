@@ -17,7 +17,7 @@
         this.modalTarget = target;
         this.isNew = true;
         this.modalForm = {
-            date: new Date().toISOString().split('T')[0],
+            date: new Date().toLocaleDateString('uk-UA', {day: '2-digit', month: '2-digit', year: 'numeric'}),
             name: '',
             uuid: ''
         };
@@ -154,7 +154,7 @@
                 class="relative z-[101] flex min-h-screen items-center justify-center p-4"
             >
                 <div @click.stop
-                x-trap.noscroll.inert="openModal"
+                x-trap.noscroll.inert.noautofocus="openModal"
                 class="modal-content h-fit w-full max-w-2xl rounded-2xl bg-white shadow-lg dark:bg-gray-800"
             >
                 <h3
@@ -167,19 +167,22 @@
                 </h3>
                 <form @submit.prevent="save()">
                     <div class="space-y-4 p-6">
-                        <div class="form-group group">
+                        <div class="relative">
+                            <svg class="svg-input pointer-events-none absolute !top-2/3 left-1 -translate-y-1/2 transform" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M6 5V4a1 1 0 1 1 2 0v1h3V4a1 1 0 1 1 2 0v1h3V4a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v2H3V7a2 2 0 0 1 2-2h1ZM3 19v-8h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Zm5-6a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2H8Z" clip-rule="evenodd" />
+                            </svg>
                             <label for="modalDate" class="label-modal"
                                 >{{ __('forms.date') }} <span class="text-red-600">*</span></label>
-                                <input
-                                    type="text"
-                                    id="modalDate"
-                                    x-model="modalForm.date"
-                                    class="input-modal datepicker-input w-full"
-                                    datepicker-format="{{ frontendDateFormat() }}"
-                                    autocomplete="off"
-                                    required
-                                />
-                            </div>
+                            <input
+                                type="text"
+                                id="modalDate"
+                                x-model="modalForm.date"
+                                class="input-modal datepicker-input w-full"
+                                datepicker-format="{{ frontendDateFormat() }}"
+                                autocomplete="off"
+                                required
+                            />
+                        </div>
                             <div
                                 x-show="modalTarget === 'episode' && availableEpisodes.length > 0"
                                 class="form-group group"
@@ -267,40 +270,32 @@
                                     {{ __('care-plan.search_medical_records') ?? 'Пошук медичних записів' }}
                                 </legend>
 
-                                <div class="mt-2 flex">
-                                    <div class="me-6 flex items-center">
+                                <div class="mt-2 flex items-center gap-6">
+                                    <label class="flex cursor-pointer items-center gap-2">
                                         <input
-                                            id="current-interaction"
                                             type="radio"
                                             value="current"
                                             x-model="searchType"
                                             name="search-type"
-                                            class="text-neutral-primary border-default-medium bg-neutral-secondary-medium checked:border-brand focus:ring-brand-subtle border-default h-4 w-4 appearance-none rounded-full border focus:ring-2 focus:outline-none"
+                                            class="default-radio"
                                         />
-                                        <label
-                                            for="current-interaction"
-                                            class="text-heading ms-2 text-sm font-medium whitespace-nowrap text-gray-700 select-none dark:text-gray-300"
-                                        >
+                                        <span class="text-sm font-medium whitespace-nowrap text-gray-700 select-none dark:text-gray-300">
                                             {{ __('care-plan.current_interaction') }}
-                                        </label>
-                                    </div>
+                                        </span>
+                                    </label>
 
-                                    <div class="flex items-center">
+                                    <label class="flex cursor-pointer items-center gap-2">
                                         <input
-                                            id="search-ehealth"
                                             type="radio"
                                             value="ehealth"
                                             x-model="searchType"
                                             name="search-type"
-                                            class="text-neutral-primary border-default-medium bg-neutral-secondary-medium checked:border-brand focus:ring-brand-subtle border-default h-4 w-4 appearance-none rounded-full border focus:ring-2 focus:outline-none"
+                                            class="default-radio"
                                         />
-                                        <label
-                                            for="search-ehealth"
-                                            class="text-heading ms-2 text-sm font-medium whitespace-nowrap text-gray-700 select-none dark:text-gray-300"
-                                        >
+                                        <span class="text-sm font-medium whitespace-nowrap text-gray-700 select-none dark:text-gray-300">
                                             {{ __('care-plan.search_in_ehealth') }}
-                                        </label>
-                                    </div>
+                                        </span>
+                                    </label>
                                 </div>
                             </fieldset>
 

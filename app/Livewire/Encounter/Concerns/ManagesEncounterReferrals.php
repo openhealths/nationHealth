@@ -95,6 +95,7 @@ trait ManagesEncounterReferrals
         $this->encounterReferralServiceResults = [];
         $this->encounterReferralSelectedService = null;
         $this->encounterReferralWarningMessage = '';
+        $this->resetEncounterReferralValidation();
         $this->showEncounterReferralDrawer = true;
     }
 
@@ -104,6 +105,24 @@ trait ManagesEncounterReferrals
         $this->encounterReferralWarningMessage = '';
         $this->encounterReferralServiceResults = [];
         $this->encounterReferralHasSearched = false;
+        $this->resetEncounterReferralValidation();
+    }
+
+    public function updatedEncounterReferralForm(mixed $value, ?string $key): void
+    {
+        if ($key !== null) {
+            $this->resetValidation('encounterReferralForm.'.$key);
+        }
+        $this->encounterReferralWarningMessage = '';
+    }
+
+    private function resetEncounterReferralValidation(): void
+    {
+        foreach ($this->getErrorBag()->keys() as $key) {
+            if (str_starts_with($key, 'encounterReferralForm.')) {
+                $this->resetValidation($key);
+            }
+        }
     }
 
     public function searchEncounterReferralServices(): void
@@ -145,9 +164,11 @@ trait ManagesEncounterReferrals
 
         $this->encounterReferralForm['service_id'] = $serviceId;
         $this->encounterReferralSelectedService = $selected;
+        $this->resetValidation('encounterReferralForm.service_id');
         $category = ServiceSearch::requestCategory($selected);
         if ($category !== null) {
             $this->encounterReferralForm['category'] = $category;
+            $this->resetValidation('encounterReferralForm.category');
         }
 
         // Hide the result list after pick — same UX as standalone eRx (readable in dark mode)
@@ -162,17 +183,19 @@ trait ManagesEncounterReferrals
     {
         $this->encounterReferralForm['service_id'] = $service['id'];
         $this->encounterReferralSelectedService = $service;
+        $this->resetValidation('encounterReferralForm.service_id');
 
         $category = ServiceSearch::requestCategory($service);
         if ($category !== null) {
             $this->encounterReferralForm['category'] = $category;
+            $this->resetValidation('encounterReferralForm.category');
         }
 
         $this->encounterReferralServiceSearch = '';
         $this->encounterReferralServiceResults = [];
         $this->encounterReferralHasSearched = false;
         $this->encounterReferralWarningMessage = '';
-        
+
         $this->dispatch('encounter-referral-service-catalog-close');
     }
 
