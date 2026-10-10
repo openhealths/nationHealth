@@ -211,7 +211,6 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             Log::info('Employee request linked to existing user. Credentials email was not sent.', [
                 'employee_request_id' => $employeeRequest->id,
                 'user_id' => $existingUser->id,
-                'email' => $email,
             ]);
 
             return;
@@ -236,14 +235,12 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             Log::info('Employee request user credentials email sent.', [
                 'employee_request_id' => $employeeRequest->id,
                 'user_id' => $user->id,
-                'email' => $user->email,
             ]);
         } catch (Exception $e) {
             Log::error('Failed to send credentials email to user.', [
                 'employee_request_id' => $employeeRequest->id,
                 'user_id' => $user->id,
-                'user_email' => $user->email,
-                'error' => $e->getMessage(),
+                'exception_type' => $e::class,
             ]);
         }
     }

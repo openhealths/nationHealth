@@ -42,7 +42,7 @@ class EHealthResponseException extends EHealthException
             'class' => $caller['class'] ?? 'unknown_class',
             'method' => $caller['function'] ?? 'unknown_method',
             'exception_type' => static::class,
-            'error_message' => $this->getDetails(),
+            'status' => $this->response->status(),
         ]);
 
         // Always show the official informational message (section 3.1.1.4)
@@ -121,9 +121,7 @@ class EHealthResponseException extends EHealthException
     {
         Log::error('eHealth API Error Detail', [
             'status' => $this->response->status(),
-            'reason' => $this->response->reason(),
-            'url' => $this->response->effectiveUri()?->__toString(),
-            'body' => $this->response->body(),
+            'url' => parse_url($this->response->effectiveUri()?->__toString() ?? '', PHP_URL_PATH) ?: '[unknown endpoint]',
         ]);
     }
 

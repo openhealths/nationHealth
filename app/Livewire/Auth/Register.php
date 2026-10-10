@@ -51,7 +51,7 @@ class Register extends Component
 
             $this->redirect(route('login', absolute: false), navigate: true);
         } catch (Exception $exception) {
-            Log::error('Register: ', ['error' => $exception->getMessage()]);
+            Log::error('Register: ', ['exception_type' => $exception::class]);
 
             session()->flash('error', __('Помилка при створенні користувача. Зверніться до адміністратора'));
 

@@ -170,8 +170,7 @@ class MisLogin extends Component
             Mail::to($this->email)->send(new UserCredentialsMail($this->email, $password));
         } catch (Throwable $exception) {
             Log::error('MisLogin: failed to provision user from employee request', [
-                'error' => $exception->getMessage(),
-                'email' => $this->email
+                'exception_type' => $exception::class,
             ]);
 
             return false;
@@ -271,7 +270,7 @@ class MisLogin extends Component
             $code = (string)random_int(100000, 999999);
         } catch (RandomException $exception) {
             Session::flash('error', __('auth.login.two_factor.generation_failed'));
-            Log::error('Failed to generate a two-factor code', ['exception' => $exception]);
+            Log::error('Failed to generate a two-factor code', ['exception_type' => $exception::class]);
 
             return false;
         }
@@ -299,7 +298,6 @@ class MisLogin extends Component
 
         Log::warning(__('auth.login.error.lockout', [], 'en'), [
             'ip' => request()->ip(),
-            'email' => $this->email
         ]);
 
         $this->addError('email', __('auth.login.error.exceed_login_attempts'));

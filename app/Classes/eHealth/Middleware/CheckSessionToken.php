@@ -64,8 +64,8 @@ class CheckSessionToken
                 try {
                     EHealth::auth()->logout($this->tokenStorage->getBearerToken());
                 } catch (EHealthConnectionException|EHealthValidationException|EHealthResponseException $exception) {
-                    Log::channel('e_health_errors')->error("Error while logout: {$exception->getMessage()}", [
-                        'exception' => $exception
+                    Log::channel('e_health_errors')->error('Error while logout', [
+                        'exception_type' => $exception::class,
                     ]);
                 }
 

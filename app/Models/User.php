@@ -549,7 +549,7 @@ class User extends Authenticatable implements MustVerifyEmail
             // Mark as sent
             self::$emailVerificationSent[$emailKey] = true;
         } catch (Exception $err) {
-            Log::error('EmailVerification Error:', ['error' => $err->getMessage(), 'user_email' => $this->email]);
+            Log::error('EmailVerification Error:', ['exception_type' => $err::class, 'user_id' => $this->id]);
 
             throw new Exception(__("Cannot send verification email to the user"));
         }

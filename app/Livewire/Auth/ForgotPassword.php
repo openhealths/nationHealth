@@ -25,7 +25,7 @@ class ForgotPassword extends Component
             $status = Password::sendResetLink($this->only('email'));
 
             if ($status === Password::RESET_LINK_SENT) {
-                Log::info('Password reset link sent', ['email' => $this->email]);
+                Log::info('Password reset link sent');
 
                 session()->flash('success', __($status));
 
@@ -36,7 +36,7 @@ class ForgotPassword extends Component
 
             // Password has 60 seconds timeout between sending another email
             if ($status === Password::RESET_THROTTLED) {
-                Log::warning('Reset attempt throttled', ['time' => now(), 'email' => $this->email]);
+                Log::warning('Reset attempt throttled');
 
                 session()->flash('error', __('auth.login.error.throttle'));
 
@@ -45,7 +45,7 @@ class ForgotPassword extends Component
 
             // If user trying get password reset link at unregistered email
             if ($status === Password::INVALID_USER) {
-                Log::warning('Password reset. Wrong email', ['time' => now(), 'email' => $this->email]);
+                Log::warning('Password reset. Wrong email');
 
                 session()->flash('error', __('auth.login.error.reset_link'));
 
@@ -54,7 +54,7 @@ class ForgotPassword extends Component
 
             session()->flash('error', __($status));
         } catch (Exception $err) {
-            Log::error('Failed to send reset link', ['error' => $err->getMessage()]);
+            Log::error('Failed to send reset link', ['exception_type' => $err::class]);
 
             session()->flash('error', __('auth.login.error.reset_link'));
         }

@@ -75,18 +75,18 @@ class SendUserCredentialsListener implements ShouldQueue
 
         // Send a link to the owner's email to verify the given address
         if ($event->owner instanceof MustVerifyEmail && !$event->owner->hasVerifiedEmail()) {
-            Log::info(static::class . ": send email verification LINK: to email: {$event->owner->email}");
+            Log::info(static::class . ': sending email verification link', ['user_id' => $event->owner->id]);
 
             $event->owner->sendEmailVerificationNotification();
         }
 
-        Log::info(static::class . ' started for: ' . $event->owner->email);
+        Log::info(static::class . ' started', ['user_id' => $event->owner->id]);
 
         // Send a credentials for the owner's account (only for local login!)
         Mail::to($event->owner->email)
             ->send(new OwnerCredentialsMail($event->owner->email, $event->password));
 
-        Log::info("LegalEntity: User credentials was sended to the {$event->owner->email} address");
+        Log::info('LegalEntity: User credentials email sent', ['user_id' => $event->owner->id]);
     }
 
     /**
@@ -99,8 +99,8 @@ class SendUserCredentialsListener implements ShouldQueue
     public function failed(LegalEntityCreate $event, Throwable $err): void
     {
         Log::error(static::class . 'failed', [
-            'user_email' => $event->owner->email,
-            'error' => $err->getMessage()
+            'user_id' => $event->owner->id,
+            'exception_type' => $err::class,
         ]);
     }
 }

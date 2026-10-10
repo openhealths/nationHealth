@@ -68,7 +68,6 @@ class EmployeeCreate
         if ($employeeRequests->isEmpty()) {
             Log::info('[EmployeeCreate] No pending/approved employee requests for user email.', [
                 'user_id' => $user->id,
-                'email' => $user->email,
             ]);
 
             return;
