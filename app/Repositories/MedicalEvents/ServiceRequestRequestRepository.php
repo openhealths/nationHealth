@@ -4,17 +4,25 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
+use App\Enums\MedicalEvents\ReferralCompletionResourceType;
 use App\Enums\Person\ServiceRequestStatus;
+use App\Classes\eHealth\Api\Responses\Collections\ServiceRequestUse;
+use App\Dto\ServiceRequest\Model as ServiceRequestModelData;
 use App\Models\CarePlanActivity;
 use App\Models\Employee\Employee;
+use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+use App\Repositories\MedicalEvents\Concerns\FindsOpenActivityRequests;
+use App\Repositories\MedicalEvents\Concerns\FindsOwnedRequests;
 use App\Repositories\MedicalEvents\Concerns\ResolvesRequestFhirRefs;
-use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
+use App\Classes\eHealth\Api\Responses\Collections\ServiceRequestSearch;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
 use Throwable;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 
 /**
  * @property ServiceRequestRequest $model
@@ -22,6 +30,67 @@ use Throwable;
 class ServiceRequestRequestRepository extends BaseRepository
 {
     use ResolvesRequestFhirRefs;
+    use FindsOpenActivityRequests;
+    use FindsOwnedRequests;
+
+    public function assertCompletionResourceOwned(string $referralUuid, string $resourceUuid, ReferralCompletionResourceType $type): void
+    {
+        $personId = $this->findByUuid($referralUuid)?->personId;
+        $modelClass = $type->modelClass();
+        $resource = $modelClass::query()->where('uuid', $resourceUuid)->first();
+
+        if ($resource === null) {
+            throw new \InvalidArgumentException(__('care-plan.referral_complete_emz_required'));
+        }
+
+        $resourcePersonId = $resource->personId ?? $resource->person_id ?? null;
+        if ($personId !== null && $resourcePersonId !== null && (int) $resourcePersonId !== (int) $personId) {
+            throw new \InvalidArgumentException(__('care-plan.referral_complete_emz_mismatch'));
+        }
+    }
+
+    public function setExecutionStatus(string $uuid, ServiceRequestStatus $status): void
+    {
+        $this->findByUuid($uuid)?->update(['status' => $status->value]);
+    }
+
+    /** Persist only after eHealth has successfully resolved the use action. */
+    public function persistExecution(string $uuid, Employee $employee, ?string $patientUuid, mixed $programId, array $response): void
+    {
+        $model = $this->findByUuid($uuid);
+        if ($model !== null) {
+            $model->update([
+                'status' => ServiceRequestStatus::IN_PROGRESS->value,
+                'program_id' => $programId ?? $model->programId,
+            ]);
+
+            return;
+        }
+
+        $person = $patientUuid ? \App\Models\Person\Person::where('uuid', $patientUuid)->first() : null;
+        if ($person === null) {
+            return;
+        }
+
+        $data = $response['data'] ?? $response;
+        $fields = app(ObjectMapperInterface::class)->map(new ServiceRequestUse($data), ServiceRequestModelData::class)->toUseRecord();
+        $this->store(array_replace($fields, [
+            'uuid' => $uuid,
+            'status' => ServiceRequestStatus::IN_PROGRESS->value,
+            'employee_id' => $employee->id,
+            'division_id' => $employee->divisionId,
+            'program_id' => $programId ?? $fields['program_id'],
+        ]), $person->id);
+    }
+
+    public function findOwnedReferralByPerson(string $uuid, int $personId, ?int $legalEntityId): ServiceRequestRequest|DeviceRequestRequest
+    {
+        try {
+            return $this->findOwnedByPerson($uuid, $personId, $legalEntityId);
+        } catch (ModelNotFoundException) {
+            return Repository::deviceRequest()->findOwnedByPerson($uuid, $personId, $legalEntityId);
+        }
+    }
 
     public function __construct(ServiceRequestRequest $model)
     {
@@ -268,7 +337,7 @@ class ServiceRequestRequestRepository extends BaseRepository
      */
     public function storeExternalIfMissing(array $referral, Employee $employee, int $personId): void
     {
-        $data = new ServiceRequestMapper()->fromFhir($referral);
+        $data = app(ObjectMapperInterface::class)->map(new ServiceRequestSearch($referral), ServiceRequestModelData::class)->toExternalRecord();
         $uuid = $data['uuid'] ?? null;
 
         if (blank($uuid) || $this->findByUuid($uuid) !== null) {
@@ -292,7 +361,7 @@ class ServiceRequestRequestRepository extends BaseRepository
 
         $mappedReferrals = collect($referrals)
             ->map(function (array $item): array {
-                $data = new ServiceRequestMapper()->fromFhir($item['referral']);
+                $data = app(ObjectMapperInterface::class)->map(new ServiceRequestSearch($item['referral']), ServiceRequestModelData::class)->toExternalRecord();
 
                 return [
                     'data' => $data,
@@ -330,7 +399,7 @@ class ServiceRequestRequestRepository extends BaseRepository
     {
         return (float) $this->model->newQuery()
             ->whereHas('basedOn', fn ($q) => $q->where('value', $activityUuid))
-            ->whereNotIn('status', MedicalEventsRequestStatuses::EXCLUDED_FROM_ISSUED_SUM)
+            ->whereNotIn('status', \App\Enums\MedicalEvents\RequestQuantityStatus::excluded())
             ->sum('quantity');
     }
 

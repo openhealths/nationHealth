@@ -1,0 +1,436 @@
+{
+    "capturedFrom": "17955764f14fa5d569a310c5498cdbfaa423d8f6:CarePlanRepository::formatCarePlanRequest",
+    "timezone": "Europe/Kyiv",
+    "cases": {
+        "minimal": {
+            "payload": {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "intent": "order",
+                "status": "new",
+                "category": {
+                    "coding": [
+                        {
+                            "system": "eHealth/care_plan_categories",
+                            "code": "736382003"
+                        }
+                    ]
+                },
+                "title": "План лікування",
+                "period": {
+                    "start": "2026-10-04T21:00:00Z"
+                },
+                "author": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "22222222-2222-4222-8222-222222222222"
+                    }
+                },
+                "terms_of_service": {
+                    "coding": [
+                        {
+                            "system": "PROVIDING_CONDITION",
+                            "code": "OUTPATIENT"
+                        }
+                    ]
+                }
+            },
+            "signingJson": "{\"id\":\"11111111-1111-4111-8111-111111111111\",\"intent\":\"order\",\"status\":\"new\",\"category\":{\"coding\":[{\"system\":\"eHealth\\/care_plan_categories\",\"code\":\"736382003\"}]},\"title\":\"\\u041f\\u043b\\u0430\\u043d \\u043b\\u0456\\u043a\\u0443\\u0432\\u0430\\u043d\\u043d\\u044f\",\"period\":{\"start\":\"2026-10-04T21:00:00Z\"},\"author\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}]},\"value\":\"22222222-2222-4222-8222-222222222222\"}},\"terms_of_service\":{\"coding\":[{\"system\":\"PROVIDING_CONDITION\",\"code\":\"OUTPATIENT\"}]}}"
+        },
+        "full_sparse_lists": {
+            "payload": {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "intent": "order",
+                "status": "new",
+                "category": {
+                    "coding": [
+                        {
+                            "system": "eHealth/care_plan_categories",
+                            "code": "736382003"
+                        }
+                    ]
+                },
+                "title": "План \"А\"\nПродовження",
+                "period": {
+                    "start": "2026-10-04T21:00:00Z",
+                    "end": "2026-10-15T20:59:59Z"
+                },
+                "addresses": [
+                    {
+                        "coding": [
+                            {
+                                "system": "eHealth/ICD10",
+                                "code": "A01"
+                            }
+                        ],
+                        "text": "Діагноз"
+                    },
+                    {
+                        "coding": [
+                            {
+                                "system": "eHealth/ICPC2",
+                                "code": "D02"
+                            }
+                        ]
+                    }
+                ],
+                "supporting_info": [
+                    {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth/resources",
+                                        "code": "episode_of_care"
+                                    }
+                                ]
+                            },
+                            "value": "episode-a"
+                        }
+                    },
+                    {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth/resources",
+                                        "code": "episode_of_care"
+                                    }
+                                ]
+                            },
+                            "value": "episode-b"
+                        }
+                    }
+                ],
+                "encounter": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "encounter"
+                                }
+                            ]
+                        },
+                        "value": "33333333-3333-4333-8333-333333333333"
+                    }
+                },
+                "author": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "22222222-2222-4222-8222-222222222222"
+                    }
+                },
+                "description": "Опис",
+                "note": "Нотатка",
+                "terms_of_service": {
+                    "coding": [
+                        {
+                            "system": "PROVIDING_CONDITION",
+                            "code": "OUTPATIENT"
+                        }
+                    ]
+                },
+                "inform_with": "auth-method"
+            },
+            "signingJson": "{\"id\":\"11111111-1111-4111-8111-111111111111\",\"intent\":\"order\",\"status\":\"new\",\"category\":{\"coding\":[{\"system\":\"eHealth\\/care_plan_categories\",\"code\":\"736382003\"}]},\"title\":\"\\u041f\\u043b\\u0430\\u043d \\\"\\u0410\\\"\\n\\u041f\\u0440\\u043e\\u0434\\u043e\\u0432\\u0436\\u0435\\u043d\\u043d\\u044f\",\"period\":{\"start\":\"2026-10-04T21:00:00Z\",\"end\":\"2026-10-15T20:59:59Z\"},\"addresses\":[{\"coding\":[{\"system\":\"eHealth\\/ICD10\",\"code\":\"A01\"}],\"text\":\"\\u0414\\u0456\\u0430\\u0433\\u043d\\u043e\\u0437\"},{\"coding\":[{\"system\":\"eHealth\\/ICPC2\",\"code\":\"D02\"}]}],\"supporting_info\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"episode_of_care\"}]},\"value\":\"episode-a\"}},{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"episode_of_care\"}]},\"value\":\"episode-b\"}}],\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}]},\"value\":\"33333333-3333-4333-8333-333333333333\"}},\"author\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}]},\"value\":\"22222222-2222-4222-8222-222222222222\"}},\"description\":\"\\u041e\\u043f\\u0438\\u0441\",\"note\":\"\\u041d\\u043e\\u0442\\u0430\\u0442\\u043a\\u0430\",\"terms_of_service\":{\"coding\":[{\"system\":\"PROVIDING_CONDITION\",\"code\":\"OUTPATIENT\"}]},\"inform_with\":\"auth-method\"}"
+        },
+        "encounter_later_same_day": {
+            "payload": {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "intent": "order",
+                "status": "new",
+                "category": {
+                    "coding": [
+                        {
+                            "system": "eHealth/care_plan_categories",
+                            "code": "736382003"
+                        }
+                    ]
+                },
+                "title": "План лікування",
+                "period": {
+                    "start": "2026-10-05T12:46:30Z"
+                },
+                "author": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "22222222-2222-4222-8222-222222222222"
+                    }
+                },
+                "terms_of_service": {
+                    "coding": [
+                        {
+                            "system": "PROVIDING_CONDITION",
+                            "code": "OUTPATIENT"
+                        }
+                    ]
+                }
+            },
+            "signingJson": "{\"id\":\"11111111-1111-4111-8111-111111111111\",\"intent\":\"order\",\"status\":\"new\",\"category\":{\"coding\":[{\"system\":\"eHealth\\/care_plan_categories\",\"code\":\"736382003\"}]},\"title\":\"\\u041f\\u043b\\u0430\\u043d \\u043b\\u0456\\u043a\\u0443\\u0432\\u0430\\u043d\\u043d\\u044f\",\"period\":{\"start\":\"2026-10-05T12:46:30Z\"},\"author\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}]},\"value\":\"22222222-2222-4222-8222-222222222222\"}},\"terms_of_service\":{\"coding\":[{\"system\":\"PROVIDING_CONDITION\",\"code\":\"OUTPATIENT\"}]}}"
+        },
+        "selected_day_after_encounter": {
+            "payload": {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "intent": "order",
+                "status": "new",
+                "category": {
+                    "coding": [
+                        {
+                            "system": "eHealth/care_plan_categories",
+                            "code": "736382003"
+                        }
+                    ]
+                },
+                "title": "План лікування",
+                "period": {
+                    "start": "2026-10-05T21:00:00Z"
+                },
+                "author": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "22222222-2222-4222-8222-222222222222"
+                    }
+                },
+                "terms_of_service": {
+                    "coding": [
+                        {
+                            "system": "PROVIDING_CONDITION",
+                            "code": "OUTPATIENT"
+                        }
+                    ]
+                }
+            },
+            "signingJson": "{\"id\":\"11111111-1111-4111-8111-111111111111\",\"intent\":\"order\",\"status\":\"new\",\"category\":{\"coding\":[{\"system\":\"eHealth\\/care_plan_categories\",\"code\":\"736382003\"}]},\"title\":\"\\u041f\\u043b\\u0430\\u043d \\u043b\\u0456\\u043a\\u0443\\u0432\\u0430\\u043d\\u043d\\u044f\",\"period\":{\"start\":\"2026-10-05T21:00:00Z\"},\"author\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}]},\"value\":\"22222222-2222-4222-8222-222222222222\"}},\"terms_of_service\":{\"coding\":[{\"system\":\"PROVIDING_CONDITION\",\"code\":\"OUTPATIENT\"}]}}"
+        },
+        "exact_encounter_midnight": {
+            "payload": {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "intent": "order",
+                "status": "new",
+                "category": {
+                    "coding": [
+                        {
+                            "system": "eHealth/care_plan_categories",
+                            "code": "736382003"
+                        }
+                    ]
+                },
+                "title": "План лікування",
+                "period": {
+                    "start": "2026-10-04T21:00:00Z"
+                },
+                "author": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "22222222-2222-4222-8222-222222222222"
+                    }
+                },
+                "terms_of_service": {
+                    "coding": [
+                        {
+                            "system": "PROVIDING_CONDITION",
+                            "code": "OUTPATIENT"
+                        }
+                    ]
+                }
+            },
+            "signingJson": "{\"id\":\"11111111-1111-4111-8111-111111111111\",\"intent\":\"order\",\"status\":\"new\",\"category\":{\"coding\":[{\"system\":\"eHealth\\/care_plan_categories\",\"code\":\"736382003\"}]},\"title\":\"\\u041f\\u043b\\u0430\\u043d \\u043b\\u0456\\u043a\\u0443\\u0432\\u0430\\u043d\\u043d\\u044f\",\"period\":{\"start\":\"2026-10-04T21:00:00Z\"},\"author\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}]},\"value\":\"22222222-2222-4222-8222-222222222222\"}},\"terms_of_service\":{\"coding\":[{\"system\":\"PROVIDING_CONDITION\",\"code\":\"OUTPATIENT\"}]}}"
+        },
+        "spring_dst": {
+            "payload": {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "intent": "order",
+                "status": "new",
+                "category": {
+                    "coding": [
+                        {
+                            "system": "eHealth/care_plan_categories",
+                            "code": "736382003"
+                        }
+                    ]
+                },
+                "title": "План лікування",
+                "period": {
+                    "start": "2026-03-28T22:00:00Z",
+                    "end": "2026-03-29T20:59:59Z"
+                },
+                "author": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "22222222-2222-4222-8222-222222222222"
+                    }
+                },
+                "terms_of_service": {
+                    "coding": [
+                        {
+                            "system": "PROVIDING_CONDITION",
+                            "code": "OUTPATIENT"
+                        }
+                    ]
+                }
+            },
+            "signingJson": "{\"id\":\"11111111-1111-4111-8111-111111111111\",\"intent\":\"order\",\"status\":\"new\",\"category\":{\"coding\":[{\"system\":\"eHealth\\/care_plan_categories\",\"code\":\"736382003\"}]},\"title\":\"\\u041f\\u043b\\u0430\\u043d \\u043b\\u0456\\u043a\\u0443\\u0432\\u0430\\u043d\\u043d\\u044f\",\"period\":{\"start\":\"2026-03-28T22:00:00Z\",\"end\":\"2026-03-29T20:59:59Z\"},\"author\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}]},\"value\":\"22222222-2222-4222-8222-222222222222\"}},\"terms_of_service\":{\"coding\":[{\"system\":\"PROVIDING_CONDITION\",\"code\":\"OUTPATIENT\"}]}}"
+        },
+        "autumn_dst": {
+            "payload": {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "intent": "order",
+                "status": "new",
+                "category": {
+                    "coding": [
+                        {
+                            "system": "eHealth/care_plan_categories",
+                            "code": "736382003"
+                        }
+                    ]
+                },
+                "title": "План лікування",
+                "period": {
+                    "start": "2026-10-24T21:00:00Z",
+                    "end": "2026-10-25T21:59:59Z"
+                },
+                "author": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "22222222-2222-4222-8222-222222222222"
+                    }
+                },
+                "terms_of_service": {
+                    "coding": [
+                        {
+                            "system": "PROVIDING_CONDITION",
+                            "code": "OUTPATIENT"
+                        }
+                    ]
+                }
+            },
+            "signingJson": "{\"id\":\"11111111-1111-4111-8111-111111111111\",\"intent\":\"order\",\"status\":\"new\",\"category\":{\"coding\":[{\"system\":\"eHealth\\/care_plan_categories\",\"code\":\"736382003\"}]},\"title\":\"\\u041f\\u043b\\u0430\\u043d \\u043b\\u0456\\u043a\\u0443\\u0432\\u0430\\u043d\\u043d\\u044f\",\"period\":{\"start\":\"2026-10-24T21:00:00Z\",\"end\":\"2026-10-25T21:59:59Z\"},\"author\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}]},\"value\":\"22222222-2222-4222-8222-222222222222\"}},\"terms_of_service\":{\"coding\":[{\"system\":\"PROVIDING_CONDITION\",\"code\":\"OUTPATIENT\"}]}}"
+        },
+        "legacy_empty_values": {
+            "payload": {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "intent": "order",
+                "status": "new",
+                "category": {
+                    "coding": [
+                        {
+                            "system": "eHealth/care_plan_categories",
+                            "code": "736382003"
+                        }
+                    ]
+                },
+                "title": "План лікування",
+                "period": {
+                    "start": "2026-10-04T21:00:00Z"
+                },
+                "addresses": [
+                    {
+                        "coding": [
+                            {
+                                "system": "literalSystem"
+                            }
+                        ],
+                        "unexpectedKey": false
+                    }
+                ],
+                "supporting_info": [
+                    {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth/resources",
+                                        "code": "episode_of_care"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth/resources",
+                                        "code": "episode_of_care"
+                                    }
+                                ]
+                            },
+                            "value": "episode-c"
+                        }
+                    }
+                ],
+                "author": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        }
+                    }
+                },
+                "terms_of_service": {
+                    "coding": [
+                        {
+                            "system": "PROVIDING_CONDITION",
+                            "code": "OUTPATIENT"
+                        }
+                    ]
+                }
+            },
+            "signingJson": "{\"id\":\"11111111-1111-4111-8111-111111111111\",\"intent\":\"order\",\"status\":\"new\",\"category\":{\"coding\":[{\"system\":\"eHealth\\/care_plan_categories\",\"code\":\"736382003\"}]},\"title\":\"\\u041f\\u043b\\u0430\\u043d \\u043b\\u0456\\u043a\\u0443\\u0432\\u0430\\u043d\\u043d\\u044f\",\"period\":{\"start\":\"2026-10-04T21:00:00Z\"},\"addresses\":[{\"coding\":[{\"system\":\"literalSystem\"}],\"unexpected_key\":false}],\"supporting_info\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"episode_of_care\"}]}}},{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"episode_of_care\"}]},\"value\":\"episode-c\"}}],\"author\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}]}}},\"terms_of_service\":{\"coding\":[{\"system\":\"PROVIDING_CONDITION\",\"code\":\"OUTPATIENT\"}]}}"
+        }
+    }
+}

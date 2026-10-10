@@ -6,7 +6,7 @@ namespace Tests\Unit\CarePlan;
 
 use App\Classes\eHealth\EHealthResponse;
 use App\Livewire\CarePlan\CarePlanApprovals;
-use App\Services\MedicalEvents\CarePlanApprovalService;
+use App\Classes\eHealth\Api\Approval as ApprovalApi;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Facades\Session;
 use Mockery;
@@ -18,10 +18,10 @@ class InpatientApprovalConfirmationTest extends TestCase
 {
     public function test_failed_confirmation_does_not_flash_success_or_refresh_as_granted(): void
     {
-        $service = Mockery::mock(CarePlanApprovalService::class);
+        $service = Mockery::mock(ApprovalApi::class);
         $service->shouldReceive('confirmWithoutOtp')->once()->with('patient', 'approval')
             ->andThrow(new RuntimeException('API unavailable'));
-        $this->instance(CarePlanApprovalService::class, $service);
+        $this->instance(ApprovalApi::class, $service);
         $component = new InpatientApprovalHarness();
         $component->patientUuid = 'patient';
 
@@ -35,10 +35,10 @@ class InpatientApprovalConfirmationTest extends TestCase
 
     public function test_unsuccessful_response_does_not_flash_success(): void
     {
-        $service = Mockery::mock(CarePlanApprovalService::class);
+        $service = Mockery::mock(ApprovalApi::class);
         $service->shouldReceive('confirmWithoutOtp')->once()
             ->andReturn(new EHealthResponse(new Response(403, [], '{"error":{"message":"Forbidden"}}')));
-        $this->instance(CarePlanApprovalService::class, $service);
+        $this->instance(ApprovalApi::class, $service);
         $component = new InpatientApprovalHarness();
         $component->patientUuid = 'patient';
 

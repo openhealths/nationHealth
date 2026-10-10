@@ -1,0 +1,594 @@
+{
+    "minimal": {
+        "json": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recordedBy\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primarySource\":true,\"managingOrganization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}]}",
+        "signedJson": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recorded_by\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primary_source\":true,\"managing_organization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}]}",
+        "form": {
+            "uuid": null,
+            "status": "completed",
+            "categoryCode": "",
+            "codeValue": "",
+            "encounterId": "",
+            "primarySource": null,
+            "performerEmployeeId": "",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "divisionId": "",
+            "outcomeCode": "",
+            "note": "",
+            "basedOnIdentifier": "",
+            "isReferralAvailable": false,
+            "referralType": "",
+            "paperReferralRequisition": "",
+            "paperReferralRequesterEmployeeName": "",
+            "paperReferralRequesterLegalEntityEdrpou": "",
+            "paperReferralRequesterLegalEntityName": "",
+            "paperReferralServiceRequestDate": "",
+            "paperReferralNote": "",
+            "performedType": "",
+            "performedDate": "",
+            "performedTime": "",
+            "performedPeriodStartDate": "",
+            "performedPeriodStartTime": "",
+            "performedPeriodEndDate": "",
+            "performedPeriodEndTime": "",
+            "reasonReferences": [],
+            "usedCodes": [],
+            "usedReferences": [],
+            "focalDevice": [],
+            "complicationDetails": []
+        },
+        "cancelJson": "{\"id\":\"procedure\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null,\"false\":false,\"list\":{\"42\":\"retained\"}},\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_status_reasons\",\"code\":\"incorrect_data\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanatory_letter\":null}"
+    },
+    "full encounter": {
+        "json": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recordedBy\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primarySource\":true,\"managingOrganization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"performedDateTime\":\"2026-10-05T07:15:00Z\",\"basedOn\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service_request\"}],\"text\":\"\"},\"value\":\"referral\"}},\"division\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"division\"}],\"text\":\"\"},\"value\":\"division\"}},\"reasonReferences\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"condition\"}}],\"outcome\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_outcomes\",\"code\":\"success\"}],\"text\":\"\"},\"note\":\"\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"usedCodes\":[{\"coding\":[{\"system\":\"eHealth\\\/assistive_products\",\"code\":\"301\"}],\"text\":\"\"}],\"usedReferences\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"equipment\"}],\"text\":\"\"},\"value\":\"equipment\"}}],\"focalDevice\":[{\"manipulated\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"action\":{\"coding\":[{\"system\":\"procedure_focal_device_actions\",\"code\":\"implantation\"}],\"text\":\"\"}},{\"manipulated\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"other-device\"}}}],\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}],\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"complicationDetails\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"complication\"}}]}",
+        "signedJson": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recorded_by\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primary_source\":true,\"managing_organization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"performed_date_time\":\"2026-10-05T07:15:00Z\",\"based_on\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service_request\"}],\"text\":\"\"},\"value\":\"referral\"}},\"division\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"division\"}],\"text\":\"\"},\"value\":\"division\"}},\"reason_references\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"condition\"}}],\"outcome\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_outcomes\",\"code\":\"success\"}],\"text\":\"\"},\"note\":\"\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"used_codes\":[{\"coding\":[{\"system\":\"eHealth\\\/assistive_products\",\"code\":\"301\"}],\"text\":\"\"}],\"used_references\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"equipment\"}],\"text\":\"\"},\"value\":\"equipment\"}}],\"focal_device\":[{\"manipulated\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"action\":{\"coding\":[{\"system\":\"procedure_focal_device_actions\",\"code\":\"implantation\"}],\"text\":\"\"}},{\"manipulated\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"other-device\"}}}],\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}],\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"complication_details\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"complication\"}}]}",
+        "form": {
+            "uuid": "procedure",
+            "status": "completed",
+            "categoryCode": "procedure",
+            "codeValue": "service",
+            "encounterId": "",
+            "primarySource": true,
+            "performerEmployeeId": "performer",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "divisionId": "",
+            "outcomeCode": "",
+            "note": "",
+            "basedOnIdentifier": "",
+            "isReferralAvailable": false,
+            "referralType": "",
+            "paperReferralRequisition": "",
+            "paperReferralRequesterEmployeeName": "",
+            "paperReferralRequesterLegalEntityEdrpou": "",
+            "paperReferralRequesterLegalEntityName": "",
+            "paperReferralServiceRequestDate": "",
+            "paperReferralNote": "",
+            "performedType": "date_time",
+            "performedDate": "05.10.2026",
+            "performedTime": "10:15",
+            "performedPeriodStartDate": "04.10.2026",
+            "performedPeriodStartTime": "09:00",
+            "performedPeriodEndDate": "05.10.2026",
+            "performedPeriodEndTime": "10:00",
+            "reasonReferences": {
+                "9": {
+                    "id": "condition",
+                    "type": "condition",
+                    "ehealthInsertedAt": "date",
+                    "codeCode": "D02",
+                    "codeSystem": "ICPC2"
+                }
+            },
+            "usedCodes": {
+                "42": {
+                    "code": "301"
+                }
+            },
+            "usedReferences": [
+                {
+                    "id": "equipment"
+                }
+            ],
+            "focalDevice": {
+                "42": {
+                    "manipulatedId": "device",
+                    "actionCode": "implantation"
+                }
+            },
+            "complicationDetails": {
+                "9": {
+                    "id": "complication",
+                    "ehealthInsertedAt": null,
+                    "codeCode": "D03",
+                    "codeSystem": null
+                }
+            }
+        },
+        "cancelJson": "{\"id\":\"procedure\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null,\"false\":false,\"list\":{\"42\":\"retained\"}},\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_status_reasons\",\"code\":\"incorrect_data\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanatory_letter\":null}"
+    },
+    "full standalone": {
+        "json": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recordedBy\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primarySource\":true,\"managingOrganization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"performedDateTime\":\"2026-10-05T07:15:00Z\",\"basedOn\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service_request\"}],\"text\":\"\"},\"value\":\"referral\"}},\"division\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"division\"}],\"text\":\"\"},\"value\":\"division\"}},\"reasonReferences\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"condition\"}}],\"outcome\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_outcomes\",\"code\":\"success\"}],\"text\":\"\"},\"note\":\"\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"usedCodes\":[{\"coding\":[{\"system\":\"eHealth\\\/assistive_products\",\"code\":\"301\"}],\"text\":\"\"}],\"usedReferences\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"equipment\"}],\"text\":\"\"},\"value\":\"equipment\"}}],\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}]}",
+        "signedJson": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recorded_by\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primary_source\":true,\"managing_organization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"performed_date_time\":\"2026-10-05T07:15:00Z\",\"based_on\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service_request\"}],\"text\":\"\"},\"value\":\"referral\"}},\"division\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"division\"}],\"text\":\"\"},\"value\":\"division\"}},\"reason_references\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"condition\"}}],\"outcome\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_outcomes\",\"code\":\"success\"}],\"text\":\"\"},\"note\":\"\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"used_codes\":[{\"coding\":[{\"system\":\"eHealth\\\/assistive_products\",\"code\":\"301\"}],\"text\":\"\"}],\"used_references\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"equipment\"}],\"text\":\"\"},\"value\":\"equipment\"}}],\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}]}",
+        "form": {
+            "uuid": "procedure",
+            "status": "completed",
+            "categoryCode": "procedure",
+            "codeValue": "service",
+            "encounterId": "",
+            "primarySource": true,
+            "performerEmployeeId": "performer",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "divisionId": "",
+            "outcomeCode": "",
+            "note": "",
+            "basedOnIdentifier": "",
+            "isReferralAvailable": false,
+            "referralType": "",
+            "paperReferralRequisition": "",
+            "paperReferralRequesterEmployeeName": "",
+            "paperReferralRequesterLegalEntityEdrpou": "",
+            "paperReferralRequesterLegalEntityName": "",
+            "paperReferralServiceRequestDate": "",
+            "paperReferralNote": "",
+            "performedType": "date_time",
+            "performedDate": "05.10.2026",
+            "performedTime": "10:15",
+            "performedPeriodStartDate": "04.10.2026",
+            "performedPeriodStartTime": "09:00",
+            "performedPeriodEndDate": "05.10.2026",
+            "performedPeriodEndTime": "10:00",
+            "reasonReferences": {
+                "9": {
+                    "id": "condition",
+                    "type": "condition",
+                    "ehealthInsertedAt": "date",
+                    "codeCode": "D02",
+                    "codeSystem": "ICPC2"
+                }
+            },
+            "usedCodes": {
+                "42": {
+                    "code": "301"
+                }
+            },
+            "usedReferences": [
+                {
+                    "id": "equipment"
+                }
+            ],
+            "focalDevice": {
+                "42": {
+                    "manipulatedId": "device",
+                    "actionCode": "implantation"
+                }
+            },
+            "complicationDetails": {
+                "9": {
+                    "id": "complication",
+                    "ehealthInsertedAt": null,
+                    "codeCode": "D03",
+                    "codeSystem": null
+                }
+            }
+        },
+        "cancelJson": "{\"id\":\"procedure\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null,\"false\":false,\"list\":{\"42\":\"retained\"}},\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_status_reasons\",\"code\":\"incorrect_data\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanatory_letter\":null}"
+    },
+    "period": {
+        "json": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recordedBy\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primarySource\":true,\"managingOrganization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"performedPeriod\":{\"start\":\"2026-10-04T06:00:00Z\",\"end\":\"2026-10-05T07:00:00Z\"},\"basedOn\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service_request\"}],\"text\":\"\"},\"value\":\"referral\"}},\"division\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"division\"}],\"text\":\"\"},\"value\":\"division\"}},\"reasonReferences\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"condition\"}}],\"outcome\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_outcomes\",\"code\":\"success\"}],\"text\":\"\"},\"note\":\"\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"usedCodes\":[{\"coding\":[{\"system\":\"eHealth\\\/assistive_products\",\"code\":\"301\"}],\"text\":\"\"}],\"usedReferences\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"equipment\"}],\"text\":\"\"},\"value\":\"equipment\"}}],\"focalDevice\":[{\"manipulated\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"action\":{\"coding\":[{\"system\":\"procedure_focal_device_actions\",\"code\":\"implantation\"}],\"text\":\"\"}},{\"manipulated\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"other-device\"}}}],\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}],\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"complicationDetails\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"complication\"}}]}",
+        "signedJson": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recorded_by\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primary_source\":true,\"managing_organization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"performed_period\":{\"start\":\"2026-10-04T06:00:00Z\",\"end\":\"2026-10-05T07:00:00Z\"},\"based_on\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service_request\"}],\"text\":\"\"},\"value\":\"referral\"}},\"division\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"division\"}],\"text\":\"\"},\"value\":\"division\"}},\"reason_references\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"condition\"}}],\"outcome\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_outcomes\",\"code\":\"success\"}],\"text\":\"\"},\"note\":\"\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"used_codes\":[{\"coding\":[{\"system\":\"eHealth\\\/assistive_products\",\"code\":\"301\"}],\"text\":\"\"}],\"used_references\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"equipment\"}],\"text\":\"\"},\"value\":\"equipment\"}}],\"focal_device\":[{\"manipulated\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"action\":{\"coding\":[{\"system\":\"procedure_focal_device_actions\",\"code\":\"implantation\"}],\"text\":\"\"}},{\"manipulated\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"other-device\"}}}],\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}],\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"complication_details\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"complication\"}}]}",
+        "form": {
+            "uuid": null,
+            "status": "completed",
+            "categoryCode": "",
+            "codeValue": "",
+            "encounterId": "",
+            "primarySource": null,
+            "performerEmployeeId": "",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "divisionId": "",
+            "outcomeCode": "",
+            "note": "",
+            "basedOnIdentifier": "",
+            "isReferralAvailable": false,
+            "referralType": "",
+            "paperReferralRequisition": "",
+            "paperReferralRequesterEmployeeName": "",
+            "paperReferralRequesterLegalEntityEdrpou": "",
+            "paperReferralRequesterLegalEntityName": "",
+            "paperReferralServiceRequestDate": "",
+            "paperReferralNote": "",
+            "performedType": "period",
+            "performedDate": "",
+            "performedTime": "",
+            "performedPeriodStartDate": "04.10.2026",
+            "performedPeriodStartTime": "09:00",
+            "performedPeriodEndDate": "05.10.2026",
+            "performedPeriodEndTime": "10:00",
+            "reasonReferences": [],
+            "usedCodes": [],
+            "usedReferences": [],
+            "focalDevice": [],
+            "complicationDetails": []
+        },
+        "cancelJson": "{\"id\":\"procedure\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null,\"false\":false,\"list\":{\"42\":\"retained\"}},\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_status_reasons\",\"code\":\"incorrect_data\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanatory_letter\":null}"
+    },
+    "not done": {
+        "json": "{\"id\":\"procedure\",\"status\":\"not_done\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recordedBy\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primarySource\":true,\"managingOrganization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"basedOn\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service_request\"}],\"text\":\"\"},\"value\":\"referral\"}},\"division\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"division\"}],\"text\":\"\"},\"value\":\"division\"}},\"reasonReferences\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"condition\"}}],\"outcome\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_outcomes\",\"code\":\"success\"}],\"text\":\"\"},\"note\":\"\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"usedCodes\":[{\"coding\":[{\"system\":\"eHealth\\\/assistive_products\",\"code\":\"301\"}],\"text\":\"\"}],\"usedReferences\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"equipment\"}],\"text\":\"\"},\"value\":\"equipment\"}}],\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}],\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"complicationDetails\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"complication\"}}]}",
+        "signedJson": "{\"id\":\"procedure\",\"status\":\"not_done\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recorded_by\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primary_source\":true,\"managing_organization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"based_on\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service_request\"}],\"text\":\"\"},\"value\":\"referral\"}},\"division\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"division\"}],\"text\":\"\"},\"value\":\"division\"}},\"reason_references\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"condition\"}}],\"outcome\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_outcomes\",\"code\":\"success\"}],\"text\":\"\"},\"note\":\"\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"used_codes\":[{\"coding\":[{\"system\":\"eHealth\\\/assistive_products\",\"code\":\"301\"}],\"text\":\"\"}],\"used_references\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"equipment\"}],\"text\":\"\"},\"value\":\"equipment\"}}],\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}],\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"complication_details\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"complication\"}}]}",
+        "form": {
+            "uuid": null,
+            "status": "not_done",
+            "categoryCode": "",
+            "codeValue": "",
+            "encounterId": "",
+            "primarySource": null,
+            "performerEmployeeId": "",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "divisionId": "",
+            "outcomeCode": "",
+            "note": "",
+            "basedOnIdentifier": "",
+            "isReferralAvailable": false,
+            "referralType": "",
+            "paperReferralRequisition": "",
+            "paperReferralRequesterEmployeeName": "",
+            "paperReferralRequesterLegalEntityEdrpou": "",
+            "paperReferralRequesterLegalEntityName": "",
+            "paperReferralServiceRequestDate": "",
+            "paperReferralNote": "",
+            "performedType": "",
+            "performedDate": "",
+            "performedTime": "",
+            "performedPeriodStartDate": "",
+            "performedPeriodStartTime": "",
+            "performedPeriodEndDate": "",
+            "performedPeriodEndTime": "",
+            "reasonReferences": [],
+            "usedCodes": [],
+            "usedReferences": [],
+            "focalDevice": [],
+            "complicationDetails": []
+        },
+        "cancelJson": "{\"id\":\"procedure\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null,\"false\":false,\"list\":{\"42\":\"retained\"}},\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_status_reasons\",\"code\":\"incorrect_data\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanatory_letter\":null}"
+    },
+    "entered in error": {
+        "json": "{\"id\":\"procedure\",\"status\":\"entered_in_error\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recordedBy\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primarySource\":true,\"managingOrganization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"basedOn\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service_request\"}],\"text\":\"\"},\"value\":\"referral\"}},\"division\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"division\"}],\"text\":\"\"},\"value\":\"division\"}},\"reasonReferences\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"condition\"}}],\"outcome\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_outcomes\",\"code\":\"success\"}],\"text\":\"\"},\"note\":\"\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"usedCodes\":[{\"coding\":[{\"system\":\"eHealth\\\/assistive_products\",\"code\":\"301\"}],\"text\":\"\"}],\"usedReferences\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"equipment\"}],\"text\":\"\"},\"value\":\"equipment\"}}],\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}],\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"complicationDetails\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"complication\"}}]}",
+        "signedJson": "{\"id\":\"procedure\",\"status\":\"entered_in_error\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recorded_by\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primary_source\":true,\"managing_organization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"based_on\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service_request\"}],\"text\":\"\"},\"value\":\"referral\"}},\"division\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"division\"}],\"text\":\"\"},\"value\":\"division\"}},\"reason_references\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"condition\"}}],\"outcome\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_outcomes\",\"code\":\"success\"}],\"text\":\"\"},\"note\":\"\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"used_codes\":[{\"coding\":[{\"system\":\"eHealth\\\/assistive_products\",\"code\":\"301\"}],\"text\":\"\"}],\"used_references\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"equipment\"}],\"text\":\"\"},\"value\":\"equipment\"}}],\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}],\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"complication_details\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"complication\"}}]}",
+        "form": {
+            "uuid": null,
+            "status": "entered_in_error",
+            "categoryCode": "",
+            "codeValue": "",
+            "encounterId": "",
+            "primarySource": null,
+            "performerEmployeeId": "",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "divisionId": "",
+            "outcomeCode": "",
+            "note": "",
+            "basedOnIdentifier": "",
+            "isReferralAvailable": false,
+            "referralType": "",
+            "paperReferralRequisition": "",
+            "paperReferralRequesterEmployeeName": "",
+            "paperReferralRequesterLegalEntityEdrpou": "",
+            "paperReferralRequesterLegalEntityName": "",
+            "paperReferralServiceRequestDate": "",
+            "paperReferralNote": "",
+            "performedType": "",
+            "performedDate": "",
+            "performedTime": "",
+            "performedPeriodStartDate": "",
+            "performedPeriodStartTime": "",
+            "performedPeriodEndDate": "",
+            "performedPeriodEndTime": "",
+            "reasonReferences": [],
+            "usedCodes": [],
+            "usedReferences": [],
+            "focalDevice": [],
+            "complicationDetails": []
+        },
+        "cancelJson": "{\"id\":\"procedure\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null,\"false\":false,\"list\":{\"42\":\"retained\"}},\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_status_reasons\",\"code\":\"incorrect_data\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanatory_letter\":null}"
+    },
+    "reported origin": {
+        "json": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recordedBy\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primarySource\":false,\"managingOrganization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"reportOrigin\":{\"coding\":[{\"system\":\"eHealth\\\/report_origins\",\"code\":\"other\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"}}",
+        "signedJson": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recorded_by\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primary_source\":false,\"managing_organization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"report_origin\":{\"coding\":[{\"system\":\"eHealth\\\/report_origins\",\"code\":\"other\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"}}",
+        "form": {
+            "uuid": null,
+            "status": "completed",
+            "categoryCode": "",
+            "codeValue": "",
+            "encounterId": "",
+            "primarySource": false,
+            "performerEmployeeId": "",
+            "reportOriginCode": "other",
+            "reportOriginText": "Опис",
+            "divisionId": "",
+            "outcomeCode": "",
+            "note": "",
+            "basedOnIdentifier": "",
+            "isReferralAvailable": false,
+            "referralType": "",
+            "paperReferralRequisition": "",
+            "paperReferralRequesterEmployeeName": "",
+            "paperReferralRequesterLegalEntityEdrpou": "",
+            "paperReferralRequesterLegalEntityName": "",
+            "paperReferralServiceRequestDate": "",
+            "paperReferralNote": "",
+            "performedType": "",
+            "performedDate": "",
+            "performedTime": "",
+            "performedPeriodStartDate": "",
+            "performedPeriodStartTime": "",
+            "performedPeriodEndDate": "",
+            "performedPeriodEndTime": "",
+            "reasonReferences": [],
+            "usedCodes": [],
+            "usedReferences": [],
+            "focalDevice": [],
+            "complicationDetails": []
+        },
+        "cancelJson": "{\"id\":\"procedure\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null,\"false\":false,\"list\":{\"42\":\"retained\"}},\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_status_reasons\",\"code\":\"incorrect_data\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanatory_letter\":null}"
+    },
+    "filtered empty lists retained": {
+        "json": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recordedBy\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primarySource\":true,\"managingOrganization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"reasonReferences\":[],\"usedCodes\":[],\"usedReferences\":[],\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}],\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"complicationDetails\":[]}",
+        "signedJson": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recorded_by\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primary_source\":true,\"managing_organization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"reason_references\":[],\"used_codes\":[],\"used_references\":[],\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}],\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"complication_details\":[]}",
+        "form": {
+            "uuid": null,
+            "status": "completed",
+            "categoryCode": "",
+            "codeValue": "",
+            "encounterId": "",
+            "primarySource": null,
+            "performerEmployeeId": "",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "divisionId": "",
+            "outcomeCode": "",
+            "note": false,
+            "basedOnIdentifier": "",
+            "isReferralAvailable": false,
+            "referralType": "",
+            "paperReferralRequisition": "",
+            "paperReferralRequesterEmployeeName": "",
+            "paperReferralRequesterLegalEntityEdrpou": "",
+            "paperReferralRequesterLegalEntityName": "",
+            "paperReferralServiceRequestDate": "",
+            "paperReferralNote": "",
+            "performedType": "",
+            "performedDate": "",
+            "performedTime": "",
+            "performedPeriodStartDate": "",
+            "performedPeriodStartTime": "",
+            "performedPeriodEndDate": "",
+            "performedPeriodEndTime": "",
+            "reasonReferences": [],
+            "usedCodes": [],
+            "usedReferences": [],
+            "focalDevice": [],
+            "complicationDetails": []
+        },
+        "cancelJson": "{\"id\":\"procedure\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null,\"false\":false,\"list\":{\"42\":\"retained\"}},\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_status_reasons\",\"code\":\"incorrect_data\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanatory_letter\":null}"
+    },
+    "missing vs null aliases": {
+        "json": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recordedBy\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primarySource\":true,\"managingOrganization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}]}",
+        "signedJson": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recorded_by\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primary_source\":true,\"managing_organization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}]}",
+        "form": {
+            "uuid": null,
+            "status": null,
+            "categoryCode": "",
+            "codeValue": "",
+            "encounterId": "",
+            "primarySource": null,
+            "performerEmployeeId": null,
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "divisionId": "",
+            "outcomeCode": "",
+            "note": null,
+            "basedOnIdentifier": "fallback",
+            "isReferralAvailable": true,
+            "referralType": "electronic",
+            "paperReferralRequisition": "",
+            "paperReferralRequesterEmployeeName": "",
+            "paperReferralRequesterLegalEntityEdrpou": "",
+            "paperReferralRequesterLegalEntityName": "",
+            "paperReferralServiceRequestDate": "",
+            "paperReferralNote": "",
+            "performedType": "",
+            "performedDate": "",
+            "performedTime": "",
+            "performedPeriodStartDate": "",
+            "performedPeriodStartTime": "",
+            "performedPeriodEndDate": "",
+            "performedPeriodEndTime": "",
+            "reasonReferences": [],
+            "usedCodes": [],
+            "usedReferences": [],
+            "focalDevice": [],
+            "complicationDetails": []
+        },
+        "cancelJson": "{\"id\":\"procedure\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null,\"false\":false,\"list\":{\"42\":\"retained\"}},\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_status_reasons\",\"code\":\"incorrect_data\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanatory_letter\":null}"
+    },
+    "paper and electronic coexist": {
+        "json": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recordedBy\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primarySource\":true,\"managingOrganization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"performedDateTime\":\"2026-10-05T07:15:00Z\",\"basedOn\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service_request\"}],\"text\":\"\"},\"value\":\"referral\"}},\"paperReferral\":{\"requisition\":\"paper\",\"requesterEmployeeName\":\"\",\"requesterLegalEntityEdrpou\":\"12345678\",\"requesterLegalEntityName\":\"\",\"serviceRequestDate\":\"2026-10-04\",\"note\":\"\"},\"division\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"division\"}],\"text\":\"\"},\"value\":\"division\"}},\"reasonReferences\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"condition\"}}],\"outcome\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_outcomes\",\"code\":\"success\"}],\"text\":\"\"},\"note\":\"\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"usedCodes\":[{\"coding\":[{\"system\":\"eHealth\\\/assistive_products\",\"code\":\"301\"}],\"text\":\"\"}],\"usedReferences\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"equipment\"}],\"text\":\"\"},\"value\":\"equipment\"}}],\"focalDevice\":[{\"manipulated\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"action\":{\"coding\":[{\"system\":\"procedure_focal_device_actions\",\"code\":\"implantation\"}],\"text\":\"\"}},{\"manipulated\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"other-device\"}}}],\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}],\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"complicationDetails\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"complication\"}}]}",
+        "signedJson": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recorded_by\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primary_source\":true,\"managing_organization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"performed_date_time\":\"2026-10-05T07:15:00Z\",\"based_on\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service_request\"}],\"text\":\"\"},\"value\":\"referral\"}},\"paper_referral\":{\"requisition\":\"paper\",\"requester_employee_name\":\"\",\"requester_legal_entity_edrpou\":\"12345678\",\"requester_legal_entity_name\":\"\",\"service_request_date\":\"2026-10-04\",\"note\":\"\"},\"division\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"division\"}],\"text\":\"\"},\"value\":\"division\"}},\"reason_references\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"condition\"}}],\"outcome\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_outcomes\",\"code\":\"success\"}],\"text\":\"\"},\"note\":\"\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"used_codes\":[{\"coding\":[{\"system\":\"eHealth\\\/assistive_products\",\"code\":\"301\"}],\"text\":\"\"}],\"used_references\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"equipment\"}],\"text\":\"\"},\"value\":\"equipment\"}}],\"focal_device\":[{\"manipulated\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"action\":{\"coding\":[{\"system\":\"procedure_focal_device_actions\",\"code\":\"implantation\"}],\"text\":\"\"}},{\"manipulated\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"other-device\"}}}],\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}],\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"complication_details\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"complication\"}}]}",
+        "form": {
+            "uuid": "procedure",
+            "status": "completed",
+            "categoryCode": "procedure",
+            "codeValue": "service",
+            "encounterId": "",
+            "primarySource": true,
+            "performerEmployeeId": "performer",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "divisionId": "",
+            "outcomeCode": "",
+            "note": "",
+            "basedOnIdentifier": "referral",
+            "isReferralAvailable": true,
+            "referralType": "paper",
+            "paperReferralRequisition": "paper",
+            "paperReferralRequesterEmployeeName": "",
+            "paperReferralRequesterLegalEntityEdrpou": "",
+            "paperReferralRequesterLegalEntityName": "",
+            "paperReferralServiceRequestDate": "04.10.2026",
+            "paperReferralNote": "",
+            "performedType": "date_time",
+            "performedDate": "05.10.2026",
+            "performedTime": "10:15",
+            "performedPeriodStartDate": "04.10.2026",
+            "performedPeriodStartTime": "09:00",
+            "performedPeriodEndDate": "05.10.2026",
+            "performedPeriodEndTime": "10:00",
+            "reasonReferences": {
+                "9": {
+                    "id": "condition",
+                    "type": "condition",
+                    "ehealthInsertedAt": "date",
+                    "codeCode": "D02",
+                    "codeSystem": "ICPC2"
+                }
+            },
+            "usedCodes": {
+                "42": {
+                    "code": "301"
+                }
+            },
+            "usedReferences": [
+                {
+                    "id": "equipment"
+                }
+            ],
+            "focalDevice": {
+                "42": {
+                    "manipulatedId": "device",
+                    "actionCode": "implantation"
+                }
+            },
+            "complicationDetails": {
+                "9": {
+                    "id": "complication",
+                    "ehealthInsertedAt": null,
+                    "codeCode": "D03",
+                    "codeSystem": null
+                }
+            }
+        },
+        "cancelJson": "{\"id\":\"procedure\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null,\"false\":false,\"list\":{\"42\":\"retained\"}},\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_status_reasons\",\"code\":\"incorrect_data\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanatory_letter\":null}"
+    },
+    "DST": {
+        "json": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recordedBy\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primarySource\":true,\"managingOrganization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"performedDateTime\":\"2026-10-25T02:15:00Z\",\"basedOn\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service_request\"}],\"text\":\"\"},\"value\":\"referral\"}},\"division\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"division\"}],\"text\":\"\"},\"value\":\"division\"}},\"reasonReferences\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"condition\"}}],\"outcome\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_outcomes\",\"code\":\"success\"}],\"text\":\"\"},\"note\":\"\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"usedCodes\":[{\"coding\":[{\"system\":\"eHealth\\\/assistive_products\",\"code\":\"301\"}],\"text\":\"\"}],\"usedReferences\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"equipment\"}],\"text\":\"\"},\"value\":\"equipment\"}}],\"focalDevice\":[{\"manipulated\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"action\":{\"coding\":[{\"system\":\"procedure_focal_device_actions\",\"code\":\"implantation\"}],\"text\":\"\"}},{\"manipulated\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"other-device\"}}}],\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}],\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"complicationDetails\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"complication\"}}]}",
+        "signedJson": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recorded_by\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primary_source\":true,\"managing_organization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"performed_date_time\":\"2026-10-25T02:15:00Z\",\"based_on\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service_request\"}],\"text\":\"\"},\"value\":\"referral\"}},\"division\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"division\"}],\"text\":\"\"},\"value\":\"division\"}},\"reason_references\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"condition\"}}],\"outcome\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_outcomes\",\"code\":\"success\"}],\"text\":\"\"},\"note\":\"\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"used_codes\":[{\"coding\":[{\"system\":\"eHealth\\\/assistive_products\",\"code\":\"301\"}],\"text\":\"\"}],\"used_references\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"equipment\"}],\"text\":\"\"},\"value\":\"equipment\"}}],\"focal_device\":[{\"manipulated\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"action\":{\"coding\":[{\"system\":\"procedure_focal_device_actions\",\"code\":\"implantation\"}],\"text\":\"\"}},{\"manipulated\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"other-device\"}}}],\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}],\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"complication_details\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"complication\"}}]}",
+        "form": {
+            "uuid": null,
+            "status": "completed",
+            "categoryCode": "",
+            "codeValue": "",
+            "encounterId": "",
+            "primarySource": null,
+            "performerEmployeeId": "",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "divisionId": "",
+            "outcomeCode": "",
+            "note": "",
+            "basedOnIdentifier": "",
+            "isReferralAvailable": false,
+            "referralType": "",
+            "paperReferralRequisition": "",
+            "paperReferralRequesterEmployeeName": "",
+            "paperReferralRequesterLegalEntityEdrpou": "",
+            "paperReferralRequesterLegalEntityName": "",
+            "paperReferralServiceRequestDate": "",
+            "paperReferralNote": "",
+            "performedType": "date_time",
+            "performedDate": "25.10.2026",
+            "performedTime": "04:15",
+            "performedPeriodStartDate": "",
+            "performedPeriodStartTime": "",
+            "performedPeriodEndDate": "",
+            "performedPeriodEndTime": "",
+            "reasonReferences": [],
+            "usedCodes": [],
+            "usedReferences": [],
+            "focalDevice": [],
+            "complicationDetails": []
+        },
+        "cancelJson": "{\"id\":\"procedure\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null,\"false\":false,\"list\":{\"42\":\"retained\"}},\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_status_reasons\",\"code\":\"incorrect_data\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanatory_letter\":null}"
+    },
+    "unknown fields": {
+        "json": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recordedBy\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primarySource\":true,\"managingOrganization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}]}",
+        "signedJson": "{\"id\":\"procedure\",\"status\":\"completed\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}},\"recorded_by\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"primary_source\":true,\"managing_organization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_categories\",\"code\":\"procedure\"}],\"text\":\"\"},\"performer\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}}]}",
+        "form": {
+            "uuid": "procedure",
+            "status": "completed",
+            "categoryCode": "procedure",
+            "codeValue": "service",
+            "encounterId": "",
+            "primarySource": true,
+            "performerEmployeeId": "performer",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "divisionId": "",
+            "outcomeCode": "",
+            "note": "",
+            "basedOnIdentifier": "",
+            "isReferralAvailable": false,
+            "referralType": "",
+            "paperReferralRequisition": "",
+            "paperReferralRequesterEmployeeName": "",
+            "paperReferralRequesterLegalEntityEdrpou": "",
+            "paperReferralRequesterLegalEntityName": "",
+            "paperReferralServiceRequestDate": "",
+            "paperReferralNote": "",
+            "performedType": "date_time",
+            "performedDate": "05.10.2026",
+            "performedTime": "10:15",
+            "performedPeriodStartDate": "04.10.2026",
+            "performedPeriodStartTime": "09:00",
+            "performedPeriodEndDate": "05.10.2026",
+            "performedPeriodEndTime": "10:00",
+            "reasonReferences": {
+                "9": {
+                    "id": "condition",
+                    "type": "condition",
+                    "ehealthInsertedAt": "date",
+                    "codeCode": "D02",
+                    "codeSystem": "ICPC2"
+                }
+            },
+            "usedCodes": {
+                "42": {
+                    "code": "301"
+                }
+            },
+            "usedReferences": [
+                {
+                    "id": "equipment"
+                }
+            ],
+            "focalDevice": {
+                "42": {
+                    "manipulatedId": "device",
+                    "actionCode": "implantation"
+                }
+            },
+            "complicationDetails": {
+                "9": {
+                    "id": "complication",
+                    "ehealthInsertedAt": null,
+                    "codeCode": "D03",
+                    "codeSystem": null
+                }
+            }
+        },
+        "cancelJson": "{\"id\":\"procedure\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null,\"false\":false,\"list\":{\"42\":\"retained\"}},\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/procedure_status_reasons\",\"code\":\"incorrect_data\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanatory_letter\":null}"
+    }
+}

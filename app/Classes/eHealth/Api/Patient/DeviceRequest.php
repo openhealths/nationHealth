@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api\Patient;
 
+use App\Classes\eHealth\Api\Concerns\ResolvesSignedPatientRequests;
 use App\Classes\eHealth\EHealthResponse;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Validator;
 
 class DeviceRequest extends PatientApiBase
 {
+    use ResolvesSignedPatientRequests;
+
     /**
      * Create a signed Device Request in eHealth (PKCS#7).
      *

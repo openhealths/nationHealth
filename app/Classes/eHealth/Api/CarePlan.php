@@ -4,20 +4,56 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
+use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
+use App\Core\Arr;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
-use App\Core\Arr;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class CarePlan extends Request
 {
     protected const string URL = '/api/care_plans';
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function createSignedAndResolve(string $patientUuid, string $signedContent): array
+    {
+        $response = $this->create($patientUuid, [
+            'signed_data' => $signedContent,
+            'signed_data_encoding' => 'base64',
+        ]);
+
+        return EHealth::job()->resolve($response->getData());
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function cancelAndResolve(string $patientUuid, string $carePlanUuid, array $payload): array
+    {
+        $response = $this->cancel($patientUuid, $carePlanUuid, $payload);
+
+        return EHealth::job()->resolve($response->getData());
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function completeAndResolve(string $patientUuid, string $carePlanUuid, array $payload): array
+    {
+        $response = $this->complete($patientUuid, $carePlanUuid, $payload);
+
+        return EHealth::job()->resolve($response->getData());
+    }
 
     /**
      * Create a new Care Plan in eHealth.

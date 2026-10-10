@@ -52,7 +52,7 @@ class CarePlanApprovalRepositoryResolutionTest extends TestCase
         // The call lives in whichever of the two holds the sync action; CarePlanShow uses the
         // CarePlanManager trait, so requiring it in both files only pins where the code sits.
         $this->assertStringContainsString(
-            'app(CarePlanApprovalService::class)->syncForCarePlan($this->carePlan)',
+            "Repository::approval()->syncApprovals(\$this->carePlan, 'care_plan', [])",
             implode("\n", $sources)
         );
     }

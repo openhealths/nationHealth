@@ -7,15 +7,18 @@ namespace App\Livewire\DiagnosticReport;
 use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
-use App\Enums\Status;
-use App\Enums\User\Role;
+use App\Dto\DiagnosticReport\Ehealth as DiagnosticReportEhealth;
+
+use App\Dto\FormCollection;
+use App\Dto\Observation\Ehealth as ObservationEhealth;
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Person\DiagnosticReportStatus;
+use App\Enums\Status;
+use App\Enums\User\Role;
 use App\Exceptions\Cipher\CipherConnectionException;
 use App\Exceptions\Cipher\CipherException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
-use App\Services\MedicalEvents\Fhir;
 use App\Livewire\DiagnosticReport\Forms\DiagnosticReportForm as Form;
 use App\Models\Employee\Employee;
 use App\Models\Equipment;
@@ -37,12 +40,15 @@ use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use RuntimeException;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 use Throwable;
 
 abstract class DiagnosticReportComponent extends Component
 {
     use FormTrait;
+
     use SearchesElectronicReferrals;
+
     use WithFileUploads;
 
     public Form $form;
@@ -398,14 +404,19 @@ abstract class DiagnosticReportComponent extends Component
             'diagnosticReport' => $diagnosticReportUuid ?? Str::uuid()->toString(),
         ];
 
-        $diagnosticReport = Fhir::diagnosticReport()->toFhir(
-            $validatedData['diagnosticReport'],
-            $uuids,
-            $status
-        );
+        $diagnosticReport = Arr::toCamelCase(app(ObjectMapperInterface::class)->map(new FormCollection($validatedData['diagnosticReport']), new DiagnosticReportEhealth(
+            id: $uuids['diagnosticReport'],
+            status: $status,
+            legalEntity: legalEntity()->uuid,
+            employee: $uuids['employee'],
+        ))->toArray());
 
         $observations = collect($validatedData['observations'] ?? [])
-            ->map(fn (array $observation) => Fhir::observation()->toFhir($observation, $uuids))
+            ->map(fn (array $observation): array => Arr::toCamelCase(app(ObjectMapperInterface::class)->map(new FormCollection($observation), new ObservationEhealth(
+                id: $observation['uuid'] ?? Str::uuid()->toString(),
+                employee: $uuids['employee'],
+                diagnosticReport: $uuids['diagnosticReport'],
+            ))->toArray()))
             ->values()
             ->toArray();
 

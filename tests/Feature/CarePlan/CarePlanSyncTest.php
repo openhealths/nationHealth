@@ -285,6 +285,35 @@ class CarePlanSyncTest extends TestCase
         return [$person, $employee];
     }
 
+    public function test_partial_sync_preserves_local_editable_fields_while_applying_remote_defaults(): void
+    {
+        [$person, $employee] = $this->makeSyncContext();
+        $plan = CarePlan::create([
+            'uuid' => (string) Str::uuid(), 'person_id' => $person->id, 'author_id' => $employee->id,
+            'legal_entity_id' => $employee->legal_entity_id, 'status' => 'draft',
+            'title' => 'Local title', 'description' => 'Local description', 'note' => 'Local note',
+            'context' => 'local-context', 'inform_with' => 'local-auth', 'terms_of_service' => 'OUTPATIENT',
+            'period_start' => '2026-10-01',
+            'addresses' => [['coding' => [['code' => 'A01']]]],
+            'supporting_info' => ['episodes' => [['uuid' => 'local-episode', 'name' => 'Local episode']]],
+        ]);
+        $this->mockEmptyActivitySummary();
+        app(CarePlanRepository::class)->syncCarePlans(['data' => [[
+            'id' => $plan->uuid, 'title' => '', 'description' => '0', 'note' => null,
+            'ehealth_inserted_at' => '2026-10-05T12:00:00Z',
+        ]]], $person->id, $employee->id);
+        $plan->refresh();
+        $this->assertSame('Local title', $plan->title);
+        $this->assertSame('Local description', $plan->description);
+        $this->assertSame('Local note', $plan->note);
+        $this->assertSame('local-context', $plan->context);
+        $this->assertSame('local-auth', $plan->inform_with);
+        $this->assertSame('active', $plan->status);
+        $this->assertNull($plan->terms_of_service);
+        $this->assertSame('local-episode', $plan->supporting_info['episodes'][0]['uuid']);
+        $this->assertSame('A01', $plan->addresses[0]['coding'][0]['code']);
+    }
+
     private function mockEmptyActivitySummary(): void
     {
         $response = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);

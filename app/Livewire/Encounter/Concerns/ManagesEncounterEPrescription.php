@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace App\Livewire\Encounter\Concerns;
 
+use App\Dto\FormCollection;
+
 use App\Classes\eHealth\EHealth;
 use App\Enums\MedicalProgram\Type as MedicalProgramType;
 use App\Enums\Person\EncounterStatus;
+use App\Enums\Person\MedicationRequestStatus;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
-use App\Services\MedicalEvents\MedicalRequestOwnership;
-use App\Services\MedicalEvents\MedicationRequestLifecycleService;
+use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -22,6 +24,9 @@ use Throwable;
 
 trait ManagesEncounterEPrescription
 {
+    use \App\Livewire\Concerns\MedicalEvents\MedicationRequest\CreatesMedicationRequestDrafts;
+    use \App\Livewire\Concerns\MedicalEvents\MedicationRequest\SignsMedicationRequests;
+
     // Uses ResolvesEncounterStandaloneContext via EncounterEdit.
 
     public bool $showEncounterEPrescriptionDrawer = false;
@@ -228,15 +233,14 @@ trait ManagesEncounterEPrescription
         }
 
         try {
-            $employeeContext = app(MedicationRequestLifecycleService::class)->resolveEncounterEmployeeContext(
+            $employeeContext = app(\App\Repositories\EmployeeRepository::class)->resolveEncounterEmployeeContext(
                 $encounter,
                 Auth::user()?->activeDoctorEmployee()?->id
             );
 
             $formData = $this->encounterEPrescriptionForm;
 
-            $this->encounterEPrescriptionRequestIdToSign = app(MedicationRequestLifecycleService::class)
-                ->createEncounterDraft($encounter, $formData, $employeeContext);
+            $this->encounterEPrescriptionRequestIdToSign = $this->createEncounterMedicationDraft($encounter, $formData, $employeeContext);
 
             $this->actionType = 'sign_eprescription';
             $this->showSignatureModal = true;
@@ -272,11 +276,11 @@ trait ManagesEncounterEPrescription
         }
 
         try {
-            $requestRecord = app(MedicalRequestOwnership::class)
-                ->medicationForEncounter(
-                    (string) $this->encounterEPrescriptionRequestIdToSign,
-                    $encounter
-                );
+            $requestRecord = Repository::medicationRequest()->findOwnedForEncounter(
+                (string) $this->encounterEPrescriptionRequestIdToSign,
+                $encounter,
+                legalEntity()?->id
+            );
 
             $validated = $this->form->validate($this->form->signingRules());
 
@@ -289,7 +293,7 @@ trait ManagesEncounterEPrescription
                 }
             }
 
-            $result = app(MedicationRequestLifecycleService::class)->signPrescription(
+            $result = $this->signMedicationRequest(
                 $encounter,
                 $requestRecord,
                 [
@@ -418,5 +422,49 @@ trait ManagesEncounterEPrescription
         $quotient = $quantity / $step;
 
         return abs($quotient - round($quotient)) < 1e-6;
+    }
+
+    protected function createEncounterMedicationDraft(Encounter $encounter, array $formData = [], array $employeeContext = []): string
+    {
+        $formData['started_at'] ??= now()->toDateString();
+        $formData['ended_at'] ??= now()->addDays(30)->toDateString();
+        $formData['medication_qty'] ??= 1;
+        $formData['intent'] = 'order';
+        $formData['category'] ??= 'community';
+        $signatureText = !empty($formData['signature_text']) ? $formData['signature_text'] : 'За призначенням лікаря';
+        $patientInstruction = !empty($formData['patient_instruction']) ? $formData['patient_instruction'] : $signatureText;
+        $formData['dosage_instructions'] = [new FormCollection([
+            'sequence' => 1, 'text' => $signatureText, 'patient_instruction' => $patientInstruction,
+            'route' => $formData['route'] ?? 'oral',
+            'dose_and_rate' => [['dose_quantity_value' => (float) ($formData['max_dose_per_administration'] ?? 1.0), 'dose_quantity_unit' => $formData['medication_unit'] ?? 'од.']],
+            'max_dose_per_administration' => (float) ($formData['max_dose_per_administration'] ?? 1.0),
+            'max_dose_per_period' => (float) ($formData['max_dose_per_period'] ?? 1.0),
+        ])];
+        $dbData = array_replace(app(\Symfony\Component\ObjectMapper\ObjectMapperInterface::class)->map(
+            new FormCollection($formData),
+            \App\Dto\MedicationRequest\Model::class
+        )->toSigningFields(), [
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'employee_id' => $employeeContext['employee_id'] ?? null,
+            'person_id' => $encounter->person_id,
+            'division_id' => $employeeContext['division_id'] ?? null,
+            'status' => MedicationRequestStatus::DRAFT->value,
+            'based_on_uuid' => null,
+            'context_uuid' => $encounter->uuid,
+        ]);
+
+        $personUuid = \App\Models\Person\Person::find($encounter->person_id)?->uuid;
+        $episodeUuid = $encounter->episode?->value ?? null;
+
+        $uuids = [
+            'person_uuid' => $personUuid,
+            'encounter_uuid' => $encounter->uuid,
+            'episode_uuid' => $episodeUuid,
+            'employee_uuid' => $employeeContext['employee_uuid'] ?? null,
+            'legal_entity_uuid' => $employeeContext['legal_entity_uuid'] ?? null,
+            'division_uuid' => $employeeContext['division_id'] ? \App\Models\Division::find($employeeContext['division_id'])?->uuid : null,
+        ];
+
+        return $this->submitMedicationRequestDraft($dbData, $uuids, null, (int) $encounter->person_id);
     }
 }

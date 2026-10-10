@@ -1,0 +1,98 @@
+{
+    "full": {
+        "signedJson": "{\"id\":\"episode\",\"type\":{\"system\":\"eHealth\\\/episode_types\",\"code\":\"primary_care\"},\"name\":\"\\u0415\\u043f\\u0456\\u0437\\u043e\\u0434\",\"status\":\"active\",\"managing_organization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"period\":{\"start\":\"2026-10-05T07:00:00Z\"},\"care_manager\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}}",
+        "updateJson": "{\"name\":\"\\u0415\\u043f\\u0456\\u0437\\u043e\\u0434\",\"care_manager\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"manager\"}}}",
+        "form": {
+            "id": "episode",
+            "name": "Епізод",
+            "typeCode": "primary_care",
+            "careManagerId": "manager",
+            "startDate": "05.10.2026",
+            "startTime": "10:00"
+        }
+    },
+    "empty name": {
+        "signedJson": "{\"id\":\"episode\",\"type\":{\"system\":\"eHealth\\\/episode_types\",\"code\":\"primary_care\"},\"name\":\"\",\"status\":\"active\",\"managing_organization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"period\":{\"start\":\"2026-10-05T07:00:00Z\"},\"care_manager\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}}",
+        "updateJson": "{\"name\":\"\",\"care_manager\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"\"}}}",
+        "form": {
+            "id": null,
+            "name": null,
+            "typeCode": "",
+            "careManagerId": "",
+            "startDate": "",
+            "startTime": ""
+        }
+    },
+    "explicit null hydration": {
+        "signedJson": "{\"id\":\"episode\",\"type\":{\"system\":\"eHealth\\\/episode_types\",\"code\":\"primary_care\"},\"name\":\"0\",\"status\":\"active\",\"managing_organization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"period\":{\"start\":\"2026-10-05T07:00:00Z\"},\"care_manager\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}}",
+        "updateJson": "{\"name\":\"0\",\"care_manager\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"manager\"}}}",
+        "form": {
+            "id": null,
+            "name": null,
+            "typeCode": null,
+            "careManagerId": null,
+            "startDate": "",
+            "startTime": ""
+        }
+    },
+    "period no separator": {
+        "signedJson": "{\"id\":\"episode\",\"type\":{\"system\":\"eHealth\\\/episode_types\",\"code\":\"primary_care\"},\"name\":\"\\u0415\\u043f\\u0456\\u0437\\u043e\\u0434\",\"status\":\"active\",\"managing_organization\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal-entity\"}},\"period\":{\"start\":\"2026-10-05T07:00:00Z\"},\"care_manager\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}}",
+        "updateJson": "{\"name\":\"\\u0415\\u043f\\u0456\\u0437\\u043e\\u0434\",\"care_manager\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"manager\"}}}",
+        "form": {
+            "id": null,
+            "name": null,
+            "typeCode": "",
+            "careManagerId": "",
+            "startDate": "05.10.2026",
+            "startTime": "05.10.2026"
+        }
+    },
+    "cancel ": {
+        "input": {
+            "cancellationReason": "incorrect_data",
+            "explanatoryLetter": ""
+        },
+        "json": "{\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/cancellation_reasons\",\"code\":\"incorrect_data\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanatory_letter\":null}"
+    },
+    "cancel 0": {
+        "input": {
+            "cancellationReason": "incorrect_data",
+            "explanatoryLetter": "0"
+        },
+        "json": "{\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/cancellation_reasons\",\"code\":\"incorrect_data\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanatory_letter\":null}"
+    },
+    "cancel Опис": {
+        "input": {
+            "cancellationReason": "incorrect_data",
+            "explanatoryLetter": "Опис"
+        },
+        "json": "{\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/cancellation_reasons\",\"code\":\"incorrect_data\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanatory_letter\":\"\\u041e\\u043f\\u0438\\u0441\"}"
+    },
+    "close ": {
+        "input": {
+            "closingReason": "completed",
+            "closingSummary": "",
+            "closingDate": "05.10.2026",
+            "closingTime": "11:00"
+        },
+        "json": "{\"period\":{\"end\":\"2026-10-05T08:00:00Z\"},\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/episode_closing_reasons\",\"code\":\"completed\"}],\"text\":\"\\u0417\\u0430\\u0432\\u0435\\u0440\\u0448\\u0435\\u043d\\u043e\"},\"closing_summary\":null}"
+    },
+    "close 0": {
+        "input": {
+            "closingReason": "completed",
+            "closingSummary": "0",
+            "closingDate": "05.10.2026",
+            "closingTime": "11:00"
+        },
+        "json": "{\"period\":{\"end\":\"2026-10-05T08:00:00Z\"},\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/episode_closing_reasons\",\"code\":\"completed\"}],\"text\":\"\\u0417\\u0430\\u0432\\u0435\\u0440\\u0448\\u0435\\u043d\\u043e\"},\"closing_summary\":null}"
+    },
+    "close Підсумок": {
+        "input": {
+            "closingReason": "completed",
+            "closingSummary": "Підсумок",
+            "closingDate": "05.10.2026",
+            "closingTime": "11:00"
+        },
+        "json": "{\"period\":{\"end\":\"2026-10-05T08:00:00Z\"},\"status_reason\":{\"coding\":[{\"system\":\"eHealth\\\/episode_closing_reasons\",\"code\":\"completed\"}],\"text\":\"\\u0417\\u0430\\u0432\\u0435\\u0440\\u0448\\u0435\\u043d\\u043e\"},\"closing_summary\":\"\\u041f\\u0456\\u0434\\u0441\\u0443\\u043c\\u043e\\u043a\"}"
+    }
+}

@@ -7,18 +7,18 @@ namespace Tests\Feature\MedicationRequest;
 use App\Classes\eHealth\Api\Patient\MedicationRequest as MedicationRequestApi;
 use App\Classes\eHealth\Api\Person as PersonApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
 use App\Models\CarePlanActivity;
-use App\Models\Person\Person;
 use App\Models\Employee\Employee;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\Person\Person;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\Mappers\MedicationRequestMapper;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
-use Mockery;
-use Tests\TestCase;
 use Livewire\Livewire;
-use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
+use Mockery;
+use Tests\Support\MedicationRequestPayloads;
+use Tests\TestCase;
 
 class MedicationRequestLifecycleTest extends TestCase
 {
@@ -45,6 +45,9 @@ class MedicationRequestLifecycleTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $signature = Mockery::mock(\App\Services\SignatureService::class);
+        $signature->shouldReceive('getCertificateAuthorities')->andReturn([]);
+        $this->instance(\App\Services\SignatureService::class, $signature);
 
         // 1. Create Patient
         $this->person = Person::create([
@@ -172,8 +175,8 @@ class MedicationRequestLifecycleTest extends TestCase
             'medication_qty' => 60.0,
             'medication_program_id' => 'program-affordable-medicines',
             'intent' => 'order',
-            'based_on_id' => $this->carePlanActivity->id,
-            'context_id' => $this->encounter->id,
+            'based_on_uuid' => $this->carePlanActivity->uuid,
+            'context_uuid' => $this->encounter->uuid,
             'dosage_instructions' => [
                 [
                     'sequence' => 1,
@@ -199,7 +202,7 @@ class MedicationRequestLifecycleTest extends TestCase
             'uuid' => $uuid,
             'medication_id' => 'INN-101',
             'person_id' => $this->person->id,
-            'based_on_id' => $this->carePlanActivity->id
+            'based_on_id' => $this->identifierId($this->carePlanActivity->uuid)
         ]);
 
         $this->assertDatabaseHas('dosage_instructions', [
@@ -210,57 +213,11 @@ class MedicationRequestLifecycleTest extends TestCase
         ]);
     }
 
-    public function test_can_map_to_fhir_payload(): void
-    {
-        $mapper = new MedicationRequestMapper();
-
-        $payload = [
-            'uuid' => (string) Str::uuid(),
-            'status' => 'draft',
-            'intent' => 'order',
-            'medication_id' => 'INN-101',
-            'medication_qty' => 30.0,
-            'medication_program_id' => 'program-affordable-medicines',
-            'based_on_uuid' => $this->carePlanActivity->uuid,
-            'note' => 'Take in the morning',
-            'dosage_instructions' => [
-                [
-                    'sequence' => 1,
-                    'text' => '1 tablet daily',
-                    'route' => 'oral',
-                    'as_needed_boolean' => false,
-                    'dose_and_rate' => [
-                        [
-                            'dose_quantity_value' => 1.0
-                        ]
-                    ]
-                ]
-            ]
-        ];
-
-        $uuids = [
-            'person_uuid' => $this->person->uuid,
-            'encounter_uuid' => $this->encounter->uuid,
-            'employee_uuid' => $this->employee->uuid,
-            'legal_entity_uuid' => (string) Str::uuid()
-        ];
-
-        $fhir = $mapper->toFhir($payload, $uuids);
-
-        $this->assertEquals($payload['uuid'], $fhir['id']);
-        $this->assertEquals('draft', $fhir['status']);
-        $this->assertEquals('INN-101', $fhir['medicationCodeableConcept']['coding'][0]['code']);
-        $this->assertEquals('program-affordable-medicines', $fhir['program']['identifier']['value']);
-        $this->assertEquals($this->carePlanActivity->uuid, $fhir['basedOn'][0]['identifier']['value']);
-        $this->assertEquals('Take in the morning', $fhir['note'][0]['text']);
-        $this->assertEquals(1.0, $fhir['dosageInstruction'][0]['doseAndRate'][0]['doseQuantity']['value']);
-    }
-
     public function test_create_request_payload_uses_snomed_route_and_object_dose_and_rate(): void
     {
-        $mapper = new MedicationRequestMapper();
+        $mapper = app(MedicationRequestPayloads::class);
 
-        $payload = $mapper->toCreateRequestPayload(
+        $payload = $mapper->create(
             [
                 'medication_id' => 'INN-101',
                 'medication_qty' => 10.0,
@@ -288,7 +245,8 @@ class MedicationRequestLifecycleTest extends TestCase
                 'employee_uuid' => $this->employee->uuid,
                 'division_uuid' => (string) Str::uuid(),
             ],
-            $this->carePlanActivity->carePlan->uuid,
+            \Carbon\CarbonImmutable::now(),
+            $this->carePlanActivity->carePlan->uuid
         );
 
         $dosage = $payload['medication_request_request']['dosage_instruction'][0];
@@ -432,21 +390,22 @@ class MedicationRequestLifecycleTest extends TestCase
             'medication_id' => 'INN-101',
             'medication_qty' => 30.0,
             'intent' => 'order',
-            'based_on_id' => $this->carePlanActivity->id,
-            'context_id' => $this->encounter->id,
+            'based_on_id' => $this->identifierId($this->carePlanActivity->uuid),
+            'context_id' => $this->identifierId($this->encounter->uuid),
             'request_number' => 'MR-777777',
             'inform_with' => 'otp-method-uuid|OTP|+380991112233'
         ]);
 
         // Mock eHealth reject API
-        $mockApi = Mockery::mock('alias:' . \App\Classes\eHealth\Api\MedicationRequest::class);
-        $mockApi->shouldReceive('getBySearchParams')->andReturn([]);
-        $mockApi->shouldReceive('getById')->andReturn([
+        $mockApi = Mockery::mock(\App\Classes\eHealth\Api\Patient\MedicationRequest::class)->makePartial();
+        $this->instance(\App\Classes\eHealth\Api\Patient\MedicationRequest::class, $mockApi);
+        $mockApi->shouldReceive('getBySearchParams')->andReturn($this->responseWithData([]));
+        $mockApi->shouldReceive('getById')->andReturn($this->responseWithData([
             'id' => $uuid,
             'status' => 'ACTIVE',
             'request_number' => 'MR-777777',
-        ]);
-        $mockApi->shouldReceive('rejectMedicationRequest')->once()->andReturn(['status' => 'rejected']);
+        ]));
+        $mockApi->shouldReceive('reject')->once()->andReturn($this->responseWithData(['status' => 'rejected']));
 
         // Mock SignatureService
         $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
@@ -491,8 +450,8 @@ class MedicationRequestLifecycleTest extends TestCase
             'medication_id' => 'INN-101',
             'medication_qty' => 30.0,
             'intent' => 'order',
-            'based_on_id' => $this->carePlanActivity->id,
-            'context_id' => $this->encounter->id,
+            'based_on_id' => $this->identifierId($this->carePlanActivity->uuid),
+            'context_id' => $this->identifierId($this->encounter->uuid),
             'request_number' => 'MR-555555',
             'started_at' => '2026-06-01',
             'ended_at' => '2026-09-01',
@@ -516,5 +475,18 @@ class MedicationRequestLifecycleTest extends TestCase
             ->call('loadPrintoutForm', $uuid)
             ->assertSet('printableContent', '<div>Official eHealth printout</div>')
             ->assertDispatched('printoutLoaded');
+    }
+
+    private function identifierId(string $uuid): int
+    {
+        return (int) \App\Models\MedicalEvents\Sql\Identifier::firstOrCreate(['value' => $uuid])->id;
+    }
+
+    private function responseWithData(array $data): \App\Classes\eHealth\EHealthResponse
+    {
+        $response = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $response->shouldReceive('getData')->andReturn($data);
+
+        return $response;
     }
 }

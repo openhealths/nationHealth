@@ -16,7 +16,7 @@ use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
 use App\Models\User;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
+use App\Repositories\EmployeeRepository;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -56,7 +56,7 @@ class ResolvesEmployeeContextTest extends TestCase
         $encounter = $this->createEncounter($performer->uuid);
         $carePlan = $this->createCarePlan($performer, $encounter);
 
-        $context = app(ReferralRequestLifecycleService::class)
+        $context = app(EmployeeRepository::class)
             ->resolveEmployeeContext($carePlan, null, $acting->id);
 
         $this->assertSame($performer->id, $context['employee_id']);
@@ -79,7 +79,7 @@ class ResolvesEmployeeContextTest extends TestCase
             'kind' => 'service_request',
         ]);
 
-        $service = app(ReferralRequestLifecycleService::class);
+        $service = app(EmployeeRepository::class);
 
         $this->assertSame(
             $author->id,
@@ -101,7 +101,7 @@ class ResolvesEmployeeContextTest extends TestCase
         // Being logged in must not decide who a request is attributed to.
         $this->actingAs(User::findOrFail($doctor->user_id));
 
-        $context = app(ReferralRequestLifecycleService::class)->resolveEmployeeContext($carePlan);
+        $context = app(EmployeeRepository::class)->resolveEmployeeContext($carePlan);
 
         $this->assertNull($context['employee_id']);
         $this->assertNull($context['employee_uuid']);
@@ -113,7 +113,7 @@ class ResolvesEmployeeContextTest extends TestCase
         $acting = $this->createEmployee('Acting');
         $encounter = $this->createEncounter(null);
 
-        $service = app(ReferralRequestLifecycleService::class);
+        $service = app(EmployeeRepository::class);
 
         $this->assertSame(
             $acting->id,
@@ -141,7 +141,7 @@ class ResolvesEmployeeContextTest extends TestCase
             'division_id' => Identifier::create(['value' => $divisionUuid])->id,
         ]);
 
-        $context = app(ReferralRequestLifecycleService::class)
+        $context = app(EmployeeRepository::class)
             ->resolveEncounterEmployeeContext($encounter->fresh(['division']));
 
         // encounters.division_id is an identifier id; request tables expect a divisions id.
@@ -155,7 +155,7 @@ class ResolvesEmployeeContextTest extends TestCase
             'division_id' => Identifier::create(['value' => (string) Str::uuid()])->id,
         ]);
 
-        $context = app(ReferralRequestLifecycleService::class)
+        $context = app(EmployeeRepository::class)
             ->resolveEncounterEmployeeContext($encounter->fresh(['division']));
 
         $this->assertNull($context['division_id']);

@@ -8,6 +8,13 @@ use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Person\EncounterStatus;
+use App\Exceptions\Cipher\CipherConnectionException;
+use App\Exceptions\Cipher\CipherException;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
+use App\Livewire\Encounter\Concerns\ManagesEncounterEPrescription;
+use App\Livewire\Encounter\Concerns\ManagesEncounterReferrals;
+use App\Livewire\Encounter\Concerns\ResolvesEncounterStandaloneContext;
 use App\Livewire\Encounter\Forms\EncounterCancellationForm;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
@@ -15,26 +22,21 @@ use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\Fhir;
 use App\Traits\HandlesEncounterCancellation;
-use App\Exceptions\Cipher\CipherConnectionException;
-use App\Exceptions\Cipher\CipherException;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
-use App\Livewire\Encounter\Concerns\ManagesEncounterEPrescription;
-use App\Livewire\Encounter\Concerns\ManagesEncounterReferrals;
-use App\Livewire\Encounter\Concerns\ResolvesEncounterStandaloneContext;
 use Livewire\Attributes\Locked;
 use Throwable;
 
 class EncounterEdit extends EncounterComponent
 {
     use HandlesEncounterCancellation;
+
     use ResolvesEncounterStandaloneContext;
+
     use ManagesEncounterEPrescription;
+
     use ManagesEncounterReferrals;
 
     #[Locked]
@@ -79,7 +81,7 @@ class EncounterEdit extends EncounterComponent
 
         $this->initializeComponent(loadEpisodes: !$this->isReadonly);
 
-        $package = Fhir::encounterPackageLoader()->load($encounter);
+        $package = $this->loadEncounterPackage($encounter);
 
         $reactionIds = collect($package['observations'])->pluck('reactionOn')->filter()->unique();
         $packageImmunizationIds = collect($package['immunizations'])->pluck('uuid')->filter()->unique();
@@ -182,7 +184,7 @@ class EncounterEdit extends EncounterComponent
             'episode' => $validated['episode']['id']
         ];
 
-        $fhir = Fhir::encounterPackage()->toFhir($validated, $uuids);
+        $fhir = $this->mapEncounterPackage($validated, $uuids);
         $fhirEncounter = $fhir['encounter'];
         $fhirEncounter['status'] = EncounterStatus::DRAFT->value;
         $fhirConditions = $fhir['conditions'];
@@ -492,7 +494,7 @@ class EncounterEdit extends EncounterComponent
     {
         // The picks arrive from the browser, so only known sections holding record ids survive
         return array_filter(array_map(
-            static fn (mixed $recordIds): array => array_filter((array)$recordIds, 'is_string'),
+            static fn (mixed $recordIds): array => array_filter((array) $recordIds, 'is_string'),
             array_intersect_key($this->selectedRecords, self::NO_RECORDS_SELECTED)
         ));
     }

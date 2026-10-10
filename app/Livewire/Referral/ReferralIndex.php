@@ -9,7 +9,7 @@ use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\Person\Person;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
+use App\Traits\MedicalEvents\UpdatesReferralExecution;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Locked;
@@ -17,6 +17,8 @@ use Livewire\Component;
 
 class ReferralIndex extends Component
 {
+    use UpdatesReferralExecution;
+
     #[Locked]
     public LegalEntity $legalEntity;
 
@@ -78,7 +80,7 @@ class ReferralIndex extends Component
         }
     }
 
-    public function process(string $uuid, string $patientUuid, ReferralRequestLifecycleService $service)
+    public function process(string $uuid, string $patientUuid)
     {
         abort_unless(auth()->user()?->can('service_request:makeinprogress'), 403);
         try {
@@ -98,7 +100,7 @@ class ReferralIndex extends Component
                 }
             }
 
-            $service->takeIntoWork($uuid, $employee, $patientUuid ?: null, array_filter([
+            $this->takeReferralIntoWork($uuid, $employee, $patientUuid ?: null, array_filter([
                 'program_id' => is_string($programId) && $programId !== '' ? $programId : null,
             ]));
 
@@ -121,7 +123,7 @@ class ReferralIndex extends Component
         $this->showCancelModal = true;
     }
 
-    public function confirmCancelUsage(ReferralRequestLifecycleService $service)
+    public function confirmCancelUsage()
     {
         abort_unless(auth()->user()?->can('service_request:use'), 403);
         $uuid = $this->referralToCancel;
@@ -144,7 +146,7 @@ class ReferralIndex extends Component
                 throw new Exception('Не вдалося знайти ідентифікатор пацієнта.');
             }
 
-            $service->cancelUsage($uuid, $patientId, [
+            $this->cancelReferralUsage($uuid, $patientId, [
                 'explanatory_letter' => $this->cancelExplanatoryLetter,
             ]);
 
@@ -161,7 +163,7 @@ class ReferralIndex extends Component
         }
     }
 
-    public function cancelUsage(string $uuid, ReferralRequestLifecycleService $service)
+    public function cancelUsage(string $uuid)
     {
         $this->openCancelModal($uuid);
     }
@@ -208,7 +210,7 @@ class ReferralIndex extends Component
         $this->showCompleteModal = true;
     }
 
-    public function confirmComplete(ReferralRequestLifecycleService $service)
+    public function confirmComplete()
     {
         abort_unless(auth()->user()?->can('service_request:complete'), 403);
         $uuid = $this->referralToComplete;
@@ -237,7 +239,7 @@ class ReferralIndex extends Component
         }
 
         try {
-            $service->completeReferral($uuid, $resourceUuid, $resourceType);
+            $this->completeReferral($uuid, $resourceUuid, $resourceType);
 
             foreach ($this->searchResults as $key => $result) {
                 if (($result['id'] ?? '') === $uuid) {

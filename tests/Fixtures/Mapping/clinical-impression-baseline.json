@@ -1,0 +1,241 @@
+{
+    "minimal": {
+        "signedJson": "{\"id\":\"impression\",\"status\":\"completed\",\"code\":{\"coding\":[{\"system\":\"eHealth\\\/clinical_impression_patient_categories\",\"code\":\"consultation\"}],\"text\":\"\"},\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"effective_period\":{\"start\":\"2026-10-05T07:00:00Z\",\"end\":\"2026-10-05T08:00:00Z\"},\"assessor\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}}",
+        "form": {
+            "uuid": null,
+            "status": "completed",
+            "codeCode": null,
+            "assessorEmployeeId": "",
+            "description": "",
+            "effectivePeriodStartDate": "",
+            "effectivePeriodStartTime": "",
+            "effectivePeriodEndDate": "",
+            "effectivePeriodEndTime": "",
+            "note": "",
+            "summary": "",
+            "previous": [],
+            "problems": [],
+            "findings": [],
+            "supportingInfo": []
+        }
+    },
+    "full sparse duplicates": {
+        "signedJson": "{\"id\":\"impression\",\"status\":\"completed\",\"code\":{\"coding\":[{\"system\":\"eHealth\\\/clinical_impression_patient_categories\",\"code\":\"consultation\"}],\"text\":\"\"},\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"effective_period\":{\"start\":\"2026-10-05T07:00:00Z\",\"end\":\"2026-10-05T08:00:00Z\"},\"assessor\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"assessor\"}},\"description\":\"\\u041e\\u043f\\u0438\\u0441\",\"previous\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"clinical_impression\"}],\"text\":\"\"},\"value\":\"previous\"}},\"problems\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"problem\"}},{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"problem\"}}],\"summary\":\"\\u041f\\u0456\\u0434\\u0441\\u0443\\u043c\\u043e\\u043a\",\"findings\":[{\"item_reference\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"observation\"}],\"text\":\"\"},\"value\":\"finding\"}},\"basis\":\"\\u041f\\u0440\\u0438\\u0447\\u0438\\u043d\\u0430\"},{\"item_reference\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"problem\"}}}],\"supporting_info\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"procedure\"}],\"text\":\"\"},\"value\":\"support\"}},{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"procedure\"}],\"text\":\"\"},\"value\":\"support\"}}],\"note\":\"\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\"}",
+        "form": {
+            "uuid": "impression",
+            "status": "completed",
+            "codeCode": "consultation",
+            "assessorEmployeeId": "assessor",
+            "description": "",
+            "effectivePeriodStartDate": "05.10.2026",
+            "effectivePeriodStartTime": "10:00",
+            "effectivePeriodEndDate": "05.10.2026",
+            "effectivePeriodEndTime": "11:00",
+            "note": "",
+            "summary": "",
+            "previous": [
+                {
+                    "id": "previous",
+                    "ehealthInsertedAt": "date",
+                    "codeCode": "previous"
+                }
+            ],
+            "problems": {
+                "42": {
+                    "id": "problem",
+                    "ehealthInsertedAt": null,
+                    "codeCode": "D02",
+                    "codeSystem": "ICPC2"
+                }
+            },
+            "findings": {
+                "42": {
+                    "id": "finding",
+                    "type": "observation",
+                    "ehealthInsertedAt": "date",
+                    "codeCode": "111",
+                    "codeSystem": "LOINC",
+                    "basis": "Причина"
+                }
+            },
+            "supportingInfo": [
+                {
+                    "uuid": "support",
+                    "type": "procedure",
+                    "ehealthInsertedAt": null,
+                    "code": "301"
+                },
+                {
+                    "uuid": "support",
+                    "type": "procedure",
+                    "ehealthInsertedAt": null,
+                    "code": "301"
+                }
+            ]
+        }
+    },
+    "null fallback assessor": {
+        "signedJson": "{\"id\":\"impression\",\"status\":\"completed\",\"code\":{\"coding\":[{\"system\":\"eHealth\\\/clinical_impression_patient_categories\",\"code\":\"consultation\"}],\"text\":\"\"},\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"effective_period\":{\"start\":\"2026-10-05T07:00:00Z\",\"end\":\"2026-10-05T08:00:00Z\"},\"assessor\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}}",
+        "form": {
+            "uuid": null,
+            "status": "completed",
+            "codeCode": null,
+            "assessorEmployeeId": null,
+            "description": "",
+            "effectivePeriodStartDate": "",
+            "effectivePeriodStartTime": "",
+            "effectivePeriodEndDate": "",
+            "effectivePeriodEndTime": "",
+            "note": "",
+            "summary": "",
+            "previous": [],
+            "problems": [],
+            "findings": [],
+            "supportingInfo": []
+        }
+    },
+    "empty assessor retained": {
+        "signedJson": "{\"id\":\"impression\",\"status\":\"completed\",\"code\":{\"coding\":[{\"system\":\"eHealth\\\/clinical_impression_patient_categories\",\"code\":\"consultation\"}],\"text\":\"\"},\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"effective_period\":{\"start\":\"2026-10-05T07:00:00Z\",\"end\":\"2026-10-05T08:00:00Z\"},\"assessor\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"\"}}}",
+        "form": {
+            "uuid": null,
+            "status": "completed",
+            "codeCode": null,
+            "assessorEmployeeId": "",
+            "description": "",
+            "effectivePeriodStartDate": "",
+            "effectivePeriodStartTime": "",
+            "effectivePeriodEndDate": "",
+            "effectivePeriodEndTime": "",
+            "note": "",
+            "summary": "",
+            "previous": [],
+            "problems": [],
+            "findings": [],
+            "supportingInfo": []
+        }
+    },
+    "false-like optional values": {
+        "signedJson": "{\"id\":\"impression\",\"status\":\"completed\",\"code\":{\"coding\":[{\"system\":\"eHealth\\\/clinical_impression_patient_categories\",\"code\":\"consultation\"}],\"text\":\"\"},\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"effective_period\":{\"start\":\"2026-10-05T07:00:00Z\",\"end\":\"2026-10-05T08:00:00Z\"},\"assessor\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}}",
+        "form": {
+            "uuid": null,
+            "status": null,
+            "codeCode": null,
+            "assessorEmployeeId": "",
+            "description": null,
+            "effectivePeriodStartDate": "",
+            "effectivePeriodStartTime": "",
+            "effectivePeriodEndDate": "",
+            "effectivePeriodEndTime": "",
+            "note": false,
+            "summary": 0,
+            "previous": [],
+            "problems": [],
+            "findings": [],
+            "supportingInfo": []
+        }
+    },
+    "missing reference metadata": {
+        "signedJson": "{\"id\":\"impression\",\"status\":\"completed\",\"code\":{\"coding\":[{\"system\":\"eHealth\\\/clinical_impression_patient_categories\",\"code\":\"consultation\"}],\"text\":\"\"},\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"effective_period\":{\"start\":\"2026-10-05T07:00:00Z\",\"end\":\"2026-10-05T08:00:00Z\"},\"assessor\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}}",
+        "form": {
+            "uuid": null,
+            "status": "completed",
+            "codeCode": null,
+            "assessorEmployeeId": "",
+            "description": "",
+            "effectivePeriodStartDate": "",
+            "effectivePeriodStartTime": "",
+            "effectivePeriodEndDate": "",
+            "effectivePeriodEndTime": "",
+            "note": "",
+            "summary": "",
+            "previous": [
+                {
+                    "id": "unknown",
+                    "ehealthInsertedAt": null,
+                    "codeCode": null
+                }
+            ],
+            "problems": {
+                "42": {
+                    "id": "unknown",
+                    "ehealthInsertedAt": null,
+                    "codeCode": null,
+                    "codeSystem": null
+                }
+            },
+            "findings": {
+                "90": {
+                    "id": "unknown",
+                    "type": "observation",
+                    "ehealthInsertedAt": null,
+                    "codeCode": null,
+                    "codeSystem": null,
+                    "basis": null
+                }
+            },
+            "supportingInfo": [
+                {
+                    "uuid": "unknown",
+                    "type": "encounter",
+                    "ehealthInsertedAt": null,
+                    "code": null
+                }
+            ]
+        }
+    },
+    "DST": {
+        "signedJson": "{\"id\":\"impression\",\"status\":\"completed\",\"code\":{\"coding\":[{\"system\":\"eHealth\\\/clinical_impression_patient_categories\",\"code\":\"consultation\"}],\"text\":\"\"},\"encounter\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"effective_period\":{\"start\":\"2026-10-25T02:15:00Z\",\"end\":\"2026-10-25T03:15:00Z\"},\"assessor\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"assessor\"}},\"description\":\"\\u041e\\u043f\\u0438\\u0441\",\"previous\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"clinical_impression\"}],\"text\":\"\"},\"value\":\"previous\"}},\"problems\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"problem\"}},{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"problem\"}}],\"summary\":\"\\u041f\\u0456\\u0434\\u0441\\u0443\\u043c\\u043e\\u043a\",\"findings\":[{\"item_reference\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"observation\"}],\"text\":\"\"},\"value\":\"finding\"}},\"basis\":\"\\u041f\\u0440\\u0438\\u0447\\u0438\\u043d\\u0430\"},{\"item_reference\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"problem\"}}}],\"supporting_info\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"procedure\"}],\"text\":\"\"},\"value\":\"support\"}},{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"procedure\"}],\"text\":\"\"},\"value\":\"support\"}}],\"note\":\"\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\"}",
+        "form": {
+            "uuid": "impression",
+            "status": "completed",
+            "codeCode": "consultation",
+            "assessorEmployeeId": "assessor",
+            "description": "",
+            "effectivePeriodStartDate": "05.10.2026",
+            "effectivePeriodStartTime": "10:00",
+            "effectivePeriodEndDate": "05.10.2026",
+            "effectivePeriodEndTime": "11:00",
+            "note": "",
+            "summary": "",
+            "previous": [
+                {
+                    "id": "previous",
+                    "ehealthInsertedAt": "date",
+                    "codeCode": "previous"
+                }
+            ],
+            "problems": {
+                "42": {
+                    "id": "problem",
+                    "ehealthInsertedAt": null,
+                    "codeCode": "D02",
+                    "codeSystem": "ICPC2"
+                }
+            },
+            "findings": {
+                "42": {
+                    "id": "finding",
+                    "type": "observation",
+                    "ehealthInsertedAt": "date",
+                    "codeCode": "111",
+                    "codeSystem": "LOINC",
+                    "basis": "Причина"
+                }
+            },
+            "supportingInfo": [
+                {
+                    "uuid": "support",
+                    "type": "procedure",
+                    "ehealthInsertedAt": null,
+                    "code": "301"
+                },
+                {
+                    "uuid": "support",
+                    "type": "procedure",
+                    "ehealthInsertedAt": null,
+                    "code": "301"
+                }
+            ]
+        }
+    }
+}

@@ -9,7 +9,9 @@ use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
 use App\Models\Preperson;
-use App\Services\MedicalEvents\Fhir;
+use App\Dto\Specimen\Form as SpecimenFormData;
+use Illuminate\Support\Collection;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 
 class SpecimenEdit extends SpecimenComponent
 {
@@ -29,7 +31,7 @@ class SpecimenEdit extends SpecimenComponent
 
         $this->specimenId = $specimen->uuid;
 
-        $specimenData = Fhir::specimen()->fromFhir($specimen->toArray());
+        $specimenData = app(ObjectMapperInterface::class)->map(new Collection($specimen->toArray()), SpecimenFormData::class)->toArray();
 
         // The collector the specimen is registered by is picked as the current employee
         if ($specimenData['collectorId'] === $specimenData['registeredById']) {

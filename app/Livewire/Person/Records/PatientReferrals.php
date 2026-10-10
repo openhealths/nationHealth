@@ -6,28 +6,40 @@ namespace App\Livewire\Person\Records;
 
 use App\Core\Arr;
 use App\Core\BaseForm as Form;
+
+use App\Dto\DeviceRequest\Ehealth as DeviceRequestEhealth;
+use App\Dto\DeviceRequest\EhealthCreate as DeviceRequestEhealthCreate;
+use App\Dto\ServiceRequest\EhealthCreate as ServiceRequestCreateData;
+use App\Dto\ServiceRequest\Input as ServiceRequestInput;
 use App\Enums\Person\ServiceRequestStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Livewire\Concerns\MedicalEvents\Referral\SelectsReferralApi;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Repositories\MedicalEvents\DeviceRequestRequestRepository;
+use App\Repositories\MedicalEvents\Repository;
 use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
-use App\Services\MedicalEvents\Mappers\DeviceRequestMapper;
-use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Livewire\WithFileUploads;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 
 class PatientReferrals extends BasePatientComponent
 {
+    use \App\Livewire\Concerns\MedicalEvents\Referral\SynchronizesReferrals;
+
+    use \App\Livewire\Concerns\MedicalEvents\Referral\PrintsReferrals;
+
+    use SelectsReferralApi;
+
     use WithFileUploads;
 
     public Form $form;
@@ -215,7 +227,7 @@ class PatientReferrals extends BasePatientComponent
                 Auth::user()->party->taxId
             );
 
-            $finalResponse = app(ReferralRequestLifecycleService::class)->submitSignedRecall($this->uuid, $record->uuid, [
+            $finalResponse = $this->referralApi('service_request')->recallAndResolve($this->uuid, $record->uuid, [
                 'signed_data' => $signedContent,
                 'signed_data_encoding' => 'base64',
                 'explanatory_letter' => $letter,
@@ -269,8 +281,7 @@ class PatientReferrals extends BasePatientComponent
                 Auth::user()->party->taxId
             );
 
-            $finalResponse = app(ReferralRequestLifecycleService::class)->submitSignedCancel(
-                $kind,
+            $finalResponse = $this->referralApi($kind)->cancelAndResolve(
                 $this->uuid,
                 $record->uuid,
                 [
@@ -310,7 +321,7 @@ class PatientReferrals extends BasePatientComponent
 
         try {
             $validated = $this->form->validate($this->form->signingRules());
-            $lifecycle = app(ReferralRequestLifecycleService::class);
+            $employees = app(\App\Repositories\EmployeeRepository::class);
 
             $activity = $requestRecord->basedOn?->value
                 ? CarePlanActivity::query()->where('uuid', $requestRecord->basedOn->value)->first()
@@ -329,10 +340,10 @@ class PatientReferrals extends BasePatientComponent
             $context = $carePlan ?? $encounter;
             $actingEmployeeId = $requestRecord->employeeId ?? Auth::user()?->activeDoctorEmployee()?->id;
             $employeeContext = $context instanceof Encounter
-                ? $lifecycle->resolveEncounterEmployeeContext($context, $actingEmployeeId)
-                : $lifecycle->resolveEmployeeContext($carePlan, $activity, $actingEmployeeId);
+                ? $employees->resolveEncounterEmployeeContext($context, $actingEmployeeId)
+                : $employees->resolveEmployeeContext($carePlan, $activity, $actingEmployeeId);
 
-            $dbData = $lifecycle->buildSignDbData($requestRecord, $activity, $context, $employeeContext);
+            $dbData = $this->referralSignData($requestRecord, $activity, $context, $employeeContext);
 
             $uuids = [
                 'person_uuid' => $this->uuid,
@@ -343,15 +354,21 @@ class PatientReferrals extends BasePatientComponent
             ];
 
             $kind = $this->requestKindToSign === 'device_request' ? 'device_request' : 'service_request';
-            $mapper = $kind === 'service_request'
-                ? new ServiceRequestMapper()
-                : new DeviceRequestMapper();
-            $signPayload = $mapper->toCreateSignedContent(
-                $dbData,
-                $uuids,
-                $carePlan !== null ? (string) $carePlan->uuid : null,
-                $activity !== null ? (string) $activity->uuid : null
-            );
+            $signPayload = $kind === 'service_request'
+                ? app(ObjectMapperInterface::class)->map(ServiceRequestInput::fromArray(
+                    $dbData,
+                    $uuids,
+                    CarbonImmutable::now(),
+                    $carePlan !== null ? (string) $carePlan->uuid : null,
+                    $activity !== null ? (string) $activity->uuid : null
+                ), ServiceRequestCreateData::class)->toArray()
+                : app(ObjectMapperInterface::class)->map(DeviceRequestEhealth::source(
+                    $dbData,
+                    $uuids,
+                    CarbonImmutable::now('UTC'),
+                    $carePlan !== null ? (string) $carePlan->uuid : null,
+                    $activity !== null ? (string) $activity->uuid : null
+                ), DeviceRequestEhealthCreate::class)->toArray();
 
             $signedContent = signatureService()->signData(
                 $signPayload,
@@ -361,9 +378,9 @@ class PatientReferrals extends BasePatientComponent
                 Auth::user()->party->taxId
             );
 
-            $finalResponse = $lifecycle->submitSignedCreate($kind, $this->uuid, $signedContent);
+            $finalResponse = $this->referralApi($kind)->createSignedAndResolve($this->uuid, $signedContent);
 
-            $dbData = $lifecycle->persistAfterSignedCreate(
+            $dbData = $this->persistAfterSignedCreate(
                 $dbData,
                 $finalResponse,
                 $kind,
@@ -399,7 +416,7 @@ class PatientReferrals extends BasePatientComponent
         $this->ownedReferral($uuid);
 
         try {
-            $response = app(ReferralRequestLifecycleService::class)->resendSms($this->uuid, $uuid, $kind);
+            $response = $this->referralApi($kind)->resendSms($this->uuid, $uuid);
 
             if ($response->successful()) {
                 Session::flash('success', __('care-plan.referral_sms_resent'));
@@ -444,7 +461,7 @@ class PatientReferrals extends BasePatientComponent
         }
 
         try {
-            return app(ReferralRequestLifecycleService::class)->buildPrintoutHtml($context, $uuid);
+            return $this->referralPrintoutHtml($context, $uuid);
         } catch (\Throwable $exception) {
             Log::error('PatientReferrals: failed to load printout: '.$exception->getMessage());
             Session::flash('error', 'Не вдалося завантажити друковану форму.');
@@ -480,7 +497,6 @@ class PatientReferrals extends BasePatientComponent
     {
         abort_unless($this->personId !== null, 404);
 
-        return app(\App\Services\MedicalEvents\MedicalRequestOwnership::class)
-            ->referralForPerson($uuid, $this->personId);
+        return Repository::serviceRequest()->findOwnedReferralByPerson($uuid, $this->personId, legalEntity()?->id);
     }
 }

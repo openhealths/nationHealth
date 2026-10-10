@@ -5,16 +5,20 @@ declare(strict_types=1);
 namespace App\Livewire\DiagnosticReport;
 
 use App\Core\Arr;
+use App\Dto\DiagnosticReport\Form as DiagnosticReportForm;
+use App\Dto\Observation\Form as ObservationForm;
 use App\Enums\Person\DiagnosticReportStatus;
-use App\Models\LegalEntity;
+
 use App\Models\Employee\Employee;
+use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\Fhir;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Locked;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 use Throwable;
 
 class DiagnosticReportEdit extends DiagnosticReportComponent
@@ -46,9 +50,7 @@ class DiagnosticReportEdit extends DiagnosticReportComponent
 
         $diagnosticReportFhirData = Arr::toCamelCase($diagnosticReport->toArray());
 
-        $diagnosticReportData = Fhir::diagnosticReport()->fromFhir(
-            $diagnosticReportFhirData
-        );
+        $diagnosticReportData = app(ObjectMapperInterface::class)->map(new Collection($diagnosticReportFhirData), DiagnosticReportForm::class)->toArray();
 
         $diagnosticReportData['status'] = $diagnosticReport->status->value;
 
@@ -112,7 +114,7 @@ class DiagnosticReportEdit extends DiagnosticReportComponent
         $this->form->diagnosticReport = $diagnosticReportData;
 
         $this->form->observations = collect(Repository::observation()->getByDiagnosticReportId($diagnosticReportId))
-            ->map(fn (array $observation) => Fhir::observation()->fromFhir($observation))
+            ->map(static fn (array $observation): array => app(ObjectMapperInterface::class)->map(new Collection($observation), ObservationForm::class)->toArray())
             ->toArray();
     }
 

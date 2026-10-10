@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api\Patient;
 
+use App\Classes\eHealth\Api\Concerns\ResolvesSignedPatientRequests;
 use App\Classes\eHealth\Api\ServiceRequest as ServiceRequestExecutorApi;
+use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthResponse;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
@@ -16,6 +18,49 @@ use Illuminate\Validation\ValidationException;
 
 class ServiceRequest extends PatientApiBase
 {
+    use ResolvesSignedPatientRequests;
+
+    public function qualifyAndValidate(string $id, mixed $programId): void
+    {
+        try {
+            $response = $this->qualify($id, ['programs' => [['id' => $programId]]])->getData();
+            $job = EHealth::job();
+            $job->assertPrequalifyValid($job->resolve(is_array($response) ? $response : []));
+        } catch (EHealthValidationException $exception) {
+            throw new \RuntimeException(__('care-plan.referral_qualify_blocked', [
+                'reason' => $exception->getTranslatedMessage() ?: $exception->getFormattedMessage(),
+            ]), previous: $exception);
+        } catch (\Throwable $exception) {
+            Log::warning('Qualify failed (blocking): '.$exception->getMessage(), ['referral_uuid' => $id]);
+            throw new \RuntimeException(__('care-plan.referral_qualify_blocked', [
+                'reason' => $exception->getMessage(),
+            ]), previous: $exception);
+        }
+    }
+
+    public function processAndResolve(string $id, array $payload): array
+    {
+        $response = $this->process($id, $payload)->getData();
+
+        return EHealth::job()->resolve(is_array($response) ? $response : []);
+    }
+
+    public function completeAndResolve(string $id, array $payload): array
+    {
+        $response = $this->complete($id, $payload)->getData();
+
+        return EHealth::job()->resolve(is_array($response) ? $response : []);
+    }
+
+    public function recallAndResolve(string $patientId, string $id, array $payload): array
+    {
+        if (trim((string) ($payload['explanatory_letter'] ?? '')) === '') {
+            throw new \InvalidArgumentException(__('care-plan.referral_recall_letter_required'));
+        }
+
+        return EHealth::job()->resolve($this->recall($patientId, $id, $payload)->getData());
+    }
+
     /**
      * Create a signed Service Request in eHealth (PKCS#7).
      *

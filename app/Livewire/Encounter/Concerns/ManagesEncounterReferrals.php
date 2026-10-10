@@ -5,28 +5,43 @@ declare(strict_types=1);
 namespace App\Livewire\Encounter\Concerns;
 
 use App\Classes\eHealth\EHealth;
+use App\Dto\DeviceRequest\Ehealth as DeviceRequestEhealth;
+
+use App\Dto\DeviceRequest\EhealthPrequalify as DeviceRequestEhealthPrequalify;
+use App\Dto\DeviceRequest\Model as DeviceRequestModelData;
+use App\Dto\FormCollection;
+use App\Dto\ServiceRequest\EhealthCreate as ServiceRequestCreateData;
+use App\Dto\ServiceRequest\EhealthPrequalify as ServiceRequestPrequalifyData;
+use App\Dto\ServiceRequest\Input as ServiceRequestInput;
+use App\Dto\ServiceRequest\Model as ServiceRequestModelData;
 use App\Enums\MedicalProgram\Type as MedicalProgramType;
 use App\Enums\Person\EncounterStatus;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Livewire\Concerns\MedicalEvents\Referral\SelectsReferralApi;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
+use App\Repositories\MedicalEvents\Repository;
 use App\Services\Dictionary\ServiceSearch;
-use App\Services\MedicalEvents\InformWith;
-use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
-use App\Services\MedicalEvents\MedicalRequestOwnership;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use RuntimeException;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 use Throwable;
 
 trait ManagesEncounterReferrals
 {
+    use \App\Livewire\Concerns\MedicalEvents\Referral\SynchronizesReferrals;
+
+    use \App\Livewire\Concerns\MedicalEvents\Referral\PrintsReferrals;
+
+    use SelectsReferralApi;
     // Uses ResolvesEncounterStandaloneContext via EncounterEdit.
 
     public bool $showEncounterReferralDrawer = false;
@@ -86,7 +101,7 @@ trait ManagesEncounterReferrals
             'program_id' => $this->resolveDefaultEncounterReferralProgramId(),
             'note' => '',
             'patient_instruction' => '',
-            'inform_with' => InformWith::formValue($this->encounterReferralAuthMethods[0] ?? []),
+            'inform_with' => $this->authenticationMethodFormValue($this->encounterReferralAuthMethods[0] ?? []),
             'reason_reference' => [],
         ];
 
@@ -172,7 +187,7 @@ trait ManagesEncounterReferrals
         $this->encounterReferralServiceResults = [];
         $this->encounterReferralHasSearched = false;
         $this->encounterReferralWarningMessage = '';
-        
+
         $this->dispatch('encounter-referral-service-catalog-close');
     }
 
@@ -202,7 +217,7 @@ trait ManagesEncounterReferrals
         }
 
         try {
-            $employeeContext = app(ReferralRequestLifecycleService::class)->resolveEncounterEmployeeContext(
+            $employeeContext = app(\App\Repositories\EmployeeRepository::class)->resolveEncounterEmployeeContext(
                 $encounter,
                 Auth::user()?->activeDoctorEmployee()?->id
             );
@@ -211,7 +226,7 @@ trait ManagesEncounterReferrals
             $formData['program_id'] = $formData['program_id'] !== '' ? $formData['program_id'] : null;
             $formData['kind'] = 'service_request';
 
-            $this->encounterReferralRequestIdToSign = app(ReferralRequestLifecycleService::class)->createEncounterDraft(
+            $this->encounterReferralRequestIdToSign = $this->createEncounterReferralDraft(
                 $encounter,
                 $formData,
                 (float) $formData['quantity'],
@@ -252,11 +267,11 @@ trait ManagesEncounterReferrals
         }
 
         try {
-            $requestRecord = app(MedicalRequestOwnership::class)
-                ->serviceForEncounter(
-                    (string) $this->encounterReferralRequestIdToSign,
-                    $encounter
-                );
+            $requestRecord = Repository::serviceRequest()->findOwnedForEncounter(
+                (string) $this->encounterReferralRequestIdToSign,
+                $encounter,
+                legalEntity()?->id
+            );
 
             $validated = $this->form->validate($this->form->signingRules());
             $person = Person::find($encounter->person_id);
@@ -264,13 +279,13 @@ trait ManagesEncounterReferrals
                 throw new RuntimeException(__('Пацієнта не знайдено'));
             }
 
-            $lifecycle = app(ReferralRequestLifecycleService::class);
-            $employeeContext = $lifecycle->resolveEncounterEmployeeContext(
+            $employees = app(\App\Repositories\EmployeeRepository::class);
+            $employeeContext = $employees->resolveEncounterEmployeeContext(
                 $encounter,
                 $requestRecord->employeeId ?? Auth::user()?->activeDoctorEmployee()?->id
             );
 
-            $dbData = $lifecycle->buildSignDbData($requestRecord, null, $encounter, $employeeContext);
+            $dbData = $this->referralSignData($requestRecord, null, $encounter, $employeeContext);
 
             $uuids = [
                 'person_uuid' => $person->uuid,
@@ -280,7 +295,10 @@ trait ManagesEncounterReferrals
                 'legal_entity_uuid' => $employeeContext['legal_entity_uuid'],
             ];
 
-            $signPayload = (new ServiceRequestMapper())->toCreateSignedContent($dbData, $uuids, null, null);
+            $signPayload = app(ObjectMapperInterface::class)->map(
+                ServiceRequestInput::fromArray($dbData, $uuids, CarbonImmutable::now()),
+                ServiceRequestCreateData::class
+            )->toArray();
 
             $signedContent = signatureService()->signData(
                 $signPayload,
@@ -290,9 +308,9 @@ trait ManagesEncounterReferrals
                 Auth::user()->party->taxId
             );
 
-            $finalResponse = $lifecycle->submitSignedCreate('service_request', $person->uuid, $signedContent);
+            $finalResponse = $this->referralApi('service_request')->createSignedAndResolve($person->uuid, $signedContent);
 
-            $dbData = $lifecycle->persistAfterSignedCreate(
+            $dbData = $this->persistAfterSignedCreate(
                 $dbData,
                 $finalResponse,
                 'service_request',
@@ -301,7 +319,7 @@ trait ManagesEncounterReferrals
 
             if (empty($dbData['request_number']) && !empty($dbData['uuid'])) {
                 try {
-                    $remote = $lifecycle->fetchRemoteReferral($person->uuid, $dbData['uuid'], 'service_request');
+                    $remote = $this->fetchRemoteReferral($person->uuid, $dbData['uuid'], 'service_request');
                     $dbData['request_number'] = $remote['requisition'] ?? $remote['request_number'] ?? $dbData['request_number'];
                     if (!empty($dbData['request_number'])) {
                         ServiceRequestRequest::where('uuid', $dbData['uuid'])
@@ -402,5 +420,96 @@ trait ManagesEncounterReferrals
         }
 
         return (string) ($this->encounterReferralPrograms[0]['id'] ?? '');
+    }
+
+    /**
+     * Select option value for Livewire forms. Accepts snapshots that still
+     * only have `uuid` from before `raw` was added.
+     *
+     * @param  array{raw?: string, uuid?: string, type?: string, phone_number?: string}  $method
+     */
+    protected function authenticationMethodFormValue(array $method): string
+    {
+        $raw = trim((string) ($method['raw'] ?? ''));
+        if ($raw !== '') {
+            return $raw;
+        }
+
+        $uuid = trim((string) ($method['uuid'] ?? ''));
+        if ($uuid === '') {
+            return '';
+        }
+
+        $type = (string) ($method['type'] ?? '');
+        $phone = (string) ($method['phone_number'] ?? '');
+
+        return ($type !== '' || $phone !== '') ? "{$uuid}|{$type}|{$phone}" : $uuid;
+    }
+
+    protected function createEncounterReferralDraft(\App\Models\MedicalEvents\Sql\Encounter $encounter, array $formData, float $qty, array $employeeContext): string
+    {
+        $kind = $formData['kind'] ?? 'service_request';
+        $formSource = new FormCollection(array_replace($formData, [
+            'started_at' => $formData['started_at'] ?? now()->toDateString(),
+            'ended_at' => $formData['ended_at'] ?? now()->addMonths(1)->toDateString(),
+            'intent' => $formData['intent'] ?? 'order',
+            'priority' => $formData['priority'] ?? 'routine',
+        ]));
+        $dbData = array_replace(app(ObjectMapperInterface::class)->map($formSource, $kind === 'service_request' ? ServiceRequestModelData::class : DeviceRequestModelData::class)->toArray(), [
+            'uuid' => (string) Str::uuid(),
+            'employee_id' => $employeeContext['employee_id'] ?? null,
+            'person_id' => $encounter->person_id,
+            'division_id' => $employeeContext['division_id'] ?? null,
+            'status' => $kind === 'service_request' ? \App\Enums\Person\ServiceRequestStatus::DRAFT->value : \App\Enums\Person\DeviceRequestStatus::DRAFT->value,
+            'quantity' => $qty,
+            'quantity_system' => $formData['quantity_system'] ?? 'SERVICE_UNIT',
+            'quantity_code' => $formData['quantity_code'] ?? 'PIECE',
+            'based_on_uuid' => null,
+            'context_uuid' => $encounter->uuid,
+        ]);
+
+        $personUuid = \App\Models\Person\Person::find($encounter->person_id)?->uuid;
+
+        $uuids = [
+            'person_uuid' => $personUuid,
+            'encounter_uuid' => $encounter->uuid,
+            'episode_uuid' => $encounter->episode?->value ?? null,
+            'employee_uuid' => $employeeContext['employee_uuid'] ?? null,
+            'legal_entity_uuid' => $employeeContext['legal_entity_uuid'] ?? null,
+        ];
+
+        if ($kind === 'service_request') {
+            $dbData['service_id'] = $formData['service_id'] ?? null;
+
+            if (!empty($dbData['program_id']) && $personUuid) {
+                $prequalifyPayload = app(ObjectMapperInterface::class)->map(ServiceRequestInput::fromArray(
+                    $dbData,
+                    $uuids,
+                    CarbonImmutable::now()
+                ), ServiceRequestPrequalifyData::class)->toArray();
+                EHealth::serviceRequest()->prequalifyAndValidate((string) $personUuid, $prequalifyPayload);
+            }
+
+            $this->referralRepository('service_request')->store($dbData, (int) $encounter->person_id);
+
+            return $dbData['uuid'];
+        }
+
+        $dbData['device_id'] = $formData['device_id'] ?? null;
+        $dbData['device_code_type'] = $formData['device_code_type'] ?? 'DEVICE_DEFINITION';
+        if ($personUuid && !empty($dbData['program_id'])) {
+            $prequalifyPayload = app(ObjectMapperInterface::class)->map(DeviceRequestEhealth::source(
+                $dbData,
+                $uuids,
+                CarbonImmutable::now('UTC'),
+                null,
+                null
+            ), DeviceRequestEhealthPrequalify::class)->toArray();
+            EHealth::deviceRequest()->prequalifyAndValidate((string) $personUuid, $prequalifyPayload);
+        }
+
+        $this->referralRepository('device_request')->store($dbData, (int) $encounter->person_id);
+
+        return $dbData['uuid'];
     }
 }

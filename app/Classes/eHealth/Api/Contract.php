@@ -20,6 +20,26 @@ class Contract extends EHealthRequest
      */
     protected const string URL = '/api/contracts';
 
+    /** Fetch a complete, validated snapshot; partial pages must never populate the cache. */
+    public function getValidatedForLegalEntity(string $legalEntityUuid): array
+    {
+        $page = 1;
+        $contracts = [];
+        do {
+            $response = $this->getMany(['contractor_legal_entity_id' => $legalEntityUuid, 'page' => $page]);
+            $contracts = array_merge($contracts, $response->validate());
+            $paging = $response->getPaging();
+            if (!isset($paging['page_number'], $paging['total_pages'])
+                || (int) $paging['page_number'] !== $page
+                || (int) $paging['total_pages'] < $page) {
+                throw new \RuntimeException('Incomplete contract pagination.');
+            }
+            $page++;
+        } while ($page <= (int) $paging['total_pages']);
+
+        return $contracts;
+    }
+
     /**
      * Maps eHealth API contract response fields to local database columns.
      *

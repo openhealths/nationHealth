@@ -19,9 +19,8 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\EncounterPackageBuilder;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use App\Traits\EnsuresEntityExists;
+use App\Traits\MedicalEvents\UpdatesReferralExecution;
 use App\Traits\SubmitsEHealthEncounter;
 use Carbon\CarbonImmutable;
 use Exception;
@@ -36,9 +35,10 @@ use Throwable;
 class EncounterCreate extends EncounterComponent
 {
     use EnsuresEntityExists;
+
     use SubmitsEHealthEncounter;
 
-    private EncounterPackageBuilder $packageBuilder;
+    use UpdatesReferralExecution;
 
     public ?int $prepersonId = null;
 
@@ -75,7 +75,7 @@ class EncounterCreate extends EncounterComponent
      * Called when the doctor picks an electronic referral from the dropdown.
      * Runs eHealth use/qualify here so signing the encounter stays on Cipher only.
      */
-    public function selectElectronicReferral(string $referralUuid, ReferralRequestLifecycleService $lifecycle): void
+    public function selectElectronicReferral(string $referralUuid): void
     {
         $referralUuid = trim($referralUuid);
         if ($referralUuid === '' || !Str::isUuid($referralUuid)) {
@@ -94,7 +94,7 @@ class EncounterCreate extends EncounterComponent
         $this->form->encounter['referralNumber'] = (string) ($referral['requisition'] ?? $referralUuid);
 
         try {
-            $this->ensureReferralTakenIntoWork($lifecycle, $referralUuid);
+            $this->ensureReferralTakenIntoWork($referralUuid);
             $this->preparedElectronicReferralUuid = $referralUuid;
         } catch (Throwable $exception) {
             $this->preparedElectronicReferralUuid = null;
@@ -109,7 +109,7 @@ class EncounterCreate extends EncounterComponent
      * Take an active electronic referral into work (eHealth use / qualify).
      * Idempotent when local status is already in_progress.
      */
-    private function ensureReferralTakenIntoWork(ReferralRequestLifecycleService $service, string $referralUuid): void
+    private function ensureReferralTakenIntoWork(string $referralUuid): void
     {
         $local = Repository::serviceRequest()->findByUuid($referralUuid);
         $status = strtolower((string) ($local?->status ?? ''));
@@ -135,7 +135,7 @@ class EncounterCreate extends EncounterComponent
             throw new RuntimeException(__('Не знайдено співробітника для взяття направлення в роботу.'));
         }
 
-        $service->takeIntoWork(
+        $this->takeReferralIntoWork(
             $referralUuid,
             $employee,
             $this->patientUuid ?: null,
@@ -176,12 +176,6 @@ class EncounterCreate extends EncounterComponent
 
             $validated['procedures'][$index]['basedOnIdentifier'] = $uuid;
         }
-    }
-
-    public function boot(): void
-    {
-        parent::boot();
-        $this->packageBuilder = app(EncounterPackageBuilder::class);
     }
 
     public function mount(LegalEntity $legalEntity, ?Person $person = null, ?Preperson $preperson = null): void
@@ -278,7 +272,7 @@ class EncounterCreate extends EncounterComponent
             return;
         }
 
-        $formattedData = $this->packageBuilder->build($validated, $this->episodeType, Status::DRAFT);
+        $formattedData = $this->buildEncounterPackage($validated, $this->episodeType, Status::DRAFT);
         $formattedData['encounter']['status'] = EncounterStatus::DRAFT->value;
 
         try {
@@ -368,7 +362,7 @@ class EncounterCreate extends EncounterComponent
             return;
         }
 
-        $formattedData = $this->packageBuilder->build($validatedData, $this->episodeType);
+        $formattedData = $this->buildEncounterPackage($validatedData, $this->episodeType);
 
         try {
             $this->syncRegisteredConditions($validatedData['conditions'] ?? []);
@@ -587,17 +581,17 @@ class EncounterCreate extends EncounterComponent
         }
     }
 
-    public function redeemReferral(ReferralRequestLifecycleService $service): void
+    public function redeemReferral(): void
     {
         try {
             if ($this->referralToRedeemUuid && $this->createdEncounterUuidForRedeem) {
                 // use/qualify already ran on referral selection; redeem only completes.
                 // Safety net: if the doctor typed a number without picking from the list, take into work once here.
                 if ($this->preparedElectronicReferralUuid !== $this->referralToRedeemUuid) {
-                    $this->ensureReferralTakenIntoWork($service, $this->referralToRedeemUuid);
+                    $this->ensureReferralTakenIntoWork($this->referralToRedeemUuid);
                 }
 
-                $service->completeReferral($this->referralToRedeemUuid, $this->createdEncounterUuidForRedeem);
+                $this->completeReferral($this->referralToRedeemUuid, $this->createdEncounterUuidForRedeem);
                 Session::flash('success', __('encounters.messages.referral_redeemed'));
             }
         } catch (\Exception $e) {

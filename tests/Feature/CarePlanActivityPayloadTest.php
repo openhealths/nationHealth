@@ -6,7 +6,6 @@ namespace Tests\Feature;
 
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\CarePlanActivity;
-use App\Repositories\CarePlanActivityRepository;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
@@ -27,7 +26,7 @@ class CarePlanActivityPayloadTest extends TestCase
             'uuid' => 'test-uuid-1234',
         ]);
 
-        $repository = new CarePlanActivityRepository();
+        $repository = new \Tests\Support\CarePlanActivityPayload();
         $payload = $repository->formatCarePlanActivityRequest($activity);
 
         $this->assertEquals(5, $payload['detail']['daily_amount']['value']);

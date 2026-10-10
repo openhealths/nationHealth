@@ -4,19 +4,66 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
+use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
+use App\Core\Arr;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use App\Core\Arr;
 
 class CarePlanActivity extends Request
 {
     protected const string URL = '/api/care_plans';
+
+    /** Return the raw remote signing snapshot, including unknown/read-only fields. */
+    public function getSigningSnapshot(string $patientUuid, string $carePlanUuid, string $activityUuid): array
+    {
+        $payload = $this->getDetails($patientUuid, $carePlanUuid, $activityUuid)->getData();
+        if (is_array($payload['data'] ?? null)) {
+            $payload = $payload['data'];
+        }
+
+        return is_array($payload) ? $payload : [];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function createSignedAndResolve(string $patientUuid, string $carePlanUuid, string $signedContent): array
+    {
+        $response = $this->create($patientUuid, $carePlanUuid, [
+            'signed_data' => $signedContent,
+            'signed_data_encoding' => 'base64',
+        ]);
+
+        return EHealth::job()->resolve($response->getData());
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function cancelAndResolve(string $patientUuid, string $carePlanUuid, string $activityUuid, array $payload): array
+    {
+        $response = $this->cancel($patientUuid, $carePlanUuid, $activityUuid, $payload);
+
+        return EHealth::job()->resolve($response->getData());
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function completeAndResolve(string $patientUuid, string $carePlanUuid, string $activityUuid, array $payload): array
+    {
+        $response = $this->complete($patientUuid, $carePlanUuid, $activityUuid, $payload);
+
+        return EHealth::job()->resolve($response->getData());
+    }
 
     /**
      * Create a new Care Plan Activity in eHealth.

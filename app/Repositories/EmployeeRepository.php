@@ -18,6 +18,34 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 
 readonly class EmployeeRepository
 {
+    use \App\Repositories\Concerns\ResolvesMedicalRequestEmployeeContext;
+    public function pharmacyEmployee(?\App\Models\User $user, int $legalEntityId): ?Employee
+    {
+        return $user?->employees()
+            ->where('legal_entity_id', $legalEntityId)
+            ->whereIn('employee_type', ['PHARMACIST', 'PHARMACIST_ADMIN'])
+            ->where('status', \App\Enums\Person\Status::APPROVED)
+            ->with(['division', 'party'])->first()
+            ?? $user?->employees()->where('legal_entity_id', $legalEntityId)
+                ->whereNotNull('division_id')->where('status', \App\Enums\Person\Status::APPROVED)
+                ->with(['division', 'party'])->first()
+            ?? $user?->employees()->where('legal_entity_id', $legalEntityId)
+                ->with(['division', 'party'])->first();
+    }
+
+    /** Resolve optional local foreign keys before passing a snapshot to ObjectMapper. */
+    public function referralExecutorContext(Employee $employee, mixed $programId): \stdClass
+    {
+        return (object) [
+            'employeeUuid' => $employee->uuid,
+            'divisionUuid' => $employee->divisionUuid
+                ?: ($employee->divisionId ? \App\Models\Division::find($employee->divisionId)?->uuid : null),
+            'legalEntityUuid' => $employee->legalEntityUuid
+                ?: ($employee->legalEntityId ? LegalEntity::find($employee->legalEntityId)?->uuid : null),
+            'programId' => $programId,
+        ];
+    }
+
     /**
      * Creates a new EmployeeRequest draft from prepared data.
      * This is a universal method that only handles database persistence.

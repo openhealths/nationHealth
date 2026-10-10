@@ -12,7 +12,10 @@ use App\Models\MedicalEvents\Sql\Device;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\Fhir;
+use App\Dto\Procedure\Form as ProcedureFormData;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Locked;
 use Throwable;
@@ -71,7 +74,7 @@ class ProcedureEdit extends ProcedureComponent
             Repository::observation()->getDetailsMapByUuids($observationUuids)
         );
 
-        $this->form->procedure = Fhir::procedure()->fromFhir($procedureData, $detailsMap);
+        $this->form->procedure = app(ObjectMapperInterface::class)->map(new Collection($procedureData), new ProcedureFormData($detailsMap))->toArray();
 
         $focalDeviceIds = collect($this->form->procedure['focalDevice'] ?? [])
             ->pluck('manipulatedId')
@@ -156,7 +159,7 @@ class ProcedureEdit extends ProcedureComponent
             if (data_get($this->form->procedure, 'referralType') === 'electronic' && filled($uuid)) {
                 $this->storeElectronicReferralIfMissing($uuid, Auth::user()->getProcedureWriterEmployee());
             }
-            
+
             Repository::procedure()->sync($this->patient(), [$this->fhirToSync($formattedData)]);
 
             return $this->procedureId;

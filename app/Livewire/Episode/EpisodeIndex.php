@@ -6,6 +6,9 @@ namespace App\Livewire\Episode;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Dto\Episode\EhealthCancellation as EpisodeEhealthCancellation;
+
+use App\Dto\Episode\EhealthClosure as EpisodeEhealthClosure;
 use App\Enums\Episode\Status;
 use App\Enums\JobStatus;
 use App\Enums\Person\EncounterStatus;
@@ -23,7 +26,6 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Repositories\MedicalEvents\Repository;
 use App\Rules\InDictionary;
-use App\Services\MedicalEvents\Fhir;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
 use Illuminate\Contracts\View\View;
@@ -33,12 +35,15 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 use Throwable;
 
 class EpisodeIndex extends BasePatientComponent
 {
     use BatchLegalEntityQueries;
+
     use HandlesSyncBatch;
+
     use WithPagination;
 
     public string $syncStatus = '';
@@ -390,7 +395,11 @@ class EpisodeIndex extends BasePatientComponent
             return;
         }
 
-        $formattedData = Fhir::episode()->toCancelFhir($this->cancellationForm->validate());
+        $validated = $this->cancellationForm->validate();
+        $reasonText = dictionary()->basics()->byName('eHealth/cancellation_reasons')->asCodeDescription()->get($validated['cancellationReason']);
+        $source = clone $this->cancellationForm;
+        $source->fill($validated);
+        $formattedData = Arr::toCamelCase(app(ObjectMapperInterface::class)->map($source, new EpisodeEhealthCancellation($reasonText))->toArray());
 
         try {
             EHealth::episode()->cancel(
@@ -457,7 +466,11 @@ class EpisodeIndex extends BasePatientComponent
 
         $this->closingForm->periodStart = $episode->period?->start ?? '';
 
-        $formattedData = Fhir::episode()->toCloseFhir($this->closingForm->validate());
+        $validated = $this->closingForm->validate();
+        $reasonText = dictionary()->basics()->byName('eHealth/episode_closing_reasons')->asCodeDescription()->get($validated['closingReason']);
+        $source = clone $this->closingForm;
+        $source->fill($validated);
+        $formattedData = Arr::toCamelCase(app(ObjectMapperInterface::class)->map($source, new EpisodeEhealthClosure($reasonText))->toArray());
 
         try {
             EHealth::episode()->close(

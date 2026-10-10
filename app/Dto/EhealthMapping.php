@@ -24,6 +24,12 @@ trait EhealthMapping
         $data = new Serializer([new ObjectNormalizer(nameConverter: $converter)])
             ->normalize($this, context: [AbstractObjectNormalizer::SKIP_NULL_VALUES => true]);
 
+        return $this->normalizeMappedData($data, $converter);
+    }
+
+    /** Contract-specific wire rules; Division retains the default empty-value and key conversion policy. */
+    protected function normalizeMappedData(array $data, CamelCaseToSnakeCaseNameConverter $converter): array
+    {
         $kept = array_intersect_key($data, array_flip($this->keepWhenSet()));
         $others = removeEmptyKeys(array_diff_key($data, $kept));
 

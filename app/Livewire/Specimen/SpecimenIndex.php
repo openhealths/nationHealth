@@ -6,6 +6,9 @@ namespace App\Livewire\Specimen;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Dto\Specimen\EhealthProcess;
+use App\Dto\Specimen\EhealthStatusReason;
+use App\Enums\Specimen\StatusReasonType;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\Specimen\Forms\SpecimenActionForm;
@@ -13,13 +16,14 @@ use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\Fhir;
 use App\Traits\FormTrait;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 use Throwable;
 
 class SpecimenIndex extends Component
@@ -162,7 +166,7 @@ class SpecimenIndex extends Component
             return;
         }
 
-        $validated = $this->form->validate($this->form->rulesForProcessing(
+        $this->form->validate($this->form->rulesForProcessing(
             data_get($this->specimen, 'collection.collectedDateTime')
             ?? data_get($this->specimen, 'collection.collectedPeriod.end')
         ));
@@ -171,7 +175,7 @@ class SpecimenIndex extends Component
             $response = EHealth::specimen()->process(
                 data_get($this->specimen, 'subject.identifier.value'),
                 data_get($this->specimen, 'uuid'),
-                Arr::toSnakeCase(Fhir::specimen()->toProcessFhir($validated))
+                app(ObjectMapperInterface::class)->map($this->form, EhealthProcess::class)->toArray()
             );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while processing the specimen');
@@ -204,7 +208,7 @@ class SpecimenIndex extends Component
             $response = EHealth::specimen()->invalidate(
                 data_get($this->specimen, 'subject.identifier.value'),
                 data_get($this->specimen, 'uuid'),
-                Arr::toSnakeCase(Fhir::specimen()->toInvalidateFhir($validated))
+                app(ObjectMapperInterface::class)->map(new Collection(['reason' => $validated['invalidateReason']]), new EhealthStatusReason(StatusReasonType::INVALIDATE))->toArray()
             );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while invalidating the specimen');
@@ -237,7 +241,7 @@ class SpecimenIndex extends Component
             $response = EHealth::specimen()->reject(
                 data_get($this->specimen, 'subject.identifier.value'),
                 data_get($this->specimen, 'uuid'),
-                Arr::toSnakeCase(Fhir::specimen()->toRejectFhir($validated))
+                app(ObjectMapperInterface::class)->map(new Collection(['reason' => $validated['rejectReason']]), new EhealthStatusReason(StatusReasonType::REJECT))->toArray()
             );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while rejecting the specimen');

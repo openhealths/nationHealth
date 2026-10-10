@@ -10,8 +10,13 @@ use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
 use App\Models\User;
-use App\Services\MedicalEvents\DeviceRequestLifecycleService;
-use App\Services\MedicalEvents\MedicationRequestLifecycleService;
+use App\Classes\eHealth\Api\DeviceRequest as DeviceRequestApi;
+use App\Classes\eHealth\Api\Job;
+use App\Classes\eHealth\EHealthResponse;
+use App\Dto\DeviceRequest\DraftResult as DeviceDraftResult;
+use App\Exceptions\EHealth\EHealthValidationException;
+use App\Classes\eHealth\Api\Patient\MedicationRequest as MedicationRequestApi;
+use App\Dto\MedicationRequest\DraftResult;
 use App\Services\SignatureService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
@@ -109,9 +114,9 @@ class StandaloneRequestSigningTest extends TestCase
         $draftId = (string) Str::uuid();
         $draftContent = ['id' => $draftId, 'status' => 'NEW', 'medication_id' => (string) Str::uuid()];
 
-        $lifecycle = Mockery::mock(MedicationRequestLifecycleService::class);
-        $lifecycle->shouldReceive('createDraft')->once()->andReturn($draftContent);
-        $lifecycle->shouldReceive('sign')
+        $lifecycle = Mockery::mock(MedicationRequestApi::class);
+        $lifecycle->shouldReceive('createAndResolve')->once()->andReturn(new DraftResult($draftContent, $draftContent));
+        $lifecycle->shouldReceive('signAndResolve')
             ->once()
             ->withArgs(static function (string $id, array $payload) use ($draftId): bool {
                 return $id === $draftId
@@ -119,7 +124,7 @@ class StandaloneRequestSigningTest extends TestCase
                     && $payload['signed_content_encoding'] === 'base64';
             })
             ->andReturn([]);
-        $this->app->instance(MedicationRequestLifecycleService::class, $lifecycle);
+        $this->app->instance(MedicationRequestApi::class, $lifecycle);
 
         $this->signature->shouldReceive('signData')
             ->once()
@@ -148,14 +153,32 @@ class StandaloneRequestSigningTest extends TestCase
             ->assertHasNoErrors();
     }
 
+    public function test_original_draft_is_retained_when_resolved_job_contains_only_metadata(): void
+    {
+        $draftId = (string) Str::uuid();
+        $raw = ['id' => $draftId, 'person' => ['id' => 'patient-id'], 'unknown_extension' => ['zero' => 0, 'list' => []]];
+        $api = Mockery::mock(MedicationRequestApi::class);
+        $api->shouldReceive('createAndResolve')->once()->andReturn(new DraftResult(
+            ['data' => $raw],
+            ['id' => $draftId, 'status' => 'processed']
+        ));
+        $this->instance(MedicationRequestApi::class, $api);
+
+        Livewire::test(MedicationRequestForm::class, ['legalEntity' => $this->legalEntity])
+            ->set('patientId', (string) Str::uuid())->set('medicalProgram', (string) Str::uuid())
+            ->set('dosageInstruction', 'Take 1 pill')->set('duration', '30')
+            ->call('createDraft')->assertSet('isDraftCreated', true)
+            ->assertSet('draftId', $draftId)->assertSet('draftContent', $raw);
+    }
+
     public function test_prescription_cannot_be_signed_without_kep_credentials(): void
     {
         $draftId = (string) Str::uuid();
 
-        $lifecycle = Mockery::mock(MedicationRequestLifecycleService::class);
-        $lifecycle->shouldReceive('createDraft')->once()->andReturn(['id' => $draftId]);
-        $lifecycle->shouldNotReceive('sign');
-        $this->app->instance(MedicationRequestLifecycleService::class, $lifecycle);
+        $lifecycle = Mockery::mock(MedicationRequestApi::class);
+        $lifecycle->shouldReceive('createAndResolve')->once()->andReturn(new DraftResult(['id' => $draftId], ['id' => $draftId]));
+        $lifecycle->shouldNotReceive('signAndResolve');
+        $this->app->instance(MedicationRequestApi::class, $lifecycle);
 
         $this->signature->shouldNotReceive('signData');
 
@@ -171,9 +194,9 @@ class StandaloneRequestSigningTest extends TestCase
 
     public function test_prescription_signing_is_refused_before_a_draft_exists(): void
     {
-        $lifecycle = Mockery::mock(MedicationRequestLifecycleService::class);
-        $lifecycle->shouldNotReceive('sign');
-        $this->app->instance(MedicationRequestLifecycleService::class, $lifecycle);
+        $lifecycle = Mockery::mock(MedicationRequestApi::class);
+        $lifecycle->shouldNotReceive('signAndResolve');
+        $this->app->instance(MedicationRequestApi::class, $lifecycle);
 
         Livewire::test(MedicationRequestForm::class, ['legalEntity' => $this->legalEntity])
             ->call('sign')
@@ -182,9 +205,9 @@ class StandaloneRequestSigningTest extends TestCase
 
     public function test_draft_without_an_identifier_is_not_treated_as_created(): void
     {
-        $lifecycle = Mockery::mock(MedicationRequestLifecycleService::class);
-        $lifecycle->shouldReceive('createDraft')->once()->andReturn(['status' => 'NEW']);
-        $this->app->instance(MedicationRequestLifecycleService::class, $lifecycle);
+        $lifecycle = Mockery::mock(MedicationRequestApi::class);
+        $lifecycle->shouldReceive('createAndResolve')->once()->andReturn(new DraftResult(['status' => 'NEW'], ['status' => 'NEW']));
+        $this->app->instance(MedicationRequestApi::class, $lifecycle);
 
         Livewire::test(MedicationRequestForm::class, ['legalEntity' => $this->legalEntity])
             ->set('patientId', (string) Str::uuid())
@@ -201,18 +224,22 @@ class StandaloneRequestSigningTest extends TestCase
         $draftId = (string) Str::uuid();
         $draftContent = ['id' => $draftId, 'status' => 'NEW'];
 
-        $lifecycle = Mockery::mock(DeviceRequestLifecycleService::class);
-        $lifecycle->shouldReceive('createDraft')->once()->andReturn($draftContent);
-        $lifecycle->shouldReceive('sign')
+        $lifecycle = Mockery::mock(DeviceRequestApi::class);
+        $lifecycle->shouldReceive('createAndResolve')->once()->andReturn(new DeviceDraftResult($draftContent, $draftContent));
+        $lifecycle->shouldReceive('signAndResolve')
             ->once()
             ->withArgs(static function (string $id, array $payload) use ($draftId): bool {
                 return $id === $draftId
                     && $payload['signed_device_request_request'] === 'REAL-KEP-SIGNATURE';
             })
             ->andReturn([]);
-        $this->app->instance(DeviceRequestLifecycleService::class, $lifecycle);
+        $this->app->instance(DeviceRequestApi::class, $lifecycle);
 
-        $this->signature->shouldReceive('signData')->once()->andReturn('REAL-KEP-SIGNATURE');
+        $this->signature->shouldReceive('signData')->once()
+            ->withArgs(static fn (array $data, string $password, string $knedp, $file, string $taxId): bool =>
+                $data === $draftContent && $password === 'secret' && $knedp === 'knedp-1'
+                && $file instanceof UploadedFile && $taxId === '9876543210')
+            ->andReturn('REAL-KEP-SIGNATURE');
 
         Livewire::test(DeviceRequestForm::class, ['legalEntity' => $this->legalEntity])
             ->set('patientId', (string) Str::uuid())
@@ -227,5 +254,94 @@ class StandaloneRequestSigningTest extends TestCase
             ->call('sign')
             ->assertSet('showSignatureModal', false)
             ->assertHasNoErrors();
+    }
+
+    public function test_device_prequalify_does_not_report_success_for_an_invalid_verdict(): void
+    {
+        $api = Mockery::mock(DeviceRequestApi::class);
+        $api->shouldReceive('prequalifyAndValidate')->once()
+            ->with(['person_id' => 'person-id', 'programs' => [['id' => 'program-id']]])
+            ->andThrow(new EHealthValidationException(['error' => ['message' => 'Program not covered']]));
+        $this->instance(DeviceRequestApi::class, $api);
+
+        $this->deviceForm()->call('preQualify')->assertSet('statusMessage', __('Помилка від ЕСОЗ:').' Program not covered')
+            ->assertSet('isDraftCreated', false);
+    }
+
+    public function test_device_create_keeps_original_raw_when_job_returns_only_metadata(): void
+    {
+        $raw = ['id' => 'device-id', 'status' => 'NEW', 'unknown_extension' => ['zero' => 0, 'list' => []]];
+        $api = Mockery::mock(DeviceRequestApi::class);
+        $api->shouldReceive('createAndResolve')->once()->andReturn(new DeviceDraftResult(
+            ['device_request_request' => $raw],
+            ['id' => 'device-id', 'status' => 'processed']
+        ));
+        $this->instance(DeviceRequestApi::class, $api);
+
+        $this->deviceForm()->call('createDraft')->assertSet('isDraftCreated', true)
+            ->assertSet('draftId', 'device-id')->assertSet('draftContent', $raw);
+    }
+
+    public function test_device_create_failure_does_not_enable_signing(): void
+    {
+        $api = Mockery::mock(DeviceRequestApi::class);
+        $api->shouldReceive('createAndResolve')->once()
+            ->andThrow(new EHealthValidationException(['error' => ['message' => 'Creation rejected']]));
+        $api->shouldNotReceive('signAndResolve');
+        $this->instance(DeviceRequestApi::class, $api);
+        $this->signature->shouldNotReceive('signData');
+
+        $this->deviceForm()->call('createDraft')->assertSet('isDraftCreated', false)->assertSet('draftId', null)
+            ->call('sign')->assertNotDispatched('device-request-created');
+    }
+
+    public function test_device_job_metadata_without_a_document_does_not_enable_signing(): void
+    {
+        $api = Mockery::mock(DeviceRequestApi::class);
+        $api->shouldReceive('createAndResolve')->once()->andReturn(new DeviceDraftResult(
+            ['job_id' => 'create-job'],
+            ['id' => 'device-id', 'status' => 'processed']
+        ));
+        $api->shouldNotReceive('signAndResolve');
+        $this->instance(DeviceRequestApi::class, $api);
+        $this->signature->shouldNotReceive('signData');
+
+        $this->deviceForm()->call('createDraft')->assertSet('isDraftCreated', false)
+            ->assertSet('draftId', null)->assertSet('draftContent', [])
+            ->assertSet('statusMessage', __('care-plan.draft_missing_document'))->call('sign');
+    }
+
+    public function test_failed_device_sign_job_preserves_draft_clears_credentials_and_emits_no_success(): void
+    {
+        $raw = ['id' => 'device-id', 'status' => 'NEW', 'unknown_extension' => ['zero' => 0, 'flag' => false]];
+        $api = Mockery::mock(DeviceRequestApi::class)->makePartial();
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('getData')->once()->andReturn(['job_id' => 'sign-job']);
+        $api->shouldReceive('signDeviceRequest')->once()
+            ->with('device-id', ['signed_device_request_request' => 'REAL-KEP-SIGNATURE', 'signed_content_encoding' => 'base64'])
+            ->andReturn($response);
+        $this->instance(DeviceRequestApi::class, $api);
+        $job = Mockery::mock(Job::class);
+        $job->shouldReceive('resolve')->once()->with(['job_id' => 'sign-job'])
+            ->andThrow(new EHealthValidationException(['error' => ['message' => 'Signing rejected']]));
+        $this->instance(Job::class, $job);
+        $this->signature->shouldReceive('signData')->once()
+            ->withArgs(static fn (array $data): bool => $data === $raw)->andReturn('REAL-KEP-SIGNATURE');
+
+        $this->deviceForm()->set('isDraftCreated', true)->set('draftId', 'device-id')->set('draftContent', $raw)
+            ->set('showSignatureModal', true)->set('form.knedp', 'knedp-1')
+            ->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 10))
+            ->set('form.password', 'secret')->call('sign')
+            ->assertSet('statusMessage', __('Помилка від ЕСОЗ:').' Signing rejected')->assertSet('isDraftCreated', true)
+            ->assertSet('draftContent', $raw)->assertSet('showSignatureModal', false)
+            ->assertSet('form.password', '')->assertSet('form.keyContainerUpload', null)
+            ->assertNotDispatched('device-request-created');
+    }
+
+    private function deviceForm(): \Livewire\Features\SupportTesting\Testable
+    {
+        return Livewire::test(DeviceRequestForm::class, ['legalEntity' => $this->legalEntity])
+            ->set('patientId', 'person-id')->set('medicalProgram', 'program-id')
+            ->set('deviceType', 'device-code')->set('quantity', '2');
     }
 }

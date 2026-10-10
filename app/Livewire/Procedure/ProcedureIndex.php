@@ -22,8 +22,8 @@ use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\Fhir;
-use App\Services\MedicalEvents\FhirResource;
+use App\Dto\Procedure\EhealthCancellation;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -384,11 +384,7 @@ class ProcedureIndex extends BasePatientComponent
             $this->form->resetSigningFields();
         }
 
-        $statusReason = FhirResource::make()
-            ->coding('eHealth/procedure_status_reasons', $validated['statusReason'])
-            ->toCodeableConcept(
-                data_get($this->dictionaries, 'eHealth/procedure_status_reasons.' . $validated['statusReason'], '')
-            );
+        $statusReason = $signedPayload['status_reason'];
 
         try {
             EHealth::procedure()->cancel($this->uuid, $procedure->uuid, [
@@ -466,12 +462,11 @@ class ProcedureIndex extends BasePatientComponent
             ->getById($this->uuid, $procedure->uuid)
             ->getData();
 
-        return Fhir::procedure()->toCancellationPackage(
-            $procedureRaw,
-            $statusReason,
-            $explanatoryLetter,
-            data_get($this->dictionaries, 'eHealth/procedure_status_reasons.' . $statusReason)
-        );
+        return app(ObjectMapperInterface::class)->map(new Collection([
+            'statusReason' => $statusReason,
+            'explanatoryLetter' => $explanatoryLetter,
+            'statusReasonText' => data_get($this->dictionaries, 'eHealth/procedure_status_reasons.' . $statusReason),
+        ]), new EhealthCancellation($procedureRaw))->toArray();
     }
 
     private function resetCancellationState(): void

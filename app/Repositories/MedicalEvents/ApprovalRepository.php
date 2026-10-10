@@ -4,26 +4,84 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
-use Throwable;
-use Carbon\Carbon;
-use App\Enums\Person\ApprovalStatus;
 use App\Classes\eHealth\EHealth;
+use App\Enums\Person\ApprovalStatus;
+use App\Models\CarePlan;
 use App\Models\EhealthJob;
 use App\Models\EhealthLink;
 use App\Models\MedicalEvents\Mongo\Approval as MongoApproval;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Database\Eloquent\Model;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Relations\AuthenticationMethod;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * @property Approval $model
  */
 class ApprovalRepository extends BaseRepository
 {
+    public function createPendingCarePlanApproval(CarePlan $carePlan, string $uuid, ?string $employeeUuid, string $href): EhealthLink
+    {
+        $attributes = [
+            'approvable_type' => CarePlan::class,
+            'approvable_id' => $carePlan->id,
+            'status' => ApprovalStatus::PENDING->value,
+        ];
+        if ($employeeUuid) {
+            $identifier = Repository::identifier()->store($employeeUuid);
+            $attributes['granted_to_id'] = $identifier->id;
+            $attributes['granted_to_type'] = 'employee';
+        }
+        $approval = Approval::firstOrCreate(['uuid' => $uuid], $attributes);
+
+        return $this->attachEhealthLink($approval, ['href' => $href]);
+    }
+
+    public function findCarePlanPollingLink(int $id, int $carePlanId): ?EhealthLink
+    {
+        return EhealthLink::with(['job', 'linkable.approvable', 'processingData'])
+            ->whereHasMorph('linkable', [Approval::class], static function ($query) use ($carePlanId): void {
+                $query->where('approvable_type', CarePlan::class)->where('approvable_id', $carePlanId);
+            })
+            ->find($id);
+    }
+
+    public function replaceProvisionalUuid(EhealthLink $link, ?string $uuid): void
+    {
+        if ($uuid && $link->linkable instanceof Approval) {
+            $link->linkable->update(['uuid' => $uuid]);
+        }
+    }
+
+    public function carePlanForPollingLink(EhealthLink $link): ?CarePlan
+    {
+        if (!$link->linkable instanceof Approval) {
+            return null;
+        }
+        $carePlan = $link->linkable->approvable;
+        if (!$carePlan instanceof CarePlan && $link->linkable->approvableId) {
+            $carePlan = CarePlan::query()->find($link->linkable->approvableId);
+        }
+
+        return $carePlan instanceof CarePlan ? $carePlan : null;
+    }
+
+    public function findOwnedForCarePlan(CarePlan $carePlan, string $uuid): Approval
+    {
+        $approval = $carePlan->approvals()->where('uuid', $uuid)->first();
+        if (!$approval instanceof Approval) {
+            throw (new ModelNotFoundException())->setModel(Approval::class, [$uuid]);
+        }
+
+        return $approval;
+    }
+
     protected const int SMS_CODE_ALIVE_MINUTES = 14;
 
     protected string $employeeUuid;

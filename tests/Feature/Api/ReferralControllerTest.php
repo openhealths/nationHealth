@@ -8,7 +8,6 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\User;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -43,6 +42,12 @@ class ReferralControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // This file tests HTTP translation; real ownership/persistence run in referral integration tests.
+        $repository = Mockery::mock(\App\Repositories\MedicalEvents\ServiceRequestRequestRepository::class);
+        $repository->shouldReceive('assertCompletionResourceOwned')->andReturnNull();
+        $repository->shouldReceive('setExecutionStatus')->andReturnNull();
+        $this->instance(\App\Repositories\MedicalEvents\ServiceRequestRequestRepository::class, $repository);
 
         $party = \App\Models\Relations\Party::create([
             'uuid' => (string) Str::uuid(),
@@ -152,38 +157,34 @@ class ReferralControllerTest extends TestCase
         );
     }
 
-    /**
-     * Regression: the controller used to pass the payload array into the `$resourceType`
-     * string parameter, which threw a TypeError on every call.
-     */
-    public function test_complete_forwards_resource_type_and_payload_in_the_right_order(): void
+    /** The wire document contains only the selected completion reference. */
+    public function test_complete_sends_the_selected_resource_and_excludes_extra_input(): void
     {
         $referralUuid = (string) Str::uuid();
         $resourceUuid = (string) Str::uuid();
 
-        $mock = Mockery::mock(ReferralRequestLifecycleService::class);
-        $mock->shouldReceive('completeReferral')
+        $mock = Mockery::mock(\App\Classes\eHealth\Api\Patient\ServiceRequest::class);
+        $mock->shouldReceive('completeAndResolve')
             ->once()
             ->withArgs(function (
                 string $uuid,
-                string $passedResourceUuid,
-                string $resourceType,
                 array $payload
             ) use ($referralUuid, $resourceUuid): bool {
                 return $uuid === $referralUuid
-                    && $passedResourceUuid === $resourceUuid
-                    && $resourceType === 'procedure'
-                    && ($payload['note'] ?? null) === 'redeem';
+                    && $payload === ['based_on' => [['identifier' => [
+                        'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'procedure']]],
+                        'value' => $resourceUuid,
+                    ]]]];
             })
             ->andReturn(['status' => 'completed']);
 
-        $this->app->instance(ReferralRequestLifecycleService::class, $mock);
+        $this->app->instance(\App\Classes\eHealth\Api\Patient\ServiceRequest::class, $mock);
 
         $this->actingAsDoctor()
             ->postJson($this->url('complete', $referralUuid), [
                 'resource_uuid' => $resourceUuid,
                 'resource_type' => 'procedure',
-                'payload' => ['note' => 'redeem'],
+                'payload' => ['note' => 'redeem', 'status' => 'draft', 'injected' => 'local-only'],
             ])
             ->assertOk()
             ->assertJsonPath('success', true)
@@ -192,14 +193,14 @@ class ReferralControllerTest extends TestCase
 
     public function test_complete_defaults_the_resource_type_to_encounter(): void
     {
-        $mock = Mockery::mock(ReferralRequestLifecycleService::class);
-        $mock->shouldReceive('completeReferral')
+        $mock = Mockery::mock(\App\Classes\eHealth\Api\Patient\ServiceRequest::class);
+        $mock->shouldReceive('completeAndResolve')
             ->once()
-            ->withArgs(static fn (string $uuid, string $resourceUuid, string $resourceType, array $payload): bool
-                => $resourceType === 'encounter' && $payload === [])
+            ->withArgs(static fn (string $uuid, array $payload): bool
+                => data_get($payload, 'based_on.0.identifier.type.coding.0.code') === 'encounter')
             ->andReturn(['status' => 'completed']);
 
-        $this->app->instance(ReferralRequestLifecycleService::class, $mock);
+        $this->app->instance(\App\Classes\eHealth\Api\Patient\ServiceRequest::class, $mock);
 
         $this->actingAsDoctor()
             ->postJson($this->url('complete'), ['encounter_uuid' => (string) Str::uuid()])
@@ -208,9 +209,9 @@ class ReferralControllerTest extends TestCase
 
     public function test_complete_rejects_an_unsupported_resource_type(): void
     {
-        $mock = Mockery::mock(ReferralRequestLifecycleService::class);
-        $mock->shouldNotReceive('completeReferral');
-        $this->app->instance(ReferralRequestLifecycleService::class, $mock);
+        $mock = Mockery::mock(\App\Classes\eHealth\Api\Patient\ServiceRequest::class);
+        $mock->shouldNotReceive('completeAndResolve');
+        $this->app->instance(\App\Classes\eHealth\Api\Patient\ServiceRequest::class, $mock);
 
         $this->actingAsDoctor()
             ->postJson($this->url('complete'), [
@@ -231,9 +232,9 @@ class ReferralControllerTest extends TestCase
         ]);
         $this->instance('legalEntity', $otherLegalEntity);
 
-        $mock = Mockery::mock(ReferralRequestLifecycleService::class);
-        $mock->shouldNotReceive('takeIntoWork');
-        $this->app->instance(ReferralRequestLifecycleService::class, $mock);
+        $mock = Mockery::mock(\App\Classes\eHealth\Api\Patient\ServiceRequest::class);
+        $mock->shouldNotReceive('processAndResolve');
+        $this->app->instance(\App\Classes\eHealth\Api\Patient\ServiceRequest::class, $mock);
 
         $this->actingAsDoctor()
             ->postJson($this->url('process'), ['patient_uuid' => (string) Str::uuid()])
@@ -245,9 +246,9 @@ class ReferralControllerTest extends TestCase
     {
         $details = ['error' => ['type' => 'validation_failed', 'message' => 'Invalid referral']];
 
-        $mock = Mockery::mock(ReferralRequestLifecycleService::class);
-        $mock->shouldReceive('completeReferral')->once()->andThrow(new EHealthValidationException($details));
-        $this->app->instance(ReferralRequestLifecycleService::class, $mock);
+        $mock = Mockery::mock(\App\Classes\eHealth\Api\Patient\ServiceRequest::class);
+        $mock->shouldReceive('completeAndResolve')->once()->andThrow(new EHealthValidationException($details));
+        $this->app->instance(\App\Classes\eHealth\Api\Patient\ServiceRequest::class, $mock);
 
         $this->actingAsDoctor()
             ->postJson($this->url('complete'), ['resource_uuid' => (string) Str::uuid()])
@@ -258,11 +259,11 @@ class ReferralControllerTest extends TestCase
 
     public function test_unexpected_failures_do_not_leak_internals_to_the_client(): void
     {
-        $mock = Mockery::mock(ReferralRequestLifecycleService::class);
-        $mock->shouldReceive('completeReferral')
+        $mock = Mockery::mock(\App\Classes\eHealth\Api\Patient\ServiceRequest::class);
+        $mock->shouldReceive('completeAndResolve')
             ->once()
             ->andThrow(new RuntimeException('SQLSTATE[42P01]: undefined_table service_request_requests'));
-        $this->app->instance(ReferralRequestLifecycleService::class, $mock);
+        $this->app->instance(\App\Classes\eHealth\Api\Patient\ServiceRequest::class, $mock);
 
         $response = $this->actingAsDoctor()
             ->postJson($this->url('complete'), ['resource_uuid' => (string) Str::uuid()])

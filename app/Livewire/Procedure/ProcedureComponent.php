@@ -11,7 +11,6 @@ use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Livewire\Procedure\Forms\ProcedureForm as Form;
-use App\Repositories\MedicalEvents\Repository;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
@@ -19,7 +18,8 @@ use App\Models\Equipment;
 use App\Models\Preperson;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Traits\SearchesElectronicReferrals;
-use App\Services\MedicalEvents\Fhir;
+use App\Dto\Procedure\Ehealth as ProcedureEhealth;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 use App\Traits\FormTrait;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
@@ -234,7 +234,14 @@ class ProcedureComponent extends Component
             'procedure' => $procedureUuid ?? Str::uuid()->toString(),
         ];
 
-        return Fhir::procedure()->toFhir($validatedData['procedure'], $uuids);
+        $mappingForm = clone $this->form;
+        $mappingForm->procedure = $validatedData['procedure'];
+
+        return Arr::toCamelCase(app(ObjectMapperInterface::class)->map($mappingForm, new ProcedureEhealth(
+            id: $uuids['procedure'],
+            legalEntity: legalEntity()->uuid,
+            employee: $uuids['employee'],
+        ))->toArray());
     }
 
     public function save(array $procedureData): void

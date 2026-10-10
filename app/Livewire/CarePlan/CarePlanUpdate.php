@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan;
 
+use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Dto\CarePlan\Ehealth as CarePlanEhealthData;
+use App\Dto\CarePlan\Model as CarePlanModelData;
+use App\Dto\CarePlan\Form as CarePlanFormData;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -16,6 +20,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Livewire\WithFileUploads;
+use Illuminate\Support\Str;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 
 class CarePlanUpdate extends CarePlanCreate
 {
@@ -37,29 +43,8 @@ class CarePlanUpdate extends CarePlanCreate
 
         parent::mount($legalEntity, $this->id);
 
-        // Hydrate form from model
-        $this->form->patient = $carePlan->person?->full_name ?? '';
-        $this->form->medical_number = (string) ($carePlan->encounterId ?? '');
-        $this->form->author = $carePlan->author?->party?->full_name ?? '';
-        $this->form->coAuthors = []; // TODO: if co-authors are implemented
-        $this->form->category = is_array($carePlan->category) ? ($carePlan->category['coding'][0]['code'] ?? '') : ($carePlan->category ?? '');
-        $this->form->context = $carePlan->context ?? '';
-        $this->form->title = $carePlan->title ?? '';
-        $this->form->intent = 'order';
-        $this->form->periodStart = $carePlan->periodStart?->format('d.m.Y') ?? '';
-        $this->form->periodStartTime = $carePlan->periodStart?->format('H:i') ?? '';
-        $this->form->periodEnd = $carePlan->periodEnd?->format('d.m.Y') ?? '';
-        $this->form->periodEndTime = $carePlan->periodEnd?->format('H:i') ?? '';
-        $this->form->encounter = $carePlan->encounter?->uuid ?? '';
-        $this->form->description = $carePlan->description ?? '';
-        $this->form->note = $carePlan->note ?? '';
-        $this->form->informWith = $carePlan->informWith ?? '';
-        $this->form->episodes = $carePlan->supportingInfo['episodes'] ?? [];
-        $this->form->medicalRecords = $carePlan->supportingInfo['medical_records'] ?? [];
-        $this->form->knedp = '';
-        $this->form->keyContainerUpload = null;
-        $this->form->keyContainerFileName = '';
-        $this->form->password = '';
+        $carePlan->loadMissing(['person', 'author.party', 'encounter']);
+        $this->form->fill(app(ObjectMapperInterface::class)->map($carePlan, CarePlanFormData::class)->toArray());
 
         // Load patient auth methods is handled by parent::mount
 
@@ -126,26 +111,14 @@ class CarePlanUpdate extends CarePlanCreate
         // so a draft edited to a different "умови надання послуг" keeps a matching author.
         $author = Auth::user()?->getCarePlanWriterEmployee($this->form->termsOfService ?: null);
 
-        $repository->updateById($this->carePlan->id, [
-            'author_id' => $author?->id ?? $this->carePlan->author_id,
-            'category' => $this->form->category,
-            'context' => $this->form->context ?: null,
-            'title' => $this->form->title,
-            'terms_of_service' => $this->form->termsOfService ?: null,
-            'period_start' => convertToYmd($this->form->periodStart),
-            'period_end' => !empty($this->form->periodEnd)
-                ? convertToYmd($this->form->periodEnd) : null,
-            'encounter_id' => $encounterData['id'],
-            'addresses' => $encounterData['addresses'],
-            'supporting_info' => [
-                'episodes' => $this->form->episodes,
-                'medical_records' => $this->form->medicalRecords,
-            ],
-            'description' => $this->form->description ?: null,
-            'note' => $this->form->note ?: null,
-            'inform_with' => $this->form->informWith ?: null,
-            'terms_of_service' => $this->form->termsOfService ?: null,
-        ]);
+        $repository->updateById($this->carePlan->id, array_replace(
+            app(ObjectMapperInterface::class)->map($this->form, CarePlanModelData::class)->toArray(),
+            [
+                'author_id' => $author?->id ?? $this->carePlan->author_id,
+                'encounter_id' => $encounterData['id'],
+                'addresses' => $encounterData['addresses'],
+            ]
+        ));
 
         session()->flash('success', __('care-plan.draft_updated') ?? 'План лікування успішно збережено');
 
@@ -198,13 +171,15 @@ class CarePlanUpdate extends CarePlanCreate
         $author = Auth::user()?->getCarePlanWriterEmployee($termsOfService);
         $this->logCarePlanAuthorRoleDebug($author, $termsOfService);
 
-        // Build eHealth payload via Repository
-        $carePlanPayload = $repository->formatCarePlanRequest(
-            $this->form->toArray(),
-            $this->form->encounter ?: null,
-            $encounterData,
-            $author?->uuid
-        );
+        $carePlanPayload = app(ObjectMapperInterface::class)->map(
+            $this->form,
+            new CarePlanEhealthData(
+                (string) Str::uuid(),
+                $author?->uuid,
+                $encounterData,
+                config('app.timezone', 'Europe/Kyiv'),
+            )
+        )->toArray();
 
         try {
             $signedContent = signatureService()->signData(
@@ -215,8 +190,7 @@ class CarePlanUpdate extends CarePlanCreate
                 Auth::user()->party->taxId
             );
 
-            $finalResponse = app(\App\Services\MedicalEvents\CarePlanLifecycleService::class)
-                ->submitSignedCreate($this->patientUuid, $signedContent);
+            $finalResponse = EHealth::carePlan()->createSignedAndResolve($this->patientUuid, $signedContent);
 
             if (($finalResponse['status'] ?? null) === 'failed') {
                 throw new \App\Exceptions\EHealth\EHealthValidationException($finalResponse);

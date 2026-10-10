@@ -1,0 +1,619 @@
+{
+    "minimal": {
+        "signedJson": "{\"id\":\"encounter\",\"status\":\"finished\",\"period\":{\"start\":\"2026-10-05T07:00:00Z\",\"end\":\"2026-10-05T08:00:00Z\"},\"visit\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"visit\"}],\"text\":\"\"},\"value\":\"visit\"}},\"episode\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"episode\"}],\"text\":\"\"},\"value\":\"episode\"}},\"class\":{\"system\":\"eHealth\\\/encounter_classes\",\"code\":\"AMB\"},\"type\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_types\",\"code\":\"consultation\"}],\"text\":\"\"},\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}},\"diagnoses\":[],\"participant\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "form": {
+            "classCode": null,
+            "typeCode": null,
+            "performerId": "",
+            "divisionId": "",
+            "priorityCode": "",
+            "periodDate": "",
+            "periodStart": "12:00",
+            "periodEnd": "12:00",
+            "actions": [],
+            "reasons": [],
+            "diagnoses": [],
+            "referralType": "",
+            "referralNumber": "",
+            "paperReferral": {
+                "serviceRequestDate": ""
+            },
+            "prescriptions": "",
+            "hospitalization": {
+                "preAdmissionIdentifier": "",
+                "admitSource": "",
+                "reAdmission": "",
+                "destination": "",
+                "dischargeDisposition": "",
+                "dischargeDepartment": ""
+            },
+            "actionReferences": [],
+            "participant": [],
+            "supportingInfo": []
+        }
+    },
+    "full sparse nested": {
+        "signedJson": "{\"id\":\"explicit\",\"status\":\"finished\",\"period\":{\"start\":\"2026-10-05T07:00:00Z\",\"end\":\"2026-10-05T08:00:00Z\"},\"visit\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"visit\"}],\"text\":\"\"},\"value\":\"visit\"}},\"episode\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"episode\"}],\"text\":\"\"},\"value\":\"episode\"}},\"class\":{\"system\":\"eHealth\\\/encounter_classes\",\"code\":\"AMB\"},\"type\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_types\",\"code\":\"consultation\"}],\"text\":\"\"},\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}},\"incoming_referral\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service_request\"}],\"text\":\"\"},\"value\":\"referral\"},\"display_value\":\"0000-0000\"},\"priority\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_priority\",\"code\":\"routine\"}],\"text\":\"\"},\"reasons\":{\"42\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/reasons\",\"code\":\"A01\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"}},\"diagnoses\":[{\"condition\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"condition\"}},\"role\":{\"coding\":[{\"system\":\"eHealth\\\/diagnosis_roles\",\"code\":\"primary\"}],\"text\":\"\"},\"rank\":1},{\"condition\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"second\"}},\"role\":{\"coding\":[{\"system\":\"eHealth\\\/diagnosis_roles\",\"code\":\"secondary\"}],\"text\":\"\"}}],\"actions\":{\"42\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/actions\",\"code\":\"action\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"}},\"action_references\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}}],\"division\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"division\"}],\"text\":\"\"},\"value\":\"division\"}},\"prescriptions\":[{\"opaque_key\":0,\"null\":null,\"false\":false}],\"supporting_info\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"procedure\"}],\"text\":\"\\u041f\\u0440\\u043e\\u0446\\u0435\\u0434\\u0443\\u0440\\u0430\"},\"value\":\"support\"}},{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"observation\"}],\"text\":\"\"},\"value\":\"support\"}}],\"hospitalization\":{\"pre_admission_identifier\":\"admission\",\"admit_source\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_admit_source\",\"code\":\"source\"}],\"text\":\"\"},\"re_admission\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_re_admission\",\"code\":\"yes\"}],\"text\":\"\"},\"destination\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal\"}},\"discharge_disposition\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_discharge_disposition\",\"code\":\"home\"}],\"text\":\"\"},\"discharge_department\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_discharge_department\",\"code\":\"department\"}],\"text\":\"\"}},\"participant\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"participant\"}},{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"asserter\"}}]}",
+        "form": {
+            "classCode": "AMB",
+            "typeCode": "consultation",
+            "performerId": "",
+            "divisionId": "",
+            "priorityCode": "",
+            "periodDate": "05.10.2026",
+            "periodStart": "10:00",
+            "periodEnd": "11:00",
+            "actions": {
+                "42": {
+                    "code": "action",
+                    "text": "Опис"
+                }
+            },
+            "reasons": {
+                "42": {
+                    "code": "A01",
+                    "text": null
+                }
+            },
+            "diagnoses": {
+                "42": {
+                    "roleCode": "primary",
+                    "rank": 0
+                }
+            },
+            "referralType": "electronic",
+            "referralNumber": "0000-0000",
+            "paperReferral": {
+                "serviceRequestDate": "05.10.2026",
+                "unknown_key": 0
+            },
+            "prescriptions": "",
+            "hospitalization": {
+                "preAdmissionIdentifier": "",
+                "admitSource": "source",
+                "reAdmission": "",
+                "destination": "",
+                "dischargeDisposition": "home",
+                "dischargeDepartment": ""
+            },
+            "actionReferences": [
+                {
+                    "uuid": "service"
+                }
+            ],
+            "participant": [
+                {
+                    "uuid": "participant",
+                    "name": "Лікар"
+                },
+                {
+                    "uuid": "employee",
+                    "name": null
+                }
+            ],
+            "supportingInfo": [
+                {
+                    "uuid": "support",
+                    "type": "procedure",
+                    "date": "date",
+                    "code": "301",
+                    "name": "",
+                    "typeLabel": ""
+                }
+            ]
+        }
+    },
+    "missing diagnosis position": {
+        "signedJson": "{\"id\":\"encounter\",\"status\":\"finished\",\"period\":{\"start\":\"2026-10-05T07:00:00Z\",\"end\":\"2026-10-05T08:00:00Z\"},\"visit\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"visit\"}],\"text\":\"\"},\"value\":\"visit\"}},\"episode\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"episode\"}],\"text\":\"\"},\"value\":\"episode\"}},\"class\":{\"system\":\"eHealth\\\/encounter_classes\",\"code\":\"AMB\"},\"type\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_types\",\"code\":\"consultation\"}],\"text\":\"\"},\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}},\"diagnoses\":[{\"condition\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"condition\"}},\"role\":{\"coding\":[{\"system\":\"eHealth\\\/diagnosis_roles\",\"code\":\"secondary\"}],\"text\":\"\"}}],\"participant\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "form": {
+            "classCode": null,
+            "typeCode": null,
+            "performerId": "",
+            "divisionId": "",
+            "priorityCode": "",
+            "periodDate": "",
+            "periodStart": "12:00",
+            "periodEnd": "12:00",
+            "actions": [],
+            "reasons": [],
+            "diagnoses": [],
+            "referralType": "",
+            "referralNumber": "",
+            "paperReferral": {
+                "serviceRequestDate": ""
+            },
+            "prescriptions": "",
+            "hospitalization": {
+                "preAdmissionIdentifier": "",
+                "admitSource": "",
+                "reAdmission": "",
+                "destination": "",
+                "dischargeDisposition": "",
+                "dischargeDepartment": ""
+            },
+            "actionReferences": [],
+            "participant": [],
+            "supportingInfo": []
+        }
+    },
+    "empty condition id retained": {
+        "signedJson": "{\"id\":\"encounter\",\"status\":\"finished\",\"period\":{\"start\":\"2026-10-05T07:00:00Z\",\"end\":\"2026-10-05T08:00:00Z\"},\"visit\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"visit\"}],\"text\":\"\"},\"value\":\"visit\"}},\"episode\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"episode\"}],\"text\":\"\"},\"value\":\"episode\"}},\"class\":{\"system\":\"eHealth\\\/encounter_classes\",\"code\":\"AMB\"},\"type\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_types\",\"code\":\"consultation\"}],\"text\":\"\"},\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}},\"diagnoses\":[{\"condition\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"\"}},\"role\":{\"coding\":[{\"system\":\"eHealth\\\/diagnosis_roles\",\"code\":\"primary\"}],\"text\":\"\"}}],\"participant\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "form": {
+            "classCode": null,
+            "typeCode": null,
+            "performerId": "",
+            "divisionId": "",
+            "priorityCode": "",
+            "periodDate": "",
+            "periodStart": "12:00",
+            "periodEnd": "12:00",
+            "actions": [],
+            "reasons": [],
+            "diagnoses": [],
+            "referralType": "",
+            "referralNumber": "",
+            "paperReferral": {
+                "serviceRequestDate": ""
+            },
+            "prescriptions": "",
+            "hospitalization": {
+                "preAdmissionIdentifier": "",
+                "admitSource": "",
+                "reAdmission": "",
+                "destination": "",
+                "dischargeDisposition": "",
+                "dischargeDepartment": ""
+            },
+            "actionReferences": [],
+            "participant": [],
+            "supportingInfo": []
+        }
+    },
+    "filtered empty supporting": {
+        "signedJson": "{\"id\":\"encounter\",\"status\":\"finished\",\"period\":{\"start\":\"2026-10-05T07:00:00Z\",\"end\":\"2026-10-05T08:00:00Z\"},\"visit\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"visit\"}],\"text\":\"\"},\"value\":\"visit\"}},\"episode\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"episode\"}],\"text\":\"\"},\"value\":\"episode\"}},\"class\":{\"system\":\"eHealth\\\/encounter_classes\",\"code\":\"AMB\"},\"type\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_types\",\"code\":\"consultation\"}],\"text\":\"\"},\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}},\"diagnoses\":[],\"supporting_info\":[],\"participant\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "form": {
+            "classCode": null,
+            "typeCode": null,
+            "performerId": "",
+            "divisionId": "",
+            "priorityCode": "",
+            "periodDate": "",
+            "periodStart": "12:00",
+            "periodEnd": "12:00",
+            "actions": [],
+            "reasons": [],
+            "diagnoses": [],
+            "referralType": "",
+            "referralNumber": "",
+            "paperReferral": {
+                "serviceRequestDate": ""
+            },
+            "prescriptions": "",
+            "hospitalization": {
+                "preAdmissionIdentifier": "",
+                "admitSource": "",
+                "reAdmission": "",
+                "destination": "",
+                "dischargeDisposition": "",
+                "dischargeDepartment": ""
+            },
+            "actionReferences": [],
+            "participant": [],
+            "supportingInfo": []
+        }
+    },
+    "unknown only hospitalization": {
+        "signedJson": "{\"id\":\"encounter\",\"status\":\"finished\",\"period\":{\"start\":\"2026-10-05T07:00:00Z\",\"end\":\"2026-10-05T08:00:00Z\"},\"visit\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"visit\"}],\"text\":\"\"},\"value\":\"visit\"}},\"episode\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"episode\"}],\"text\":\"\"},\"value\":\"episode\"}},\"class\":{\"system\":\"eHealth\\\/encounter_classes\",\"code\":\"AMB\"},\"type\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_types\",\"code\":\"consultation\"}],\"text\":\"\"},\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}},\"diagnoses\":[],\"hospitalization\":[],\"participant\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "form": {
+            "classCode": null,
+            "typeCode": null,
+            "performerId": "",
+            "divisionId": "",
+            "priorityCode": "",
+            "periodDate": "",
+            "periodStart": "12:00",
+            "periodEnd": "12:00",
+            "actions": [],
+            "reasons": [],
+            "diagnoses": [],
+            "referralType": "",
+            "referralNumber": "",
+            "paperReferral": {
+                "serviceRequestDate": ""
+            },
+            "prescriptions": "",
+            "hospitalization": {
+                "preAdmissionIdentifier": "",
+                "admitSource": "",
+                "reAdmission": "",
+                "destination": "",
+                "dischargeDisposition": "",
+                "dischargeDepartment": ""
+            },
+            "actionReferences": [],
+            "participant": [],
+            "supportingInfo": []
+        }
+    },
+    "false-like optionals": {
+        "signedJson": "{\"id\":\"encounter\",\"status\":\"finished\",\"period\":{\"start\":\"2026-10-05T07:00:00Z\",\"end\":\"2026-10-05T08:00:00Z\"},\"visit\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"visit\"}],\"text\":\"\"},\"value\":\"visit\"}},\"episode\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"episode\"}],\"text\":\"\"},\"value\":\"episode\"}},\"class\":{\"system\":\"eHealth\\\/encounter_classes\",\"code\":\"AMB\"},\"type\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_types\",\"code\":\"consultation\"}],\"text\":\"\"},\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}},\"diagnoses\":[],\"participant\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "form": {
+            "classCode": null,
+            "typeCode": null,
+            "performerId": "",
+            "divisionId": "",
+            "priorityCode": "",
+            "periodDate": "",
+            "periodStart": "12:00",
+            "periodEnd": "12:00",
+            "actions": [],
+            "reasons": [],
+            "diagnoses": [],
+            "referralType": "",
+            "referralNumber": "",
+            "paperReferral": {
+                "serviceRequestDate": ""
+            },
+            "prescriptions": null,
+            "hospitalization": {
+                "preAdmissionIdentifier": "",
+                "admitSource": "",
+                "reAdmission": "",
+                "destination": "",
+                "dischargeDisposition": "",
+                "dischargeDepartment": ""
+            },
+            "actionReferences": [],
+            "participant": [],
+            "supportingInfo": []
+        }
+    },
+    "paper referral": {
+        "signedJson": "{\"id\":\"encounter\",\"status\":\"finished\",\"period\":{\"start\":\"2026-10-05T07:00:00Z\",\"end\":\"2026-10-05T08:00:00Z\"},\"visit\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"visit\"}],\"text\":\"\"},\"value\":\"visit\"}},\"episode\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"episode\"}],\"text\":\"\"},\"value\":\"episode\"}},\"class\":{\"system\":\"eHealth\\\/encounter_classes\",\"code\":\"AMB\"},\"type\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_types\",\"code\":\"consultation\"}],\"text\":\"\"},\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}},\"paper_referral\":{\"service_request_date\":\"2026-10-05\",\"requester_legal_entity_name\":\"\\u0417\\u0430\\u043a\\u043b\\u0430\\u0434\",\"opaque_key\":0},\"diagnoses\":[],\"participant\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "form": {
+            "classCode": null,
+            "typeCode": null,
+            "performerId": "",
+            "divisionId": "",
+            "priorityCode": "",
+            "periodDate": "",
+            "periodStart": "12:00",
+            "periodEnd": "12:00",
+            "actions": [],
+            "reasons": [],
+            "diagnoses": [],
+            "referralType": "paper",
+            "referralNumber": "",
+            "paperReferral": {
+                "serviceRequestDate": "05.10.2026",
+                "requesterLegalEntityName": "Заклад"
+            },
+            "prescriptions": "",
+            "hospitalization": {
+                "preAdmissionIdentifier": "",
+                "admitSource": "",
+                "reAdmission": "",
+                "destination": "",
+                "dischargeDisposition": "",
+                "dischargeDepartment": ""
+            },
+            "actionReferences": [],
+            "participant": [],
+            "supportingInfo": []
+        }
+    },
+    "zero code and null text": {
+        "signedJson": "{\"id\":\"encounter\",\"status\":\"finished\",\"period\":{\"start\":\"2026-10-05T07:00:00Z\",\"end\":\"2026-10-05T08:00:00Z\"},\"visit\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"visit\"}],\"text\":\"\"},\"value\":\"visit\"}},\"episode\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"episode\"}],\"text\":\"\"},\"value\":\"episode\"}},\"class\":{\"system\":\"eHealth\\\/encounter_classes\",\"code\":\"AMB\"},\"type\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_types\",\"code\":\"consultation\"}],\"text\":\"\"},\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}},\"reasons\":{\"90\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/reasons\",\"code\":\"\"}],\"text\":\"\"}},\"diagnoses\":[],\"actions\":{\"42\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/actions\",\"code\":\"0\"}],\"text\":\"\"}},\"participant\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "form": {
+            "classCode": null,
+            "typeCode": null,
+            "performerId": "",
+            "divisionId": "",
+            "priorityCode": "",
+            "periodDate": "",
+            "periodStart": "12:00",
+            "periodEnd": "12:00",
+            "actions": {
+                "42": {
+                    "code": null,
+                    "text": ""
+                }
+            },
+            "reasons": {
+                "90": {
+                    "code": null,
+                    "text": null
+                }
+            },
+            "diagnoses": [],
+            "referralType": "",
+            "referralNumber": "",
+            "paperReferral": {
+                "serviceRequestDate": ""
+            },
+            "prescriptions": "",
+            "hospitalization": {
+                "preAdmissionIdentifier": "",
+                "admitSource": "",
+                "reAdmission": "",
+                "destination": "",
+                "dischargeDisposition": "",
+                "dischargeDepartment": ""
+            },
+            "actionReferences": [],
+            "participant": [],
+            "supportingInfo": []
+        }
+    },
+    "missing supporting metadata": {
+        "signedJson": "{\"id\":\"encounter\",\"status\":\"finished\",\"period\":{\"start\":\"2026-10-05T07:00:00Z\",\"end\":\"2026-10-05T08:00:00Z\"},\"visit\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"visit\"}],\"text\":\"\"},\"value\":\"visit\"}},\"episode\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"episode\"}],\"text\":\"\"},\"value\":\"episode\"}},\"class\":{\"system\":\"eHealth\\\/encounter_classes\",\"code\":\"AMB\"},\"type\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_types\",\"code\":\"consultation\"}],\"text\":\"\"},\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}},\"diagnoses\":[],\"participant\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "form": {
+            "classCode": null,
+            "typeCode": null,
+            "performerId": "",
+            "divisionId": "",
+            "priorityCode": "",
+            "periodDate": "",
+            "periodStart": "12:00",
+            "periodEnd": "12:00",
+            "actions": [],
+            "reasons": [],
+            "diagnoses": [],
+            "referralType": "",
+            "referralNumber": "",
+            "paperReferral": {
+                "serviceRequestDate": ""
+            },
+            "prescriptions": "",
+            "hospitalization": {
+                "preAdmissionIdentifier": "",
+                "admitSource": "",
+                "reAdmission": "",
+                "destination": "",
+                "dischargeDisposition": "",
+                "dischargeDepartment": ""
+            },
+            "actionReferences": [],
+            "participant": [],
+            "supportingInfo": [
+                {
+                    "uuid": "unknown",
+                    "type": null,
+                    "date": null,
+                    "code": null,
+                    "name": "",
+                    "typeLabel": ""
+                }
+            ]
+        }
+    },
+    "DST": {
+        "signedJson": "{\"id\":\"explicit\",\"status\":\"finished\",\"period\":{\"start\":\"2026-10-25T02:15:00Z\",\"end\":\"2026-10-25T03:15:00Z\"},\"visit\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"visit\"}],\"text\":\"\"},\"value\":\"visit\"}},\"episode\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"episode\"}],\"text\":\"\"},\"value\":\"episode\"}},\"class\":{\"system\":\"eHealth\\\/encounter_classes\",\"code\":\"AMB\"},\"type\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_types\",\"code\":\"consultation\"}],\"text\":\"\"},\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}},\"incoming_referral\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service_request\"}],\"text\":\"\"},\"value\":\"referral\"},\"display_value\":\"0000-0000\"},\"priority\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_priority\",\"code\":\"routine\"}],\"text\":\"\"},\"reasons\":{\"42\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/reasons\",\"code\":\"A01\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"}},\"diagnoses\":[{\"condition\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"condition\"}},\"role\":{\"coding\":[{\"system\":\"eHealth\\\/diagnosis_roles\",\"code\":\"primary\"}],\"text\":\"\"},\"rank\":1},{\"condition\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}],\"text\":\"\"},\"value\":\"second\"}},\"role\":{\"coding\":[{\"system\":\"eHealth\\\/diagnosis_roles\",\"code\":\"secondary\"}],\"text\":\"\"}}],\"actions\":{\"42\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/actions\",\"code\":\"action\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"}},\"action_references\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}],\"text\":\"\"},\"value\":\"service\"}}],\"division\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"division\"}],\"text\":\"\"},\"value\":\"division\"}},\"prescriptions\":[{\"opaque_key\":0,\"null\":null,\"false\":false}],\"supporting_info\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"procedure\"}],\"text\":\"\\u041f\\u0440\\u043e\\u0446\\u0435\\u0434\\u0443\\u0440\\u0430\"},\"value\":\"support\"}},{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"observation\"}],\"text\":\"\"},\"value\":\"support\"}}],\"hospitalization\":{\"pre_admission_identifier\":\"admission\",\"admit_source\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_admit_source\",\"code\":\"source\"}],\"text\":\"\"},\"re_admission\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_re_admission\",\"code\":\"yes\"}],\"text\":\"\"},\"destination\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}],\"text\":\"\"},\"value\":\"legal\"}},\"discharge_disposition\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_discharge_disposition\",\"code\":\"home\"}],\"text\":\"\"},\"discharge_department\":{\"coding\":[{\"system\":\"eHealth\\\/encounter_discharge_department\",\"code\":\"department\"}],\"text\":\"\"}},\"participant\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"participant\"}},{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"asserter\"}}]}",
+        "form": {
+            "classCode": "AMB",
+            "typeCode": "consultation",
+            "performerId": "",
+            "divisionId": "",
+            "priorityCode": "",
+            "periodDate": "05.10.2026",
+            "periodStart": "10:00",
+            "periodEnd": "11:00",
+            "actions": {
+                "42": {
+                    "code": "action",
+                    "text": "Опис"
+                }
+            },
+            "reasons": {
+                "42": {
+                    "code": "A01",
+                    "text": null
+                }
+            },
+            "diagnoses": {
+                "42": {
+                    "roleCode": "primary",
+                    "rank": 0
+                }
+            },
+            "referralType": "electronic",
+            "referralNumber": "0000-0000",
+            "paperReferral": {
+                "serviceRequestDate": "05.10.2026",
+                "unknown_key": 0
+            },
+            "prescriptions": "",
+            "hospitalization": {
+                "preAdmissionIdentifier": "",
+                "admitSource": "source",
+                "reAdmission": "",
+                "destination": "",
+                "dischargeDisposition": "home",
+                "dischargeDepartment": ""
+            },
+            "actionReferences": [
+                {
+                    "uuid": "service"
+                }
+            ],
+            "participant": [
+                {
+                    "uuid": "participant",
+                    "name": "Лікар"
+                },
+                {
+                    "uuid": "employee",
+                    "name": null
+                }
+            ],
+            "supportingInfo": [
+                {
+                    "uuid": "support",
+                    "type": "procedure",
+                    "date": "date",
+                    "code": "301",
+                    "name": "",
+                    "typeLabel": ""
+                }
+            ]
+        }
+    },
+    "cancellation": {
+        "package": {
+            "encounter": {
+                "id": "encounter",
+                "status": "finished",
+                "unknown_field": {
+                    "literal_key": 0,
+                    "null": null
+                }
+            },
+            "conditions": {
+                "42": {
+                    "id": "condition",
+                    "verificationStatus": "confirmed",
+                    "unknown_field": false
+                }
+            },
+            "deviceDispenses": [
+                {
+                    "id": "dispense",
+                    "status": "completed"
+                }
+            ],
+            "custom_section": [
+                {
+                    "opaque_key": 0
+                }
+            ],
+            "observations": {
+                "42": {
+                    "id": "observations",
+                    "status": "completed",
+                    "unknown_field": {
+                        "literal_key": 0,
+                        "null": null
+                    }
+                },
+                "90": {
+                    "id": "unselected",
+                    "status": "completed"
+                }
+            },
+            "immunizations": {
+                "42": {
+                    "id": "immunizations",
+                    "status": "completed",
+                    "unknown_field": {
+                        "literal_key": 0,
+                        "null": null
+                    }
+                },
+                "90": {
+                    "id": "unselected",
+                    "status": "completed"
+                }
+            },
+            "diagnosticReports": {
+                "42": {
+                    "id": "diagnosticReports",
+                    "status": "completed",
+                    "unknown_field": {
+                        "literal_key": 0,
+                        "null": null
+                    }
+                },
+                "90": {
+                    "id": "unselected",
+                    "status": "completed"
+                }
+            },
+            "procedures": {
+                "42": {
+                    "id": "procedures",
+                    "status": "completed",
+                    "unknown_field": {
+                        "literal_key": 0,
+                        "null": null
+                    }
+                },
+                "90": {
+                    "id": "unselected",
+                    "status": "completed"
+                }
+            },
+            "clinicalImpressions": {
+                "42": {
+                    "id": "clinicalImpressions",
+                    "status": "completed",
+                    "unknown_field": {
+                        "literal_key": 0,
+                        "null": null
+                    }
+                },
+                "90": {
+                    "id": "unselected",
+                    "status": "completed"
+                }
+            },
+            "devices": {
+                "42": {
+                    "id": "devices",
+                    "status": "completed",
+                    "unknown_field": {
+                        "literal_key": 0,
+                        "null": null
+                    }
+                },
+                "90": {
+                    "id": "unselected",
+                    "status": "completed"
+                }
+            },
+            "deviceAssociations": {
+                "42": {
+                    "id": "deviceAssociations",
+                    "status": "completed",
+                    "unknown_field": {
+                        "literal_key": 0,
+                        "null": null
+                    }
+                },
+                "90": {
+                    "id": "unselected",
+                    "status": "completed"
+                }
+            },
+            "detectedIssues": {
+                "42": {
+                    "id": "detectedIssues",
+                    "status": "completed",
+                    "unknown_field": {
+                        "literal_key": 0,
+                        "null": null
+                    }
+                },
+                "90": {
+                    "id": "unselected",
+                    "status": "completed"
+                }
+            },
+            "specimens": {
+                "42": {
+                    "id": "specimens",
+                    "status": "completed",
+                    "unknown_field": {
+                        "literal_key": 0,
+                        "null": null
+                    }
+                },
+                "90": {
+                    "id": "unselected",
+                    "status": "completed"
+                }
+            }
+        },
+        "fullJson": "{\"encounter\":{\"id\":\"encounter\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null},\"cancellation_reason\":{\"coding\":[{\"system\":\"eHealth\\\/cancellation_reasons\",\"code\":\"incorrect_data\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"},\"conditions\":{\"42\":{\"id\":\"condition\",\"verification_status\":\"entered_in_error\",\"unknown_field\":false,\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"}},\"device_dispenses\":[{\"id\":\"dispense\",\"status\":\"completed\"}],\"custom_section\":[{\"opaque_key\":0}],\"observations\":{\"42\":{\"id\":\"observations\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null},\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"},\"90\":{\"id\":\"unselected\",\"status\":\"entered_in_error\",\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"}},\"immunizations\":{\"42\":{\"id\":\"immunizations\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null},\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"},\"90\":{\"id\":\"unselected\",\"status\":\"entered_in_error\",\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"}},\"diagnostic_reports\":{\"42\":{\"id\":\"diagnosticReports\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null},\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"},\"90\":{\"id\":\"unselected\",\"status\":\"entered_in_error\",\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"}},\"procedures\":{\"42\":{\"id\":\"procedures\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null},\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"},\"90\":{\"id\":\"unselected\",\"status\":\"entered_in_error\",\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"}},\"clinical_impressions\":{\"42\":{\"id\":\"clinicalImpressions\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null},\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"},\"90\":{\"id\":\"unselected\",\"status\":\"entered_in_error\",\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"}},\"devices\":{\"42\":{\"id\":\"devices\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null},\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"},\"90\":{\"id\":\"unselected\",\"status\":\"entered_in_error\",\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"}},\"device_associations\":{\"42\":{\"id\":\"deviceAssociations\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null},\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"},\"90\":{\"id\":\"unselected\",\"status\":\"entered_in_error\",\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"}},\"detected_issues\":{\"42\":{\"id\":\"detectedIssues\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null},\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"},\"90\":{\"id\":\"unselected\",\"status\":\"entered_in_error\",\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"}},\"specimens\":{\"42\":{\"id\":\"specimens\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null},\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"},\"90\":{\"id\":\"unselected\",\"status\":\"entered_in_error\",\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"}}}",
+        "partialJson": "{\"encounter\":{\"id\":\"encounter\",\"status\":\"finished\",\"unknown_field\":{\"literal_key\":0,\"null\":null},\"cancellation_reason\":{\"coding\":[{\"system\":\"eHealth\\\/cancellation_reasons\",\"code\":\"incorrect_data\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"},\"conditions\":{\"42\":{\"id\":\"condition\",\"verification_status\":\"confirmed\",\"unknown_field\":false}},\"device_dispenses\":[{\"id\":\"dispense\",\"status\":\"completed\"}],\"custom_section\":[{\"opaque_key\":0}],\"observations\":{\"42\":{\"id\":\"observations\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null},\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"},\"90\":{\"id\":\"unselected\",\"status\":\"completed\"}},\"immunizations\":{\"42\":{\"id\":\"immunizations\",\"status\":\"completed\",\"unknown_field\":{\"literal_key\":0,\"null\":null}},\"90\":{\"id\":\"unselected\",\"status\":\"completed\"}},\"diagnostic_reports\":{\"42\":{\"id\":\"diagnosticReports\",\"status\":\"completed\",\"unknown_field\":{\"literal_key\":0,\"null\":null}},\"90\":{\"id\":\"unselected\",\"status\":\"completed\"}},\"procedures\":{\"42\":{\"id\":\"procedures\",\"status\":\"completed\",\"unknown_field\":{\"literal_key\":0,\"null\":null}},\"90\":{\"id\":\"unselected\",\"status\":\"completed\"}},\"clinical_impressions\":{\"42\":{\"id\":\"clinicalImpressions\",\"status\":\"completed\",\"unknown_field\":{\"literal_key\":0,\"null\":null}},\"90\":{\"id\":\"unselected\",\"status\":\"completed\"}},\"devices\":{\"42\":{\"id\":\"devices\",\"status\":\"completed\",\"unknown_field\":{\"literal_key\":0,\"null\":null}},\"90\":{\"id\":\"unselected\",\"status\":\"completed\"}},\"device_associations\":{\"42\":{\"id\":\"deviceAssociations\",\"status\":\"completed\",\"unknown_field\":{\"literal_key\":0,\"null\":null}},\"90\":{\"id\":\"unselected\",\"status\":\"completed\"}},\"detected_issues\":{\"42\":{\"id\":\"detectedIssues\",\"status\":\"completed\",\"unknown_field\":{\"literal_key\":0,\"null\":null}},\"90\":{\"id\":\"unselected\",\"status\":\"completed\"}},\"specimens\":{\"42\":{\"id\":\"specimens\",\"status\":\"entered_in_error\",\"unknown_field\":{\"literal_key\":0,\"null\":null},\"explanatory_letter\":\"\\u041b\\u0438\\u0441\\u0442\"},\"90\":{\"id\":\"unselected\",\"status\":\"completed\"}}}"
+    }
+}

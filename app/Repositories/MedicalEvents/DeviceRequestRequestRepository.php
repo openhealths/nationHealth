@@ -8,6 +8,8 @@ use App\Enums\Person\ServiceRequestStatus;
 use App\Models\CarePlanActivity;
 use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Repositories\MedicalEvents\Concerns\FindsOpenActivityRequests;
+use App\Repositories\MedicalEvents\Concerns\FindsOwnedRequests;
 use App\Repositories\MedicalEvents\Concerns\ResolvesRequestFhirRefs;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
@@ -19,6 +21,8 @@ use Throwable;
 class DeviceRequestRequestRepository extends BaseRepository
 {
     use ResolvesRequestFhirRefs;
+    use FindsOpenActivityRequests;
+    use FindsOwnedRequests;
 
     public function __construct(DeviceRequestRequest $model)
     {
@@ -270,7 +274,7 @@ class DeviceRequestRequestRepository extends BaseRepository
     {
         return (float) $this->model->newQuery()
             ->whereHas('basedOn', fn ($q) => $q->where('value', $activityUuid))
-            ->whereNotIn('status', MedicalEventsRequestStatuses::EXCLUDED_FROM_ISSUED_SUM)
+            ->whereNotIn('status', \App\Enums\MedicalEvents\RequestQuantityStatus::excluded())
             ->sum('quantity');
     }
 

@@ -1,0 +1,1762 @@
+{
+    "source_commit": "4b1f0e732700f860a3f1a0ad402bc8ae79b874db",
+    "now": "2026-09-19T10:00:00+00:00",
+    "timezone": "Europe\/Kyiv",
+    "cases": {
+        "care_plan_all_fields": {
+            "prequalify": {
+                "service_request": {
+                    "status": "active",
+                    "intent": "order",
+                    "priority": "urgent",
+                    "code": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "service"
+                                    }
+                                ]
+                            },
+                            "value": "20000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_employee": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "employee"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_legal_entity": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "legal_entity"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000003"
+                        }
+                    },
+                    "based_on": [
+                        {
+                            "identifier": {
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "system": "eHealth\/resources",
+                                            "code": "care_plan"
+                                        }
+                                    ]
+                                },
+                                "value": "60000000-0000-4000-8000-000000000001"
+                            }
+                        },
+                        {
+                            "identifier": {
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "system": "eHealth\/resources",
+                                            "code": "activity"
+                                        }
+                                    ]
+                                },
+                                "value": "60000000-0000-4000-8000-000000000002"
+                            }
+                        }
+                    ],
+                    "context": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "encounter"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000004"
+                        }
+                    },
+                    "category": {
+                        "coding": [
+                            {
+                                "system": "eHealth\/SNOMED\/service_request_categories",
+                                "code": "diagnostic_procedure"
+                            }
+                        ]
+                    },
+                    "quantity": {
+                        "value": 2.0,
+                        "system": "SERVICE_UNIT",
+                        "code": "PROCEDURE"
+                    },
+                    "occurrence_period": {
+                        "start": "2026-09-19T11:00:00.000Z",
+                        "end": "2026-09-20T20:59:59.000Z"
+                    },
+                    "supporting_info": [
+                        {
+                            "identifier": {
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "system": "eHealth\/resources",
+                                            "code": "observation"
+                                        }
+                                    ]
+                                },
+                                "value": "40000000-0000-4000-8000-000000000001"
+                            }
+                        }
+                    ],
+                    "reason_reference": [
+                        {
+                            "identifier": {
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "system": "eHealth\/resources",
+                                            "code": "condition"
+                                        }
+                                    ]
+                                },
+                                "value": "40000000-0000-4000-8000-000000000002"
+                            }
+                        }
+                    ],
+                    "patient_instruction": "Пройти обстеження \/ повторно",
+                    "inform_with": {
+                        "auth_method_id": "50000000-0000-4000-8000-000000000001"
+                    }
+                },
+                "programs": [
+                    {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "medical_program"
+                                    }
+                                ]
+                            },
+                            "value": "30000000-0000-4000-8000-000000000001"
+                        }
+                    }
+                ]
+            },
+            "signedCreate": {
+                "status": "active",
+                "intent": "order",
+                "priority": "urgent",
+                "code": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "service"
+                                }
+                            ]
+                        },
+                        "value": "20000000-0000-4000-8000-000000000002"
+                    }
+                },
+                "requester_employee": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000002"
+                    }
+                },
+                "requester_legal_entity": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "legal_entity"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000003"
+                    }
+                },
+                "based_on": [
+                    {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "care_plan"
+                                    }
+                                ]
+                            },
+                            "value": "60000000-0000-4000-8000-000000000001"
+                        }
+                    },
+                    {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "activity"
+                                    }
+                                ]
+                            },
+                            "value": "60000000-0000-4000-8000-000000000002"
+                        }
+                    }
+                ],
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "encounter"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000004"
+                    }
+                },
+                "category": {
+                    "coding": [
+                        {
+                            "system": "eHealth\/SNOMED\/service_request_categories",
+                            "code": "diagnostic_procedure"
+                        }
+                    ]
+                },
+                "quantity": {
+                    "value": 2.0,
+                    "system": "SERVICE_UNIT",
+                    "code": "PROCEDURE"
+                },
+                "occurrence_period": {
+                    "start": "2026-09-19T11:00:00.000Z",
+                    "end": "2026-09-20T20:59:59.000Z"
+                },
+                "supporting_info": [
+                    {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "observation"
+                                    }
+                                ]
+                            },
+                            "value": "40000000-0000-4000-8000-000000000001"
+                        }
+                    }
+                ],
+                "reason_reference": [
+                    {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "condition"
+                                    }
+                                ]
+                            },
+                            "value": "40000000-0000-4000-8000-000000000002"
+                        }
+                    }
+                ],
+                "patient_instruction": "Пройти обстеження \/ повторно",
+                "inform_with": {
+                    "auth_method_id": "50000000-0000-4000-8000-000000000001"
+                },
+                "id": "20000000-0000-4000-8000-000000000001",
+                "program": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "medical_program"
+                                }
+                            ]
+                        },
+                        "value": "30000000-0000-4000-8000-000000000001"
+                    }
+                }
+            },
+            "legacySignedEnvelope": {
+                "service_request": {
+                    "status": "active",
+                    "intent": "order",
+                    "priority": "urgent",
+                    "code": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "service"
+                                    }
+                                ]
+                            },
+                            "value": "20000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_employee": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "employee"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_legal_entity": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "legal_entity"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000003"
+                        }
+                    },
+                    "based_on": [
+                        {
+                            "identifier": {
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "system": "eHealth\/resources",
+                                            "code": "care_plan"
+                                        }
+                                    ]
+                                },
+                                "value": "60000000-0000-4000-8000-000000000001"
+                            }
+                        },
+                        {
+                            "identifier": {
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "system": "eHealth\/resources",
+                                            "code": "activity"
+                                        }
+                                    ]
+                                },
+                                "value": "60000000-0000-4000-8000-000000000002"
+                            }
+                        }
+                    ],
+                    "context": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "encounter"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000004"
+                        }
+                    },
+                    "category": {
+                        "coding": [
+                            {
+                                "system": "eHealth\/SNOMED\/service_request_categories",
+                                "code": "diagnostic_procedure"
+                            }
+                        ]
+                    },
+                    "quantity": {
+                        "value": 2.0,
+                        "system": "SERVICE_UNIT",
+                        "code": "PROCEDURE"
+                    },
+                    "occurrence_period": {
+                        "start": "2026-09-19T11:00:00.000Z",
+                        "end": "2026-09-20T20:59:59.000Z"
+                    },
+                    "supporting_info": [
+                        {
+                            "identifier": {
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "system": "eHealth\/resources",
+                                            "code": "observation"
+                                        }
+                                    ]
+                                },
+                                "value": "40000000-0000-4000-8000-000000000001"
+                            }
+                        }
+                    ],
+                    "reason_reference": [
+                        {
+                            "identifier": {
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "system": "eHealth\/resources",
+                                            "code": "condition"
+                                        }
+                                    ]
+                                },
+                                "value": "40000000-0000-4000-8000-000000000002"
+                            }
+                        }
+                    ],
+                    "patient_instruction": "Пройти обстеження \/ повторно",
+                    "inform_with": {
+                        "auth_method_id": "50000000-0000-4000-8000-000000000001"
+                    },
+                    "id": "20000000-0000-4000-8000-000000000001",
+                    "authored_on": "2026-09-19T10:00:00.000Z"
+                },
+                "programs": [
+                    {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "medical_program"
+                                    }
+                                ]
+                            },
+                            "value": "30000000-0000-4000-8000-000000000001"
+                        }
+                    }
+                ]
+            },
+            "signedJson": "{\"status\":\"active\",\"intent\":\"order\",\"priority\":\"urgent\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}]},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"requester_employee\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"10000000-0000-4000-8000-000000000002\"}},\"requester_legal_entity\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}]},\"value\":\"10000000-0000-4000-8000-000000000003\"}},\"based_on\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"care_plan\"}]},\"value\":\"60000000-0000-4000-8000-000000000001\"}},{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"activity\"}]},\"value\":\"60000000-0000-4000-8000-000000000002\"}}],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}]},\"value\":\"10000000-0000-4000-8000-000000000004\"}},\"category\":{\"coding\":[{\"system\":\"eHealth\\\/SNOMED\\\/service_request_categories\",\"code\":\"diagnostic_procedure\"}]},\"quantity\":{\"value\":2.0,\"system\":\"SERVICE_UNIT\",\"code\":\"PROCEDURE\"},\"occurrence_period\":{\"start\":\"2026-09-19T11:00:00.000Z\",\"end\":\"2026-09-20T20:59:59.000Z\"},\"supporting_info\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"observation\"}]},\"value\":\"40000000-0000-4000-8000-000000000001\"}}],\"reason_reference\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}]},\"value\":\"40000000-0000-4000-8000-000000000002\"}}],\"patient_instruction\":\"\\u041f\\u0440\\u043e\\u0439\\u0442\\u0438 \\u043e\\u0431\\u0441\\u0442\\u0435\\u0436\\u0435\\u043d\\u043d\\u044f \\\/ \\u043f\\u043e\\u0432\\u0442\\u043e\\u0440\\u043d\\u043e\",\"inform_with\":{\"auth_method_id\":\"50000000-0000-4000-8000-000000000001\"},\"id\":\"20000000-0000-4000-8000-000000000001\",\"program\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"medical_program\"}]},\"value\":\"30000000-0000-4000-8000-000000000001\"}}}"
+        },
+        "encounter_zero_quantity": {
+            "prequalify": {
+                "service_request": {
+                    "status": "active",
+                    "intent": "order",
+                    "priority": "routine",
+                    "code": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "service"
+                                    }
+                                ]
+                            },
+                            "value": "20000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_employee": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "employee"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_legal_entity": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "legal_entity"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000003"
+                        }
+                    },
+                    "context": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "encounter"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000004"
+                        }
+                    },
+                    "quantity": {
+                        "value": 0.0,
+                        "system": "SERVICE_UNIT",
+                        "code": "PIECE"
+                    }
+                }
+            },
+            "signedCreate": {
+                "status": "active",
+                "intent": "order",
+                "priority": "routine",
+                "code": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "service"
+                                }
+                            ]
+                        },
+                        "value": "20000000-0000-4000-8000-000000000002"
+                    }
+                },
+                "requester_employee": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000002"
+                    }
+                },
+                "requester_legal_entity": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "legal_entity"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000003"
+                    }
+                },
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "encounter"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000004"
+                    }
+                },
+                "quantity": {
+                    "value": 0.0,
+                    "system": "SERVICE_UNIT",
+                    "code": "PIECE"
+                },
+                "id": "20000000-0000-4000-8000-000000000001"
+            },
+            "legacySignedEnvelope": {
+                "service_request": {
+                    "status": "active",
+                    "intent": "order",
+                    "priority": "routine",
+                    "code": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "service"
+                                    }
+                                ]
+                            },
+                            "value": "20000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_employee": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "employee"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_legal_entity": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "legal_entity"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000003"
+                        }
+                    },
+                    "context": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "encounter"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000004"
+                        }
+                    },
+                    "quantity": {
+                        "value": 0.0,
+                        "system": "SERVICE_UNIT",
+                        "code": "PIECE"
+                    },
+                    "id": "20000000-0000-4000-8000-000000000001",
+                    "authored_on": "2026-09-19T10:00:00.000Z"
+                }
+            },
+            "signedJson": "{\"status\":\"active\",\"intent\":\"order\",\"priority\":\"routine\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}]},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"requester_employee\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"10000000-0000-4000-8000-000000000002\"}},\"requester_legal_entity\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}]},\"value\":\"10000000-0000-4000-8000-000000000003\"}},\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}]},\"value\":\"10000000-0000-4000-8000-000000000004\"}},\"quantity\":{\"value\":0.0,\"system\":\"SERVICE_UNIT\",\"code\":\"PIECE\"},\"id\":\"20000000-0000-4000-8000-000000000001\"}"
+        },
+        "episode_minimal": {
+            "prequalify": {
+                "service_request": {
+                    "status": "active",
+                    "intent": "order",
+                    "priority": "routine",
+                    "code": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "service"
+                                    }
+                                ]
+                            },
+                            "value": "20000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_employee": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "employee"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_legal_entity": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "legal_entity"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000003"
+                        }
+                    },
+                    "context": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "episode_of_care"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000005"
+                        }
+                    }
+                }
+            },
+            "signedCreate": {
+                "status": "active",
+                "intent": "order",
+                "priority": "routine",
+                "code": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "service"
+                                }
+                            ]
+                        },
+                        "value": "20000000-0000-4000-8000-000000000002"
+                    }
+                },
+                "requester_employee": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000002"
+                    }
+                },
+                "requester_legal_entity": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "legal_entity"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000003"
+                    }
+                },
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "episode_of_care"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000005"
+                    }
+                },
+                "id": "20000000-0000-4000-8000-000000000001"
+            },
+            "legacySignedEnvelope": {
+                "service_request": {
+                    "status": "active",
+                    "intent": "order",
+                    "priority": "routine",
+                    "code": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "service"
+                                    }
+                                ]
+                            },
+                            "value": "20000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_employee": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "employee"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_legal_entity": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "legal_entity"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000003"
+                        }
+                    },
+                    "context": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "episode_of_care"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000005"
+                        }
+                    },
+                    "id": "20000000-0000-4000-8000-000000000001",
+                    "authored_on": "2026-09-19T10:00:00.000Z"
+                }
+            },
+            "signedJson": "{\"status\":\"active\",\"intent\":\"order\",\"priority\":\"routine\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}]},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"requester_employee\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"10000000-0000-4000-8000-000000000002\"}},\"requester_legal_entity\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}]},\"value\":\"10000000-0000-4000-8000-000000000003\"}},\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"episode_of_care\"}]},\"value\":\"10000000-0000-4000-8000-000000000005\"}},\"id\":\"20000000-0000-4000-8000-000000000001\"}"
+        },
+        "no_context_incomplete_based_on": {
+            "prequalify": {
+                "service_request": {
+                    "status": "active",
+                    "intent": "order",
+                    "priority": "routine",
+                    "code": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "service"
+                                    }
+                                ]
+                            },
+                            "value": "20000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_employee": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "employee"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_legal_entity": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "legal_entity"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000003"
+                        }
+                    }
+                }
+            },
+            "signedCreate": {
+                "status": "active",
+                "intent": "order",
+                "priority": "routine",
+                "code": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "service"
+                                }
+                            ]
+                        },
+                        "value": "20000000-0000-4000-8000-000000000002"
+                    }
+                },
+                "requester_employee": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000002"
+                    }
+                },
+                "requester_legal_entity": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "legal_entity"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000003"
+                    }
+                },
+                "id": "20000000-0000-4000-8000-000000000001"
+            },
+            "legacySignedEnvelope": {
+                "service_request": {
+                    "status": "active",
+                    "intent": "order",
+                    "priority": "routine",
+                    "code": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "service"
+                                    }
+                                ]
+                            },
+                            "value": "20000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_employee": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "employee"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_legal_entity": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "legal_entity"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000003"
+                        }
+                    },
+                    "id": "20000000-0000-4000-8000-000000000001",
+                    "authored_on": "2026-09-19T10:00:00.000Z"
+                }
+            },
+            "signedJson": "{\"status\":\"active\",\"intent\":\"order\",\"priority\":\"routine\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}]},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"requester_employee\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"10000000-0000-4000-8000-000000000002\"}},\"requester_legal_entity\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}]},\"value\":\"10000000-0000-4000-8000-000000000003\"}},\"id\":\"20000000-0000-4000-8000-000000000001\"}"
+        },
+        "invalid_reference_rows": {
+            "prequalify": {
+                "service_request": {
+                    "status": "active",
+                    "intent": "order",
+                    "priority": "routine",
+                    "code": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "service"
+                                    }
+                                ]
+                            },
+                            "value": "20000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_employee": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "employee"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_legal_entity": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "legal_entity"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000003"
+                        }
+                    },
+                    "context": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "encounter"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000004"
+                        }
+                    },
+                    "supporting_info": []
+                }
+            },
+            "signedCreate": {
+                "status": "active",
+                "intent": "order",
+                "priority": "routine",
+                "code": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "service"
+                                }
+                            ]
+                        },
+                        "value": "20000000-0000-4000-8000-000000000002"
+                    }
+                },
+                "requester_employee": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000002"
+                    }
+                },
+                "requester_legal_entity": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "legal_entity"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000003"
+                    }
+                },
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "encounter"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000004"
+                    }
+                },
+                "supporting_info": [],
+                "id": "20000000-0000-4000-8000-000000000001"
+            },
+            "legacySignedEnvelope": {
+                "service_request": {
+                    "status": "active",
+                    "intent": "order",
+                    "priority": "routine",
+                    "code": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "service"
+                                    }
+                                ]
+                            },
+                            "value": "20000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_employee": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "employee"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_legal_entity": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "legal_entity"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000003"
+                        }
+                    },
+                    "context": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "encounter"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000004"
+                        }
+                    },
+                    "supporting_info": [],
+                    "id": "20000000-0000-4000-8000-000000000001",
+                    "authored_on": "2026-09-19T10:00:00.000Z"
+                }
+            },
+            "signedJson": "{\"status\":\"active\",\"intent\":\"order\",\"priority\":\"routine\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}]},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"requester_employee\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"10000000-0000-4000-8000-000000000002\"}},\"requester_legal_entity\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}]},\"value\":\"10000000-0000-4000-8000-000000000003\"}},\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}]},\"value\":\"10000000-0000-4000-8000-000000000004\"}},\"supporting_info\":[],\"id\":\"20000000-0000-4000-8000-000000000001\"}"
+        },
+        "only_period_end": {
+            "prequalify": {
+                "service_request": {
+                    "status": "active",
+                    "intent": "order",
+                    "priority": "routine",
+                    "code": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "service"
+                                    }
+                                ]
+                            },
+                            "value": "20000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_employee": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "employee"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_legal_entity": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "legal_entity"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000003"
+                        }
+                    },
+                    "context": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "encounter"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000004"
+                        }
+                    },
+                    "occurrence_period": {
+                        "start": "2026-09-19T11:00:00.000Z",
+                        "end": "2026-12-20T21:59:59.000Z"
+                    },
+                    "inform_with": {
+                        "auth_method_id": "50000000-0000-4000-8000-000000000001"
+                    }
+                }
+            },
+            "signedCreate": {
+                "status": "active",
+                "intent": "order",
+                "priority": "routine",
+                "code": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "service"
+                                }
+                            ]
+                        },
+                        "value": "20000000-0000-4000-8000-000000000002"
+                    }
+                },
+                "requester_employee": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000002"
+                    }
+                },
+                "requester_legal_entity": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "legal_entity"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000003"
+                    }
+                },
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "encounter"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000004"
+                    }
+                },
+                "occurrence_period": {
+                    "start": "2026-09-19T11:00:00.000Z",
+                    "end": "2026-12-20T21:59:59.000Z"
+                },
+                "inform_with": {
+                    "auth_method_id": "50000000-0000-4000-8000-000000000001"
+                },
+                "id": "20000000-0000-4000-8000-000000000001"
+            },
+            "legacySignedEnvelope": {
+                "service_request": {
+                    "status": "active",
+                    "intent": "order",
+                    "priority": "routine",
+                    "code": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "service"
+                                    }
+                                ]
+                            },
+                            "value": "20000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_employee": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "employee"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_legal_entity": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "legal_entity"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000003"
+                        }
+                    },
+                    "context": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "encounter"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000004"
+                        }
+                    },
+                    "occurrence_period": {
+                        "start": "2026-09-19T11:00:00.000Z",
+                        "end": "2026-12-20T21:59:59.000Z"
+                    },
+                    "inform_with": {
+                        "auth_method_id": "50000000-0000-4000-8000-000000000001"
+                    },
+                    "id": "20000000-0000-4000-8000-000000000001",
+                    "authored_on": "2026-09-19T10:00:00.000Z"
+                }
+            },
+            "signedJson": "{\"status\":\"active\",\"intent\":\"order\",\"priority\":\"routine\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}]},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"requester_employee\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"10000000-0000-4000-8000-000000000002\"}},\"requester_legal_entity\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}]},\"value\":\"10000000-0000-4000-8000-000000000003\"}},\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}]},\"value\":\"10000000-0000-4000-8000-000000000004\"}},\"occurrence_period\":{\"start\":\"2026-09-19T11:00:00.000Z\",\"end\":\"2026-12-20T21:59:59.000Z\"},\"inform_with\":{\"auth_method_id\":\"50000000-0000-4000-8000-000000000001\"},\"id\":\"20000000-0000-4000-8000-000000000001\"}"
+        },
+        "only_period_start": {
+            "prequalify": {
+                "service_request": {
+                    "status": "active",
+                    "intent": "order",
+                    "priority": "routine",
+                    "code": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "service"
+                                    }
+                                ]
+                            },
+                            "value": "20000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_employee": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "employee"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_legal_entity": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "legal_entity"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000003"
+                        }
+                    },
+                    "context": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "encounter"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000004"
+                        }
+                    },
+                    "quantity": {
+                        "value": 1.25,
+                        "system": "SERVICE_UNIT",
+                        "code": "PIECE"
+                    },
+                    "occurrence_period": {
+                        "start": "2026-10-01T09:30:00.000Z",
+                        "end": "2027-01-01T20:59:59.000Z"
+                    }
+                }
+            },
+            "signedCreate": {
+                "status": "active",
+                "intent": "order",
+                "priority": "routine",
+                "code": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "service"
+                                }
+                            ]
+                        },
+                        "value": "20000000-0000-4000-8000-000000000002"
+                    }
+                },
+                "requester_employee": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000002"
+                    }
+                },
+                "requester_legal_entity": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "legal_entity"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000003"
+                    }
+                },
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "encounter"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000004"
+                    }
+                },
+                "quantity": {
+                    "value": 1.25,
+                    "system": "SERVICE_UNIT",
+                    "code": "PIECE"
+                },
+                "occurrence_period": {
+                    "start": "2026-10-01T09:30:00.000Z",
+                    "end": "2027-01-01T20:59:59.000Z"
+                },
+                "id": "20000000-0000-4000-8000-000000000001"
+            },
+            "legacySignedEnvelope": {
+                "service_request": {
+                    "status": "active",
+                    "intent": "order",
+                    "priority": "routine",
+                    "code": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "service"
+                                    }
+                                ]
+                            },
+                            "value": "20000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_employee": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "employee"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_legal_entity": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "legal_entity"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000003"
+                        }
+                    },
+                    "context": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "encounter"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000004"
+                        }
+                    },
+                    "quantity": {
+                        "value": 1.25,
+                        "system": "SERVICE_UNIT",
+                        "code": "PIECE"
+                    },
+                    "occurrence_period": {
+                        "start": "2026-10-01T09:30:00.000Z",
+                        "end": "2027-01-01T20:59:59.000Z"
+                    },
+                    "id": "20000000-0000-4000-8000-000000000001",
+                    "authored_on": "2026-09-19T10:00:00.000Z"
+                }
+            },
+            "signedJson": "{\"status\":\"active\",\"intent\":\"order\",\"priority\":\"routine\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}]},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"requester_employee\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"10000000-0000-4000-8000-000000000002\"}},\"requester_legal_entity\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}]},\"value\":\"10000000-0000-4000-8000-000000000003\"}},\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}]},\"value\":\"10000000-0000-4000-8000-000000000004\"}},\"quantity\":{\"value\":1.25,\"system\":\"SERVICE_UNIT\",\"code\":\"PIECE\"},\"occurrence_period\":{\"start\":\"2026-10-01T09:30:00.000Z\",\"end\":\"2027-01-01T20:59:59.000Z\"},\"id\":\"20000000-0000-4000-8000-000000000001\"}"
+        },
+        "empty_optional_values": {
+            "prequalify": {
+                "service_request": {
+                    "status": "active",
+                    "intent": "order",
+                    "priority": "routine",
+                    "code": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "service"
+                                    }
+                                ]
+                            },
+                            "value": "20000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_employee": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "employee"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_legal_entity": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "legal_entity"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000003"
+                        }
+                    },
+                    "context": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "encounter"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000004"
+                        }
+                    }
+                }
+            },
+            "signedCreate": {
+                "status": "active",
+                "intent": "order",
+                "priority": "routine",
+                "code": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "service"
+                                }
+                            ]
+                        },
+                        "value": "20000000-0000-4000-8000-000000000002"
+                    }
+                },
+                "requester_employee": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000002"
+                    }
+                },
+                "requester_legal_entity": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "legal_entity"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000003"
+                    }
+                },
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "encounter"
+                                }
+                            ]
+                        },
+                        "value": "10000000-0000-4000-8000-000000000004"
+                    }
+                },
+                "id": "20000000-0000-4000-8000-000000000001"
+            },
+            "legacySignedEnvelope": {
+                "service_request": {
+                    "status": "active",
+                    "intent": "order",
+                    "priority": "routine",
+                    "code": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "service"
+                                    }
+                                ]
+                            },
+                            "value": "20000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_employee": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "employee"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000002"
+                        }
+                    },
+                    "requester_legal_entity": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "legal_entity"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000003"
+                        }
+                    },
+                    "context": {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "encounter"
+                                    }
+                                ]
+                            },
+                            "value": "10000000-0000-4000-8000-000000000004"
+                        }
+                    },
+                    "id": "20000000-0000-4000-8000-000000000001",
+                    "authored_on": "2026-09-19T10:00:00.000Z"
+                }
+            },
+            "signedJson": "{\"status\":\"active\",\"intent\":\"order\",\"priority\":\"routine\",\"code\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}]},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"requester_employee\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"10000000-0000-4000-8000-000000000002\"}},\"requester_legal_entity\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"legal_entity\"}]},\"value\":\"10000000-0000-4000-8000-000000000003\"}},\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}]},\"value\":\"10000000-0000-4000-8000-000000000004\"}},\"id\":\"20000000-0000-4000-8000-000000000001\"}"
+        }
+    }
+}

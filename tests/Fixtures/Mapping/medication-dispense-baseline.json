@@ -1,0 +1,102 @@
+{
+    "plain": {
+        "payload": {
+            "medication_dispense": {
+                "medication_request_id": "prescription",
+                "dispensed_at": "2026-10-05",
+                "division_id": "division",
+                "dispense_details": [
+                    {
+                        "medication_id": "drug",
+                        "medication_qty": 2.5,
+                        "sell_price": 10.0,
+                        "sell_amount": 25.0,
+                        "discount_amount": 0.0
+                    }
+                ]
+            },
+            "code": "1234"
+        },
+        "json": "{\"medication_dispense\":{\"medication_request_id\":\"prescription\",\"dispensed_at\":\"2026-10-05\",\"division_id\":\"division\",\"dispense_details\":[{\"medication_id\":\"drug\",\"medication_qty\":2.5,\"sell_price\":10.0,\"sell_amount\":25.0,\"discount_amount\":0.0}]},\"code\":\"1234\"}"
+    },
+    "coded aliases": {
+        "payload": {
+            "medication_dispense": {
+                "medication_request_id": "prescription",
+                "dispensed_at": "2026-10-05",
+                "division_id": "division",
+                "medical_program_id": "program",
+                "dispense_details": [
+                    {
+                        "medication_id": "drug",
+                        "medication_qty": 2.0,
+                        "sell_price": 10.0,
+                        "sell_amount": 20.0,
+                        "discount_amount": 0.0
+                    }
+                ]
+            },
+            "code": "1234"
+        },
+        "json": "{\"medication_dispense\":{\"medication_request_id\":\"prescription\",\"dispensed_at\":\"2026-10-05\",\"division_id\":\"division\",\"medical_program_id\":\"program\",\"dispense_details\":[{\"medication_id\":\"drug\",\"medication_qty\":2.0,\"sell_price\":10.0,\"sell_amount\":20.0,\"discount_amount\":0.0}]},\"code\":\"1234\"}"
+    },
+    "qualified minimum": {
+        "payload": {
+            "medication_dispense": {
+                "medication_request_id": "prescription",
+                "dispensed_at": "2026-10-05",
+                "division_id": "division",
+                "medical_program_id": "program",
+                "dispense_details": [
+                    {
+                        "medication_id": "brand",
+                        "medication_qty": 5.0,
+                        "sell_price": 10.0,
+                        "sell_amount": 50.0,
+                        "discount_amount": 0.0
+                    }
+                ]
+            },
+            "code": "1234"
+        },
+        "json": "{\"medication_dispense\":{\"medication_request_id\":\"prescription\",\"dispensed_at\":\"2026-10-05\",\"division_id\":\"division\",\"medical_program_id\":\"program\",\"dispense_details\":[{\"medication_id\":\"brand\",\"medication_qty\":5.0,\"sell_price\":10.0,\"sell_amount\":50.0,\"discount_amount\":0.0}]},\"code\":\"1234\"}"
+    },
+    "already above minimum": {
+        "payload": {
+            "medication_dispense": {
+                "medication_request_id": "prescription",
+                "dispensed_at": "2026-10-05",
+                "division_id": "division",
+                "medical_program_id": "program",
+                "dispense_details": [
+                    {
+                        "medication_id": "drug",
+                        "medication_qty": 7.0,
+                        "sell_price": 10.0,
+                        "sell_amount": 70.0,
+                        "discount_amount": 0.0
+                    }
+                ]
+            }
+        },
+        "json": "{\"medication_dispense\":{\"medication_request_id\":\"prescription\",\"dispensed_at\":\"2026-10-05\",\"division_id\":\"division\",\"medical_program_id\":\"program\",\"dispense_details\":[{\"medication_id\":\"drug\",\"medication_qty\":7.0,\"sell_price\":10.0,\"sell_amount\":70.0,\"discount_amount\":0.0}]}}"
+    },
+    "zero is preserved by wire contract": {
+        "payload": {
+            "medication_dispense": {
+                "medication_request_id": "prescription",
+                "dispensed_at": "2026-10-05",
+                "division_id": "division",
+                "dispense_details": [
+                    {
+                        "medication_qty": 0.0,
+                        "sell_price": 10.0,
+                        "sell_amount": 0.0,
+                        "discount_amount": 0.0
+                    }
+                ]
+            }
+        },
+        "json": "{\"medication_dispense\":{\"medication_request_id\":\"prescription\",\"dispensed_at\":\"2026-10-05\",\"division_id\":\"division\",\"dispense_details\":[{\"medication_qty\":0.0,\"sell_price\":10.0,\"sell_amount\":0.0,\"discount_amount\":0.0}]}}"
+    }
+}

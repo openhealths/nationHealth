@@ -12,8 +12,7 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\CarePlan;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
-use App\Services\MedicalEvents\CarePlanApprovalService;
-use App\Services\MedicalEvents\MedicalRequestOwnership;
+use App\Repositories\MedicalEvents\Repository;
 use App\Traits\FormTrait;
 use App\Traits\InteractsWithApprovals;
 use Exception;
@@ -30,6 +29,10 @@ class CarePlanApprovals extends Component
 {
     use FormTrait;
     use InteractsWithApprovals;
+    use \App\Livewire\Concerns\MedicalEvents\Approval\SelectsCarePlanApprovalAccess;
+    use \App\Livewire\Concerns\MedicalEvents\Approval\RequestsCarePlanApprovals;
+    use \App\Livewire\Concerns\MedicalEvents\Approval\QueuesCarePlanApproval;
+    use \App\Livewire\Concerns\MedicalEvents\Approval\PollsCarePlanApprovals;
 
     #[Locked]
     public int $carePlanId;
@@ -81,7 +84,7 @@ class CarePlanApprovals extends Component
         $this->patientUuid = $carePlan->person?->uuid ?? '';
         $this->isReadOnly = CarePlanStatus::fromStored($carePlan->status)->isTerminal();
         $this->statusLabel = CarePlanStatus::labelFor($carePlan->status);
-        $this->skipsPatientOtp = app(CarePlanApprovalService::class)->skipsPatientOtp($carePlan);
+        $this->skipsPatientOtp = $this->skipsPatientOtp($carePlan);
         $this->fetchApprovals();
 
         // Load active employees for the dropdown, filtered by the current active legal entity.
@@ -133,7 +136,7 @@ class CarePlanApprovals extends Component
 
         try {
             $carePlan = CarePlan::findOrFail($this->carePlanId);
-            app(CarePlanApprovalService::class)->syncForCarePlan($carePlan);
+            \App\Repositories\MedicalEvents\Repository::approval()->syncApprovals($carePlan, 'care_plan', []);
             $this->approvals = $carePlan->approvals()
                 ->withAllRelations()
                 ->latest()
@@ -148,7 +151,7 @@ class CarePlanApprovals extends Component
     }
 
     /**
-     * Submit a new approval request to eHealth via CarePlanApprovalService.
+     * Submit a new approval request to eHealth via the patient Approval API.
      */
     public function createApproval(): void
     {
@@ -178,13 +181,11 @@ class CarePlanApprovals extends Component
                 });
             }
 
-            $service = app(CarePlanApprovalService::class);
-
-            $result = $service->create(
+            $result = $this->createCarePlanApproval(
                 carePlan: $carePlan,
                 patientUuid: $this->patientUuid,
                 employeeUuid: $this->newApproval['employee_uuid'],
-                accessLevel: $service->resolveAccessLevel($carePlan),
+                accessLevel: $this->resolveAccessLevel($carePlan),
                 authorizeWith: $this->skipsPatientOtp ? null : ($this->selectedAuthMethodUuid ?: null),
                 user: Auth::user(),
                 bearerToken: Session::get(config('ehealth.api.oauth.bearer_token')),
@@ -235,7 +236,7 @@ class CarePlanApprovals extends Component
             return;
         }
 
-        $status = app(CarePlanApprovalService::class)->resolveAsyncJob($this->pollingLinkId);
+        $status = $this->resolveCarePlanApprovalJob($this->pollingLinkId, $this->carePlanId);
 
         if ($status->isPending()) {
             return;
@@ -302,7 +303,7 @@ class CarePlanApprovals extends Component
 
         try {
             try {
-                app(CarePlanApprovalService::class)
+                EHealth::approval()
                     ->deactivate($this->patientUuid, $oldApprovalUuid);
             } catch (EHealthResponseException $e) {
                 // Only an absent approval can be safely replaced without deactivation.
@@ -322,12 +323,11 @@ class CarePlanApprovals extends Component
                 return;
             }
 
-            $service = app(CarePlanApprovalService::class);
-            $result = $service->create(
+            $result = $this->createCarePlanApproval(
                 carePlan: $carePlan,
                 patientUuid: $this->patientUuid,
                 employeeUuid: $employeeUuid,
-                accessLevel: $service->resolveAccessLevel($carePlan),
+                accessLevel: $this->resolveAccessLevel($carePlan),
                 authorizeWith: $this->skipsPatientOtp ? null : ($this->selectedAuthMethodUuid ?: null),
                 user: Auth::user(),
                 bearerToken: Session::get(config('ehealth.api.oauth.bearer_token')),
@@ -370,7 +370,7 @@ class CarePlanApprovals extends Component
         $this->approvalId = $approvalUuid;
 
         try {
-            $response = app(CarePlanApprovalService::class)->confirmWithoutOtp($this->patientUuid, $approvalUuid);
+            $response = EHealth::approval()->confirmWithoutOtp($this->patientUuid, $approvalUuid);
             if (!$response->successful()) {
                 throw new EHealthResponseException($response);
             }
@@ -408,10 +408,10 @@ class CarePlanApprovals extends Component
         }
 
         try {
-            $response = app(CarePlanApprovalService::class)->verify(
+            $response = EHealth::approval()->verify(
                 $this->patientUuid,
                 $this->approvalId,
-                (int) $this->verificationCode,
+                ['code' => (int) $this->verificationCode],
             );
 
             if ($response->successful()) {
@@ -450,7 +450,7 @@ class CarePlanApprovals extends Component
         }
 
         try {
-            app(CarePlanApprovalService::class)->resendSms($this->patientUuid, $this->approvalId);
+            $this->resendCarePlanApprovalSms($this->patientUuid, $this->approvalId);
             $this->smsResent = true;
             Session::flash('success', __('care-plan.sms_resent'));
         } catch (EHealthResponseException $e) {
@@ -481,9 +481,8 @@ class CarePlanApprovals extends Component
 
         $this->authorize('manage', $this->currentCarePlan());
         try {
-            app(MedicalRequestOwnership::class)
-                ->approvalForCarePlan($this->currentCarePlan(), $approvalUuid);
-            app(CarePlanApprovalService::class)
+            Repository::approval()->findOwnedForCarePlan($this->currentCarePlan(), $approvalUuid);
+            EHealth::approval()
                 ->deactivate($this->patientUuid, $approvalUuid);
             Session::flash('success', __('care-plan.approval_cancelled'));
             $this->fetchApprovals();

@@ -1,0 +1,276 @@
+{
+    "captured_from": "c8e5f5cec5ed01e1f3f8f659616cc53691230f0a",
+    "entrypoint": "ServiceRequestMapper::fromFhir",
+    "cases": {
+        "full_camel_response": {
+            "uuid": "local-uuid",
+            "status": "completed",
+            "request_number": "primary",
+            "started_at": "2026-10-01T14:15:00+03:00",
+            "ended_at": "2026-11-01T09:30:00Z",
+            "service_id": "service-primary",
+            "quantity": 0,
+            "program_id": "program-id",
+            "intent": "proposal",
+            "category": "diagnostic_procedure",
+            "based_on_uuid": "activity-id",
+            "context_uuid": "encounter-id",
+            "priority": "urgent",
+            "note": "first note",
+            "patient_instruction": "camel instruction",
+            "reason_reference": [
+                {
+                    "uuid": "condition-id",
+                    "type": "condition"
+                }
+            ],
+            "inform_with": {
+                "name": "primary"
+            },
+            "supporting_info": [
+                {
+                    "uuid": "observation-id",
+                    "type": "observation"
+                }
+            ]
+        },
+        "flat_fallbacks": {
+            "uuid": "remote-id",
+            "status": null,
+            "request_number": "snake-number",
+            "started_at": "2026-10-02",
+            "ended_at": "2026-10-03",
+            "service_id": "service-id",
+            "quantity": 0,
+            "program_id": null,
+            "intent": null,
+            "category": null,
+            "based_on_uuid": null,
+            "context_uuid": null,
+            "priority": null,
+            "note": null,
+            "patient_instruction": "snake instruction",
+            "reason_reference": [
+                {
+                    "uuid": "condition-id",
+                    "type": "condition"
+                }
+            ],
+            "inform_with": "phone",
+            "supporting_info": []
+        },
+        "null_primary_falls_back": {
+            "uuid": "remote-id",
+            "status": null,
+            "request_number": "camel-number",
+            "started_at": "2026-10-02",
+            "ended_at": null,
+            "service_id": "coded-service",
+            "quantity": 2,
+            "program_id": null,
+            "intent": null,
+            "category": null,
+            "based_on_uuid": null,
+            "context_uuid": null,
+            "priority": null,
+            "note": null,
+            "patient_instruction": "fallback",
+            "reason_reference": [
+                {
+                    "uuid": "reason-id",
+                    "type": "condition"
+                }
+            ],
+            "inform_with": [],
+            "supporting_info": []
+        },
+        "empty_primary_does_not_fall_back": {
+            "uuid": "",
+            "status": null,
+            "request_number": "",
+            "started_at": "",
+            "ended_at": "",
+            "service_id": "",
+            "quantity": "0",
+            "program_id": null,
+            "intent": null,
+            "category": null,
+            "based_on_uuid": null,
+            "context_uuid": null,
+            "priority": null,
+            "note": null,
+            "patient_instruction": "",
+            "reason_reference": [],
+            "inform_with": [],
+            "supporting_info": []
+        },
+        "incomplete_reference_rows": {
+            "uuid": null,
+            "status": null,
+            "request_number": null,
+            "started_at": null,
+            "ended_at": null,
+            "service_id": null,
+            "quantity": null,
+            "program_id": null,
+            "intent": null,
+            "category": null,
+            "based_on_uuid": null,
+            "context_uuid": null,
+            "priority": null,
+            "note": null,
+            "patient_instruction": null,
+            "reason_reference": [
+                {
+                    "uuid": "only-id",
+                    "type": null
+                },
+                {
+                    "uuid": null,
+                    "type": "condition"
+                },
+                {
+                    "uuid": null,
+                    "type": null
+                }
+            ],
+            "inform_with": null,
+            "supporting_info": [
+                {
+                    "uuid": "only-id",
+                    "type": null
+                },
+                {
+                    "uuid": null,
+                    "type": "observation"
+                },
+                {
+                    "uuid": null,
+                    "type": null
+                },
+                {
+                    "uuid": null,
+                    "type": null
+                },
+                {
+                    "uuid": null,
+                    "type": null
+                }
+            ]
+        },
+        "reference_aliases_do_not_override_identifier": {
+            "uuid": null,
+            "status": null,
+            "request_number": null,
+            "started_at": null,
+            "ended_at": null,
+            "service_id": null,
+            "quantity": null,
+            "program_id": null,
+            "intent": null,
+            "category": null,
+            "based_on_uuid": null,
+            "context_uuid": null,
+            "priority": null,
+            "note": null,
+            "patient_instruction": null,
+            "reason_reference": [
+                {
+                    "uuid": "right",
+                    "type": "condition"
+                },
+                {
+                    "uuid": null,
+                    "type": null
+                }
+            ],
+            "inform_with": null,
+            "supporting_info": [
+                {
+                    "uuid": "right",
+                    "type": "observation"
+                }
+            ]
+        },
+        "object_category_and_plain_note_are_not_imported": {
+            "uuid": null,
+            "status": null,
+            "request_number": null,
+            "started_at": null,
+            "ended_at": null,
+            "service_id": null,
+            "quantity": null,
+            "program_id": null,
+            "intent": null,
+            "category": null,
+            "based_on_uuid": null,
+            "context_uuid": null,
+            "priority": null,
+            "note": null,
+            "patient_instruction": null,
+            "reason_reference": [],
+            "inform_with": null,
+            "supporting_info": []
+        },
+        "secondary_number_and_fractional_quantity": {
+            "uuid": null,
+            "status": null,
+            "request_number": "camel-number",
+            "started_at": null,
+            "ended_at": null,
+            "service_id": null,
+            "quantity": 0.5,
+            "program_id": null,
+            "intent": null,
+            "category": null,
+            "based_on_uuid": null,
+            "context_uuid": null,
+            "priority": null,
+            "note": null,
+            "patient_instruction": null,
+            "reason_reference": [],
+            "inform_with": null,
+            "supporting_info": []
+        },
+        "false_notification_and_empty_note": {
+            "uuid": null,
+            "status": null,
+            "request_number": null,
+            "started_at": null,
+            "ended_at": null,
+            "service_id": null,
+            "quantity": null,
+            "program_id": null,
+            "intent": null,
+            "category": null,
+            "based_on_uuid": null,
+            "context_uuid": null,
+            "priority": null,
+            "note": "",
+            "patient_instruction": null,
+            "reason_reference": [],
+            "inform_with": false,
+            "supporting_info": []
+        },
+        "absent_fields": {
+            "uuid": null,
+            "status": null,
+            "request_number": null,
+            "started_at": null,
+            "ended_at": null,
+            "service_id": null,
+            "quantity": null,
+            "program_id": null,
+            "intent": null,
+            "category": null,
+            "based_on_uuid": null,
+            "context_uuid": null,
+            "priority": null,
+            "note": null,
+            "patient_instruction": null,
+            "reason_reference": [],
+            "inform_with": null,
+            "supporting_info": []
+        }
+    }
+}

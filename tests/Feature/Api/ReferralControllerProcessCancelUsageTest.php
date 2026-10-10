@@ -7,7 +7,6 @@ namespace Tests\Feature\Api;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\User;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -39,6 +38,12 @@ class ReferralControllerProcessCancelUsageTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $repository = Mockery::mock(\App\Repositories\MedicalEvents\ServiceRequestRequestRepository::class);
+        $repository->shouldReceive('setExecutionStatus')->andReturnNull();
+        $repository->shouldReceive('findByUuid')->andReturnNull();
+        $repository->shouldReceive('persistExecution')->andReturnNull()->byDefault();
+        $this->instance(\App\Repositories\MedicalEvents\ServiceRequestRequestRepository::class, $repository);
 
         $party = \App\Models\Relations\Party::create([
             'uuid' => (string) Str::uuid(),
@@ -87,23 +92,26 @@ class ReferralControllerProcessCancelUsageTest extends TestCase
         }
     }
 
-    public function test_process_passes_patient_uuid_and_payload_in_correct_order(): void
+    public function test_process_maps_executor_and_persists_with_the_correct_patient(): void
     {
         $referralUuid = (string) Str::uuid();
         $patientUuid = (string) Str::uuid();
 
-        $mock = Mockery::mock(ReferralRequestLifecycleService::class);
-        $mock->shouldReceive('takeIntoWork')
+        $repository = app(\App\Repositories\MedicalEvents\ServiceRequestRequestRepository::class);
+        $repository->shouldReceive('persistExecution')->once()
+            ->with($referralUuid, Mockery::on(fn (Employee $employee): bool => $employee->id === $this->employee->id), $patientUuid, null, ['status' => 'in_progress']);
+        $mock = Mockery::mock(\App\Classes\eHealth\Api\Patient\ServiceRequest::class);
+        $mock->shouldReceive('processAndResolve')
             ->once()
-            ->withArgs(function (string $uuid, Employee $employee, ?string $patientId, array $payload) use ($referralUuid, $patientUuid): bool {
+            ->withArgs(function (string $uuid, array $payload) use ($referralUuid): bool {
                 return $uuid === $referralUuid
-                    && $employee->id === $this->employee->id
-                    && $patientId === $patientUuid
-                    && ($payload['note'] ?? null) === 'take';
+                    && data_get($payload, 'used_by_employee.identifier.value') === $this->employee->uuid
+                    && data_get($payload, 'used_by_legal_entity.identifier.value') === $this->legalEntity->uuid
+                    && !array_key_exists('note', $payload);
             })
             ->andReturn(['status' => 'in_progress']);
 
-        $this->app->instance(ReferralRequestLifecycleService::class, $mock);
+        $this->app->instance(\App\Classes\eHealth\Api\Patient\ServiceRequest::class, $mock);
 
         $response = $this->actingAsDoctor()->postJson($this->url($referralUuid, 'process'), [
             'patient_uuid' => $patientUuid,
@@ -120,7 +128,7 @@ class ReferralControllerProcessCancelUsageTest extends TestCase
         $referralUuid = (string) Str::uuid();
         $patientId = (string) Str::uuid();
 
-        $mock = Mockery::mock(ReferralRequestLifecycleService::class);
+        $mock = Mockery::mock(\App\Classes\eHealth\Api\Patient\ServiceRequest::class);
         $mock->shouldReceive('cancelUsage')
             ->once()
             ->withArgs(function (string $uuid, string $passedPatientId, array $payload) use ($referralUuid, $patientId): bool {
@@ -128,9 +136,9 @@ class ReferralControllerProcessCancelUsageTest extends TestCase
                     && $passedPatientId === $patientId
                     && ($payload['explanatory_letter'] ?? null) === 'Пацієнт не зʼявився';
             })
-            ->andReturn(['status' => 'active']);
+            ->andReturn($this->responseWithData(['status' => 'active']));
 
-        $this->app->instance(ReferralRequestLifecycleService::class, $mock);
+        $this->app->instance(\App\Classes\eHealth\Api\Patient\ServiceRequest::class, $mock);
 
         $response = $this->actingAsDoctor()->postJson($this->url($referralUuid, 'cancel-usage'), [
             'patient_id' => $patientId,
@@ -146,9 +154,9 @@ class ReferralControllerProcessCancelUsageTest extends TestCase
     {
         $referralUuid = (string) Str::uuid();
 
-        $mock = Mockery::mock(ReferralRequestLifecycleService::class);
+        $mock = Mockery::mock(\App\Classes\eHealth\Api\Patient\ServiceRequest::class);
         $mock->shouldNotReceive('cancelUsage');
-        $this->app->instance(ReferralRequestLifecycleService::class, $mock);
+        $this->app->instance(\App\Classes\eHealth\Api\Patient\ServiceRequest::class, $mock);
 
         $response = $this->actingAsDoctor()->postJson($this->url($referralUuid, 'cancel-usage'), [
             'payload' => ['explanatory_letter' => 'x'],
@@ -160,6 +168,14 @@ class ReferralControllerProcessCancelUsageTest extends TestCase
     private function actingAsDoctor(): static
     {
         return $this->actingAs($this->user, 'ehealth')->withoutMiddleware();
+    }
+
+    private function responseWithData(array $data): \App\Classes\eHealth\EHealthResponse
+    {
+        $response = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $response->shouldReceive('getData')->andReturn($data);
+
+        return $response;
     }
 
     private function url(string $referralUuid, string $action): string

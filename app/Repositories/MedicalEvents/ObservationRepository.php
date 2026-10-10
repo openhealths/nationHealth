@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
+use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\ObservationComponent;
-use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Quantity;
 use App\Models\Person\Person;
 use App\Models\Preperson;
@@ -96,6 +96,12 @@ class ObservationRepository extends BaseRepository
                     Repository::codeableConcept()->attach($device, $datum['device']);
                 }
 
+                $specimen = null;
+                if (isset($datum['specimen'])) {
+                    $specimen = Repository::identifier()->store($datum['specimen']['identifier']['value']);
+                    Repository::codeableConcept()->attach($specimen, $datum['specimen']);
+                }
+
                 $observation = $this->model->updateOrCreate(
                     ['uuid' => $datum['uuid'] ?? $datum['id']],
                     [
@@ -122,6 +128,7 @@ class ObservationRepository extends BaseRepository
                             : null,
                         'reaction_on_id' => $reactionOn?->id,
                         'device_id' => $device?->id,
+                        'specimen_id' => $specimen?->id,
                         'context_id' => $context?->id
                     ]
                 );
@@ -262,6 +269,7 @@ class ObservationRepository extends BaseRepository
             'effectivePeriod',
             'reactionOn.type.coding',
             'device.type.coding',
+            'specimen.type.coding',
             'components.code.coding',
             'components.value.valueQuantity',
             'components.value.valueCodeableConcept.coding',

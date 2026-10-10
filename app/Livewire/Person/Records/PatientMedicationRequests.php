@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Person\Records;
 
-use App\Classes\eHealth\Api\MedicationRequest as MedicationRequestApi;
+use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -142,10 +142,10 @@ class PatientMedicationRequests extends BasePatientComponent
 
             if ($this->activeTab === 'requests') {
                 // MedicationRequestRequests – drafts / requests
-                $response = MedicationRequestApi::getRequestsBySearchParams($this->uuid, $params);
+                $response = EHealth::medicationRequest()->getRequestsBySearchParams($this->uuid, $params)->getData();
             } else {
                 // MedicationRequests – signed prescriptions
-                $response = MedicationRequestApi::getBySearchParams($this->uuid, $params);
+                $response = EHealth::medicationRequest()->getBySearchParams($this->uuid, $params)->getData();
             }
 
             $this->eHealthResults = $response['data'] ?? $response ?? [];

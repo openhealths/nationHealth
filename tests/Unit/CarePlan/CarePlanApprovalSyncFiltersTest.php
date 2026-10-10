@@ -13,7 +13,6 @@ use App\Models\Person\Person;
 use App\Models\Relations\Party;
 use App\Models\User;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\CarePlanApprovalService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -58,7 +57,7 @@ class CarePlanApprovalSyncFiltersTest extends TestCase
             ->andReturn($response);
         $this->instance(ApprovalApi::class, $api);
 
-        app(CarePlanApprovalService::class)->syncForCarePlan($carePlan->fresh(['person']));
+        \App\Repositories\MedicalEvents\Repository::approval()->syncApprovals($carePlan->fresh(['person']), 'care_plan', []);
     }
 
     public function test_sync_approvals_passes_get_approvals_resource_filters(): void

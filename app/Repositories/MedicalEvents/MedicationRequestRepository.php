@@ -5,15 +5,19 @@ declare(strict_types=1);
 namespace App\Repositories\MedicalEvents;
 
 use App\Enums\Person\MedicationRequestStatus;
+use App\Dto\MedicationRequest\Model as ModelData;
 use App\Models\CarePlanActivity;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
+use App\Repositories\MedicalEvents\Concerns\FindsOpenActivityRequests;
+use App\Repositories\MedicalEvents\Concerns\FindsOwnedRequests;
 use App\Repositories\MedicalEvents\Concerns\ResolvesRequestFhirRefs;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Throwable;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 
 /**
  * @property MedicationRequestRequest $model
@@ -21,6 +25,36 @@ use Throwable;
 class MedicationRequestRepository extends BaseRepository
 {
     use ResolvesRequestFhirRefs;
+    use FindsOpenActivityRequests;
+    use FindsOwnedRequests;
+
+    public function personUuid(int $personId): ?string
+    {
+        return \App\Models\Person\Person::whereKey($personId)->value('uuid');
+    }
+
+    public function rememberActiveId(MedicationRequestRequest $record, string $activeId): void
+    {
+        $payload = is_array($record->ehealthPayload) ? $record->ehealthPayload : [];
+        $payload['active_id'] = $activeId;
+        $record->update(['ehealth_payload' => $payload]);
+    }
+
+    /** Load local context before ObjectMapper reads the model; no lazy SQL in transforms. */
+    public function signingContext(\App\Models\CarePlan|Encounter $context, MedicationRequestRequest $record, ?string $personUuid): array
+    {
+        $record->loadMissing(['dosageInstructions', 'intent', 'category', 'basedOn', 'context']);
+        $employee = \App\Models\Employee\Employee::find($record->employeeId);
+        $division = \App\Models\Division::find($record->divisionId);
+        $encounter = $record->context?->value ? Encounter::where('uuid', $record->context->value)->first() : null;
+        $activity = $record->basedOn?->value ? CarePlanActivity::where('uuid', $record->basedOn->value)->first() : null;
+
+        return [
+            'uuids' => ['person_uuid' => $personUuid, 'encounter_uuid' => $encounter?->uuid, 'employee_uuid' => $employee?->uuid, 'division_uuid' => $division?->uuid],
+            'activity_uuid' => $activity?->uuid,
+            'care_plan_uuid' => $context instanceof \App\Models\CarePlan ? $context->uuid : $activity?->carePlan?->uuid,
+        ];
+    }
 
     public function __construct(MedicationRequestRequest $model)
     {
@@ -378,15 +412,7 @@ class MedicationRequestRepository extends BaseRepository
             }
 
             // List responses are partial; do not erase the local author, references or medication details.
-            $request->fill(array_filter([
-                'status' => $eHealthData['status'] ?? null,
-                'request_number' => $eHealthData['request_number'] ?? $eHealthData['requisition'] ?? null,
-                'started_at' => $eHealthData['started_at'] ?? null,
-                'ended_at' => $eHealthData['ended_at'] ?? null,
-                'medication_id' => $eHealthData['medication_id'] ?? data_get($eHealthData, 'medication_info.id'),
-                'medication_qty' => $eHealthData['medication_qty'] ?? null,
-                'medication_program_id' => $eHealthData['medical_program_id'] ?? data_get($eHealthData, 'medical_program.id'),
-            ], static fn ($value) => $value !== null));
+            $request->fill(app(ObjectMapperInterface::class)->map((object) $eHealthData, ModelData::class)->toSyncPatch());
             $request->resourceType = $resourceType;
             // Replace supplied arrays as a whole, so removed dosage entries cannot survive a refresh.
             $request->ehealthPayload = array_replace($request->ehealthPayload ?? [], $eHealthData);

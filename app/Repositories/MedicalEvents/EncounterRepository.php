@@ -719,4 +719,44 @@ class EncounterRepository extends BaseRepository
             $encounter->hospitalization()->create($hospitalizationData);
         }
     }
+
+    public function findEligibleEncountersForEPrescription(int $personId, ?string $employeeUuid): \Illuminate\Support\Collection
+    {
+        if ($employeeUuid === null || $employeeUuid === '') {
+            return collect();
+        }
+
+        return Encounter::query()
+            ->where('person_id', $personId)
+            ->where('status', EncounterStatus::FINISHED)
+            ->whereHas('performer', static function ($query) use ($employeeUuid): void {
+                $query->where('value', $employeeUuid);
+            })
+            ->whereHas('period', static function ($query): void {
+                $query->whereDate('end', today());
+            })
+            ->with(['period', 'performer'])
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    public function resolveEligibleEncounterForCreate(int $personId, ?string $employeeUuid, ?int $selectedEncounterId): Encounter
+    {
+        $eligible = $this->findEligibleEncountersForEPrescription($personId, $employeeUuid);
+
+        if ($eligible->isEmpty()) {
+            throw new \RuntimeException(__('care-plan.eprescription_encounter_none'));
+        }
+
+        if ($selectedEncounterId === null || $selectedEncounterId <= 0) {
+            throw new \InvalidArgumentException(__('care-plan.eprescription_encounter_required'));
+        }
+
+        $selected = $eligible->firstWhere('id', $selectedEncounterId);
+        if (!$selected instanceof Encounter) {
+            throw new \InvalidArgumentException(__('care-plan.eprescription_encounter_invalid'));
+        }
+
+        return $selected;
+    }
 }

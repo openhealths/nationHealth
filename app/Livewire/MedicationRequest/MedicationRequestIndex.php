@@ -6,7 +6,14 @@ namespace App\Livewire\MedicationRequest;
 
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\LegalEntity;
-use App\Services\MedicalEvents\MedicationDispenseLifecycleService;
+use App\Classes\eHealth\EHealth;
+use App\Classes\eHealth\Api\Job;
+use App\Dto\MedicationDispense\Request as DispenseRequestData;
+use App\Dto\MedicationDispense\Ehealth as DispenseEhealthData;
+use App\Models\Employee\Employee;
+use App\Repositories\EmployeeRepository;
+use Illuminate\Support\Collection;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -48,7 +55,7 @@ class MedicationRequestIndex extends Component
         'password' => '',
     ];
 
-    public function search(MedicationDispenseLifecycleService $service): void
+    public function search(): void
     {
         abort_unless($this->userCanDispense(), 403);
         $this->validate([
@@ -60,10 +67,10 @@ class MedicationRequestIndex extends Component
         $this->errorMessage = null;
         $this->hasSearched = true;
         $this->selectedRequestId = null;
-        $this->requestNumber = $service->formatRequestNumber($this->requestNumber);
+        $this->requestNumber = DispenseRequestData::formatNumber($this->requestNumber);
 
         try {
-            $this->searchResults = $service->searchByRequestNumber($this->requestNumber);
+            $this->searchResults = $this->searchByRequestNumber($this->requestNumber);
 
             if ($this->searchResults === []) {
                 $this->errorMessage = 'Електронний рецепт не знайдено.';
@@ -110,7 +117,7 @@ class MedicationRequestIndex extends Component
         $this->showSignatureModal = true;
     }
 
-    public function sign(MedicationDispenseLifecycleService $service): void
+    public function sign(): void
     {
         abort_unless($this->userCanDispense(), 403);
         try {
@@ -129,7 +136,7 @@ class MedicationRequestIndex extends Component
             return;
         }
 
-        $this->searchResults = $service->searchByRequestNumber($this->requestNumber);
+        $this->searchResults = $this->searchByRequestNumber($this->requestNumber);
         $request = $this->selectedRequest();
         if ($request === null) {
             Session::flash('error', 'Електронний рецепт не знайдено. Повторіть пошук.');
@@ -139,41 +146,15 @@ class MedicationRequestIndex extends Component
         }
 
         try {
-            $employee = Auth::user()?->employees()
-                ->where('legal_entity_id', $this->legalEntity->id)
-                ->whereIn('employee_type', ['PHARMACIST', 'PHARMACIST_ADMIN'])
-                ->where('status', \App\Enums\Person\Status::APPROVED)
-                ->with(['division', 'party'])
-                ->first()
-                ?? Auth::user()?->employees()
-                    ->where('legal_entity_id', $this->legalEntity->id)
-                    ->whereNotNull('division_id')
-                    ->where('status', \App\Enums\Person\Status::APPROVED)
-                    ->with(['division', 'party'])
-                    ->first()
-                ?? Auth::user()?->employees()
-                    ->where('legal_entity_id', $this->legalEntity->id)
-                    ->with(['division', 'party'])
-                    ->first();
-
-            $service->dispense(
-                $request,
-                [
-                    'code' => $this->code,
-                    'medication_qty' => $this->medicationQty,
-                    'password' => $this->form['password'],
-                    'knedp' => $this->form['knedp'],
-                    'keyContainerUpload' => $this->form['keyContainerUpload'],
-                ],
-                $service->resolvePharmacyEmployeeContext($employee)
-            );
+            $employee = app(EmployeeRepository::class)->pharmacyEmployee(Auth::user(), $this->legalEntity->id);
+            $this->dispenseSelectedRequest($request, $employee);
 
             $this->showSignatureModal = false;
             $this->form['password'] = '';
             $this->form['keyContainerUpload'] = null;
             $this->form['keyContainerFileName'] = '';
             Session::flash('success', 'Електронний рецепт успішно погашено в аптеці.');
-            $this->search($service);
+            $this->search();
         } catch (EHealthValidationException $exception) {
             $exception->report();
             Session::flash('error', $exception->getTranslatedMessage());
@@ -183,6 +164,85 @@ class MedicationRequestIndex extends Component
             Session::flash('error', 'Не вдалося погасити рецепт: '.$exception->getMessage());
             $this->showSignatureModal = false;
         }
+    }
+
+    protected function searchByRequestNumber(string $number): array
+    {
+        $payload = EHealth::medicationRequest()->searchByPharmacy(['request_number' => DispenseRequestData::formatNumber($number)])->getData();
+        $items = $payload['data'] ?? (isset($payload[0]) ? $payload : ($payload !== [] ? [$payload] : []));
+
+        return is_array($items) ? array_values(array_filter($items, static fn ($item): bool => is_array($item))) : [];
+    }
+
+    protected function dispenseSelectedRequest(array $rawRequest, ?Employee $employee): array
+    {
+        if ($employee === null || empty($employee->uuid)) {
+            throw new \RuntimeException('Не знайдено співробітника аптеки для погашення рецепта.');
+        }
+        $divisionUuid = $employee->division?->uuid;
+        if (empty($divisionUuid)) {
+            throw new \RuntimeException('У співробітника аптеки не вказано місце надання послуг.');
+        }
+        $mapper = app(ObjectMapperInterface::class);
+        $request = $mapper->map(new Collection($rawRequest), DispenseRequestData::class);
+        if ($request->id === '') {
+            throw new \InvalidArgumentException('Немає ідентифікатора електронного рецепта.');
+        }
+        $medicationId = $request->medicationId;
+        $minimumQuantity = null;
+        if ($request->programId !== '') {
+            try {
+                $response = EHealth::medicationRequest()->qualify($request->id, [
+                    'division_id' => $divisionUuid,
+                    'programs' => [['id' => $request->programId]],
+                ])->getData();
+                $participant = data_get($response, '0.participants.0') ?? data_get($response, 'data.0.participants.0');
+                if (!empty($participant['medication_id'])) {
+                    $medicationId = (string) $participant['medication_id'];
+                }
+                if (!empty($participant['package_min_qty'])) {
+                    $minimumQuantity = (float) $participant['package_min_qty'];
+                }
+            } catch (Throwable $exception) {
+                Log::warning('Qualify lookup failed, continuing with request data: '.$exception->getMessage());
+            }
+        }
+        $payload = ['medication_dispense' => $mapper->map($this, new DispenseEhealthData(
+            $request,
+            $divisionUuid,
+            now()->toDateString(),
+            $medicationId,
+            $minimumQuantity
+        ))->toArray()];
+        if (trim($this->code) !== '') {
+            $payload['code'] = trim($this->code);
+        }
+        $created = EHealth::medicationDispense()->create($payload)->getData();
+        $entity = $created['data'] ?? $created;
+        if (isset($entity[0]) && is_array($entity[0])) {
+            $entity = $entity[0];
+        }
+        $id = (string) ($entity['id'] ?? $entity['uuid'] ?? '');
+        if ($id === '') {
+            throw new \RuntimeException('ЕСОЗ не повернула ідентифікатор відпуску ліків.');
+        }
+        if (in_array(strtoupper((string) ($entity['status'] ?? '')), ['PROCESSED', 'COMPLETED'], true)) {
+            return is_array($entity) ? $entity : (array) $created;
+        }
+        $signed = signatureService()->signData(
+            is_array($entity) ? $entity : $payload['medication_dispense'],
+            $this->form['password'],
+            $this->form['knedp'],
+            $this->form['keyContainerUpload'] ?? null,
+            $employee->party?->taxId,
+        );
+        $processed = EHealth::medicationDispense()->process($id, [
+            'signed_medication_dispense' => $signed,
+            'signed_content_encoding' => 'base64',
+        ]);
+        $final = app(Job::class)->resolve($processed->getData());
+
+        return is_array($final) ? $final : (array) $processed->getData();
     }
 
     public function updatedFormKeyContainerUpload(): void

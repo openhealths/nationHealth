@@ -7,6 +7,7 @@ namespace App\Livewire\Specimen;
 use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Dto\Specimen\Ehealth as SpecimenEhealth;
 use App\Enums\Specimen\Status;
 use App\Exceptions\Cipher\CipherConnectionException;
 use App\Exceptions\Cipher\CipherException;
@@ -19,15 +20,16 @@ use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\Fhir;
 use App\Traits\FormTrait;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 use Throwable;
 
 abstract class SpecimenComponent extends Component
@@ -172,10 +174,13 @@ abstract class SpecimenComponent extends Component
             return;
         }
 
-        $fhirSpecimen = Fhir::specimen()->toFhir(
-            [...$specimen, 'uuid' => $this->specimenId],
-            ['employee' => $specimen['registeredById']]
-        );
+        $mappingForm = clone $this->form;
+        $mappingForm->specimen = $specimen;
+        $fhirSpecimen = app(ObjectMapperInterface::class)->map($mappingForm, new SpecimenEhealth(
+            id: $this->specimenId ?? Str::uuid()->toString(),
+            legalEntity: legalEntity()->uuid,
+            employee: $specimen['registeredById'],
+        ))->toArray();
         $fhirSpecimen['status'] = Status::DRAFT->value;
 
         try {
@@ -230,10 +235,13 @@ abstract class SpecimenComponent extends Component
             return;
         }
 
-        $fhirSpecimen = Fhir::specimen()->toFhir(
-            [...$specimen, 'uuid' => $this->specimenId],
-            ['employee' => $specimen['registeredById']]
-        );
+        $mappingForm = clone $this->form;
+        $mappingForm->specimen = $specimen;
+        $fhirSpecimen = app(ObjectMapperInterface::class)->map($mappingForm, new SpecimenEhealth(
+            id: $this->specimenId ?? Str::uuid()->toString(),
+            legalEntity: legalEntity()->uuid,
+            employee: $specimen['registeredById'],
+        ))->toArray();
 
         try {
             $signedContent = new CipherRequest()->signData(

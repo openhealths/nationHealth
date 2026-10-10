@@ -15,8 +15,10 @@ use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\User;
-use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
+use App\Dto\ServiceRequest\Input as ServiceRequestInput;
+use App\Dto\ServiceRequest\EhealthPrequalify as ServiceRequestPrequalifyData;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -133,7 +135,7 @@ class ReferralExecutorPhase4Test extends TestCase
         $mockApi->shouldReceive('process')->never();
         $this->app->instance(ServiceRequestApi::class, $mockApi);
 
-        $service = app(ReferralRequestLifecycleService::class);
+        $service = new \Tests\Support\ReferralExecutionHarness();
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Результати перевірки не дають змоги використати електронне направлення');
@@ -171,7 +173,7 @@ class ReferralExecutorPhase4Test extends TestCase
         $mockApi->shouldReceive('process')->never();
         $this->app->instance(ServiceRequestApi::class, $mockApi);
 
-        $service = app(ReferralRequestLifecycleService::class);
+        $service = new \Tests\Support\ReferralExecutionHarness();
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Результати перевірки не дають змоги використати електронне направлення');
@@ -206,15 +208,64 @@ class ReferralExecutorPhase4Test extends TestCase
             ->andReturn($recallResponse);
         $this->app->instance(PatientServiceRequestApi::class, $mockPatientApi);
 
-        $service = app(ReferralRequestLifecycleService::class);
-        $result = $service->recallReferral($this->person->uuid, $referralUuid, [
-            'explanatory_letter' => 'Пацієнт більше не потребує послуги',
-        ]);
-
-        $this->assertSame('recalled', $result['status']);
+        $signature = Mockery::mock(\App\Services\SignatureService::class);
+        $signature->shouldReceive('getCertificateAuthorities')->andReturn([]);
+        $signature->shouldReceive('signData')->once()->andReturn('signed-content');
+        $this->instance(\App\Services\SignatureService::class, $signature);
+        $this->actingAs($this->user);
+        Livewire::test(\App\Livewire\Person\Records\PatientReferrals::class, [
+            'legalEntity' => $this->legalEntity, 'person' => $this->person, 'preperson' => null,
+        ])->call('recallReferral', $referralUuid, 'service_request')
+            ->set('referralExplanatoryLetter', 'Пацієнт більше не потребує послуги')
+            ->set('form.password', 'test-password')->set('form.knedp', 'test-knedp')
+            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('test.dat', 10))
+            ->call('sign')->assertHasNoErrors()->assertSet('showSignatureModal', false);
         $this->assertDatabaseHas('service_request_requests', [
             'uuid' => $referralUuid,
             'status' => 'recalled',
+        ]);
+    }
+
+    public function test_failed_process_does_not_change_the_local_referral(): void
+    {
+        $uuid = (string) Str::uuid();
+        ServiceRequestRequest::create([
+            'uuid' => $uuid, 'employee_id' => $this->employee->id, 'person_id' => $this->person->id,
+            'status' => 'active', 'service_id' => '59300-00', 'quantity' => 1,
+        ]);
+        $api = Mockery::mock(ServiceRequestApi::class);
+        $api->shouldNotReceive('qualify');
+        $api->shouldReceive('process')->once()->andThrow(new \RuntimeException('Use failed'));
+        $this->instance(ServiceRequestApi::class, $api);
+
+        try {
+            (new \Tests\Support\ReferralExecutionHarness())->takeIntoWork($uuid, $this->employee, $this->person->uuid);
+            $this->fail('A failed use action must propagate.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Use failed', $exception->getMessage());
+            $this->assertDatabaseHas('service_request_requests', ['uuid' => $uuid, 'status' => 'active']);
+        }
+    }
+
+    public function test_search_referral_import_preserves_zero_quantity_and_resolved_author(): void
+    {
+        $uuid = (string) Str::uuid();
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('getData')->andReturn(['data' => [
+            'requisition' => 'SR-USE-1', 'code' => ['coding' => [['code' => '59300-00']]],
+            'quantity' => ['value' => 0], 'program' => ['id' => 'remote-program'],
+        ]]);
+        $api = Mockery::mock(ServiceRequestApi::class);
+        $api->shouldNotReceive('qualify');
+        $api->shouldReceive('process')->once()->andReturn($response);
+        $this->instance(ServiceRequestApi::class, $api);
+
+        (new \Tests\Support\ReferralExecutionHarness())->takeIntoWork($uuid, $this->employee, $this->person->uuid);
+
+        $this->assertDatabaseHas('service_request_requests', [
+            'uuid' => $uuid, 'status' => 'in_progress', 'employee_id' => $this->employee->id,
+            'person_id' => $this->person->id, 'service_id' => '59300-00', 'quantity' => 0,
+            'program_id' => 'remote-program', 'request_number' => 'SR-USE-1',
         ]);
     }
 
@@ -253,7 +304,7 @@ class ReferralExecutorPhase4Test extends TestCase
             ->andReturn($completeResponse);
         $this->app->instance(ServiceRequestApi::class, $mockApi);
 
-        $service = app(ReferralRequestLifecycleService::class);
+        $service = new \Tests\Support\ReferralExecutionHarness();
         $result = $service->completeReferral($referralUuid, $encounterUuid, 'encounter');
 
         $this->assertSame('completed', $result['status']);
@@ -303,7 +354,7 @@ class ReferralExecutorPhase4Test extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(__('care-plan.referral_complete_emz_mismatch'));
 
-        app(ReferralRequestLifecycleService::class)->completeReferral($referralUuid, $encounterUuid, 'encounter');
+        (new \Tests\Support\ReferralExecutionHarness())->completeReferral($referralUuid, $encounterUuid, 'encounter');
     }
 
     public function test_referral_index_complete_requires_linked_encounter(): void
@@ -333,12 +384,14 @@ class ReferralExecutorPhase4Test extends TestCase
             'ehealth_inserted_at' => now(),
         ]);
 
-        $mockLifecycle = Mockery::mock(ReferralRequestLifecycleService::class);
-        $mockLifecycle->shouldReceive('completeReferral')
+        $mockLifecycle = Mockery::mock(PatientServiceRequestApi::class);
+        $mockLifecycle->shouldReceive('completeAndResolve')
             ->once()
-            ->with($referralUuid, $encounterUuid, 'encounter')
+            ->with($referralUuid, Mockery::on(static fn (array $payload): bool =>
+                data_get($payload, 'based_on.0.identifier.value') === $encounterUuid
+                && data_get($payload, 'based_on.0.identifier.type.coding.0.code') === 'encounter'))
             ->andReturn(['status' => 'completed']);
-        $this->instance(ReferralRequestLifecycleService::class, $mockLifecycle);
+        $this->instance(PatientServiceRequestApi::class, $mockLifecycle);
 
         Livewire::test(\App\Livewire\Referral\ReferralIndex::class, ['legalEntity' => $this->legalEntity])
             ->set('searchResults', [[
@@ -389,11 +442,11 @@ class ReferralExecutorPhase4Test extends TestCase
 
     public function test_mapper_includes_author_optional_fields(): void
     {
-        $mapper = new ServiceRequestMapper();
+        $mapper = app(ObjectMapperInterface::class);
         $authUuid = (string) Str::uuid();
         $conditionUuid = (string) Str::uuid();
 
-        $payload = $mapper->toPrequalifyPayload(
+        $payload = $mapper->map(ServiceRequestInput::fromArray(
             [
                 'service_id' => '59300-00',
                 'intent' => 'order',
@@ -411,13 +464,131 @@ class ReferralExecutorPhase4Test extends TestCase
                 'employee_uuid' => $this->employee->uuid,
                 'legal_entity_uuid' => $this->legalEntity->uuid,
                 'encounter_uuid' => (string) Str::uuid(),
-            ]
-        );
+            ],
+            CarbonImmutable::now(),
+        ), ServiceRequestPrequalifyData::class)->toArray();
 
         $sr = $payload['service_request'];
         $this->assertSame('Підготуватися натще', $sr['patient_instruction']);
         $this->assertSame(['auth_method_id' => $authUuid], $sr['inform_with']);
         $this->assertSame($conditionUuid, $sr['reason_reference'][0]['identifier']['value']);
         $this->assertSame('condition', $sr['reason_reference'][0]['identifier']['type']['coding'][0]['code']);
+    }
+
+    public function test_cancel_usage_returns_the_local_referral_to_active_after_ehealth_success(): void
+    {
+        $request = $this->executingReferral();
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('getData')->andReturn(['status' => 'active']);
+        $api = Mockery::mock(PatientServiceRequestApi::class);
+        $api->shouldReceive('cancelUsage')->once()->with($request->uuid, $this->person->uuid, ['explanatory_letter' => 'cancel'])->andReturn($response);
+        $this->instance(PatientServiceRequestApi::class, $api);
+
+        $result = (new \Tests\Support\ReferralExecutionHarness())->cancelReferralUsage($request->uuid, $this->person->uuid, ['explanatory_letter' => 'cancel']);
+
+        $this->assertSame(['status' => 'active'], $result);
+        $this->assertSame('active', $request->fresh()->status);
+    }
+
+    public function test_cancel_usage_keeps_local_status_when_ehealth_rejects_it(): void
+    {
+        $request = $this->executingReferral();
+        $api = Mockery::mock(PatientServiceRequestApi::class);
+        $api->shouldReceive('cancelUsage')->once()->andThrow(new EHealthValidationException(['error' => ['message' => 'denied']]));
+        $this->instance(PatientServiceRequestApi::class, $api);
+
+        try {
+            (new \Tests\Support\ReferralExecutionHarness())->cancelReferralUsage($request->uuid, $this->person->uuid);
+            $this->fail('Rejected cancellation must not persist success.');
+        } catch (EHealthValidationException) {
+            $this->assertSame('in_progress', $request->fresh()->status);
+        }
+    }
+
+    public function test_completion_missing_resource_stops_before_ehealth_and_persistence(): void
+    {
+        $request = $this->executingReferral();
+        $api = Mockery::mock(PatientServiceRequestApi::class);
+        $api->shouldNotReceive('completeAndResolve');
+        $this->instance(PatientServiceRequestApi::class, $api);
+
+        try {
+            (new \Tests\Support\ReferralExecutionHarness())->completeReferral($request->uuid, (string) Str::uuid());
+            $this->fail('A missing medical record must not complete a referral.');
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertSame(__('care-plan.referral_complete_emz_required'), $exception->getMessage());
+            $this->assertSame('in_progress', $request->fresh()->status);
+        }
+    }
+
+    private function executingReferral(): ServiceRequestRequest
+    {
+        return ServiceRequestRequest::create([
+            'uuid' => (string) Str::uuid(),
+            'employee_id' => $this->employee->id,
+            'person_id' => $this->person->id,
+            'status' => 'in_progress',
+            'service_id' => '37003-00',
+            'intent' => 'order',
+        ]);
+    }
+
+    public static function completionRecords(): iterable
+    {
+        foreach (['procedure', 'diagnostic_report'] as $type) {
+            yield $type.' same patient' => [$type, false];
+            yield $type.' another patient' => [$type, true];
+        }
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('completionRecords')]
+    public function test_completion_validates_the_patient_for_procedures_and_reports(string $type, bool $foreign): void
+    {
+        $request = $this->executingReferral();
+        $person = $foreign ? Person::create([
+            'uuid' => (string) Str::uuid(), 'birth_date' => '1990-01-01', 'gender' => 'MALE',
+            'patient_signed' => true, 'process_disclosure_data_consent' => true,
+        ]) : $this->person;
+        $uuid = $this->completionRecord($type, $person->id);
+        $api = Mockery::mock(PatientServiceRequestApi::class);
+        if ($foreign) {
+            $api->shouldNotReceive('completeAndResolve');
+        } else {
+            $api->shouldReceive('completeAndResolve')->once()->with($request->uuid, Mockery::on(static fn (array $payload): bool =>
+                data_get($payload, 'based_on.0.identifier.value') === $uuid
+                && data_get($payload, 'based_on.0.identifier.type.coding.0.code') === $type))->andReturn(['status' => 'completed']);
+        }
+        $this->instance(PatientServiceRequestApi::class, $api);
+
+        try {
+            $result = (new \Tests\Support\ReferralExecutionHarness())->completeReferral($request->uuid, $uuid, $type);
+            $this->assertFalse($foreign, 'Another patient cannot supply a completion record.');
+            $this->assertSame('completed', $result['status']);
+            $this->assertSame('completed', $request->fresh()->status);
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertTrue($foreign);
+            $this->assertSame(__('care-plan.referral_complete_emz_mismatch'), $exception->getMessage());
+            $this->assertSame('in_progress', $request->fresh()->status);
+        }
+    }
+
+    private function completionRecord(string $type, int $personId): string
+    {
+        $uuid = (string) Str::uuid();
+        $data = [
+            'uuid' => $uuid,
+            'person_id' => $personId,
+            'status' => $type === 'procedure' ? 'completed' : 'final',
+            'code_id' => Identifier::create(['value' => (string) Str::uuid()])->id,
+            'recorded_by_id' => Identifier::create(['value' => $this->employee->uuid])->id,
+            'managing_organization_id' => Identifier::create(['value' => $this->legalEntity->uuid])->id,
+            'primary_source' => true,
+        ];
+        if ($type === 'diagnostic_report') {
+            $data['issued'] = now();
+        }
+        \Illuminate\Support\Facades\DB::table($type === 'procedure' ? 'procedures' : 'diagnostic_reports')->insert($data);
+
+        return $uuid;
     }
 }

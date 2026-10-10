@@ -7,18 +7,47 @@ namespace Tests\Feature\CarePlan;
 use App\Classes\eHealth\Api\Approval;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
-use App\Models\Person\Person;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\Person\Person;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Livewire\Livewire;
-use Tests\TestCase;
-use Mockery;
-
 use Illuminate\Support\Str;
+use Livewire\Livewire;
+use Mockery;
+use Tests\TestCase;
 
 class CarePlanLifecycleTest extends TestCase
 {
     use DatabaseTransactions;
+    public function test_activity_edit_and_save_stay_scoped_to_the_current_care_plan(): void
+    {
+        $this->withoutVite();
+        $this->actingAs($this->user);
+        $attributes = [
+            'person_id' => $this->person->id,
+            'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id,
+            'status' => 'draft', 'title' => 'Scope test', 'period_start' => '2026-10-01',
+        ];
+        $current = CarePlan::create($attributes + ['uuid' => (string) Str::uuid()]);
+        $other = CarePlan::create($attributes + ['uuid' => (string) Str::uuid()]);
+        $foreign = CarePlanActivity::create([
+            'care_plan_id' => $other->id, 'author_id' => $this->employee->id,
+            'kind' => 'service_request', 'status' => 'draft', 'quantity' => 2,
+            'description' => 'Must remain unchanged',
+        ]);
+        $component = Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $current]);
+        $initialForm = $component->get('activityForm');
+        $component->call('editActivity', $foreign->id)->assertSet('activityForm', $initialForm);
+        foreach (['saveActivity', 'saveActivityAndSign'] as $action) {
+            Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $current])
+                ->set('activityForm.id', $foreign->id)
+                ->set('activityForm.description', 'Tampered')
+                ->call($action)
+                ->assertStatus(404);
+        }
+        $this->assertSame('Must remain unchanged', $foreign->fresh()->description);
+        $this->assertSame(2, $foreign->fresh()->quantity);
+    }
 
     protected function migrateDatabases()
     {
@@ -153,11 +182,11 @@ class CarePlanLifecycleTest extends TestCase
         $activityUuid = (string) Str::uuid();
         $approvalId = (string) Str::uuid(); // Use different ID for internal approval ID if needed
 
-        $mockCarePlanApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlan::class);
+        $mockCarePlanApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlan::class)->makePartial();
         $mockApprovalApi = Mockery::mock(\App\Classes\eHealth\Api\Approval::class);
         $mockPatientApi = Mockery::mock(\App\Classes\eHealth\Api\Person::class);
-        $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class);
-        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class)->makePartial();
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class)->makePartial();
         $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
 
         // Bind mocks to container
@@ -338,7 +367,7 @@ class CarePlanLifecycleTest extends TestCase
         $condition = \App\Models\MedicalEvents\Sql\Condition::first();
 
         // Bind mock APIs to satisfy dependencies
-        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class)->makePartial();
         $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
 
         $activityCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
@@ -365,6 +394,37 @@ class CarePlanLifecycleTest extends TestCase
         ]);
     }
 
+    public function test_repository_quantity_check_keeps_the_activity_row_lock_and_transaction_scope(): void
+    {
+        $plan = CarePlan::create([
+            'person_id' => $this->person->id, 'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->employee->legal_entity_id, 'status' => 'draft',
+            'title' => 'Quantity plan', 'period_start' => '2026-10-05',
+        ]);
+        $activity = CarePlanActivity::create(['care_plan_id' => $plan->id, 'author_id' => $this->employee->id, 'kind' => 'service_request', 'status' => 'draft', 'quantity' => 7]);
+        $initialLevel = \Illuminate\Support\Facades\DB::transactionLevel();
+        $queries = [];
+        \Illuminate\Support\Facades\DB::listen(static function ($query) use (&$queries): void {
+            $queries[] = $query->sql;
+        });
+        $result = app(\App\Repositories\CarePlanActivityRepository::class)->assertCanIssue($activity->id, 5, function (int $id) use ($activity, $initialLevel): float {
+            $this->assertSame($activity->id, $id);
+            $this->assertSame($initialLevel + 1, \Illuminate\Support\Facades\DB::transactionLevel());
+
+            return 2.0;
+        });
+        $this->assertSame($activity->id, $result->id);
+        $this->assertNotEmpty(array_filter($queries, static fn (string $sql): bool => str_contains(strtolower($sql), 'for update')));
+        $this->assertSame($initialLevel, \Illuminate\Support\Facades\DB::transactionLevel());
+        try {
+            app(\App\Repositories\CarePlanActivityRepository::class)->assertCanIssue($activity->id, 6, static fn (): float => 2.0);
+            $this->fail('Quantity above the remaining cap must fail.');
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertSame(__('care-plan.activity_issue_exceeds_remaining', ['remaining' => 5.0]), $exception->getMessage());
+        }
+        $this->assertSame($initialLevel, \Illuminate\Support\Facades\DB::transactionLevel());
+    }
+
     public function test_create_medication_activity_with_program_and_linked_grounds(): void
     {
         $this->actingAs($this->user);
@@ -381,7 +441,7 @@ class CarePlanLifecycleTest extends TestCase
 
         $condition = \App\Models\MedicalEvents\Sql\Condition::first();
 
-        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class)->makePartial();
         $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
 
         $activityCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
@@ -435,7 +495,7 @@ class CarePlanLifecycleTest extends TestCase
             'status' => 'draft',
         ]);
 
-        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class)->makePartial();
         $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
 
         $activityCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
@@ -493,7 +553,7 @@ class CarePlanLifecycleTest extends TestCase
             'status' => 'draft',
         ]);
 
-        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class)->makePartial();
         $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
 
         $activityCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
@@ -553,9 +613,9 @@ class CarePlanLifecycleTest extends TestCase
             'author_id' => $this->employee->id,
         ]);
 
-        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class)->makePartial();
         $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
-        $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class);
+        $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class)->makePartial();
 
         $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
         $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
@@ -621,10 +681,10 @@ class CarePlanLifecycleTest extends TestCase
         $this->actingAs($this->user);
         $carePlanUuid = (string) Str::uuid();
 
-        $mockCarePlanApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlan::class);
+        $mockCarePlanApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlan::class)->makePartial();
         $mockApprovalApi = Mockery::mock(\App\Classes\eHealth\Api\Approval::class);
         $mockPatientApi = Mockery::mock(\App\Classes\eHealth\Api\Person::class);
-        $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class);
+        $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class)->makePartial();
         $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
 
         $this->instance(\App\Classes\eHealth\Api\CarePlan::class, $mockCarePlanApi);
@@ -718,6 +778,12 @@ class CarePlanLifecycleTest extends TestCase
         $this->assertFalse(array_key_exists('instantiates_protocol', $capturedPayload));
         $this->assertStringNotContainsString('"instantiates_protocol"', json_encode($capturedPayload));
         $this->assertEquals('SMS', $capturedPayload['inform_with'] ?? null);
+        $this->assertSame($this->employee->uuid, $capturedPayload['author']['identifier']['value']);
+        $this->assertSame($this->encounter->uuid, $capturedPayload['encounter']['identifier']['value']);
+        $this->assertSame('PROVIDING_CONDITION', $capturedPayload['terms_of_service']['coding'][0]['code']);
+        foreach (['password', 'knedp', 'key_container_upload', 'patient', 'medical_number', 'co_authors'] as $key) {
+            $this->assertArrayNotHasKey($key, $capturedPayload);
+        }
 
         // Check signed Care Plan is in DB with all fields persisted locally
         $this->assertDatabaseHas('care_plans', [
@@ -763,6 +829,9 @@ class CarePlanLifecycleTest extends TestCase
         // Check payload did NOT contain instantiates_protocol
         $this->assertNotNull($capturedPayload);
         $this->assertFalse(array_key_exists('instantiates_protocol', $capturedPayload));
+        $this->assertSame('Signed Updated Plan', $capturedPayload['title']);
+        $this->assertSame('PROVIDING_CONDITION_SIGNED', $capturedPayload['terms_of_service']['coding'][0]['code']);
+        $this->assertSame($this->employee->uuid, $capturedPayload['author']['identifier']['value']);
 
         // Check updated Care Plan is in DB with all fields updated locally
         $this->assertDatabaseHas('care_plans', [
@@ -984,6 +1053,7 @@ class CarePlanLifecycleTest extends TestCase
         $devicesById = collect($devices)->keyBy('id');
 
         $this->mock(\App\Classes\eHealth\Api\DeviceDefinition::class, function ($mock) use ($response, $devicesById): void {
+            $mock->makePartial();
             $mock->shouldReceive('getMany')->andReturn($response);
             $mock->shouldReceive('getById')->andReturnUsing(function (string $id) use ($devicesById) {
                 $device = $devicesById->get($id);
@@ -1090,6 +1160,7 @@ class CarePlanLifecycleTest extends TestCase
         );
 
         $this->mock(\App\Classes\eHealth\Api\DeviceDefinition::class, function ($mock) use ($catalogResponse, $byIdResponse, $targetId): void {
+            $mock->makePartial();
             $mock->shouldReceive('getMany')->andReturn($catalogResponse);
             $mock->shouldReceive('getById')->with($targetId)->andReturn($byIdResponse);
         });
@@ -1151,6 +1222,7 @@ class CarePlanLifecycleTest extends TestCase
         );
 
         $this->mock(\App\Classes\eHealth\Api\DeviceDefinition::class, function ($mock) use ($response): void {
+            $mock->makePartial();
             $mock->shouldReceive('getMany')->andReturn($response);
             $mock->shouldReceive('getById')->andReturn($response);
         });
@@ -1213,6 +1285,7 @@ class CarePlanLifecycleTest extends TestCase
         );
 
         $this->mock(\App\Classes\eHealth\Api\DeviceDefinition::class, function ($mock) use ($emptyCatalog, $byIdResponse, $targetId): void {
+            $mock->makePartial();
             $mock->shouldReceive('getMany')->andReturn($emptyCatalog);
             $mock->shouldReceive('getById')->with($targetId)->andReturn($byIdResponse);
         });
@@ -1289,6 +1362,7 @@ class CarePlanLifecycleTest extends TestCase
         );
 
         $this->mock(\App\Classes\eHealth\Api\DeviceDefinition::class, function ($mock) use ($deviceResponse, $deviceUuid): void {
+            $mock->makePartial();
             $mock->shouldReceive('getById')->once()->with($deviceUuid)->andReturn($deviceResponse);
             $mock->shouldReceive('getMany')->never();
         });

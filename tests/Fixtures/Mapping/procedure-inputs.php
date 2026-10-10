@@ -1,0 +1,23 @@
+<?php
+
+declare(strict_types=1);
+$base = ['uuid' => 'procedure', 'status' => 'completed', 'codeValue' => 'service', 'categoryCode' => 'procedure', 'primarySource' => true, 'performerEmployeeId' => 'performer'];
+$full = $base + ['performedType' => 'date_time', 'performedDate' => '05.10.2026', 'performedTime' => '10:15', 'basedOnIdentifier' => 'referral', 'divisionId' => 'division', 'reasonReferences' => [9 => ['id' => 'condition', 'type' => 'condition'], 42 => ['id' => '', 'type' => 'observation']], 'outcomeCode' => 'success', 'note' => 'Примітка', 'usedCodes' => [9 => ['code' => '301'], 42 => ['code' => '301'], 78 => ['code' => '0']], 'usedReferences' => [9 => ['id' => 'equipment'], 42 => ['id' => 'equipment']], 'focalDevice' => [9 => ['manipulatedId' => 'device', 'actionCode' => 'implantation'], 42 => ['manipulatedId' => 'other-device']], 'complicationDetails' => [9 => ['id' => 'complication'], 42 => ['id' => 'complication']]];
+$stored = ['uuid' => 'procedure', 'status' => 'completed', 'category' => ['coding' => [['code' => 'procedure']]], 'code' => ['identifier' => ['value' => 'service']], 'primarySource' => true, 'performer' => [['identifier' => ['value' => 'performer']]], 'performedDateTime' => '05.10.2026 10:15', 'performedPeriodStartDate' => '04.10.2026', 'performedPeriodStartTime' => '09:00', 'performedPeriodEndDate' => '05.10.2026', 'performedPeriodEndTime' => '10:00', 'reasonReferences' => [9 => ['identifier' => ['value' => 'condition', 'type' => ['coding' => [['code' => 'condition']]]]]], 'usedCodes' => [42 => ['coding' => [['code' => '301']]]], 'usedReferences' => [9 => [], 42 => ['identifier' => ['value' => 'equipment']]], 'focalDevices' => [42 => ['manipulated' => ['identifier' => ['value' => 'device']], 'action' => ['coding' => [['code' => 'implantation']]]]], 'complicationDetails' => [9 => ['identifier' => ['value' => 'complication']]]];
+$period = array_replace($full, ['performedType' => 'period', 'performedPeriodStartDate' => '04.10.2026', 'performedPeriodStartTime' => '09:00', 'performedPeriodEndDate' => '05.10.2026', 'performedPeriodEndTime' => '10:00']);
+$paper = ['paperReferralRequesterLegalEntityEdrpou' => '12345678', 'paperReferralServiceRequestDate' => '04.10.2026', 'paperReferralRequisition' => 'paper', 'paperReferralNote' => null];
+
+return [
+ 'minimal' => ['outbound' => $base, 'inbound' => [], 'encounter' => null],
+ 'full encounter' => ['outbound' => $full, 'inbound' => $stored, 'encounter' => 'encounter'],
+ 'full standalone' => ['outbound' => $full, 'inbound' => $stored, 'encounter' => null],
+ 'period' => ['outbound' => $period, 'inbound' => ['performedPeriodStartDate' => '04.10.2026', 'performedPeriodStartTime' => '09:00', 'performedPeriodEndDate' => '05.10.2026', 'performedPeriodEndTime' => '10:00'], 'encounter' => 'encounter'],
+ 'not done' => ['outbound' => array_replace($period, ['status' => 'not_done']), 'inbound' => ['status' => 'not_done'], 'encounter' => 'encounter'],
+ 'entered in error' => ['outbound' => array_replace($full, ['status' => 'entered_in_error']), 'inbound' => ['status' => 'entered_in_error'], 'encounter' => 'encounter'],
+ 'reported origin' => ['outbound' => array_replace($base, ['primarySource' => false, 'reportOriginCode' => 'other', 'reportOriginText' => 'Опис']), 'inbound' => ['primarySource' => false, 'reportOrigin' => ['coding' => [['code' => 'other']], 'text' => 'Опис']], 'encounter' => null],
+ 'filtered empty lists retained' => ['outbound' => $base + ['reasonReferences' => [['id' => '', 'type' => 'condition']], 'usedCodes' => [['code' => '0']], 'usedReferences' => [['id' => '0']], 'complicationDetails' => [['id' => '0']], 'note' => '0'], 'inbound' => ['note' => false, 'usedReferences' => [['identifier' => ['value' => '0']]]], 'encounter' => 'encounter'],
+ 'missing vs null aliases' => ['outbound' => $base, 'inbound' => ['uuid' => null, 'status' => null, 'note' => null, 'primarySource' => null, 'performer' => ['identifier' => ['value' => 'fallback'], 0 => ['identifier' => ['value' => null]]], 'basedOn' => ['identifier' => ['value' => 'fallback']]], 'encounter' => null],
+ 'paper and electronic coexist' => ['outbound' => $full + $paper, 'inbound' => $stored + ['paperReferral' => ['requisition' => 'paper', 'serviceRequestDate' => '04.10.2026'], 'basedOn' => ['identifier' => ['value' => 'referral']]], 'encounter' => 'encounter'],
+ 'DST' => ['outbound' => array_replace($full, ['performedDate' => '25.10.2026', 'performedTime' => '04:15']), 'inbound' => ['performedDateTime' => '25.10.2026 04:15'], 'encounter' => 'encounter'],
+ 'unknown fields' => ['outbound' => $base + ['password' => 'synthetic', 'unknown' => 0], 'inbound' => $stored + ['unknown' => 0], 'encounter' => ''],
+];

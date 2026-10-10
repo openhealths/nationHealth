@@ -6,6 +6,8 @@ namespace App\Traits;
 
 use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
+use App\Dto\Encounter\EhealthCancellation as EncounterEhealthCancellation;
+
 use App\Exceptions\Cipher\CipherConnectionException;
 use App\Exceptions\Cipher\CipherException;
 use App\Exceptions\EHealth\EHealthConnectionException;
@@ -13,13 +15,13 @@ use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\Encounter\Forms\EncounterCancellationForm;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\Fhir;
-use App\Services\MedicalEvents\FhirResource;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\WithFileUploads;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 use Throwable;
 
 /**
@@ -29,6 +31,10 @@ use Throwable;
  */
 trait HandlesEncounterCancellation
 {
+    use \App\Livewire\Encounter\Concerns\BuildsEncounterPackage;
+
+    use \App\Livewire\Encounter\Concerns\LoadsEncounterPackage;
+
     // The signature modal takes the key container as an upload, so every page that cancels also handles files
     use WithFileUploads;
 
@@ -284,15 +290,7 @@ trait HandlesEncounterCancellation
             if ($selectedRecords === []) {
                 Repository::encounter()->markAsEnteredInError(
                     $encounter,
-                    FhirResource::make()
-                        ->coding('eHealth/cancellation_reasons', $validated['cancellationReason'])
-                        ->toCodeableConcept(
-                            data_get(
-                                $this->dictionaries,
-                                'eHealth/cancellation_reasons.' . $validated['cancellationReason'],
-                                ''
-                            )
-                        ),
+                    $package['encounter']['cancellation_reason'],
                     $validated['explanatoryLetter']
                 );
             } else {
@@ -353,12 +351,9 @@ trait HandlesEncounterCancellation
         string $cancellationReason,
         string $explanatoryLetter
     ): array {
-        return Fhir::encounter()->toCancellationPackage(
-            $this->rebuildEncounterPackage($encounter),
-            $cancellationReason,
-            $explanatoryLetter,
-            data_get($this->dictionaries, 'eHealth/cancellation_reasons.' . $cancellationReason)
-        );
+        return app(ObjectMapperInterface::class)->map(new Collection([
+            'cancellationReason' => $cancellationReason, 'explanatoryLetter' => $explanatoryLetter, 'cancellationReasonText' => data_get($this->dictionaries, 'eHealth/cancellation_reasons.'.$cancellationReason),
+        ]), new EncounterEhealthCancellation($this->rebuildEncounterPackage($encounter)))->toArray();
     }
 
     /**
@@ -377,14 +372,9 @@ trait HandlesEncounterCancellation
         string $cancellationReason,
         string $explanatoryLetter
     ): array {
-        return Fhir::encounter()->toRecordCancellationPackage(
-            $this->rebuildEncounterPackage($encounter),
-            $encounter->status->value,
-            $recordIds,
-            $cancellationReason,
-            $explanatoryLetter,
-            data_get($this->dictionaries, 'eHealth/cancellation_reasons.' . $cancellationReason)
-        );
+        return app(ObjectMapperInterface::class)->map(new Collection([
+            'cancellationReason' => $cancellationReason, 'explanatoryLetter' => $explanatoryLetter, 'cancellationReasonText' => data_get($this->dictionaries, 'eHealth/cancellation_reasons.'.$cancellationReason),
+        ]), new EncounterEhealthCancellation($this->rebuildEncounterPackage($encounter), $encounter->status->value, $recordIds))->toArray();
     }
 
     /**
@@ -406,7 +396,7 @@ trait HandlesEncounterCancellation
             'episode' => data_get($storedEncounter, 'episode.identifier.value')
         ];
 
-        return Fhir::encounterPackage()->toFhir(Fhir::encounterPackageLoader()->load($storedEncounter), $uuids);
+        return $this->mapEncounterPackage($this->loadEncounterPackage($storedEncounter), $uuids);
     }
 
     /**

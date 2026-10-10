@@ -347,6 +347,7 @@ return [
     'prequalify_passed' => 'PreQualify успішно пройдено. Можна створювати чернетку.',
     'draft_created_awaiting_signature' => 'Чернетку створено (ID: :id). Очікується підпис КЕП.',
     'draft_missing_identifier' => 'ЕСОЗ не повернула ідентифікатор чернетки. Спробуйте ще раз.',
+    'draft_missing_document' => 'ЕСОЗ не повернула документ чернетки для підпису. Спробуйте ще раз.',
     'draft_required_before_signing' => 'Спершу створіть чернетку.',
     'prescription_signed' => 'Рецепт підписано КЕП та передано до ЕСОЗ.',
     'device_request_signed' => 'Запит на медичний виріб підписано КЕП та передано до ЕСОЗ.',

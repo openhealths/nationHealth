@@ -17,6 +17,7 @@ return [
     'prequalify_passed' => 'PreQualify passed. You can create a draft.',
     'draft_created_awaiting_signature' => 'Draft created (ID: :id). Awaiting KEP signature.',
     'draft_missing_identifier' => 'eHealth did not return a draft identifier. Please try again.',
+    'draft_missing_document' => 'eHealth did not return the draft document for signing. Please try again.',
     'draft_required_before_signing' => 'Create a draft first.',
     'prescription_signed' => 'Prescription signed with KEP and submitted to eHealth.',
     'device_request_signed' => 'Device request signed with KEP and submitted to eHealth.',

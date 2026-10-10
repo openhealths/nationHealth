@@ -126,7 +126,7 @@ class PharmacyDispenseTest extends TestCase
             ]],
         ]);
 
-        $api = Mockery::mock(MedicationRequestApi::class);
+        $api = Mockery::mock(MedicationRequestApi::class)->makePartial();
         $api->shouldReceive('searchByPharmacy')->once()->andReturn($response);
         $this->app->instance(MedicationRequestApi::class, $api);
 
@@ -158,7 +158,7 @@ class PharmacyDispenseTest extends TestCase
             ]],
         ]);
 
-        $mrApi = Mockery::mock(MedicationRequestApi::class);
+        $mrApi = Mockery::mock(MedicationRequestApi::class)->makePartial();
         $mrApi->shouldReceive('searchByPharmacy')->andReturn($searchResponse);
         $mrApi->shouldReceive('post')->once()->andThrow(new RuntimeException('Qualify unavailable'));
         $this->app->instance(MedicationRequestApi::class, $mrApi);

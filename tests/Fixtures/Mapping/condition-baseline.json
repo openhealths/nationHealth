@@ -1,0 +1,294 @@
+{
+    "minimal": {
+        "json": "{\"id\":\"condition\",\"primarySource\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinicalStatus\":\"active\",\"verificationStatus\":\"confirmed\",\"onsetDate\":\"2026-10-05T07:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "signedJson": "{\"id\":\"condition\",\"primary_source\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinical_status\":\"active\",\"verification_status\":\"confirmed\",\"onset_date\":\"2026-10-05T07:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "form": {
+            "uuid": null,
+            "primarySource": null,
+            "codeSystem": null,
+            "codeCode": null,
+            "clinicalStatus": null,
+            "verificationStatus": null,
+            "onsetDate": "",
+            "onsetTime": "12:00",
+            "assertedDate": null,
+            "assertedTime": null,
+            "severityCode": "",
+            "bodySites": [],
+            "stageCode": "",
+            "asserterEmployeeId": "",
+            "asserterText": "",
+            "reportOriginCode": "",
+            "evidenceCodes": [],
+            "evidenceDetails": []
+        }
+    },
+    "full sparse": {
+        "json": "{\"id\":\"condition\",\"primarySource\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinicalStatus\":\"active\",\"verificationStatus\":\"confirmed\",\"onsetDate\":\"2026-10-05T07:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\\u041b\\u0456\\u043a\\u0430\\u0440\"},\"value\":\"asserter\"}}],\"severity\":{\"coding\":[{\"system\":\"eHealth\\\/condition_severities\",\"code\":\"severe\"}],\"text\":\"\"},\"bodySites\":[{\"coding\":[{\"system\":\"eHealth\\\/body_sites\",\"code\":\"arm\"}],\"text\":\"\"}],\"stage\":{\"summary\":{\"coding\":[{\"system\":\"eHealth\\\/condition_stages\",\"code\":\"stage\"}],\"text\":\"\"}},\"assertedDate\":\"2026-10-05T08:00:00Z\",\"evidences\":[{\"codes\":{\"9\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/reasons\",\"code\":\"A01\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"42\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"}},\"details\":{\"42\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"observation\"}],\"text\":\"\"},\"value\":\"evidence\"}}}}]}",
+        "signedJson": "{\"id\":\"condition\",\"primary_source\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinical_status\":\"active\",\"verification_status\":\"confirmed\",\"onset_date\":\"2026-10-05T07:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\\u041b\\u0456\\u043a\\u0430\\u0440\"},\"value\":\"asserter\"}}],\"severity\":{\"coding\":[{\"system\":\"eHealth\\\/condition_severities\",\"code\":\"severe\"}],\"text\":\"\"},\"body_sites\":[{\"coding\":[{\"system\":\"eHealth\\\/body_sites\",\"code\":\"arm\"}],\"text\":\"\"}],\"stage\":{\"summary\":{\"coding\":[{\"system\":\"eHealth\\\/condition_stages\",\"code\":\"stage\"}],\"text\":\"\"}},\"asserted_date\":\"2026-10-05T08:00:00Z\",\"evidences\":[{\"codes\":{\"9\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/reasons\",\"code\":\"A01\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"42\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"}},\"details\":{\"42\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"observation\"}],\"text\":\"\"},\"value\":\"evidence\"}}}}]}",
+        "form": {
+            "uuid": "condition",
+            "primarySource": true,
+            "codeSystem": "eHealth\/ICPC2\/condition_codes",
+            "codeCode": "D02",
+            "clinicalStatus": "active",
+            "verificationStatus": "confirmed",
+            "onsetDate": "05.10.2026",
+            "onsetTime": "10:15",
+            "assertedDate": "05.10.2026",
+            "assertedTime": "11:00",
+            "severityCode": "",
+            "bodySites": {
+                "42": {
+                    "code": "arm"
+                }
+            },
+            "stageCode": "",
+            "asserterEmployeeId": "asserter",
+            "asserterText": "Лікар",
+            "reportOriginCode": "",
+            "evidenceCodes": {
+                "9": {
+                    "code": "A01",
+                    "system": "eHealth\/ICPC2\/reasons"
+                }
+            },
+            "evidenceDetails": {
+                "42": {
+                    "id": "evidence",
+                    "ehealthInsertedAt": "date",
+                    "codeCode": "111",
+                    "type": "observation"
+                }
+            }
+        }
+    },
+    "external origin": {
+        "json": "{\"id\":\"condition\",\"primarySource\":false,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinicalStatus\":\"active\",\"verificationStatus\":\"confirmed\",\"onsetDate\":\"2026-10-05T07:15:00Z\",\"reportOrigin\":{\"coding\":[{\"system\":\"eHealth\\\/report_origins\",\"code\":\"other\"}],\"text\":\"\"}}",
+        "signedJson": "{\"id\":\"condition\",\"primary_source\":false,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinical_status\":\"active\",\"verification_status\":\"confirmed\",\"onset_date\":\"2026-10-05T07:15:00Z\",\"report_origin\":{\"coding\":[{\"system\":\"eHealth\\\/report_origins\",\"code\":\"other\"}],\"text\":\"\"}}",
+        "form": {
+            "uuid": null,
+            "primarySource": false,
+            "codeSystem": null,
+            "codeCode": null,
+            "clinicalStatus": null,
+            "verificationStatus": null,
+            "onsetDate": "",
+            "onsetTime": "12:00",
+            "assertedDate": null,
+            "assertedTime": null,
+            "severityCode": "",
+            "bodySites": [],
+            "stageCode": "",
+            "asserterEmployeeId": "",
+            "asserterText": "",
+            "reportOriginCode": "other",
+            "evidenceCodes": [],
+            "evidenceDetails": []
+        }
+    },
+    "asserter missing fallback": {
+        "json": "{\"id\":\"condition\",\"primarySource\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinicalStatus\":\"active\",\"verificationStatus\":\"confirmed\",\"onsetDate\":\"2026-10-05T07:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "signedJson": "{\"id\":\"condition\",\"primary_source\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinical_status\":\"active\",\"verification_status\":\"confirmed\",\"onset_date\":\"2026-10-05T07:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "form": {
+            "uuid": null,
+            "primarySource": null,
+            "codeSystem": null,
+            "codeCode": null,
+            "clinicalStatus": null,
+            "verificationStatus": null,
+            "onsetDate": "",
+            "onsetTime": "12:00",
+            "assertedDate": null,
+            "assertedTime": null,
+            "severityCode": "",
+            "bodySites": [],
+            "stageCode": "",
+            "asserterEmployeeId": "employee",
+            "asserterText": "Fallback",
+            "reportOriginCode": "",
+            "evidenceCodes": [],
+            "evidenceDetails": []
+        }
+    },
+    "asserter null fallback": {
+        "json": "{\"id\":\"condition\",\"primarySource\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinicalStatus\":\"active\",\"verificationStatus\":\"confirmed\",\"onsetDate\":\"2026-10-05T07:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "signedJson": "{\"id\":\"condition\",\"primary_source\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinical_status\":\"active\",\"verification_status\":\"confirmed\",\"onset_date\":\"2026-10-05T07:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "form": {
+            "uuid": null,
+            "primarySource": null,
+            "codeSystem": null,
+            "codeCode": null,
+            "clinicalStatus": null,
+            "verificationStatus": null,
+            "onsetDate": "",
+            "onsetTime": "12:00",
+            "assertedDate": null,
+            "assertedTime": null,
+            "severityCode": "",
+            "bodySites": [],
+            "stageCode": "",
+            "asserterEmployeeId": null,
+            "asserterText": null,
+            "reportOriginCode": "",
+            "evidenceCodes": [],
+            "evidenceDetails": []
+        }
+    },
+    "empty filtered body sites": {
+        "json": "{\"id\":\"condition\",\"primarySource\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinicalStatus\":\"active\",\"verificationStatus\":\"confirmed\",\"onsetDate\":\"2026-10-05T07:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "signedJson": "{\"id\":\"condition\",\"primary_source\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinical_status\":\"active\",\"verification_status\":\"confirmed\",\"onset_date\":\"2026-10-05T07:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "form": {
+            "uuid": null,
+            "primarySource": null,
+            "codeSystem": null,
+            "codeCode": null,
+            "clinicalStatus": null,
+            "verificationStatus": null,
+            "onsetDate": "",
+            "onsetTime": "12:00",
+            "assertedDate": null,
+            "assertedTime": null,
+            "severityCode": "",
+            "bodySites": {
+                "42": {
+                    "code": ""
+                }
+            },
+            "stageCode": "",
+            "asserterEmployeeId": "",
+            "asserterText": "",
+            "reportOriginCode": "",
+            "evidenceCodes": [],
+            "evidenceDetails": []
+        }
+    },
+    "explicit scalar null": {
+        "json": "{\"id\":\"condition\",\"primarySource\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinicalStatus\":\"active\",\"verificationStatus\":\"confirmed\",\"onsetDate\":\"2026-10-05T07:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "signedJson": "{\"id\":\"condition\",\"primary_source\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinical_status\":\"active\",\"verification_status\":\"confirmed\",\"onset_date\":\"2026-10-05T07:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "form": {
+            "uuid": null,
+            "primarySource": null,
+            "codeSystem": null,
+            "codeCode": null,
+            "clinicalStatus": null,
+            "verificationStatus": null,
+            "onsetDate": "",
+            "onsetTime": "12:00",
+            "assertedDate": null,
+            "assertedTime": null,
+            "severityCode": null,
+            "bodySites": [],
+            "stageCode": "",
+            "asserterEmployeeId": "",
+            "asserterText": "",
+            "reportOriginCode": "",
+            "evidenceCodes": [],
+            "evidenceDetails": []
+        }
+    },
+    "incomplete asserted time": {
+        "json": "{\"id\":\"condition\",\"primarySource\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinicalStatus\":\"active\",\"verificationStatus\":\"confirmed\",\"onsetDate\":\"2026-10-05T07:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "signedJson": "{\"id\":\"condition\",\"primary_source\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinical_status\":\"active\",\"verification_status\":\"confirmed\",\"onset_date\":\"2026-10-05T07:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "form": {
+            "uuid": "condition",
+            "primarySource": true,
+            "codeSystem": "eHealth\/ICPC2\/condition_codes",
+            "codeCode": "D02",
+            "clinicalStatus": "active",
+            "verificationStatus": "confirmed",
+            "onsetDate": "05.10.2026",
+            "onsetTime": "10:15",
+            "assertedDate": "05.10.2026",
+            "assertedTime": "11:00",
+            "severityCode": "",
+            "bodySites": {
+                "42": {
+                    "code": "arm"
+                }
+            },
+            "stageCode": "",
+            "asserterEmployeeId": "asserter",
+            "asserterText": "Лікар",
+            "reportOriginCode": "",
+            "evidenceCodes": {
+                "9": {
+                    "code": "A01",
+                    "system": "eHealth\/ICPC2\/reasons"
+                }
+            },
+            "evidenceDetails": {
+                "42": {
+                    "id": "evidence",
+                    "ehealthInsertedAt": "date",
+                    "codeCode": "111",
+                    "type": "observation"
+                }
+            }
+        }
+    },
+    "false-like optional values": {
+        "json": "{\"id\":\"condition\",\"primarySource\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinicalStatus\":\"active\",\"verificationStatus\":\"confirmed\",\"onsetDate\":\"2026-10-05T07:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "signedJson": "{\"id\":\"condition\",\"primary_source\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinical_status\":\"active\",\"verification_status\":\"confirmed\",\"onset_date\":\"2026-10-05T07:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}}]}",
+        "form": {
+            "uuid": null,
+            "primarySource": null,
+            "codeSystem": null,
+            "codeCode": null,
+            "clinicalStatus": null,
+            "verificationStatus": null,
+            "onsetDate": "",
+            "onsetTime": "12:00",
+            "assertedDate": null,
+            "assertedTime": null,
+            "severityCode": "",
+            "bodySites": [],
+            "stageCode": "",
+            "asserterEmployeeId": "",
+            "asserterText": "",
+            "reportOriginCode": "",
+            "evidenceCodes": [],
+            "evidenceDetails": []
+        }
+    },
+    "DST": {
+        "json": "{\"id\":\"condition\",\"primarySource\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinicalStatus\":\"active\",\"verificationStatus\":\"confirmed\",\"onsetDate\":\"2026-10-25T02:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\\u041b\\u0456\\u043a\\u0430\\u0440\"},\"value\":\"asserter\"}}],\"severity\":{\"coding\":[{\"system\":\"eHealth\\\/condition_severities\",\"code\":\"severe\"}],\"text\":\"\"},\"bodySites\":[{\"coding\":[{\"system\":\"eHealth\\\/body_sites\",\"code\":\"arm\"}],\"text\":\"\"}],\"stage\":{\"summary\":{\"coding\":[{\"system\":\"eHealth\\\/condition_stages\",\"code\":\"stage\"}],\"text\":\"\"}},\"assertedDate\":\"2026-10-05T08:00:00Z\",\"evidences\":[{\"codes\":{\"9\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/reasons\",\"code\":\"A01\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"42\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"}},\"details\":{\"42\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"observation\"}],\"text\":\"\"},\"value\":\"evidence\"}}}}]}",
+        "signedJson": "{\"id\":\"condition\",\"primary_source\":true,\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"code\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"},\"clinical_status\":\"active\",\"verification_status\":\"confirmed\",\"onset_date\":\"2026-10-25T02:15:00Z\",\"asserter\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\\u041b\\u0456\\u043a\\u0430\\u0440\"},\"value\":\"asserter\"}}],\"severity\":{\"coding\":[{\"system\":\"eHealth\\\/condition_severities\",\"code\":\"severe\"}],\"text\":\"\"},\"body_sites\":[{\"coding\":[{\"system\":\"eHealth\\\/body_sites\",\"code\":\"arm\"}],\"text\":\"\"}],\"stage\":{\"summary\":{\"coding\":[{\"system\":\"eHealth\\\/condition_stages\",\"code\":\"stage\"}],\"text\":\"\"}},\"asserted_date\":\"2026-10-05T08:00:00Z\",\"evidences\":[{\"codes\":{\"9\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/reasons\",\"code\":\"A01\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"42\":{\"coding\":[{\"system\":\"eHealth\\\/ICPC2\\\/condition_codes\",\"code\":\"D02\"}],\"text\":\"\"}},\"details\":{\"42\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"observation\"}],\"text\":\"\"},\"value\":\"evidence\"}}}}]}",
+        "form": {
+            "uuid": "condition",
+            "primarySource": true,
+            "codeSystem": "eHealth\/ICPC2\/condition_codes",
+            "codeCode": "D02",
+            "clinicalStatus": "active",
+            "verificationStatus": "confirmed",
+            "onsetDate": "05.10.2026",
+            "onsetTime": "10:15",
+            "assertedDate": "05.10.2026",
+            "assertedTime": "11:00",
+            "severityCode": "",
+            "bodySites": {
+                "42": {
+                    "code": "arm"
+                }
+            },
+            "stageCode": "",
+            "asserterEmployeeId": "asserter",
+            "asserterText": "Лікар",
+            "reportOriginCode": "",
+            "evidenceCodes": {
+                "9": {
+                    "code": "A01",
+                    "system": "eHealth\/ICPC2\/reasons"
+                }
+            },
+            "evidenceDetails": {
+                "42": {
+                    "id": "evidence",
+                    "ehealthInsertedAt": "date",
+                    "codeCode": "111",
+                    "type": "observation"
+                }
+            }
+        }
+    }
+}

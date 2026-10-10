@@ -6,12 +6,15 @@ namespace App\Livewire\DeviceRequest;
 
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\LegalEntity;
-use App\Services\MedicalEvents\DeviceRequestLifecycleService;
+use App\Classes\eHealth\Api\DeviceRequest as DeviceRequestApi;
+use App\Dto\DeviceRequest\EhealthDraft;
+use App\Dto\DeviceRequest\EhealthDraftPrequalify;
 use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 
 class DeviceRequestForm extends Component
 {
@@ -53,17 +56,13 @@ class DeviceRequestForm extends Component
         'quantity' => 'required|numeric|min:1',
     ];
 
-    public function preQualify(DeviceRequestLifecycleService $service): void
+    public function preQualify(): void
     {
         $this->validate();
 
         try {
-            $service->preQualify([
-                'person_id' => $this->patientId,
-                'programs' => [
-                    ['id' => $this->medicalProgram],
-                ],
-            ]);
+            $payload = app(ObjectMapperInterface::class)->map($this, EhealthDraftPrequalify::class)->toArray();
+            app(DeviceRequestApi::class)->prequalifyAndValidate($payload);
 
             $this->statusMessage = __('care-plan.prequalify_passed');
         } catch (EHealthValidationException $e) {
@@ -73,24 +72,13 @@ class DeviceRequestForm extends Component
         }
     }
 
-    public function createDraft(DeviceRequestLifecycleService $service): void
+    public function createDraft(): void
     {
         $this->validate();
 
         try {
-            $response = $service->createDraft([
-                'person_id' => $this->patientId,
-                'program' => $this->medicalProgram,
-                'code' => [
-                    'coding' => [
-                        [
-                            'system' => 'eHealth/SNOMED',
-                            'code' => $this->deviceType,
-                        ],
-                    ],
-                ],
-                'quantity' => (int) $this->quantity,
-            ]);
+            $payload = app(ObjectMapperInterface::class)->map($this, EhealthDraft::class)->toArray();
+            $created = app(DeviceRequestApi::class)->createAndResolve($payload);
         } catch (EHealthValidationException $e) {
             $this->failWith($e->getFormattedMessage());
 
@@ -101,7 +89,8 @@ class DeviceRequestForm extends Component
             return;
         }
 
-        $draftId = $response['id'] ?? ($response['device_request_request']['id'] ?? null);
+        $draftId = $created->uuid();
+        $draftContent = $created->document();
 
         if (!is_string($draftId) || $draftId === '') {
             Log::channel('e_health_errors')->error('Device request draft created without an identifier', [
@@ -112,9 +101,15 @@ class DeviceRequestForm extends Component
             return;
         }
 
+        if ($draftContent === []) {
+            $this->failWith(__('care-plan.draft_missing_document'));
+
+            return;
+        }
+
         $this->isDraftCreated = true;
         $this->draftId = $draftId;
-        $this->draftContent = $response['device_request_request'] ?? $response;
+        $this->draftContent = $draftContent;
 
         $this->statusMessage = __('care-plan.draft_created_awaiting_signature', ['id' => $draftId]);
     }
@@ -130,7 +125,7 @@ class DeviceRequestForm extends Component
         $this->showSignatureModal = true;
     }
 
-    public function sign(DeviceRequestLifecycleService $service): void
+    public function sign(): void
     {
         if (!$this->isDraftCreated || $this->draftId === null) {
             $this->failWith(__('care-plan.draft_required_before_signing'));
@@ -154,7 +149,7 @@ class DeviceRequestForm extends Component
                 (string) Auth::user()?->party?->taxId
             );
 
-            $service->sign($this->draftId, [
+            app(DeviceRequestApi::class)->signAndResolve($this->draftId, [
                 'signed_device_request_request' => $signedContent,
                 'signed_content_encoding' => 'base64',
             ]);
