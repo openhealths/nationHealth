@@ -136,7 +136,7 @@ abstract class EHealthJob implements ShouldQueue
         if ($response?->isNotLast()) {
             echo "Scheduling next page job: " . static::BATCH_NAME . " Page: " . $this->page . " Next Page: " . ($this->page + 1) . PHP_EOL;
             $this->batch()
-                ?->add(new static(legalEntity: $this->legalEntity, page: $this->page + 1, isFirstLogin: $this->isFirstLogin, nextEntity: $this->nextEntity, standalone: $this->standalone)
+                ?->add($this->getNextPageJob()
                     ->delay(now()->addSeconds(self::RATE_LIMIT_DELAY)));
 
             return;
@@ -167,6 +167,11 @@ abstract class EHealthJob implements ShouldQueue
                 ->onQueue('sync')
                 ->dispatch();
         }
+    }
+
+    protected function getNextPageJob(): EHealthJob
+    {
+        return new static(legalEntity: $this->legalEntity, page: $this->page + 1, isFirstLogin: $this->isFirstLogin, nextEntity: $this->nextEntity, standalone: $this->standalone);
     }
 
     // Handle job failure

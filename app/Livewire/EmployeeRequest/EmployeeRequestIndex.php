@@ -144,7 +144,7 @@ class EmployeeRequestIndex extends EmployeeComponent
         Log::info("[SyncOne] Started for Request ID: {$requestId}");
 
         $localRequest = EmployeeRequest::with(['revision', 'employee', 'party', 'division'])
-            ->where('legal_entity_id', legalEntity()->id)
+            ->whereLegalEntityId(legalEntity()->id)
             ->find($requestId);
 
         if (!$localRequest) {
@@ -261,18 +261,19 @@ class EmployeeRequestIndex extends EmployeeComponent
 
         // 2. Process Page 1 immediately
         $validatedData = $response->validate();
-        $processor->processBatch($validatedData, legalEntity());
+        $requestUuids = $processor->processBatch($validatedData, legalEntity());
+        $detailsSync = new EmployeeRequestsSyncAll($this->legalEntity);
         // Store result for dispatched jobs
         $batch = null;
 
         // 3. Check if there are more pages
         if ($response->isNotLast()) {
             $batch = Bus::batch([
-                new EmployeeRequestsSyncAll(
+                $detailsSync->getRequestDetailsChain(new EmployeeRequestsSyncAll(
                     legalEntity: $this->legalEntity,
                     page: 2,
                     nextEntity: null
-                ),
+                ), $requestUuids),
             ])
                 ->withOption('legal_entity_id', $this->legalEntity->id)
                 ->withOption('token', Crypt::encryptString($token))
@@ -287,7 +288,7 @@ class EmployeeRequestIndex extends EmployeeComponent
                 ->name(self::BATCH_NAME)
                 ->dispatch();
         } else {
-            $batch = Bus::batch($this->getEmployeeRequestDetailsStartJob($this->legalEntity, null))
+            $batch = Bus::batch(array_filter([$detailsSync->getRequestDetailsChain(null, $requestUuids)]))
                 ->withOption('legal_entity_id', $this->legalEntity->id)
                 ->withOption('token', Crypt::encryptString($token))
                 ->withOption('user', $user)
@@ -366,7 +367,9 @@ class EmployeeRequestIndex extends EmployeeComponent
     {
         return EmployeeRequest::query()
             ->with(['party', 'division', 'revision'])
-            ->where('legal_entity_id', legalEntity()->id)
+            ->whereLegalEntityId(legalEntity()->id)
+            ->where(fn ($query) => $query->whereNull('legal_entity_uuid')
+                ->orWhere('legal_entity_uuid', legalEntity()->uuid))
             ->whereHas('revision')
             ->when($this->search, fn ($query) => $query->searchByFullName($this->search))
             ->when($this->status !== '', function ($query) {
