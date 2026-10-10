@@ -34,6 +34,13 @@ return [
     'choose_time' => 'Оберіть час',
     'comment_non_working_hours' => 'Коментар до неробочого часу',
     'non_working_hours' => 'Неробочий час №',
+    'not_available_attributes' => [
+        'start_date' => 'дата початку неробочого часу №:position',
+        'start_time' => 'час початку неробочого часу №:position',
+        'end_date' => 'дата кінця неробочого часу №:position',
+        'end_time' => 'час кінця неробочого часу №:position',
+        'description' => 'коментар до неробочого часу №:position'
+    ],
     'service_search' => 'Пошук',
 
      // modals
@@ -96,6 +103,7 @@ return [
         ],
         'not_available' => [
             'end_after_start' => 'Кінець неробочого часу має бути пізніше за початок.',
+            'end_date_after_start_date' => 'Дата кінця неробочого часу №:position не може бути раніше за дату початку.',
         ],
     ],
 ];

@@ -100,7 +100,13 @@ class HealthcareServiceForm extends Form
         $typeDictionary = "HEALTHCARE_SERVICE_{$categoryCode}_TYPES";
 
         return array_merge([
-            'divisionId' => ['required', 'uuid', Rule::exists('divisions', 'uuid')->where('status', Status::ACTIVE)],
+            'divisionId' => [
+                'required',
+                'uuid',
+                Rule::exists('divisions', 'uuid')
+                    ->where('id', $this->getComponent()->divisionId)
+                    ->where('status', Status::ACTIVE)
+            ],
             'category' => ['array', 'required'],
             'category.coding.*.system' => ['required', 'string', Rule::in('HEALTHCARE_SERVICE_CATEGORIES')],
             'category.coding.*.code' => [
@@ -195,11 +201,11 @@ class HealthcareServiceForm extends Form
             'divisionId' => __('forms.division_name'),
             'availableTime.*.availableStartTime' => mb_strtolower(__('forms.start_time')),
             'availableTime.*.availableEndTime' => mb_strtolower(__('forms.end')),
-            'notAvailable.*.during.startDate' => mb_strtolower(__('forms.date')),
-            'notAvailable.*.during.startTime' => mb_strtolower(__('healthcare-services.start_non_working_time')),
-            'notAvailable.*.during.endDate' => mb_strtolower(__('forms.date')),
-            'notAvailable.*.during.endTime' => mb_strtolower(__('healthcare-services.end_non_working_time')),
-            'notAvailable.*.description' => mb_strtolower(__('healthcare-services.comment_non_working_hours')),
+            'notAvailable.*.during.startDate' => __('healthcare-services.not_available_attributes.start_date'),
+            'notAvailable.*.during.startTime' => __('healthcare-services.not_available_attributes.start_time'),
+            'notAvailable.*.during.endDate' => __('healthcare-services.not_available_attributes.end_date'),
+            'notAvailable.*.during.endTime' => __('healthcare-services.not_available_attributes.end_time'),
+            'notAvailable.*.description' => __('healthcare-services.not_available_attributes.description'),
         ];
     }
 
@@ -219,43 +225,36 @@ class HealthcareServiceForm extends Form
             'type.coding.*.code.prohibited' => __('healthcare-services.validation.type_coding.prohibited_unless'),
             'licenseId.required' => __('healthcare-services.validation.license_id.required_if'),
             'licenseId.prohibited' => __('healthcare-services.validation.license_id.prohibited_if'),
+            'notAvailable.*.during.endDate.after_or_equal' => __('healthcare-services.validation.not_available.end_date_after_start_date')
         ];
     }
 
     /**
      * Do form's validation (correctness of filling the form fields)
      *
-     * @return array
+     * @return void
      * @throws ValidationException
      */
-    public function doValidation(): array
+    public function doValidation(): void
     {
-        $validated = $this->validate();
+        $this->validate();
 
         $this->validateNotAvailablePeriods();
 
         $this->validateConstraint();
-
-        if (empty($validated['type']['coding'][0]['code'])) {
-            unset($validated['type']);
-        }
-
-        return $validated;
     }
 
     /**
      * Do validation for the update flow (mutable fields only).
      *
-     * @return array
+     * @return void
      * @throws ValidationException
      */
-    public function doUpdateValidation(): array
+    public function doUpdateValidation(): void
     {
-        $validated = $this->validate($this->rulesForUpdating());
+        $this->validate($this->rulesForUpdating());
 
         $this->validateNotAvailablePeriods();
-
-        return $validated;
     }
 
     /**
@@ -284,32 +283,6 @@ class HealthcareServiceForm extends Form
                 ]);
             }
         }
-    }
-
-    /**
-     * Convert date to ISO 8601 and format to snake case.
-     */
-    public function formatForApi(array $data): array
-    {
-        // format notAvailable
-        if (isset($data['notAvailable'])) {
-            $data['notAvailable'] = collect($data['notAvailable'])
-                ->map(static function (array $item) {
-                    if (isset($item['during'])) {
-                        $during = $item['during'];
-
-                        $item['during'] = [
-                            'start' => convertToEHealthISO8601("{$during['startDate']} {$during['startTime']}"),
-                            'end' => convertToEHealthISO8601("{$during['endDate']} {$during['endTime']}")
-                        ];
-                    }
-
-                    return $item;
-                })
-                ->all();
-        }
-
-        return removeEmptyKeys(Arr::toSnakeCase($data));
     }
 
     /**

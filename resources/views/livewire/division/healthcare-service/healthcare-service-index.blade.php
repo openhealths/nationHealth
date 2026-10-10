@@ -52,6 +52,7 @@
                                 </div>
                                 <input
                                     type="text"
+                                    name="divisionSearch"
                                     x-model="search"
                                     placeholder="{{ __('forms.search') }}..."
                                     class="block w-full rounded-md border border-gray-200 bg-white py-1.5 pr-3 pl-8 text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"

@@ -6,6 +6,8 @@ namespace App\Livewire\Division\HealthcareService;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Dto\HealthcareService\Ehealth as EhealthData;
+use App\Dto\HealthcareService\Model as HealthcareServiceData;
 use App\Livewire\Division\Forms\HealthcareServiceForm as Form;
 use App\Models\Division;
 use App\Models\HealthcareService;
@@ -17,6 +19,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
@@ -34,14 +37,17 @@ class HealthcareServiceUpdate extends Component
      *
      * @var bool
      */
+    #[Locked]
     public bool $canUpdate;
 
     public bool $working = true;
 
     public bool $isDisabled = false;
 
+    #[Locked]
     public int $healthcareServiceId;
 
+    #[Locked]
     public string $healthcareServiceUuid;
 
     public function mount(LegalEntity $legalEntity, Division $division, HealthcareService $healthcareService): void
@@ -67,7 +73,7 @@ class HealthcareServiceUpdate extends Component
         }
 
         try {
-            $validated = $this->form->doUpdateValidation();
+            $this->form->doUpdateValidation();
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
@@ -75,11 +81,14 @@ class HealthcareServiceUpdate extends Component
             return;
         }
 
+        $healthcareServiceEhealthMapped = EhealthData::fromForm($this->form)->toArray();
+
         try {
-            // The API format drops empty values, while for a PATCH they are exactly what clears the field
+            // Only mutable fields are sent; the API format drops empty values, while for a PATCH they are exactly what clears the field
             $response = EHealth::healthcareService()->update(
                 $this->healthcareServiceUuid,
-                $this->form->formatForApi($validated) + ['comment' => null, 'available_time' => [], 'not_available' => []]
+                Arr::only($healthcareServiceEhealthMapped, ['comment', 'available_time', 'not_available'])
+                    + ['comment' => null, 'available_time' => [], 'not_available' => []]
             );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when updating a healthcare service');
@@ -88,14 +97,13 @@ class HealthcareServiceUpdate extends Component
         }
 
         try {
-            $validated = $response->validate();
+            $healthcareServiceData = HealthcareServiceData::fromSource($response->validate());
 
-            // A cleared field may be missing from the response, so it has to be nulled locally on its own
-            $validated = Arr::only($validated, ['comment', 'coverage_area', 'available_time', 'not_available', 'ehealth_updated_at', 'ehealth_updated_by'])
-                + ['comment' => null, 'available_time' => [], 'not_available' => []];
-            $validated['id'] = $this->healthcareServiceId;
-
-            Repository::healthcareService()->update($validated, false);
+            Repository::healthcareService()->saveMapped(
+                $healthcareServiceData,
+                HealthcareService::findOrFail($this->healthcareServiceId),
+                legalEntity()
+            );
 
             Session::flash('success', __('healthcare-services.success.updated'));
             $this->redirectRoute('healthcare-service.index', [legalEntity()], navigate: true);

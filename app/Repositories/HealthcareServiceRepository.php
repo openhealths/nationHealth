@@ -4,75 +4,58 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Classes\eHealth\Api\Responses\HealthcareServiceResponse;
 use App\Repositories\MedicalEvents\Repository;
 use App\Models\HealthcareService;
-use Carbon\Carbon;
-use Illuminate\Support\Arr;
+use App\Models\LegalEntity;
+use App\Dto\HealthcareService\Model as HealthcareServiceData;
 use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
 use Throwable;
 
 class HealthcareServiceRepository
 {
     /**
-     * Store data after successful creating in EHealth.
+     * Save a mapped healthcare service with its category and type, creating or updating them.
      *
-     * @param  array  $data
+     * @param  HealthcareServiceData  $data
+     * @param  HealthcareService  $healthcareService
+     * @param  LegalEntity  $legalEntity
      * @return HealthcareService
      * @throws Throwable
      */
-    public function store(array $data): HealthcareService
-    {
-        return DB::transaction(function () use ($data) {
-            $data = $this->storeCategoryAndType($data);
+    public function saveMapped(
+        HealthcareServiceData $data,
+        HealthcareService $healthcareService,
+        LegalEntity $legalEntity
+    ): HealthcareService {
+        return DB::transaction(static function () use ($data, $healthcareService, $legalEntity): HealthcareService {
+            $data->toModel($healthcareService);
+            $healthcareService->legalEntity()->associate($legalEntity);
 
-            return HealthcareService::create($data);
-        });
-    }
-
-    /**
-     * Update existed record with EHealth data.
-     *
-     * @param  array  $data
-     * @param  bool  $updateCategoryAndType
-     * @return HealthcareService
-     * @throws Throwable
-     */
-    public function update(array $data, bool $updateCategoryAndType = true): HealthcareService
-    {
-        return DB::transaction(function () use ($data, $updateCategoryAndType) {
-            if (empty($data['id'])) {
-                throw new InvalidArgumentException('HealthcareService ID is required for update.');
-            }
-
-            $id = $data['id'];
-            unset($data['id']); // remove, to avoid updating it
-
-            if ($updateCategoryAndType) {
-                $service = HealthcareService::with(['category.coding', 'type.coding'])->findOrFail($id);
-
-                $data = $this->updateCategoryAndType($service, $data);
+            if ($healthcareService->category) {
+                Repository::codeableConcept()->update($healthcareService->category, $data->category);
             } else {
-                $service = HealthcareService::findOrFail($id);
+                $healthcareService->category()->associate(Repository::codeableConcept()->store($data->category));
             }
 
-            $service->update($data);
+            $removedType = null;
+            if ($data->type && $healthcareService->type) {
+                Repository::codeableConcept()->update($healthcareService->type, $data->type);
+            } elseif ($data->type) {
+                $healthcareService->type()->associate(Repository::codeableConcept()->store($data->type));
+            } elseif ($healthcareService->type) {
+                $removedType = $healthcareService->type;
+                $healthcareService->type()->dissociate();
+            }
 
-            return $service;
+            $healthcareService->saveOrFail();
+
+            if ($removedType) {
+                Repository::codeableConcept()->delete($removedType);
+            }
+
+            return $healthcareService;
         });
-    }
-
-    /**
-     * Update healthcare service data after activation/deactivation.
-     *
-     * @param  string  $uuid
-     * @param  array  $data
-     * @return void
-     */
-    public function updateStatus(string $uuid, array $data): void
-    {
-        $forUpdate = Arr::only($data, ['status', 'ehealth_updated_at', 'ehealth_updated_by']);
-        HealthcareService::whereUuid($uuid)->update($forUpdate);
     }
 
     /**
@@ -92,117 +75,31 @@ class HealthcareServiceRepository
                 ->get(['uuid', 'category_id', 'type_id'])
                 ->keyBy('uuid');
 
-            $prepared = collect($items)->map(function (array $item) use ($existingConceptIds) {
-                $existing = $existingConceptIds->get($item['uuid']);
+            $prepared = collect($items)->map(static function (array $item) use ($existingConceptIds): array {
+                $data = HealthcareServiceData::fromSource(new HealthcareServiceResponse($item));
+                $existing = $existingConceptIds->get($data->uuid);
 
-                // Sync category
-                $categoryConcept = $item['category'] ?? null;
-                if ($categoryConcept) {
-                    if ($existing && $existing->categoryId) {
-                        $item['category_id'] = Repository::codeableConcept()->updateById(
-                            $existing->categoryId,
-                            $categoryConcept
-                        )->id;
-                    } else {
-                        $item['category_id'] = Repository::codeableConcept()->store($categoryConcept)->id;
-                    }
-                }
+                // Casts on the model encode JSON columns and format eHealth dates
+                $row = $data->toModel()->getAttributes();
+                $row['division_id'] = $item['division_id'];
+                $row['legal_entity_id'] = $item['legal_entity_id'];
 
-                // Sync type
-                $typeConcept = $item['type'] ?? null;
-                if ($typeConcept) {
-                    if ($existing && $existing->typeId) {
-                        $item['type_id'] = Repository::codeableConcept()->updateById(
-                            $existing->typeId,
-                            $typeConcept
-                        )->id;
-                    } else {
-                        $item['type_id'] = Repository::codeableConcept()->store($typeConcept)->id;
-                    }
+                $row['category_id'] = $existing && $existing->categoryId
+                    ? Repository::codeableConcept()->updateById($existing->categoryId, $data->category)->id
+                    : Repository::codeableConcept()->store($data->category)->id;
+
+                if ($data->type) {
+                    $row['type_id'] = $existing && $existing->typeId
+                        ? Repository::codeableConcept()->updateById($existing->typeId, $data->type)->id
+                        : Repository::codeableConcept()->store($data->type)->id;
                 } else {
-                    $item['type_id'] = $existing->typeId ?? null;
+                    $row['type_id'] = $existing->typeId ?? null;
                 }
 
-                unset($item['category'], $item['type']);
-
-                // Format to JSON
-                $item['available_time'] = json_encode($item['available_time'] ?? [], JSON_THROW_ON_ERROR);
-                $item['not_available'] = json_encode($item['not_available'] ?? [], JSON_THROW_ON_ERROR);
-
-                $item['ehealth_inserted_at'] = Carbon::parse($item['ehealth_inserted_at'])->format('Y-m-d H:i:s');
-                $item['ehealth_updated_at'] = Carbon::parse($item['ehealth_updated_at'])->format('Y-m-d H:i:s');
-
-                return $item;
+                return $row;
             })->values()->all();
 
             HealthcareService::upsert($prepared, 'uuid', new HealthcareService()->getFillable());
         });
-    }
-
-    /**
-     * Store category and type in separate tables.
-     *
-     * @param  array  $data
-     * @return array ID of created category and type.
-     */
-    protected function storeCategoryAndType(array $data): array
-    {
-        // Save category
-        $category = Repository::codeableConcept()->store($data['category']);
-        $data['category_id'] = $category->id;
-
-        // Save if type is present
-        if (!empty($data['type'])) {
-            $type = Repository::codeableConcept()->store($data['type']);
-            $data['type_id'] = $type->id;
-        }
-
-        // Remove nested data to avoid mass assignment issues
-        unset($data['category'], $data['type']);
-
-        return $data;
-    }
-
-    /**
-     * Update category and type from edit form.
-     *
-     * @param  HealthcareService  $service
-     * @param  array  $data
-     * @return array
-     */
-    protected function updateCategoryAndType(HealthcareService $service, array $data): array
-    {
-        // Update category (it's required)
-        if (!empty($data['category'])) {
-            Repository::codeableConcept()->update($service->category, $data['category']);
-        }
-
-        // Handle type
-        if (array_key_exists('type', $data)) {
-            if (!empty($data['type'])) {
-                // Update or create
-                if ($service->type) {
-                    Repository::codeableConcept()->update($service->type, $data['type']);
-                } else {
-                    $type = Repository::codeableConcept()->store($data['type']);
-                    $data['type_id'] = $type->id;
-                }
-            } else {
-                // If was presented before in draft, but then removed
-                if ($service->type) {
-                    // Dissociate and delete
-                    $service->type()->dissociate();
-                    $service->save();
-
-                    Repository::codeableConcept()->delete($service->type);
-                }
-
-                $data['type_id'] = null;
-            }
-        }
-
-        unset($data['category'], $data['type']);
-
-        return $data;
     }
 }

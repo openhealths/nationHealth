@@ -9,6 +9,7 @@ use App\Exceptions\EHealth\EHealthException;
 use Exception;
 use Throwable;
 use App\Classes\eHealth\EHealth;
+use App\Dto\HealthcareService\Model as HealthcareServiceData;
 use App\Enums\JobStatus;
 use App\Enums\Status;
 use App\Jobs\HealthcareServiceSync;
@@ -165,7 +166,9 @@ class HealthcareServiceIndex extends Component
         }
 
         try {
-            Repository::healthcareService()->updateStatus($healthcareService->uuid, $response->validate());
+            $healthcareServiceData = HealthcareServiceData::fromSource($response->validate());
+
+            Repository::healthcareService()->saveMapped($healthcareServiceData, $healthcareService, legalEntity());
 
             Session::flash('success', __('healthcare-services.success.activated'));
         } catch (Throwable $exception) {
@@ -192,7 +195,9 @@ class HealthcareServiceIndex extends Component
         }
 
         try {
-            Repository::healthcareService()->updateStatus($healthcareService->uuid, $response->validate());
+            $healthcareServiceData = HealthcareServiceData::fromSource($response->validate());
+
+            Repository::healthcareService()->saveMapped($healthcareServiceData, $healthcareService, legalEntity());
 
             Session::flash('success', __('healthcare-services.success.deactivated'));
         } catch (Throwable $exception) {

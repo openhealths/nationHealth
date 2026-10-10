@@ -43,13 +43,12 @@
                 }
             });
         @endif
-        let syncingFromWire = true;
-        $nextTick(() => { syncingFromWire = false; });
         $watch('selected', (val) => {
-            if (syncingFromWire) {
+            const next = Array.isArray(val) ? [...val] : val;
+            if (JSON.stringify(next) === JSON.stringify($wire.get('{{ $bind }}'))) {
                 return;
             }
-            $wire.set('{{ $bind }}', Array.isArray(val) ? [...val] : val, {{ $live ? 'true' : 'false' }});
+            $wire.set('{{ $bind }}', next, {{ $live ? 'true' : 'false' }});
         });
     "
     x-effect="$dispatch('open-changed', { open })"

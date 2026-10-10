@@ -168,7 +168,7 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
                 Route::get('/{division}', DivisionView::class)->name('division.view')->can('view', 'division');
                 Route::get('/{division}/edit', DivisionEdit::class)->name('division.edit')->can('update', 'division');
 
-                Route::prefix('{division}/healthcare-service')->name('healthcare-service.')->group(static function () {
+                Route::prefix('{division}/healthcare-service')->name('healthcare-service.')->scopeBindings()->group(static function () {
                     Route::get('/create', HealthcareServiceCreate::class)
                         ->name('create')
                         ->can('create', HealthcareService::class);

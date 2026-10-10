@@ -43,8 +43,11 @@ class HealthcareService extends Model
     protected $casts = [
         'available_time' => 'json',
         'not_available' => 'json',
+        'coverage_area' => 'json',
+        'licensed_healthcare_service' => 'json',
         'status' => Status::class,
         'ehealth_inserted_at' => 'datetime',
+        'ehealth_updated_at' => 'datetime',
         'created_at' => 'datetime'
     ];
 

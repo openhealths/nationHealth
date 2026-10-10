@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Division\HealthcareService;
 
+use App\Dto\HealthcareService\Model as HealthcareServiceData;
 use App\Models\Division;
 use App\Models\HealthcareService;
 use App\Models\LegalEntity;
@@ -34,20 +35,19 @@ class HealthcareServiceEdit extends HealthcareServiceComponent
             return;
         }
 
-        $validated = $this->validateForm();
-        if (!$validated) {
+        if (!$this->validateForm()) {
             return;
         }
 
-        $response = $this->createInEHealth($validated);
+        $response = $this->createInEHealth();
         if (!$response) {
             return;
         }
 
         try {
-            $validated = $response->validate();
-            $validated['id'] = $this->healthcareServiceId;
-            Repository::healthcareService()->update($response->map($validated));
+            $healthcareServiceData = HealthcareServiceData::fromSource($response->validate());
+
+            Repository::healthcareService()->saveMapped($healthcareServiceData, $healthcareService, legalEntity());
 
             Session::flash('success', __('healthcare-services.success.created'));
             $this->redirectRoute('healthcare-service.index', [legalEntity(), $this->divisionId], navigate: true);

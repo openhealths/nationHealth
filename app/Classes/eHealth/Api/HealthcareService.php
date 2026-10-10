@@ -12,6 +12,7 @@ use App\Models\Division as DivisionModel;
 use App\Rules\InDictionary;
 use Illuminate\Support\Facades\Log;
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\Api\Responses\HealthcareServiceResponse;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Validator;
 use App\Classes\eHealth\EHealthRequest as Request;
@@ -78,7 +79,6 @@ class HealthcareService extends Request
     public function create(array $data = []): PromiseInterface|EHealthResponse
     {
         $this->setValidator($this->validateResponse(...));
-        $this->setMapper($this->mapCreate(...));
 
         return $this->post(self::URL, $data);
     }
@@ -112,10 +112,10 @@ class HealthcareService extends Request
     }
 
     /**
-     * Validate healthcare service response (create, activate, deactivate),
+     * Validate healthcare service response (create, update, activate, deactivate),
      * see: https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/healthcare-services/create-healthcare-service
      */
-    protected function validateResponse(EHealthResponse $response): array
+    protected function validateResponse(EHealthResponse $response): HealthcareServiceResponse
     {
         $data = $response->getData();
 
@@ -127,7 +127,7 @@ class HealthcareService extends Request
             Log::channel('e_health_errors')->error('Validation failed: ' . implode(', ', $validator->errors()->all()));
         }
 
-        return $validator->validate();
+        return new HealthcareServiceResponse($validator->validate());
     }
 
     /**
@@ -155,20 +155,6 @@ class HealthcareService extends Request
         }
 
         return $validator->validate();
-    }
-
-    /**
-     * Map UUID values to ID.
-     *
-     * @param  array  $validated
-     * @return array
-     */
-    protected function mapCreate(array $validated): array
-    {
-        $validated['division_id'] = DivisionModel::where('uuid', $validated['division_id'])->value('id');
-        $validated['legal_entity_id'] = LegalEntityModel::where('uuid', $validated['legal_entity_id'])->value('id');
-
-        return $validated;
     }
 
     /**

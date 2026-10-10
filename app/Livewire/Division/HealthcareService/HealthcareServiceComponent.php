@@ -6,6 +6,7 @@ namespace App\Livewire\Division\HealthcareService;
 
 use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthResponse;
+use App\Dto\HealthcareService\Ehealth as EhealthData;
 use App\Livewire\Division\Forms\HealthcareServiceForm as Form;
 use App\Models\Division;
 use App\Models\LegalEntity;
@@ -30,6 +31,7 @@ class HealthcareServiceComponent extends Component
 
     public string $divisionName;
 
+    #[Locked]
     public int $divisionId;
 
     public Collection $licenses;
@@ -104,14 +106,16 @@ class HealthcareServiceComponent extends Component
     }
 
     /**
-     * Validate form, if valid return validated data.
+     * Validate form; on failure flash the first error and fill the error bag.
      *
-     * @return array|false
+     * @return bool
      */
-    protected function validateForm(): array|false
+    protected function validateForm(): bool
     {
         try {
-            return $this->form->doValidation();
+            $this->form->doValidation();
+
+            return true;
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
@@ -123,13 +127,14 @@ class HealthcareServiceComponent extends Component
     /**
      * Send a request to the API; if successful, return it; otherwise, show and log errors.
      *
-     * @param  array  $validated
      * @return EHealthResponse|PromiseInterface|null
      */
-    protected function createInEHealth(array $validated): EHealthResponse|PromiseInterface|null
+    protected function createInEHealth(): EHealthResponse|PromiseInterface|null
     {
+        $healthcareServiceEhealthMapped = EhealthData::fromForm($this->form)->toArray();
+
         try {
-            return EHealth::healthcareService()->create($this->form->formatForApi($validated));
+            return EHealth::healthcareService()->create($healthcareServiceEhealthMapped);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when creating a healthcare service');
 

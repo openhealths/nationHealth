@@ -6,7 +6,6 @@ namespace App\Classes\eHealth;
 
 use Closure;
 use Illuminate\Http\Client\Response;
-use Illuminate\Support\Collection;
 use RuntimeException;
 
 class EHealthResponse extends Response
@@ -46,9 +45,9 @@ class EHealthResponse extends Response
     /**
      * Validate response data.
      *
-     * @return array|Collection
+     * @return array|object
      */
-    public function validate(): array|Collection
+    public function validate(): array|object
     {
         if (is_null($this->validator)) {
             throw new RuntimeException('Validator is not implemented for this response.');

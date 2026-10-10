@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Division\HealthcareService;
 
-use App\Enums\HealthcareService\Status;
+use App\Dto\HealthcareService\Model as HealthcareServiceData;
 use App\Models\Division;
 use App\Models\HealthcareService;
 use App\Models\LegalEntity;
@@ -31,7 +31,7 @@ class HealthcareServiceCreate extends HealthcareServiceComponent
         }
 
         try {
-            $validated = $this->form->doValidation();
+            $this->form->doValidation();
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
@@ -39,13 +39,14 @@ class HealthcareServiceCreate extends HealthcareServiceComponent
             return;
         }
 
-        // Store in local database
         try {
-            $validated['divisionId'] = $this->divisionId;
-            $validated['legalEntityId'] = legalEntity()->id;
-            $validated['status'] = Status::DRAFT;
+            $healthcareServiceData = HealthcareServiceData::fromSource($this->form);
 
-            Repository::healthcareService()->store($this->form->formatForApi($validated));
+            Repository::healthcareService()->saveMapped(
+                $healthcareServiceData,
+                new HealthcareService(['division_id' => $this->divisionId]),
+                legalEntity()
+            );
 
             Session::flash('success', __('healthcare-services.success.draft_created'));
             $this->redirectRoute('healthcare-service.index', [legalEntity(), $this->divisionId], navigate: true);
@@ -64,19 +65,23 @@ class HealthcareServiceCreate extends HealthcareServiceComponent
             return;
         }
 
-        $validated = $this->validateForm();
-        if (!$validated) {
+        if (!$this->validateForm()) {
             return;
         }
 
-        $response = $this->createInEHealth($validated);
+        $response = $this->createInEHealth();
         if (!$response) {
             return;
         }
 
         try {
-            $validated = $response->validate();
-            Repository::healthcareService()->store($response->map($this->form->formatForApi($validated)));
+            $healthcareServiceData = HealthcareServiceData::fromSource($response->validate());
+
+            Repository::healthcareService()->saveMapped(
+                $healthcareServiceData,
+                new HealthcareService(['division_id' => $this->divisionId]),
+                legalEntity()
+            );
 
             Session::flash('success', __('healthcare-services.success.created'));
             $this->redirectRoute('healthcare-service.index', [legalEntity(), $this->divisionId], navigate: true);
