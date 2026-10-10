@@ -105,6 +105,13 @@ class EHealthValidationException extends EHealthException
                     if (str_contains($description, 'At least one of action references, diagnostic reports or procedures should reference the same service')) {
                         return __('errors.ehealth.messages.referral_service_mismatch');
                     }
+                    // eHealth points entry at encounter, but the actionable field is care plan category.
+                    if (str_contains($description, 'Primary diagnosis condition codes and care plan category mismatch')) {
+                        return __('errors.ehealth.messages.care_plan_category_diagnosis_mismatch');
+                    }
+                    if (str_contains($description, 'End date must be greater than or equal the start date')) {
+                        return __('errors.ehealth.messages.period_end_before_start');
+                    }
                     if (str_contains($description, 'Category mismatch') || (str_contains($entry, 'code.identifier.value') && str_contains($description, 'Category mismatch'))) {
                         return __('Категорія послуги: обрана послуга не відповідає вказаній категорії в ЕСОЗ. Будь ласка, оберіть правильну категорію в полі «Категорія» (наприклад, Діагностична процедура / Процедура / Лабораторна діагностика тощо)');
                     }
@@ -165,6 +172,8 @@ class EHealthValidationException extends EHealthException
             'requester.identifier.value' => __('care-plan.ehealth_fields.requester'),
             'authored_on' => __('care-plan.ehealth_fields.authored_on'),
             '$.authored_on' => __('care-plan.ehealth_fields.authored_on'),
+            'period.end' => __('care-plan.date_and_time_end'),
+            '$.period.end' => __('care-plan.date_and_time_end'),
             'medical_programs.[0]' => __('Медична програма'),
             'medical_programs' => __('Медична програма'),
             'detail.product_reference.identifier.value' => __('Код медичного виробу'),
@@ -246,6 +255,13 @@ class EHealthValidationException extends EHealthException
                 $translatedMessage = __('Код одиниці добової дози (daily_amount) повинен збігатися з denumerator_unit одного з INNM обраного лікарського засобу');
             } elseif (str_contains($message, 'Activity can be completed only if it has in_progress status')) {
                 $translatedMessage = __('Призначення може бути виконане тільки якщо воно має статус "В процесі" (in_progress)');
+            } elseif (str_contains($message, 'Primary diagnosis condition codes and care plan category mismatch')) {
+                // Platform entry points at encounter; the form field to fix is category.
+                $translatedKey = __('care-plan.category');
+                $translatedMessage = __('errors.ehealth.messages.care_plan_category_diagnosis_mismatch');
+            } elseif (str_contains($message, 'End date must be greater than or equal the start date')) {
+                $translatedKey = __('care-plan.date_and_time_end');
+                $translatedMessage = __('errors.ehealth.messages.period_end_before_start');
             } elseif (str_contains($message, 'Category mismatch')) {
                 $translatedMessage = __('Категорія послуги не відповідає обраному коду в довіднику ЕСОЗ. Будь ласка, оберіть правильну категорію в полі «Категорія» (наприклад, Діагностична процедура / Процедура / Лабораторна діагностика тощо)');
             } elseif (!empty($message)) {
@@ -297,6 +313,40 @@ class EHealthValidationException extends EHealthException
 
         return str_contains($message, 'cannot be cancelled')
             && str_contains($message, 'cancelled');
+    }
+
+    /**
+     * Primary diagnosis ICD codes are incompatible with the selected care plan category.
+     */
+    public function isCarePlanCategoryDiagnosisMismatch(): bool
+    {
+        $invalidErrors = Arr::get($this->details, 'error.invalid') ?? Arr::get($this->details, 'invalid') ?? [];
+
+        foreach ($invalidErrors as $detail) {
+            $message = (string) (Arr::get($detail, 'rules.0.description') ?? Arr::get($detail, 'msg') ?? '');
+            if (str_contains($message, 'Primary diagnosis condition codes and care plan category mismatch')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Care plan period.end is earlier than period.start.
+     */
+    public function isCarePlanPeriodEndBeforeStart(): bool
+    {
+        $invalidErrors = Arr::get($this->details, 'error.invalid') ?? Arr::get($this->details, 'invalid') ?? [];
+
+        foreach ($invalidErrors as $detail) {
+            $message = (string) (Arr::get($detail, 'rules.0.description') ?? Arr::get($detail, 'msg') ?? '');
+            if (str_contains($message, 'End date must be greater than or equal the start date')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function translateTopLevelMessage(string $message): string

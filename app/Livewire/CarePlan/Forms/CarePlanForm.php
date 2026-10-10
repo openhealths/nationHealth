@@ -43,8 +43,8 @@ class CarePlanForm extends Form
             'category' => 'required|string',
             'context' => 'nullable|string',
             'title' => 'required|string',
-            'periodStart' => 'required|string',
-            'periodEnd' => 'nullable|string',
+            'periodStart' => 'required|date_format:d.m.Y',
+            'periodEnd' => 'nullable|date_format:d.m.Y|after_or_equal:periodStart',
             'encounter' => 'nullable|string',
             'description' => 'nullable|string',
             'note' => 'nullable|string',
@@ -86,6 +86,16 @@ class CarePlanForm extends Form
             'knedp' => __('forms.knedp') ?? 'КНЕДП',
             'keyContainerUpload' => __('forms.key_container') ?? 'Ключ-контейнер',
             'password' => __('forms.password'),
+        ];
+    }
+
+    /**
+     * Custom validation messages.
+     */
+    public function messages(): array
+    {
+        return [
+            'periodEnd.after_or_equal' => __('care-plan.period_end_before_start'),
         ];
     }
 }
