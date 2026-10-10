@@ -26,8 +26,12 @@ class LocationRule implements ValidationRule
             return;
         }
 
-        if (!preg_match('/^-?([1-8]?[1-9]|[1-9]0|0)\.\d{1,6}/', number_format((float) $value, 6, '.', ''))) {
-            $fail(__('divisions.errors.location.loсation_misformat'));
+        $fieldName = str_ends_with($attribute, '.longitude') ? 'longitude' : 'latitude';
+
+        $maximum = $fieldName === 'longitude' ? 180 : 90;
+
+        if (abs((float) $value) > $maximum) {
+            $fail(__("divisions.errors.location.{$fieldName}_misformat"));
 
             return;
         }

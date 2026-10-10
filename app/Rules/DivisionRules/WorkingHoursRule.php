@@ -4,18 +4,23 @@ declare(strict_types=1);
 
 namespace App\Rules\DivisionRules;
 
-use Illuminate\Contracts\Validation\ValidationRule;
-use App\Exceptions\CustomValidationException;
-use App\Traits\WorkTimeUtilities;
-use Carbon\Carbon;
 use Closure;
+use Carbon\Carbon;
+use App\Models\Division;
+use App\Traits\WorkTimeUtilities;
+use App\Exceptions\CustomValidationException;
+use Illuminate\Contracts\Validation\ValidationRule;
 
 class WorkingHoursRule implements ValidationRule
 {
     use WorkTimeUtilities;
 
+    /**
+     * @var array{workingHours: array<string, list<array{0: string, 1: string}>>}
+     */
     protected array $division;
 
+    // The validation message for the current failed check.
     protected string $message;
 
     public function __construct(array $division)
@@ -26,11 +31,7 @@ class WorkingHoursRule implements ValidationRule
     }
 
     /**
-     * Check that working hours schedule is correct
-     * Here 'shift' is the working time period from start to the end
-     * If shift's count is more or equal than 1, then the day is considered as a workday
-     *
-     * @param  \Closure(string): \Illuminate\Translation\PotentiallyTranslatedString  $fail
+     * Validate every working interval in the weekly schedule.
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
@@ -69,34 +70,34 @@ class WorkingHoursRule implements ValidationRule
     }
 
     /**
-     * Check if a shift is considered empty (non-working).
+     * Determine whether the first shift should be skipped as non-working.
      *
      * A shift is considered empty if:
-     * - It is null or empty array
-     * - Both start and end times are '00:00', which indicates a day off
+     * - It is missing or malformed
+     * - Both start and end times are the day-off sentinel
      *
-     * @param  mixed  $shift  The shift array to check, containing start and end times
-     * @return bool Returns true if the shift is empty (non-working), false otherwise
+     * @param  mixed  $shift
+     *
+     * @return bool True when the shift should be skipped.
      */
     protected function checkEmptyShift(mixed $shift): bool
     {
-        if (!is_array($shift) || !array_key_exists(0, $shift) || !array_key_exists(1, $shift)) {
+        if (!\is_array($shift) || !\array_key_exists(0, $shift) || !\array_key_exists(1, $shift)) {
             return true;
         }
 
-        // If Start time = '00:00' and endTime = '00:00' it means that day is off
-        // Also treat identical empty strings or nulls as off
-        if ($shift[0] === $shift[1] && ($shift[0] === '00:00' || $shift[0] === '' || $shift[0] === null)) {
-            return true;
-        }
-
-        return false;
+        return $shift[0] === Division::WORKING_TIME_DAY_OFF &&
+               $shift[1] === Division::WORKING_TIME_DAY_OFF;
     }
 
     /**
-     * Check that all bunch of the workingHours' data is correct and valid
+     * Throw the current validation error for a shift.
      *
-     * @param  \Closure(string): \Illuminate\Translation\PotentiallyTranslatedString  $fail
+     * @param  string  $shiftName
+     *
+     * @return void
+     *
+     * @throws CustomValidationException
      */
     protected function throwError(string $shiftName = ''): void
     {
@@ -104,12 +105,11 @@ class WorkingHoursRule implements ValidationRule
     }
 
     /**
-     * Throw a custom validation exception with the current error message.
+     * Set the validation message for the current failed check.
      *
-     * This method is called when a address type rule fails validation.
+     * @param  string  $message
      *
      * @return void
-     * @throws CustomValidationException
      */
     protected function setMessage(string $message): void
     {
@@ -117,12 +117,11 @@ class WorkingHoursRule implements ValidationRule
     }
 
     /**
-     * Set the custom error message for the validation rule.
+     * Build the validation message, optionally prefixed with a shift label.
      *
-     * This message will be used when throwing a validation exception.
+     * @param  string  $shiftName
      *
-     * @param  string  $message  The error message to set.
-     * @return void
+     * @return string
      */
     protected function message(string $shiftName = ''): string
     {
@@ -130,13 +129,20 @@ class WorkingHoursRule implements ValidationRule
     }
 
     /**
-     * Check if the beginning of the shift start earlier than one's ending
+     * Validate a shift's time format and chronological range.
      *
-     * @param  array  $day
-     * @return bool
+     * @param  array{0: string, 1: string}  $shift
+     *
+     * @return bool True when the shift has valid, non-equal start and end times.
      */
     protected function compareTime(string $day, array $shift): bool
     {
+        if (($shift[0] ?? null) === ($shift[1] ?? null)) {
+            $this->setMessage(__('divisions.errors.workingHours.sameTime'));
+
+            return false;
+        }
+
         if (!$this->isValidTimeFormat($shift[0] ?? null) || !$this->isValidTimeFormat($shift[1] ?? null)) {
             $this->setMessage(__('divisions.errors.workingHours.wrongFormat'));
 
@@ -156,11 +162,12 @@ class WorkingHoursRule implements ValidationRule
     }
 
     /**
-     * Check if the beginning of the upcoming shift starts after previous one's ending
+     * Check whether the current shift begins before the previous shift ends.
      *
-     * @param  string  $prevShiftEnd  // The time the next shift will start
-     * @param  string  $currShiftStart  // The time the previous shift ended
-     * @return bool
+     * @param  string  $prevShiftEnd
+     * @param  string  $currShiftStart
+     *
+     * @return bool True when the shifts intersect or either time is invalid.
      */
     protected function isShiftIntersected(string $prevShiftEnd, string $currShiftStart): bool
     {
@@ -186,7 +193,8 @@ class WorkingHoursRule implements ValidationRule
      * Check if the time string is in valid H:i format.
      *
      * @param  string|null  $time
-     * @return bool
+     *
+     * @return bool True when the value is a time in 24-hour H:i format.
      */
     protected function isValidTimeFormat(?string $time): bool
     {

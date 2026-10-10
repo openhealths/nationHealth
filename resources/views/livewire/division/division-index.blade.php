@@ -95,6 +95,7 @@
                                     :options="$divisionUuids"
                                     label="{{ __('forms.select') }}"
                                     placeholder="{{ __('forms.uuid') }}"
+                                    searchable
                                 />
                             </div>
 

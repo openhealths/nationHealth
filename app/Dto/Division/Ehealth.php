@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Dto\Division;
 
+use App\Models\Division;
 use App\Dto\EhealthMapping;
 use App\Livewire\Division\Forms\DivisionForm;
 use Symfony\Component\ObjectMapper\Attribute\Map;
@@ -63,7 +64,8 @@ class Ehealth
     }
 
     /**
-     * eHealth expects the time divider to be a dot (08.00) instead of a colon.
+     * eHealth expects the time divider to be a dot (08.00) instead of a colon
+     * and uses 00.00 for a day off.
      *
      * @param  array<string, array<int, array<int, string>>>|null  $workingHours
      * @return array<string, array<int, array<int, string>>>
@@ -72,7 +74,12 @@ class Ehealth
     {
         return array_map(
             fn (array $intervals) => array_map(
-                fn (array $interval) => array_map(fn (string $time) => str_replace(':', '.', $time), $interval),
+                fn (array $interval) => array_map(
+                    fn (string $time) => $time === Division::WORKING_TIME_DAY_OFF
+                        ? '00.00'
+                        : str_replace(':', '.', $time),
+                    $interval
+                ),
                 $intervals
             ),
             $workingHours ?? []
