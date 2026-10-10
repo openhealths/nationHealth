@@ -9,6 +9,7 @@ use App\Core\Arr;
 use App\Models\Employee\EmployeeRequest;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
+use App\Models\User;
 use App\Repositories\Repository;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -72,14 +73,25 @@ class EmployeePositionAdd extends AbstractEmployeeFormManager
             'position', 'start_date', 'end_date', 'employee_type', 'division_id', 'email',
         ]);
 
-        $selectedUser = $this->partyUsers?->firstWhere('email', $this->formEmail);
+        $email = is_string($this->formEmail) ? trim($this->formEmail) : '';
 
-        if ($this->formEmail && !$selectedUser) {
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw ValidationException::withMessages([
-                'formEmail' => __('employees.position_add_email_not_in_legal_entity'),
+                'formEmail' => __('validation.email', ['attribute' => __('forms.email')]),
             ]);
         }
 
+        $selectedUser = $this->partyUsers?->firstWhere('email', $email)
+            ?? User::query()->where('email', $email)->first();
+
+        // Existing login may only be reused when it already belongs to this party.
+        if ($selectedUser && $selectedUser->partyId && (int) $selectedUser->partyId !== (int) $this->party->id) {
+            throw ValidationException::withMessages([
+                'formEmail' => __('employees.position_add_email_belongs_to_other_party'),
+            ]);
+        }
+
+        $employeeRequestData['email'] = $email;
         $employeeRequestData['user_id'] = $selectedUser?->id;
         $employeeRequestData['party_id'] = $this->party->id;
 
