@@ -5,6 +5,10 @@
     use App\Models\Connection\Connection;
     use App\Models\Preperson;
     use App\Models\Relations\PersonVerificationDetail;
+    use App\Enums\Status;
+    use Illuminate\Support\Facades\Auth;
+
+    $isLegalEntityNew = legalEntity()?->status === Status::NEW->value;
 @endphp
 
 <aside
@@ -20,8 +24,13 @@
                         @click="open = ! open"
                         type="button"
                         class="menu-item"
+                        @style([
+                            'cursor: default' => $isLegalEntityNew,
+                            'pointer-events: none' => $isLegalEntityNew,
+                        ])
                         aria-controls="dropdown-legal-entity"
                         :aria-expanded="open"
+                        @disabled($isLegalEntityNew)
                     >
                         @icon('institution')
                         <span>{{ __('forms.institution') }}</span>
@@ -106,7 +115,7 @@
                     <li>
                         <a
                             href="{{ route('connection.index', [legalEntity()]) }}"
-                            class="menu-item-simple {{ request()->routeIs('legal-entity-connection.*') ? 'menu-item-active' : '' }}"
+                            class="menu-item-simple {{ request()->routeIs('connection.*') ? 'menu-item-active' : '' }}"
                         >
                             @icon('connection-two-way')
                             <span>{{ __('Зв\'язки МІС та СГуСОЗ') }}</span>
@@ -570,6 +579,19 @@
                     </ul>
                 </li>
             @endif
+
+              {{-- Create connection for unauthorized (by eHealth) user --}}
+              @if (!legalEntity() && Auth::user()->can('limitedAction', LegalEntity::class))
+                    <li>
+                        <a
+                            href="{{ route('connection.create') }}"
+                            class="menu-item-simple {{ request()->routeIs('connection.*') ? 'menu-item-active' : '' }}"
+                        >
+                            @icon('connection-two-way')
+                            <span>{{ __('Зв\'язки МІС та СГуСОЗ') }}</span>
+                        </a>
+                    </li>
+              @endif
         </ul>
     </div>
 </aside>
