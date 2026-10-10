@@ -9,10 +9,17 @@ use App\Models\Person\Person;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 class DeviceRequestRequest extends Model
 {
     use HasCamelCasing;
+
+    public function __construct(array $attributes = [])
+    {
+        $this->mergeFillable(array_map(Str::camel(...), $this->getFillable()));
+        parent::__construct($attributes);
+    }
 
     protected $table = 'device_request_requests';
 
@@ -35,6 +42,9 @@ class DeviceRequestRequest extends Model
         'priority_id',
         'note',
         'supporting_info',
+        'request_payload',
+        'remote_details',
+        'sms_resent_at',
     ];
 
     protected $casts = [
@@ -42,6 +52,9 @@ class DeviceRequestRequest extends Model
         'ended_at' => 'datetime',
         'quantity' => 'decimal:2',
         'supporting_info' => 'array',
+        'request_payload' => 'array',
+        'remote_details' => 'array',
+        'sms_resent_at' => 'datetime',
     ];
 
     public function person(): BelongsTo

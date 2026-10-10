@@ -41,7 +41,8 @@
     };
 @endphp
 
-<x-layouts.patient :showLegacyMessages="false"
+<x-layouts.patient
+    :showLegacyMessages="false"
     :personId="$personId"
     :patientFullName="$patientFullName"
     :hideNavigation="true"
@@ -389,6 +390,22 @@
                                 </button>
                             </fieldset>
 
+                            @if ($this instanceof EncounterEdit && $isReadonly && $personId !== null)
+                                @can('device_request:write')
+                                    <fieldset class="fieldset-card p-5">
+                                        <legend class="legend">{{ __('device-requests.encounter_section') }}</legend>
+                                        <button
+                                            wire:click="openDeviceRequest"
+                                            type="button"
+                                            class="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                        >
+                                            @icon('plus', 'w-4 h-4')
+                                            <span>{{ __('device-requests.add_request') }}</span>
+                                        </button>
+                                    </fieldset>
+                                @endcan
+                            @endif
+
                             <fieldset class="fieldset-card p-5">
                                 <legend class="legend">{{ __('patients.medical_reports') }}</legend>
                                 <button
@@ -510,11 +527,11 @@
 
     @if ($this instanceof EncounterEdit && $this->canBeCancelled)
         @include('livewire.encounter.encounter-cancellation', [
-            'formPath' => 'cancellationForm',
-            'description' => array_filter($this->selectedRecords)
-                ? __('encounters.records_cancel_modal_description')
-                : __('encounters.cancel_modal_description')
-        ])
+                            'formPath' => 'cancellationForm',
+                            'description' => array_filter($this->selectedRecords)
+                                ? __('encounters.records_cancel_modal_description')
+                                : __('encounters.cancel_modal_description')
+                        ])
     @endif
 
     @if ($this instanceof EncounterEdit)

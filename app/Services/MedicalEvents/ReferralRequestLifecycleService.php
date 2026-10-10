@@ -274,6 +274,11 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
         $patient = $contextModel instanceof CarePlan
             ? $contextModel->person
             : \App\Models\Person\Person::find($contextModel->person_id);
+        if ($record instanceof DeviceRequestRequest && $patient !== null) {
+            app(DeviceRequestLifecycleService::class)->authorizeAction(legalEntity(), 'device_request:read');
+
+            return app(DeviceRequestLifecycleService::class)->printoutHtml($patient, $requestId);
+        }
         $patientName = $patient?->fullName
             ?? ($patient?->primaryName ? trim($patient->primaryName->last_name.' '.$patient->primaryName->first_name) : '—');
         $adviceText = $record instanceof ServiceRequestRequest

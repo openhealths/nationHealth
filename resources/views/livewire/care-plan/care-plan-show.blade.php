@@ -5,7 +5,8 @@
     <script src="{{ asset('js/print-sandboxed.js') }}"></script>
 @endassets
 
-<x-layouts.patient :showLegacyMessages="false"
+<x-layouts.patient
+    :showLegacyMessages="false"
     :personId="$carePlan->person_id"
     :uuid="$carePlan->person?->uuid ?? null"
     :patientFullName="$carePlan->person?->full_name ?? ''"
@@ -50,8 +51,6 @@
         "
         wire:key="care-plan-show-container"
     >
-
-
         <div class="w-full max-w-screen-xl">
             @php
                 $status = is_array($carePlan->status) ? ($carePlan->status['coding'][0]['code'] ?? ($carePlan->status['text'] ?? '')) : $carePlan->status;
@@ -326,6 +325,10 @@
                         </div>
                     </div>
                 </fieldset>
+
+                @if ($remotePlanDetails)
+                    @include('livewire.care-plan.remote-details', ['record' => $remotePlanDetails])
+                @endif
 
                 {{-- Condition/Diagnosis --}}
                 <fieldset class="fieldset !mb-6 !max-w-full !rounded-xl !border-gray-100 bg-white !p-6 !shadow-none dark:!border-gray-700 dark:bg-gray-800">

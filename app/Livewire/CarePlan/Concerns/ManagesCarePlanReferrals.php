@@ -67,6 +67,16 @@ trait ManagesCarePlanReferrals
         }
 
         $resolvedKind = $activity->resolvedKind();
+        if ($resolvedKind === 'device_request') {
+            $this->redirectRoute('device-requests.create', [
+                'legalEntity' => legalEntity(),
+                'person' => $this->carePlan->person,
+                'carePlan' => $this->carePlan->uuid,
+                'activity' => $activity->uuid,
+            ]);
+
+            return;
+        }
         if (!in_array($resolvedKind, ['service_request', 'device_request'], true)) {
             Session::flash('error', __('care-plan.referral_wrong_activity_kind'));
 
@@ -329,6 +339,11 @@ trait ManagesCarePlanReferrals
     public function resendReferralSms(string $requestId, string $kind): void
     {
         $this->authorizeCarePlanWrite();
+        if ($kind === 'device_request') {
+            $this->redirectRoute('device-requests.index', ['legalEntity' => legalEntity(), 'person' => $this->carePlan->person]);
+
+            return;
+        }
         try {
             app(MedicalRequestOwnership::class)
                 ->referralForPerson($requestId, (int) $this->carePlan->personId);
@@ -397,6 +412,12 @@ trait ManagesCarePlanReferrals
         $kind = $requestRecord instanceof ServiceRequestRequest
             ? 'service_request'
             : 'device_request';
+
+        if ($kind === 'device_request') {
+            $this->redirectRoute('device-requests.create', ['legalEntity' => legalEntity(), 'person' => $this->carePlan->person, 'draft' => $requestRecord->uuid]);
+
+            return;
+        }
 
         try {
             $activity = $this->ownedActivityByBasedOnUuid($requestRecord->basedOn?->value);
@@ -485,6 +506,11 @@ trait ManagesCarePlanReferrals
 
     public function cancelReferral(string $requestId, string $kind): void
     {
+        if ($kind === 'device_request') {
+            $this->redirectRoute('device-requests.index', ['legalEntity' => legalEntity(), 'person' => $this->carePlan->person]);
+
+            return;
+        }
         $this->openSignatureModal('cancel_referral', null, $requestId);
     }
 
@@ -598,6 +624,12 @@ trait ManagesCarePlanReferrals
         $record = $service ?: $device;
 
         $kind = $service ? 'service_request' : 'device_request';
+
+        if ($kind === 'device_request') {
+            $this->redirectRoute('device-requests.index', ['legalEntity' => legalEntity(), 'person' => $this->carePlan->person]);
+
+            return;
+        }
 
         try {
             $payload = [

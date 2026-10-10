@@ -39,12 +39,12 @@ class EHealthJobResolver
     {
         $jobHref = $responseData['links'][0]['href'] ?? null;
 
-        if ((!is_string($jobHref) || !str_contains($jobHref, '/jobs/')) && isset($responseData['job_id']) && is_string($responseData['job_id']) && $responseData['job_id'] !== '') {
+        if ((!is_string($jobHref) || !str_contains(strtolower($jobHref), '/jobs/')) && isset($responseData['job_id']) && is_string($responseData['job_id']) && $responseData['job_id'] !== '') {
             $jobHref = '/api/jobs/'.$responseData['job_id'];
             $responseData['links'][0]['href'] = $jobHref;
         }
 
-        if (!is_string($jobHref) || !str_contains($jobHref, '/jobs/')) {
+        if (!is_string($jobHref) || !str_contains(strtolower($jobHref), '/jobs/')) {
             return $responseData;
         }
 

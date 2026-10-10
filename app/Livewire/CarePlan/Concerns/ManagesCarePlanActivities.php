@@ -370,8 +370,8 @@ trait ManagesCarePlanActivities
 
         $kindLower = strtolower($this->activityForm['kind']);
         if (str_contains($kindLower, 'device')) {
-            $rules['activityForm.quantity'] = 'required|integer|min:1';
-            $rules['activityForm.product_reference'] = 'required|uuid';
+            $rules['activityForm.quantity'] = !empty($programId) ? 'required|integer|min:1' : 'nullable|integer|min:1';
+            $rules['activityForm.product_reference'] = 'nullable|uuid|required_without:activityForm.product_codeable_concept';
 
             $allowedCodeTypes = $this->resolveDeviceRequestAllowedCodeTypes($programId);
             $requiresClassificationOnly = in_array('CLASSIFICATION_TYPE', $allowedCodeTypes, true)
@@ -380,7 +380,7 @@ trait ManagesCarePlanActivities
             if ($requiresClassificationOnly) {
                 $rules['activityForm.product_codeable_concept'] = 'required|string';
             } else {
-                $rules['activityForm.product_codeable_concept'] = 'nullable|string';
+                $rules['activityForm.product_codeable_concept'] = 'nullable|string|required_without:activityForm.product_reference';
             }
         }
 

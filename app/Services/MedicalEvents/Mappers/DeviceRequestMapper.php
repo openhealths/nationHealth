@@ -7,6 +7,7 @@ namespace App\Services\MedicalEvents\Mappers;
 use App\Contracts\FhirMapperContract;
 use App\Core\Arr;
 use App\Services\MedicalEvents\FhirResource;
+use App\Services\MedicalEvents\InformWith;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 
@@ -182,9 +183,10 @@ class DeviceRequestMapper implements FhirMapperContract
         $deviceRequest = array_merge($deviceRequest, $this->mapDeviceCode($data));
         $deviceRequest = array_merge($deviceRequest, $occurrence);
 
-        if (!empty($data['supporting_info'])) {
+        $reasons = $data['reason_reference'] ?? $data['supporting_info'] ?? [];
+        if (!empty($reasons)) {
             $deviceRequest['reason'] = [];
-            foreach ($data['supporting_info'] as $ref) {
+            foreach ($reasons as $ref) {
                 if (!empty($ref['uuid']) && !empty($ref['type'])) {
                     $deviceRequest['reason'][] = $this->resourceIdentifier(
                         strtolower((string) $ref['type']),
@@ -192,6 +194,14 @@ class DeviceRequestMapper implements FhirMapperContract
                     );
                 }
             }
+        }
+
+        $authMethodId = InformWith::authMethodId($data['inform_with'] ?? null);
+        if ($authMethodId !== null) {
+            $deviceRequest['inform_with'] = $authMethodId;
+        }
+        if (!empty($data['parameter'])) {
+            $deviceRequest['parameter'] = $data['parameter'];
         }
 
         return array_filter($deviceRequest, static fn ($value) => $value !== null);
@@ -216,16 +226,13 @@ class DeviceRequestMapper implements FhirMapperContract
     }
 
     /**
-     * eHealth accepts authored_on only within ~last 3 days and not in the future
-     * (server clock). Subtract a small skew buffer — local clocks are often a few
-     * seconds ahead of eHealth and "now" then fails as future-dated.
+     * The authored timestamp is the current UTC time (TZ 3.20.2.1.3).
      *
      * @param  array{start: string, end: string}  $occurrencePeriod
      */
     private function resolveAuthoredOn(array $occurrencePeriod): string
     {
         return CarbonImmutable::now('UTC')
-            ->subSeconds(30)
             ->format('Y-m-d\TH:i:s.000\Z');
     }
 
@@ -253,7 +260,7 @@ class DeviceRequestMapper implements FhirMapperContract
         return [
             'code' => [
                 'coding' => [[
-                    'system' => 'device_definition_classification_type',
+                    'system' => $data['device_code_system'] ?? 'device_definition_classification_type',
                     'code' => $deviceId,
                 ]],
             ],
@@ -262,13 +269,17 @@ class DeviceRequestMapper implements FhirMapperContract
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{value: int, system: string, code: string}
+     * @return array{value: int, system: string, code: string}|null
      */
-    private function mapDeviceQuantity(array $data): array
+    private function mapDeviceQuantity(array $data): ?array
     {
+        if (array_key_exists('quantity', $data) && $data['quantity'] === null) {
+            return null;
+        }
+
         return [
             'value' => (int) ($data['quantity'] ?? 1),
-            'system' => 'device_unit',
+            'system' => $data['quantity_system'] ?? 'device_unit',
             'code' => strtolower((string) ($data['quantity_code'] ?? 'piece')),
         ];
     }
@@ -304,7 +315,7 @@ class DeviceRequestMapper implements FhirMapperContract
         return [
             'occurrencePeriod' => [
                 'start' => $start->format('Y-m-d\TH:i:s.000\Z'),
-                'end' => $end->endOfDay()->utc()->format('Y-m-d\TH:i:s.000\Z'),
+                'end' => $end->utc()->format('Y-m-d\TH:i:s.000\Z'),
             ],
         ];
     }

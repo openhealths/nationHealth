@@ -263,7 +263,10 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
 
             // --- Device Requests (Медичні Вироби) ---
             Route::prefix('device-requests')->name('device-requests.')->group(function () {
-                Route::get('/', \App\Livewire\DeviceRequest\DeviceRequestIndex::class)->name('index');
+                Route::get('/{person}/create', \App\Livewire\DeviceRequest\DeviceRequestForm::class)
+                    ->middleware('permission:device_request:write')->name('create');
+                Route::get('/{person?}', \App\Livewire\DeviceRequest\DeviceRequestIndex::class)
+                    ->middleware('permission:device_request:read')->name('index');
             });
 
             // --- Group of Contracts (Already signed/active) ---

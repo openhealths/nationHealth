@@ -5,6 +5,12 @@
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
 
     <x-slot name="headerActions">
+        @can('device_request:read')
+            <a
+                class="button-primary"
+                href="{{ route('device-requests.index', ['legalEntity' => legalEntity(), 'person' => $personId]) }}"
+            >Е-запити на медичні вироби</a>
+        @endcan
         <button
             wire:click.prevent="applyFilters"
             type="button"
@@ -212,11 +218,15 @@
                                     <td colspan="8" class="bg-gray-50 px-4 py-3 text-sm dark:bg-gray-900/30">
                                         <div class="grid gap-3 sm:grid-cols-3">
                                             <div>
-                                                <div class="text-[10px] text-gray-400 uppercase">{{ __('Пріоритет') }}</div>
+                                                <div class="text-[10px] text-gray-400 uppercase">
+                                                    {{ __('Пріоритет') }}
+                                                </div>
                                                 <div class="font-medium">{{ $referral['priorityLabel'] ?? '—' }}</div>
                                             </div>
                                             <div>
-                                                <div class="text-[10px] text-gray-400 uppercase">{{ __('Програма') }}</div>
+                                                <div class="text-[10px] text-gray-400 uppercase">
+                                                    {{ __('Програма') }}
+                                                </div>
                                                 <div class="font-medium">{{ $referral['programName'] ?? '—' }}</div>
                                             </div>
                                             <div>
@@ -224,7 +234,9 @@
                                                 <div class="font-medium break-all">{{ $referral['uuid'] }}</div>
                                             </div>
                                             <div class="sm:col-span-3">
-                                                <div class="text-[10px] text-gray-400 uppercase">{{ __('Примітка') }}</div>
+                                                <div class="text-[10px] text-gray-400 uppercase">
+                                                    {{ __('Примітка') }}
+                                                </div>
                                                 <div>{{ $referral['note'] !== '' ? $referral['note'] : '—' }}</div>
                                             </div>
                                             <div class="sm:col-span-3">

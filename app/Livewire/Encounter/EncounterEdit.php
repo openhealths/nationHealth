@@ -28,6 +28,7 @@ use App\Livewire\Encounter\Concerns\ManagesEncounterEPrescription;
 use App\Livewire\Encounter\Concerns\ManagesEncounterReferrals;
 use App\Livewire\Encounter\Concerns\ResolvesEncounterStandaloneContext;
 use Livewire\Attributes\Locked;
+use App\Services\MedicalEvents\DeviceRequestLifecycleService;
 use Throwable;
 
 class EncounterEdit extends EncounterComponent
@@ -55,6 +56,20 @@ class EncounterEdit extends EncounterComponent
     public bool $canBeCancelled;
 
     public EncounterCancellationForm $cancellationForm;
+
+    public function openDeviceRequest(): void
+    {
+        abort_unless($this->personId !== null, 403);
+        try {
+            $service = app(DeviceRequestLifecycleService::class);
+            $employee = $service->authorizeAction(legalEntity(), 'device_request:write');
+            $person = $this->patient();
+            $service->encounter($person, $employee, $this->encounterUuid);
+            $this->redirectRoute('device-requests.create', ['legalEntity' => legalEntity(), 'person' => $person, 'encounter' => $this->encounterUuid]);
+        } catch (ValidationException $exception) {
+            Session::flash('error', $exception->validator->errors()->first());
+        }
+    }
 
     public function mount(LegalEntity $legalEntity, int $encounterId, ?Person $person = null, ?Preperson $preperson = null): void
     {
