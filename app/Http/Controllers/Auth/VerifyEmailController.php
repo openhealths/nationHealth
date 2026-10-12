@@ -43,7 +43,7 @@ class VerifyEmailController extends Controller
 
         event(new Verified($user));
 
-        Log::info("Email [{$user->email}] verified for user ID {$userId}");
+        Log::info('Email verified', ['user_id' => $userId]);
 
         return Redirect::route('login')->with('success', __('auth.login.success.verification'));
     }

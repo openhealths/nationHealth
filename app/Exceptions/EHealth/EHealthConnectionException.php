@@ -11,6 +11,18 @@ use Illuminate\Support\Facades\Session;
 class EHealthConnectionException extends ConnectionException
 {
     /**
+     * Connection exception messages may contain the full request URL.
+     */
+    public function report(): void
+    {
+        Log::error('eHealth connection failed', [
+            'exception_type' => static::class,
+            'file' => $this->getFile(),
+            'line' => $this->getLine(),
+        ]);
+    }
+
+    /**
      * Log the exception and flash a user-facing error message.
      *
      * @param  string  $logMessage
@@ -20,7 +32,7 @@ class EHealthConnectionException extends ConnectionException
     public function handle(string $logMessage, ?string $flashMessage = null): void
     {
         Log::channel('e_health_errors')->error($logMessage, [
-            'message' => $this->getMessage(),
+            'exception_type' => static::class,
             'file' => $this->getFile(),
             'line' => $this->getLine()
         ]);

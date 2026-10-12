@@ -62,9 +62,8 @@ class Request
 
                 if ($response->status() !== 200) {
                     Log::channel('api_errors')->error('API request failed', [
-                        'url' => $this->makeApiUrl(),
+                        'url' => parse_url($this->makeApiUrl(), PHP_URL_PATH) ?: '[unknown endpoint]',
                         'status' => $response->status(),
-                        'errors' => $response->body()
                     ]);
                 }
 
@@ -119,10 +118,8 @@ class Request
             $errors = json_decode($response->body(), true);
 
             Log::channel('api_errors')->error('API request failed', [
-                'url' => $this->makeApiUrl(),
+                'url' => parse_url($this->makeApiUrl(), PHP_URL_PATH) ?: '[unknown endpoint]',
                 'status' => $response->status(),
-                'request' => $this->params,
-                'errors' => $errors
             ]);
 
             $errorResult = (new ErrorHandler())->handleError($errors ?? []);

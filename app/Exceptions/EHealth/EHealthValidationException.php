@@ -26,7 +26,7 @@ class EHealthValidationException extends EHealthException
     {
         Log::error('eHealth API Validation Error Detail', [
             'message' => $this->getMessage(),
-            'details' => $this->details,
+            'status' => 422,
         ]);
     }
 
@@ -45,7 +45,7 @@ class EHealthValidationException extends EHealthException
             'class' => $caller['class'] ?? 'unknown_class',
             'method' => $caller['function'] ?? 'unknown_method',
             'exception_type' => static::class,
-            'error_message' => $this->getDetails()
+            'status' => 422,
         ]);
 
         Session::flash('error', $flashMessage ?? $this->getFormattedMessage());

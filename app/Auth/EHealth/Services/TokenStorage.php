@@ -141,8 +141,8 @@ class TokenStorage
 
             return true;
         } catch (EHealthException|EHealthConnectionException $exception) {
-            Log::channel('e_health_errors')->error("Error while extend token lifetime {$exception->getMessage()}", [
-                'exception' => $exception
+            Log::channel('e_health_errors')->error('Error while extending token lifetime', [
+                'exception_type' => $exception::class,
             ]);
 
             return false;

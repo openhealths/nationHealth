@@ -32,7 +32,7 @@ class VerifyEmail extends Component
 
             return Redirect::route('login')->with('success', __('auth.login.vlink_sent'));
         } catch (Exception $err) {
-            Log::error('Failed to send verification email', [$err->getMessage()]);
+            Log::error('Failed to send verification email', ['exception_type' => $err::class]);
 
             session()->flash('error', __('auth.login.error.vlink_not_sent'));
         }

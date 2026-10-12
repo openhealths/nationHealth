@@ -131,7 +131,7 @@ class Login extends Component
         if (!$this->isLocalAuth && (!$user || !$this->userHasRolesForLegalEntity($user) || $this->isSingleRoleAuth)) {
             $this->showRoleSelect = true;
 
-            Log::info('[Login] Користувач не знайдений або не має ролей. Перехід до "першого входу" eHealth.', ['email' => $this->email, 'legalEntityUuid' => $this->legalEntityUuid]);
+            Log::info('[Login] Користувач не знайдений або не має ролей. Перехід до "першого входу" eHealth.', ['legalEntityUuid' => $this->legalEntityUuid]);
 
             if (empty($this->role)) {
                 $this->isFirstLogin = true;
@@ -159,7 +159,7 @@ class Login extends Component
 
         if (!$this->isLocalAuth) {
             if (empty($this->legalEntityUuid)) {
-                Log::error("Legal entity hasn't been choose for email $user->email");
+                Log::error('Legal entity has not been chosen', ['user_id' => $user->id]);
 
                 return Redirect::back();
             }
@@ -219,7 +219,6 @@ class Login extends Component
         if (Cache::has("login_lockout:$key")) {
             Log::warning(__('auth.login.error.lockout', [], 'en'), [
                 'ip' => request()->ip(),
-                'email' => $credentials['email']
             ]);
 
             return false;

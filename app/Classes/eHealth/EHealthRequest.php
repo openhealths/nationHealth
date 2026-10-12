@@ -15,7 +15,6 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\HigherOrderTapProxy;
-use Illuminate\Support\Str;
 
 abstract class EHealthRequest extends PendingRequest
 {
@@ -73,8 +72,12 @@ abstract class EHealthRequest extends PendingRequest
      */
     public function send(string $method, string $url, array $options = []): EHealthResponse|Response
     {
-        Log::debug("eHealth Request: {$method} {$url}", [
-            'options' => $this->sanitizeOptionsForLog($options),
+        $logUrl = parse_url($url, PHP_URL_PATH) ?: '[unknown endpoint]';
+
+        // API payloads and query strings can contain credentials, tokens or echoed secrets.
+        Log::debug('eHealth Request', [
+            'method' => $method,
+            'url' => $logUrl,
         ]);
 
         try {
@@ -93,44 +96,18 @@ abstract class EHealthRequest extends PendingRequest
 
         if ($response->status() === 422) {
             Log::error('eHealth validation failed 422', [
-                'url' => $url,
-                'request' => $this->sanitizeOptionsForLog($options),
-                'response' => $response->json()
+                'status' => $response->status(),
+                'url' => $logUrl,
             ]);
             throw new EHealthValidationException($response->json());
         }
 
         Log::error('eHealth request failed', [
             'status' => $response->status(),
-            'url' => $url,
-            'body' => $response->body()
+            'url' => $logUrl,
         ]);
 
         throw new EHealthResponseException($response);
-    }
-
-    /**
-     * Remove sensitive and too-large values from HTTP client logs.
-     */
-    private function sanitizeOptionsForLog(array $options): array
-    {
-        if (isset($options['json']) && is_array($options['json'])) {
-            $json = $options['json'];
-
-            foreach (['signed_content', 'signed_medication_request_request', 'signed_medication_reject', 'signed_device_request_request', 'signed_data', 'signed_legal_entity_request'] as $signedKey) {
-                if (isset($json[$signedKey]) && is_string($json[$signedKey])) {
-                    $json[$signedKey] = '[base64_signed_content_redacted length=' . strlen($json[$signedKey]) . ']';
-                }
-            }
-
-            $options['json'] = $json;
-        }
-
-        if (isset($options['body']) && is_string($options['body']) && strlen($options['body']) > 512) {
-            $options['body'] = '[body_redacted length=' . strlen($options['body']) . ' preview=' . Str::limit($options['body'], 120) . ']';
-        }
-
-        return $options;
     }
 
     /**

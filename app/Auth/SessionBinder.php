@@ -204,8 +204,8 @@ class SessionBinder
         } catch (EHealthException|EHealthConnectionException $exception) {
             // The local session is dropped either way, so a failed revocation must not block the login
             Log::channel('e_health_errors')->error(
-                "Error while terminating the previous eHealth session: {$exception->getMessage()}",
-                ['exception' => $exception]
+                'Error while terminating the previous eHealth session',
+                ['exception_type' => $exception::class]
             );
         }
     }

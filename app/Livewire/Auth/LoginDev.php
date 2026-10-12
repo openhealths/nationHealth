@@ -98,7 +98,7 @@ class LoginDev extends Login
         try {
             $code = EHealth::auth()->authorize($accessToken, $scopes, $credentials['legalEntityUuid']);
         } catch (Exception $exception) {
-            Log::channel('e_health_errors')->error('Authorization error: ' . (data_get($exception, 'details.error.message') ?? $exception->getMessage()), ['exception' => $exception]);
+            Log::channel('e_health_errors')->error('Authorization error', ['exception_type' => $exception::class]);
 
             Session::flash('error', $exception->getMessage());
 

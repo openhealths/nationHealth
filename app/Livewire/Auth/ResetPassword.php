@@ -67,7 +67,7 @@ class ResetPassword extends Component
          * redirect them back to where they came from with their error message.
          */
         if ($status !== Password::PASSWORD_RESET) {
-            Log::error('Reset password:', ['email' => $this->email, 'status' => __($status)]);
+            Log::error('Reset password:', ['status' => __($status)]);
 
             session()->flash('error', __('auth.login.error.reset_password'));
 

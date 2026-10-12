@@ -149,7 +149,7 @@ class EHealthLoginController extends Controller
             Log::error('EHealth login post-auth listener failed', [
                 'user_id' => $user->id,
                 'legal_entity_id' => $legalEntity->id,
-                'exception' => $message,
+                'exception_type' => $exception::class,
             ]);
 
             return $this->breakAuth($message);
@@ -247,7 +247,6 @@ class EHealthLoginController extends Controller
 
             Log::info('Local user account was created during eHealth login.', [
                 'user_id' => $user->id,
-                'email' => $ehealthEmail,
                 'ehealth_user_id' => $ehealthUserId,
             ]);
 
@@ -256,8 +255,7 @@ class EHealthLoginController extends Controller
             } catch (\Exception $e) {
                 Log::error('Failed to send credentials email to user.', [
                     'user_id' => $user->id,
-                    'user_email' => $user->email,
-                    'error' => $e->getMessage(),
+                    'exception_type' => $e::class,
                 ]);
             }
         }
@@ -317,9 +315,7 @@ class EHealthLoginController extends Controller
         // Redirect to login page with error message
         $err = $err ?: 'auth.login.error.common';
 
-        $logMessage = __($err, [], 'en');
-
-        Log::error($logMessage);
+        Log::error('eHealth login failed');
 
         $errorMessage = __($err);
 
