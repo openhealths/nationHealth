@@ -18,7 +18,7 @@ class PrepersonPolicy
      */
     public function before(User $user, string $ability): ?Response
     {
-        if (!in_array(legalEntity()->type->name, config('ehealth.preperson_legal_entities_allowed_types'), true)) {
+        if (!in_array(legalEntity()->type->name, config('ehealth.preperson_legal_entities_allowed_types', []), true)) {
             return Response::denyWithStatus(404);
         }
 

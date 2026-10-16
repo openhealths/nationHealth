@@ -242,23 +242,67 @@ class EmployeeRequestSyncOneTest extends TestCase
     }
 
     #[Test]
-    public function sync_applies_when_details_include_employee_id_even_if_search_misses(): void
+    public function sync_applies_when_employee_list_search_resolves_uuid(): void
     {
         $legalEntity = $this->makeLegalEntity();
         $request = $this->makePendingRequest($legalEntity);
         session()->put(config('ehealth.api.oauth.bearer_token'), 'test-token');
 
         $employeeUuid = (string) Str::uuid();
+        $updatedAt = '2024-06-15T12:00:00Z';
 
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('validate')->once()->andReturn([
             'uuid' => $request->uuid,
             'status' => 'APPROVED',
-            'employee_id' => $employeeUuid,
             'legal_entity_id' => $legalEntity->uuid,
             'position' => 'P1',
             'employee_type' => 'DOCTOR',
             'start_date' => '2024-01-10',
+            'updated_at' => $updatedAt,
+        ]);
+
+        $api = Mockery::mock(EmployeeRequestApi::class);
+        $api->shouldReceive('getDetails')->once()->with($request->uuid)->andReturn($response);
+        $this->instance(EmployeeRequestApi::class, $api);
+
+        $matcher = Mockery::mock(EmployeeRequestMatcher::class);
+        $matcher->shouldReceive('findApprovedForRequest')->once()->andReturn([
+            'uuid' => $employeeUuid,
+            'status' => 'APPROVED',
+        ]);
+        $this->instance(EmployeeRequestMatcher::class, $matcher);
+
+        $processor = Mockery::mock(EmployeeRequestProcessor::class, [$matcher])->makePartial();
+        $processor->shouldAllowMockingProtectedMethods();
+        $processor->shouldReceive('applyApprovedRequest')->once()->withArgs(
+            function (EmployeeRequest $req, array $payload) use ($request, $employeeUuid, $updatedAt): bool {
+                return $req->is($request)
+                    && ($payload['employee_id'] ?? null) === $employeeUuid
+                    && ($payload['status'] ?? null) === 'APPROVED'
+                    && ($payload['updated_at'] ?? null) === $updatedAt;
+            }
+        );
+
+        $result = $processor->syncSinglePendingRequest($request, $legalEntity);
+
+        $this->assertSame(EmployeeRequestProcessor::OUTCOME_APPROVED, $result['outcome']);
+    }
+
+    #[Test]
+    public function sync_fails_when_create_cannot_resolve_employee_without_list_match(): void
+    {
+        $legalEntity = $this->makeLegalEntity();
+        $request = $this->makePendingRequest($legalEntity);
+        session()->put(config('ehealth.api.oauth.bearer_token'), 'test-token');
+
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('validate')->once()->andReturn([
+            'uuid' => $request->uuid,
+            'status' => 'APPROVED',
+            'updated_at' => '2024-06-15T12:00:00Z',
+            // getDetails must not be treated as a source of employee_id
+            'employee_id' => (string) Str::uuid(),
         ]);
 
         $api = Mockery::mock(EmployeeRequestApi::class);
@@ -271,16 +315,10 @@ class EmployeeRequestSyncOneTest extends TestCase
 
         $processor = Mockery::mock(EmployeeRequestProcessor::class, [$matcher])->makePartial();
         $processor->shouldAllowMockingProtectedMethods();
-        $processor->shouldReceive('applyApprovedRequest')->once()->withArgs(
-            function (EmployeeRequest $req, array $payload) use ($request, $employeeUuid): bool {
-                return $req->is($request)
-                    && ($payload['employee_id'] ?? null) === $employeeUuid
-                    && ($payload['status'] ?? null) === 'APPROVED';
-            }
-        );
+        $processor->shouldNotReceive('applyApprovedRequest');
 
         $result = $processor->syncSinglePendingRequest($request, $legalEntity);
 
-        $this->assertSame(EmployeeRequestProcessor::OUTCOME_APPROVED, $result['outcome']);
+        $this->assertSame(EmployeeRequestProcessor::OUTCOME_FAILED, $result['outcome']);
     }
 }

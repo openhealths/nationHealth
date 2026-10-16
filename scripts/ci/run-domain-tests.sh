@@ -14,6 +14,7 @@ php artisan config:clear --no-interaction
 DOMAIN_PATHS=(
   tests/Unit/Employee
   tests/Unit/Config/PartyVerificationScopesTest.php
+  tests/Unit/Config/PrepersonPolicyConfigurationTest.php
   tests/Unit/Enums/Party
   tests/Unit/Enums/CarePlanStatusTest.php
   tests/Unit/Livewire/Employee

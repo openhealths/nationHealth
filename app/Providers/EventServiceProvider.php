@@ -17,6 +17,7 @@ use App\Listeners\OnRegularLoginSyncronization;
 use App\Listeners\SyncUserRolesAfterVerification;
 use App\Listeners\FirstLoginOwnerSynchronization;
 use App\Listeners\eHealth\EmployeeRequestActualize;
+use App\Listeners\eHealth\EmployeePendingEditApply;
 use App\Listeners\PartyVerificationSyncStatusOnLogin;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
@@ -42,6 +43,8 @@ class EventServiceProvider extends ServiceProvider
             FirstLoginOwnerSynchronization::class,
             OnRegularLoginSyncronization::class,
             EmployeeCreate::class,
+            // After EmployeeCreate skip-gate: apply pending edits only when scoped (getById).
+            EmployeePendingEditApply::class,
             OwnerNewReplace::class,
             EmployeeRequestActualize::class,
             PartyVerificationSyncStatusOnLogin::class
