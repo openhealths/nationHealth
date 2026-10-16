@@ -120,7 +120,12 @@ class PatientReferrals extends BasePatientComponent
 
     public function openSign(string $uuid, string $kind): void
     {
-        $this->ownedReferral($uuid);
+        $record = $this->ownedReferral($uuid);
+        if ($record instanceof DeviceRequestRequest) {
+            $this->redirectRoute('device-requests.create', ['legalEntity' => legalEntity(), 'person' => $this->patient(), 'draft' => $uuid]);
+
+            return;
+        }
         $this->requestIdToSign = $uuid;
         $this->requestKindToSign = $kind === 'device_request' ? 'device_request' : 'service_request';
         $this->actionType = $this->requestKindToSign === 'device_request'
@@ -166,7 +171,12 @@ class PatientReferrals extends BasePatientComponent
 
     public function cancelReferral(string $uuid, string $kind): void
     {
-        $this->ownedReferral($uuid);
+        $record = $this->ownedReferral($uuid);
+        if ($record instanceof DeviceRequestRequest) {
+            $this->redirectRoute('device-requests.index', ['legalEntity' => legalEntity(), 'person' => $this->patient()]);
+
+            return;
+        }
         $this->requestIdToSign = $uuid;
         $this->requestKindToSign = $kind === 'device_request' ? 'device_request' : 'service_request';
         $this->actionType = 'cancel_referral';
@@ -257,6 +267,11 @@ class PatientReferrals extends BasePatientComponent
         }
 
         $record = $this->ownedReferral((string) $this->requestIdToSign);
+        if ($record instanceof DeviceRequestRequest) {
+            $this->redirectRoute('device-requests.index', ['legalEntity' => legalEntity(), 'person' => $this->patient()]);
+
+            return;
+        }
         $kind = $record instanceof ServiceRequestRequest ? 'service_request' : 'device_request';
 
         try {
@@ -307,6 +322,11 @@ class PatientReferrals extends BasePatientComponent
         }
 
         $requestRecord = $this->ownedReferral((string) $this->requestIdToSign);
+        if ($requestRecord instanceof DeviceRequestRequest) {
+            $this->redirectRoute('device-requests.create', ['legalEntity' => legalEntity(), 'person' => $this->patient(), 'draft' => $requestRecord->uuid]);
+
+            return;
+        }
 
         try {
             $validated = $this->form->validate($this->form->signingRules());
@@ -396,7 +416,12 @@ class PatientReferrals extends BasePatientComponent
 
     public function resendSms(string $uuid, string $kind): void
     {
-        $this->ownedReferral($uuid);
+        $record = $this->ownedReferral($uuid);
+        if ($record instanceof DeviceRequestRequest) {
+            $this->redirectRoute('device-requests.index', ['legalEntity' => legalEntity(), 'person' => $this->patient()]);
+
+            return;
+        }
 
         try {
             $response = app(ReferralRequestLifecycleService::class)->resendSms($this->uuid, $uuid, $kind);

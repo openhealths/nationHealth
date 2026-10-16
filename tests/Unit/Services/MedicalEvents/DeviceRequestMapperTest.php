@@ -12,6 +12,27 @@ use Tests\TestCase;
 
 class DeviceRequestMapperTest extends TestCase
 {
+    public function test_signed_request_keeps_reason_auth_method_and_parameters_without_quantity(): void
+    {
+        $requestId = (string) Str::uuid();
+        $reasonId = (string) Str::uuid();
+        $authMethodId = (string) Str::uuid();
+        $parameter = ['code' => ['coding' => [['system' => 'device_request_code_parameter', 'code' => 'brakes']]], 'value_boolean' => false];
+        $payload = (new DeviceRequestMapper())->toCreateSignedContent([
+            'uuid' => $requestId, 'device_id' => '12_18_06', 'device_code_type' => 'CLASSIFICATION_TYPE',
+            'device_code_system' => 'assistive_devices', 'quantity' => null,
+            'started_at' => today()->toDateString(), 'ended_at' => today()->addDay()->toDateString(),
+            'reason_reference' => [['type' => 'condition', 'uuid' => $reasonId]],
+            'inform_with' => $authMethodId, 'parameter' => [$parameter],
+        ], ['person_uuid' => (string) Str::uuid(), 'encounter_uuid' => (string) Str::uuid(), 'employee_uuid' => (string) Str::uuid(), 'legal_entity_uuid' => (string) Str::uuid()]);
+        $this->assertArrayNotHasKey('quantity', $payload);
+        $this->assertSame($reasonId, $payload['reason'][0]['identifier']['value']);
+        $this->assertSame($authMethodId, $payload['inform_with']);
+        $this->assertSame([$parameter], $payload['parameter']);
+        $this->assertSame('assistive_devices', $payload['code']['coding'][0]['system']);
+        $this->assertSame(today()->addDay()->utc()->format('Y-m-d\TH:i:s.000\Z'), $payload['occurrence_period']['end']);
+    }
+
     #[Test]
     public function prequalify_authored_on_is_current_utc_not_in_the_future(): void
     {
@@ -40,7 +61,7 @@ class DeviceRequestMapperTest extends TestCase
         );
 
         $authoredOn = $payload['device_request']['authored_on'];
-        $this->assertSame('2026-08-13T07:37:54.000Z', $authoredOn);
+        $this->assertSame('2026-08-13T07:38:24.000Z', $authoredOn);
 
         $occurrenceStart = CarbonImmutable::parse($payload['device_request']['occurrence_period']['start']);
         $this->assertTrue($occurrenceStart->lessThanOrEqualTo(CarbonImmutable::now('UTC')->addMinute()));

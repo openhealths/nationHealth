@@ -27,6 +27,6 @@ class Dictionary extends Request
      */
     public function getMany(array $query = []): PromiseInterface|EHealthResponse
     {
-        return $this->timeout(300)->get(self::URL, $query);
+        return $this->timeout(300)->get(self::URL, $this->normalizeActiveFilter($query));
     }
 }

@@ -55,7 +55,7 @@ class DeviceRequestRequestRepository extends BaseRepository
                     'started_at' => $data['started_at'] ?? null,
                     'ended_at' => $data['ended_at'] ?? null,
                     'device_id' => $data['device_id'],
-                    'quantity' => $data['quantity'] ?? 1,
+                    'quantity' => array_key_exists('quantity', $data) ? $data['quantity'] : 1,
                     'program_id' => $data['program_id'] ?? null,
                     'intent_id' => $fhirRefs['intent_id'],
                     'category_id' => $fhirRefs['category_id'],

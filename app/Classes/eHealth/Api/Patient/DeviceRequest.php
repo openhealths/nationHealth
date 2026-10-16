@@ -114,6 +114,33 @@ class DeviceRequest extends PatientApiBase
      */
     public function resendSms(string $patientId, string $id): PromiseInterface|EHealthResponse
     {
-        return $this->post(self::URL . "/{$patientId}/device_requests/{$id}/actions/resend", []);
+        return $this->patch(self::URL . "/{$patientId}/device_requests/{$id}/actions/resend", []);
+    }
+
+    public function revoke(string $patientId, string $id, array $payload): PromiseInterface|EHealthResponse
+    {
+        return $this->patch(self::URL . "/{$patientId}/device_requests/{$id}/actions/revoke", $payload);
+    }
+
+    public function complete(string $patientId, string $id): PromiseInterface|EHealthResponse
+    {
+        return $this->patch(self::URL . "/{$patientId}/device_requests/{$id}/actions/complete", []);
+    }
+
+    public function markInError(string $patientId, string $id, array $payload): PromiseInterface|EHealthResponse
+    {
+        return $this->patch(self::URL . "/{$patientId}/device_requests/{$id}/actions/mark_in_error", $payload);
+    }
+
+    public function getDispenses(string $patientId, array $query = []): PromiseInterface|EHealthResponse
+    {
+        $this->setDefaultPageSize();
+
+        return $this->get(self::URL . "/{$patientId}/device_dispenses", array_merge($this->options['query'], $query));
+    }
+
+    public function getDispense(string $patientId, string $id): PromiseInterface|EHealthResponse
+    {
+        return $this->get(self::URL . "/{$patientId}/device_dispenses/{$id}");
     }
 }

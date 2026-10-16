@@ -83,7 +83,7 @@ class Configuration extends Request
     {
         $this->setDefaultPageSize();
 
-        return $this->get(self::URL_DEVICES, $query);
+        return $this->get(self::URL_DEVICES, $this->normalizeActiveFilter($query));
     }
 
     /**
@@ -109,7 +109,7 @@ class Configuration extends Request
     {
         $this->setDefaultPageSize();
 
-        return $this->get(self::URL_DEVICE_PARAMETERS, $query);
+        return $this->get(self::URL_DEVICE_PARAMETERS, $this->normalizeActiveFilter($query));
     }
 
     /**
@@ -134,7 +134,7 @@ class Configuration extends Request
     {
         $this->setDefaultPageSize();
 
-        return $this->get(self::URL_DICTIONARIES, $query);
+        return $this->get(self::URL_DICTIONARIES, $this->normalizeActiveFilter($query));
     }
 
     /**
@@ -162,4 +162,5 @@ class Configuration extends Request
 
         return $this->get(self::URL_OBSERVATIONS, $query);
     }
+
 }

@@ -11,6 +11,16 @@ use App\Core\Arr;
  */
 trait EHealthApiFormatter
 {
+    /** Metadata search accepts literal true/false, not Guzzle's boolean 1/0. */
+    protected function normalizeActiveFilter(array $query): array
+    {
+        if (isset($query['is_active']) && is_bool($query['is_active'])) {
+            $query['is_active'] = $query['is_active'] ? 'true' : 'false';
+        }
+
+        return $query;
+    }
+
     /**
      * Format data for eHealth API calls.
      *

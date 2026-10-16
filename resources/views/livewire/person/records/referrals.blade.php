@@ -5,6 +5,12 @@
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
 
     <x-slot name="headerActions">
+        @can('device_request:read')
+            <a
+                class="button-primary"
+                href="{{ route('device-requests.index', ['legalEntity' => legalEntity(), 'person' => $personId]) }}"
+            >Е-запити на медичні вироби</a>
+        @endcan
         <button
             wire:click.prevent="applyFilters"
             type="button"

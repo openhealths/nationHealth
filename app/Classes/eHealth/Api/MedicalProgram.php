@@ -15,6 +15,11 @@ class MedicalProgram extends Request
 {
     public const string URL = '/api/medical_programs';
 
+    public function getById(string $id): PromiseInterface|EHealthResponse
+    {
+        return $this->get(self::URL . '/' . $id);
+    }
+
     /**
      * Receives a list of medical programs.
      *
