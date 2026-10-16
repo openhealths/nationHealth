@@ -118,6 +118,7 @@ class EmployeeRequestSyncOneTest extends TestCase
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('validate')->once()->andReturn([
             'uuid' => $request->uuid,
+            'legal_entity_uuid' => $legalEntity->uuid,
             'status' => 'REJECTED',
         ]);
 
@@ -141,6 +142,7 @@ class EmployeeRequestSyncOneTest extends TestCase
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('validate')->once()->andReturn([
             'uuid' => $request->uuid,
+            'legal_entity_uuid' => $legalEntity->uuid,
             'status' => 'EXPIRED',
         ]);
 
@@ -164,6 +166,7 @@ class EmployeeRequestSyncOneTest extends TestCase
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('validate')->once()->andReturn([
             'uuid' => $request->uuid,
+            'legal_entity_uuid' => $legalEntity->uuid,
             'status' => 'NEW',
         ]);
 
@@ -191,6 +194,7 @@ class EmployeeRequestSyncOneTest extends TestCase
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('validate')->once()->andReturn([
             'uuid' => $request->uuid,
+            'legal_entity_uuid' => $legalEntity->uuid,
             'status' => 'NEW',
             // Edit flow: employee already exists, but request is not email-confirmed yet.
             'employee_id' => (string) Str::uuid(),
@@ -224,6 +228,7 @@ class EmployeeRequestSyncOneTest extends TestCase
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('validate')->once()->andReturn([
             'uuid' => $request->uuid,
+            'legal_entity_uuid' => $legalEntity->uuid,
             'status' => 'SIGNED',
         ]);
 
@@ -253,6 +258,7 @@ class EmployeeRequestSyncOneTest extends TestCase
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('validate')->once()->andReturn([
             'uuid' => $request->uuid,
+            'legal_entity_uuid' => $legalEntity->uuid,
             'status' => 'APPROVED',
             'employee_id' => $employeeUuid,
             'legal_entity_id' => $legalEntity->uuid,

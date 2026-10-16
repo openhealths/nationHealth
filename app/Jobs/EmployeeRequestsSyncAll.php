@@ -22,6 +22,9 @@ class EmployeeRequestsSyncAll extends EHealthJob
     public const string SCOPE_REQUIRED = 'employee_request:read';
     public const string ENTITY = LegalEntity::ENTITY_EMPLOYEE_REQUEST;
 
+    /** @var list<string> */
+    protected array $requestUuids = [];
+
     public function handle(): void
     {
         if ($this->batch()?->processedJobs === 0) {
@@ -48,7 +51,7 @@ class EmployeeRequestsSyncAll extends EHealthJob
 
         // Use the service to process the data
         $processor = app(EmployeeRequestProcessor::class);
-        $processor->processBatch($validatedData, $this->legalEntity);
+        $this->requestUuids = $processor->processBatch($validatedData, $this->legalEntity);
     }
 
     protected function getAdditionalMiddleware(): array
@@ -60,16 +63,30 @@ class EmployeeRequestsSyncAll extends EHealthJob
      * Get the next entity job to be scheduled after EmployeeRequestSync completes.
      *
      * If the job is standalone, returns a CompleteSync job for the current legal entity.
-     * Otherwise, returns a chain of EmployeeRequestDetailsUpsert jobs for employee requests with PARTIAL sync status.
+     * Verify this page's candidates before continuing to the next entity.
      *
      * @return EHealthJob|null
      */
     protected function getNextEntityJob(): ?EHealthJob
     {
-        $nextEntity = $this->getEmployeeRequestDetailsStartJob($this->legalEntity, $this->nextEntity) ?? $this->nextEntity;
-
-        return $this->standalone || !$nextEntity
+        $nextEntity = $this->standalone || !$this->nextEntity
             ? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin)
-            : $nextEntity;
+            : $this->nextEntity;
+
+        return $this->getRequestDetailsChain($nextEntity);
+    }
+
+    protected function getNextPageJob(): EHealthJob
+    {
+        return $this->getRequestDetailsChain(parent::getNextPageJob());
+    }
+
+    public function getRequestDetailsChain(?EHealthJob $nextEntity, ?array $requestUuids = null): ?EHealthJob
+    {
+        foreach (array_reverse($requestUuids ?? $this->requestUuids) as $uuid) {
+            $nextEntity = new EmployeeRequestDetailsUpsert($uuid, $this->legalEntity, $nextEntity, isFirstLogin: $this->isFirstLogin);
+        }
+
+        return $nextEntity;
     }
 }
