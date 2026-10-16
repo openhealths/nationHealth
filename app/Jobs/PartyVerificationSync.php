@@ -7,7 +7,10 @@ namespace App\Jobs;
 use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\EHealthJob;
+use App\Enums\JobStatus;
+use App\Exceptions\EHealth\EHealthResponseException;
 use App\Models\LegalEntity;
+use App\Notifications\SyncNotification;
 use App\Services\Party\PartyVerificationBulkAccess;
 use App\Services\Party\PartyVerificationCache;
 use App\Traits\BatchLegalEntityQueries;
@@ -27,6 +30,19 @@ class PartyVerificationSync extends EHealthJob
     public const string SCOPE_REQUIRED = PartyVerificationBulkAccess::BULK_SCOPE;
 
     public const string ENTITY = LegalEntity::ENTITY_PARTY_VERIFICATION;
+
+    public function handle(): void
+    {
+        try {
+            parent::handle();
+        } catch (EHealthResponseException $exception) {
+            if (!$this->isMissingScope($exception)) {
+                throw $exception;
+            }
+
+            $this->fail($exception);
+        }
+    }
 
     /**
      * Bulk sync via GET /api/parties/verifications (party_verification:read).
@@ -65,12 +81,27 @@ class PartyVerificationSync extends EHealthJob
     public function failed(Throwable|null $exception): void
     {
         Log::error('Job [PartyVerificationSync] failed.', [
-            'legal_entity_id' => $this->legalEntity->id ?? 'unknown',
+            'legalEntityId' => $this->legalEntity->id ?? 'unknown',
             'error' => $exception?->getMessage(),
             'trace' => $exception?->getTraceAsString(),
         ]);
 
+        if ($this->isMissingScope($exception)) {
+            $this->setEntityStatus(JobStatus::PAUSED);
+            $user = $this->batch()?->options['user'] ?? $this->user;
+            $user?->notify(new SyncNotification('party_verification', 'paused'));
+
+            return;
+        }
+
         parent::failed($exception);
+    }
+
+    private function isMissingScope(?Throwable $exception): bool
+    {
+        return $exception instanceof EHealthResponseException
+            && $exception->response->status() === 403
+            && str_contains((string) $exception->response->json('error.message', ''), 'Missing allowances:');
     }
 
     /**

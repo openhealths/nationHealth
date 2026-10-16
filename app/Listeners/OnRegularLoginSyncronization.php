@@ -48,17 +48,25 @@ class OnRegularLoginSyncronization implements ShouldQueue
             return;
         }
 
+        $resumed = false;
+
         foreach ($failedBatches as $batch) {
             echo 'Found related batch: ' . $batch->name . ' id: ' . $batch->id . PHP_EOL;
+
+            if (!$this->restartBatch($batch, $event->user, $event->token, $event->legalEntity, $event->scopes)) {
+                continue;
+            }
+
+            $resumed = true;
 
             if ($batch->name === self::FIRST_LOGIN_BATCH_NAME) {
                 $event->legalEntity?->setEntityStatus(JobStatus::PROCESSING);
             }
-
-            $this->restartBatch($batch, $event->user, $event->token, $event->legalEntity);
         }
 
-        $event->user->notify(new SyncNotification('legal_entity', 'resumed'));
+        if ($resumed) {
+            $event->user->notify(new SyncNotification('legal_entity', 'resumed'));
+        }
     }
 
     /**

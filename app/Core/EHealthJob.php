@@ -369,6 +369,12 @@ abstract class EHealthJob implements ShouldQueue
         return $users->get($userKey);
     }
 
+    /** Check saved steps without creating or running the next synchronization job. */
+    public function requiresScope(string $scope): bool
+    {
+        return $this->requiredScope() === $scope || ($this->nextEntity?->requiresScope($scope) ?? false);
+    }
+
     /**
      * Get the required scope for the job.
      *
