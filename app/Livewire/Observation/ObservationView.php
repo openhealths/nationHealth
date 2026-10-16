@@ -14,6 +14,7 @@ use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
@@ -109,8 +110,15 @@ class ObservationView extends BasePatientComponent
             return;
         }
 
+        $observation = $this->observation();
+
+        // A record of a person merged into the patient stays with its own owner
+        $owner = $observation->prepersonId !== null
+            ? Preperson::findOrFail($observation->prepersonId)
+            : Person::findOrFail($observation->personId);
+
         try {
-            Repository::observation()->sync($this->patient(), [$response->validate()]);
+            Repository::observation()->sync($owner, [$response->validate()]);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing the observation');
 
@@ -124,14 +132,15 @@ class ObservationView extends BasePatientComponent
     }
 
     /**
-     * Resolve the observation being displayed, scoped to the patient so that a record belonging to somebody else
-     * is not reachable by its ID. Loaded again on later requests, where Livewire hydrates without mount().
+     * Resolve the observation being displayed, scoped to the patient and the persons merged into it so that a record
+     * belonging to somebody else is not reachable by its ID. Loaded again on later requests, where Livewire hydrates
+     * without mount().
      *
      * @return Observation
      */
     protected function observation(): Observation
     {
-        return $this->observationModel ??= Observation::forPatient($this->patient())
+        return $this->observationModel ??= Observation::readableFor($this->patient(), true, Auth::user())
             ->withAllRelations()
             ->whereId($this->observationId)
             ->firstOrFail();

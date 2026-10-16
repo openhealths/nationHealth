@@ -297,6 +297,17 @@ class CarePlanRepository
                     MedicalEventsRepository::codeableConcept()->attach($careManager, $rawFhir['careManager']);
                 }
 
+                $managingOrganization = isset($rawFhir['managing_organization']['identifier']['value'])
+                    ? MedicalEventsRepository::identifier()->store(
+                        $rawFhir['managing_organization']['identifier']['value'],
+                        $rawFhir['managing_organization']['display_value'] ?? null
+                    )
+                    : null;
+
+                if ($managingOrganization && isset($rawFhir['managing_organization']['identifier']['type'])) {
+                    MedicalEventsRepository::codeableConcept()->attach($managingOrganization, $rawFhir['managing_organization']);
+                }
+
                 $author = null;
                 $authorUuid = $rawFhir['author']['identifier']['value'] ?? null;
                 if ($authorUuid) {
@@ -367,6 +378,7 @@ class CarePlanRepository
                         'encounter_identifier_id' => $encounterIdentifier?->id,
                         'encounter_id' => $localEncounterId ?? $carePlan->encounter_id,
                         'care_manager_id' => $careManager?->id,
+                        'managing_organization_id' => $managingOrganization?->id ?? $carePlan->managingOrganizationId,
                         'period_start' => isset($rawFhir['period']['start'])
                             ? \Carbon\Carbon::parse($rawFhir['period']['start'])
                             : ($rawFhir['ehealth_inserted_at'] ?? now()),
@@ -390,6 +402,7 @@ class CarePlanRepository
                         'encounter_identifier_id' => $encounterIdentifier?->id,
                         'encounter_id' => $localEncounterId,
                         'care_manager_id' => $careManager?->id,
+                        'managing_organization_id' => $managingOrganization?->id,
                         'period_start' => isset($rawFhir['period']['start'])
                             ? \Carbon\Carbon::parse($rawFhir['period']['start'])
                             : ($rawFhir['ehealth_inserted_at'] ?? now()),

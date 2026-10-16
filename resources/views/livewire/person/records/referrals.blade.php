@@ -119,7 +119,7 @@
                                         </a>
                                     @elseif (!empty($referral['encounterId']) && $personId)
                                         <a
-                                            href="{{ route('encounter.view', [legalEntity(), 'person' => $personId, 'encounterId' => $referral['encounterId']]) }}"
+                                            href="{{ route('encounter.view', [legalEntity(), 'person' => $personId, 'encounter' => $referral['encounterId']]) }}"
                                             class="text-link"
                                         >
                                             {{ $referral['basisLabel'] }}
@@ -148,7 +148,7 @@
                                             </button>
                                             @if (!empty($referral['encounterId']) && $personId)
                                                 <a
-                                                    href="{{ route('encounter.view', [legalEntity(), 'person' => $personId, 'encounterId' => $referral['encounterId']]) }}"
+                                                    href="{{ route('encounter.view', [legalEntity(), 'person' => $personId, 'encounter' => $referral['encounterId']]) }}"
                                                     class="text-link text-xs"
                                                 >
                                                     {{ __('Редагувати') }}

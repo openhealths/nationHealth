@@ -17,7 +17,9 @@ use App\Exceptions\EHealth\EHealthException;
 use App\Jobs\DiagnosticReportSync;
 use App\Livewire\DiagnosticReport\Forms\DiagnosticReportCancellationForm as Form;
 use App\Livewire\Person\Records\BasePatientComponent;
+use App\Models\Declaration;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Repositories\MedicalEvents\Repository;
@@ -136,6 +138,19 @@ class DiagnosticReportIndex extends BasePatientComponent
     }
 
     /**
+     * Whether the user has an active declaration or approval on the patient, which opens the diagnostic reports of
+     * every legal entity.
+     *
+     * @return bool
+     */
+    #[Computed]
+    public function hasPatientAccess(): bool
+    {
+        return Declaration::accessGrantedTo(Auth::user(), $this->patient(), legalEntity())->exists()
+            || Approval::accessGrantedTo(Auth::user(), $this->patient(), legalEntity())->exists();
+    }
+
+    /**
      * Diagnostic reports for the current page, either from the eHealth search or from the local database.
      *
      * @return LengthAwarePaginator
@@ -191,7 +206,7 @@ class DiagnosticReportIndex extends BasePatientComponent
         try {
             $response = EHealth::diagnosticReport()->getBySearchParams(
                 $this->uuid,
-                ['managing_organization_id' => legalEntity()->uuid]
+                $this->hasPatientAccess ? [] : ['managing_organization_id' => legalEntity()->uuid]
             );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while synchronizing diagnostic report');
@@ -235,7 +250,7 @@ class DiagnosticReportIndex extends BasePatientComponent
                 [
                     legalEntity(),
                     'preperson' => $this->prepersonId,
-                    'diagnosticReportId' => $diagnosticReport->id,
+                    'diagnosticReport' => $diagnosticReport->id,
                 ],
                 navigate: true
             );
@@ -248,7 +263,7 @@ class DiagnosticReportIndex extends BasePatientComponent
             [
                 legalEntity(),
                 'person' => $this->personId,
-                'diagnosticReportId' => $diagnosticReport->id,
+                'diagnosticReport' => $diagnosticReport->id,
             ],
             navigate: true
         );
@@ -549,7 +564,7 @@ class DiagnosticReportIndex extends BasePatientComponent
      */
     protected function paginateLocalDiagnosticReports(): LengthAwarePaginator
     {
-        $paginator = DiagnosticReport::forPatient($this->patient())
+        $paginator = DiagnosticReport::readableFor($this->patient(), $this->hasPatientAccess)
             ->notInDraftEncounter($this->patient())
             ->withAllRelations()
             ->recentlyUpdatedFirst()
@@ -670,7 +685,7 @@ class DiagnosticReportIndex extends BasePatientComponent
             'issued_from' => $this->filterIssuedFrom ?: null,
             'issued_to' => $this->filterIssuedTo ?: null,
             'based_on' => $this->filterBasedOn ?: null,
-            'managing_organization_id' => legalEntity()->uuid,
+            'managing_organization_id' => $this->hasPatientAccess ? null : legalEntity()->uuid,
             'specimen_id' => $this->filterSpecimenId ?: null,
             'page' => $this->getPage(),
             'page_size' => config('pagination.per_page')

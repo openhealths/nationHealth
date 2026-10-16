@@ -4,88 +4,138 @@ declare(strict_types=1);
 
 namespace App\Livewire\Encounter;
 
-use App\Enums\Person\EncounterStatus;
+use App\Classes\eHealth\EHealth;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
+use App\Livewire\Person\Records\BasePatientComponent;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
 use App\Models\Preperson;
+use App\Repositories\MedicalEvents\Repository;
+use Illuminate\Support\Facades\Session;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
-use Livewire\Attributes\On;
+use Throwable;
 
-class EncounterView extends EncounterEdit
+class EncounterView extends BasePatientComponent
 {
     /**
-     * Edit page of a draft that is not waiting for eHealth.
+     * ID of the encounter being displayed.
      *
-     * @var string|null
+     * @var int
      */
     #[Locked]
-    public ?string $editUrl = null;
+    public int $encounterId;
 
     /**
-     * Load the encounter package for viewing, offering its edit page while it can still be changed.
+     * eHealth ID of the encounter, kept so that a refresh does not have to read the record to find it.
+     *
+     * @var string
+     */
+    #[Locked]
+    public string $encounterUuid;
+
+    /**
+     * Request-scoped memoized encounter.
+     *
+     * @var Encounter|null
+     */
+    private ?Encounter $encounterModel = null;
+
+    protected array $dictionaryNames = [
+        'eHealth/encounter_classes',
+        'eHealth/encounter_types',
+        'eHealth/ICPC2/reasons',
+        'eHealth/ICPC2/actions',
+        'eHealth/diagnosis_roles',
+        'eHealth/cancellation_reasons',
+        'eHealth/encounter_admit_source',
+        'eHealth/encounter_re_admission',
+        'eHealth/encounter_discharge_disposition',
+        'eHealth/encounter_discharge_department'
+    ];
+
+    /**
+     * Bind the route models and load the encounter being displayed.
      *
      * @param  LegalEntity  $legalEntity
-     * @param  int  $encounterId
      * @param  Person|null  $person
      * @param  Preperson|null  $preperson
+     * @param  Encounter|null  $encounter
      * @return void
      */
-    public function mount(LegalEntity $legalEntity, int $encounterId, ?Person $person = null, ?Preperson $preperson = null): void
-    {
-        parent::mount($legalEntity, $encounterId, $person, $preperson);
+    public function mount(
+        LegalEntity $legalEntity,
+        ?Person $person = null,
+        ?Preperson $preperson = null,
+        ?Encounter $encounter = null
+    ): void {
+        parent::mount($legalEntity, $person, $preperson);
 
-        // The edit page leaves only a draft that is not waiting for eHealth editable
-        $this->editUrl = $this->isReadonly ? null : $this->editPageUrl();
+        $this->getDictionary();
 
-        $this->isReadonly = true;
+        $this->encounterId = $encounter->id;
+        $this->encounterUuid = $encounter->uuid;
+
+        $this->encounter();
     }
 
     /**
-     * Offer the additional actions once the submitted encounter was processed and finished.
-     *
-     * @return void
-     */
-    #[On('submission-processed')]
-    public function showAdditionalActions(): void
-    {
-        $this->isFinished = Encounter::whereKey($this->encounterId)->value('status') === EncounterStatus::FINISHED;
-    }
-
-    /**
-     * Offer the edit page once eHealth rejected the submitted package, which stays a draft to fix.
+     * Refresh the encounter from eHealth, so that the page shows the record as it stands there now.
      *
      * @return void
      */
-    #[On('submission-rejected')]
-    public function offerEditing(): void
+    public function sync(): void
     {
-        $this->editUrl = $this->editPageUrl();
+        try {
+            $response = EHealth::encounter()->getById($this->uuid, $this->encounterUuid);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while synchronizing the encounter');
+
+            return;
+        }
+
+        $encounter = $this->encounter();
+
+        // A record of a person merged into the patient stays with its own owner
+        $owner = $encounter->preperson_id !== null
+            ? Preperson::findOrFail($encounter->preperson_id)
+            : Person::findOrFail($encounter->person_id);
+
+        try {
+            Repository::encounter()->sync($owner, [$response->validate()]);
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing the encounter');
+
+            return;
+        }
+
+        // Drop the memoized model so that the page renders what has just been stored
+        $this->encounterModel = null;
+
+        Session::flash('success', __('encounters.messages.record_synced_successfully'));
     }
 
     /**
-     * Get the edit page of the encounter.
+     * Resolve the encounter being displayed, scoped to the patient and the persons merged into it so that a record
+     * belonging to somebody else is not reachable by its ID. Loaded again on later requests, where Livewire hydrates
+     * without mount().
      *
-     * @return string
+     * @return Encounter
      */
-    private function editPageUrl(): string
+    protected function encounter(): Encounter
     {
-        return route(
-            $this->prepersonId !== null ? 'prepersons.encounter.edit' : 'encounter.edit',
-            $this->prepersonId !== null
-                ? [legalEntity(), 'preperson' => $this->prepersonId, 'encounterId' => $this->encounterId]
-                : [legalEntity(), 'person' => $this->personId, 'encounterId' => $this->encounterId]
-        );
+        return $this->encounterModel ??= Encounter::readableFor($this->patient(), true)
+            ->withRelationships()
+            ->whereId($this->encounterId)
+            ->firstOrFail();
     }
 
-    /**
-     * Render the encounter package form, which is readonly here.
-     *
-     * @return View
-     */
     public function render(): View
     {
-        return view('livewire.encounter.encounter-view');
+        return view('livewire.encounter.encounter-view')->with([
+            'encounter' => $this->encounter()
+        ]);
     }
 }

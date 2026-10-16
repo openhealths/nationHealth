@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Livewire;
 
 use App\Enums\Person\EncounterStatus;
-use App\Livewire\Encounter\Concerns\ManagesEncounterReferrals;
+use App\Livewire\EncounterPackage\Concerns\ManagesEncounterReferrals;
 use App\Livewire\Referral\ReferralIndex;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;

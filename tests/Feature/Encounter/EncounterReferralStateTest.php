@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Encounter;
 
-use App\Livewire\Encounter\EncounterEdit;
+use App\Livewire\EncounterPackage\EncounterPackageEdit;
 use App\Enums\Person\EncounterStatus;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
@@ -28,7 +28,7 @@ class EncounterReferralStateTest extends TestCase
 
     public function test_referral_signature_renders_only_the_creation_handler(): void
     {
-        Livewire::test(EncounterReferralStateHarness::class)
+        Livewire::test(EncounterPackageReferralStateHarness::class)
             ->set('actionType', 'sign_referral')
             ->set('showSignatureModal', true)
             ->assertSeeHtml('wire:click="sign"')
@@ -39,7 +39,7 @@ class EncounterReferralStateTest extends TestCase
 
     public function test_cancellation_signature_renders_only_the_cancellation_handler(): void
     {
-        Livewire::test(EncounterReferralStateHarness::class)
+        Livewire::test(EncounterPackageReferralStateHarness::class)
             ->set('actionType', 'cancel_encounter')
             ->set('showSignatureModal', true)
             ->assertSeeHtml('wire:click="cancelSelectedEncounter"')
@@ -49,7 +49,7 @@ class EncounterReferralStateTest extends TestCase
     #[DataProvider('unrelatedSignatureActions')]
     public function test_misrouted_cancellation_does_not_validate_an_unrelated_signature(?string $action): void
     {
-        Livewire::test(EncounterReferralStateHarness::class)
+        Livewire::test(EncounterPackageReferralStateHarness::class)
             ->set('actionType', $action)
             ->set('showSignatureModal', true)
             ->call('cancelSelectedEncounter')
@@ -65,7 +65,7 @@ class EncounterReferralStateTest extends TestCase
 
     public function test_cancellation_requires_its_reason_and_explanation(): void
     {
-        Livewire::test(EncounterReferralStateHarness::class)
+        Livewire::test(EncounterPackageReferralStateHarness::class)
             ->set('actionType', 'cancel_encounter')
             ->call('cancelSelectedEncounter')
             ->assertHasErrors([
@@ -77,7 +77,7 @@ class EncounterReferralStateTest extends TestCase
     public function test_search_selection_clears_results_and_only_the_changed_field_errors(): void
     {
         $service = $this->service();
-        Livewire::test(EncounterReferralStateHarness::class)
+        Livewire::test(EncounterPackageReferralStateHarness::class)
             ->set('encounterReferralServiceSearch', '12')
             ->set('encounterReferralHasSearched', true)
             ->set('encounterReferralServiceResults', [$service])
@@ -100,7 +100,7 @@ class EncounterReferralStateTest extends TestCase
     public function test_catalog_selection_clears_results_and_closes_the_catalog(): void
     {
         $service = $this->service();
-        Livewire::test(EncounterReferralStateHarness::class)
+        Livewire::test(EncounterPackageReferralStateHarness::class)
             ->set('encounterReferralServiceSearch', '12')
             ->set('encounterReferralHasSearched', true)
             ->set('encounterReferralServiceResults', [$service])
@@ -118,7 +118,7 @@ class EncounterReferralStateTest extends TestCase
 
     public function test_editing_a_referral_field_clears_only_its_stale_error(): void
     {
-        Livewire::test(EncounterReferralStateHarness::class)
+        Livewire::test(EncounterPackageReferralStateHarness::class)
             ->call('seedError', 'encounterReferralForm.quantity')
             ->call('seedError', 'encounterReferralForm.service_id')
             ->set('encounterReferralForm.quantity', 2)
@@ -128,7 +128,7 @@ class EncounterReferralStateTest extends TestCase
 
     public function test_closing_the_drawer_clears_only_referral_errors(): void
     {
-        Livewire::test(EncounterReferralStateHarness::class)
+        Livewire::test(EncounterPackageReferralStateHarness::class)
             ->call('seedError', 'encounterReferralForm.quantity')
             ->call('seedError', 'encounterReferralForm.service_id')
             ->call('seedError', 'form.password')
@@ -139,7 +139,7 @@ class EncounterReferralStateTest extends TestCase
 
     public function test_opening_the_drawer_clears_old_errors_without_clearing_signature_errors(): void
     {
-        Livewire::test(EncounterReferralStateHarness::class)
+        Livewire::test(EncounterPackageReferralStateHarness::class)
             ->call('seedError', 'encounterReferralForm.quantity')
             ->call('seedError', 'form.password')
             ->call('openEncounterReferralDrawer')
@@ -151,7 +151,7 @@ class EncounterReferralStateTest extends TestCase
     public function test_invalid_service_selection_preserves_the_current_service(): void
     {
         $service = $this->service();
-        Livewire::test(EncounterReferralStateHarness::class)
+        Livewire::test(EncounterPackageReferralStateHarness::class)
             ->set('encounterReferralSelectedService', $service)
             ->set('encounterReferralForm.service_id', $service['id'])
             ->set('encounterReferralServiceResults', [$service])
@@ -169,7 +169,7 @@ class EncounterReferralStateTest extends TestCase
     }
 }
 
-class EncounterReferralStateHarness extends EncounterEdit
+class EncounterPackageReferralStateHarness extends EncounterPackageEdit
 {
     public string $signedAction = '';
 
@@ -177,7 +177,7 @@ class EncounterReferralStateHarness extends EncounterEdit
     {
     }
 
-    public function mount(?LegalEntity $legalEntity = null, int $encounterId = 0, ?Person $person = null, ?Preperson $preperson = null): void
+    public function mount(?LegalEntity $legalEntity = null, ?Encounter $encounter = null, ?Person $person = null, ?Preperson $preperson = null): void
     {
         $this->isReadonly = true;
     }

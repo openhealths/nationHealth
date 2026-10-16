@@ -252,14 +252,27 @@
                                             <a
                                                 href="{{
                                                     $prepersonId
-                                                    ? route('prepersons.encounter.view', [legalEntity(), 'preperson' => $prepersonId, 'encounterId' => data_get($encounter, 'id')])
-                                                    : route('encounter.view', [legalEntity(), 'person' => $personId, 'encounterId' => data_get($encounter, 'id')])
+                                                    ? route('prepersons.encounter.view', [legalEntity(), 'preperson' => $prepersonId, 'encounter' => data_get($encounter, 'id')])
+                                                    : route('encounter.view', [legalEntity(), 'person' => $personId, 'encounter' => data_get($encounter, 'id')])
                                                 }}"
                                                 wire:navigate
                                                 class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
                                             >
                                                 @icon('eye', 'w-5 h-5 text-gray-500')
-                                                {{ __('forms.view_details') }}
+                                                {{ __('encounters.view_package') }}
+                                            </a>
+
+                                            <a
+                                                href="{{
+                                                    $prepersonId
+                                                    ? route('prepersons.encounters.view', [legalEntity(), 'preperson' => $prepersonId, 'encounter' => data_get($encounter, 'id')])
+                                                    : route('persons.encounters.view', [legalEntity(), 'person' => $personId, 'encounter' => data_get($encounter, 'id')])
+                                                }}"
+                                                wire:navigate
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                            >
+                                                @icon('file', 'w-5 h-5 text-gray-500')
+                                                {{ __('encounters.view_encounter') }}
                                             </a>
                                         @endif
 
@@ -332,7 +345,7 @@
         </div>
     </div>
 
-    @include('livewire.encounter.encounter-cancellation')
+    @include('livewire.encounter-package.encounter-cancellation')
 
     <x-forms.loading />
 </x-layouts.patient>

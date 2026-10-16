@@ -160,6 +160,9 @@ class CarePlan extends Request
             '*.uuid' => 'required|uuid',
             '*.status' => 'required|string',
             '*.title' => 'nullable|string',
+            '*.managing_organization' => ['required', 'array'],
+            '*.managing_organization.identifier.value' => ['required', 'uuid'],
+            '*.managing_organization.display_value' => ['required', 'string']
         ]);
 
         if ($validator->fails()) {

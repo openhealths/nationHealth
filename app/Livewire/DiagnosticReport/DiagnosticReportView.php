@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\DiagnosticReport;
 
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use Illuminate\View\View;
@@ -27,16 +28,16 @@ class DiagnosticReportView extends DiagnosticReportEdit
      * @param  LegalEntity  $legalEntity
      * @param  Person|null  $person
      * @param  Preperson|null  $preperson
-     * @param  int|null  $diagnosticReportId
+     * @param  DiagnosticReport|null  $diagnosticReport
      * @return void
      */
     public function mount(
         LegalEntity $legalEntity,
         ?Person $person = null,
         ?Preperson $preperson = null,
-        ?int $diagnosticReportId = null
+        ?DiagnosticReport $diagnosticReport = null
     ): void {
-        parent::mount($legalEntity, $person, $preperson, $diagnosticReportId);
+        parent::mount($legalEntity, $person, $preperson, $diagnosticReport);
 
         // The edit page leaves only a draft that is not waiting for eHealth editable
         $this->editUrl = $this->isReadonly ? null : $this->editPageUrl();
@@ -65,8 +66,8 @@ class DiagnosticReportView extends DiagnosticReportEdit
         return route(
             $this->prepersonId !== null ? 'prepersons.diagnostic-report.edit' : 'diagnostic-report.edit',
             $this->prepersonId !== null
-                ? [legalEntity(), 'preperson' => $this->prepersonId, 'diagnosticReportId' => $this->diagnosticReportId]
-                : [legalEntity(), 'person' => $this->personId, 'diagnosticReportId' => $this->diagnosticReportId]
+                ? [legalEntity(), 'preperson' => $this->prepersonId, 'diagnosticReport' => $this->diagnosticReportId]
+                : [legalEntity(), 'person' => $this->personId, 'diagnosticReport' => $this->diagnosticReportId]
         );
     }
 

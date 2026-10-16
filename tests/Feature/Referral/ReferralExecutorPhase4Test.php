@@ -321,7 +321,7 @@ class ReferralExecutorPhase4Test extends TestCase
         $this->assertSame('in_progress', $record->fresh()->status);
 
         // The async submission has been accepted; completion now runs on the encounter view.
-        $view = new \App\Livewire\Encounter\EncounterView();
+        $view = new \App\Livewire\EncounterPackage\EncounterPackageView();
         $view->referralToRedeemId = $record->uuid;
         $view->encounterUuid = $encounter->uuid;
         $view->showReferralRedeemModal = true;
@@ -338,7 +338,7 @@ class ReferralExecutorPhase4Test extends TestCase
         $this->actingAs($this->user);
         $record = $this->createActiveReferral();
         $encounter = $this->finishedEncounterForReferral($record);
-        $component = new \App\Livewire\Encounter\EncounterView();
+        $component = new \App\Livewire\EncounterPackage\EncounterPackageView();
         $component->referralToRedeemId = $record->uuid;
         $component->encounterUuid = $encounter->uuid;
         $component->showReferralRedeemModal = true;
@@ -396,10 +396,10 @@ class ReferralExecutorPhase4Test extends TestCase
         $this->assertSame([$record->uuid], array_column($component->availableReferrals, 'id'));
     }
 
-    private function encounterCreateComponent(ServiceRequestRequest $record): \App\Livewire\Encounter\EncounterCreate
+    private function encounterCreateComponent(ServiceRequestRequest $record): \App\Livewire\EncounterPackage\EncounterPackageCreate
     {
-        $component = new \App\Livewire\Encounter\EncounterCreate();
-        $component->form = new \App\Livewire\Encounter\Forms\EncounterForm($component, 'form');
+        $component = new \App\Livewire\EncounterPackage\EncounterPackageCreate();
+        $component->form = new \App\Livewire\EncounterPackage\Forms\EncounterForm($component, 'form');
         $component->personId = $this->person->id;
         $component->patientUuid = $this->person->uuid;
         $component->availableReferrals = [['id' => $record->uuid, 'requisition' => '0000-1111-2222-3333']];

@@ -231,12 +231,15 @@
                                     }
                                 "
                                 type="text"
+                                id="filterOnsetDateRange"
                                 class="daterangepicker-uk with-leading-icon input peer w-full"
                                 placeholder=" "
                                 autocomplete="off"
                             />
 
-                            <label class="wrapped-label"> {{ __('conditions.filter_onset_date_range') }} </label>
+                            <label for="filterOnsetDateRange" class="wrapped-label">
+                                {{ __('conditions.filter_onset_date_range') }}
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -312,7 +315,9 @@
                                         class="absolute right-0 z-50 mt-2 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-700"
                                     >
                                         <button
+                                            type="button"
                                             @click="close($refs.button)"
+                                            wire:click="view('{{ data_get($condition, 'uuid') }}')"
                                             class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
                                         >
                                             @icon('eye', 'w-5 h-5 text-gray-500')

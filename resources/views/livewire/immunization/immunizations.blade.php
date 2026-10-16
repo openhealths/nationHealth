@@ -493,7 +493,7 @@
         </div>
     </div>
 
-    @include('livewire.encounter.encounter-cancellation')
+    @include('livewire.encounter-package.encounter-cancellation')
 
     <x-forms.loading />
 </x-layouts.patient>

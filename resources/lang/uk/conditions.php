@@ -17,6 +17,7 @@ return [
 
     'label' => 'Стан',
     'plural' => 'Стани',
+    'id' => 'ID стану',
     'search' => 'Пошук станів',
     'condition_or_diagnosis' => 'Стан або діагноз',
     'code' => 'Код',
@@ -74,10 +75,15 @@ return [
 
     'messages' => [
         'synced_successfully' => 'Стани успішно синхронізовані',
+        'record_synced_successfully' => 'Стан успішно синхронізовано',
         'first_page_synced_successfully' => 'Перша сторінка станів синхронізована, решта обробляється у фоні',
         'sync_already_running' => 'Синхронізація станів вже запущена. Будь ласка, зачекайте її завершення.',
         'sync_resume_started' => 'Відновлення попередньої синхронізації станів розпочато',
         'sync_background_dispatch_error' => 'Помилка запуску фонової синхронізації станів'
+    ],
+
+    'policy' => [
+        'view' => 'У вас немає доступу до цього стану.'
     ],
 
     // Custom messages for validation rules

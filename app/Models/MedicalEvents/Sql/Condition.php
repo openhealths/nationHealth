@@ -196,6 +196,100 @@ class Condition extends Model
     }
 
     /**
+     * Filter the patient's conditions of the current legal entity. Of the managing organizations the rule names,
+     * only the episode's one is stored for a condition, through the encounter it was created within.
+     *
+     * ABAC rule 2.
+     *
+     * @param  Builder  $query
+     * @param  Person|Preperson  $patient
+     * @return Builder
+     */
+    #[Scope]
+    protected function forLegalEntity(Builder $query, Person|Preperson $patient): Builder
+    {
+        return $query->forPatient($patient)->whereHas(
+            'context',
+            static fn (Builder $identifier): Builder => $identifier->whereIn(
+                'value',
+                Encounter::forLegalEntity($patient)->pluck('uuid')
+            )
+        );
+    }
+
+    /**
+     * Filter the patient's conditions created within an encounter whose episode is managed by the current legal entity.
+     *
+     * ABAC rule 3.
+     *
+     * @param  Builder  $query
+     * @param  Person|Preperson  $patient
+     * @return Builder
+     */
+    #[Scope]
+    protected function inEpisodeOfLegalEntity(Builder $query, Person|Preperson $patient): Builder
+    {
+        return $query->forPatient($patient)->whereHas(
+            'context',
+            static fn (Builder $identifier): Builder => $identifier->whereIn(
+                'value',
+                Encounter::inEpisodeOfLegalEntity($patient)->pluck('uuid')
+            )
+        );
+    }
+
+    /**
+     * Filter the patient's conditions created within an encounter originated by an episode managed by the current
+     * legal entity.
+     *
+     * ABAC rule 8.
+     *
+     * @param  Builder  $query
+     * @param  Person|Preperson  $patient
+     * @return Builder
+     */
+    #[Scope]
+    protected function inEncounterOriginatedInLegalEntity(Builder $query, Person|Preperson $patient): Builder
+    {
+        return $query->forPatient($patient)->whereHas(
+            'context',
+            static fn (Builder $identifier): Builder => $identifier->whereIn(
+                'value',
+                Encounter::originatedInLegalEntity($patient)->pluck('uuid')
+            )
+        );
+    }
+
+    /**
+     * Conditions of the patient the user may read: with access to all the patient's data (an active declaration or
+     * approval) all of them, including the ones of the persons and prepersons merged into a person, otherwise only the patient's
+     * own ones of the current legal entity or created within an encounter originated by its episode.
+     *
+     * ABAC rule 1.
+     *
+     * @param  Builder  $query
+     * @param  Person|Preperson  $patient
+     * @param  bool  $hasPatientAccess
+     * @return Builder
+     */
+    #[Scope]
+    protected function readableFor(Builder $query, Person|Preperson $patient, bool $hasPatientAccess): Builder
+    {
+        if ($hasPatientAccess) {
+            return $patient instanceof Person
+                ? $patient->filterRecordsWithMerged($query)
+                : $query->forPatient($patient);
+        }
+
+        return $query->where(
+            static fn (Builder $condition): Builder => $condition->forLegalEntity($patient)
+                ->orWhere(
+                    static fn (Builder $originated): Builder => $originated->inEncounterOriginatedInLegalEntity($patient)
+                )
+        );
+    }
+
+    /**
      * Leave out the records of an encounter package eHealth has not accepted yet, which is still a draft.
      *
      * @param  Builder  $query

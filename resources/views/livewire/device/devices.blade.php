@@ -475,7 +475,7 @@
                                         <div class="record-inner-value wrap-break-word">
                                             @forelse ($deviceProperties as $property)
                                                 <div>
-                                                    {{ $this->dictionaryLabel($property, 'code') }}: {{ DeviceProperty::displayValue($property) }}
+                                                    {{ $this->dictionaryLabel($property, 'code') }} : {{ DeviceProperty::displayValue($property) }}
                                                 </div>
                                             @empty
                                                 -
@@ -528,7 +528,7 @@
         </div>
     </div>
 
-    @include('livewire.encounter.encounter-cancellation', [
+    @include('livewire.encounter-package.encounter-cancellation', [
         'note' => __('medical-events.messages.cancel_device_group_warning')
     ])
 

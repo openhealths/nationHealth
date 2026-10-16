@@ -10,7 +10,7 @@ use App\Exceptions\Cipher\CipherConnectionException;
 use App\Exceptions\Cipher\CipherException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
-use App\Livewire\Encounter\Forms\EncounterCancellationForm;
+use App\Livewire\EncounterPackage\Forms\EncounterCancellationForm;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Fhir;

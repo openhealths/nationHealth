@@ -39,6 +39,7 @@ return new class extends Migration
                 $table->foreignId('category_id')->nullable()->constrained('codeable_concepts');
                 $table->foreignId('encounter_identifier_id')->nullable()->constrained('identifiers');
                 $table->foreignId('care_manager_id')->nullable()->constrained('identifiers');
+                $table->foreignId('managing_organization_id')->nullable()->constrained('identifiers');
 
                 $table->timestamps();
             });

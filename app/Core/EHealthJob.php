@@ -233,6 +233,7 @@ abstract class EHealthJob implements ShouldQueue
                 ->withOption('patient_uuid', $this->batch()?->options['patient_uuid'] ?? null)
                 ->withOption('person_id', $this->batch()?->options['person_id'] ?? null)
                 ->withOption('preperson_id', $this->batch()?->options['preperson_id'] ?? null)
+                ->withOption('has_patient_access', $this->batch()?->options['has_patient_access'] ?? false)
                 ->onQueue('sync')
                 ->finally(function (Batch $batch) use ($failedJobUuids) {
                     if (!empty($failedJobUuids)) {

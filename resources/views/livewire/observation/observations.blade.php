@@ -213,9 +213,7 @@
                         bindParam="name"
                         :label="__('episodes.plural')"
                     />
-                </div>
 
-                <div class="form-row-3 mb-6">
                     <x-forms.combobox
                         :options="$encounters"
                         bind="filterEncounterId"
@@ -223,7 +221,9 @@
                         bindParam="name"
                         :label="__('encounters.label')"
                     />
+                </div>
 
+                <div class="form-row-3 mb-9">
                     <x-forms.combobox
                         :options="$diagnosticReports"
                         bind="filterDiagnosticReportId"
@@ -239,15 +239,13 @@
                         bindParam="name"
                         :label="__('devices.plural')"
                     />
-                </div>
 
-                <div class="form-row-3 mb-9">
                     <x-forms.combobox
                         :options="$specimens"
                         bind="filterSpecimenId"
                         bindValue="uuid"
-                        bindParam="uuid"
-                        :label="__('observations.specimen_id')"
+                        bindParam="name"
+                        :label="__('observations.specimen')"
                     />
                 </div>
             </div>
@@ -456,7 +454,7 @@
         </div>
     </div>
 
-    @include('livewire.encounter.encounter-cancellation')
+    @include('livewire.encounter-package.encounter-cancellation')
 
     <x-forms.loading />
 </x-layouts.patient>

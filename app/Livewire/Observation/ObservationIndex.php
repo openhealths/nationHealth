@@ -10,7 +10,7 @@ use App\Enums\JobStatus;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Jobs\ObservationSync;
-use App\Livewire\Encounter\Forms\EncounterCancellationForm;
+use App\Livewire\EncounterPackage\Forms\EncounterCancellationForm;
 use App\Livewire\Person\Records\BasePatientComponent;
 use App\Models\Declaration;
 use App\Models\LegalEntity;
@@ -19,14 +19,17 @@ use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Observation;
+use App\Models\MedicalEvents\Sql\Specimen;
 use App\Repositories\MedicalEvents\Repository;
 use App\Rules\InDictionary;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesEncounterCancellation;
 use App\Traits\HandlesSyncBatch;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
@@ -100,7 +103,8 @@ class ObservationIndex extends BasePatientComponent
         'GENDER',
         'eHealth/rankin_scale',
         'eHealth/vaccination_covid_groups',
-        'eHealth/occupation_type'
+        'eHealth/occupation_type',
+        'specimen_types'
     ];
 
     protected function getSyncStatus(string $entityType): ?string
@@ -221,10 +225,17 @@ class ObservationIndex extends BasePatientComponent
      */
     public function view(string $observationId): void
     {
-        $observation = Observation::forPatient($this->patient())->whereUuid($observationId)->first()
+        // The records of the persons merged into the patient count too, so a stored one is not pulled in again under this patient
+        $observation = Observation::readableFor($this->patient(), true, Auth::user())->whereUuid($observationId)->first()
             ?? $this->storeSearchedObservation($observationId);
 
         if ($observation === null) {
+            return;
+        }
+
+        if (Auth::user()->cannot('view', [$observation, $this->patient()])) {
+            Session::flash('error', __('observations.policy.view'));
+
             return;
         }
 
@@ -298,11 +309,27 @@ class ObservationIndex extends BasePatientComponent
                 'name' => $device->names->first()?->value ?? $device->uuid
             ])
             ->toArray();
-        // todo: specimens
+
+        $this->specimens = Specimen::forPatient($this->patient())
+            ->notDraft()
+            ->notInDraftEncounter($this->patient())
+            ->with('type.coding')
+            ->get(['uuid', 'type_id', 'accession_identifier'])
+            ->map(fn (Specimen $specimen): array => [
+                'uuid' => $specimen->uuid,
+                'name' => collect([
+                    $this->dictionaries['specimen_types'][$specimen->type->coding->first()?->code] ?? null,
+                    $specimen->accessionIdentifier
+                ])
+                    ->filter()
+                    ->implode(' | ')
+            ])
+            ->toArray();
     }
 
     /**
-     * Store an observation found through the eHealth search, so that it has a page to open.
+     * Store an observation found through the eHealth search, so that it has a page to open. It is kept only when the
+     * user may read it, so a record the access rules hide is not left behind in the database.
      *
      * @param  string  $observationId
      * @return Observation|null
@@ -318,14 +345,26 @@ class ObservationIndex extends BasePatientComponent
         }
 
         try {
-            Repository::observation()->sync($this->patient(), [$response->validate()]);
+            return DB::transaction(function () use ($response, $observationId): Observation {
+                Repository::observation()->sync($this->patient(), [$response->validate()]);
+
+                $observation = Observation::forPatient($this->patient())->whereUuid($observationId)->firstOrFail();
+
+                if (Auth::user()->cannot('view', [$observation, $this->patient()])) {
+                    throw new AuthorizationException();
+                }
+
+                return $observation;
+            });
+        } catch (AuthorizationException) {
+            Session::flash('error', __('observations.policy.view'));
+
+            return null;
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while storing the observation');
 
             return null;
         }
-
-        return Observation::forPatient($this->patient())->whereUuid($observationId)->first();
     }
 
     /**
@@ -335,7 +374,7 @@ class ObservationIndex extends BasePatientComponent
      */
     protected function paginateLocalObservations(): LengthAwarePaginator
     {
-        $paginator = Observation::readableFor($this->patient(), $this->hasPatientAccess)
+        $paginator = Observation::readableFor($this->patient(), $this->hasPatientAccess, Auth::user())
             ->notInDraftEncounter($this->patient())
             ->notInDraftDiagnosticReport($this->patient())
             ->withAllRelations()

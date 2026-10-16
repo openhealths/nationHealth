@@ -61,7 +61,7 @@
                         name: specimenTypes[specimen.typeCode] || specimen.uuid
                     }));
             },
-            
+
             setEffectiveType(type) {
                 const now = new Date();
 
@@ -142,12 +142,12 @@
         @diagnostic-report-service-selected.window="selectDiagnosticReportService($event.detail.service)"
     >
         <fieldset @disabled($isReadonly) @class(['pointer-events-none opacity-80' => $isReadonly])>
-            @include('livewire.encounter.diagnostic-report-parts.main-information', ['context' => 'diagnostic-report'])
-            @include('livewire.encounter.diagnostic-report-parts.additional-information', ['context' => 'diagnostic-report'])
+            @include('livewire.encounter-package.diagnostic-report-parts.main-information', ['context' => 'diagnostic-report'])
+            @include('livewire.encounter-package.diagnostic-report-parts.additional-information', ['context' => 'diagnostic-report'])
             <fieldset class="fieldset">
                 <legend class="legend">{{ __('observations.plural') }}</legend>
 
-                @include('livewire.encounter.parts.observations', ['context' => 'diagnostic-report'])
+                @include('livewire.encounter-package.parts.observations', ['context' => 'diagnostic-report'])
             </fieldset>
         </fieldset>
 

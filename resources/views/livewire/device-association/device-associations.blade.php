@@ -442,7 +442,7 @@
         </div>
     </div>
 
-    @include('livewire.encounter.encounter-cancellation', [
+    @include('livewire.encounter-package.encounter-cancellation', [
         'note' => __('medical-events.messages.cancel_device_group_warning')
     ])
 

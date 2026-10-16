@@ -566,7 +566,7 @@ abstract class DiagnosticReportComponent extends Component
         if ($this->prepersonId !== null) {
             $this->redirectRoute(
                 "prepersons.diagnostic-report.$page",
-                [legalEntity(), 'preperson' => $this->prepersonId, 'diagnosticReportId' => $diagnosticReportId],
+                [legalEntity(), 'preperson' => $this->prepersonId, 'diagnosticReport' => $diagnosticReportId],
                 navigate: true
             );
 
@@ -575,7 +575,7 @@ abstract class DiagnosticReportComponent extends Component
 
         $this->redirectRoute(
             "diagnostic-report.$page",
-            [legalEntity(), 'person' => $this->personId, 'diagnosticReportId' => $diagnosticReportId],
+            [legalEntity(), 'person' => $this->personId, 'diagnosticReport' => $diagnosticReportId],
             navigate: true
         );
     }

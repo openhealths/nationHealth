@@ -10,6 +10,7 @@ use App\Casts\EHealthTimestampCast;
 use App\Enums\Person\ObservationStatus;
 use App\Models\Person\Person;
 use App\Models\Preperson;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -355,7 +356,7 @@ class Observation extends Model
                     'diagnosticReport',
                     static fn (Builder $identifier): Builder => $identifier->whereIn(
                         'value',
-                        DiagnosticReport::forPatient($patient)->forLegalEntity()->pluck('uuid')
+                        DiagnosticReport::forPatient($patient)->managedByLegalEntity()->pluck('uuid')
                     )
                 )
         );
@@ -443,23 +444,48 @@ class Observation extends Model
             'diagnosticReport',
             static fn (Builder $identifier): Builder => $identifier->whereIn(
                 'value',
-                DiagnosticReport::forPatient($patient)->forLegalEntity()->pluck('uuid')
+                DiagnosticReport::forPatient($patient)->managedByLegalEntity()->pluck('uuid')
             )
+        );
+    }
+
+    /**
+     * Filter the patient's observations belonging to a diagnostic report with an active approval granted to one of the
+     * user's employees or to the current legal entity.
+     *
+     * ABAC rule 11.
+     *
+     * @param  Builder  $query
+     * @param  Person|Preperson  $patient
+     * @param  User  $user
+     * @return Builder
+     */
+    #[Scope]
+    protected function inApprovedDiagnosticReport(Builder $query, Person|Preperson $patient, User $user): Builder
+    {
+        $diagnosticReportIds = DiagnosticReport::forPatient($patient)
+            ->whereKey(Approval::diagnosticReportAccessGrantedTo($user, legalEntity())->pluck('approvable_id'))
+            ->pluck('uuid');
+
+        return $query->forPatient($patient)->whereHas(
+            'diagnosticReport',
+            static fn (Builder $identifier): Builder => $identifier->whereIn('value', $diagnosticReportIds)
         );
     }
 
     /**
      * Observations of the patient the user may read: with access to all the patient's data (an active declaration or
      * approval) all of them, including the ones of the persons and prepersons merged into a person, otherwise only
-     * the patient's own ones of the current legal entity or originated by its episode.
+     * the patient's own ones of the current legal entity, originated by its episode or of an approved diagnostic report.
      *
      * @param  Builder  $query
      * @param  Person|Preperson  $patient
      * @param  bool  $hasPatientAccess
+     * @param  User  $user
      * @return Builder
      */
     #[Scope]
-    protected function readableFor(Builder $query, Person|Preperson $patient, bool $hasPatientAccess): Builder
+    protected function readableFor(Builder $query, Person|Preperson $patient, bool $hasPatientAccess, User $user): Builder
     {
         if ($hasPatientAccess) {
             return $patient instanceof Person
@@ -474,6 +500,9 @@ class Observation extends Model
                 )
                 ->orWhere(
                     static fn (Builder $originated): Builder => $originated->inEncounterOriginatedInLegalEntity($patient)
+                )
+                ->orWhere(
+                    static fn (Builder $approved): Builder => $approved->inApprovedDiagnosticReport($patient, $user)
                 )
         );
     }

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Encounter;
 
 use App\Classes\eHealth\Api\Division;
-use App\Livewire\Encounter\Concerns\ManagesEncounterReferrals;
+use App\Livewire\EncounterPackage\Concerns\ManagesEncounterReferrals;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Encounter;
 
 use App\Enums\Person\EncounterStatus;
-use App\Livewire\Encounter\Concerns\ManagesEncounterEPrescription;
-use App\Livewire\Encounter\Concerns\ManagesEncounterReferrals;
-use App\Livewire\Encounter\Concerns\ResolvesEncounterStandaloneContext;
+use App\Livewire\EncounterPackage\Concerns\ManagesEncounterEPrescription;
+use App\Livewire\EncounterPackage\Concerns\ManagesEncounterReferrals;
+use App\Livewire\EncounterPackage\Concerns\ResolvesEncounterStandaloneContext;
 use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\EncounterHospitalization;

@@ -307,7 +307,7 @@ class DiagnosticReport extends Model implements SubmittedToEHealth
      * @return Builder
      */
     #[Scope]
-    protected function forLegalEntity(Builder $query): Builder
+    protected function managedByLegalEntity(Builder $query): Builder
     {
         return $query->whereHas(
             'managingOrganization',
@@ -316,9 +316,79 @@ class DiagnosticReport extends Model implements SubmittedToEHealth
     }
 
     /**
+     * Filter the patient's diagnostic reports of the current legal entity: the managing organization of the episode
+     * of the report's encounter or of the report itself is the current legal entity.
+     *
+     * ABAC rule 2.
+     *
+     * @param  Builder  $query
+     * @param  Person|Preperson  $patient
+     * @return Builder
+     */
+    #[Scope]
+    protected function forLegalEntity(Builder $query, Person|Preperson $patient): Builder
+    {
+        return $query->forPatient($patient)->where(
+            static fn (Builder $report): Builder => $report
+                ->whereHas(
+                    'encounter',
+                    static fn (Builder $identifier): Builder => $identifier->whereIn(
+                        'value',
+                        Encounter::forLegalEntity($patient)->pluck('uuid')
+                    )
+                )
+                ->orWhere(static fn (Builder $managed): Builder => $managed->managedByLegalEntity())
+        );
+    }
+
+    /**
+     * Filter the patient's diagnostic reports created within an encounter whose episode is managed by the current
+     * legal entity.
+     *
+     * ABAC rule 3.
+     *
+     * @param  Builder  $query
+     * @param  Person|Preperson  $patient
+     * @return Builder
+     */
+    #[Scope]
+    protected function inEpisodeOfLegalEntity(Builder $query, Person|Preperson $patient): Builder
+    {
+        return $query->forPatient($patient)->whereHas(
+            'encounter',
+            static fn (Builder $identifier): Builder => $identifier->whereIn(
+                'value',
+                Encounter::inEpisodeOfLegalEntity($patient)->pluck('uuid')
+            )
+        );
+    }
+
+    /**
+     * Filter the patient's diagnostic reports created within an encounter originated by an episode managed by the
+     * current legal entity.
+     *
+     * ABAC rule 8.
+     *
+     * @param  Builder  $query
+     * @param  Person|Preperson  $patient
+     * @return Builder
+     */
+    #[Scope]
+    protected function inEncounterOriginatedInLegalEntity(Builder $query, Person|Preperson $patient): Builder
+    {
+        return $query->forPatient($patient)->whereHas(
+            'encounter',
+            static fn (Builder $identifier): Builder => $identifier->whereIn(
+                'value',
+                Encounter::originatedInLegalEntity($patient)->pluck('uuid')
+            )
+        );
+    }
+
+    /**
      * Filter the patient's diagnostic reports originated by an episode managed by the current legal entity.
      *
-     * ABAC rule 7.
+     * ABAC rule 6.
      *
      * @param  Builder  $query
      * @param  Person|Preperson  $patient
@@ -331,7 +401,7 @@ class DiagnosticReport extends Model implements SubmittedToEHealth
             'originEpisode',
             static fn (Builder $identifier): Builder => $identifier->whereIn(
                 'value',
-                Episode::forPatient($patient)->forLegalEntity()->pluck('uuid')
+                Episode::forPatient($patient)->managedByLegalEntity()->pluck('uuid')
             )
         );
     }
@@ -339,7 +409,10 @@ class DiagnosticReport extends Model implements SubmittedToEHealth
     /**
      * Diagnostic reports of the patient the user may read: with access to all the patient's data (an active
      * declaration or approval) all of them, including the ones of the persons and prepersons merged into a person,
-     * otherwise only the patient's own ones managed by the current legal entity or originated by its episode.
+     * otherwise only the patient's own ones of the current legal entity, originated by its episode or created within
+     * an encounter originated by its episode.
+     *
+     * ABAC rule 1.
      *
      * @param  Builder  $query
      * @param  Person|Preperson  $patient
@@ -355,9 +428,12 @@ class DiagnosticReport extends Model implements SubmittedToEHealth
                 : $query->forPatient($patient);
         }
 
-        return $query->forPatient($patient)->where(
-            static fn (Builder $report): Builder => $report->forLegalEntity()
+        return $query->where(
+            static fn (Builder $report): Builder => $report->forLegalEntity($patient)
                 ->orWhere(static fn (Builder $originated): Builder => $originated->originatedInLegalEntity($patient))
+                ->orWhere(
+                    static fn (Builder $originated): Builder => $originated->inEncounterOriginatedInLegalEntity($patient)
+                )
         );
     }
 

@@ -72,6 +72,13 @@ return [
     'paper_referral_institution_short' => 'Найменування закладу',
     'paper_referral_date' => 'Дата направлення',
     'paper_referral_notes' => 'Нотатки',
+    'id' => 'ID взаємодії',
+    'view_encounter' => 'Переглянути взаємодію',
+    'view_package' => 'Переглянути пакет взаємодії',
+    'visit' => 'Візит',
+    'diagnoses' => 'Діагнози',
+    'actions' => 'Дії',
+    'supporting_info' => 'Підтверджуюча інформація',
     'hospitalization' => [
         'label' => 'Госпіталізація',
         'admit_source' => 'Джерело госпіталізації',
@@ -171,6 +178,7 @@ return [
     'messages' => [
         'medication_programs_unavailable' => 'Додаткові медичні програми зараз недоступні. Можна продовжити з варіантом «Рецептурний лікарський засіб».',
         'synced_successfully' => 'Взаємодії успішно синхронізовані',
+        'record_synced_successfully' => 'Взаємодію успішно синхронізовано',
         'first_page_synced_successfully' => 'Перша сторінка взаємодій синхронізована, інші сторінки обробляються у фоновому режимі',
         'sync_already_running' => 'Синхронізація взаємодій вже запущена. Будь ласка, зачекайте її завершення.',
         'sync_resume_started' => 'Відновлення попередньої синхронізації взаємодій розпочато',

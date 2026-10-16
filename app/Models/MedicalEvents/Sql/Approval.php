@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models\MedicalEvents\Sql;
 
 use App\Enums\Person\ApprovalStatus;
+use App\Models\CarePlan;
 use App\Models\EhealthLink;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
@@ -205,7 +206,7 @@ class Approval extends Model
      * Active approvals on the resource granted to one of the user's employees in the legal entity or to the legal
      * entity itself, which open that resource.
      *
-     * ABAC rule 5.
+     * ABAC rules 5 and 11.
      *
      * @param  Builder  $query
      * @param  User  $user
@@ -219,18 +220,50 @@ class Approval extends Model
         return $query->isAlive($resource)
             ->isVerified()
             ->whereStatus(ApprovalStatus::ACTIVE)
-            ->where(
-                static fn (Builder $approval): Builder => $approval
-                    ->grantedToEmployees($user, $legalEntity)
-                    ->orWhere(
-                        static fn (Builder $toLegalEntity): Builder => $toLegalEntity
-                            ->whereGrantedToType('legal_entity')
-                            ->whereHas(
-                                'grantedTo',
-                                static fn (Builder $identifier): Builder => $identifier->whereValue($legalEntity->uuid)
-                            )
-                    )
-            );
+            ->grantedToEmployeesOrLegalEntity($user, $legalEntity);
+    }
+
+    /**
+     * Active approvals on diagnostic reports granted to one of the user's employees in the legal entity or to the legal
+     * entity itself, which open those reports.
+     *
+     * ABAC rule 11.
+     *
+     * @param  Builder  $query
+     * @param  User  $user
+     * @param  LegalEntity  $legalEntity
+     * @return Builder
+     */
+    #[Scope]
+    protected function diagnosticReportAccessGrantedTo(Builder $query, User $user, LegalEntity $legalEntity): Builder
+    {
+        return $query->whereApprovableType(DiagnosticReport::class)
+            ->where('expires_at', '>', now())
+            ->isVerified()
+            ->whereStatus(ApprovalStatus::ACTIVE)
+            ->grantedToEmployeesOrLegalEntity($user, $legalEntity);
+    }
+
+    /**
+     * Active read approvals on care plans granted by the patient to one of the user's employees in the legal entity,
+     * which open the records based on those care plans.
+     *
+     * ABAC rule 14.
+     *
+     * @param  Builder  $query
+     * @param  User  $user
+     * @param  LegalEntity  $legalEntity
+     * @return Builder
+     */
+    #[Scope]
+    protected function carePlanAccessGrantedTo(Builder $query, User $user, LegalEntity $legalEntity): Builder
+    {
+        return $query->whereApprovableType(CarePlan::class)
+            ->where('expires_at', '>', now())
+            ->isVerified()
+            ->whereStatus(ApprovalStatus::ACTIVE)
+            ->whereAccessLevel('read')
+            ->grantedToEmployees($user, $legalEntity);
     }
 
     /**
@@ -252,6 +285,31 @@ class Approval extends Model
                     Employee::forUserInLegalEntity($user, $legalEntity)->pluck('uuid')
                 )
             );
+    }
+
+    /**
+     * Filter approvals granted to one of the user's employees in the legal entity or to the legal entity itself.
+     *
+     * @param  Builder  $query
+     * @param  User  $user
+     * @param  LegalEntity  $legalEntity
+     * @return Builder
+     */
+    #[Scope]
+    protected function grantedToEmployeesOrLegalEntity(Builder $query, User $user, LegalEntity $legalEntity): Builder
+    {
+        return $query->where(
+            static fn (Builder $approval): Builder => $approval
+                ->grantedToEmployees($user, $legalEntity)
+                ->orWhere(
+                    static fn (Builder $toLegalEntity): Builder => $toLegalEntity
+                        ->whereGrantedToType('legal_entity')
+                        ->whereHas(
+                            'grantedTo',
+                            static fn (Builder $identifier): Builder => $identifier->whereValue($legalEntity->uuid)
+                        )
+                )
+        );
     }
 
     #[Scope]

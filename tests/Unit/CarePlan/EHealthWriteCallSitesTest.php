@@ -49,7 +49,7 @@ class EHealthWriteCallSitesTest extends TestCase
             app_path('Livewire/CarePlan/Concerns/ManagesCarePlanReferrals.php'),
             app_path('Livewire/CarePlan/Concerns/ManagesCarePlanEPrescription.php'),
             app_path('Livewire/Person/Records/PatientReferrals.php'),
-            app_path('Livewire/Encounter/Concerns/ManagesEncounterReferrals.php'),
+            app_path('Livewire/EncounterPackage/Concerns/ManagesEncounterReferrals.php'),
         ];
     }
 }

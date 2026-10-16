@@ -26,6 +26,8 @@ class ConditionSync extends EHealthJob
     protected ?string $patientUuid = null;
     protected ?int $personId = null;
     protected ?int $prepersonId = null;
+    protected Person|Preperson $patient;
+    protected bool $hasPatientAccess = false;
 
     public function handle(): void
     {
@@ -33,6 +35,10 @@ class ConditionSync extends EHealthJob
         $this->patientUuid = $this->batch()->options['patient_uuid'] ?? null;
         $this->personId = $this->batch()->options['person_id'] ?? null;
         $this->prepersonId = $this->batch()->options['preperson_id'] ?? null;
+        $this->hasPatientAccess = $this->batch()->options['has_patient_access'] ?? false;
+        $this->patient = $this->prepersonId !== null
+            ? Preperson::findOrFail($this->prepersonId)
+            : Person::findOrFail($this->personId);
 
         parent::handle();
     }
@@ -44,10 +50,10 @@ class ConditionSync extends EHealthJob
     {
         return EHealth::condition()
             ->withToken($token)
-            ->getBySearchParams($this->patientUuid, [
-                'managing_organization_id' => $this->legalEntity->uuid,
+            ->getBySearchParams($this->patientUuid, array_filter([
+                'managing_organization_id' => $this->hasPatientAccess ? null : $this->legalEntity->uuid,
                 'page' => $this->page
-            ]);
+            ]));
     }
 
     /**
@@ -63,11 +69,7 @@ class ConditionSync extends EHealthJob
             return;
         }
 
-        $patient = $this->prepersonId !== null
-            ? Preperson::findOrFail($this->prepersonId)
-            : Person::findOrFail($this->personId);
-
-        Repository::condition()->sync($patient, $validatedData);
+        Repository::condition()->sync($this->patient, $validatedData);
     }
 
     /**

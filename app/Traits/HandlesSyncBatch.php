@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Traits;
 
 use App\Enums\JobStatus;
+use App\Models\Declaration;
+use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\User;
 use App\Notifications\SyncNotification;
 use Illuminate\Bus\Batch;
@@ -217,6 +219,10 @@ trait HandlesSyncBatch
         $jobClass = $this->getJobClass($entityType);
         $entityConstant = $this->getEntityConstant($entityType);
 
+        // Decided once for the whole batch, so every page is fetched with the same filter
+        $hasPatientAccess = Declaration::accessGrantedTo($user, $this->patient(), legalEntity())->exists()
+            || Approval::accessGrantedTo($user, $this->patient(), legalEntity())->exists();
+
         Bus::batch([new $jobClass(legalEntity(), page: 2)])
             ->withOption('legal_entity_id', legalEntity()->id)
             ->withOption('token', Crypt::encryptString($token))
@@ -224,6 +230,7 @@ trait HandlesSyncBatch
             ->withOption('patient_uuid', $this->uuid)
             ->withOption('person_id', $this->personId)
             ->withOption('preperson_id', $this->prepersonId)
+            ->withOption('has_patient_access', $hasPatientAccess)
             ->then(fn () => $user->notify(new SyncNotification($entityType, 'completed')))
             ->catch(function (Batch $batch, Throwable $exception) use ($user, $entityType) {
                 Log::error(ucfirst($entityType) . ' sync batch failed.', [

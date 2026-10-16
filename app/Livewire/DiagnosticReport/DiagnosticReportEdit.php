@@ -34,15 +34,15 @@ class DiagnosticReportEdit extends DiagnosticReportComponent
         LegalEntity $legalEntity,
         ?Person $person = null,
         ?Preperson $preperson = null,
-        ?int $diagnosticReportId = null
+        ?DiagnosticReport $diagnosticReport = null
     ): void {
         parent::mount($legalEntity, $person, $preperson);
 
-        $this->diagnosticReportId = $diagnosticReportId;
+        $this->diagnosticReportId = $diagnosticReport->id;
 
-        $diagnosticReport = DiagnosticReport::withAllRelations()
-            ->whereKey($diagnosticReportId)
-            ->forPatient($this->patient())
+        $diagnosticReport = DiagnosticReport::readableFor($this->patient(), true)
+            ->withAllRelations()
+            ->whereKey($this->diagnosticReportId)
             ->firstOrFail();
 
         $this->diagnosticReportUuid = $diagnosticReport->uuid;
@@ -117,7 +117,7 @@ class DiagnosticReportEdit extends DiagnosticReportComponent
 
         $this->form->diagnosticReport = $diagnosticReportData;
 
-        $this->form->observations = collect(Repository::observation()->getByDiagnosticReportId($diagnosticReportId))
+        $this->form->observations = collect(Repository::observation()->getByDiagnosticReportId($this->diagnosticReportId))
             ->map(fn (array $observation) => Fhir::observation()->fromFhir($observation))
             ->toArray();
     }

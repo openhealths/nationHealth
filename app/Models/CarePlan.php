@@ -48,6 +48,7 @@ class CarePlan extends Model
         'category_id',
         'encounter_identifier_id',
         'care_manager_id',
+        'managing_organization_id',
     ];
 
     protected $casts = [
@@ -106,6 +107,16 @@ class CarePlan extends Model
     public function careManager(): BelongsTo
     {
         return $this->belongsTo(Identifier::class, 'care_manager_id');
+    }
+
+    /**
+     * Legal entity managing the care plan, as eHealth returns it.
+     *
+     * @return BelongsTo
+     */
+    public function managingOrganization(): BelongsTo
+    {
+        return $this->belongsTo(Identifier::class, 'managing_organization_id');
     }
 
     public function supportingInfoReferences(): BelongsToMany

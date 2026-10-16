@@ -11,15 +11,20 @@ use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Jobs\ConditionSync;
 use App\Livewire\Person\Records\BasePatientComponent;
+use App\Models\Declaration;
 use App\Models\Icd10;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Repositories\MedicalEvents\Repository;
 use App\Rules\InDictionary;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
@@ -101,6 +106,18 @@ class ConditionIndex extends BasePatientComponent
         $this->loadFilterOptions();
     }
 
+    /**
+     * Whether the user has an active declaration or approval on the patient, which opens the conditions of every legal entity.
+     *
+     * @return bool
+     */
+    #[Computed]
+    public function hasPatientAccess(): bool
+    {
+        return Declaration::accessGrantedTo(Auth::user(), $this->patient(), legalEntity())->exists()
+            || Approval::accessGrantedTo(Auth::user(), $this->patient(), legalEntity())->exists();
+    }
+
     #[Computed]
     public function paginatedConditions(): LengthAwarePaginator
     {
@@ -136,7 +153,7 @@ class ConditionIndex extends BasePatientComponent
         try {
             $response = EHealth::condition()->getBySearchParams(
                 $this->uuid,
-                ['managing_organization_id' => legalEntity()->uuid]
+                $this->hasPatientAccess ? [] : ['managing_organization_id' => legalEntity()->uuid]
             );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while synchronizing condition');
@@ -164,6 +181,45 @@ class ConditionIndex extends BasePatientComponent
 
         $this->isSearching = false;
         $this->resetPage();
+    }
+
+    /**
+     * Open the page of a condition from the list or the eHealth search, storing it first when it is not in the database yet.
+     *
+     * @param  string  $conditionId
+     * @return void
+     */
+    public function view(string $conditionId): void
+    {
+        // The records of the persons merged into the patient count too, so a stored one is not pulled in again under this patient
+        $condition = Condition::readableFor($this->patient(), true)->whereUuid($conditionId)->first()
+            ?? $this->storeSearchedCondition($conditionId);
+
+        if ($condition === null) {
+            return;
+        }
+
+        if (Auth::user()->cannot('view', [$condition, $this->patient()])) {
+            Session::flash('error', __('conditions.policy.view'));
+
+            return;
+        }
+
+        if ($this->prepersonId !== null) {
+            $this->redirectRoute(
+                'prepersons.conditions.view',
+                [legalEntity(), 'preperson' => $this->prepersonId, 'condition' => $condition->id],
+                navigate: true
+            );
+
+            return;
+        }
+
+        $this->redirectRoute(
+            'persons.conditions.view',
+            [legalEntity(), 'person' => $this->personId, 'condition' => $condition->id],
+            navigate: true
+        );
     }
 
     public function searchICD10(string $value): void
@@ -194,13 +250,53 @@ class ConditionIndex extends BasePatientComponent
     }
 
     /**
+     * Store a condition found through the eHealth search, so that it has a page to open. It is kept only when the user
+     * may read it, so a record the access rules hide is not left behind in the database.
+     *
+     * @param  string  $conditionId
+     * @return Condition|null
+     */
+    protected function storeSearchedCondition(string $conditionId): ?Condition
+    {
+        try {
+            $response = EHealth::condition()->getById($this->uuid, $conditionId);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while loading the condition');
+
+            return null;
+        }
+
+        try {
+            return DB::transaction(function () use ($response, $conditionId): Condition {
+                Repository::condition()->sync($this->patient(), [$response->validate()]);
+
+                $condition = Condition::forPatient($this->patient())->whereUuid($conditionId)->firstOrFail();
+
+                if (Auth::user()->cannot('view', [$condition, $this->patient()])) {
+                    throw new AuthorizationException();
+                }
+
+                return $condition;
+            });
+        } catch (AuthorizationException) {
+            Session::flash('error', __('conditions.policy.view'));
+
+            return null;
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Error while storing the condition');
+
+            return null;
+        }
+    }
+
+    /**
      * Paginate locally stored (synced) conditions straight from the database.
      *
      * @return LengthAwarePaginator
      */
     protected function paginateLocalConditions(): LengthAwarePaginator
     {
-        $paginator = Condition::forPatient($this->patient())
+        $paginator = Condition::readableFor($this->patient(), $this->hasPatientAccess)
             ->notInDraftEncounter($this->patient())
             ->withAllRelations()
             ->recentlyUpdatedFirst()
@@ -227,7 +323,7 @@ class ConditionIndex extends BasePatientComponent
             'episode_id' => $this->filterEpisodeId ?: null,
             'onset_date_from' => $this->filterOnsetDateFrom ?: null,
             'onset_date_to' => $this->filterOnsetDateTo ?: null,
-            'managing_organization_id' => legalEntity()->uuid,
+            'managing_organization_id' => $this->hasPatientAccess ? null : legalEntity()->uuid,
             'page' => $page,
             'page_size' => $perPage
         ]);

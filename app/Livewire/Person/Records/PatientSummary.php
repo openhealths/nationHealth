@@ -514,7 +514,7 @@ class PatientSummary extends BasePatientComponent
     {
         // Short observations are open by a declaration (rule 1) or by the managing organization (rule 2) only
         $observations = Declaration::accessGrantedTo(Auth::user(), $this->patient(), legalEntity())->exists()
-            ? Observation::readableFor($this->patient(), true)
+            ? Observation::readableFor($this->patient(), true, Auth::user())
             : Observation::forLegalEntity($this->patient());
 
         $this->setPaginatedRecords(
@@ -600,9 +600,14 @@ class PatientSummary extends BasePatientComponent
 
     public function getConditions(): void
     {
+        // Short conditions are open by a declaration (rule 1) or by the managing organization (rule 2) only
+        $conditions = Declaration::accessGrantedTo(Auth::user(), $this->patient(), legalEntity())->exists()
+            ? Condition::readableFor($this->patient(), true)
+            : Condition::forLegalEntity($this->patient());
+
         $this->setPaginatedRecords(
             'conditions',
-            Condition::forPatient($this->patient())->notInDraftEncounter($this->patient())->allowedForSummary()->withAllRelations(),
+            $conditions->notInDraftEncounter($this->patient())->allowedForSummary()->withAllRelations(),
             'conditions',
             fn (array $conditions) => $this->populateIcd10Descriptions($conditions)
         );
@@ -650,10 +655,14 @@ class PatientSummary extends BasePatientComponent
 
     public function getDiagnosticReports(): void
     {
+        // Short diagnostic reports are open by a declaration (rule 1) or by the managing organization (rule 2) only
+        $diagnosticReports = Declaration::accessGrantedTo(Auth::user(), $this->patient(), legalEntity())->exists()
+            ? DiagnosticReport::readableFor($this->patient(), true)
+            : DiagnosticReport::forLegalEntity($this->patient());
+
         $this->setPaginatedRecords(
             'diagnosticReports',
-            DiagnosticReport::forPatient($this->patient())
-                ->whereNot('status', DiagnosticReportStatus::DRAFT)
+            $diagnosticReports->whereNot('status', DiagnosticReportStatus::DRAFT)
                 ->notInDraftEncounter($this->patient())
                 ->allowedForSummary()
                 ->withAllRelations(),

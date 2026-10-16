@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Livewire\Encounter;
 
 use App\Enums\Person\DeviceRequestStatus;
-use App\Livewire\Encounter\Forms\DeviceDispenseForm;
+use App\Livewire\EncounterPackage\Forms\DeviceDispenseForm;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
