@@ -364,6 +364,7 @@ return [
     'coding' => 'Кодування',
     'access_level' => 'Рівень доступу',
     'read' => 'Читання',
+    'write' => 'Запис',
     'service_group' => 'Група послуг',
     'list_of_services' => 'Список послуг',
     'organization' => 'Організація',
