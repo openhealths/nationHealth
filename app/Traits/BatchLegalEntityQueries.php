@@ -328,22 +328,28 @@ trait BatchLegalEntityQueries
      * @param  EHealthJob|null  $nextEntity  The job to be executed after the chain completes (or null)
      * @return EHealthJob|null The first job in the EmployeeRequestDetailsUpsert chain, or null if there are no employee_requests
      */
-    protected function getEmployeeRequestDetailsStartJob(LegalEntity $legalEntity, ?EHealthJob $nextEntity): ?EHealthJob
+    protected function getEmployeeRequestDetailsStartJob(LegalEntity $legalEntity, ?EHealthJob $nextEntity, ?array $requestUuids = null): ?EHealthJob
     {
         $job = null;
 
         // The incoming $nextEntity will be executed after the whole chain
         $previousJob = $nextEntity;
 
-        $models = EmployeeRequest::filterByLegalEntityId($legalEntity->id)
-            ->filterBySyncStatus(JobStatus::PARTIAL)
+        $models = EmployeeRequest::query()
+            ->whereNotNull('uuid')
+            ->when(
+                $requestUuids !== null,
+                fn ($query) => $query->whereIn('uuid', $requestUuids),
+                fn ($query) => $query->filterByLegalEntityId($legalEntity->id)->filterBySyncStatus(JobStatus::PARTIAL),
+            )
             ->get();
 
         foreach ($models->reverse() as $index => $model) {
             $job = new EmployeeRequestDetailsUpsert(
                 employeeRequest: $model,
                 legalEntity: $legalEntity,
-                nextEntity: $previousJob
+                nextEntity: $previousJob,
+                isFirstLogin: $this->isFirstLogin ?? false,
             );
 
             $previousJob = $job;

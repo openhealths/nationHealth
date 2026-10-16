@@ -16,7 +16,6 @@ use App\Models\Employee\EmployeeRequest;
 use App\Models\LegalEntity;
 use App\Repositories\Repository;
 use App\Traits\BatchLegalEntityQueries;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -298,123 +297,45 @@ class EmployeeRequestProcessor
      */
     private function resolveEmployeeUuid(EmployeeRequest $request, string $taxId): ?string
     {
-        $remote = $this->matcher->findApprovedForRequest($request, $taxId, legalEntity()->uuid);
+        $remote = $this->matcher->findApprovedForRequest($request, $taxId, $request->legalEntity->uuid);
 
         return $remote['uuid'] ?? null;
     }
 
     /**
-     * Processes a batch of remote Employee Request data from eHealth.
+     * Stage request UUIDs without assigning ownership from the EDRPOU list.
+     *
+     * @return list<string> Candidates requiring verified details.
      */
-    public function processBatch(array $eHealthData, LegalEntity $legalEntity): void
+    public function processBatch(array $eHealthData, LegalEntity $legalEntity): array
     {
-        // Fix for single object response vs array response
-        // If eHealth returns a single associative array (has 'uuid' or 'id'), wrap it in a list.
-        if (!empty($eHealthData) && (isset($eHealthData['uuid']) || isset($eHealthData['id']))) {
+        if (isset($eHealthData['uuid']) || isset($eHealthData['id'])) {
             $eHealthData = [$eHealthData];
         }
 
-        $eHealthRequests = collect($eHealthData)->keyBy('uuid');
-
-        if ($eHealthRequests->isEmpty()) {
-            return;
-        }
-
-        $localPendingRequests = EmployeeRequest::query()
-            ->where('legal_entity_id', $legalEntity->id)
-            ->whereNull('applied_at')
-            ->whereIn('uuid', $eHealthRequests->keys())
-            ->with(['revision', 'employee', 'party', 'division'])
-            ->cursor();
-
-        $approvedCount = 0;
-
-        foreach ($localPendingRequests as $localRequest) {
-
-            $remoteRequestData = $eHealthRequests->get($localRequest->uuid);
-
-            if (!$remoteRequestData) {
-                continue;
-            }
-
-            $remoteStatus = $remoteRequestData['status'] ?? null;
-
-            if (!$remoteStatus) {
-                Log::warning(
-                    "[EmployeeRequestProcessor] Remote status missing for Request UUID: {$localRequest->uuid}"
-                );
-                continue;
-            }
-
-            try {
-                if ($remoteStatus === 'APPROVED') {
-                    // Pass the specific item data, not the whole array
-                    $this->applyApprovedRequest($localRequest, $remoteRequestData);
-                    $approvedCount++;
-                    Log::info(
-                        "[EmployeeRequestProcessor] Request APPROVED and applied successfully. Request ID: {$localRequest->id}"
-                    );
-
-                } elseif (in_array($remoteStatus, ['REJECTED', 'EXPIRED'])) {
-                    $newStatus = match ($remoteStatus) {
-                        'REJECTED' => LocalStatus::REJECTED,
-                        'EXPIRED' => LocalStatus::EXPIRED,
-                        default => null,
-                    };
-
-                    if ($newStatus) {
-                        $localRequest->update(
-                            [
-                                'status' => $newStatus,
-                                'applied_at' => now(),
-                            ]
-                        );
-                        $localRequest->revision?->update(
-                            ['status' => RevisionStatus::OUTDATED]
-                        );
-
-                        Log::info(
-                            "[EmployeeRequestProcessor] Request status updated to {$newStatus->value}. Request ID: {$localRequest->id}"
-                        );
-                    }
+        return DB::transaction(function () use ($eHealthData, $legalEntity): array {
+            // Serialize staging for clinics of the same proprietor to avoid duplicate UUIDs.
+            LegalEntity::whereEdrpou($legalEntity->edrpou)->orderBy('id')->lockForUpdate()->get();
+            $requestUuids = [];
+            foreach ($eHealthData as $data) {
+                $uuid = $data['uuid'] ?? $data['id'] ?? null;
+                if (!is_string($uuid) || !\Illuminate\Support\Str::isUuid($uuid)) {
+                    continue;
                 }
-            } catch (\Throwable $e) {
-                Log::error(
-                    "[EmployeeRequestProcessor] Failed to process request ID {$localRequest->id}: " . $e->getMessage(),
-                    ['exception' => $e]
-                );
-            }
-        }
-
-        // Logic to insert missing requests from eHealth that don't exist locally
-        $localEmployeeRequestUuids = EmployeeRequest::where('legal_entity_id', $legalEntity->id)
-            ->pluck('uuid')
-            ->toArray();
-
-        $employeeRequestsUpsertData = [];
-
-        foreach ($eHealthData as $ehealthEmployeeRequest) {
-            if (in_array($ehealthEmployeeRequest['uuid'], $localEmployeeRequestUuids, true)) {
-                continue;
+                $request = EmployeeRequest::firstOrCreate(['uuid' => $uuid], [
+                    'status' => $data['status'] ?? LocalStatus::NEW,
+                    'inserted_at' => $data['inserted_at'] ?? now(),
+                    'sync_status' => JobStatus::PARTIAL->value,
+                ]);
+                if ($request->sync_status === JobStatus::COMPLETED->value && $request->appliedAt !== null) {
+                    continue;
+                }
+                $request->setSyncStatus(JobStatus::PARTIAL);
+                $requestUuids[] = $uuid;
             }
 
-            // Check if 'inserted_at' exists, otherwise use current time
-            $insertedAt = isset($ehealthEmployeeRequest['inserted_at'])
-                ? Carbon::parse($ehealthEmployeeRequest['inserted_at'])->format('Y-m-d H:i:s')
-                : now();
-
-            $employeeRequestsUpsertData[] = [
-                'uuid' => $ehealthEmployeeRequest['uuid'],
-                'inserted_at' => $insertedAt,
-                'status' => $ehealthEmployeeRequest['status'],
-                'legal_entity_id' => $legalEntity->id,
-                'sync_status' => JobStatus::PARTIAL->value
-            ];
-        }
-
-        if (!empty($employeeRequestsUpsertData)) {
-            EmployeeRequest::insert($employeeRequestsUpsertData);
-        }
+            return array_values(array_unique($requestUuids));
+        });
     }
 
     /**

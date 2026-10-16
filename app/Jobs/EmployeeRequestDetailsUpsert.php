@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthResponseException;
 use Throwable;
 use App\Core\Arr;
 use Carbon\Carbon;
@@ -19,6 +20,8 @@ use Illuminate\Queue\SerializesModels;
 use App\Classes\eHealth\EHealthResponse;
 use App\Enums\Employee\RevisionStatus;
 use App\Models\Employee\EmployeeRequest;
+use App\Services\Employee\EmployeeRequestProcessor;
+use Illuminate\Support\Facades\DB;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Middleware\RateLimited;
@@ -41,8 +44,9 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
         public ?LegalEntity $legalEntity,
         protected ?EHealthJob $nextEntity = null,
         public bool $standalone = false,
+        protected bool $isFirstLogin = false,
     ) {
-        parent::__construct(legalEntity: $legalEntity, nextEntity: $nextEntity, standalone: $standalone);
+        parent::__construct(legalEntity: $legalEntity, nextEntity: $nextEntity, standalone: $standalone, isFirstLogin: $isFirstLogin);
     }
 
     /**
@@ -52,7 +56,17 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
      */
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse|null
     {
-        return EHealth::employeeRequest()->withToken($token)->getDetails($this->employeeRequest->uuid);
+        try {
+            return EHealth::employeeRequest()->withToken($token)->getDetails($this->employeeRequest->uuid);
+        } catch (EHealthResponseException $exception) {
+            if (!in_array($exception->response->status(), [403, 404], true)) {
+                throw $exception;
+            }
+            $this->suspendUnassignedRequest();
+            Log::warning('Employee request details are unavailable.', ['requestId' => $this->employeeRequest->id, 'status' => $exception->response->status()]);
+
+            return null;
+        }
     }
 
     /**
@@ -62,17 +76,32 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
      */
     protected function processResponse(?EHealthResponse $response): void
     {
+        if ($response === null) {
+            return;
+        }
         $validatedData = $response->validate();
+        if (($validatedData['uuid'] ?? null) !== $this->employeeRequest->uuid) {
+            $this->suspendUnassignedRequest();
+
+            return;
+        }
+        $targetLegalEntity = LegalEntity::whereUuid($validatedData['legal_entity_uuid'])
+            ->whereIsActive(true)->whereStatus('ACTIVE')->first();
+        if ($targetLegalEntity === null) {
+            $this->suspendUnassignedRequest();
+
+            return;
+        }
 
         $validatedData['inserted_at'] = Carbon::parse($validatedData['inserted_at'])->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s');
 
         Log::info('Processing EmployeeRequestDetailsUpsert for employee_request:' . $this->employeeRequest->id . ', LE:' . ($this->legalEntity->id ?? 'N/A'));
 
-        $this->employeeRequest->legalEntityUuid = $this->legalEntity?->uuid;
-
         $userEmail = Arr::get($validatedData, 'party.email');
 
-        $employeeRequestUser = User::where('email', $userEmail)->first();
+        $employeeRequestUser = User::where('email', $userEmail)
+            ->whereHas('employees', fn ($employees) => $employees->whereLegalEntityId($targetLegalEntity->id))
+            ->first();
 
         $employeeRequestPartyId = $employeeRequestUser?->partyId;
 
@@ -80,7 +109,7 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
         $isTerminal = in_array($remoteStatus, ['APPROVED', 'REJECTED', 'EXPIRED'], true);
 
         $fillData = array_merge(
-            $response->map($validatedData, $this->legalEntity, $employeeRequestUser?->id ?? null, $employeeRequestPartyId ?? null),
+            $response->map($validatedData, $targetLegalEntity, $employeeRequestUser?->id ?? null, $employeeRequestPartyId ?? null),
             [
                 'sync_status' => JobStatus::COMPLETED->value,
                 'inserted_at' => Carbon::parse($validatedData['inserted_at'])->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? Carbon::now(),
@@ -94,15 +123,34 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
                 ->format('Y-m-d H:i:s');
         }
 
-        $this->employeeRequest->fill($fillData);
-
-        $this->employeeRequest->save();
-
         $revisionData['data'] = Ehealth::employeeRequest()->mapRevisionData($response);
         $revisionData['ehealth_response'] = [ 'data' => $response->getData()];
-        $revisionData['status'] = RevisionStatus::APPLIED->value;
+        $revisionData['status'] = match ($remoteStatus) {
+            'APPROVED' => RevisionStatus::APPLIED->value,
+            'REJECTED', 'EXPIRED' => RevisionStatus::OUTDATED->value,
+            default => RevisionStatus::PENDING->value,
+        };
+        DB::transaction(function () use ($targetLegalEntity, $validatedData, $remoteStatus, $fillData, $revisionData) {
+            $request = EmployeeRequest::whereKey($this->employeeRequest->id)->lockForUpdate()->firstOrFail();
+            if ($request->legalEntityId !== null && (int) $request->legalEntityId !== (int) $targetLegalEntity->id) {
+                Log::warning('Employee request has conflicting ownership.', ['requestId' => $request->id]);
 
-        Repository::revision()->saveRevision($this->employeeRequest, $revisionData);
+                return;
+            }
+            if ($remoteStatus === 'APPROVED' && $request->isPendingEhealth() && $request->revision) {
+                app(EmployeeRequestProcessor::class)->applyApprovedRequest($request, $validatedData);
+            }
+            $fillData['user_id'] ??= $request->userId;
+            $fillData['party_id'] ??= $request->partyId;
+            $request->fill($fillData)->save();
+            Repository::revision()->saveRevision($request, $revisionData);
+        });
+    }
+
+    private function suspendUnassignedRequest(): void
+    {
+        EmployeeRequest::whereKey($this->employeeRequest->id)->whereNull('legal_entity_id')
+            ->update(['sync_status' => JobStatus::SUSPENDED->value]);
     }
 
     /**
