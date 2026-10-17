@@ -266,15 +266,28 @@ abstract class EHealthJob implements ShouldQueue
             return '';
         }
 
-        $session = DB::table('sessions')->where('user_id', $this->user->id)->first();
+        $payload = $this->getSessionPayload($this->user);
+
+        return $payload[config('ehealth.api.oauth.bearer_token')] ?? '';
+    }
+
+    /**
+     * Read token data from the session currently bound to the user.
+     */
+    protected function getSessionPayload(User $user): array
+    {
+        $session = DB::table('sessions')
+            ->where('user_id', $user->id)
+            ->where('id', $user->sessionId)
+            ->first();
 
         if (!$session) {
-            return '';
+            return [];
         }
 
-        $payload = unserialize(base64_decode($session->payload));
+        $payload = unserialize(base64_decode($session->payload), ['allowed_classes' => false]);
 
-        return $payload['auth_token'] ?? '';
+        return is_array($payload) ? $payload : [];
     }
 
     /**
@@ -355,6 +368,7 @@ abstract class EHealthJob implements ShouldQueue
                     // whereColumn creates correlation between main query and subquery
                     // This ensures we check sessions for the specific user from outer query
                     ->whereColumn('sessions.user_id', 'users.id')
+                    ->whereColumn('sessions.id', 'users.session_id')
             )
             ->get();
 
@@ -363,10 +377,20 @@ abstract class EHealthJob implements ShouldQueue
         // $users here is a Collection of User models. $userKey is the key/index of the first user that has the required scope/permission
         $userKey = empty($this->requiredScope())
             ? $users->keys()->first()
-            : $users->search(fn (User $user) => $user->hasPermissionTo($this->requiredScope(), 'ehealth'));
+            : $users->search(function (User $user): bool {
+                $payload = $this->getSessionPayload($user);
+                $scopes = $payload[config('ehealth.api.oauth.token_scopes')] ?? [];
+
+                return $user->permissions
+                    ->where('guard_name', 'ehealth')
+                    ->contains('name', $this->requiredScope())
+                    && is_array($scopes)
+                    && in_array($this->requiredScope(), $scopes, true)
+                    && !empty($payload[config('ehealth.api.oauth.bearer_token')]);
+            });
 
         // If no user found with required scope, return null
-        return $users->get($userKey);
+        return $userKey === false ? null : $users->get($userKey);
     }
 
     /**

@@ -118,10 +118,16 @@ trait BatchLegalEntityQueries
      * @param  User  $user  The user context for the new batch execution
      * @param  string  $token  Encrypted authentication token for API requests
      * @param  LegalEntity|null  $legalEntity  The legal entity context for the batch (optional)
-     * @return void
+     * @param  array|null  $scopes  Token scopes to check before restarting the batch
+     * @return bool Whether the batch was restarted
      */
-    protected function restartBatch(stdClass $batch, User $user, string $token, ?LegalEntity $legalEntity = null): void
-    {
+    protected function restartBatch(
+        stdClass $batch,
+        User $user,
+        string $token,
+        ?LegalEntity $legalEntity = null,
+        ?array $scopes = null
+    ): bool {
         $legalEntity = $legalEntity ?? legalEntity();
 
         $pendingJobs = $this->extractPendingJobsFromBatches($batch);
@@ -132,10 +138,20 @@ trait BatchLegalEntityQueries
                 echo 'No pending jobs found in batch: ' . $batch->name . ' id: ' . $batch->id . PHP_EOL;
             }
 
-            return;
+            return false;
+        }
+
+        if ($scopes !== null) {
+            foreach ($pendingJobs as $job) {
+                if ($job instanceof EHealthJob && $job::SCOPE_REQUIRED !== '' && !in_array($job::SCOPE_REQUIRED, $scopes, true)) {
+                    return false;
+                }
+            }
         }
 
         $this->restartFailedBatch($user, $batch, $token, $legalEntity, $pendingJobs);
+
+        return true;
     }
 
     /**
@@ -197,6 +213,11 @@ trait BatchLegalEntityQueries
 
         $newBatch = $batchOptions->dispatch();
 
+        // Keep failed jobs until the replacement batch has been dispatched.
+        DB::table('failed_jobs')
+            ->whereIn('uuid', json_decode($batch->failed_job_ids, true) ?? [])
+            ->delete();
+
         // Here do echo only into the job context where legalEntity() is not set
         if (!legalEntity()) {
             echo 'Dispatched new batch: ' . $newBatch->name . ' id: ' . $newBatch->id . PHP_EOL;
@@ -241,9 +262,6 @@ trait BatchLegalEntityQueries
             if (isset($payload['data']['command'])) {
                 $pendingJobs[] = unserialize($payload['data']['command']);
             }
-
-            // Remove the job from failed_jobs table to prevent reprocessing
-            DB::table('failed_jobs')->where('id', $job->id)->delete();
         }
 
         return $pendingJobs;
