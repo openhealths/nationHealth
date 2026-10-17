@@ -47,10 +47,14 @@ class LegalEntityAccreditationCast implements CastsAttributes
      * Prepare the given value for storage.
      *
      * @param  array<string, mixed>  $attributes
-     * @return array
+     * @return string
      */
     public function set(Model $model, string $key, mixed $value, array $attributes): string
     {
+        if (empty($value)) {
+            return json_encode([]);
+        }
+
         $arrayData = \is_array($value) ? $value : json_decode($value, true) ?? [];
 
         foreach ($arrayData as $key => $value) {
