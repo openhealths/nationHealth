@@ -169,7 +169,6 @@ abstract class DeclarationComponent extends Component
     {
         $patient = Person::select(['id', 'uuid', 'birth_date', 'is_syncing'])
             ->with('names')
-            ->withExists('documents')
             ->whereId($personId)
             ->firstOrFail();
 
@@ -197,12 +196,8 @@ abstract class DeclarationComponent extends Component
         $authMethodTypes = collect($this->authMethods)->pluck('type');
         $hasThirdPerson = $authMethodTypes->contains(AuthenticationMethod::THIRD_PERSON->value);
 
-        // Use 'documents_exists' dynamic attribute (added by withExists) to determine if we need to update person data (for one haven't OTP authentication method).
         // A child below the self-authentication age can act only through a confidant person, whose presence is proven by the THIRD_PERSON method
         $this->isNeedToPersonUpdate = $hasNoAuthMethod
-            || (!$patient->documents_exists
-                && !$hasThirdPerson
-                && !$authMethodTypes->contains(AuthenticationMethod::OTP->value))
             || ($patient->age < config('ehealth.no_self_auth_age') && !$hasThirdPerson);
 
         $this->isNeedToResign = Repository::declarationRequest()->checkIfNeedToResign($this->patientUuid);
