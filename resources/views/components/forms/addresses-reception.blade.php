@@ -32,6 +32,10 @@
             this.clearRegion();
         },
         init() {
+            if (this.readonly) {
+                return;
+            }
+
             this.$watch('address.area', value => {
                     this.clearArea();
             });
@@ -130,14 +134,19 @@
     {{-- SETTLEMENT ID --}}
     <div class="form-group group">
         <input
+            required
             x-model="address.settlementId"
             type="text"
             placeholder=" "
             id="addressSettlementId{{ $uid }}"
             value="{{ $address['settlementId'] ?? '-' }}"
             class="input peer"
-            :disabled="readonly"
+            disabled
         />
+
+        @error('receptionAddress.settlementId')
+            <p id="addressSettlementIdErrorHelp{{ $uid }}" class="text-error">{{ $message }}</p>
+        @enderror
 
         <label for="addressSettlementId{{ $uid }}" class="label z-10">
             {{ __('forms.settlement_id') }}

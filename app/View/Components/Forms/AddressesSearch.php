@@ -47,9 +47,12 @@ class AddressesSearch extends Addresses
     public static function getAddressMessages(): array
     {
         return [
+            'address.type.required' => __('forms.addresses.error.type'),
+            'address.country.required' => __('forms.addresses.error.country'),
             'address.area' => __('forms.addresses.error.area'),
             'address.settlementType' => __('forms.addresses.error.settlementType'),
             'address.settlement' => __('forms.addresses.error.settlement'),
+            'address.settlementId.required' => __('forms.addresses.error.settlementId'),
             'address.street.required_with' => __('forms.addresses.error.street_required_with'),
             'address.building.required_with' => __('forms.addresses.error.building_required_with'),
             'address.building' => __('forms.addresses.error.building'),

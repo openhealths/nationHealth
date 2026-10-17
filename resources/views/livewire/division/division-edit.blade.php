@@ -1,6 +1,6 @@
 @php
     $action = 'update';
-    $division = \App\Models\Division::find($divisionForm->division['id']);
+    $division = legalEntity()->divisions()->findOrFail($divisionId);
     $divisionType = dictionary()->basics()->byName('DIVISION_TYPE')->where('code', $divisionForm->division['type'])->value('description');
     $status = $divisionForm->division['status'];
 @endphp

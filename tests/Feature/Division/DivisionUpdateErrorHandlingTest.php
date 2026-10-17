@@ -13,9 +13,12 @@ use App\Livewire\Division\DivisionEdit;
 use App\Livewire\Division\Forms\DivisionForm;
 use App\Models\Division;
 use App\Models\LegalEntity;
+use App\Models\User;
 use App\Repositories\DivisionRepository;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -26,6 +29,11 @@ class DivisionUpdateErrorHandlingTest extends TestCase
         $component = new class extends DivisionEdit
         {
             public ?string $redirectUrl = null;
+
+            public function runUpdate(Division $division): void
+            {
+                $this->divisionUpdate($division);
+            }
 
             public function redirect($url, $navigate = false): void
             {
@@ -76,11 +84,64 @@ class DivisionUpdateErrorHandlingTest extends TestCase
         $this->assertNull(session('success'));
     }
 
+    public static function externalIdPayloads(): array
+    {
+        return [
+            'clear with null' => ['division-uuid', ['externalId' => null], ['external_id' => '']],
+            'clear with empty string' => ['division-uuid', ['externalId' => ''], ['external_id' => '']],
+            'missing field' => ['division-uuid', [], []],
+            'zero' => ['division-uuid', ['externalId' => '0'], ['external_id' => '0']],
+            'replacement' => ['division-uuid', ['externalId' => 'NEW-ID'], ['external_id' => 'NEW-ID']],
+            'draft with null' => [null, ['externalId' => null], []],
+            'draft with empty string' => [null, ['externalId' => ''], []],
+        ];
+    }
+
+    #[DataProvider('externalIdPayloads')]
+    public function test_external_id_payload_distinguishes_clearing_from_creation(
+        ?string $uuid,
+        array $input,
+        array $expected
+    ): void {
+        $component = $this->divisionComponent();
+        unset($component->divisionForm->division['externalId']);
+        $component->divisionForm->division = array_replace($component->divisionForm->division, $input);
+        $division = new Division(['uuid' => $uuid, 'external_id' => 'OLD-ID']);
+
+        if ($uuid === null) {
+            $user = Mockery::mock(User::class);
+            $user->shouldReceive('cannot')->once()->with('create', Division::class)->andReturnFalse();
+            Auth::shouldReceive('user')->once()->andReturn($user);
+        }
+
+        $response = $this->mock(EHealthResponse::class);
+        $response->shouldReceive('validate')->once()->andReturn(new DivisionResponse([
+            'uuid' => 'division-uuid', 'name' => 'API division', 'type' => 'CLINIC',
+            'email' => 'division@example.com', 'status' => 'ACTIVE',
+            'external_id' => $expected['external_id'] ?? null,
+            'addresses' => [], 'phones' => [],
+        ]));
+        $this->mock(DivisionApi::class)->shouldReceive('update')->once()
+            ->with($uuid, Mockery::on(function (array $payload) use ($expected): bool {
+                $this->assertSame($expected, array_intersect_key($payload, ['external_id' => true]));
+
+                return true;
+            }))->andReturn($response);
+        $this->mock(DivisionRepository::class)->shouldReceive('saveMappedDivision')->once()
+            ->with(Mockery::type(DivisionData::class), $division, legalEntity())->andReturn($division);
+
+        $component->runUpdate($division);
+
+        $this->assertNull(session('error'));
+        $this->assertSame(__('forms.success_response'), session('success'));
+    }
+
     public function test_maps_request_and_saves_response_into_existing_division(): void
     {
         $component = $this->divisionComponent();
+        $component->divisionForm->division['uuid'] = 'forged-division-uuid';
         $input = $component->divisionForm->division;
-        $division = new Division();
+        $division = new Division(['uuid' => 'division-uuid']);
         $division->id = 42;
         $response = $this->mock(EHealthResponse::class);
         $response->shouldReceive('validate')->once()->andReturn(new DivisionResponse([
@@ -109,7 +170,7 @@ class DivisionUpdateErrorHandlingTest extends TestCase
                 return true;
             }), $division, legalEntity())->andReturn($division);
 
-        $component->divisionUpdate($division);
+        $component->runUpdate($division);
 
         $this->assertSame(42, $division->id);
         $this->assertSame($input, $component->divisionForm->division);
@@ -120,6 +181,10 @@ class DivisionUpdateErrorHandlingTest extends TestCase
 
     public function test_draft_update_passes_null_uuid_and_preserves_local_model(): void
     {
+        $user = Mockery::mock(User::class);
+        $user->shouldReceive('cannot')->once()->with('create', Division::class)->andReturnFalse();
+        Auth::shouldReceive('user')->once()->andReturn($user);
+
         $component = $this->divisionComponent();
         unset($component->divisionForm->division['uuid']);
         $division = new Division();
@@ -128,7 +193,7 @@ class DivisionUpdateErrorHandlingTest extends TestCase
         $this->mock(DivisionRepository::class)->shouldReceive('saveMappedDivision')->once()
             ->with(Mockery::type(DivisionData::class), $division, legalEntity())->andReturn($division);
 
-        $component->divisionUpdate($division);
+        $component->runUpdate($division);
 
         $this->assertSame(42, $division->id);
         $this->assertSame(__('forms.success_response'), session('success'));
@@ -144,7 +209,7 @@ class DivisionUpdateErrorHandlingTest extends TestCase
         $this->mock(DivisionRepository::class)->shouldNotReceive('saveMappedDivision');
         $this->expectChannelError('e_health_errors');
 
-        $component->divisionUpdate(new Division());
+        $component->runUpdate(new Division(['uuid' => 'division-uuid']));
 
         $this->assertFailure($component, 'errors.ehealth.messages.request_error');
     }
@@ -158,7 +223,7 @@ class DivisionUpdateErrorHandlingTest extends TestCase
         $this->mock(DivisionRepository::class)->shouldNotReceive('saveMappedDivision');
         $this->expectChannelError('e_health_errors');
 
-        $component->divisionUpdate(new Division());
+        $component->runUpdate(new Division(['uuid' => 'division-uuid']));
 
         $this->assertFailure($component, 'errors.ehealth.messages.request_error');
     }
@@ -172,7 +237,7 @@ class DivisionUpdateErrorHandlingTest extends TestCase
         $this->mock(DivisionRepository::class)->shouldNotReceive('saveMappedDivision');
         $this->expectChannelError('e_health_errors');
 
-        $component->divisionUpdate(new Division());
+        $component->runUpdate(new Division(['uuid' => 'division-uuid']));
 
         $this->assertFailure($component, 'errors.ehealth.messages.request_error');
     }
@@ -185,7 +250,7 @@ class DivisionUpdateErrorHandlingTest extends TestCase
         $this->mock(DivisionRepository::class)->shouldNotReceive('saveMappedDivision');
         $this->expectChannelError('e_health_errors');
 
-        $component->divisionUpdate(new Division());
+        $component->runUpdate(new Division(['uuid' => 'division-uuid']));
 
         $this->assertFailure($component, 'errors.ehealth.messages.request_error');
     }
@@ -197,7 +262,7 @@ class DivisionUpdateErrorHandlingTest extends TestCase
         $this->mock(DivisionRepository::class)->shouldNotReceive('saveMappedDivision');
         $this->expectChannelError('db_errors');
 
-        $component->divisionUpdate(new Division());
+        $component->runUpdate(new Division(['uuid' => 'division-uuid']));
 
         $this->assertFailure($component, 'errors.database.messages.save_error');
     }
@@ -210,7 +275,7 @@ class DivisionUpdateErrorHandlingTest extends TestCase
             ->andThrow(new RuntimeException('Database failed'));
         $this->expectChannelError('db_errors');
 
-        $component->divisionUpdate(new Division());
+        $component->runUpdate(new Division(['uuid' => 'division-uuid']));
 
         $this->assertFailure($component, 'errors.database.messages.save_error');
     }

@@ -5,8 +5,8 @@
 
     $divisionId = $divisionForm->division['id'] ?? null;
 
-    // Model may be null if not preloaded; use for policy checks only
-    $division = $divisionId ? \App\Models\Division::find($divisionId) : null;
+    // Resolve only divisions of the legal entity authorized for this request.
+    $division = legalEntity()->divisions()->findOrFail($divisionId);
     $divisionType = dictionary()->basics()->byName('DIVISION_TYPE')->where('code', $divisionForm->division['type'])->value('description');
 @endphp
 
@@ -45,7 +45,7 @@
             <button
                 x-on:click.prevent="
                     divisionId={{ $divisionId }};
-                    textConfirmation=@js(__('divisions.modals.deactivate.confirmation_text'));
+                    textConfirmation=@js(__('divisions.modals.deactivate.confirmation_text') . ($division->status === Status::UNSYNCED ? ' ' . __('divisions.modals.deactivate.unsynced_warning') : ''));
                     actionType='deactivate';
                     actionTitle=@js(__('divisions.modals.deactivate.title'));
                     actionButtonText=@js(__('forms.deactivate'));

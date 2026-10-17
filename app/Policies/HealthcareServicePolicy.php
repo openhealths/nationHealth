@@ -81,6 +81,10 @@ class HealthcareServicePolicy
      */
     public function delete(User $user, HealthcareService $healthcareService): Response
     {
+        if ($user->cannot('healthcare_service:write')) {
+            return Response::denyWithStatus(404);
+        }
+
         // Should belong to the same legal entity
         if (legalEntity()->id !== $healthcareService->legalEntityId) {
             return Response::denyWithStatus(404);

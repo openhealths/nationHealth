@@ -144,6 +144,8 @@ class Division extends Request
      */
     public function deactivate(string $uuid): PromiseInterface|EHealthResponse
     {
+        $this->setValidator($this->validateOne(...));
+
         return parent::patch(self::URL . '/' . $uuid . self::ACTIONS_DEACTIVATE);
     }
 

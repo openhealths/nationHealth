@@ -504,7 +504,7 @@ trait BatchLegalEntityQueries
     /**
      * Generates a chain of jobs to fetch details for all PARTIAL contract requests.
      */
-    public function getContractRequestDetailsStartJob(LegalEntity $legalEntityModel, ?EHealthJob $nextEntityModel = null): ?EHealthJob
+    protected function getContractRequestDetailsStartJob(LegalEntity $legalEntityModel, ?EHealthJob $nextEntityModel = null): ?EHealthJob
     {
         $partialRequestsList = ContractRequest::where('contractor_legal_entity_id', $legalEntityModel->uuid)
             ->where('sync_status', JobStatus::PARTIAL->value)

@@ -7,6 +7,8 @@
     'id' => null,
     'showAllIfEmpty' => false,
     'initial' => null,
+    'searchable' => false,
+    'allowCustom' => false,
 ])
 
 @php
@@ -24,6 +26,38 @@
         open: false,
         selected: [],
         options: @js($options),
+        searchValue: '',
+        @if ($allowCustom)
+        addCustomValue() {
+            const value = this.searchValue.trim();
+
+            if (!value) {
+                return;
+            }
+
+            const key = Object.keys(this.options).find(option => option.toLowerCase() === value.toLowerCase()) ?? value;
+            this.options = { ...this.options, [key]: this.options[key] ?? value };
+
+            if (!this.selected.includes(key)) {
+                this.selected = [...this.selected, key];
+            }
+
+            this.searchValue = '';
+        },
+        @endif
+        get filteredOptions() {
+            const searchValue = this.searchValue.trim().toLowerCase();
+
+            if (!searchValue) {
+                return this.options;
+            }
+
+            return Object.fromEntries(
+                Object.entries(this.options).filter(([value, label]) =>
+                    String(value).toLowerCase().includes(searchValue) || String(label).toLowerCase().includes(searchValue)
+                )
+            );
+        },
         get displayText() {
             const selectedArr = Array.isArray(this.selected) ? this.selected : [];
             if (selectedArr.length === 0) {
@@ -88,8 +122,36 @@
             x-transition:leave-end="transform opacity-0 scale-95"
             class="multiselect-dropdown absolute z-30 mt-2 max-h-60 w-full overflow-y-auto rounded-md border border-gray-200 shadow-lg dark:border-gray-600"
         >
+            {{-- Search input for filtering options --}}
+            @if ($searchable || $allowCustom)
+                <div class="!bg-white px-3 pt-2 dark:!bg-gray-800">
+                    {{-- sr-only deliberately hides the label visually while keeping it available to screen readers --}}
+                    <label for="{{ $elementId }}-search" class="sr-only">{{ __('forms.search') }}</label>
+                    <input
+                        type="text"
+                        id="{{ $elementId }}-search"
+                        x-model="searchValue"
+                        @if ($allowCustom)
+                            @keydown.enter.prevent="addCustomValue()"
+                        @endif
+                        class="input w-full placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                        placeholder="{{ $allowCustom ? ($placeholder ?? __('forms.search')) : __('forms.search') }}"
+                    />
+                    @if ($allowCustom)
+                        <button
+                            type="button"
+                            @click="addCustomValue()"
+                            :disabled="!searchValue.trim()"
+                            class="button-primary mt-2 px-4! py-2! text-xs!"
+                        >
+                            {{ __('forms.add_to_search') }}
+                        </button>
+                    @endif
+                </div>
+            @endif
+
             <ul class="space-y-2 !bg-white px-3 py-2 text-sm text-gray-700 dark:!bg-gray-800 dark:text-gray-200">
-                <template x-for="(optLabel, optValue) in options" :key="optValue">
+                <template x-for="(optLabel, optValue) in filteredOptions" :key="optValue">
                     <li>
                         <label class="flex cursor-pointer items-center space-x-2 rounded p-1 hover:bg-gray-50 dark:hover:bg-gray-600">
                             <input

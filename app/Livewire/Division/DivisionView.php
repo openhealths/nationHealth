@@ -9,7 +9,7 @@ use Exception;
 use Throwable;
 use App\Models\Division;
 use App\Models\LegalEntity;
-use App\Enums\Division\Status;
+use App\Enums\Status;
 use Livewire\Attributes\Locked;
 use App\Classes\eHealth\EHealth;
 use App\Repositories\Repository;
@@ -47,8 +47,13 @@ class DivisionView extends DivisionComponent
 
         $this->divisionUuid = $division->uuid ?? '';
 
-        $this->statusLabel = Status::tryFrom($division->status->value)?->label() ?? __('forms.unknown');
-        $this->statusStyle = Status::tryFrom($division->status->value)?->cssClass() ?? 'status-alert-default';
+        $this->statusLabel = $division->status->label();
+        $this->statusStyle = match ($division->status) {
+            Status::ACTIVE => 'status-alert-green',
+            Status::INACTIVE, Status::DRAFT => 'status-alert-red',
+            Status::UNSYNCED => 'status-alert-yellow',
+            default => 'status-alert-default',
+        };
 
         $this->setDictionary();
     }
@@ -61,7 +66,7 @@ class DivisionView extends DivisionComponent
      */
     public function sync(): RedirectResponse|Redirector|null
     {
-        if (Auth::user()->cannot('viewAny', Division::class)) {
+        if (Auth::user()->cannot('division:details') || $this->divisionUuid === '') {
             Session::flash('error', __('divisions.policy.deny.sync'));
 
             return null;
@@ -71,6 +76,14 @@ class DivisionView extends DivisionComponent
             ->filterByLegalEntityId(legalEntity()->id)
             ->where('uuid', $this->divisionUuid)
             ->first();
+
+        // For view here should always have a valid division model
+        // Only Draft divisions can be synchronized
+        if (!$division) {
+            Session::flash('error', __('divisions.policy.deny.sync'));
+
+            return null;
+        }
 
         try {
             $response = EHealth::division()->getDetails(uuid: $division->uuid);
@@ -94,12 +107,12 @@ class DivisionView extends DivisionComponent
             return null;
         }
 
-        $divisionModelMapped = new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessorBuilder()
-            ->disableExceptionOnInvalidPropertyPath()
-            ->getPropertyAccessor())
-            ->map($divisionData, DivisionData::class);
-
         try {
+            $divisionModelMapped = new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessorBuilder()
+                ->disableExceptionOnInvalidPropertyPath()
+                ->getPropertyAccessor())
+                ->map($divisionData, DivisionData::class);
+
             Repository::division()->saveMappedDivision($divisionModelMapped, $division, legalEntity());
         } catch (Throwable $err) {
             Log::channel('db_errors')->error(self::class . ':sync', ['error' => $err->getMessage()]);

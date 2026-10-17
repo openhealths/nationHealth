@@ -95,13 +95,18 @@
                                     :options="$divisionUuids"
                                     label="{{ __('forms.select') }}"
                                     placeholder="{{ __('forms.uuid') }}"
+                                    searchable
+                                    allow-custom
                                 />
                             </div>
 
                             <div class="form-group group relative" style="z-index: 10;">
                                 <x-forms.multiselect
                                     bind="statusFilter"
-                                    :options="DivisionStatus::entries()"
+                                    :options="array_merge(DivisionStatus::entries(), [
+                                        Status::DRAFT->value => Status::DRAFT->label(),
+                                        Status::UNSYNCED->value => Status::UNSYNCED->label(),
+                                    ])"
                                     label="{{ __('forms.status.label') }}"
                                     placeholder="{{ __('forms.select') }}"
                                 />
@@ -276,9 +281,9 @@
                                                        actionButtonText = @js(__('forms.activate'));
                                                        open = !open;
                                                     "
-                                                       class="flex items-center gap-2 w-full first-of-type:rounded-t-md last-of-type:rounded-b-md px-4 py-2.5 text-left text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"
+                                                       class="flex items-center gap-2 w-full first-of-type:rounded-t-md last-of-type:rounded-b-md px-4 py-2.5 text-left text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-gray-600"
                                                     >
-                                                        @icon('check-circle', 'w-5 h-5 text-gray-600 dark:text-gray-300')
+                                                        @icon('check-circle', 'w-5 h-5 text-green-600 dark:text-green-400')
                                                         {{ __('forms.activate') }}
                                                     </a>
                                                 @endcan
@@ -288,15 +293,15 @@
                                                        wire:key="deactivate-{{ $division->id }}"
                                                        @click.prevent="
                                                        divisionId= {{ $division->id }};
-                                                       textConfirmation = @js(__('divisions.modals.deactivate.confirmation_text'));
+                                                       textConfirmation = @js(__('divisions.modals.deactivate.confirmation_text') . ($division->status === Status::UNSYNCED ? ' ' . __('divisions.modals.deactivate.unsynced_warning') : ''));
                                                        actionType = 'deactivate';
                                                        actionTitle = @js(__('divisions.modals.deactivate.title'));
                                                        actionButtonText = @js(__('forms.deactivate'));
                                                        open = !open;
                                                     "
-class="flex items-center gap-2 w-full last-of-type:rounded-b-md px-4 py-2.5 text-left text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"
+class="flex items-center gap-2 w-full last-of-type:rounded-b-md px-4 py-2.5 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-600"
                                                     >
-                                                        @icon('delete', 'w-5 h-5 text-gray-600 dark:text-gray-300')
+                                                        @icon('delete', 'w-5 h-5 text-red-600 dark:text-red-400')
                                                             {{ __('forms.deactivate') }}
                                                     </a>
                                                 @endcan

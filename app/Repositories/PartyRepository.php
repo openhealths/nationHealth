@@ -59,7 +59,7 @@ class PartyRepository
 
         $guards = collect(array_keys((array) config('auth.guards')))->values();
         $savedGuard = Auth::getDefaultDriver();
-        $loginedRole = Session::get('first_login_role');
+        $loginedRole = Session::get('single_role_login');
 
         setPermissionsTeamId($legalEntity->id);
 

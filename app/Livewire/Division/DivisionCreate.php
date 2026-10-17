@@ -9,22 +9,27 @@ use Throwable;
 use App\Models\Division;
 use App\Models\LegalEntity;
 use App\Models\Relations\Phone;
+use Livewire\Attributes\Locked;
 use App\Classes\eHealth\EHealth;
-use App\Dto\Division\Ehealth as EhealthData;
-use App\Dto\Division\Model as DivisionData;
 use App\Repositories\Repository;
 use App\Traits\WorkTimeUtilities;
-use Symfony\Component\ObjectMapper\ObjectMapper;
-use Symfony\Component\PropertyAccess\PropertyAccess;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Redirect;
+use App\Dto\Division\Model as DivisionData;
+use App\Dto\Division\Ehealth as EhealthData;
+use Symfony\Component\ObjectMapper\ObjectMapper;
+use App\Dto\Division\Coordinate as CoordinateData;
 use Livewire\Features\SupportRedirects\Redirector;
+use Symfony\Component\PropertyAccess\PropertyAccess;
 
 class DivisionCreate extends DivisionComponent
 {
     use WorkTimeUtilities;
+
+    #[Locked]
+    public ?int $divisionId = null;
 
     /**
      * Array containing dictionary names only used within the component.
@@ -51,16 +56,14 @@ class DivisionCreate extends DivisionComponent
      *
      * This method is automatically called by Livewire when the
      * divisionForm.division.location.latitude property is updated.
-     * It ensures the value is always stored as a float.
+     * Numeric input is stored as a float; invalid input is kept for validation.
      *
      * @param  mixed  $value  The value for latitude from input field
      * @return void
      */
     public function updatedDivisionFormDivisionLocationLatitude($value): void
     {
-        $this->divisionForm->division['location']['latitude'] = empty($value) && !is_numeric($value)
-            ? null
-            : (float) number_format((float) $value, 6, '.', '');
+        $this->divisionForm->division['location']['latitude'] = CoordinateData::fromInput($value)->value;
     }
 
     /**
@@ -68,16 +71,14 @@ class DivisionCreate extends DivisionComponent
      *
      * This method is automatically called by Livewire when the
      * divisionForm.division.location.longitude property is updated.
-     * It ensures the value is always stored as a float.
+     * Numeric input is stored as a float; invalid input is kept for validation.
      *
      * @param  mixed  $value  The value for longitude from input field
      * @return void
      */
     public function updatedDivisionFormDivisionLocationLongitude($value): void
     {
-        $this->divisionForm->division['location']['longitude'] = empty($value) && !is_numeric($value)
-            ? null
-            : (float) number_format((float) $value, 6, '.', '');
+        $this->divisionForm->division['location']['longitude'] = CoordinateData::fromInput($value)->value;
     }
 
     /**
@@ -94,9 +95,35 @@ class DivisionCreate extends DivisionComponent
             return null;
         }
 
+        if ((string) ($this->divisionForm->division['id'] ?? '') !== (string) $this->divisionId) {
+            session()->flash('error', __('divisions.policy.deny.edit'));
+
+            return null;
+        }
+
+        // A draft already saved by this component must be continued on the edit page.
+        if ($this->divisionId !== null) {
+            $division = legalEntity()->divisions()->find($this->divisionId);
+
+            if (!$division) {
+                session()->flash('error', __('errors.database.messages.load_error'));
+
+                return null;
+            }
+
+            if (Auth::user()->cannot('update', $division)) {
+                session()->flash('error', __('divisions.policy.deny.edit'));
+
+                return null;
+            }
+
+            return Redirect::route('division.edit', [legalEntity(), $division]);
+        }
+
         if ($this->validateDivision()) {
             try {
-                $division = $this->saveToDB();
+                $division = $this->saveToDB(new Division());
+                $this->divisionId = $division->id;
 
                 return $justSave
                     ? Redirect::route('division.edit', [legalEntity(), $division])->with('success', __('forms.saved_successfully'))
@@ -112,7 +139,7 @@ class DivisionCreate extends DivisionComponent
     }
 
     /**
-     * Combined method used both preliminary saving and modification Division's data
+     * Saves a new local draft and submits it for registration in eHealth.
      *
      * @return void
      */
@@ -137,18 +164,18 @@ class DivisionCreate extends DivisionComponent
      * creation, and upon a successful response, updates the local record with the
      * synchronized data (e.g., the eHealth UUID). If the API call is successful,
      * it redirects the user to the division index page with a success message.
-     * Otherwise, it logs the error and displays an error message to the user.
+     * If the request fails, it redirects to the saved draft with an error message.
      *
      * @param  Division  $division  The pre-saved division model instance to be created in eHealth
      * @return void This method does not return a value but performs a redirect on success
      */
     protected function divisionCreate(Division $division): void
     {
-        $divisionEhealthMapped = new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessor())
-            ->map($this->divisionForm, EhealthData::class)
-            ->toArray();
-
         try {
+            $divisionEhealthMapped = new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessor())
+                ->map($this->divisionForm, EhealthData::class)
+                ->toArray();
+
             $response = EHealth::division()->create(data: $divisionEhealthMapped)->validate();
             // If the response is empty, it means the create failed and uncatched
             if ($response->isEmpty()) {
@@ -158,16 +185,17 @@ class DivisionCreate extends DivisionComponent
         } catch (Throwable $err) {
             Log::channel('e_health_errors')->error(self::class . '::divisionCreate()', ['error' => $err->getMessage()]);
             session()->flash('error', __('errors.ehealth.messages.request_error'));
+            $this->redirect(route('division.edit', [legalEntity(), $division]), navigate: true);
 
             return;
         }
 
-        $divisionModelMapped = new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessorBuilder()
-            ->disableExceptionOnInvalidPropertyPath()
-            ->getPropertyAccessor())
-            ->map($response, DivisionData::class);
-
         try {
+            $divisionModelMapped = new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessorBuilder()
+                ->disableExceptionOnInvalidPropertyPath()
+                ->getPropertyAccessor())
+                ->map($response, DivisionData::class);
+
             Repository::division()->saveMappedDivision($divisionModelMapped, $division, legalEntity());
         } catch (Throwable $err) {
             Log::channel('db_errors')->error(self::class . '::divisionCreate()', ['error' => $err->getMessage()]);

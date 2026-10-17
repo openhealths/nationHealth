@@ -92,7 +92,7 @@ class LoginDev extends Login
             $permissions = $role->permissions->pluck('name')->unique()->toArray();
             $scopes = implode(' ', $permissions);
 
-            Session::put('first_login_role', $this->role);
+            Session::put('single_role_login', $this->role);
         }
 
         try {

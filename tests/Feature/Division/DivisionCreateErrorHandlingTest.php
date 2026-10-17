@@ -67,18 +67,38 @@ class DivisionCreateErrorHandlingTest extends TestCase
         Log::shouldReceive('channel')->once()->with($channel)->andReturn($logger);
     }
 
-    public function test_api_failure_does_not_attempt_database_saving(): void
+    public function test_api_failure_redirects_to_saved_draft_with_error(): void
     {
         $component = $this->divisionComponent();
+        $division = new Division();
+        $division->id = 13;
         $this->mock(DivisionApi::class)->shouldReceive('create')->once()
             ->andThrow(new RuntimeException('API failed'));
         $this->mock(DivisionRepository::class)->shouldNotReceive('saveMappedDivision');
         $this->expectChannelError('e_health_errors');
 
-        $component->runCreation(new Division());
+        $component->runCreation($division);
 
         $this->assertSame(__('errors.ehealth.messages.request_error'), session('error'));
-        $this->assertNull($component->redirectUrl);
+        $this->assertSame(route('division.edit', [legalEntity(), $division]), $component->redirectUrl);
+        $this->assertNull(session('success'));
+    }
+
+    public function test_empty_response_redirects_to_saved_draft_with_error(): void
+    {
+        $component = $this->divisionComponent();
+        $division = new Division();
+        $division->id = 13;
+        $response = $this->mock(EHealthResponse::class);
+        $response->shouldReceive('validate')->once()->andReturn(new DivisionResponse([]));
+        $this->mock(DivisionApi::class)->shouldReceive('create')->once()->andReturn($response);
+        $this->mock(DivisionRepository::class)->shouldNotReceive('saveMappedDivision');
+        $this->expectChannelError('e_health_errors');
+
+        $component->runCreation($division);
+
+        $this->assertSame(__('errors.ehealth.messages.request_error'), session('error'));
+        $this->assertSame(route('division.edit', [legalEntity(), $division]), $component->redirectUrl);
         $this->assertNull(session('success'));
     }
 

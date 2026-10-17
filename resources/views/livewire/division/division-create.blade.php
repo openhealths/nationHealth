@@ -16,6 +16,8 @@
             id="save_button"
             class="button-primary-outline leading-none inline-flex items-center"
             wire:click="store"
+            wire:loading.attr="disabled"
+            wire:target="store,create"
         >
             {{ __('forms.save') }}
         </button>
@@ -25,6 +27,8 @@
             id="save_button"
             class="button-primary cursor-pointer leading-none inline-flex items-center"
             wire:click="create"
+            wire:loading.attr="disabled"
+            wire:target="store,create"
         >
             {{ __('forms.save_and_send') }}
         </button>

@@ -351,7 +351,7 @@ class Login extends Component
             'scope' => $scope
         ];
 
-        Session::put('first_login_role', $this->role);
+        Session::put('single_role_login', $this->role);
 
         // Build the full URL with query parameters
         return $baseUrl . '?' . http_build_query($queryParams);

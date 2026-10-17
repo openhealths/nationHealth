@@ -60,7 +60,7 @@ class HealthcareServiceComponent extends Component
         'HEALTHCARE_SERVICE_PHARMACY_DRUGS_TYPES'
     ];
 
-    public function baseMount(LegalEntity $legalEntity, Division $division): void
+    protected function baseMount(LegalEntity $legalEntity, Division $division): void
     {
         $this->getDictionary();
 

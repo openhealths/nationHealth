@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Division;
 
+use App\Livewire\Division\DivisionCreate;
+use App\Livewire\Division\DivisionEdit;
 use App\Livewire\Division\Forms\DivisionForm;
 use App\Models\LegalEntity;
 use App\Models\LegalEntityType;
@@ -125,15 +127,19 @@ class DivisionFormValidationTest extends TestCase
             'missing type' => ['type', ''],
             'missing email' => ['email', ''],
             'invalid email' => ['email', 'invalid-email'],
-            'non-integer external id' => ['externalId', 'invalid'],
-            'zero external id' => ['externalId', 0],
-            'negative external id' => ['externalId', -1],
+            'integer external id' => ['externalId', 123],
+            'integer zero external id' => ['externalId', 0],
+            'negative integer external id' => ['externalId', -1],
             'missing latitude' => ['location.latitude', null],
             'missing longitude' => ['location.longitude', null],
             'non-numeric latitude' => ['location.latitude', 'invalid'],
             'non-numeric longitude' => ['location.longitude', 'invalid'],
             'invalid latitude' => ['location.latitude', 100],
-            'invalid longitude' => ['location.longitude', 100],
+            'invalid longitude' => ['location.longitude', 181],
+            'latitude above range' => ['location.latitude', 90.000001],
+            'latitude below range' => ['location.latitude', -90.000001],
+            'longitude above range' => ['location.longitude', 180.000001],
+            'longitude below range' => ['location.longitude', -180.000001],
             'missing phones' => ['phones', []],
             'missing phone type' => ['phones.0.type', ''],
             'invalid phone type' => ['phones.0.type', 'INVALID'],
@@ -151,10 +157,108 @@ class DivisionFormValidationTest extends TestCase
 
     public function test_accepts_optional_external_id_and_zero_coordinates(): void
     {
-        $this->assertSame('', $this->divisionForm(['externalId' => 123])->doValidation());
+        foreach ([null, '123', 'ABC-123', 'invalid', '0'] as $externalId) {
+            $form = $this->divisionForm(['externalId' => $externalId]);
+
+            $this->assertSame('', $form->doValidation());
+            $this->assertSame($externalId, $form->getDivision()['externalId']);
+        }
+
         $this->assertSame('', $this->divisionForm([
             'location' => ['latitude' => 0, 'longitude' => 0],
         ])->doValidation());
+    }
+
+    public function test_accepts_coordinates_at_axis_limits_and_longitudes_outside_latitude_range(): void
+    {
+        foreach ([[90, 180], [-90, -180], [0, 100], [0, -100]] as [$latitude, $longitude]) {
+            $this->assertSame('', $this->divisionForm([
+                'location' => ['latitude' => $latitude, 'longitude' => $longitude],
+            ])->doValidation());
+        }
+    }
+
+    public static function coordinateInputs(): array
+    {
+        return [
+            'arbitrary text' => ['not-a-coordinate', false, 'not-a-coordinate'],
+            'comma decimal' => ['30,52', true, 30.52],
+            'negative comma decimal' => ['-30,52', true, -30.52],
+            'comma zero' => ['0,0', true, 0.0],
+            'multiple commas' => ['30,5,2', false, '30,5,2'],
+            'mixed separators' => ['30,5.2', false, '30,5.2'],
+            'comma with text' => ['30,52degrees', false, '30,52degrees'],
+            'out of range comma decimal' => ['180,1', false, 180.1],
+            'numeric prefix' => ['30.52degrees', false, '30.52degrees'],
+            'empty' => ['', false, ''],
+            'missing' => [null, false, null],
+            'decimal' => ['30.52', true, 30.52],
+            'negative decimal' => ['-30.52', true, -30.52],
+            'zero' => ['0', true, 0.0],
+            'numeric zero' => [0, true, 0.0],
+        ];
+    }
+
+    #[DataProvider('coordinateInputs')]
+    public function test_coordinate_updates_preserve_invalid_input_for_validation(
+        mixed $value,
+        bool $valid,
+        mixed $expected
+    ): void {
+        foreach ([DivisionCreate::class, DivisionEdit::class] as $componentClass) {
+            foreach (['latitude', 'longitude'] as $axis) {
+                $component = new $componentClass();
+                $component->divisionForm = new DivisionForm($component, 'divisionForm');
+                $component->divisionForm->division['location'][$axis] = $value;
+                $component->hydrate();
+                $this->assertSame($expected, $component->divisionForm->division['location'][$axis]);
+
+                $component->divisionForm->division['location'][$axis] = $value;
+                $hook = 'updatedDivisionFormDivisionLocation' . ucfirst($axis);
+                $component->$hook($value);
+
+                // A later Livewire request must not turn rejected input into a valid number.
+                $component->hydrate();
+                $coordinate = $component->divisionForm->division['location'][$axis];
+                $this->assertSame($expected, $coordinate);
+
+                $form = $this->divisionForm();
+                $form->division['location'][$axis] = $coordinate;
+
+                if ($valid) {
+                    $this->assertSame('', $form->doValidation());
+                } else {
+                    $this->assertArrayHasKey(
+                        'divisionForm.division.location.' . $axis,
+                        $this->validationErrors($form)
+                    );
+                }
+            }
+        }
+    }
+
+    public function test_coordinate_updates_round_only_the_changed_axis(): void
+    {
+        foreach ([DivisionCreate::class, DivisionEdit::class] as $componentClass) {
+            foreach (['latitude' => 'longitude', 'longitude' => 'latitude'] as $axis => $otherAxis) {
+                $component = new $componentClass();
+                $component->divisionForm = new DivisionForm($component, 'divisionForm');
+                $component->divisionForm->division['location'] = [
+                    'latitude' => '50.123456789',
+                    'longitude' => '30.987654321',
+                ];
+                $component->hydrate();
+                $this->assertSame(50.123456789, $component->divisionForm->division['location']['latitude']);
+                $this->assertSame(30.987654321, $component->divisionForm->division['location']['longitude']);
+                $otherValue = $component->divisionForm->division['location'][$otherAxis];
+
+                $hook = 'updatedDivisionFormDivisionLocation' . ucfirst($axis);
+                $component->$hook('-12,34567891');
+
+                $this->assertSame(-12.345679, $component->divisionForm->division['location'][$axis]);
+                $this->assertSame($otherValue, $component->divisionForm->division['location'][$otherAxis]);
+            }
+        }
     }
 
     public function test_rejects_duplicate_phone_types(): void

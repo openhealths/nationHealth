@@ -24,9 +24,10 @@ class WorkingHours implements CastsAttributes
 
         $decodedValue = $value ? json_decode($value, true) : null;
 
-        $data = array_replace($this->workingHours, $decodedValue ?: []);
+        // Older null values were stored as a numeric list instead of weekday keys.
+        $data = array_replace($this->workingHours, array_intersect_key($decodedValue ?: [], $this->workingHours));
 
-        return $this->prepareWorkingHours($data, true);
+        return $this->mapLegacyDayOffValues($this->prepareWorkingHours($data, true));
     }
 
     /**
@@ -41,7 +42,7 @@ class WorkingHours implements CastsAttributes
         if (is_array($value)) {
             $data = [$key => $value];
         } else {
-            $data = $value ? [$key => json_decode($value, true)] : [$key => [Division::getWorkingTimeTemplate()]];
+            $data = $value ? [$key => json_decode($value, true)] : [$key => Division::getWorkingDaysTemplate()];
         }
 
         return json_encode($this->prepareWorkingHours($data[$key]));
@@ -57,5 +58,25 @@ class WorkingHours implements CastsAttributes
     public function prepareWorkingHours(array $workingHours, bool $dotToColon = false): array
     {
         return $this->prepareTimeToRequest($workingHours, $dotToColon);
+    }
+
+    /**
+     * Convert empty days and the legacy eHealth day-off value to the internal sentinel.
+     *
+     * @param  array<string, array<int, array<int, string>>>  $workingHours
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    protected function mapLegacyDayOffValues(array $workingHours): array
+    {
+        return array_map(
+            fn (array $intervals) => array_map(
+                fn (array $interval) => ($interval[0] ?? null) === '00:00' && ($interval[1] ?? null) === '00:00'
+                    ? Division::getWorkingTimeTemplate()
+                    : $interval,
+                $intervals ?: [Division::getWorkingTimeTemplate()]
+            ),
+            $workingHours
+        );
     }
 }

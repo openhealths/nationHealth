@@ -48,7 +48,7 @@
 
                         <button
                             type="button"
-                            @click.prevent="$wire.$call(actionType, divisionId); divisionId = 0;"
+                            @click.prevent="actionType === 'sync' ? $wire.sync() : $wire.$call(actionType, divisionId); divisionId = 0;"
                             wire:loading.attr="disabled"
                             :class="actionType === 'activate' ? 'button-success' : 'button-danger'"
                             x-text="actionButtonText"

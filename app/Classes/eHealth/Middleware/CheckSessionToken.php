@@ -38,6 +38,12 @@ class CheckSessionToken
      */
     public function handle(Request $request, Closure $next)
     {
+        // Preserve the selected role in sessions created before the key was renamed.
+        if (!Session::exists('single_role_login') && Session::exists('first_login_role')) {
+            Session::put('single_role_login', Session::get('first_login_role'));
+        }
+        Session::forget('first_login_role');
+
         // Skip check
         if ($request->routeIs(['login', 'dev.login', 'logout'])) {
             return $next($request);

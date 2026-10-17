@@ -34,7 +34,7 @@ class OwnerNewReplace
 
         $user = $event->user->load('roles', 'permissions', 'party');
 
-        $role = session('first_login_role');
+        $role = session('single_role_login');
 
         if ($role !== Role::OWNER->value) {
             return;

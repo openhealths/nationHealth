@@ -36,10 +36,20 @@
             </x-slot>
 
             @if($readonly)
-                @can('sync', Division::class)
+                @can('sync', $division)
                 <div class="mt-3 ml-0 flex flex-col sm:flex-row sm:flex-wrap gap-2 self-start">
                     <button
-                        wire:click="sync"
+                        @if ($division->status === \App\Enums\Status::UNSYNCED)
+                            x-on:click.prevent="
+                                divisionId={{ $division->id }};
+                                textConfirmation=@js(__('divisions.modals.sync.confirmation_text'));
+                                actionType='sync';
+                                actionTitle=@js(__('divisions.modals.sync.title'));
+                                actionButtonText=@js(__('forms.synchronise_with_eHealth'));
+                            "
+                        @else
+                            wire:click="sync"
+                        @endif
                         class="button-sync flex items-center gap-2 whitespace-nowrap"
                     >
                         @icon('refresh', 'w-4 h-4')
@@ -60,7 +70,7 @@
                             Livewire.hook('commit', ({ succeed }) => {
                                 succeed(() => {
                                     this.$nextTick(() => {
-                                        const firstErrorMessage = document.querySelector('.input-error')
+                                        const firstErrorMessage = document.querySelector('.input-error, .select-error, .text-error')
                                         if (firstErrorMessage !== null) {
                                             firstErrorMessage.scrollIntoView({ block: 'center', inline: 'center' });
                                         }
@@ -157,7 +167,7 @@
                                         <select id="type"
                                                 class='peer input @error("divisionForm.division.type") select-error border-red-500 @enderror'
                                                 wire:model.defer='divisionForm.division.type'
-                                                x-bind:disabled="{{ ($action === 'update' && $status !== 'DRAFT') || $action === 'show' ? 'true' : 'false' }}"
+                                                x-bind:disabled="isDisabled"
                                         >
                                             <option value="_placeholder_" selected hidden>-- {{ __('forms.type') }}--
                                             </option>
@@ -183,7 +193,7 @@
                                             class="peer input @error('divisionForm.division.externalId') input-error border-red-500 @enderror"
                                             name="external_id"
                                             wire:model.defer='divisionForm.division.externalId'
-                                            x-bind:disabled="{{ ($action === 'update' && $status !== 'DRAFT') || $action === 'show'? 'true' : 'false' }}"
+                                            x-bind:disabled="isDisabled"
                                         />
 
                                         <label
@@ -299,7 +309,8 @@
 
                                 <div class="form-row-3">
                                     <div class="form-group">
-                                        <input type="number"
+                                        <input type="text"
+                                            inputmode="decimal"
                                             id="longitude"
                                             required
                                             placeholder=" "
@@ -323,7 +334,8 @@
                                     <div class="form-group">
                                         <input id="latitude"
                                             required
-                                            type="number"
+                                            type="text"
+                                            inputmode="decimal"
                                             name="latitude"
                                             placeholder=" "
                                             class="peer input"
@@ -355,7 +367,7 @@
                                                 class="peer input"
                                                 x-bind:disabled="true"
                                                 name="dlcId"
-                                                value="{{ $division->dlcId ?? '-' }}"
+                                                value="{{ $division->dlsId ?? '-' }}"
                                             />
                                             <label
                                                 for="dlcId"
@@ -371,7 +383,7 @@
                                                 class="peer input"
                                                 x-bind:disabled="true"
                                                 name="dlcVerify"
-                                                value="{{ $division->dlcVerify ?? '-' }}"
+                                                value="{{ $division->dlsVerified === null ? '-' : ($division->dlsVerified ? __('forms.yes') : __('forms.no')) }}"
                                             />
                                             <label
                                                 for="dlcVerify"
@@ -487,23 +499,27 @@
                                         />
                                     </div>
 
+                                @endif
+
+                                <div class="form-row-3">
                                     <div class="form-group checkbox-group"
                                         x-data="{ isMountainGroup: @js($this->divisionForm->division['mountainGroup'] ?? false) }"
                                     >
                                         <input id="mountain_group"
                                             type="checkbox"
                                             :checked="isMountainGroup"
-                                            class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded-sm focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                                            class="default-checkbox text-blue-500 focus:ring-blue-300"
                                             disabled
                                         />
 
                                         <label for="mountain_group"
-                                            class="checkbox-label text-gray-500 dark:text-gray-300 ms-2"
+                                            class="ms-2 text-sm font-medium"
+                                            :class="isMountainGroup ? 'text-black dark:text-gray-300' : 'text-gray-400 dark:text-gray-500'"
                                         >
                                             {{__('forms.mountainous_status')}}
                                         </label>
                                     </div>
-                                @endif
+                                </div>
 
                                 @if(!$readonly)
                                 <div class="pt-6 mt-auto">
@@ -515,13 +531,14 @@
 
                         {{-- WORKING HOURS --}}
                         <fieldset class="fieldset"
+                                wire:key="division-working-hours-{{ $divisionForm->division['id'] ?? 'new' }}-{{ $divisionForm->division['status'] ?? 'DRAFT' }}"
                                 x-data="{
                                     working: false,
                                     workingHours: $wire.entangle('divisionForm.division.workingHours'),
                                     isStoreMode: {{ $action === 'store' ? 'true' : 'false' }},
                                     init() {
                                         this.working = Object.values(this.workingHours).some(day => 
-                                            day.some(shift => (shift[0] && shift[0] !== '' && shift[0] !== '00:00') || (shift[1] && shift[1] !== '' && shift[1] !== '00:00'))
+                                            day.some(shift => (shift[0] && shift[0] !== '' && shift[0] !== '-1') || (shift[1] && shift[1] !== '' && shift[1] !== '-1'))
                                         );
                                     }
                                 }"
@@ -570,37 +587,46 @@
                                                 <div
                                                     :key="'{{ $key }}'"
                                                     x-data="{
-                                                    shift: workingHours['{{ $key }}'].length > 1,
-                                                    show_work: (workingHours['{{ $key }}'][0][0] !== '' && workingHours['{{ $key }}'][0][0] !== null && workingHours['{{ $key }}'][0][0] !== '00:00') ||
-                                                    (workingHours['{{ $key }}'][0][1] !== '' && workingHours['{{ $key }}'][0][1] !== null && workingHours['{{ $key }}'][0][1] !== '00:00') ||
-                                                    '{{ $action }}' === 'store',
-                                                    switchWorking(day) {
-                                                    this.show_work = !this.show_work;
-                                                    this.workingHours[day] = [['00:00', '00:00']];
-                                                    if (! this.show_work) {
-                                                    this.shift = false;
-                                                    }
-                                                    },
-                                                    addAvailableShift(day) {
-                                                    if (this.workingHours[day].length < 4) {
-                                                    this.workingHours[day].push(['00:00', '00:00']);
-                                                    }
-                                                    },
-                                                    deleteShift(day, index) {
-                                                    if (this.workingHours[day].length > 1) {
-                                                    this.workingHours[day].splice(index, 1);
-                                                    }
-                                                    },
-                                                    switchShift(day) {
-                                                    if (! this.shift) {
-                                                    return;
-                                                    }
-                                                    shiftCount = this.workingHours[day].length;
-                                                    if (shiftCount > 1) {
-                                                    this.workingHours[day].splice(1);
-                                                    }
-                                                    },
-                                                    errors: []
+                                                        shift: $wire.entangle('divisionForm.workingHoursShifts.{{ $key }}'),
+
+                                                        show_work: (workingHours['{{ $key }}'][0][0] !== '' && workingHours['{{ $key }}'][0][0] !== null && workingHours['{{ $key }}'][0][0] !== '-1') ||
+                                                        (workingHours['{{ $key }}'][0][1] !== '' && workingHours['{{ $key }}'][0][1] !== null && workingHours['{{ $key }}'][0][1] !== '-1'),
+
+                                                        switchWorking(day) {
+                                                            this.show_work = !this.show_work;
+
+                                                            this.workingHours[day] = [this.show_work ? ['00:00', '00:00'] : ['-1', '-1']];
+
+                                                            if (! this.show_work) {
+                                                                this.shift = false;
+                                                            }
+                                                        },
+
+                                                        addAvailableShift(day) {
+                                                            if (this.workingHours[day].length < 4) {
+                                                                this.workingHours[day].push(['00:00', '00:00']);
+                                                            }
+                                                        },
+
+                                                        deleteShift(day, index) {
+                                                            if (this.workingHours[day].length > 1) {
+                                                                this.workingHours[day].splice(index, 1);
+                                                            }
+                                                        },
+
+                                                        switchShift(day) {
+                                                            if (! this.shift) {
+                                                                return;
+                                                            }
+
+                                                            shiftCount = this.workingHours[day].length;
+
+                                                            if (shiftCount > 1) {
+                                                                this.workingHours[day].splice(1);
+                                                            }
+                                                        },
+
+                                                        errors: []
                                                     }"
                                                     x-init="errors =@js($errors->getMessages())"
                                                 >
@@ -685,7 +711,8 @@
                                                                                             :id="'opened_by-' + '{{ $key }}' + '-' + shiftIndex"
                                                                                             class="input timepicker-uk text-gray-900 dark:text-white border-t-0 border-r-0 border-l-0 border-b border-gray-300 focus:ring-0 px-0 ps-8"
                                                                                             placeholder="--:--"
-                                                                                            x-model.lazy="workingHours['{{ $key }}'][shiftIndex][0]"
+                                                                                            x-bind:value="workingHours['{{ $key }}'][shiftIndex][0] === '-1' ? '' : workingHours['{{ $key }}'][shiftIndex][0]"
+                                                                                            x-on:change="workingHours['{{ $key }}'][shiftIndex][0] = $event.target.value"
                                                                                             x-bind:disabled="isDisabled"
                                                                                         />
                                                                                     </div>
@@ -725,7 +752,8 @@
                                                                                             :id="'closed_by-' + '{{ $key }}' + '-' + shiftIndex"
                                                                                             class="input timepicker-uk text-gray-900 dark:text-white border-t-0 border-r-0 border-l-0 border-b border-gray-300 focus:ring-0 px-0 ps-8"
                                                                                             placeholder="--:--"
-                                                                                            x-model.lazy="workingHours['{{ $key }}'][shiftIndex][1]"
+                                                                                            x-bind:value="workingHours['{{ $key }}'][shiftIndex][1] === '-1' ? '' : workingHours['{{ $key }}'][shiftIndex][1]"
+                                                                                            x-on:change="workingHours['{{ $key }}'][shiftIndex][1] = $event.target.value"
                                                                                             x-bind:disabled="isDisabled"
                                                                                         />
                                                                                     </div>

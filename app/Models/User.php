@@ -1060,7 +1060,7 @@ class User extends Authenticatable implements MustVerifyEmail
         }
 
         // If user is in the "single role login" state with a temporary role, only check direct permissions
-        if (session('first_login_role')) {
+        if (session('single_role_login')) {
             return $this->getDirectPermissions()
                 ->pluck('name')
                 ->contains($name);

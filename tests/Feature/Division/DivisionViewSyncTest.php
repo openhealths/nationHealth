@@ -43,7 +43,7 @@ class DivisionViewSyncTest extends TestCase
         $component->divisionUuid = $division->uuid;
 
         $user = Mockery::mock(User::class);
-        $user->shouldReceive('cannot')->once()->with('viewAny', Division::class)->andReturnFalse();
+        $user->shouldReceive('cannot')->once()->with('division:details')->andReturnFalse();
         Auth::shouldReceive('user')->once()->andReturn($user);
 
         return $component;

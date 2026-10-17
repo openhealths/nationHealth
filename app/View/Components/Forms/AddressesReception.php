@@ -44,9 +44,12 @@ class AddressesReception extends Addresses
     public static function getAddressMessages(): array
     {
         return [
+            'receptionAddress.type.required' => __('forms.addresses.error.type'),
+            'receptionAddress.country.required' => __('forms.addresses.error.country'),
             'receptionAddress.area' => __('forms.addresses.error.area'),
             'receptionAddress.settlementType' => __('forms.addresses.error.settlementType'),
             'receptionAddress.settlement' => __('forms.addresses.error.settlement'),
+            'receptionAddress.settlementId.required' => __('forms.addresses.error.settlementId'),
             'receptionAddress.street.required_with' => __('forms.addresses.error.street_required_with'),
             'receptionAddress.building.required_with' => __('forms.addresses.error.building_required_with'),
             'receptionAddress.building' => __('forms.addresses.error.building'),

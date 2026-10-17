@@ -9,7 +9,6 @@ use App\Enums\Status;
 use App\Models\Division;
 use App\Enums\User\Role;
 use App\Models\LegalEntity;
-use App\Models\Employee\Employee;
 use App\Models\HealthcareService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Auth\Access\Response;
@@ -22,7 +21,7 @@ class DivisionPolicy
      */
     public function viewAny(User $user): Response
     {
-        if ($user->cannot('division:read') && $user->cannot('division:details')) {
+        if ($user->cannot('division:read')) {
             return Response::denyWithStatus(404);
         }
 
@@ -42,7 +41,7 @@ class DivisionPolicy
             return Response::denyWithStatus(404);
         }
 
-        if ($user->cannot('division:read') && $user->cannot('division:details')) {
+        if ($user->cannot('division:details')) {
             return Response::denyWithStatus(404);
         }
 
@@ -52,17 +51,21 @@ class DivisionPolicy
     /**
      * User allowed to synchronize the division(s)
      */
-    public function sync(User $user): Response
+    public function sync(User $user, ?Division $division = null): Response
     {
-        if ($user->cannot('division:read') && $user->cannot('division:details')) {
+        if ($division !== null && $division->legalEntityId !== (int) legalEntity()->id) {
             return Response::denyWithStatus(404);
         }
 
-        if (
-            $user->hasAllowedRole([Role::REORGANIZATION_OWNER, Role::OWNER, Role::ADMIN, Role::HR])
-            && Auth::guard('ehealth')->check()
-        ) {
-            return Response::allow();
+        // This for the case when newly created Draft division cannot be synchronized
+        if ($division !== null && empty($division->uuid)) {
+            return Response::denyWithStatus(404);
+        }
+
+        $scope = $division === null ? 'division:read' : 'division:details';
+
+        if ($user->cannot($scope)) {
+            return Response::denyWithStatus(404);
         }
 
         return Response::allow();
@@ -71,10 +74,20 @@ class DivisionPolicy
 
     /**
      * User allow to create the Division
+     * TV 3.29.1.1.1: only OWNER with division:write may create a division.
      */
     public function create(User $user): Response
     {
         if ($user->cannot('division:write')) {
+            return Response::denyWithStatus(404);
+        }
+
+        $loginRole = session('single_role_login');
+        $hasOwnerRole = $loginRole
+            ? $loginRole === Role::OWNER->value && $user->hasRole(Role::OWNER, Auth::getDefaultDriver())
+            : $user->hasAllowedRole([Role::OWNER]);
+
+        if (!$hasOwnerRole) {
             return Response::denyWithStatus(404);
         }
 
@@ -86,6 +99,10 @@ class DivisionPolicy
      */
     public function delete(User $user, Division $division): Response
     {
+        if ($user->cannot('division:write')) {
+            return Response::denyWithStatus(404);
+        }
+
         // Only Divisions with DRAFT status can be deleted
         if ($division->status !== Status::DRAFT) {
             return Response::deny();
@@ -101,10 +118,11 @@ class DivisionPolicy
 
     /**
      * Determine whether the user can update the model.
+     * TV 3.29.1.2.1: any role with division:write may update a registered division.
      */
     public function update(User $user, Division $division, ?LegalEntity $legalEntity = null): Response|bool
     {
-        if (is_null($legalEntity)) {
+        if (\is_null($legalEntity)) {
             $legalEntity = legalEntity();
         }
 
@@ -132,6 +150,7 @@ class DivisionPolicy
 
     /**
      * Determine whether the user can activate the division.
+     * TV 3.29.1.2.3: any role with division:activate may activate a division.
      *
      * @param  User  $user
      * @param  Division  $division
@@ -144,12 +163,8 @@ class DivisionPolicy
             return Response::denyWithStatus(404);
         }
 
-        // Some divisions cannot be activated
-        if (
-            $division->status === Status::ACTIVE ||
-            $division->status === Status::DRAFT ||
-            $division->status === Status::UNSYNCED
-        ) {
+        // Only inactive divisions can be activated
+        if ($division->status !== Status::INACTIVE) {
             return Response::deny();
         }
 
@@ -163,6 +178,7 @@ class DivisionPolicy
 
     /**
      * Determine whether the user can deactivate the division.
+     * TV 3.29.1.2.2: any role with division:deactivate may deactivate a division.
      *
      * @param  User  $user  The user attempting the action
      * @param  Division  $division  The division to be deactivated
@@ -180,22 +196,7 @@ class DivisionPolicy
             return Response::denyWithStatus(404);
         }
 
-        // Divisions with at least one active service cannot be deactivated
-        if ($this->hasAnyActiveService($division)) {
-            return Response::deny();
-        }
-
-        // Divisions that have employees cannot be deactivated
-        if (Employee::where('division_id', $division->id)->exists()) {
-            return Response::deny();
-        }
-
-        // Some divisions cannot be deactivated
-        if (
-            $division->status === Status::INACTIVE ||
-            $division->status === Status::DRAFT ||
-            $division->status === Status::UNSYNCED
-        ) {
+        if (!in_array($division->status, [Status::ACTIVE, Status::UNSYNCED], true)) {
             return Response::deny();
         }
 

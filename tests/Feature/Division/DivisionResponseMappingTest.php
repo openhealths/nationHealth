@@ -42,7 +42,7 @@ class DivisionResponseMappingTest extends TestCase
         $this->assertFalse($division->dlsVerified);
         $this->assertSame($response['inserted_at'], $division->ehealthInsertedAt);
         $this->assertSame([['08:00', '17:30']], $division->workingHours['mon']);
-        $this->assertSame([], $division->workingHours['sun']);
+        $this->assertSame([['-1', '-1']], $division->workingHours['sun']);
         $this->assertEquals($response['location'], $division->location);
         $this->assertInstanceOf(AddressData::class, $data->addresses[0]);
         $this->assertSame('0', $data->addresses[0]->building);
@@ -265,6 +265,23 @@ class DivisionResponseMappingTest extends TestCase
         $this->assertNull($data->workingHours);
         $this->assertNull($data->dlsId);
         $this->assertFalse($data->dlsVerified);
+    }
+
+    public function test_reads_null_and_legacy_fallback_working_hours(): void
+    {
+        $data = $this->mapResponse($this->response(['working_hours' => null]));
+        $division = $data->toModel();
+
+        $this->assertSame(Division::getWorkingDaysTemplate(), $division->workingHours);
+
+        $response = $this->response();
+        unset($response['working_hours']);
+
+        $this->assertSame(Division::getWorkingDaysTemplate(), $this->mapResponse($response)->toModel()->workingHours);
+
+        $division->setRawAttributes(['working_hours' => '[["-1","-1"]]']);
+
+        $this->assertSame(Division::getWorkingDaysTemplate(), $division->workingHours);
     }
 
     public function test_does_not_map_local_identifiers_from_nested_response_arrays(): void

@@ -170,7 +170,7 @@ trait FormTrait
      * @param  string|null  $additionalConfigPath
      * @return array
      */
-    public function getFilteredKeysFromConfig(string $configPath, ?string $additionalConfigPath = null): array
+    protected function getFilteredKeysFromConfig(string $configPath, ?string $additionalConfigPath = null): array
     {
         return collect([
             config("ehealth.$configPath"),

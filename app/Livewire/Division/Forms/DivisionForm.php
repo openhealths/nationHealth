@@ -10,7 +10,6 @@ use App\Traits\FormTrait;
 use App\Rules\PhoneNumber;
 use App\Rules\InDictionary;
 use App\Rules\PhoneDuplicates;
-use Livewire\Attributes\Validate;
 use App\Rules\DivisionRules\TypeRule;
 use App\Repositories\AddressRepository;
 use App\Rules\DivisionRules\AddressRule;
@@ -34,14 +33,17 @@ class DivisionForm extends Form
      */
     public bool $showReceptionAddress = false;
 
-    #[Validate([
-        'division.name' => 'required|min:6|max:255',
-        'division.type' => 'required',
-        'division.email' => ['required', 'email', new Email()],
-        'division.addresses' => 'required',
-    ])]
+    public array $workingHoursShifts = [
+        'mon' => false,
+        'tue' => false,
+        'wed' => false,
+        'thu' => false,
+        'fri' => false,
+        'sat' => false,
+        'sun' => false,
+    ];
 
-    public ?array $division = [
+    public array $division = [
         'workingHours' => [
             'mon' => [[Division::WORKING_TIME_DEFAULT_START, Division::WORKING_TIME_DEFAULT_END]],
             'tue' => [[Division::WORKING_TIME_DEFAULT_START, Division::WORKING_TIME_DEFAULT_END]],
@@ -85,12 +87,16 @@ class DivisionForm extends Form
     public function setDivision(array $division)
     {
         $this->division = $division;
+        $this->workingHoursShifts = array_map(
+            fn (array $shifts) => count($shifts) > 1,
+            $division['workingHours'] ?? []
+        );
     }
 
     /**
      * Do form's validation (check correctness of filling the form fields)
      *
-     * @return mixed
+     * @return string
      */
     public function doValidation(): string
     {
@@ -105,8 +111,8 @@ class DivisionForm extends Form
             $errors = $this->component->addressValidation();
 
             if ($this->showReceptionAddress) {
-                $errors1 = $this->component->receptionAddressValidation();
-                $errors = \array_merge($errors, $errors1);
+                $receptionErrors = $this->component->receptionAddressValidation();
+                $errors = \array_merge($errors, $receptionErrors);
             }
 
             $this->validate();
@@ -133,10 +139,19 @@ class DivisionForm extends Form
             : ['residence' => $this->component->address];
     }
 
+    /**
+     * Get the validation rules that apply to the division form.
+     *
+     * @return array The validation rules.
+     */
     public function rules(): array
     {
         return [
-            'division.externalId' => 'nullable|integer|gt:0',
+            'division.name' => 'required|min:6|max:255',
+            'division.type' => 'required',
+            'division.email' => ['required', 'email', new Email()],
+            'division.addresses' => 'required',
+            'division.externalId' => 'nullable|string|min:1',
             'division.location.longitude' => ['required', 'numeric', new LocationRule($this->division)],
             'division.location.latitude' => ['required', 'numeric', new LocationRule($this->division)],
             'division.phones' => 'required|array',
@@ -183,7 +198,7 @@ class DivisionForm extends Form
             // Check that all bunch of the address' data is correct and valid
             new AddressRule($this->division),
             // Check that working hours schedule is correct
-            new WorkingHoursRule($this->division),
+            new WorkingHoursRule($this->division, $this->workingHoursShifts),
             // Check that Division type exists in dictionaries
             new TypeRule($this->division),
         ];

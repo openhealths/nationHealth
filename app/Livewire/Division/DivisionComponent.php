@@ -14,6 +14,7 @@ use App\Livewire\Division\Forms\DivisionForm;
 use App\Classes\eHealth\Api\Division as DivisionApi;
 use App\Dto\Division\Model as DivisionData;
 use App\Dto\Division\Form as DivisionFormData;
+use App\Dto\Division\Location as DivisionLocationData;
 use App\Models\Relations\Address;
 use App\Traits\Addresses\AddressSearch;
 use App\Traits\Addresses\ReceptionAddressSearch;
@@ -34,7 +35,7 @@ class DivisionComponent extends Component
      */
     public DivisionForm $divisionForm;
 
-    public function setDivisionData(Division $division): void
+    protected function setDivisionData(Division $division): void
     {
         $data = new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessor())
             ->map($division, DivisionFormData::class);
@@ -57,29 +58,17 @@ class DivisionComponent extends Component
     ];
 
     /**
-     * Handles data type conversion for location coordinates after component hydration.
-     *
-     * This method is automatically called by Livewire after the component receives data
-     * from the browser but before the data is applied to the component's properties.
-     * It ensures that latitude and longitude values are always stored as float type,
-     * even if they come from the form as strings.
-     *
-     * - If a coordinate value is empty, it's converted to 0
-     * - If a value exists, it's properly cast to float
-     *
-     * @return void
+     * Maps restored location coordinates before Livewire applies incoming property updates.
      */
-    public function hydrate()
+    public function hydrate(): void
     {
-        $lat = $this->divisionForm->division['location']['latitude'] ?? null;
-        $this->divisionForm->division['location']['latitude'] = is_null($lat)
-            ? null
-            : (float) $lat;
+        $location = new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessor())
+            ->map($this->divisionForm, DivisionLocationData::class);
 
-        $lng = $this->divisionForm->division['location']['longitude'] ?? null;
-        $this->divisionForm->division['location']['longitude'] = is_null($lng)
-            ? null
-            : (float) $lng;
+        $this->divisionForm->division['location'] = array_replace(
+            $this->divisionForm->division['location'] ?? [],
+            $location->toArray()
+        );
     }
 
     /**
@@ -142,24 +131,37 @@ class DivisionComponent extends Component
     /**
      * Store division data to the database
      *
+     * @param  Division|null  $division  Existing authorized division, if already loaded
+     *
      * @return null|Division
      */
-    protected function saveToDB(): ?Division
+    protected function saveToDB(?Division $division = null): ?Division
     {
+        // The authorized model owns the eHealth UUID; the form must not replace it.
+        if ($division !== null) {
+            $this->divisionForm->division['uuid'] = $division->uuid;
+        }
+
         $divisionData = new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessorBuilder()
             ->disableExceptionOnInvalidPropertyPath()
             ->getPropertyAccessor())
             ->map($this->divisionForm, DivisionData::class);
 
-        $division = $divisionData->uuid ? Division::where('uuid', $divisionData->uuid)->first() : null;
-        if (is_null($division) && isset($divisionData->id)) {
-            $division = Division::find($divisionData->id);
-        }
-        if (is_null($division)) {
-            $division = new Division();
+        if ($division === null) {
+            $divisionId = $this->divisionForm->division['id'] ?? null;
+            if ($divisionId) {
+                $division = legalEntity()->divisions()->findOrFail($divisionId);
+            } elseif ($divisionData->uuid) {
+                $division = legalEntity()->divisions()->where('uuid', $divisionData->uuid)->firstOrFail();
+            }
+
+            $division ??= new Division();
         }
 
-        return Repository::division()->saveMappedDivision($divisionData, $division, legalEntity());
+        $division = Repository::division()->saveMappedDivision($divisionData, $division, legalEntity());
+        $this->divisionForm->division['id'] = $division->id;
+
+        return $division;
     }
 
     /**

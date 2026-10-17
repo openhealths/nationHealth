@@ -27,8 +27,9 @@ class Division extends Model
 {
     use HasCamelCasing;
 
-    public const string WORKING_TIME_DEFAULT_START = '00:00';
-    public const string WORKING_TIME_DEFAULT_END = '00:00';
+    public const string WORKING_TIME_DAY_OFF = '-1';
+    public const string WORKING_TIME_DEFAULT_START = self::WORKING_TIME_DAY_OFF;
+    public const string WORKING_TIME_DEFAULT_END = self::WORKING_TIME_DAY_OFF;
 
     protected $fillable = [
         'uuid',
@@ -173,6 +174,11 @@ class Division extends Model
     public function healthcareServices(): HasMany
     {
         return $this->hasMany(HealthcareService::class);
+    }
+
+    public function equipments(): HasMany
+    {
+        return $this->hasMany(Equipment::class);
     }
 
     public function addresses(): MorphMany

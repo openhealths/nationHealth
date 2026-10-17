@@ -27,7 +27,7 @@ use Symfony\Component\ObjectMapper\Transform\MapCollection;
 class Model implements ModelContract
 {
     #[Map(source: '[uuid]', if: new SourceClass(DivisionCreate::class))]
-    #[Map(source: 'division[uuid]', if: new SourceClass(DivisionForm::class))]
+    #[Map(source: 'division[uuid]', if: new SourceClass(DivisionForm::class), transform: [self::class, 'normalizeUuid'])]
     public ?string $uuid = null;
 
     #[Map(source: '[name]', if: new SourceClass(DivisionCreate::class))]
@@ -108,6 +108,11 @@ class Model implements ModelContract
     }
 
     public static function normalizeExternalId(mixed $value): ?string
+    {
+        return $value === null || $value === '' ? null : (string) $value;
+    }
+
+    public static function normalizeUuid(mixed $value): ?string
     {
         return $value === null || $value === '' ? null : (string) $value;
     }

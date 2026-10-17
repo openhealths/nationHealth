@@ -30,7 +30,7 @@ class EmployeeApi
 
         setPermissionsTeamId($legalEntity->id);
 
-        $role = Session::get('first_login_role');
+        $role = Session::get('single_role_login');
 
         if (!$user || $role) {
             $permissions = Role::where('name', $role)
