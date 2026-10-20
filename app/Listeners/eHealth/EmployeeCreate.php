@@ -36,6 +36,9 @@ class EmployeeCreate
         $user = $event->user;
 
         $employeeRequests = EmployeeRequest::with('revision')
+            ->whereLegalEntityId($event->legalEntity->id)
+            ->where(fn (EloquentBuilder $query) => $query->whereNull('legal_entity_uuid')
+                ->orWhere('legal_entity_uuid', $event->legalEntity->uuid))
             ->where('email', $user->email)
             ->where(
                 fn (EloquentBuilder $q) => $q
