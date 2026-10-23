@@ -267,6 +267,20 @@ class DeviceRequestComplianceTest extends TestCase
         }
     }
 
+    public function testPrintoutPreservesTheTypeCodeAndSystemAlongsideItsDisplay(): void
+    {
+        $api = Mockery::mock(DeviceRequestApi::class);
+        $api->shouldReceive('getById')->once()->andReturn($this->response([
+            'requisition' => 'ABCD-1234-5678-9012',
+            'code' => ['coding' => [['code' => 'RAW-30221', 'system' => 'device_definition_classification_type', 'display' => 'Тест-смужки']]],
+        ]));
+        $this->instance(DeviceRequestApi::class, $api);
+        $html = $this->service()->printoutHtml($this->person, $this->requestId);
+        foreach (['RAW-30221', 'device_definition_classification_type', 'Тест-смужки'] as $text) {
+            $this->assertStringContainsString($text, $html);
+        }
+    }
+
     public function test_program_printout_without_auth_method_requires_code(): void
     {
         $api = Mockery::mock(DeviceRequestApi::class);

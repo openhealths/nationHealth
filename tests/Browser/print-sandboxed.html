@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="uk">
+<meta charset="utf-8">
+<title>Перевірка друку пам’ятки</title>
+<style>
+body { max-width: 850px; margin: 40px auto; font: 16px/1.6 system-ui, sans-serif; }
+button { padding: 10px 20px; font: inherit; }
+pre { white-space: pre-wrap; }
+</style>
+<h1>Перевірка друку пам’ятки</h1>
+<p>Синтетичні дані. Перевіряється справжній iframe; виклик діалогу друку перехоплюється тестом.</p>
+<button id="run">Запустити перевірку</button>
+<p id="script-state">Скрипти пам’ятки не виконувалися</p>
+<pre id="result" role="status">Очікування запуску</pre>
+<script src="/print-sandboxed.js"></script>
+<script>
+const result = document.getElementById('result');
+const marker = document.getElementById('script-state');
+const button = document.getElementById('run');
+
+button.addEventListener('click', async () => {
+    button.disabled = true;
+    const checks = [];
+    const append = document.body.appendChild;
+    const originalOpen = window.open;
+    let prints = 0;
+    window.open = () => { throw new Error('Друк не повинен відкривати popup'); };
+
+    try {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('Друк не викликано')), 3000);
+                document.body.appendChild = function (frame) {
+                    frame.addEventListener('load', () => {
+                        frame.contentWindow.print = () => {
+                            try {
+                                const image = frame.contentDocument.querySelector('img');
+                                if (!image?.complete || !image.naturalWidth) throw new Error('Зображення не завантажене до друку');
+                                if (frame.contentWindow.opener !== null) throw new Error('Документ має opener');
+                                if (marker.textContent !== 'Скрипти пам’ятки не виконувалися') throw new Error('Виконано скрипт пам’ятки');
+                                if (frame.getAttribute('sandbox') !== 'allow-same-origin allow-modals') throw new Error('Некоректний sandbox');
+                                if (!frame.contentDocument.querySelector('style')?.textContent.includes('A5')) throw new Error('Втрачено формат A5');
+                                prints++;
+                                frame.contentWindow.dispatchEvent(new Event('afterprint'));
+                                if (document.querySelector('iframe[data-print-sandbox]')) throw new Error('Iframe не видалено після друку');
+                                checks.push(`PASS ${attempt}: документ і зображення завантажені; A5 збережено; скрипти заблоковані; iframe видалено`);
+                                clearTimeout(timeout);
+                                resolve();
+                            } catch (error) { clearTimeout(timeout); reject(error); }
+                        };
+                    }, { capture: true, once: true });
+                    return append.call(this, frame);
+                };
+
+                setTimeout(() => window.printSandboxedHtml(
+                    '<!doctype html><html><head><style>@page { size: A5; }</style></head><body>'
+                    + '<h1>TEST-REQUEST</h1><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6YyYAAAAASUVORK5CYII=" '
+                    + 'onload="parent.document.getElementById(\'script-state\').textContent=\'EXECUTED\'">'
+                    + '<script>parent.document.getElementById("script-state").textContent="EXECUTED";<\/script>'
+                    + '</body></html>'
+                ), 50);
+            });
+        }
+        result.textContent = checks.join('\n') + `\nPASS: ${prints} повторних асинхронних виклики друку без popup`;
+    } catch (error) {
+        result.textContent = checks.join('\n') + '\nFAIL: ' + error.message;
+    } finally {
+        document.body.appendChild = append;
+        window.open = originalOpen;
+        button.disabled = false;
+    }
+});
+</script>
+</html>

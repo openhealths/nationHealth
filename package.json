@@ -4,6 +4,7 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
+        "test:print": "node --test tests/JavaScript/print-sandboxed.test.cjs",
         "build": "vite build"
     },
     "devDependencies": {

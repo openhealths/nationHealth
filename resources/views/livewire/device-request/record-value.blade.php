@@ -8,7 +8,7 @@
             <span>{{ $value['text'] }}</span>
         @endif
         @foreach ($value['coding'] as $coding)
-            <span>{{ $coding['display'] ?? $coding['code'] ?? '' }} ({{ $coding['system'] ?? '' }})</span>
+            <span>{{ $coding['display'] ?? '' }} {{ $coding['code'] ?? '' }} ({{ $coding['system'] ?? '' }})</span>
         @endforeach
     @elseif (isset($value['identifier']))
         <span>{{ data_get($value, 'identifier.value') }}</span>

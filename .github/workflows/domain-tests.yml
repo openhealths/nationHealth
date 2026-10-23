@@ -34,6 +34,8 @@ jobs:
         run: npm ci
       - name: Build frontend assets
         run: npm run build
+      - name: Test patient print helper
+        run: npm run test:print
 
   phpunit:
     name: Owned domain suites
