@@ -20,6 +20,8 @@ use App\Livewire\DeviceAssociation\DeviceAssociationIndex;
 use App\Livewire\DeviceAssociation\DeviceAssociationView;
 use App\Livewire\DeviceDispense\DeviceDispenses;
 use App\Livewire\DeviceDispense\DeviceDispenseView;
+use App\Livewire\DeviceRequest\DeviceRequestForm;
+use App\Livewire\DeviceRequest\DeviceRequestIndex;
 use App\Livewire\DiagnosticReport\DiagnosticReportCreate;
 use App\Livewire\DiagnosticReport\DiagnosticReportEdit;
 use App\Livewire\DiagnosticReport\DiagnosticReportIndex;
@@ -72,6 +74,7 @@ use App\Models\MedicalEvents\Sql\DetectedIssue;
 use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\DeviceAssociation;
 use App\Models\MedicalEvents\Sql\DeviceDispense;
+use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Episode;
@@ -154,6 +157,10 @@ Route::prefix('persons')->whereNumber('person')
                 Route::get('/prescription-requests/{requestId}', PatientPrescriptionRequestView::class)
                     ->name('prescription-requests.view');
                 Route::get('/referrals', PatientReferrals::class)->name('referrals');
+                Route::get('/device-requests', DeviceRequestIndex::class)
+                    ->can('viewAny', DeviceRequestRequest::class)->name('device-requests');
+                Route::get('/device-requests/create', DeviceRequestForm::class)
+                    ->can('create', DeviceRequestRequest::class)->name('device-requests.create');
                 Route::get('/observations', ObservationIndex::class)
                     ->can('viewAny', Observation::class)
                     ->name('observations');

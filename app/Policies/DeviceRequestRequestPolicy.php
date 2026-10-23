@@ -12,13 +12,23 @@ use Illuminate\Auth\Access\Response;
 
 class DeviceRequestRequestPolicy
 {
-    public function viewAny(User $user, LegalEntity $legalEntity): Response
+    public function viewAny(User $user, ?LegalEntity $legalEntity = null): Response
     {
+        $legalEntity ??= legalEntity();
+        if ($legalEntity === null) {
+            return Response::denyAsNotFound();
+        }
+
         return $this->perform($user, $legalEntity, 'device_request:read');
     }
 
-    public function create(User $user, LegalEntity $legalEntity): Response
+    public function create(User $user, ?LegalEntity $legalEntity = null): Response
     {
+        $legalEntity ??= legalEntity();
+        if ($legalEntity === null) {
+            return Response::denyAsNotFound();
+        }
+
         return $this->perform($user, $legalEntity, 'device_request:write');
     }
 

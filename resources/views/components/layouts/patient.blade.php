@@ -13,6 +13,7 @@
     use App\Models\DeclarationRequest;
     use App\Models\MedicalEvents\Sql\DetectedIssue;
     use App\Models\MedicalEvents\Sql\DeviceAssociation;
+    use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
     use App\Models\MedicalEvents\Sql\Encounter;
     use App\Models\Person\Person;
     use App\Models\Relations\PersonVerificationDetail;
@@ -247,12 +248,16 @@
                                 </a>
                             @endcan
 
-                            <a
-                                href="{{ route("$routePrefix.prescription-requests", [legalEntity(), $routeParamKey => $recordId]) }}"
-                                class="summary-tab {{ $isCurrentRoute("$routePrefix.prescription-requests") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
-                            >
-                                {{ __('patients.prescription_requests') }}
-                            </a>
+                            @if ($personId)
+                                @can('viewAny', DeviceRequestRequest::class)
+                                    <a
+                                        href="{{ route('persons.device-requests', ['legalEntity' => legalEntity(), 'person' => $personId]) }}"
+                                        class="summary-tab {{ ($activeTab === 'device-requests' || $isCurrentRoute('persons.device-requests*')) ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                                    >
+                                        {{ __('device-requests.labels.patient_tab') }}
+                                    </a>
+                                @endcan
+                            @endif
 
                             <a
                                 href="{{ route("$routePrefix.specimens", [legalEntity(), $routeParamKey => $recordId]) }}"

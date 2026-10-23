@@ -1,15 +1,15 @@
+@use(App\Models\MedicalEvents\Sql\DeviceRequestRequest)
+
 <x-layouts.patient :personId="$personId" :patientFullName="$patientFullName" activeTab="prescription-requests">
     <x-slot name="headerActions">
-        <button type="button" class="button-primary-outline px-5 py-2 text-sm whitespace-nowrap">
-            {{ __('patients.data_access') }}
-        </button>
-        <button
-            type="button"
-            class="button-sync flex items-center gap-2 px-5 py-2 text-sm whitespace-nowrap shadow-sm transition-colors"
-        >
-            @icon('refresh', 'w-4 h-4')
-            {{ __('legal-entity-connection.sync_data') }}
-        </button>
+        @can('viewAny', DeviceRequestRequest::class)
+            <a
+                href="{{ route('persons.device-requests', ['legalEntity' => legalEntity(), 'person' => $personId]) }}"
+                class="button-primary px-5 py-2 text-sm whitespace-nowrap"
+            >
+                {{ __('device-requests.labels.patient_tab') }}
+            </a>
+        @endcan
     </x-slot>
 
     <div class="breadcrumb-form shift-content p-4">

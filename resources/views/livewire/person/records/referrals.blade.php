@@ -15,7 +15,7 @@
     <x-slot name="headerActions">
         @can('viewAny', [\App\Models\MedicalEvents\Sql\DeviceRequestRequest::class, legalEntity()])
             <a
-                href="{{ route('device-requests.index', ['legalEntity' => legalEntity(), 'person' => $personId]) }}"
+                href="{{ route('persons.device-requests', ['legalEntity' => legalEntity(), 'person' => $personId]) }}"
                 class="button-primary-outline"
             >{{ __('device-requests.labels.registry') }}</a>
         @endcan

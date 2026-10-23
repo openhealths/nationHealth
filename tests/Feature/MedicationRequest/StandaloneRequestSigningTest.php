@@ -368,7 +368,7 @@ class StandaloneRequestSigningTest extends TestCase
         $component->encounterId = $encounter->id;
         $component->encounterUuid = $encounter->uuid;
         $component->openDeviceRequest();
-        $this->assertSame(route('device-requests.create', ['legalEntity' => $this->legalEntity, 'person' => $person, 'encounter' => $encounter->id]), $component->redirectedUrl);
+        $this->assertSame(route('persons.device-requests.create', ['legalEntity' => $this->legalEntity, 'person' => $person, 'encounter' => $encounter->id]), $component->redirectedUrl);
     }
 
     public function test_assistant_with_write_scope_cannot_prescribe_devices(): void
@@ -401,7 +401,7 @@ class StandaloneRequestSigningTest extends TestCase
 
         Livewire::test(DeviceEncounterActionsHarness::class, ['personId' => $person->id, 'compositionUrl' => null])
             ->assertDontSeeHtml('wire:click="openDeviceRequest"')
-            ->assertSeeHtml('href="'.route('device-requests.index', ['legalEntity' => $this->legalEntity, 'person' => $person->id]).'"')
+            ->assertSeeHtml('href="'.route('persons.device-requests', ['legalEntity' => $this->legalEntity, 'person' => $person->id]).'"')
             ->assertSeeHtml('disabled')
             ->assertSee(__('encounters.medical_report_creation_unavailable'));
     }
@@ -410,14 +410,28 @@ class StandaloneRequestSigningTest extends TestCase
     {
         $model = \App\Models\MedicalEvents\Sql\DeviceRequestRequest::class;
         $this->assertTrue($this->user->can('create', [$model, $this->legalEntity]));
+        $this->assertTrue($this->user->can('create', $model));
+        $this->assertTrue($this->user->can('viewAny', $model));
         $this->assertFalse($this->user->can('perform', [$model, $this->legalEntity, 'unrelated:write']));
         $this->assertFalse($this->user->can('perform', [$model, $this->legalEntity, 'device_request:revoke']));
         $this->assertSame(404, \Illuminate\Support\Facades\Gate::inspect('perform', [$model, $this->legalEntity, 'device_request:revoke'])->status());
         setPermissionsTeamId($this->legalEntity->id + 1000);
         $this->assertFalse($this->user->can('create', [$model, $this->legalEntity]));
+        $this->assertFalse($this->user->can('create', $model));
+        $this->assertFalse($this->user->can('viewAny', $model));
         setPermissionsTeamId($this->legalEntity->id);
         $this->user->employees()->firstOrFail()->update(['is_active' => false]);
         $this->assertFalse($this->user->can('create', [$model, $this->legalEntity]));
+        $this->assertFalse($this->user->can('create', $model));
+    }
+
+    public function testDevicePolicyDeniesRequestsWithoutLegalEntityContext(): void
+    {
+        $this->app->forgetInstance('legalEntity');
+        $model = \App\Models\MedicalEvents\Sql\DeviceRequestRequest::class;
+        $this->assertFalse($this->user->can('viewAny', $model));
+        $this->assertFalse($this->user->can('create', $model));
+        $this->assertSame(404, \Illuminate\Support\Facades\Gate::inspect('viewAny', $model)->status());
     }
 
     public function test_assistant_with_extra_write_scope_can_still_open_device_registry(): void
@@ -431,7 +445,7 @@ class StandaloneRequestSigningTest extends TestCase
         $response->shouldReceive('getData')->andReturn([]);
         $response->shouldReceive('getPaging')->andReturn(['total_pages' => 1]);
         $api = Mockery::mock(\App\Classes\eHealth\Api\Patient\DeviceRequest::class);
-        $api->shouldReceive('getBySearchParams')->twice()->with($person->uuid, ['requester_legal_entity' => $this->legalEntity->uuid, 'page' => 1])->andReturn($response);
+        $api->shouldReceive('getBySearchParams')->twice()->with($person->uuid, ['page' => 1])->andReturn($response);
         $this->instance(\App\Classes\eHealth\Api\Patient\DeviceRequest::class, $api);
         Livewire::test(\App\Livewire\DeviceRequest\DeviceRequestIndex::class, ['legalEntity' => $this->legalEntity, 'person' => $person])
             ->assertSet('legalEntityId', $this->legalEntity->id)

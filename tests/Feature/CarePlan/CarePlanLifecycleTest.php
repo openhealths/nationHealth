@@ -1277,7 +1277,7 @@ class CarePlanLifecycleTest extends TestCase
 
         Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan->fresh()])
             ->call('initReferralForm', $activity->id)
-            ->assertRedirect(route('device-requests.create', [
+            ->assertRedirect(route('persons.device-requests.create', [
                 'legalEntity' => legalEntity(), 'person' => $this->person,
                 'carePlan' => $carePlan->uuid, 'activity' => $activity->uuid,
             ]));

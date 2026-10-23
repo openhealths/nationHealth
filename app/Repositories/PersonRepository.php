@@ -14,11 +14,6 @@ use Throwable;
 
 class PersonRepository
 {
-    public function getById(int $personId): Person
-    {
-        return Person::findOrFail($personId);
-    }
-
     /**
      * Response keys that are stored through relations, so they must never reach the person attributes.
      */
@@ -30,6 +25,18 @@ class PersonRepository
         'addresses',
         'confidant_person'
     ];
+
+    public function getById(int $personId): Person
+    {
+        return Person::findOrFail($personId);
+    }
+
+    public function searchBySurname(string $surname): array
+    {
+        return Person::whereHas('names', fn ($query) => $query->whereLike('last_name', '%'.$surname.'%'))
+            ->whereNotNull('uuid')->with('names')->orderBy('id')->limit(20)->get()
+            ->map(fn (Person $person): array => ['id' => $person->id, 'name' => $person->fullName])->all();
+    }
 
     /**
      * Create person.

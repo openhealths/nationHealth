@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\Livewire\DeviceRequest;
 
 use App\Classes\eHealth\EHealth;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\Person\Person;
 use App\Repositories\LegalEntityRepository;
 use App\Repositories\PersonRepository;
+use App\Repositories\MedicalEvents\DeviceRequestRequestRepository;
 use App\Services\MedicalEvents\DeviceRequestLifecycleService;
+use App\Livewire\DeviceRequest\Forms\DeviceRequestSearchForm;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Locked;
@@ -29,12 +33,15 @@ class DeviceRequestIndex extends Component
     #[Locked]
     public ?int $personId = null;
 
+    #[Locked]
+    public bool $patientContext = false;
+
     public string $patientSearch = '';
 
     #[Locked]
     public array $patients = [];
 
-    public array $filters = ['requester_legal_entity' => '', 'status' => '', 'code' => '', 'context_episode_id' => '', 'encounter' => '', 'program' => ''];
+    public DeviceRequestSearchForm $filters;
 
     #[Locked]
     public array $requests = [];
@@ -53,6 +60,9 @@ class DeviceRequestIndex extends Component
 
     #[Locked]
     public array $dispenseDetails = [];
+
+    #[Locked]
+    public bool $dispensesLoaded = false;
 
     #[Locked]
     public array $reasons = [];
@@ -84,16 +94,11 @@ class DeviceRequestIndex extends Component
     {
         $this->legalEntityId = $legalEntity->id;
         $this->personId = $person?->exists ? $person->id : null;
-        $this->filters['requester_legal_entity'] = $legalEntity->uuid;
+        $this->patientContext = $this->personId !== null;
+        abort_unless(Auth::user()->can('perform', [DeviceRequestRequest::class, $legalEntity, 'device_request:read']), 404);
 
         if ($person?->exists) {
-            if (Auth::user()->can('create', [DeviceRequestRequest::class, $legalEntity])) {
-                $employee = app(DeviceRequestLifecycleService::class)->authorizeAction($legalEntity, 'device_request:write');
-                $this->drafts = DeviceRequestRequest::wherePersonId($person->id)->whereEmployeeId($employee->id)
-                    ->whereStatus('draft')->whereNotNull('request_payload')->latest()->get()
-                    ->map(fn ($draft): array => ['uuid' => $draft->uuid, 'device' => $draft->deviceId, 'updatedAt' => $draft->updatedAt->format('d.m.Y H:i')])->all();
-            }
-
+            $this->loadDrafts();
             $this->search();
         }
     }
@@ -112,37 +117,87 @@ class DeviceRequestIndex extends Component
 
     public function searchPatients(): void
     {
-        $this->authorize('perform', [DeviceRequestRequest::class, $this->legalEntity, 'device_request:read']);
-        $this->authorize('viewAny', Person::class);
+        abort_if($this->patientContext, 404);
+        abort_unless(Auth::user()->can('perform', [DeviceRequestRequest::class, $this->legalEntity, 'device_request:read']), 404);
+        abort_unless(Auth::user()->can('viewAny', Person::class), 404);
         $this->validate(['patientSearch' => 'required|string|min:3|max:100']);
-        $search = $this->patientSearch;
-        $this->patients = Person::whereHas('names', fn ($query) => $query->where('last_name', 'ilike', '%'.$search.'%'))
-            ->with('names')->limit(20)->get()->map(fn (Person $person): array => ['id' => $person->id, 'name' => $person->fullName])->all();
+        $this->patients = app(PersonRepository::class)->searchBySurname(trim($this->patientSearch));
     }
 
     public function openPatient(int $id): void
     {
-        $this->authorize('perform', [DeviceRequestRequest::class, $this->legalEntity, 'device_request:read']);
-        $this->authorize('viewAny', Person::class);
-        $this->redirectRoute('device-requests.index', ['legalEntity' => $this->legalEntity, 'person' => Person::findOrFail($id)]);
+        abort_if($this->patientContext, 404);
+        abort_unless(Auth::user()->can('perform', [DeviceRequestRequest::class, $this->legalEntity, 'device_request:read']), 404);
+        abort_unless(Auth::user()->can('viewAny', Person::class), 404);
+        $person = app(PersonRepository::class)->getById($id);
+        abort_unless(\Illuminate\Support\Str::isUuid($person->uuid), 404);
+        $this->personId = $person->id;
+        unset($this->person);
+        $this->patients = [];
+        $this->resetFilters();
+        $this->loadDrafts();
+    }
+
+    public function clearPatient(): void
+    {
+        abort_if($this->patientContext, 404);
+        abort_unless(Auth::user()->can('perform', [DeviceRequestRequest::class, $this->legalEntity, 'device_request:read']), 404);
+        $this->personId = null;
+        unset($this->person);
+        $this->filters->reset();
+        $this->reset('drafts', 'requests', 'page', 'totalPages', 'patients');
+        $this->clearDetails();
+    }
+
+    private function loadDrafts(): void
+    {
+        $this->drafts = [];
+        if (Auth::user()->can('create', DeviceRequestRequest::class)) {
+            $employee = app(DeviceRequestLifecycleService::class)->authorizeAction($this->legalEntity, 'device_request:write');
+            $this->drafts = app(DeviceRequestRequestRepository::class)->draftsForPatientEmployee($this->personId, $employee->id);
+        }
+    }
+
+    public function resetFilters(): void
+    {
+        $this->filters->reset();
+        $this->search();
+    }
+
+    private function clearDetails(): void
+    {
+        $this->reset(
+            'selected',
+            'selectedId',
+            'catalog',
+            'dispenses',
+            'dispenseDetails',
+            'dispensesLoaded',
+            'action',
+            'reasons',
+            'reason',
+            'reasonText',
+            'phone',
+            'phoneConfirmed',
+            'showSignatureModal',
+            'form'
+        );
+        $this->resetValidation();
     }
 
     public function search(bool $resetPage = true): void
     {
-        $this->authorize('perform', [DeviceRequestRequest::class, $this->legalEntity, 'device_request:read']);
+        abort_unless(Auth::user()->can('perform', [DeviceRequestRequest::class, $this->legalEntity, 'device_request:read']), 404);
         abort_unless($this->person?->exists, 404);
-        $this->validate([
-            'filters.requester_legal_entity' => 'nullable|uuid', 'filters.context_episode_id' => 'nullable|uuid',
-            'filters.encounter' => 'nullable|uuid', 'filters.program' => 'nullable|uuid',
-            'filters.status' => 'nullable|in:active,completed,revoked,entered-in-error', 'filters.code' => 'nullable|string|max:100',
-        ]);
+        $filters = $this->filters->toQuery();
 
         if ($resetPage) {
             $this->page = 1;
+            $this->clearDetails();
         }
 
         try {
-            $response = EHealth::deviceRequest()->getBySearchParams($this->person->uuid, array_filter($this->filters) + ['page' => $this->page]);
+            $response = EHealth::deviceRequest()->getBySearchParams($this->person->uuid, $filters + ['page' => $this->page]);
             $this->requests = $response->getData();
             $this->totalPages = (int) ($response->getPaging()['total_pages'] ?? 1);
         } catch (Throwable $exception) {
@@ -160,15 +215,16 @@ class DeviceRequestIndex extends Component
     public function showDetails(string $id): void
     {
         $service = app(DeviceRequestLifecycleService::class);
-        $this->authorize('perform', [DeviceRequestRequest::class, $this->legalEntity, 'device_request:read']);
+        abort_unless(Auth::user()->can('perform', [DeviceRequestRequest::class, $this->legalEntity, 'device_request:read']), 404);
         abort_unless($this->person?->exists, 404);
+
+        $this->clearDetails();
 
         try {
             abort_unless(\Illuminate\Support\Str::isUuid($id), 404);
             $response = EHealth::deviceRequest()->getById($this->person->uuid, $id);
             $this->selected = $response->getData();
             $this->selectedId = $id;
-            $this->dispenses = $this->dispenseDetails = [];
             $this->catalog = [];
             $this->phoneConfirmed = false;
             $this->phone = data_get($response->getUrgent(), 'authentication_method_current.phone_number', '');
@@ -206,7 +262,7 @@ class DeviceRequestIndex extends Component
     {
         abort_unless($this->selectedId !== null && $this->person?->exists && in_array($action, ['revoke', 'mark_in_error'], true), 404);
         $service = app(DeviceRequestLifecycleService::class);
-        $this->authorize('perform', [DeviceRequestRequest::class, $this->legalEntity, 'device_request:'.$action]);
+        abort_unless(Auth::user()->can('perform', [DeviceRequestRequest::class, $this->legalEntity, 'device_request:'.$action]), 404);
 
         try {
             $service->assertTransition($service->details($this->person, $this->selectedId), $action);
@@ -275,11 +331,16 @@ class DeviceRequestIndex extends Component
     public function loadDispenses(): void
     {
         $service = app(DeviceRequestLifecycleService::class);
-        $this->authorize('perform', [DeviceRequestRequest::class, $this->legalEntity, 'device_dispense:read']);
-        abort_unless($this->selectedId !== null, 404);
+        abort_unless(Auth::user()->can('perform', [DeviceRequestRequest::class, $this->legalEntity, 'device_dispense:read']), 404);
+        abort_unless($this->person?->exists, 404);
+        $this->validate(['selectedId' => 'required|uuid']);
+        $this->resetValidation();
+        $this->dispenses = $this->dispenseDetails = [];
+        $this->dispensesLoaded = false;
 
         try {
             $this->dispenses = $service->collectPages(fn (int $page) => EHealth::deviceRequest()->getDispenses($this->person->uuid, ['based_on' => $this->selectedId, 'page' => $page]));
+            $this->dispensesLoaded = true;
         } catch (Throwable $exception) {
             $this->error($exception);
         }
@@ -288,8 +349,11 @@ class DeviceRequestIndex extends Component
     public function showDispense(string $id): void
     {
         abort_unless(\Illuminate\Support\Str::isUuid($id), 404);
-        $this->authorize('perform', [DeviceRequestRequest::class, $this->legalEntity, 'device_dispense:read']);
+        abort_unless(Auth::user()->can('perform', [DeviceRequestRequest::class, $this->legalEntity, 'device_dispense:read']), 404);
         $this->validate(['selectedId' => 'required|uuid']);
+        abort_unless($this->person?->exists, 404);
+        $this->dispenseDetails = [];
+        $this->resetValidation();
 
         try {
             $record = EHealth::deviceRequest()->getDispense($this->person->uuid, $id)->getData();
@@ -302,7 +366,10 @@ class DeviceRequestIndex extends Component
 
     public function printout(): void
     {
-        $this->authorize('perform', [DeviceRequestRequest::class, $this->legalEntity, 'device_request:read']);
+        abort_unless(Auth::user()->can('perform', [DeviceRequestRequest::class, $this->legalEntity, 'device_request:read']), 404);
+        abort_unless($this->person?->exists, 404);
+        $this->validate(['selectedId' => 'required|uuid']);
+        $this->resetValidation();
 
         try {
             $html = app(DeviceRequestLifecycleService::class)->printoutHtml($this->person, $this->selectedId);
@@ -314,6 +381,12 @@ class DeviceRequestIndex extends Component
 
     private function error(Throwable $exception): void
     {
+        if ($exception instanceof EHealthException || $exception instanceof EHealthConnectionException) {
+            $exception->handle('Error while processing a device request action');
+
+            return;
+        }
+
         if ($exception instanceof \Illuminate\Validation\ValidationException) {
             $this->setErrorBag($exception->validator->errors());
         } else {

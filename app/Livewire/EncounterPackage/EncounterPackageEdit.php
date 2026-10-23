@@ -171,7 +171,7 @@ class EncounterPackageEdit extends EncounterPackageComponent
             $employee = $service->authorizeAction(legalEntity(), 'device_request:write');
             $person = $this->patient();
             $service->encounter($person, $employee, $this->encounterUuid);
-            $this->redirectRoute('device-requests.create', ['legalEntity' => legalEntity(), 'person' => $person, 'encounter' => $this->encounterId]);
+            $this->redirectRoute('persons.device-requests.create', ['legalEntity' => legalEntity(), 'person' => $person, 'encounter' => $this->encounterId]);
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
         }

@@ -12,7 +12,7 @@
         ],
         'device-requests' => [
             'label' => __('encounters.open_device_requests'),
-            'href' => route('device-requests.index', ['legalEntity' => legalEntity(), 'person' => $personId]),
+            'href' => route('persons.device-requests', ['legalEntity' => legalEntity(), 'person' => $personId]),
             'icon' => 'arrow-right',
         ],
     ];

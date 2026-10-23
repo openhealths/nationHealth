@@ -271,7 +271,7 @@
                 {{ __('device-requests.form.sign_create') }}</button
             ><a
                 class="button-minor"
-                href="{{ route('device-requests.index', ['legalEntity' => $legalEntity, 'person' => $person]) }}"
+                href="{{ route('persons.device-requests', ['legalEntity' => $legalEntity, 'person' => $person]) }}"
                 >{{ __('device-requests.form.back') }}</a>
         </div>
     </form>
