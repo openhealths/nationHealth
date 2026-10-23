@@ -50,6 +50,11 @@ class EmployeeRolePolicy
             return Response::denyWithStatus(404);
         }
 
+        // Legal entity can view only its own employee roles
+        if (!$employeeRole->healthcareService()->whereLegalEntityId(legalEntity()->id)->exists()) {
+            return Response::denyWithStatus(404);
+        }
+
         return Response::allow();
     }
 

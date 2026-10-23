@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\EmployeeRole\Forms;
 
+use App\Enums\HealthcareService\Status as HealthcareServiceStatus;
 use App\Enums\Status;
+use App\Enums\User\Role;
 use App\Models\Employee\Employee;
 use App\Models\EmployeeRole;
 use App\Models\HealthcareService;
@@ -25,10 +27,24 @@ class EmployeeRoleForm extends Form
                 'required',
                 'uuid',
                 Rule::exists('employees', 'uuid')
+                    ->where('legal_entity_id', legalEntity()->id)
+                    ->whereIn('employee_type', [
+                        Role::DOCTOR->value,
+                        Role::SPECIALIST->value,
+                        Role::ASSISTANT->value,
+                        Role::LABORANT->value
+                    ])
                     ->where('status', Status::APPROVED->value)
                     ->where('is_active', true)
             ],
-            'healthcareServiceId' => ['required', 'uuid', 'exists:healthcare_services,uuid']
+            'healthcareServiceId' => [
+                'required',
+                'uuid',
+                Rule::exists('healthcare_services', 'uuid')
+                    ->where('legal_entity_id', legalEntity()->id)
+                    ->where('status', HealthcareServiceStatus::ACTIVE->value)
+                    ->where('is_active', true)
+            ]
         ];
     }
 

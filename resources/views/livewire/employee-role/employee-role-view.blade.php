@@ -4,6 +4,18 @@
     <div class="flex flex-wrap items-center justify-between gap-4">
         <x-header-navigation class="breadcrumb-form min-w-0 flex-1">
             <x-slot name="title">{{ __('employee-roles.role') }}</x-slot>
+
+            <x-slot name="actions">
+                <button
+                    wire:click.prevent="sync"
+                    wire:loading.attr="disabled"
+                    type="button"
+                    class="button-sync flex items-center gap-2 px-4 py-2 text-sm shadow-sm"
+                >
+                    @icon('refresh', 'w-4 h-4')
+                    <span>{{ __('forms.synchronise_with_eHealth') }}</span>
+                </button>
+            </x-slot>
         </x-header-navigation>
     </div>
 
@@ -75,12 +87,12 @@
 
             <div class="form-row-2">
                 <div class="form-group group">
-                    <label for="divisionName" class="label">{{ __('employee-roles.start_datetime') }}</label>
+                    <label for="startDate" class="label">{{ __('employee-roles.start_datetime') }}</label>
                     <input
                         value="{{ formatDisplayDateTime($employeeRole->startDate) }}"
                         type="text"
-                        name="divisionName"
-                        id="divisionName"
+                        name="startDate"
+                        id="startDate"
                         class="input peer"
                         placeholder=" "
                         disabled
@@ -89,12 +101,12 @@
                 </div>
 
                 <div class="form-group group">
-                    <label for="fullName" class="label">{{ __('employee-roles.end_datetime') }}</label>
+                    <label for="endDate" class="label">{{ __('employee-roles.end_datetime') }}</label>
                     <input
                         value="{{ formatDisplayDateTime($employeeRole->endDate) ?: '-' }}"
                         type="text"
-                        name="fullName"
-                        id="fullName"
+                        name="endDate"
+                        id="endDate"
                         class="input peer"
                         placeholder=" "
                         disabled
@@ -151,12 +163,12 @@
 
             <div class="form-row-2">
                 <div class="form-group group">
-                    <label for="ehealthInsertedAt" class="label">{{ __('employee-roles.updated_at') }}</label>
+                    <label for="ehealthUpdatedAt" class="label">{{ __('employee-roles.updated_at') }}</label>
                     <input
                         value="{{ $employeeRole->ehealthUpdatedAt }}"
                         type="text"
-                        name="ehealthInsertedAt"
-                        id="ehealthInsertedAt"
+                        name="ehealthUpdatedAt"
+                        id="ehealthUpdatedAt"
                         class="input peer"
                         placeholder=" "
                         disabled
@@ -165,12 +177,12 @@
                 </div>
 
                 <div class="form-group group">
-                    <label for="ehealthInsertedBy" class="label">{{ __('employee-roles.updated_by') }}</label>
+                    <label for="ehealthUpdatedBy" class="label">{{ __('employee-roles.updated_by') }}</label>
                     <input
                         value="{{ $employeeRole->updatedByUser?->party?->fullName ?: $employeeRole->ehealthUpdatedBy }}"
                         type="text"
-                        name="ehealthInsertedBy"
-                        id="ehealthInsertedBy"
+                        name="ehealthUpdatedBy"
+                        id="ehealthUpdatedBy"
                         class="input peer"
                         placeholder=" "
                         disabled
@@ -179,9 +191,31 @@
                 </div>
             </div>
 
-            <a href="{{ route('employee-role.index', legalEntity()) }}" type="submit" class="button-minor">
-                {{ __('forms.back') }}
-            </a>
+            <div class="flex flex-wrap items-center gap-4">
+                <a href="{{ route('employee-role.index', legalEntity()) }}" class="button-minor">
+                    {{ __('forms.back') }}
+                </a>
+
+                @can('view', $employeeRole->employee)
+                    <a
+                        href="{{ route('employee.show', [legalEntity(), 'employee' => $employeeRole->employee->id]) }}"
+                        class="button-primary-outline"
+                    >
+                        {{ __('employee-roles.view_employee') }}
+                    </a>
+                @endcan
+
+                @can('view', $employeeRole->healthcareService)
+                    <a
+                        href="{{ route('healthcare-service.view', [legalEntity(), $employeeRole->healthcareService->divisionId, $employeeRole->healthcareService->id]) }}"
+                        class="button-primary-outline"
+                    >
+                        {{ __('employee-roles.view_healthcare_service') }}
+                    </a>
+                @endcan
+            </div>
         </fieldset>
     </div>
+
+    <livewire:components.x-message :key="now()->timestamp" />
 </section>
