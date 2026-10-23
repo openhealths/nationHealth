@@ -17,6 +17,18 @@ use Illuminate\Validation\Rule;
 
 class DeviceDispense extends PatientApiBase
 {
+    public function getById(string $patientId, string $deviceDispenseId): PromiseInterface|EHealthResponse
+    {
+        $this->setValidator($this->validateDeviceDispense(...));
+
+        return $this->get(self::URL . "/$patientId/device_dispenses/$deviceDispenseId");
+    }
+
+    protected function validateDeviceDispense(EHealthResponse $response): array
+    {
+        return $this->runDeviceDispenseValidation([$this->replaceEHealthPropNames($response->getData())])[0];
+    }
+
     /**
      * Get device dispenses by search params in patient context.
      *

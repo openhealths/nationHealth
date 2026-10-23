@@ -162,20 +162,36 @@ class DeviceDispenses extends BasePatientComponent
 
     public function openDeviceDispenseView(string $deviceDispenseUuid): void
     {
-        // The records of the persons merged into the patient count too
-        $deviceDispense = DeviceDispense::readableFor($this->patient(), true)
-            ->whereUuid($deviceDispenseUuid)
-            ->first();
-
-        if ($deviceDispense === null) {
-            Session::flash(
-                'error',
-                __('device-dispenses.messages.not_found_in_db')
-            );
+        if (!Auth::user()->can('viewAny', DeviceDispense::class)) {
+            Session::flash('error', __('device-dispenses.policy.view'));
 
             return;
         }
 
+        validator(['uuid' => $deviceDispenseUuid], ['uuid' => ['required', 'uuid']])->validate();
+        $repository = Repository::deviceDispense();
+        $deviceDispense = $repository->findForPatientByUuid($this->patient(), $deviceDispenseUuid);
+
+        if ($deviceDispense === null) {
+            try {
+                $response = EHealth::deviceDispense()->getById($this->uuid, $deviceDispenseUuid);
+                $validatedData = $response->validate();
+                abort_unless($validatedData['uuid'] === $deviceDispenseUuid, 404);
+                $repository->sync($this->patient(), [$validatedData]);
+            } catch (EHealthException|EHealthConnectionException $exception) {
+                $exception->handle('Error while loading the device dispense');
+
+                return;
+            } catch (Throwable $exception) {
+                $this->handleDatabaseErrors($exception, 'Error while storing the device dispense');
+
+                return;
+            }
+
+            $deviceDispense = $repository->findForPatientByUuid($this->patient(), $deviceDispenseUuid);
+        }
+
+        abort_if($deviceDispense === null, 404);
         if (Auth::user()->cannot('view', [$deviceDispense, $this->patient()])) {
             Session::flash('error', __('device-dispenses.policy.view'));
 
