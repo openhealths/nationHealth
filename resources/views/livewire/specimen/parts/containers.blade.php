@@ -45,7 +45,12 @@
 
         <div class="form-row-2 mt-6">
             <div class="form-group group">
-                <select x-model="container.typeCode" :id="`containerType${containerIndex}`" class="input-select peer">
+                <select
+                    x-model="container.typeCode"
+                    @change="if (! container.typeCode) container.typeText = '';"
+                    :id="`containerType${containerIndex}`"
+                    class="input-select peer"
+                >
                     <option value="" selected>{{ __('forms.select') }}</option>
                     @foreach ($this->dictionaries['specimen_container_types'] as $code => $containerType)
                         <option value="{{ $code }}">{{ $containerType }}</option>
@@ -60,6 +65,7 @@
             <div class="form-group group">
                 <select
                     x-model="container.additiveCode"
+                    @change="if (! container.additiveCode) container.additiveText = '';"
                     :id="`containerAdditive${containerIndex}`"
                     class="input-select peer"
                 >
@@ -69,6 +75,40 @@
                     @endforeach
                 </select>
                 <label :for="`containerAdditive${containerIndex}`" class="label">{{ __('specimens.additive') }}</label>
+            </div>
+        </div>
+
+        <div class="form-row-2 mt-6">
+            <div class="form-group group">
+                <input
+                    x-model="container.typeText"
+                    :disabled="! container.typeCode"
+                    type="text"
+                    :id="`containerTypeText${containerIndex}`"
+                    class="input peer"
+                    placeholder=" "
+                    autocomplete="off"
+                />
+                <label
+                    :for="`containerTypeText${containerIndex}`"
+                    class="label"
+                >{{ __('specimens.container_type_clarification') }}</label>
+            </div>
+
+            <div class="form-group group">
+                <input
+                    x-model="container.additiveText"
+                    :disabled="! container.additiveCode"
+                    type="text"
+                    :id="`containerAdditiveText${containerIndex}`"
+                    class="input peer"
+                    placeholder=" "
+                    autocomplete="off"
+                />
+                <label
+                    :for="`containerAdditiveText${containerIndex}`"
+                    class="label"
+                >{{ __('specimens.additive_clarification') }}</label>
             </div>
         </div>
 

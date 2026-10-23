@@ -1,3 +1,10 @@
+@php
+    use App\Models\MedicalEvents\Sql\Device;
+    use Illuminate\Support\Facades\Auth;
+
+    $canCancelDeviceRecords = ($canCancelRecords ?? false) && Auth::user()->can('cancel', Device::class);
+@endphp
+
 <div
     class="p-4 sm:p-8"
     id="detected-issue-section"
@@ -5,7 +12,7 @@
         detectedIssues: $wire.entangle('detectedIssueForm.detectedIssues'),
         selectedRecords: $wire.entangle('selectedRecords.detectedIssues'),
         cancelledRecords: $wire.cancelledRecords.detectedIssues,
-        canCancelRecords: {{ ($canCancelRecords ?? false) ? 'true' : 'false' }},
+        canCancelRecords: {{ $canCancelDeviceRecords ? 'true' : 'false' }},
         devices: $wire.entangle('deviceForm.devices'),
         patientDevices: $wire.patientDevices,
         previousDetectedIssues: $wire.entangle('previousDetectedIssues'),
@@ -151,7 +158,7 @@
         },
     }"
 >
-    @if (($canCancelRecords ?? false) && !empty($this->detectedIssueForm->detectedIssues))
+    @if ($canCancelDeviceRecords && !empty($this->detectedIssueForm->detectedIssues))
         <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
             {{ __('medical-events.messages.cancel_device_group_note') }}
         </p>

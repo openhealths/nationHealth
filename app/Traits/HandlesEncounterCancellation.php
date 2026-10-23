@@ -11,6 +11,7 @@ use App\Exceptions\Cipher\CipherException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\EncounterPackage\Forms\EncounterCancellationForm;
+use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Fhir;
@@ -224,6 +225,16 @@ trait HandlesEncounterCancellation
             $encounter->uuid,
             $this->selectedCancellationRecords()
         );
+
+        $isDeviceGroupPicked = !empty($selectedRecords['devices'])
+            || !empty($selectedRecords['deviceAssociations'])
+            || !empty($selectedRecords['detectedIssues']);
+
+        if ($isDeviceGroupPicked && Auth::user()->cannot('cancel', Device::class)) {
+            Session::flash('error', __('devices.policy.cancel'));
+
+            return;
+        }
 
         try {
             $package = $selectedRecords === []

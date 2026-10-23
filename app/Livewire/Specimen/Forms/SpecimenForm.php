@@ -36,7 +36,14 @@ class SpecimenForm extends BaseForm
                 Rule::in(collect($this->component->registeredByEmployees)->pluck('uuid'))
             ],
             'specimen.typeCode' => ['required', 'string', new InDictionary('specimen_types')],
+            'specimen.typeText' => ['nullable', 'string'],
             'specimen.conditionCode' => ['nullable', 'string', new InDictionary('specimen_conditions')],
+            // A clarification only reaches eHealth as the text of the code it clarifies
+            'specimen.conditionText' => [
+                Rule::prohibitedIf(empty($this->specimen['conditionCode'] ?? '')),
+                'nullable',
+                'string'
+            ],
             'specimen.note' => ['nullable', 'string'],
             'specimen.parentIds' => ['nullable', 'array'],
             'specimen.parentIds.*' => [
@@ -141,6 +148,11 @@ class SpecimenForm extends BaseForm
             'specimen.containers.*.identifier' => ['required', 'string', 'distinct'],
             'specimen.containers.*.description' => ['nullable', 'string'],
             'specimen.containers.*.typeCode' => ['nullable', 'string', new InDictionary('specimen_container_types')],
+            'specimen.containers.*.typeText' => Rule::forEach(fn (mixed $value, string $attribute): array => [
+                Rule::prohibitedIf(empty($this->specimen['containers'][(int) explode('.', $attribute)[2]]['typeCode'] ?? '')),
+                'nullable',
+                'string'
+            ]),
             'specimen.containers.*.capacityValue' => ['nullable', 'numeric', 'gt:0'],
             'specimen.containers.*.capacityCode' => [
                 'required_with:specimen.containers.*.capacityValue',
@@ -168,7 +180,12 @@ class SpecimenForm extends BaseForm
                     }
                 }
             ],
-            'specimen.containers.*.additiveCode' => ['nullable', 'string', new InDictionary('specimen_container_additives')]
+            'specimen.containers.*.additiveCode' => ['nullable', 'string', new InDictionary('specimen_container_additives')],
+            'specimen.containers.*.additiveText' => Rule::forEach(fn (mixed $value, string $attribute): array => [
+                Rule::prohibitedIf(empty($this->specimen['containers'][(int) explode('.', $attribute)[2]]['additiveCode'] ?? '')),
+                'nullable',
+                'string'
+            ])
         ];
     }
 

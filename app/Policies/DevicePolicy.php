@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\User\Role;
 use App\Models\Declaration;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Device;
@@ -50,6 +51,24 @@ class DevicePolicy
     public function create(User $user): Response
     {
         if ($user->cannot('device:write')) {
+            return Response::denyWithStatus(404);
+        }
+
+        return Response::allow();
+    }
+
+    /**
+     * Determine whether the user can mark devices, their associations with the patient and their detected issues as
+     * entered in error. They are cancelled together, so one rule covers all three.
+     */
+    public function cancel(User $user): Response
+    {
+        if ($user->cannot('encounter:cancel')) {
+            return Response::denyWithStatus(404);
+        }
+
+        // The scope alone is held by more roles than may cancel devices
+        if (!$user->hasAllowedRole([Role::DOCTOR, Role::SPECIALIST, Role::MED_ADMIN])) {
             return Response::denyWithStatus(404);
         }
 

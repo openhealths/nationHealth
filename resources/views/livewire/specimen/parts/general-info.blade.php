@@ -17,13 +17,47 @@
         </div>
 
         <div class="form-group group">
-            <select x-model="modalSpecimen.conditionCode" id="specimenCondition" class="input-select peer">
+            <select
+                x-model="modalSpecimen.conditionCode"
+                @change="if (! modalSpecimen.conditionCode) modalSpecimen.conditionText = '';"
+                id="specimenCondition"
+                class="input-select peer"
+            >
                 <option value="" selected>{{ __('forms.select') }}</option>
                 @foreach ($this->dictionaries['specimen_conditions'] as $code => $specimenCondition)
                     <option value="{{ $code }}">{{ $specimenCondition }}</option>
                 @endforeach
             </select>
             <label for="specimenCondition" class="label">{{ __('specimens.specimen_condition') }}</label>
+        </div>
+    </div>
+
+    <div class="form-row-2 mt-6">
+        <div class="form-group group">
+            <input
+                x-model="modalSpecimen.typeText"
+                type="text"
+                id="specimenTypeText"
+                class="input peer"
+                placeholder=" "
+                autocomplete="off"
+            />
+            <label for="specimenTypeText" class="label">{{ __('specimens.specimen_type_clarification') }}</label>
+        </div>
+
+        <div class="form-group group">
+            <input
+                x-model="modalSpecimen.conditionText"
+                :disabled="! modalSpecimen.conditionCode"
+                type="text"
+                id="specimenConditionText"
+                class="input peer"
+                placeholder=" "
+                autocomplete="off"
+            />
+            <label for="specimenConditionText" class="label">
+                {{ __('specimens.specimen_condition_clarification') }}
+            </label>
         </div>
     </div>
 

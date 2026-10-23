@@ -62,9 +62,20 @@
                     $collectedPeriodStart = formatDisplayDateTime(convertToLocalTimezone(data_get($specimen, 'collection.collectedPeriod.start') ?? ''));
                     $collectedPeriodEnd = formatDisplayDateTime(convertToLocalTimezone(data_get($specimen, 'collection.collectedPeriod.end') ?? ''));
                     $status = SpecimenStatus::from(data_get($specimen, 'status'));
+                    $conceptLabel = static fn (?array $concept): string => $dictionaries[data_get($concept, 'coding.0.system')][data_get($concept, 'coding.0.code')] ?? '-';
+                    $quantityLabel = static fn (?array $quantity): string => isset($quantity['value']) ? trim($quantity['value'] . ' ' . ($quantity['unit'] ?? '')) : '-';
+                    $dateTimeLabel = static fn (?string $value): string => $value ? formatDisplayDateTime(convertToLocalTimezone($value)) : '-';
+                    // Collected by the patient, the collector would name the patient, so only the role is shown then
+                    $collector = data_get($specimen, 'collection.collector.identifier.type.coding.0.code') === 'patient'
+                        ? __('forms.patient')
+                        : data_get($specimen, 'collection.collector.displayValue') ?? data_get($specimen, 'collection.collector.identifier.value') ?? '-';
                 @endphp
                 <div class="space-y-4">
-                    <div class="record-inner-card" wire:key="specimen-{{ data_get($specimen, 'uuid') }}">
+                    <div
+                        class="record-inner-card"
+                        wire:key="specimen-{{ data_get($specimen, 'uuid') }}"
+                        x-data="{ showDetails: false }"
+                    >
                         <div class="record-inner-header">
                             <div class="record-inner-checkbox-col">
                                 <label for="specimenRecord" class="sr-only">{{ __('forms.select') }}</label>
@@ -129,11 +140,18 @@
                                             <li>
                                                 <button
                                                     type="button"
-                                                    wire:click="view"
+                                                    @click="
+                                                        showDetails = ! showDetails;
+                                                        close($refs.button);
+                                                    "
                                                     class="flex w-full cursor-pointer items-center gap-2 px-5 py-2 whitespace-nowrap text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600"
                                                 >
                                                     @icon('eye', 'w-5 h-5')
-                                                    {{ __('forms.view_details') }}
+                                                    <span x-show="! showDetails">{{ __('forms.view_details') }}</span>
+                                                    <span
+                                                        x-show="showDetails"
+                                                        x-cloak
+                                                    >{{ __('specimens.hide_details') }}</span>
                                                 </button>
                                             </li>
                                             @can('process', [Specimen::class, $specimen])
@@ -283,6 +301,22 @@
                                             @endforelse
                                         </div>
                                     </div>
+                                    <div>
+                                        <div class="record-inner-label text-[10px] uppercase">
+                                            {{ __('forms.gender') }}
+                                        </div>
+                                        <div class="record-inner-value font-semibold">
+                                            {{ $dictionaries['GENDER'][data_get($specimen, 'identity.gender')] ?? '-' }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="record-inner-label text-[10px] uppercase">
+                                            {{ __('specimens.patient_age') }}
+                                        </div>
+                                        <div class="record-inner-value font-semibold">
+                                            {{ data_get($specimen, 'identity.age') ?? '-' }}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -294,6 +328,168 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <div
+                            x-show="showDetails"
+                            x-cloak
+                            class="space-y-6 border-t border-gray-200 p-4 text-sm dark:border-gray-700"
+                        >
+                            <div>
+                                <div class="mb-3 font-semibold text-gray-900 dark:text-gray-100">
+                                    {{ __('specimens.general_info') }}
+                                </div>
+                                <div class="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-3">
+                                    <div>
+                                        <div class="record-inner-label">{{ __('forms.ehealth_id') }}</div>
+                                        <div class="record-inner-value break-all">
+                                            {{ data_get($specimen, 'uuid') }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="record-inner-label">{{ __('specimens.status_reason') }}</div>
+                                        <div class="record-inner-value">
+                                            {{ $conceptLabel(data_get($specimen, 'statusReason')) }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="record-inner-label">{{ __('specimens.specimen_condition') }}</div>
+                                        <div class="record-inner-value">
+                                            {{ $conceptLabel(data_get($specimen, 'condition')) }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="record-inner-label">{{ __('specimens.date_time_received') }}</div>
+                                        <div class="record-inner-value">
+                                            {{ $dateTimeLabel(data_get($specimen, 'receivedTime')) }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="record-inner-label">{{ __('specimens.created_in_system') }}</div>
+                                        <div class="record-inner-value">
+                                            {{ $dateTimeLabel(data_get($specimen, 'ehealthInsertedAt')) }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="record-inner-label">{{ __('specimens.updated_in_system') }}</div>
+                                        <div class="record-inner-value">
+                                            {{ $dateTimeLabel(data_get($specimen, 'ehealthUpdatedAt')) }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="record-inner-label">
+                                            {{ __('specimens.healthcare_service_where_collected') }}
+                                        </div>
+                                        <div class="record-inner-value">
+                                            {{ data_get($specimen, 'managingOrganization.displayValue') ?? data_get($specimen, 'managingOrganization.identifier.value') ?? '-' }}
+                                        </div>
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <div class="record-inner-label">{{ __('specimens.note') }}</div>
+                                        <div class="record-inner-value">{{ data_get($specimen, 'note') ?? '-' }}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="mb-3 font-semibold text-gray-900 dark:text-gray-100">
+                                    {{ __('specimens.collection_details') }}
+                                </div>
+                                <div class="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-3">
+                                    <div>
+                                        <div class="record-inner-label">{{ __('specimens.collector') }}</div>
+                                        <div class="record-inner-value">{{ $collector }}</div>
+                                    </div>
+                                    <div>
+                                        <div class="record-inner-label">
+                                            {{ __('specimens.procedure_during_collection') }}
+                                        </div>
+                                        <div class="record-inner-value break-all">
+                                            {{ data_get($specimen, 'collection.procedure.identifier.value') ?? '-' }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="record-inner-label">{{ __('specimens.collection_duration') }}</div>
+                                        <div class="record-inner-value">
+                                            {{ $quantityLabel(data_get($specimen, 'collection.duration')) }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="record-inner-label">{{ __('specimens.material_amount') }}</div>
+                                        <div class="record-inner-value">
+                                            {{ $quantityLabel(data_get($specimen, 'collection.quantity')) }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="record-inner-label">{{ __('specimens.collection_method') }}</div>
+                                        <div class="record-inner-value">
+                                            {{ $conceptLabel(data_get($specimen, 'collection.method')) }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="record-inner-label">{{ __('specimens.body_site') }}</div>
+                                        <div class="record-inner-value">
+                                            {{ $conceptLabel(data_get($specimen, 'collection.bodySite')) }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="record-inner-label">{{ __('specimens.fasting_status') }}</div>
+                                        <div class="record-inner-value">
+                                            {{ $conceptLabel(data_get($specimen, 'collection.fastingStatusCodeableConcept')) }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            @foreach (data_get($specimen, 'container', []) as $container)
+                                <div wire:key="specimen-container-{{ $loop->index }}">
+                                    <div class="mb-3 font-semibold text-gray-900 dark:text-gray-100">
+                                        {{ __('specimens.container_number') }}{{ $loop->iteration }}
+                                    </div>
+                                    <div class="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-3">
+                                        <div>
+                                            <div class="record-inner-label">{{ __('specimens.identifier') }}</div>
+                                            <div class="record-inner-value">
+                                                {{ data_get($container, 'identifier') }}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="record-inner-label">{{ __('specimens.container_type') }}</div>
+                                            <div class="record-inner-value">
+                                                {{ $conceptLabel(data_get($container, 'type')) }}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="record-inner-label">
+                                                {{ __('specimens.container_description') }}
+                                            </div>
+                                            <div class="record-inner-value">
+                                                {{ data_get($container, 'description') ?? '-' }}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="record-inner-label">{{ __('specimens.container_volume') }}</div>
+                                            <div class="record-inner-value">
+                                                {{ $quantityLabel(data_get($container, 'capacity')) }}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="record-inner-label">
+                                                {{ __('specimens.biomaterial_amount_in_container') }}
+                                            </div>
+                                            <div class="record-inner-value">
+                                                {{ $quantityLabel(data_get($container, 'specimenQuantity')) }}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="record-inner-label">{{ __('specimens.additive') }}</div>
+                                            <div class="record-inner-value">
+                                                {{ $conceptLabel(data_get($container, 'additiveCodeableConcept')) }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
                         </div>
                     </div>
                 </div>

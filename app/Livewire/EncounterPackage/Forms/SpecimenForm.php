@@ -37,7 +37,14 @@ class SpecimenForm extends Form
                 'date_format:H:i'
             ]),
             'specimens.*.typeCode' => ['required_with:specimens', 'string', new InDictionary('specimen_types')],
+            'specimens.*.typeText' => ['nullable', 'string'],
             'specimens.*.conditionCode' => ['nullable', 'string', new InDictionary('specimen_conditions')],
+            // A clarification only reaches eHealth as the text of the code it clarifies
+            'specimens.*.conditionText' => Rule::forEach(fn (mixed $value, string $attribute): array => [
+                Rule::prohibitedIf(empty($this->specimens[(int) explode('.', $attribute)[1]]['conditionCode'] ?? '')),
+                'nullable',
+                'string'
+            ]),
             'specimens.*.note' => ['nullable', 'string'],
             'specimens.*.parentIds' => ['nullable', 'array'],
             'specimens.*.parentIds.*' => [
@@ -219,6 +226,15 @@ class SpecimenForm extends Form
             ],
             'specimens.*.containers.*.description' => ['nullable', 'string'],
             'specimens.*.containers.*.typeCode' => ['nullable', 'string', new InDictionary('specimen_container_types')],
+            'specimens.*.containers.*.typeText' => Rule::forEach(function (mixed $value, string $attribute): array {
+                [, $specimenIndex, , $containerIndex] = explode('.', $attribute);
+
+                return [
+                    Rule::prohibitedIf(empty($this->specimens[(int) $specimenIndex]['containers'][(int) $containerIndex]['typeCode'] ?? '')),
+                    'nullable',
+                    'string'
+                ];
+            }),
             'specimens.*.containers.*.capacityValue' => ['nullable', 'numeric', 'gt:0'],
             'specimens.*.containers.*.capacityCode' => [
                 'required_with:specimens.*.containers.*.capacityValue',
@@ -250,7 +266,16 @@ class SpecimenForm extends Form
                     }
                 }
             ],
-            'specimens.*.containers.*.additiveCode' => ['nullable', 'string', new InDictionary('specimen_container_additives')]
+            'specimens.*.containers.*.additiveCode' => ['nullable', 'string', new InDictionary('specimen_container_additives')],
+            'specimens.*.containers.*.additiveText' => Rule::forEach(function (mixed $value, string $attribute): array {
+                [, $specimenIndex, , $containerIndex] = explode('.', $attribute);
+
+                return [
+                    Rule::prohibitedIf(empty($this->specimens[(int) $specimenIndex]['containers'][(int) $containerIndex]['additiveCode'] ?? '')),
+                    'nullable',
+                    'string'
+                ];
+            })
         ];
     }
 

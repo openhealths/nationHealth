@@ -41,6 +41,11 @@ class SpecimenPolicy
             return Response::denyWithStatus(404);
         }
 
+        // The scope alone is held by more roles than may create a specimen outside the encounter package
+        if (!$user->hasAllowedRole([Role::ASSISTANT, Role::LABORANT])) {
+            return Response::denyWithStatus(404);
+        }
+
         return Response::allow();
     }
 
@@ -86,8 +91,9 @@ class SpecimenPolicy
     }
 
     /**
-     * Determine whether the user can mark the specimen as entered in error. Allowed to its author and to a medical
-     * administrator of the legal entity that manages it.
+     * Determine whether the user can mark the specimen as entered in error on its own. Allowed to its author and to a
+     * medical administrator of the legal entity that manages it. A specimen recorded in an encounter package is marked
+     * as such together with the package instead.
      *
      * @param  User  $user
      * @param  array  $specimen
@@ -103,6 +109,7 @@ class SpecimenPolicy
 
         if (
             !in_array($specimen['status'], $cancellableStatuses, true)
+            || data_get($specimen, 'context.identifier.value') !== null
             || $user->cannot('specimen:cancel')
             || legalEntity()->status !== Status::ACTIVE->value
             || data_get($specimen, 'managingOrganization.identifier.value') !== legalEntity()->uuid

@@ -30,7 +30,7 @@ class SpecimenMapper implements FhirMapperContract
             'status' => $isReferenced ? Status::UNAVAILABLE->value : Status::AVAILABLE->value,
             'type' => FhirResource::make()
                 ->coding('specimen_types', $data['typeCode'])
-                ->toCodeableConcept(),
+                ->toCodeableConcept($data['typeText'] ?? ''),
             'managingOrganization' => FhirResource::make()
                 ->coding('eHealth/resources', 'legal_entity')
                 ->toIdentifier(legalEntity()->uuid),
@@ -64,7 +64,7 @@ class SpecimenMapper implements FhirMapperContract
         if (!empty($data['conditionCode'])) {
             $result['condition'] = FhirResource::make()
                 ->coding('specimen_conditions', $data['conditionCode'])
-                ->toCodeableConcept();
+                ->toCodeableConcept($data['conditionText'] ?? '');
         }
 
         // A parent select left unpicked keeps an empty value
@@ -106,7 +106,9 @@ class SpecimenMapper implements FhirMapperContract
         return [
             'uuid' => data_get($data, 'id', data_get($data, 'uuid')),
             'typeCode' => data_get($data, 'type.coding.0.code', ''),
+            'typeText' => data_get($data, 'type.text') ?? '',
             'conditionCode' => data_get($data, 'condition.coding.0.code', ''),
+            'conditionText' => data_get($data, 'condition.text') ?? '',
             'receivedDate' => $receivedTime ? convertToAppDateFormat($receivedTime) : '',
             'receivedTime' => $receivedTime ? CarbonImmutable::parse($receivedTime)->format('H:i') : '',
             'note' => data_get($data, 'note', ''),
@@ -140,11 +142,13 @@ class SpecimenMapper implements FhirMapperContract
                     'identifier' => data_get($container, 'identifier', ''),
                     'description' => data_get($container, 'description', ''),
                     'typeCode' => data_get($container, 'type.coding.0.code', ''),
+                    'typeText' => data_get($container, 'type.text') ?? '',
                     'capacityValue' => data_get($container, 'capacity.value', ''),
                     'capacityCode' => data_get($container, 'capacity.code', ''),
                     'specimenQuantityValue' => data_get($container, 'specimenQuantity.value', ''),
                     'specimenQuantityCode' => data_get($container, 'specimenQuantity.code', ''),
-                    'additiveCode' => data_get($container, 'additiveCodeableConcept.coding.0.code', '')
+                    'additiveCode' => data_get($container, 'additiveCodeableConcept.coding.0.code', ''),
+                    'additiveText' => data_get($container, 'additiveCodeableConcept.text') ?? ''
                 ])
                 ->values()
                 ->toArray()
@@ -297,7 +301,7 @@ class SpecimenMapper implements FhirMapperContract
         if (!empty($container['typeCode'])) {
             $result['type'] = FhirResource::make()
                 ->coding('specimen_container_types', $container['typeCode'])
-                ->toCodeableConcept();
+                ->toCodeableConcept($container['typeText'] ?? '');
         }
 
         if (!empty($container['capacityValue'])) {
@@ -314,7 +318,7 @@ class SpecimenMapper implements FhirMapperContract
         if (!empty($container['additiveCode'])) {
             $result['additiveCodeableConcept'] = FhirResource::make()
                 ->coding('specimen_container_additives', $container['additiveCode'])
-                ->toCodeableConcept();
+                ->toCodeableConcept($container['additiveText'] ?? '');
         }
 
         return $result;

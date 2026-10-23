@@ -1,5 +1,9 @@
 @php
     use App\Enums\Device\Status as DeviceStatus;
+    use App\Models\MedicalEvents\Sql\Device;
+    use Illuminate\Support\Facades\Auth;
+
+    $canCancelDeviceRecords = ($canCancelRecords ?? false) && Auth::user()->can('cancel', Device::class);
 @endphp
 
 <div
@@ -9,7 +13,7 @@
         devices: $wire.entangle('deviceForm.devices'),
         selectedRecords: $wire.entangle('selectedRecords.devices'),
         cancelledRecords: $wire.cancelledRecords.devices,
-        canCancelRecords: {{ ($canCancelRecords ?? false) ? 'true' : 'false' }},
+        canCancelRecords: {{ $canCancelDeviceRecords ? 'true' : 'false' }},
         deviceTypesDictionary: $wire.dictionaries['device_definition_classification_type'],
         deviceDefinitions: $wire.dictionaries['custom/device_definitions'],
         patientDevices: $wire.patientDevices,
@@ -73,7 +77,7 @@
         },
     }"
 >
-    @if (($canCancelRecords ?? false) && !empty($this->deviceForm->devices))
+    @if ($canCancelDeviceRecords && !empty($this->deviceForm->devices))
         <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
             {{ __('medical-events.messages.cancel_device_group_note') }}
         </p>

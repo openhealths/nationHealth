@@ -8,13 +8,15 @@
     activeTab="specimens"
 >
     <x-slot name="headerActions">
-        <a
-            href="{{ $prepersonId ? route('prepersons.specimens.create', [legalEntity(), 'preperson' => $prepersonId]) : route('persons.specimens.create', [legalEntity(), 'person' => $personId]) }}"
-            class="button-primary"
-            wire:navigate
-        >
-            {{ __('specimens.new_specimen') }}
-        </a>
+        @can('create', Specimen::class)
+            <a
+                href="{{ $prepersonId ? route('prepersons.specimens.create', [legalEntity(), 'preperson' => $prepersonId]) : route('persons.specimens.create', [legalEntity(), 'person' => $personId]) }}"
+                class="button-primary"
+                wire:navigate
+            >
+                {{ __('specimens.new_specimen') }}
+            </a>
+        @endcan
         <button type="button" class="button-primary-outline px-5 py-2 text-sm whitespace-nowrap">
             {{ __('patients.data_access') }}
         </button>
@@ -311,19 +313,34 @@
                                             </button>
                                         @endif
 
-                                        @can('cancel', [Specimen::class, $specimen])
-                                            <button
-                                                type="button"
-                                                @click="
-                                                    $dispatch('open-specimen-cancellation', { id: '{{ data_get($specimen, 'uuid') }}' });
-                                                    close($refs.button);
-                                                "
-                                                class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                                            >
-                                                @icon('alert-circle', 'w-5 h-5 text-gray-500')
-                                                {{ __('medical-events.mark_as_error') }}
-                                            </button>
-                                        @endcan
+                                        @if (data_get($specimen, 'context.identifier.value'))
+                                            {{-- Recorded in an encounter package, so it is marked as entered in error through the package --}}
+                                            @if (data_get($specimen, 'status') !== SpecimenStatus::ENTERED_IN_ERROR->value)
+                                                <button
+                                                    type="button"
+                                                    wire:click="openRecordCancellation('specimens', '{{ data_get($specimen, 'uuid') }}')"
+                                                    @click="close($refs.button)"
+                                                    class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                >
+                                                    @icon('alert-circle', 'w-5 h-5 text-gray-500')
+                                                    {{ __('medical-events.mark_as_error') }}
+                                                </button>
+                                            @endif
+                                        @else
+                                            @can('cancel', [Specimen::class, $specimen])
+                                                <button
+                                                    type="button"
+                                                    @click="
+                                                        $dispatch('open-specimen-cancellation', { id: '{{ data_get($specimen, 'uuid') }}' });
+                                                        close($refs.button);
+                                                    "
+                                                    class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                >
+                                                    @icon('alert-circle', 'w-5 h-5 text-gray-500')
+                                                    {{ __('medical-events.mark_as_error') }}
+                                                </button>
+                                            @endcan
+                                        @endif
                                     </div>
                                 </div>
                             </div>
@@ -418,4 +435,6 @@
     </div>
 
     <livewire:specimen.specimen-cancellation :patient-id="$uuid" />
+
+    @include('livewire.encounter-package.encounter-cancellation')
 </x-layouts.patient>

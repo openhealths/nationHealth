@@ -4,11 +4,13 @@
             this.identifier = '';
             this.description = '';
             this.typeCode = '';
+            this.typeText = '';
             this.capacityValue = '';
             this.capacityCode = '';
             this.specimenQuantityValue = '';
             this.specimenQuantityCode = '';
             this.additiveCode = '';
+            this.additiveText = '';
 
             if (obj) {
                 Object.assign(this, JSON.parse(JSON.stringify(obj)));
@@ -20,7 +22,9 @@
         constructor(obj = null) {
             this.uuid = crypto.randomUUID();
             this.typeCode = '';
+            this.typeText = '';
             this.conditionCode = '';
+            this.conditionText = '';
             this.receivedDate = '';
             this.receivedTime = '';
             this.note = '';

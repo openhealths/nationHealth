@@ -10,9 +10,6 @@ use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\Specimen\Forms\SpecimenActionForm;
 use App\Models\MedicalEvents\Sql\Specimen;
-use App\Models\Person\Person;
-use App\Models\Preperson;
-use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Fhir;
 use App\Traits\FormTrait;
 use Illuminate\Support\Facades\Auth;
@@ -20,7 +17,6 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
-use Throwable;
 
 class SpecimenIndex extends Component
 {
@@ -29,7 +25,8 @@ class SpecimenIndex extends Component
     public string $searchId = '';
 
     /**
-     * Specimen found by its accession identifier.
+     * Specimen found by its accession identifier. Its subject is used only to address the patient in the requests,
+     * so that nothing identifying the patient is shown.
      *
      * @var array
      */
@@ -40,7 +37,13 @@ class SpecimenIndex extends Component
         'specimen_types',
         'specimen_container_types',
         'specimen_invalidate_reasons',
-        'specimen_reject_reasons'
+        'specimen_reject_reasons',
+        'specimen_conditions',
+        'specimen_collection_methods',
+        'specimen_container_additives',
+        'fasting_statuses',
+        'eHealth/body_sites',
+        'GENDER'
     ];
 
     public bool $showProcessModal = false;
@@ -76,77 +79,6 @@ class SpecimenIndex extends Component
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while searching specimen by accession identifier');
         }
-    }
-
-    /**
-     * Open the page of the found specimen under its patient, storing the specimen first when it is not in the database yet.
-     * The page lives under the patient, so a specimen of a patient unknown to the system cannot be opened.
-     *
-     * @return void
-     */
-    public function view(): void
-    {
-        $patientId = data_get($this->specimen, 'subject.identifier.value');
-        $specimenId = data_get($this->specimen, 'uuid');
-
-        $patient = Person::whereUuid($patientId)->first() ?? Preperson::whereUuid($patientId)->first();
-
-        if ($patient === null) {
-            Session::flash('error', __('specimens.messages.patient_not_found'));
-
-            return;
-        }
-
-        $specimen = Specimen::forPatient($patient)->whereUuid($specimenId)->first()
-            ?? $this->storeFoundSpecimen($patient, $specimenId);
-
-        if ($specimen === null) {
-            return;
-        }
-
-        if ($patient instanceof Preperson) {
-            $this->redirectRoute(
-                'prepersons.specimens.view',
-                [legalEntity(), 'preperson' => $patient->id, 'specimen' => $specimen->id],
-                navigate: true
-            );
-
-            return;
-        }
-
-        $this->redirectRoute(
-            'persons.specimens.view',
-            [legalEntity(), 'person' => $patient->id, 'specimen' => $specimen->id],
-            navigate: true
-        );
-    }
-
-    /**
-     * Store the found specimen under its patient, so that it has a page to open.
-     *
-     * @param  Person|Preperson  $patient
-     * @param  string  $specimenId
-     * @return Specimen|null
-     */
-    protected function storeFoundSpecimen(Person|Preperson $patient, string $specimenId): ?Specimen
-    {
-        try {
-            $response = EHealth::specimen()->getDetails($patient->uuid, $specimenId);
-        } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle('Error while loading the specimen');
-
-            return null;
-        }
-
-        try {
-            Repository::specimen()->sync($patient, [$response->validate()]);
-        } catch (Throwable $exception) {
-            $this->handleDatabaseErrors($exception, 'Error while storing the specimen');
-
-            return null;
-        }
-
-        return Specimen::forPatient($patient)->whereUuid($specimenId)->first();
     }
 
     /**

@@ -79,6 +79,9 @@ return [
     'container_position' => 'контейнер №:position',
     'collection_date_range' => 'Дата забору від - до',
     'container_id' => 'ID контейнера',
+    'status_reason' => 'Причина зміни статусу',
+    'patient_age' => 'Кількість повних років пацієнта',
+    'hide_details' => 'Сховати деталі',
 
     'statuses' => [
         'available' => 'Доступний',
@@ -92,7 +95,6 @@ return [
 
     'messages' => [
         'record_synced_successfully' => 'Зразок біоматеріалу успішно синхронізований',
-        'patient_not_found' => 'Пацієнта, якому належить зразок, немає в системі, тому сторінку зразка відкрити неможливо.',
         'synced_successfully' => 'Зразки біоматеріалу успішно синхронізовані',
         'first_page_synced_successfully' => 'Перша сторінка зразків біоматеріалу синхронізована, решта обробляється у фоні',
         'sync_already_running' => 'Синхронізація зразків біоматеріалу вже запущена. Будь ласка, зачекайте її завершення.',
@@ -137,7 +139,9 @@ return [
     'attributes' => [
         'registeredById' => 'Працівник, що створив запис',
         'typeCode' => 'Тип зразка',
+        'typeText' => 'Уточнення до типу зразка',
         'conditionCode' => 'Стан зразка',
+        'conditionText' => 'Уточнення до стану зразка',
         'receivedDate' => 'Дата/час отримання для дослідження',
         'receivedTime' => 'Дата/час отримання для дослідження',
         'note' => 'Нотатка',
@@ -162,10 +166,12 @@ return [
         'containers.*.identifier' => 'Ідентифікатор',
         'containers.*.description' => 'Опис контейнера',
         'containers.*.typeCode' => 'Тип контейнера',
+        'containers.*.typeText' => 'Уточнення до типу контейнера',
         'containers.*.capacityValue' => "Об'єм контейнера",
         'containers.*.capacityCode' => "Об'єм контейнера (Одиниця виміру)",
         'containers.*.specimenQuantityValue' => 'Кількість біоматеріалу в контейнері',
         'containers.*.specimenQuantityCode' => 'Кількість біоматеріалу в контейнері (Одиниця виміру)',
-        'containers.*.additiveCode' => 'Добавка / домішка'
+        'containers.*.additiveCode' => 'Добавка / домішка',
+        'containers.*.additiveText' => 'Уточнення до домішки'
     ]
 ];

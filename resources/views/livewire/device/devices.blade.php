@@ -1,5 +1,6 @@
 @php
     use App\Enums\Device\Status;
+    use App\Models\MedicalEvents\Sql\Device;
     use App\Models\MedicalEvents\Sql\DeviceProperty;
 @endphp
 
@@ -367,17 +368,19 @@
                                             </button>
                                         @endif
 
-                                        @if (data_get($device, 'status') !== Status::ENTERED_IN_ERROR->value)
-                                            <button
-                                                type="button"
-                                                wire:click="openRecordCancellation('devices', '{{ data_get($device, 'uuid') }}')"
-                                                @click="close($refs.button)"
-                                                class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                                            >
-                                                @icon('alert-circle', 'w-5 h-5 text-gray-500')
-                                                {{ __('medical-events.mark_as_error') }}
-                                            </button>
-                                        @endif
+                                        @can('cancel', Device::class)
+                                            @if (data_get($device, 'status') !== Status::ENTERED_IN_ERROR->value)
+                                                <button
+                                                    type="button"
+                                                    wire:click="openRecordCancellation('devices', '{{ data_get($device, 'uuid') }}')"
+                                                    @click="close($refs.button)"
+                                                    class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                >
+                                                    @icon('alert-circle', 'w-5 h-5 text-gray-500')
+                                                    {{ __('medical-events.mark_as_error') }}
+                                                </button>
+                                            @endif
+                                        @endcan
                                     </div>
                                 </div>
                             </div>

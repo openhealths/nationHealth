@@ -13,11 +13,30 @@ use Illuminate\Auth\Access\Response;
 class EquipmentPolicy
 {
     /**
+     * Roles that may view equipment.
+     *
+     * @var array
+     */
+    private const array VIEWING_ROLES = [
+        Role::OWNER,
+        Role::ADMIN,
+        Role::DOCTOR,
+        Role::SPECIALIST,
+        Role::ASSISTANT,
+        Role::LABORANT
+    ];
+
+    /**
      * User allowed to view the list of equipment
      */
     public function viewAny(User $user): Response
     {
         if ($user->cannot('equipment:read')) {
+            return Response::denyWithStatus(404);
+        }
+
+        // The scope alone is held by more roles than may view equipment
+        if (!$user->hasAllowedRole(self::VIEWING_ROLES)) {
             return Response::denyWithStatus(404);
         }
 
@@ -38,6 +57,11 @@ class EquipmentPolicy
             return Response::denyWithStatus(404);
         }
 
+        // The scope alone is held by more roles than may view equipment
+        if (!$user->hasAllowedRole(self::VIEWING_ROLES)) {
+            return Response::denyWithStatus(404);
+        }
+
         return Response::allow();
     }
 
@@ -47,6 +71,11 @@ class EquipmentPolicy
     public function sync(User $user): Response
     {
         if ($user->cannot('equipment:write') && $user->cannot('equipment:read')) {
+            return Response::denyWithStatus(404);
+        }
+
+        // The scopes alone are held by more roles than may view equipment
+        if (!$user->hasAllowedRole(self::VIEWING_ROLES)) {
             return Response::denyWithStatus(404);
         }
 
