@@ -99,6 +99,10 @@ class LegalEntity extends Model
         'sync_status',
     ];
 
+    protected $hidden = [
+        'client_secret'
+    ];
+
     protected $casts = [
         'accreditation' => LegalEntityAccreditationCast::class,
         'archive' => LegalEntityArchiveCast::class,

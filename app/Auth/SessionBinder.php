@@ -53,7 +53,7 @@ class SessionBinder
     /**
      * Number of seconds to wait for eHealth to acknowledge a token revocation.
      */
-    private const int REVOCATION_TIMEOUT = 5;
+    private const int REVOCATION_TIMEOUT = 15;
 
     /**
      * Bind the current session to the user and terminate every session opened earlier.

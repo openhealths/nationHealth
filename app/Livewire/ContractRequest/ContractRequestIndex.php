@@ -79,14 +79,14 @@ class ContractRequestIndex extends Component
         $currentLegalEntity = legalEntity();
 
         if ($currentLegalEntity->getEntityStatus(LegalEntity::ENTITY_CONTRACT_REQUEST) === JobStatus::PROCESSING) {
-            Session::flash('error', 'Synchronization is already in progress.');
+            Session::flash('error', __('forms.errors.sync_already_running'));
 
             return;
         }
 
         $user = Auth::user();
 
-        $this->dispatch('flashMessage', ['message' => 'Starting synchronization...', 'type' => 'success']);
+        $this->dispatch('flashMessage', ['message' => __('forms.success.sync_started'), 'type' => 'success']);
 
         $token = session()?->get(config('ehealth.api.oauth.bearer_token'));
         $encryptedToken = Crypt::encryptString($token);

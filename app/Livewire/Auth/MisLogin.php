@@ -54,21 +54,24 @@ class MisLogin extends Component
     private const int CODE_TTL_MINUTES = 10;
 
     /**
+     * Session key holding the user who entered the correct password and still has to confirm the one-time code.
+     */
+    private const string PENDING_USER_KEY = 'mis_2fa_pending_user_id';
+
+    /**
      * Validate the submitted credentials and email a one-time code to the user.
      *
      * @return RedirectResponse|Redirector|null
      */
     public function login(): RedirectResponse|Redirector|null
     {
-        $key = $this->throttleKey();
-
         $this->validate([
             'email' => 'required|email',
             'password' => $this->isFirstLogin ? 'nullable' : 'required|string'
         ]);
 
         if (!$this->ensureIsNotRateLimited()) {
-            $seconds = RateLimiter::availableIn($key);
+            $seconds = RateLimiter::availableIn($this->lockoutKey());
 
             return Redirect::route('mis.login')->with('error', __('auth.throttle', [
                 'minutes' => ceil($seconds / 60),
@@ -85,11 +88,11 @@ class MisLogin extends Component
         }
 
         if (!$user) {
-            return $this->handleMissingUser($key);
+            return $this->handleMissingUser();
         }
 
         if (!Hash::check($this->password, $user->password)) {
-            RateLimiter::hit($key, config('ehealth.auth.delay_seconds'));
+            $this->registerFailedAttempt();
 
             $this->addError('email', __('auth.login.error.validation.credentials'));
 
@@ -108,6 +111,8 @@ class MisLogin extends Component
             return null;
         }
 
+        Session::put(self::PENDING_USER_KEY, $user->id);
+
         $this->showCodeForm = true;
         $this->reset('password');
 
@@ -117,17 +122,16 @@ class MisLogin extends Component
     /**
      * Handle a login attempt for an email that has no user yet.
      *
-     * @param  string  $key  The rate limiting throttle key.
      * @return RedirectResponse|Redirector|null
      */
-    protected function handleMissingUser(string $key): RedirectResponse|Redirector|null
+    protected function handleMissingUser(): RedirectResponse|Redirector|null
     {
         $employeeRequest = EmployeeRequest::whereEmail($this->email)
             ->whereStatus(RequestStatus::APPROVED)
             ->first();
 
         if (!$employeeRequest) {
-            RateLimiter::hit($key, config('ehealth.auth.delay_seconds'));
+            $this->registerFailedAttempt();
 
             $this->addError('email', __('auth.login.error.validation.credentials'));
 
@@ -187,12 +191,16 @@ class MisLogin extends Component
      */
     public function verify(): RedirectResponse|Redirector|null
     {
-        $key = $this->throttleKey();
-
         $this->validate(['code' => 'required|string']);
 
+        $user = $this->resolvePendingUser();
+
+        if (!$user) {
+            return null;
+        }
+
         if (!$this->ensureIsNotRateLimited()) {
-            $seconds = RateLimiter::availableIn($key);
+            $seconds = RateLimiter::availableIn($this->lockoutKey());
 
             return Redirect::route('mis.login')->with('error', __('auth.throttle', [
                 'minutes' => ceil($seconds / 60),
@@ -200,15 +208,12 @@ class MisLogin extends Component
             ]));
         }
 
-        $user = User::where('email', $this->email)->first();
-
-        $isCodeValid = $user
-            && $user->twoFactorCode
+        $isCodeValid = $user->twoFactorCode
             && $user->twoFactorCodeExpiresAt?->isFuture()
             && Hash::check($this->code, $user->twoFactorCode);
 
         if (!$isCodeValid) {
-            RateLimiter::hit($key, config('ehealth.auth.delay_seconds'));
+            $this->registerFailedAttempt();
 
             $this->addError('code', __('auth.login.two_factor.invalid_code'));
 
@@ -222,6 +227,7 @@ class MisLogin extends Component
 
         RateLimiter::clear($this->throttleKey());
 
+        Session::forget(self::PENDING_USER_KEY);
         Session::put('mis_2fa', [
             'user_id' => $user->id,
             'email' => $user->email,
@@ -238,16 +244,16 @@ class MisLogin extends Component
      */
     public function resendCode(): void
     {
-        if (!$this->ensureIsNotRateLimited()) {
+        $user = $this->resolvePendingUser();
+
+        if (!$user || !$this->ensureIsNotRateLimited()) {
             return;
         }
 
         $resendKey = 'resend_code:' . $this->throttleKey();
 
-        $executed = RateLimiter::attempt($resendKey, 1, function (): void {
-            $user = User::where('email', $this->email)->first();
-
-            if ($user && $this->sendCode($user)) {
+        $executed = RateLimiter::attempt($resendKey, 1, function () use ($user): void {
+            if ($this->sendCode($user)) {
                 Session::flash('success', __('auth.login.two_factor.sent'));
             }
         });
@@ -257,6 +263,29 @@ class MisLogin extends Component
                 'seconds' => RateLimiter::availableIn($resendKey)
             ]));
         }
+    }
+
+    /**
+     * Get the user who passed the password step in this session, whatever email the form currently holds.
+     *
+     * Without one the code form is closed, so the code can only ever be checked against the user whose password was verified.
+     *
+     * @return User|null
+     */
+    protected function resolvePendingUser(): ?User
+    {
+        $user = User::find(Session::get(self::PENDING_USER_KEY));
+
+        if ($user) {
+            $this->email = $user->email;
+
+            return $user;
+        }
+
+        $this->reset('code', 'showCodeForm');
+        Session::flash('error', __('auth.login.error.legal_entity.invalid_session'));
+
+        return null;
     }
 
     /**
@@ -287,13 +316,32 @@ class MisLogin extends Component
     }
 
     /**
-     * Ensure the authentication request is not rate limited.
+     * Count a failed sign-in attempt and lock the account out once the allowed number is reached within the window.
+     *
+     * @return void
+     */
+    protected function registerFailedAttempt(): void
+    {
+        $key = $this->throttleKey();
+
+        RateLimiter::hit($key, config('ehealth.auth.delay_seconds'));
+
+        if (!RateLimiter::tooManyAttempts($key, config('ehealth.auth.max_login_attempts'))) {
+            return;
+        }
+
+        RateLimiter::clear($key);
+        RateLimiter::hit($this->lockoutKey(), config('ehealth.auth.lockout_seconds'));
+    }
+
+    /**
+     * Ensure the account is not locked out after too many failed attempts.
      *
      * @return bool
      */
     protected function ensureIsNotRateLimited(): bool
     {
-        if (!RateLimiter::tooManyAttempts($this->throttleKey(), config('ehealth.auth.max_login_attempts'))) {
+        if (!RateLimiter::tooManyAttempts($this->lockoutKey(), 1)) {
             return true;
         }
 
@@ -308,13 +356,23 @@ class MisLogin extends Component
     }
 
     /**
-     * Get the authentication rate limiting throttle key.
+     * Get the key failed sign-in attempts of the account are counted under.
      *
      * @return string
      */
     protected function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->email) . '|' . request()->ip());
+        return Str::transliterate(Str::lower($this->email));
+    }
+
+    /**
+     * Get the key the account lockout is kept under.
+     *
+     * @return string
+     */
+    protected function lockoutKey(): string
+    {
+        return 'lockout:' . $this->throttleKey();
     }
 
     /**

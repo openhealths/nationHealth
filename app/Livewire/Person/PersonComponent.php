@@ -96,6 +96,7 @@ class PersonComponent extends Component
      *
      * @var array
      */
+    #[Locked]
     public array $uploadedDocuments = [];
 
     /**

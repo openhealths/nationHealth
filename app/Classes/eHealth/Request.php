@@ -75,27 +75,10 @@ class Request
             }
         }
 
-        //TODO DELETE AFTER TESTING
-        if (config('ehealth.api.api_key') === null && empty(config('ehealth.api.api_key'))) {
-            $data = [
-                'method' => $this->method,
-                'url' => $this->makeApiUrl(),
-                'params' => $this->params,
-                'token' => $this->tokenStorage->getBearerToken(),
-                'isToken' => $this->isToken
-            ];
-
-            $uri = config('ehealth.api.connection_redirect_uri');
-
-            $response = Http::acceptJson()
-                ->timeout(EHealthRequest::TIMEOUT)
-                ->post("{$uri}/api/v1/send-request", $data);
-        } else {
-            $response = Http::acceptJson()
-                ->timeout(EHealthRequest::TIMEOUT)
-                ->withHeaders($this->getHeaders())
-                ->{$this->method}($this->makeApiUrl(), $this->params);
-        }
+        $response = Http::acceptJson()
+            ->timeout(EHealthRequest::TIMEOUT)
+            ->withHeaders($this->getHeaders())
+            ->{$this->method}($this->makeApiUrl(), $this->params);
 
         if ($response->successful()) {
             $data = json_decode($response->body(), true);

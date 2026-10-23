@@ -126,6 +126,7 @@ class PatientData extends BasePatientComponent
 
     public bool $showAdditionalParams = false;
 
+    #[Locked]
     public array $uploadedDocuments = [];
 
     public array $uploadedFiles = [];

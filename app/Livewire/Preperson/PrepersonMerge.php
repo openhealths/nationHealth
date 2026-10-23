@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Throwable;
@@ -102,6 +103,7 @@ class PrepersonMerge extends Component
      *
      * @var array
      */
+    #[Locked]
     public array $uploadedDocuments = [];
 
     /**

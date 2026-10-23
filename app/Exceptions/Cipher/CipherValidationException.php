@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Session;
 
 class CipherValidationException extends CipherException
 {
-    public function __construct(string $message, public readonly Response $response)
+    public function __construct(string $message, public readonly ?Response $response = null)
     {
         parent::__construct($message);
     }
@@ -26,7 +26,7 @@ class CipherValidationException extends CipherException
     {
         Log::channel('cipher_errors')->error($logMessage, [
             'message' => $this->getMessage(),
-            'response' => $this->response->json(),
+            'response' => $this->response?->json(),
             'file' => $this->getFile(),
             'line' => $this->getLine()
         ]);
@@ -41,6 +41,6 @@ class CipherValidationException extends CipherException
      */
     public function getContext(): ?array
     {
-        return $this->response->json();
+        return $this->response?->json();
     }
 }

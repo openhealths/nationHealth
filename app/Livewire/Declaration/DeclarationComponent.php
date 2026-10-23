@@ -98,6 +98,7 @@ abstract class DeclarationComponent extends Component
      *
      * @var array
      */
+    #[Locked]
     public array $uploadedDocuments = [];
 
     /**

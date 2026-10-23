@@ -43,8 +43,9 @@ return [
     ],
 
     'auth' => [
-        'delay_seconds' => 900,     // Amount of the seconds to another login attempt
-        'max_login_attempts' => 5   // Amount of the wrong attempt before locking out
+        'delay_seconds' => 900,     // Window in seconds within which failed login attempts are counted
+        'max_login_attempts' => 5,  // Amount of the wrong attempt before locking out
+        'lockout_seconds' => 300    // Amount of the seconds the account stays locked out
     ],
 
     'legal_entity_localized_names' => [

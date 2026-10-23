@@ -25,7 +25,7 @@ class EnsureMisTwoFactorPassed
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!$this->isGateValid($request->session()->get('mis_2fa'))) {
+        if (!self::isGateValid($request->session()->get('mis_2fa'))) {
             $request->session()->forget('mis_2fa');
             $request->session()->reflash();
 
@@ -41,7 +41,7 @@ class EnsureMisTwoFactorPassed
      * @param  array{user_id: int, verified_at: string}|null  $gate
      * @return bool
      */
-    private function isGateValid(?array $gate): bool
+    public static function isGateValid(?array $gate): bool
     {
         if (empty($gate['verified_at'])) {
             return false;

@@ -16,7 +16,6 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Storage;
 use JsonException;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
@@ -59,6 +58,8 @@ class CipherRequest extends PendingRequest
         string $taxId,
         ?string $edrpou = null
     ): CipherResponse|PromiseInterface {
+        $base64File = $this->convertFileToBase64($uploadedFile);
+
         $ticketUuid = $this->createSession()->getTicketUuid();
 
         try {
@@ -74,7 +75,6 @@ class CipherRequest extends PendingRequest
         $this->loadSessionData($ticketUuid, base64_encode($encodedSignature));
         $this->setSessionParameters($ticketUuid, $knedp);
 
-        $base64File = $this->convertFileToBase64($uploadedFile);
         $this->uploadKeyFile($ticketUuid, $base64File);
 
         $this->verifyWithFileContainer($ticketUuid, $password, $taxId, $edrpou);
@@ -95,13 +95,15 @@ class CipherRequest extends PendingRequest
      * @param  TemporaryUploadedFile  $uploadedFile
      * @param  string  $password
      * @return CipherResponse|PromiseInterface|null
-     * @throws CipherConnectionException|CipherResponseException|CipherEncodingException
+     * @throws CipherConnectionException|CipherResponseException|CipherValidationException|CipherEncodingException
      */
     public function getPersonalData(
         string $knedp,
         TemporaryUploadedFile $uploadedFile,
         string $password
     ): null|CipherResponse|PromiseInterface {
+        $base64File = $this->convertFileToBase64($uploadedFile);
+
         $ticketUuid = $this->createSession()->getTicketUuid();
 
         try {
@@ -117,7 +119,6 @@ class CipherRequest extends PendingRequest
         $this->loadSessionData($ticketUuid, base64_encode($encodedEmpty));
         $this->setSessionParameters($ticketUuid, $knedp);
 
-        $base64File = $this->convertFileToBase64($uploadedFile);
         $this->uploadKeyFile($ticketUuid, $base64File);
 
         return $this->verifyKeyContainer($ticketUuid, $password);
@@ -315,22 +316,21 @@ class CipherRequest extends PendingRequest
         return $this->get('/certificateAuthority/supported');
     }
 
-    protected function convertFileToBase64(TemporaryUploadedFile $keyContainerUpload): ?string
+    /**
+     * Read the key container straight from the temporary upload, so the private key is never copied to a web-accessible disk.
+     *
+     * @param  TemporaryUploadedFile  $keyContainerUpload
+     * @return string
+     * @throws CipherValidationException When the temporary upload is gone, e.g. cleaned up after a day
+     */
+    protected function convertFileToBase64(TemporaryUploadedFile $keyContainerUpload): string
     {
-        $fileExtension = $keyContainerUpload->getClientOriginalExtension();
-        $filePath = $keyContainerUpload->storeAs('uploads/kep', 'kep.' . $fileExtension, 'public');
+        $keyContainer = $keyContainerUpload->get();
 
-        if ($filePath) {
-            $fileContents = file_get_contents(storage_path('app/public/' . $filePath));
-
-            if ($fileContents !== false) {
-                $base64Content = base64_encode($fileContents);
-                Storage::disk('public')->delete($filePath);
-
-                return $base64Content;
-            }
+        if ($keyContainer === null || $keyContainer === '') {
+            throw new CipherValidationException(__('validation.custom.cipher.kep_file_missing'));
         }
 
-        return null;
+        return base64_encode($keyContainer);
     }
 }
