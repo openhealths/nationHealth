@@ -8,9 +8,30 @@ use Illuminate\Bus\Batch;
 use Illuminate\Support\Str;
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Bus\DatabaseBatchRepository;
+use Illuminate\Support\Collection;
+use stdClass;
 
 class EHealthDatabaseBatchRepository extends DatabaseBatchRepository
 {
+    public function findForUpdate(string $batchId): ?stdClass
+    {
+        return $this->connection->table($this->table)->where('id', $batchId)->lockForUpdate()->first();
+    }
+
+    public function getFailedJobs(stdClass $batch): Collection
+    {
+        return $this->connection->table(config('queue.failed.table', 'failed_jobs'))
+            ->whereIn('uuid', json_decode($batch->failed_job_ids, true) ?? [])
+            ->get();
+    }
+
+    public function deleteFailedJobs(stdClass $batch): void
+    {
+        $this->connection->table(config('queue.failed.table', 'failed_jobs'))
+            ->whereIn('uuid', json_decode($batch->failed_job_ids, true) ?? [])
+            ->delete();
+    }
+
     public function store(PendingBatch $batch): Batch
     {
         $id = (string) Str::orderedUuid();
