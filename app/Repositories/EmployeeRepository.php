@@ -19,6 +19,96 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 
 readonly class EmployeeRepository
 {
+    public function requestMatchesEmployee(EmployeeRequest $request, Employee $employee): bool
+    {
+        if ((int) $request->legalEntityId !== (int) $employee->legalEntityId
+            || ($request->employeeId !== null && (int) $request->employeeId !== (int) $employee->id)
+            || ($request->partyId !== null && (int) $request->partyId !== (int) $employee->partyId)
+            || (filled($request->employeeType) && $request->employeeType !== $employee->employeeType)
+            || (filled($request->position) && $request->position !== $employee->position)) {
+            return false;
+        }
+
+        $employeeUuid = data_get($request->revision?->data, 'employee_uuid');
+        $revisionEmployeeType = data_get($request->revision?->data, 'employee_request_data.employee_type');
+        $revisionPosition = data_get($request->revision?->data, 'employee_request_data.position');
+        if ((filled($employeeUuid) && $employeeUuid !== $employee->uuid)
+            || (filled($revisionEmployeeType) && $revisionEmployeeType !== $employee->employeeType)
+            || (filled($revisionPosition) && $revisionPosition !== $employee->position)) {
+            return false;
+        }
+
+        if ($request->employeeId !== null || $request->partyId !== null) {
+            return true;
+        }
+
+        $party = $employee->party;
+        $partyUuid = data_get($request->revision?->data, 'party.uuid');
+        $taxId = data_get($request->revision?->data, 'party.tax_id');
+
+        return $party && ((filled($partyUuid) && $partyUuid === $party->uuid)
+            || (filled($taxId) && $taxId === $party->taxId));
+    }
+
+    public function employeeForRequest(EmployeeRequest $request): ?Employee
+    {
+        $employee = $request->employee;
+
+        return $employee && $this->requestMatchesEmployee($request, $employee) ? $employee : null;
+    }
+
+    public function latestDraftForEmployee(Employee $employee): ?EmployeeRequest
+    {
+        return EmployeeRequest::whereEmployeeId($employee->id)
+            ->whereLegalEntityId($employee->legalEntityId)
+            ->whereNull('uuid')
+            ->whereNull('applied_at')
+            ->with('revision')
+            ->latest()
+            ->latest('id')
+            ->get()
+            ->first(fn (EmployeeRequest $request): bool => $this->requestMatchesEmployee($request, $employee));
+    }
+
+    public function requestForEmployeeDetails(Employee $employee, ?string $divisionUuid, ?string $startDate): ?EmployeeRequest
+    {
+        $requests = EmployeeRequest::whereLegalEntityId($employee->legalEntityId)
+            ->whereEmployeeType($employee->employeeType)
+            ->wherePosition($employee->position)
+            ->whereNotNull('uuid')
+            ->where(fn (Builder $query) => $query->whereEmployeeId($employee->id)->orWhereNull('employee_id'))
+            ->where(fn (Builder $query) => $query->wherePartyId($employee->partyId)->orWhereNull('party_id'))
+            ->where('division_uuid', $divisionUuid)
+            ->where('start_date', $startDate)
+            ->with('revision')
+            ->latest('applied_at')
+            ->latest('id')
+            ->get()
+            ->filter(fn (EmployeeRequest $request): bool => $this->requestMatchesEmployee($request, $employee));
+
+        $linked = $requests->first(fn (EmployeeRequest $request): bool => (int) $request->employeeId === (int) $employee->id);
+
+        return $linked ?? ($requests->count() === 1 ? $requests->first() : null);
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function originalSpecialities(Employee|EmployeeRequest|null $source, ?int $legalEntityId, string $employeeType): array
+    {
+        $employee = $source instanceof EmployeeRequest ? $this->employeeForRequest($source) : $source;
+
+        if (!$employee
+            || !$employee->exists
+            || (int) $employee->legalEntityId !== $legalEntityId
+            || $employee->employeeType !== $employeeType
+            || $employee->status !== \App\Enums\Status::APPROVED) {
+            return [];
+        }
+
+        $employee->loadMissing('specialities');
+
+        return Arr::toCamelCase($employee->specialities->toArray());
+    }
+
     public function activeForLegalEntity(User $user, LegalEntity $legalEntity, array $employeeTypes): ?Employee
     {
         return $user->employees()->whereLegalEntityId($legalEntity->id)->active()->whereIn('employee_type', $employeeTypes)->first();

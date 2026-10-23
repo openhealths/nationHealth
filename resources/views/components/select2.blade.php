@@ -1,6 +1,6 @@
-@props(['modelPath', 'dictionaryName'])
+@props(['modelPath', 'dictionaryName', 'options' => null, 'optionsWatch' => null])
 
-<div x-data="selectComponent('{{ $dictionaryName }}', '{{ $modelPath }}')"
+<div x-data="selectComponent('{{ $dictionaryName }}', '{{ $modelPath }}', {{ $options ? '() => ('.$options.')' : 'null' }}, @js($optionsWatch))"
      x-modelable="selected"
      x-model="{{ $modelPath }}"
      @click.away="hideOptions"
@@ -56,7 +56,7 @@
 </div>
 
 <script>
-    function selectComponent(dictionaryKey, modelPath) {
+    function selectComponent(dictionaryKey, modelPath, optionsSource = null, optionsWatch = null) {
         return {
             search: '',
             selected: '',
@@ -108,7 +108,19 @@
                 try {
                     const rawData = this.$wire.dictionaries?.[dictionaryKey] ?? {};
 
-                    if (dictionaryKey === 'eHealth/LOINC/observation_codes') {
+                    if (optionsSource) {
+                        this.setExplicitOptions(optionsSource());
+
+                        if (optionsWatch) {
+                            this.$wire.$watch(optionsWatch, (newValue, oldValue) => {
+                                this.setExplicitOptions(optionsSource());
+                                if (oldValue !== undefined && newValue !== oldValue && !this.optionsMap.has(this.selected)) {
+                                    this.selected = '';
+                                    this.search = '';
+                                }
+                            });
+                        }
+                    } else if (dictionaryKey === 'eHealth/LOINC/observation_codes') {
                         const allowedCodes = this.$wire.observationLoincCodeMap?.laboratory;
                         if (allowedCodes !== undefined) {
                             const allowedSet = new Set(allowedCodes);
@@ -132,38 +144,6 @@
                         this.updateIcfOptions(rawData);
                         this.$watch('modalObservation.categoryCode', () => {
                             this.updateIcfOptions(rawData);
-                        });
-                    } else if (dictionaryKey === 'SPECIALITY_TYPE') {
-                        const readEmployeeType = () => this.$wire.form?.employeeType ?? null;
-
-                        const setSpecialityOptions = () => {
-                            const empType = readEmployeeType();
-                            const specDict = (empType && this.$wire.employeeTypeSpecialities?.[empType]) 
-                                ? this.$wire.employeeTypeSpecialities[empType] 
-                                : {};
-
-                            this.options = Object.entries(specDict).map(([value, label]) => this.makeOption(value, label));
-                            this.buildOptionsMap();
-
-                            const selectedOption = this.optionsMap.get(this.selected);
-                            if (selectedOption) {
-                                this.search = this.getDisplayText(selectedOption);
-                            } else if (this.selected) {
-                                this.selected = '';
-                                this.search = '';
-                            }
-
-                            this.filterOptions();
-                        };
-
-                        setSpecialityOptions();
-
-                        this.$wire.$watch('form.employeeType', (newType, oldType) => {
-                            setSpecialityOptions();
-                            if (oldType !== undefined && newType !== oldType && !this.optionsMap.has(this.selected)) {
-                                this.selected = '';
-                                this.search = '';
-                            }
                         });
                     } else if (dictionaryKey === 'custom/services') {
                         const rootPath = modelPath.split('.')[0];
@@ -227,10 +207,7 @@
 
                     // Restore display text if selected was set before optionsMap was built
                     if (this.selected && !this.search) {
-                        const opt = this.optionsMap.get(this.selected);
-                        if (opt) {
-                            this.search = this.getDisplayText(opt);
-                        }
+                        this.showSelectedValue();
                     }
 
                     this.initialized = true;
@@ -248,6 +225,21 @@
                     label,
                     searchText: `${label} ${value}`.toLowerCase()
                 };
+            },
+
+            setExplicitOptions(rawData) {
+                this.options = Object.entries(rawData ?? {}).map(([value, label]) => this.makeOption(value, label));
+                this.buildOptionsMap();
+                this.showSelectedValue();
+                this.filterOptions();
+            },
+
+            showSelectedValue() {
+                if (!this.selected) return;
+
+                const option = this.optionsMap.get(this.selected);
+                const label = this.$wire.dictionaries?.[dictionaryKey]?.[this.selected] ?? this.selected;
+                this.search = this.getDisplayText(option ?? this.makeOption(this.selected, label));
             },
 
             buildOptionsMap() {
@@ -371,11 +363,7 @@
                         return;
                     }
 
-                    const opt = this.optionsMap.get(value);
-
-                    if (opt) {
-                        this.search = this.getDisplayText(opt);
-                    }
+                    this.showSelectedValue();
                 });
             }
         }

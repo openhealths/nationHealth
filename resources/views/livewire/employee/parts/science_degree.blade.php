@@ -4,8 +4,6 @@
               {{-- Avoid $wire.entangle on objects: Livewire JSON-clones via stringify and can RPC missing toJSON. --}}
               x-data="{
                   scienceDegree: {},
-                  employeeType: $wire.entangle('form.employeeType'),
-                  employeeTypeSpecialities: @js($this->employeeTypeSpecialities),
                   openModal: false,
                   modalScienceDegree: new ScienceDegree(),
                   isNew: false,
@@ -16,7 +14,6 @@
                       return this.modalScienceDegree.degree
                           && this.modalScienceDegree.country
                           && this.modalScienceDegree.city
-                          && this.modalScienceDegree.issuedDate
                           && this.modalScienceDegree.institutionName
                           && this.modalScienceDegree.speciality
                           && this.modalScienceDegree.diplomaNumber;
@@ -58,12 +55,12 @@
             <tbody>
             <template x-if="scienceDegree && scienceDegree.degree">
                 <tr>
-                    <td class="td-input" x-text="degreeDict[scienceDegree.degree]"></td>
+                    <td class="td-input" x-text="degreeDict[scienceDegree.degree] ?? scienceDegree.degree"></td>
                     <td class="td-input" x-text="countryDict[scienceDegree.country]"></td>
                     <td class="td-input" x-text="scienceDegree.city"></td>
                     <td class="td-input" x-text="scienceDegree.issuedDate"></td>
                     <td class="td-input" x-text="scienceDegree.institutionName"></td>
-                    <td class="td-input" x-text="specDict[scienceDegree.speciality]"></td>
+                    <td class="td-input" x-text="specDict[scienceDegree.speciality] ?? scienceDegree.speciality"></td>
                     <td class="td-input" x-text="scienceDegree.diplomaNumber"></td>
                     <td class="td-input">
                         <div
@@ -176,7 +173,7 @@
                                     <select x-model="modalScienceDegree.degree" id="scienceDegreeDegree"
                                             class="input-modal" required>
                                         <option value="">{{__('forms.select_level')}}</option>
-                                        @foreach($this->dictionaries['SCIENCE_DEGREE'] as $degreeValue => $degreeDescription)
+                                        @foreach($this->scienceDegreeOptions as $degreeValue => $degreeDescription)
                                             <option value="{{ $degreeValue }}">{{ $degreeDescription }}</option>
                                         @endforeach
                                     </select>
@@ -199,7 +196,7 @@
                                     <svg class="svg-input absolute left-1 !top-2/3 transform -translate-y-1/2 pointer-events-none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M6 5V4a1 1 0 1 1 2 0v1h3V4a1 1 0 1 1 2 0v1h3V4a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v2H3V7a2 2 0 0 1 2-2h1ZM3 19v-8h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Zm5-6a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2H8Z" clip-rule="evenodd"/>
                                     </svg>
-                                    <label for="scienceDegreeIssuedDate" class="label-modal">{{ __('forms.issuedDate') }}<span class="text-red-600"> *</span></label>
+                                    <label for="scienceDegreeIssuedDate" class="label-modal">{{ __('forms.issuedDate') }}</label>
                                     <input x-model="modalScienceDegree.issuedDate" datepicker-format="{{ frontendDateFormat() }}" type="text" name="scienceDegreeIssuedDate" id="scienceDegreeIssuedDate" class="input-modal datepicker-input" autocomplete="off">
                                 </div>
                                 <div>
@@ -209,11 +206,7 @@
                                 </div>
                                 <div>
                                     <label for="scienceDegreeSpeciality" class="label-modal">{{ __('forms.speciality') }} <span class="text-red-600"> *</span></label>
-                                    <x-select2
-                                        modelPath="modalScienceDegree.speciality"
-                                        dictionaryName="SPECIALITY_TYPE"
-                                        id="scienceDegreeSpeciality"
-                                    />
+                                    <input type="text" x-model="modalScienceDegree.speciality" id="scienceDegreeSpeciality" class="input-modal" maxlength="255" required />
                                 </div>
                                 <div>
                                     <label for="scienceDegreeDiplomaNumber" class="label-modal">{{ __('forms.diplomaNumber') }}</label>

@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Employee\Forms;
 
 use App\Core\Arr;
+use App\Repositories\Repository;
 use App\Enums\Status;
 use App\Livewire\Employee\EmployeeCreate;
+use App\Livewire\Employee\AbstractEmployeeFormManager;
 use App\Livewire\Party\PartyEdit;
 use App\Models\Employee\BaseEmployee;
 use App\Rules\DateFormat;
@@ -122,12 +124,12 @@ class EmployeeForm extends Form
 
         $positionRules = ['required', 'string'];
         if (!$useFreeText) {
-            $positionRules[] = Rule::in($this->allowedValuesForEmployeeType('position', 'POSITION'));
+            $positionRules[] = Rule::in($this->allowedValuesForEmployeeType('POSITION'));
         }
 
         return [
             'position' => $positionRules,
-            'employeeType' => ['required', 'string', Rule::in(array_keys($this->component->dictionaries['EMPLOYEE_TYPE'] ?? []))],
+            'employeeType' => ['required', 'string', Rule::in(array_keys(dictionary()->employees()->employeeTypes(legalEntity()?->type?->name ?? '')))],
             'startDate' => ['required', new DateFormat()],
             'endDate' => [
                 'nullable',
@@ -287,7 +289,7 @@ class EmployeeForm extends Form
             'doctor.educations.*.institutionName' => ['required', 'string', 'max:255'],
             'doctor.educations.*.issuedDate' => ['nullable', 'date'],
             'doctor.educations.*.diplomaNumber' => ['required', 'string', 'max:255'],
-            'doctor.educations.*.degree' => ['required', 'string', 'max:255', Rule::in($this->allowedValuesForEmployeeType('education_degree', 'EDUCATION_DEGREE'))],
+            'doctor.educations.*.degree' => ['required', 'string', 'max:255', Rule::in($this->allowedValuesForEmployeeType('EDUCATION_DEGREE'))],
             'doctor.educations.*.speciality' => ['required', 'string', 'max:255'],
 
             'doctor.specialities' => array_merge($specialitiesRules, [
@@ -311,10 +313,11 @@ class EmployeeForm extends Form
                     }
                 },
             ]),
-            'doctor.specialities.*.speciality' => ['required', 'string', 'max:255', Rule::in($this->allowedValuesForEmployeeType('speciality_type', 'SPECIALITY_TYPE'))],
+            'doctor.specialities.*' => ['required', 'array'],
+            'doctor.specialities.*.speciality' => ['bail', 'required', 'string', 'max:255', $this->specialityDictionaryRule('SPECIALITY_TYPE')],
             'doctor.specialities.*.specialityOfficio' => ['required', 'boolean'],
-            'doctor.specialities.*.level' => ['required', 'string', 'max:255', Rule::in($this->allowedValuesForEmployeeType('speciality_level', 'SPECIALITY_LEVEL'))],
-            'doctor.specialities.*.qualificationType' => ['required', 'string', Rule::in($this->allowedValuesForEmployeeType('speciality_qualification_type', 'SPEC_QUALIFICATION_TYPE'))],
+            'doctor.specialities.*.level' => ['bail', 'required', 'string', 'max:255', $this->specialityDictionaryRule('SPECIALITY_LEVEL')],
+            'doctor.specialities.*.qualificationType' => ['bail', 'required', 'string', $this->specialityDictionaryRule('SPEC_QUALIFICATION_TYPE')],
             'doctor.specialities.*.attestationName' => ['required', 'string', 'max:255'],
             'doctor.specialities.*.attestationDate' => ['required', 'date'],
             'doctor.specialities.*.validToDate' => ['nullable', 'date'],
@@ -330,7 +333,7 @@ class EmployeeForm extends Form
             'doctor.scienceDegree.issuedDate' => ['nullable', 'date'],
 
             'doctor.qualifications' => ['nullable', 'array'],
-            'doctor.qualifications.*.type' => ['required', 'string', 'max:255', Rule::in($this->allowedValuesForEmployeeType('qualification_type', 'QUALIFICATION_TYPE'))],
+            'doctor.qualifications.*.type' => ['required', 'string', 'max:255', Rule::in($this->allowedValuesForEmployeeType('QUALIFICATION_TYPE'))],
             'doctor.qualifications.*.institutionName' => ['required', 'string', 'max:255'],
             'doctor.qualifications.*.speciality' => ['required', 'string', 'max:255'],
             'doctor.qualifications.*.issuedDate' => ['required', 'date'],
@@ -377,21 +380,80 @@ class EmployeeForm extends Form
      */
     protected function dictionaryKeys(string $dictionaryName): array
     {
-        return array_keys($this->component->dictionaries[$dictionaryName] ?? []);
+        return array_keys(dictionary()->employees()->activeOptions($dictionaryName));
     }
 
     /**
      * @return list<string>
      */
-    protected function allowedValuesForEmployeeType(string $configKey, string $dictionaryName): array
+    protected function allowedValuesForEmployeeType(string $dictionaryName): array
     {
-        $configured = config('ehealth.employee_type.' . $this->employeeType . '.' . $configKey, []);
+        return array_keys(dictionary()->employees()->optionsForEmployeeType($this->employeeType, $dictionaryName));
+    }
 
-        if (is_array($configured) && $configured !== []) {
-            return array_values($configured);
+    protected function specialityDictionaryRule(string $dictionaryName): Closure
+    {
+        $allowed = $this->allowedValuesForEmployeeType($dictionaryName);
+
+        return function (string $attribute, mixed $value, Closure $fail) use ($allowed): void {
+            if (in_array($value, $allowed, true) || $this->retainsOriginalSpeciality($attribute)) {
+                return;
+            }
+
+            $fail(__('employees.speciality_not_available'));
+        };
+    }
+
+    private function retainsOriginalSpeciality(string $attribute): bool
+    {
+        if (!$this->component instanceof AbstractEmployeeFormManager
+            || !preg_match('/specialities\.(\d+)\./', $attribute, $matches)) {
+            return false;
         }
 
-        return $this->dictionaryKeys($dictionaryName);
+        $specialities = $this->doctor['specialities'] ?? [];
+        $submitted = $specialities[(int) $matches[1]] ?? null;
+
+        if (!is_array($submitted)) {
+            return false;
+        }
+
+        $document = $this->specialityDocument($submitted);
+
+        if ($document === null) {
+            return false;
+        }
+
+        $originalCount = collect($this->component->originalEmployeeSpecialities())
+            ->filter(fn (array $original): bool => $this->specialityDocument($original) === $document)
+            ->count();
+        $submittedCount = collect($specialities)
+            ->filter(fn (mixed $item): bool => is_array($item) && $this->specialityDocument($item) === $document)
+            ->count();
+
+        return $originalCount > 0 && $submittedCount <= $originalCount;
+    }
+
+    /** @return array<string, string|bool|null>|null */
+    private function specialityDocument(array $speciality): ?array
+    {
+        foreach (['speciality', 'specialityOfficio', 'level', 'qualificationType', 'attestationName', 'attestationDate', 'validToDate', 'certificateNumber'] as $key) {
+            $value = $speciality[$key] ?? null;
+            if ($value !== null && !is_scalar($value)) {
+                return null;
+            }
+        }
+
+        return [
+            'speciality' => (string) ($speciality['speciality'] ?? ''),
+            'specialityOfficio' => filter_var($speciality['specialityOfficio'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'level' => (string) ($speciality['level'] ?? ''),
+            'qualificationType' => (string) ($speciality['qualificationType'] ?? ''),
+            'attestationName' => (string) ($speciality['attestationName'] ?? ''),
+            'attestationDate' => toIsoDate($speciality['attestationDate'] ?? null),
+            'validToDate' => toIsoDate($speciality['validToDate'] ?? null),
+            'certificateNumber' => (string) ($speciality['certificateNumber'] ?? ''),
+        ];
     }
 
     /**
@@ -545,8 +607,8 @@ class EmployeeForm extends Form
         $revisionData = $request->revision->data ?? [];
 
         // 1. BASE: Hydrate from original Employee if exists
-        if ($request->employee) {
-            $this->hydrateFromEmployee($request->employee);
+        if ($employee = Repository::employee()->employeeForRequest($request)) {
+            $this->hydrateFromEmployee($employee);
         } elseif ($request->party) {
             $this->populatePartyData($request->party);
         }
@@ -633,8 +695,8 @@ class EmployeeForm extends Form
                 }
             }
 
-            // Merge recursive to override specific fields
-            $this->doctor = array_replace_recursive($this->doctor, $doctorDataFromRevision);
+            // Professional lists are complete document snapshots, not index-based patches.
+            $this->doctor = array_replace($this->doctor, $doctorDataFromRevision);
         }
 
         // --- Personal data (Party) ---

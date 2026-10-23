@@ -6,7 +6,6 @@
         x-data="{
                   educations: [],
                   employeeType: $wire.entangle('form.employeeType'),
-                  employeeTypeSpecialities: @js($this->employeeTypeSpecialities),
                   employeeTypeDegrees: @js($this->employeeTypeDegrees),
                   openModal: false,
                   modalEducation: new Education(),
@@ -62,8 +61,8 @@
                         <td class="td-input" x-text="countryDict[education.country]"></td>
                         <td class="td-input" x-text="education.city"></td>
                         <td class="td-input" x-text="education.institutionName"></td>
-                        <td class="td-input" x-text="specDict[education.speciality]"></td>
-                        <td class="td-input" x-text="degreeDict[education.degree]"></td>
+                        <td class="td-input" x-text="specDict[education.speciality] ?? education.speciality"></td>
+                        <td class="td-input" x-text="degreeDict[education.degree] ?? education.degree"></td>
                         <td class="td-input" x-text="education.issuedDate"></td>
                         <td class="td-input" x-text="education.diplomaNumber"></td>
                         <td class="td-input">
@@ -207,11 +206,7 @@
                                     <div>
                                         <label for="educationSpeciality" class="label-modal"
                                             >{{ __('forms.speciality') }} <span class="text-red-600"> *</span></label>
-                                        <x-select2
-                                            modelPath="modalEducation.speciality"
-                                            dictionaryName="SPECIALITY_TYPE"
-                                            id="educationSpeciality"
-                                        />
+                                        <input type="text" x-model="modalEducation.speciality" id="educationSpeciality" class="input-modal" maxlength="255" required />
                                     </div>
                                     <div>
                                         <label for="educationDegree" class="label-modal"
@@ -238,7 +233,7 @@
                                             <path fill-rule="evenodd" d="M6 5V4a1 1 0 1 1 2 0v1h3V4a1 1 0 1 1 2 0v1h3V4a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v2H3V7a2 2 0 0 1 2-2h1ZM3 19v-8h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Zm5-6a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2H8Z" clip-rule="evenodd" />
                                         </svg>
                                         <label for="educationIssuedDate" class="label-modal"
-                                            >{{ __('forms.issuedDate') }}<span class="text-red-600"> *</span></label>
+                                            >{{ __('forms.issuedDate') }}</label>
                                         <input
                                             x-model="modalEducation.issuedDate"
                                             datepicker-format="{{ frontendDateFormat() }}"

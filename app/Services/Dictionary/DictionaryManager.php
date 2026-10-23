@@ -13,6 +13,7 @@ use App\Services\Dictionary\Collections\BasicDictionaryCollection;
 use App\Services\Dictionary\Collections\DeviceDefinitionCollection;
 use App\Services\Dictionary\Collections\DiagnoseGroupCollection;
 use App\Services\Dictionary\Collections\DrugCollection;
+use App\Services\Dictionary\Collections\EmployeeDictionaryCollection;
 use App\Services\Dictionary\Collections\ForbiddenGroupCollection;
 use App\Services\Dictionary\Collections\RuleEngineRuleCollection;
 use App\Services\Dictionary\Collections\ServiceCollection;
@@ -89,6 +90,11 @@ class DictionaryManager
     public function basics(): BasicDictionaryCollection
     {
         return BasicDictionaryCollection::make($this->get(BasicDictionary::KEY));
+    }
+
+    public function employees(): EmployeeDictionaryCollection
+    {
+        return EmployeeDictionaryCollection::make($this->basics());
     }
 
     /**

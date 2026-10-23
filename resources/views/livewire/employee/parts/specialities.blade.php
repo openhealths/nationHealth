@@ -16,7 +16,12 @@
                   primaryConflict: false,
                   specDict: @js($this->dictionaries['SPECIALITY_TYPE']),
                   levelDict: @js($this->dictionaries['SPECIALITY_LEVEL']),
-                  qualTypeDict: @js($this->dictionaries['QUALIFICATION_TYPE']),
+                  specQualDict: @js($this->dictionaries['SPEC_QUALIFICATION_TYPE']),
+
+                  isLegacySpeciality() {
+                      return this.modalSpeciality.speciality
+                          && !this.employeeTypeSpecialities[this.employeeType]?.[this.modalSpeciality.speciality];
+                  },
 
                   isModalValid() {
                       return this.modalSpeciality.speciality
@@ -104,9 +109,9 @@
             <tbody>
                 <template x-for="(speciality, index) in specialities" :key="index">
                     <tr>
-                        <td class="td-input" x-text="specDict[speciality.speciality]"></td>
+                        <td class="td-input" x-text="specDict[speciality.speciality] ?? speciality.speciality"></td>
                         <td class="td-input" x-text="speciality.attestationName"></td>
-                        <td class="td-input" x-text="levelDict[speciality.level]"></td>
+                        <td class="td-input" x-text="levelDict[speciality.level] ?? speciality.level"></td>
                         <td class="td-input text-left">
                             <template x-if="speciality.specialityOfficio">
                                 <svg class="h-6 w-6 text-green-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
@@ -222,8 +227,13 @@
                                         <x-select2
                                             modelPath="modalSpeciality.speciality"
                                             dictionaryName="SPECIALITY_TYPE"
+                                            options="employeeTypeSpecialities[$wire.form.employeeType] ?? {}"
+                                            options-watch="form.employeeType"
                                             id="specialitySpeciality"
                                         />
+                                        <p x-show="isLegacySpeciality()" class="mt-2 text-sm text-amber-700 dark:text-amber-300">
+                                            {{ __('employees.legacy_speciality_notice') }}
+                                        </p>
                                     </div>
 
                                     <div class="flex flex-col justify-end">
@@ -287,6 +297,9 @@
                                             required
                                         >
                                             <option value="">{{ __('forms.select_level') }}</option>
+                                            <template x-if="modalSpeciality.level && !employeeTypeLevels[employeeType]?.[modalSpeciality.level]">
+                                                <option :value="modalSpeciality.level" x-text="levelDict[modalSpeciality.level] ?? modalSpeciality.level"></option>
+                                            </template>
                                             <template x-if="employeeType && employeeTypeLevels[employeeType]">
                                                 <template
                                                     x-for="(levelName, levelKey) in employeeTypeLevels[employeeType]"
@@ -309,6 +322,9 @@
                                             required
                                         >
                                             <option value="">{{ __('forms.select_qualification_type') }}</option>
+                                            <template x-if="modalSpeciality.qualificationType && !employeeTypeSpecQualifications[employeeType]?.[modalSpeciality.qualificationType]">
+                                                <option :value="modalSpeciality.qualificationType" x-text="specQualDict[modalSpeciality.qualificationType] ?? modalSpeciality.qualificationType"></option>
+                                            </template>
                                             <template x-if="employeeType && employeeTypeSpecQualifications[employeeType]">
                                                 <template
                                                     x-for="

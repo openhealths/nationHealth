@@ -13,6 +13,14 @@ use Tests\TestCase;
 
 class EmployeePrimarySpecialityValidationTest extends TestCase
 {
+    use \Tests\Concerns\FakesEmployeeDictionaries;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->fakeEmployeeDictionaries();
+    }
+
     #[Test]
     public function rejects_more_than_one_primary_speciality(): void
     {

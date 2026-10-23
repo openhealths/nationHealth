@@ -6,7 +6,6 @@
         x-data="{
                   qualifications: [],
                   employeeType: $wire.entangle('form.employeeType'),
-                  employeeTypeSpecialities: @js($this->employeeTypeSpecialities),
                   employeeTypeQualifications: @js($this->employeeTypeQualifications),
                   openModal: false,
                   modalQualification: new Qualification(),
@@ -59,9 +58,9 @@
             <tbody>
                 <template x-for="(qualification, index) in qualifications" :key="index">
                     <tr>
-                        <td class="td-input" x-text="qualTypeDict[qualification.type]"></td>
+                        <td class="td-input" x-text="qualTypeDict[qualification.type] ?? qualification.type"></td>
                         <td class="td-input" x-text="qualification.institutionName"></td>
-                        <td class="td-input" x-text="qualSpecDict[qualification.speciality]"></td>
+                        <td class="td-input" x-text="qualSpecDict[qualification.speciality] ?? qualification.speciality"></td>
                         <td class="td-input" x-text="qualification.certificateNumber"></td>
                         <td class="td-input" x-text="qualification.issuedDate"></td>
                         <td class="td-input" x-text="qualification.validTo"></td>
@@ -208,11 +207,7 @@
                                     <div>
                                         <label for="qualificationSpeciality" class="label-modal"
                                             >{{ __('forms.speciality') }} <span class="text-red-600"> *</span></label>
-                                        <x-select2
-                                            modelPath="modalQualification.speciality"
-                                            dictionaryName="SPECIALITY_TYPE"
-                                            id="qualificationSpeciality"
-                                        />
+                                        <input type="text" x-model="modalQualification.speciality" id="qualificationSpeciality" class="input-modal" maxlength="255" required />
                                     </div>
                                     <div>
                                         <label for="qualificationCertificateNumber" class="label-modal"

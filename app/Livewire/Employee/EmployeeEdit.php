@@ -23,11 +23,7 @@ class EmployeeEdit extends AbstractEmployeeFormManager
     public function mount(LegalEntity $legalEntity, Employee $employee): void
     {
         // MERGE STRATEGY: Instead of redirecting, check for an existing OPEN draft.
-        $existingDraft = EmployeeRequest::where('employee_id', $employee->id)
-            ->whereNull('uuid') // Only drafts (not signed/approved)
-            ->whereNull('applied_at')
-            ->latest()
-            ->first();
+        $existingDraft = Repository::employee()->latestDraftForEmployee($employee);
 
         $this->loadDictionaries();
         $this->employee = $employee;

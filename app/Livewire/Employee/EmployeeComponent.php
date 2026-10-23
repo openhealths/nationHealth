@@ -25,9 +25,7 @@ use Throwable;
 
 abstract class EmployeeComponent extends Component
 {
-    use FormTrait {
-        getDictionary as traitGetDictionary;
-    }
+    use FormTrait;
 
     public Form $form;
     public bool $isPersonalDataLocked = false;
@@ -42,19 +40,15 @@ abstract class EmployeeComponent extends Component
     public bool $showSignatureModal = false;
     public bool $showRequestPreviewModal = false;
 
+    #[Locked]
     public ?array $dictionaryNames = [
         'PHONE_TYPE', 'COUNTRY', 'SETTLEMENT_TYPE', 'SPECIALITY_TYPE', 'DIVISION_TYPE',
         'SPECIALITY_LEVEL', 'GENDER', 'QUALIFICATION_TYPE', 'SCIENCE_DEGREE', 'DOCUMENT_TYPE',
         'SPEC_QUALIFICATION_TYPE', 'EMPLOYEE_TYPE', 'POSITION', 'EDUCATION_DEGREE'
     ];
 
+    #[Locked]
     public ?array $dictionaries = [];
-    public array $employeeTypePosition = [];
-    public array $employeeTypeSpecialities = [];
-    public array $employeeTypeLevels = [];
-    public array $employeeTypeDegrees = [];
-    public array $employeeTypeQualifications = [];
-    public array $employeeTypeSpecQualifications = [];
 
     /**
      * This is the single, public method that child components will call.
@@ -69,45 +63,64 @@ abstract class EmployeeComponent extends Component
      */
     protected function getDictionary(): void
     {
-        $this->traitGetDictionary();
+        $catalogue = dictionary()->employees();
+        $this->dictionaries = [];
+        $missingDictionaries = false;
+        foreach ($this->dictionaryNames ?? [] as $name) {
+            $this->dictionaries[$name] = $catalogue->activeOptions($name);
+            $missingDictionaries = $missingDictionaries || !$catalogue->contains('name', $name);
+        }
 
+        $labelNames = array_merge(array_keys($catalogue::ROLE_DICTIONARIES), ['SCIENCE_DEGREE']);
+        $this->dictionaries = array_replace($this->dictionaries, $catalogue->labels($labelNames));
+        $this->dictionaries['EMPLOYEE_TYPE'] = $catalogue->employeeTypes(legalEntity()?->type?->name ?? '');
         $this->filterEmployeeDocumentTypes();
 
-        if (legalEntity()) {
-            $allowedEmployeeTypes = config('ehealth.legal_entity_employee_types.' . legalEntity()->type->name, []);
-
-            $this->dictionaries['EMPLOYEE_TYPE'] = array_intersect_key(
-                $this->dictionaries['EMPLOYEE_TYPE'] ?? [],
-                array_flip($allowedEmployeeTypes)
-            );
-
-            foreach ($this->dictionaries['EMPLOYEE_TYPE'] as $employeeType => $description) {
-
-                $allowedQualKeys = config("ehealth.employee_type.{$employeeType}.qualification_type", []);
-                $masterQualDict = $this->dictionaries['QUALIFICATION_TYPE'] ?? [];
-                $this->employeeTypeQualifications[$employeeType] = array_intersect_key($masterQualDict, array_flip($allowedQualKeys));
-
-                $allowedSpecQualKeys = config("ehealth.employee_type.{$employeeType}.speciality_qualification_type", []);
-                $masterSpecQualDict = $this->dictionaries['SPEC_QUALIFICATION_TYPE'] ?? [];
-                $this->employeeTypeSpecQualifications[$employeeType] = array_intersect_key($masterSpecQualDict, array_flip($allowedSpecQualKeys));
-
-                $allowedPositionKeys = config("ehealth.employee_type.{$employeeType}.position", []);
-                $masterPositionDict = $this->dictionaries['POSITION'] ?? [];
-                $this->employeeTypePosition[$employeeType] = array_intersect_key($masterPositionDict, array_flip($allowedPositionKeys));
-
-                $allowedSpecialityKeys = config("ehealth.employee_type.{$employeeType}.speciality_type", []);
-                $masterSpecialityDict = $this->dictionaries['SPECIALITY_TYPE'] ?? [];
-                $this->employeeTypeSpecialities[$employeeType] = array_intersect_key($masterSpecialityDict, array_flip($allowedSpecialityKeys));
-
-                $allowedLevelKeys = config("ehealth.employee_type.{$employeeType}.speciality_level", []);
-                $masterLevelDict = $this->dictionaries['SPECIALITY_LEVEL'] ?? [];
-                $this->employeeTypeLevels[$employeeType] = array_intersect_key($masterLevelDict, array_flip($allowedLevelKeys));
-
-                $allowedDegreeKeys = config("ehealth.employee_type.{$employeeType}.education_degree", []);
-                $masterDegreeDict = $this->dictionaries['EDUCATION_DEGREE'] ?? [];
-                $this->employeeTypeDegrees[$employeeType] = array_intersect_key($masterDegreeDict, array_flip($allowedDegreeKeys));
-            }
+        if ($missingDictionaries) {
+            session()->flash('error', __('employees.dictionaries_unavailable'));
         }
+    }
+
+    #[Computed]
+    public function employeeTypePosition(): array
+    {
+        return dictionary()->employees()->optionsByEmployeeType(legalEntity()?->type?->name ?? '', 'POSITION');
+    }
+
+    #[Computed]
+    public function employeeTypeSpecialities(): array
+    {
+        return dictionary()->employees()->optionsByEmployeeType(legalEntity()?->type?->name ?? '', 'SPECIALITY_TYPE');
+    }
+
+    #[Computed]
+    public function employeeTypeLevels(): array
+    {
+        return dictionary()->employees()->optionsByEmployeeType(legalEntity()?->type?->name ?? '', 'SPECIALITY_LEVEL');
+    }
+
+    #[Computed]
+    public function employeeTypeDegrees(): array
+    {
+        return dictionary()->employees()->optionsByEmployeeType(legalEntity()?->type?->name ?? '', 'EDUCATION_DEGREE');
+    }
+
+    #[Computed]
+    public function employeeTypeQualifications(): array
+    {
+        return dictionary()->employees()->optionsByEmployeeType(legalEntity()?->type?->name ?? '', 'QUALIFICATION_TYPE');
+    }
+
+    #[Computed]
+    public function employeeTypeSpecQualifications(): array
+    {
+        return dictionary()->employees()->optionsByEmployeeType(legalEntity()?->type?->name ?? '', 'SPEC_QUALIFICATION_TYPE');
+    }
+
+    #[Computed]
+    public function scienceDegreeOptions(): array
+    {
+        return dictionary()->employees()->activeOptions('SCIENCE_DEGREE');
     }
 
     /**

@@ -45,7 +45,6 @@ class EmployeeRequestMatcher
     /**
      * Pick APPROVED employee from an eHealth list for this request.
      * Match: position + employee_type + start_date (same day when both set) + division when set.
-     * Fuzzy fallback: sole candidate for the filtered list.
      *
      * @param  list<array<string, mixed>>  $employeesList
      * @return array<string, mixed>|null
@@ -60,11 +59,17 @@ class EmployeeRequestMatcher
         $employeeType = $request->employeeType;
         $targetPosition = $request->position;
         $targetStartDate = $request->startDate;
+        $employeeUuid = $request->employee?->uuid ?? data_get($request->revision?->data, 'employee_uuid');
+        $matches = [];
 
         foreach ($employeesList as $remoteEmp) {
             if (!isset($remoteEmp['uuid'])) {
                 Log::warning('[EmployeeRequestMatcher] Skipping remote employee record without uuid.');
 
+                continue;
+            }
+
+            if (filled($employeeUuid) && $remoteEmp['uuid'] !== $employeeUuid) {
                 continue;
             }
 
@@ -82,21 +87,11 @@ class EmployeeRequestMatcher
             }
 
             if ($posMatch && $typeMatch && $dateMatch && $divisionMatch) {
-                Log::info('[EmployeeRequestMatcher] Found MATCHING Employee UUID: ' . $remoteEmp['uuid']);
-
-                return $remoteEmp;
+                $matches[] = $remoteEmp;
             }
         }
 
-        if (count($employeesList) === 1 && isset($employeesList[0]['uuid'])) {
-            Log::warning(
-                '[EmployeeRequestMatcher] Fuzzy match: taking the only found employee for this Tax ID.'
-            );
-
-            return $employeesList[0];
-        }
-
-        return null;
+        return count($matches) === 1 ? $matches[0] : null;
     }
 
     /**

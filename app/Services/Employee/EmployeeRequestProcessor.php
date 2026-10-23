@@ -201,6 +201,10 @@ class EmployeeRequestProcessor
                 $employee = Employee::find($request->employeeId);
             }
 
+            if ($employee && !Repository::employee()->requestMatchesEmployee($request, $employee)) {
+                throw new \RuntimeException('Cannot apply employee request to a different employee or position.');
+            }
+
             $isNew = false;
             if (!$employee) {
                 $isNew = true;

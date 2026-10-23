@@ -35,7 +35,7 @@ class EmployeeCreate
     {
         $user = $event->user;
 
-        $employeeRequests = EmployeeRequest::with('revision')
+        $employeeRequests = EmployeeRequest::with(['revision', 'employee'])
             ->where('email', $user->email)
             // Same email can exist across legal entities — never mix foreign LE revisions into this login.
             ->where('legal_entity_id', $event->legalEntity->id)
@@ -420,7 +420,16 @@ class EmployeeCreate
                 )
             )
             ->where('position', $employee['position'])
-            ->where('employee_type', $employee['employee_type']);
+            ->where('employee_type', $employee['employee_type'])
+            ->filter(function (EmployeeRequest $request) use ($employee): bool {
+                $employeeUuid = data_get($request->revision?->data, 'employee_uuid');
+                if (filled($employeeUuid) && $employeeUuid !== ($employee['uuid'] ?? null)) {
+                    return false;
+                }
+
+                return !$request->employeeId
+                    || Repository::employee()->employeeForRequest($request)?->uuid === ($employee['uuid'] ?? null);
+            });
 
         return $candidates
             ->filter(function (EmployeeRequest $employeeRequest) use ($employee) {
