@@ -88,9 +88,20 @@ class DeclarationRequestPolicy
     /**
      * Determine whether the user can create declaration request.
      */
-    public function approve(User $user): Response
+    public function approve(User $user, ?DeclarationRequest $declarationRequest = null): Response
     {
         if ($user->cannot('declaration_request:approve')) {
+            return Response::denyWithStatus(404);
+        }
+
+        if ($declarationRequest && (
+            $declarationRequest->legalEntityId !== legalEntity()->id
+            || $declarationRequest->status !== RequestStatus::NEW
+            || ($declarationRequest->parentDeclarationUuid !== null && (
+                !$user->hasAllowedRole(Role::DOCTOR, true)
+                || $declarationRequest->employee?->partyId !== $user->partyId
+            ))
+        )) {
             return Response::denyWithStatus(404);
         }
 
@@ -140,6 +151,10 @@ class DeclarationRequestPolicy
         }
 
         if ($declarationRequest->status !== RequestStatus::APPROVED) {
+            return Response::denyWithStatus(404);
+        }
+
+        if ($declarationRequest->parentDeclarationUuid !== null && $declarationRequest->employee?->partyId !== $user->partyId) {
             return Response::denyWithStatus(404);
         }
 

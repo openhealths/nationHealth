@@ -38,6 +38,7 @@ return [
     'date_format' => 'Поле :attribute не відповідає формату :format.',
     'declined_if' => 'Поле :attribute має бути відхилено, якщо :other є :value.',
     'different' => 'Поля :attribute та :other повинні бути різними.',
+    'digits' => 'Поле «:attribute» має містити рівно :digits цифр.',
     'digits_between' => 'Поле «:attribute» має містити від :min до :max цифр.',
     'dimensions' => 'Поле :attribute містить неприпустимі розміри зображення.',
     'distinct' => 'Поле :attribute містить значення, яке дублюється.',

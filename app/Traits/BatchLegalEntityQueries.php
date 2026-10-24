@@ -362,9 +362,10 @@ trait BatchLegalEntityQueries
      *
      * @param  LegalEntity  $legalEntity
      * @param  EHealthJob|null  $nextEntity  The job to be executed after the chain completes (or null)
+     * @param  User  $user  The user initiating synchronization
      * @return EHealthJob|null The first job in the EmployeeDetailsUpsert chain, or null if there are no employees
      */
-    protected function getDeclarationDataStartJob(LegalEntity $legalEntity, ?EHealthJob $nextEntity): ?EHealthJob
+    protected function getDeclarationDataStartJob(LegalEntity $legalEntity, ?EHealthJob $nextEntity, User $user): ?EHealthJob
     {
         $job = null;
 
@@ -374,6 +375,7 @@ trait BatchLegalEntityQueries
         $models = Declaration::with('person')
             ->filterByLegalEntityId(legalEntityId: $legalEntity->id)
             ->filterBySyncStatus(status: JobStatus::PARTIAL)
+            ->forSyncBy($user, $legalEntity)
             ->get();
 
         foreach ($models->reverse() as $index => $model) {
@@ -399,18 +401,20 @@ trait BatchLegalEntityQueries
      *
      * @param  LegalEntity  $legalEntity
      * @param  EHealthJob|null  $nextEntity  The job to be executed after the chain completes (or null)
+     * @param  User  $user  The user initiating synchronization
      * @return EHealthJob|null The first job in the DeclarationRequestsDetailsSync chain, or null if there are no declarationRequests
      */
-    protected function getDeclarationRequestsStartJob(LegalEntity $legalEntity, ?EHealthJob $nextEntity): ?EHealthJob
+    protected function getDeclarationRequestsStartJob(LegalEntity $legalEntity, ?EHealthJob $nextEntity, User $user): ?EHealthJob
     {
         $job = null;
 
         // The incoming $nextEntity will be executed after the whole chain
-        $nextJob = $this->getDeclarationDataStartJob($legalEntity, $nextEntity);
+        $nextJob = $this->getDeclarationDataStartJob($legalEntity, $nextEntity, $user);
 
         $models = DeclarationRequest::with(['employee', 'division', 'person'])
             ->filterByLegalEntityId(legalEntityId: $legalEntity->id)
             ->filterBySyncStatus(status: JobStatus::PARTIAL)
+            ->forSyncBy($user, $legalEntity)
             ->get();
 
         foreach ($models->reverse() as $model) {

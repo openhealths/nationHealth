@@ -8,6 +8,7 @@ use App\Enums\JobStatus;
 use App\Models\Person\Person;
 use App\Models\Employee\Employee;
 use App\Enums\Declaration\Status;
+use App\Traits\HasDeclarationSyncScope;
 use Illuminate\Database\Eloquent\Model;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Declaration extends Model
 {
     use HasCamelCasing;
+    use HasDeclarationSyncScope;
 
     protected $fillable = [
         'id',
@@ -132,6 +134,6 @@ class Declaration extends Model
      */
     public function hasParentDeclaration(): bool
     {
-        return $this->declarationRequest()->whereNotNull('parent_declaration_uuid')->exists();
+        return $this->declarationRequest?->parentDeclarationUuid !== null;
     }
 }

@@ -333,7 +333,7 @@ class DeclarationRequest extends Request
 
         if ($validator->fails()) {
             Log::channel('e_health_errors')->error(
-                'EHealth Employee validation failed: ' . implode(', ', $validator->errors()->all())
+                'EHealth Declaration Request validation failed: ' . implode(', ', $validator->errors()->all())
             );
         }
 

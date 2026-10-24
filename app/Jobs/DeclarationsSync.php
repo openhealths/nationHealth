@@ -7,6 +7,7 @@ namespace App\Jobs;
 use App\Core\EHealthJob;
 use App\Enums\User\Role;
 use App\Models\LegalEntity;
+use App\Models\Employee\Employee;
 use App\Classes\eHealth\EHealth;
 use App\Repositories\Repository;
 use App\Traits\BatchLegalEntityQueries;
@@ -26,20 +27,21 @@ class DeclarationsSync extends EHealthJob
 
     /**
      * Get declarations data from EHealth API
+     * OWNER, REORGANIZATION_OWNER and ADMIN sync all declarations of the legal entity.
+     * Otherwise, doctors sync only their own declarations.
      *
      * @param  string  $token
      * @return PromiseInterface|EHealthResponse
      */
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse
     {
-        $query = ['page' => $this->page];
+        $query = ['page' => $this->page, 'legal_entity_id' => $this->legalEntity->uuid];
 
-        // If user is doctor, get only his declarations
-        if ($this->user->hasAllowedRole(Role::DOCTOR) && !$this->user->hasAllowedRole(Role::OWNER)) {
-            $query['employee_id'] = $this->user
-                ->employees()
-                ->forParty($this->user->party->id)
-                ->first()->uuid;
+        if ($this->user->hasAllowedRole(Role::DOCTOR) && !$this->user->hasAllowedRole([Role::OWNER, Role::REORGANIZATION_OWNER, Role::ADMIN])) {
+            $query['employee_id'] = Employee::forParty($this->user->partyId)
+                ->filterByLegalEntityId($this->legalEntity->id)
+                ->doctor()
+                ->firstOrFail()->uuid;
         }
 
         return EHealth::declaration()->withToken($token)->getMany(query: $query, groupByEntities: true);
@@ -82,6 +84,6 @@ class DeclarationsSync extends EHealthJob
     {
         return $this->standalone
             ? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin)
-            : $this->getDeclarationRequestsStartJob($this->legalEntity, $this->nextEntity);
+            : $this->getDeclarationRequestsStartJob($this->legalEntity, $this->nextEntity, $this->user);
     }
 }

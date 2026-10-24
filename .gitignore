@@ -49,3 +49,4 @@ opencode.json
 
 # Local git worktrees (never belong in a feature PR)
 .worktrees/
+.codex/config.toml

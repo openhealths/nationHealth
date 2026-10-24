@@ -31,6 +31,7 @@ use App\Jobs\ConfidantPersonSync;
 use App\Models\DeclarationRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use App\Enums\Status as EntityStatus;
@@ -123,7 +124,7 @@ class DeclarationIndex extends Component
     public array $employeeIds;
 
     /**
-     * eHealth uuids of the current user's own employees in this legal entity.
+     * eHealth UUIDs of the current user's doctor employees in this legal entity.
      *
      * @var array|string[]
      */
@@ -223,15 +224,7 @@ class DeclarationIndex extends Component
             ->values()
             ->all();
 
-        // Select employee_ids from reorganization_employee_declarations where legal_entity_uuid is in legators of current legal entity
-        $reorganizedEmployeeIds = $user->party->reorganizedEmployeeDeclarations()
-            ->hasConnectionTo($legalEntity)
-            ->pluck('employee_id')
-            ->all();
-
-        $this->employeeIds = array_values(
-            array_unique(array_merge($ownEmployees->pluck('id')->all(), $reorganizedEmployeeIds))
-        );
+        $this->employeeIds = $ownEmployees->pluck('id')->all();
 
         $this->doctors = $this->getDoctors();
 
@@ -283,6 +276,7 @@ class DeclarationIndex extends Component
         }
 
         return DeclarationRequest::forEmployees($this->employeeIds)
+            ->filterByLegalEntityId(legalEntity()->id)
             ->whereStatus(RequestStatus::APPROVED->value)
             ->whereChannel(Channel::PIS->value)
             ->count();
@@ -310,28 +304,49 @@ class DeclarationIndex extends Component
         $declarations = collect();
         $declarationRequests = collect();
 
+        $selectedEmployeeIds = $this->doctors
+            ->whereIn('uuid', $this->doctorFilter)
+            ->pluck('id')
+            ->all();
+
         if ($user->can('viewAny', Declaration::class)) {
-            $selectedEmployeeIds = $this->doctors
-                ->whereIn('uuid', $this->doctorFilter)
-                ->pluck('id')
-                ->all();
+            // A current doctor selection also includes their old records, matched by party, only for active declarations.
+            if ($user->hasAllowedRole(Role::DOCTOR) && array_intersect($this->doctorFilter, $this->ownEmployeeUuids)) {
+                $selectedEmployeeIds = array_values(array_unique(array_merge(
+                    $selectedEmployeeIds,
+                    $user->party->reorganizedEmployeeDeclarations()
+                        ->hasConnectionTo(legalEntity())
+                        ->whereIn('declaration_id', Declaration::where('status', Status::ACTIVE)->select('id'))
+                        ->pluck('employee_id')
+                        ->all()
+                )));
+            }
 
             $employeePool = array_values(array_unique(array_merge($this->employeeIds, $selectedEmployeeIds)));
 
             $declarations = Declaration::with([
                 'reorganizedEmployeeDeclaration',
+                'declarationRequest:id,parent_declaration_uuid',
                 'person:id,birth_date',
                 'person.names'
             ])
-                ->when(
-                    !$user->hasAllowedRole([Role::OWNER, Role::REORGANIZATION_OWNER, Role::ADMIN]),
-                    fn (Builder $query) => $query->forEmployees($employeePool),
-                    fn (Builder $query) => $query->filterByLegalEntityId(legalEntity()->id)
+                ->where(function (Builder $query) use ($user, $employeePool): void {
+                    // Current-entity declarations are available in every status, subject to the user's access.
+                    $query->where(fn (Builder $currentQuery) => $currentQuery->filterByLegalEntityId(legalEntity()->id)
                         ->when(
-                            !empty($selectedEmployeeIds),
-                            fn (Builder $ownerQuery) => $ownerQuery->forEmployees($selectedEmployeeIds)
-                        )
-                )
+                            !$user->hasAllowedRole([Role::OWNER, Role::REORGANIZATION_OWNER, Role::ADMIN, Role::DOCTOR]),
+                            fn (Builder $employeeQuery) => $employeeQuery->forEmployees($employeePool)
+                        ));
+
+                    // A matching current doctor sees only ACTIVE predecessor declarations belonging to their own party.
+                    if ($user->hasAllowedRole(Role::DOCTOR) && !empty($this->ownEmployeeUuids)) {
+                        $query->orWhere(fn (Builder $oldQuery) => $oldQuery->where('status', Status::ACTIVE)
+                            ->whereHas('reorganizedEmployeeDeclaration', fn (Builder $reorganizationQuery) => $reorganizationQuery
+                                ->hasConnectionTo(legalEntity())
+                                ->where('party_id', $user->partyId)));
+                    }
+                })
+                ->when(!empty($this->doctorFilter), fn (Builder $query) => $query->forEmployees($selectedEmployeeIds))
                 ->get()
                 ->each->setAttribute('type', 'declaration');
         }
@@ -343,6 +358,7 @@ class DeclarationIndex extends Component
                 'person.names'
             ])
                 ->forEmployees($this->employeeIds)
+                ->filterByLegalEntityId(legalEntity()->id)
                 ->whereNotIn('status', [RequestStatus::SIGNED->value])
                 ->get()
                 ->each->setAttribute('type', 'request');
@@ -426,12 +442,8 @@ class DeclarationIndex extends Component
 
             // Filter by doctors
             if (!empty($this->doctorFilter)) {
-                $allItems = $allItems->filter(function (DeclarationRequest|Declaration $item) {
-                    if ($item instanceof Declaration) {
-                        return \in_array($item->employee->uuid, $this->doctorFilter, true);
-                    }
-
-                    return false;
+                $allItems = $allItems->filter(function (DeclarationRequest|Declaration $item) use ($selectedEmployeeIds) {
+                    return \in_array($item->employee?->id, $selectedEmployeeIds, true);
                 });
             }
 
@@ -442,15 +454,12 @@ class DeclarationIndex extends Component
                         return false;
                     }
 
-                    if ($item->reorganizedEmployeeDeclaration) {
-                        if ($item->hasParentDeclaration()) {
-                            return \in_array(ReorganizedStatus::RESIGNED->value, $this->reorganizationFilter, true);
-                        }
-
+                    if ($item->status === Status::ACTIVE && $item->reorganizedEmployeeDeclaration) {
                         return \in_array(ReorganizedStatus::TO_BE_RESIGNED->value, $this->reorganizationFilter, true);
                     }
 
-                    return false;
+                    return $item->hasParentDeclaration()
+                        && \in_array(ReorganizedStatus::RESIGNED->value, $this->reorganizationFilter, true);
                 });
             }
         }
@@ -519,13 +528,11 @@ class DeclarationIndex extends Component
         // Get declarations from eHealth filtered by legal entity
         $query = ['legal_entity_id' => $legalEntity->uuid];
 
-        // If user is doctor, get only his declarations
-        if ($user->hasAllowedRole(Role::DOCTOR) && !$user->hasAllowedRole(Role::OWNER)) {
-            $query['employee_id'] = Auth::user()->party
-                ->employees()
-                ->whereLegalEntityId($legalEntity->id)
-                ->forParty(Auth::user()->party->id)
-                ->first()->uuid;
+        if ($user->hasAllowedRole(Role::DOCTOR) && !$user->hasAllowedRole([Role::OWNER, Role::REORGANIZATION_OWNER, Role::ADMIN])) {
+            $query['employee_id'] = Employee::forParty($user->partyId)
+                ->filterByLegalEntityId($legalEntity->id)
+                ->doctor()
+                ->firstOrFail()->uuid;
         }
 
         try {
@@ -576,7 +583,7 @@ class DeclarationIndex extends Component
             Session::flash('success', __('declarations.sync.started'));
         } else {
             if (!empty($declarations['declarations'])) {
-                Bus::batch($this->getDeclarationRequestsStartJob($legalEntity, null))
+                Bus::batch($this->getDeclarationRequestsStartJob($legalEntity, null, $user))
                     ->withOption('legal_entity_id', $legalEntity->id)
                     ->withOption('token', Crypt::encryptString($token))
                     ->withOption('user', $user)
@@ -690,7 +697,9 @@ class DeclarationIndex extends Component
      */
     public function resign(int $declarationId): void
     {
-        if (Auth::user()->cannot('resign', Declaration::class)) {
+        $declaration = Declaration::findOrFail($declarationId);
+
+        if (Auth::user()->cannot('resign', $declaration)) {
             Session::flash('error', __('declarations.policy.resign'));
 
             return;
@@ -713,22 +722,27 @@ class DeclarationIndex extends Component
             return;
         }
 
-        $currentEmployee = Employee::whereUserId(Auth::id())
-            ->whereEmployeeType('DOCTOR')
-            ->whereNot('status', EntityStatus::REORGANIZED)
+        $currentEmployee = Employee::forUserInLegalEntity($user, legalEntity())
+            ->doctor()
+            ->with('division')
+            ->whereHas('division')
             ->first();
+
+        if (!$currentEmployee) {
+            Session::flash('error', __('declarations.active_doctor_required'));
+
+            return;
+        }
+
         $reorganizedPerson = Person::find($reorganizedDeclaration->personId);
 
         $resignRequestData = [
             'person_id' => $reorganizedPerson->uuid,
             'employee_id' => $currentEmployee->uuid,
-            'division_id' => $currentEmployee->divisionUuid,
+            'division_id' => $currentEmployee->division->uuid,
             'authorize_with' => $reorganizedDeclaration->authorizeWith,
             'parent_declaration_id' => $reorganizedDeclaration->declarationUuid
         ];
-
-        $declarationRequest = Repository::declarationRequest()
-            ->store(array_merge($resignRequestData, ['status' => EntityStatus::DRAFT->value]));
 
         try {
             $response = EHealth::declarationRequest()->create(removeEmptyKeys(Arr::toSnakeCase($resignRequestData)));
@@ -738,7 +752,15 @@ class DeclarationIndex extends Component
             $responseData['sync_status'] = JobStatus::PARTIAL->value;
 
             try {
-                Repository::declarationRequest()->update($declarationRequest->id, $responseData);
+                $declarationRequest = DB::transaction(function () use ($resignRequestData, $responseData) {
+                    $declarationRequest = Repository::declarationRequest()
+                        ->store(array_merge($resignRequestData, ['status' => EntityStatus::DRAFT->value]));
+
+                    Repository::declarationRequest()->update($declarationRequest->id, $responseData);
+                    Repository::declarationRequest()->cancelPendingRequests($declarationRequest->personId, $declarationRequest->id);
+
+                    return $declarationRequest;
+                });
             } catch (Exception $exception) {
                 $this->handleDatabaseErrors($exception, 'Error updating declaration request after response');
                 Session::flash('error', __('messages.database_error'));
@@ -750,6 +772,8 @@ class DeclarationIndex extends Component
 
             return;
         }
+
+        Session::flash('success', __('declarations.request_created'));
 
         $this->redirectRoute(
             'declaration.edit',
@@ -846,7 +870,8 @@ class DeclarationIndex extends Component
         return Employee::with('party:id,last_name,first_name')
             ->doctor()
             ->filterByLegalEntityId(legalEntity()->id)
-            ->whereHas('declarations')
+            ->where(fn (Builder $query) => $query->whereHas('declarations')
+                ->orWhereIn('uuid', $this->ownEmployeeUuids))
             ->get(['id', 'uuid', 'party_id', 'position'])
             ->map(fn (Employee $doctor) => [
                 'id' => $doctor->id,

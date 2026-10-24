@@ -19,7 +19,6 @@ use App\Models\Relations\AuthenticationMethod;
 use App\Models\Relations\Document;
 use App\Models\Relations\Party;
 use App\Models\Relations\Phone;
-use App\Models\ReorganizationEmployeeDeclaration;
 use BackedEnum;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
@@ -142,7 +141,9 @@ class DeclarationRequestRepository
 
         $isUpdated = false;
 
-        $isUpdated |= $this->syncJsonField($person, 'emergency_contact', $personData['emergency_contact']);
+        if (isset($personData['emergency_contact'])) {
+            $isUpdated |= $this->syncJsonField($person, 'emergency_contact', $personData['emergency_contact']);
+        }
 
         // Emergency contact has been updated, so delete it.
         unset($personData['emergency_contact']);
@@ -451,16 +452,12 @@ class DeclarationRequestRepository
                 ->firstOrFail();
         }
 
-        $data['parent_declaration_uuid'] = Arr::pull($data, 'parent_declaration_id', null);
+        $parentDeclarationUuid = Arr::pull($data, 'parent_declaration_id');
+
+        if ($parentDeclarationUuid) {
+            $data['parent_declaration_uuid'] = $parentDeclarationUuid;
+        }
 
         return $data;
-    }
-
-    public function checkIfNeedToResign(string $personUuid): bool
-    {
-        return DeclarationRequest::whereNotNull('parent_declaration_uuid')
-            ->whereIn('parent_declaration_uuid', ReorganizationEmployeeDeclaration::where('person_uuid', $personUuid)->selectRaw('declaration_uuid::text'))
-            ->whereIn('status', [Status::NEW->value, Status::APPROVED->value])
-            ->exists();
     }
 }

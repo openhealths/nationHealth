@@ -8,6 +8,7 @@ use App\Enums\JobStatus;
 use App\Models\Person\Person;
 use App\Enums\Declaration\RequestStatus;
 use App\Models\Employee\Employee;
+use App\Traits\HasDeclarationSyncScope;
 use Illuminate\Database\Eloquent\Model;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class DeclarationRequest extends Model
 {
     use HasCamelCasing;
+    use HasDeclarationSyncScope;
 
     protected $guarded = [];
 

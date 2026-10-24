@@ -224,6 +224,7 @@ class Declaration extends Request
             'person.gender' => 'required|string',
             'person.uuid' => 'required|uuid',
             'person.last_name' => 'nullable|string',
+            'person.tax_id' => 'nullable|string',
             'person.phones' => 'nullable|array',
             'person.phones.*.type' => 'required_with:person.phones|string',
             'person.phones.*.number' => 'required_with:person.phones|string',

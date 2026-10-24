@@ -13,20 +13,22 @@
             </x-slot>
         </x-header-navigation>
 
-        <div class="shrink-0">
-            <button
-                @click="
-                    let printWindow = window.open('', '_blank');
-                    printWindow.document.body.innerHTML = $wire.printableContent;
-                    printWindow.focus();
-                    printWindow.print();
-                "
-                class="button-minor flex items-center gap-2"
-            >
-                @icon('printer', 'w-4 h-4 dark:text-white')
-                {{ __('declarations.print_declaration') }}
-            </button>
-        </div>
+        @if (!$declaration->hasParentDeclaration())
+            <div class="shrink-0">
+                <button
+                    @click="
+                        let printWindow = window.open('', '_blank');
+                        printWindow.document.body.innerHTML = $wire.printableContent;
+                        printWindow.focus();
+                        printWindow.print();
+                    "
+                    class="button-minor flex items-center gap-2"
+                >
+                    @icon('printer', 'w-4 h-4 dark:text-white')
+                    {{ __('declarations.print_declaration') }}
+                </button>
+            </div>
+        @endif
     </div>
 
     <div class="shift-content pl-3.5 mt-8 w-full">
@@ -230,7 +232,7 @@
                             {{ __('declarations.reorganized_uuid') }}
                         </label>
                         <input
-                            value="{{ $declaration->reorganizedEmployeeDeclaration ? $declaration->reorganizedEmployeeDeclaration->legalEntity->uuid : Declaration::whereUuid($declaration->declarationRequest->parentDeclarationUuid)->first()->legalEntity->uuid }}"
+                            value="{{ $declaration->reorganizedEmployeeDeclaration ? $declaration->reorganizedEmployeeDeclaration->legalEntity->uuid : Declaration::whereUuid($declaration->declarationRequest->parentDeclarationUuid)->first()?->legalEntity?->uuid }}"
                             type="text"
                             name="divisionName"
                             id="divisionName"
@@ -246,7 +248,7 @@
                             {{ __('declarations.reorganized_name') }}
                         </label>
                         <input
-                            value="{{ $declaration->reorganizedEmployeeDeclaration ? $declaration->reorganizedEmployeeDeclaration->legalEntity->edr['name'] : Declaration::whereUuid($declaration->declarationRequest->parentDeclarationUuid)->first()->legalEntity->edr['name'] }}"
+                            value="{{ $declaration->reorganizedEmployeeDeclaration ? $declaration->reorganizedEmployeeDeclaration->legalEntity->edr['name'] : (Declaration::whereUuid($declaration->declarationRequest->parentDeclarationUuid)->first()?->legalEntity?->edr['name'] ?? '') }}"
                             type="text"
                             name="patientLastName"
                             id="patientLastName"

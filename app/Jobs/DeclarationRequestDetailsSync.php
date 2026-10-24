@@ -81,20 +81,27 @@ class DeclarationRequestDetailsSync extends EHealthJob
             'declaration_uuid'
         ]);
 
+        // Shortened responses must not erase the locally saved re-signing history or signing data.
+        foreach (['parent_declaration_uuid', 'data_to_be_signed'] as $field) {
+            if (empty($validatedData[$field])) {
+                unset($validatedData[$field]);
+            }
+        }
+
         $person = Arr::get($validatedData, 'data_to_be_signed.person', null); // Extract person data for separate processing
-        $personModel = Person::where('uuid', Arr::get($person, 'id'))->first();
         $personId = Arr::get($person, 'id', null);
+        $personModel = $personId ? Person::where('uuid', $personId)->first() : null;
 
         // Check if person exists and if any of the critical fields have changed to determine if we need to update or create the person record
         $isToBeSaved = $personId && (
             !$personModel ||
                 (
                     $personModel?->noTaxId !== $person['no_tax_id'] ||
-                    $personModel?->taxId !== $person['tax_id'] ||
-                    $personModel?->email !== $person['email'] ||
+                    (\array_key_exists('tax_id', $person) && $personModel?->taxId !== $person['tax_id']) ||
+                    (\array_key_exists('email', $person) && $personModel?->email !== $person['email']) ||
                     $personModel?->emergencyContact !== $person['emergency_contact'] ||
                     $personModel?->secret !== $person['secret'] ||
-                    $personModel?->unzr !== $person['unzr'] ||
+                    (\array_key_exists('unzr', $person) && $personModel?->unzr !== $person['unzr']) ||
                     $personModel?->birthCountry !== $person['birth_country'] ||
                     $personModel?->birthSettlement !== $person['birth_settlement']
                 )
@@ -110,7 +117,9 @@ class DeclarationRequestDetailsSync extends EHealthJob
             $person['phones'] ??= [];
             $person['patient_signed'] ??= false; // default value if not provided
             $person['process_disclosure_data_consent'] ??= true; // default value if not provided
-            $person['authentication_methods'] ??= [$urgentData['authentication_method_current'] ?? []];
+            $person['authentication_methods'] ??= !empty($urgentData['authentication_method_current'])
+                ? [$urgentData['authentication_method_current']]
+                : [];
             // TODO: Check if we need to update authentication method with new URL from urgent data.
             // if (!empty($urgentData['documents'][0]['url'])) {
             //     $person['authentication_methods'][0]['url'] = Arr::get($urgentData, 'documents.0.url');

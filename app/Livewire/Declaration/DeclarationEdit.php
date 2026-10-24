@@ -13,6 +13,9 @@ class DeclarationEdit extends DeclarationComponent
 {
     public function mount(LegalEntity $legalEntity, Person $person, DeclarationRequest $declarationRequest): void
     {
+        abort_unless($declarationRequest->personId === $person->id, 404);
+
+        $this->isNeedToResign = $declarationRequest->parentDeclarationUuid !== null;
         $this->baseMount($person->id);
         $this->declarationRequestId = $declarationRequest->id;
 
@@ -21,7 +24,7 @@ class DeclarationEdit extends DeclarationComponent
         }
 
         if ($declarationRequest->dataToBeSigned) {
-            $this->printableContent = $declarationRequest->dataToBeSigned['content'];
+            $this->printableContent = $this->isNeedToResign ? '' : ($declarationRequest->dataToBeSigned['content'] ?? '');
             $this->dataToBeSigned = $declarationRequest->dataToBeSigned;
         }
 

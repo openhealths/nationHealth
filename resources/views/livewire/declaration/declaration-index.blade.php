@@ -133,17 +133,20 @@
 
                                     <td class="td-input">
                                         @php
-                                            $isToBeResigned = $declaration->status === Status::ACTIVE
+                                            $isResigned = $declaration->type === 'declaration'
+                                                && $declaration->hasParentDeclaration();
+                                            $isToBeResigned = $declaration->type === 'declaration'
+                                                && $declaration->status === Status::ACTIVE
                                                 && $hasLegators
-                                                && $declaration->reorganizedEmployeeDeclaration
-                                                && !$declaration->hasParentDeclaration();
+                                                && $declaration->reorganizedEmployeeDeclaration;
+                                            $canResign = $isToBeResigned && Auth::user()->can('resign', $declaration);
                                         @endphp
                                         <span class="{{ $isToBeResigned ? 'badge-yellow' : $declaration->status->color() }}">
                                             @if ($declaration->type === 'declaration')
-                                                @if ($hasLegators && $declaration->reorganizedEmployeeDeclaration && $declaration->status === Status::ACTIVE)
+                                                @if ($isToBeResigned)
                                                     {{ __('declarations.status.to_be_resigned') }}
                                                 @else
-                                                    {{ !$declaration->hasParentDeclaration() ? $declaration->status->label() : __('declarations.status.resigned') }}
+                                                    {{ $isResigned ? __('declarations.status.resigned') : $declaration->status->label() }}
                                                 @endif
                                             @else
                                                 {{ $declaration->status->label() }}
@@ -155,12 +158,7 @@
                                         x-data="{ openDropdown: false }"
                                         class="td-input relative overflow-visible text-center"
                                     >
-                                        @if (
-                                            $declaration->status === Status::REJECTED ||
-                                            $declaration->status === Status::TERMINATED ||
-                                            $declaration->status === Status::CLOSED ||
-                                            ($declaration->type === 'declaration' && (!$hasLegators || !$declaration->reorganizedEmployeeDeclaration))
-                                        )
+                                        @if ($declaration->type === 'declaration' && !$canResign)
                                             @can('view', $declaration)
                                                 <a
                                                     href="{{ route('declaration.view', [legalEntity(), $declaration->id]) }}"
@@ -256,7 +254,7 @@
                                                 @endif
                                             @else
                                                 @if ($hasLegators)
-                                                    @can('resign', $declaration)
+                                                    @if ($canResign)
                                                         <button
                                                             @click="
                                                                 openDropdown = false;
@@ -267,7 +265,7 @@
                                                             @icon('check-circle', 'w-5 h-5 text-green-500')
                                                             {{ __('declarations.resign') }}
                                                         </button>
-                                                    @endcan
+                                                    @endif
 
                                                     @can('view', $declaration)
                                                         <a

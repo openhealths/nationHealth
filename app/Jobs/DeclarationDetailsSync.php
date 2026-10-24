@@ -17,6 +17,7 @@ use App\Repositories\Repository;
 use App\Classes\eHealth\EHealth;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Queue\SerializesModels;
 use App\Classes\eHealth\EHealthResponse;
@@ -25,6 +26,7 @@ use GuzzleHttp\Promise\PromiseInterface;
 use App\Models\Relations\ConfidantPerson;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Middleware\RateLimited;
+use App\Enums\Declaration\Status as DeclarationStatus;
 use App\Exceptions\EHealth\EHealthConnectionException;
 
 class DeclarationDetailsSync extends EHealthJob
@@ -103,7 +105,9 @@ class DeclarationDetailsSync extends EHealthJob
         $person['addresses'] ??= [];
         $person['documents'] ??= [];
         $person['phones'] ??= [];
-        $person['authentication_methods'][] = $urgentData['authentication_method_current'] ?? [];
+        $person['authentication_methods'] = !empty($urgentData['authentication_method_current'])
+            ? [$urgentData['authentication_method_current']]
+            : [];
 
         unset($person['uuid']);
 
@@ -127,11 +131,19 @@ class DeclarationDetailsSync extends EHealthJob
 
         $validatedData['sync_status'] = JobStatus::COMPLETED->value;
 
-        if (!empty($validatedData)) {
+        DB::transaction(function () use ($validatedData) {
             $this->declaration->update($validatedData);
 
             $this->declaration->refresh();
-        }
+
+            $parentDeclarationUuid = $this->declaration->declarationRequest?->parentDeclarationUuid;
+
+            if ($this->declaration->status === DeclarationStatus::ACTIVE && $parentDeclarationUuid) {
+                Declaration::whereUuid($parentDeclarationUuid)
+                    ->whereStatus(DeclarationStatus::ACTIVE)
+                    ->update(['status' => DeclarationStatus::TERMINATED, 'is_active' => false]);
+            }
+        });
 
         if ($this->legalEntity->status === Status::REORGANIZED->value) {
             Repository::declaration()->storeDataForReorganizedLegalEntity($response->validate(), $this->legalEntity);
