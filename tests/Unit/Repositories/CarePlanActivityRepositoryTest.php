@@ -4,404 +4,122 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Repositories;
 
-use App\Enums\CarePlanStatus;
-use App\Models\CarePlan;
-use App\Models\CarePlanActivity;
-use App\Models\MedicalEvents\Sql\Period;
-use App\Repositories\CarePlanActivityRepository;
-use Carbon\Carbon;
-use Illuminate\Support\Str;
+use App\Classes\eHealth\Api\CarePlanActivity as ActivityApi;
+use App\Classes\eHealth\EHealthResponse;
+use App\Core\Arr;
+use App\Services\MedicalEvents\Mappers\DeviceRequestMapper;
+use GuzzleHttp\Psr7\Response;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
+/** Contract scenarios retained after moving payload construction out of repositories. */
 class CarePlanActivityRepositoryTest extends TestCase
 {
     public function test_device_request_quantity_is_integer_in_payload(): void
     {
-        $carePlan = new CarePlan([
-            'period_start' => now()->subDay(),
-            'period_end' => now()->addMonth(),
-        ]);
-        $carePlan->setRawAttributes(array_merge($carePlan->getAttributes(), [
-            'period_start' => now()->subDay()->format('Y-m-d'),
-            'period_end' => now()->addMonth()->format('Y-m-d'),
-        ]));
-
-        $activity = new CarePlanActivity([
-            'kind' => 'device_request',
-            'status' => CarePlanStatus::DRAFT->value,
-            'quantity' => 1,
-            'quantity_system' => 'device_unit',
-            'quantity_code' => 'piece',
-            'product_reference' => '0cf026bd-82f0-46eb-becb-669a0552368d',
-            'program' => '0cefbce3-0000-0000-0000-000000000001',
-            'scheduled_period_start' => now()->format('Y-m-d'),
-            'scheduled_period_end' => now()->addWeek()->format('Y-m-d'),
-        ]);
-        $activity->setRelation('carePlan', $carePlan);
-
-        $payload = app(CarePlanActivityRepository::class)->formatCarePlanActivityRequest($activity);
-
+        $resource = $this->fixture();
+        $resource['detail']['kind'] = 'device_request';
+        $resource['detail']['quantity']['value'] = 1;
+        $payload = app(ActivityApi::class)->buildCreateContent($resource);
         $this->assertIsInt($payload['detail']['quantity']['value']);
         $this->assertSame(1, $payload['detail']['quantity']['value']);
     }
 
-    public function test_device_payload_prefers_device_definition_uuid_over_classification(): void
+    public function test_device_payload_requires_an_explicit_product_variant(): void
     {
-        $carePlan = new CarePlan([
-            'period_start' => now()->subDay(),
-            'period_end' => now()->addMonth(),
-        ]);
-        $carePlan->setRawAttributes(array_merge($carePlan->getAttributes(), [
-            'period_start' => now()->subDay()->format('Y-m-d'),
-            'period_end' => now()->addMonth()->format('Y-m-d'),
-        ]));
-
-        $deviceUuid = '0b70715d-0e6e-4a89-889f-815cf429cb87';
-        $activity = new CarePlanActivity([
-            'kind' => 'device_request',
-            'status' => CarePlanStatus::DRAFT->value,
-            'quantity' => 1,
-            'quantity_system' => 'device_unit',
-            'quantity_code' => 'piece',
-            'product_reference' => $deviceUuid,
-            'product_codeable_concept' => '18_09_03',
-            'program' => 'af8ba0d3-1520-4a01-8156-22065e96fd9a',
-            'scheduled_period_start' => now()->format('Y-m-d'),
-            'scheduled_period_end' => now()->addWeek()->format('Y-m-d'),
-        ]);
-        $activity->setRelation('carePlan', $carePlan);
-
-        $payload = app(CarePlanActivityRepository::class)->formatCarePlanActivityRequest($activity);
-
-        $this->assertSame(
-            $deviceUuid,
-            $payload['detail']['product_reference']['identifier']['value'] ?? null
-        );
-        $this->assertArrayNotHasKey('product_codeable_concept', $payload['detail']);
+        $resource = $this->fixture();
+        $resource['detail']['productCodeableConcept'] = ['coding' => [['system' => 'synthetic/classification', 'code' => 'TEST']]];
+        $this->expectException(ValidationException::class);
+        app(ActivityApi::class)->buildCreateContent($resource);
     }
 
     public function test_build_device_prequalify_payload_includes_occurrence_period(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-06-29 10:00:00', 'Europe/Kyiv'));
-
-        $carePlan = new CarePlan();
-        $carePlan->setRawAttributes([
-            'uuid' => (string) Str::uuid(),
-        ]);
-
-        $activity = new CarePlanActivity([
-            'kind' => 'device_request',
-            'status' => CarePlanStatus::DRAFT->value,
-            'uuid' => (string) Str::uuid(),
-            'quantity' => 100,
-            'quantity_system' => 'device_unit',
-            'quantity_code' => 'piece',
-            'product_reference' => '0fa1e6cd-7066-4881-92a5-6d747a1128f7',
-            'program' => '85953838-1834-4ed6-8bf4-3f83057380ec',
-            'scheduled_period_start' => '2026-06-27',
-            'scheduled_period_end' => '2026-07-06',
-        ]);
-        $activity->setRelation('carePlan', $carePlan);
-
-        $uuids = [
-            'person_uuid' => (string) Str::uuid(),
-            'encounter_uuid' => (string) Str::uuid(),
-            'employee_uuid' => (string) Str::uuid(),
-            'legal_entity_uuid' => (string) Str::uuid(),
-        ];
-
-        $payload = app(CarePlanActivityRepository::class)->buildDevicePrequalifyPayload($activity, $carePlan, $uuids);
-
-        $this->assertArrayHasKey('occurrence_period', $payload['device_request']);
+        $deviceUuid = '0fa1e6cd-7066-4881-92a5-6d747a1128f7';
+        $payload = (new DeviceRequestMapper())->toPrequalifyPayload([
+            'device_id' => $deviceUuid, 'quantity' => 100,
+            'started_at' => '2026-06-27', 'ended_at' => '2026-07-06',
+        ], ['person_uuid' => 'patient', 'encounter_uuid' => 'encounter', 'employee_uuid' => 'employee', 'legal_entity_uuid' => 'entity'], 'plan', 'activity');
         $this->assertArrayHasKey('start', $payload['device_request']['occurrence_period']);
         $this->assertArrayHasKey('end', $payload['device_request']['occurrence_period']);
         $this->assertArrayNotHasKey('code', $payload['device_request']);
-        $this->assertArrayHasKey('identifier', $payload['device_request']['code_reference']);
-        $this->assertSame('0fa1e6cd-7066-4881-92a5-6d747a1128f7', $payload['device_request']['code_reference']['identifier']['value']);
+        $this->assertSame($deviceUuid, $payload['device_request']['code_reference']['identifier']['value']);
     }
 
-    public function test_draft_activity_start_is_clipped_to_ehealth_care_plan_period_start(): void
+    public function test_precise_activity_schedule_is_not_rebuilt_during_signing(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-06-25 17:13:11', 'Europe/Kyiv'));
-
-        $carePlan = new CarePlan();
-        $carePlan->setRawAttributes([
-            'period_start' => '2026-06-25',
-            'period_end' => '2026-07-25',
-        ]);
-
-        $effectivePeriod = new Period();
-        $effectivePeriod->setRawAttributes([
-            'start' => '2026-06-25 16:33:00',
-            'end' => null,
-        ]);
-        $carePlan->setRelation('effectivePeriod', $effectivePeriod);
-
-        $activity = new CarePlanActivity([
-            'kind' => 'service_request',
-            'status' => CarePlanStatus::DRAFT->value,
-            'uuid' => (string) Str::uuid(),
-            'quantity' => 1,
-            'quantity_system' => 'SERVICE_UNIT',
-            'quantity_code' => 'PIECE',
-            'product_reference' => '4fbe6a29-5ffb-4bde-be83-7c968ee12e25',
-            'scheduled_period_start' => '2026-06-25',
-            'scheduled_period_end' => '2026-07-02',
-            'created_at' => Carbon::parse('2026-06-25 10:00:00'),
-        ]);
-        $activity->setRelation('carePlan', $carePlan);
-
-        $payload = app(CarePlanActivityRepository::class)->formatCarePlanActivityRequest($activity);
-        $planStart = Carbon::parse('2026-06-25T16:33:00Z')->utc();
-        $activityStart = Carbon::parse($payload['detail']['scheduled_period']['start'])->utc();
-
-        $this->assertTrue($activityStart->gte($planStart));
-        $this->assertSame('2026-06-25T16:33:00Z', $payload['detail']['scheduled_period']['start']);
-
-        Carbon::setTestNow();
+        $resource = $this->fixture();
+        $resource['detail']['scheduledPeriod']['start'] = '2026-06-25T16:33:00.123456Z';
+        $payload = app(ActivityApi::class)->buildCreateContent($resource);
+        $this->assertSame('2026-06-25T16:33:00.123456Z', $payload['detail']['scheduled_period']['start']);
     }
 
     public function test_payload_author_comes_from_the_activity_not_the_current_session(): void
     {
-        $authorUuid = '6f2f8d1a-3a4e-4c39-9d1d-4a0f1b6ad0aa';
-
-        $author = new \App\Models\Employee\Employee();
-        $author->setRawAttributes(['id' => 42, 'uuid' => $authorUuid]);
-
-        $activity = new CarePlanActivity([
-            'kind' => 'service_request',
-            'status' => CarePlanStatus::DRAFT->value,
-            'uuid' => (string) Str::uuid(),
-            'quantity' => 1,
-            'quantity_system' => 'SERVICE_UNIT',
-            'quantity_code' => 'PIECE',
-            'product_reference' => '4fbe6a29-5ffb-4bde-be83-7c968ee12e25',
-        ]);
-        $activity->setRelation('carePlan', new CarePlan());
-        $activity->setRelation('author', $author);
-
-        $payload = app(CarePlanActivityRepository::class)->formatCarePlanActivityRequest($activity);
-
-        $this->assertSame($authorUuid, $payload['author'][0]['identifier']['value']);
+        $resource = $this->fixture();
+        $payload = app(ActivityApi::class)->buildCreateContent($resource);
+        $this->assertSame($resource['author'][0]['identifier']['value'], $payload['author'][0]['identifier']['value']);
+        $this->assertCount(2, $payload['author']);
     }
 
-    public function test_payload_omits_the_author_when_the_activity_has_none(): void
+    public function test_payload_rejects_an_activity_without_an_author(): void
     {
-        $activity = new CarePlanActivity([
-            'kind' => 'service_request',
-            'status' => CarePlanStatus::DRAFT->value,
-            'uuid' => (string) Str::uuid(),
-            'quantity' => 1,
-            'quantity_system' => 'SERVICE_UNIT',
-            'quantity_code' => 'PIECE',
-            'product_reference' => '4fbe6a29-5ffb-4bde-be83-7c968ee12e25',
-        ]);
-        $activity->setRelation('carePlan', new CarePlan());
-        $activity->setRelation('author', null);
-
-        $payload = app(CarePlanActivityRepository::class)->formatCarePlanActivityRequest($activity);
-
-        // eHealth rejects an activity without an author uuid, which beats silently
-        // attributing it to whoever is signed in.
-        $this->assertArrayNotHasKey('value', $payload['author'][0]['identifier']);
+        $resource = $this->fixture();
+        $resource['author'] = [];
+        $this->expectException(ValidationException::class);
+        app(ActivityApi::class)->buildCreateContent($resource);
     }
 
-    public function test_normalize_ehealth_activity_for_signing_strips_read_only_fields(): void
+    public function test_create_content_excludes_server_fields_and_preserves_false(): void
     {
-        $raw = [
-            'id' => 'f5ad4f67-7066-4d0d-bcff-c17a11a723e4',
-            'author' => [
-                'display_value' => 'Андрій Дмитрович Копилець',
-                'identifier' => [
-                    'type' => [
-                        'coding' => [
-                            ['code' => 'employee', 'system' => 'eHealth/resources'],
-                        ],
-                        'text' => null,
-                    ],
-                    'value' => '1766ae9e-828d-4daa-bba8-48da3a13393a',
-                ],
-            ],
-            'care_plan' => [
-                'display_value' => null,
-                'identifier' => [
-                    'type' => [
-                        'coding' => [
-                            ['code' => 'care_plan', 'system' => 'eHealth/resources'],
-                        ],
-                        'text' => null,
-                    ],
-                    'value' => '63e74515-13cd-43c5-9e8e-9742854ad949',
-                ],
-            ],
-            'detail' => [
-                'kind' => 'medication_request',
-                'status' => 'scheduled',
-                'do_not_perform' => false,
-                'goal' => [],
-                'reason_code' => [],
-                'reason_reference' => [],
-                'description' => null,
-                'product_reference' => [
-                    'display_value' => null,
-                    'identifier' => [
-                        'type' => [
-                            'coding' => [
-                                ['code' => 'medication', 'system' => 'eHealth/resources'],
-                            ],
-                            'text' => null,
-                        ],
-                        'value' => '02b5e4de-22ec-429d-81f2-8faf44bd8c92',
-                    ],
-                ],
-                'quantity' => [
-                    'code' => 'PIECE',
-                    'system' => 'MEDICATION_UNIT',
-                    'unit' => 'шт',
-                    'value' => 1.0,
-                ],
-                'scheduled_period' => [
-                    'start' => '2026-06-25T18:14:37Z',
-                    'end' => '2026-07-02T20:59:59Z',
-                ],
-            ],
-            'remaining_quantity' => ['value' => 1.0],
-            'inserted_at' => '2026-06-25T18:14:41.040000Z',
-        ];
-
-        $normalized = app(CarePlanActivityRepository::class)->normalizeEHealthActivityForSigning($raw);
-
-        // Author is wrapped as a list here, so the object lives at [0].
-        $this->assertArrayNotHasKey('display_value', $normalized['author'][0]);
-        $this->assertArrayNotHasKey('remaining_quantity', $normalized);
-        $this->assertArrayNotHasKey('inserted_at', $normalized);
-        $this->assertArrayNotHasKey('goal', $normalized['detail']);
-        $this->assertArrayNotHasKey('reason_code', $normalized['detail']);
-        $this->assertArrayNotHasKey('description', $normalized['detail']);
-        $this->assertArrayNotHasKey('text', $normalized['author'][0]['identifier']['type']);
+        $resource = $this->fixture();
+        $resource['insertedAt'] = '2026-06-25T18:14:41.040000Z';
+        $payload = app(ActivityApi::class)->buildCreateContent($resource);
+        $this->assertArrayNotHasKey('inserted_at', $payload);
+        $this->assertArrayNotHasKey('remaining_quantity', $payload['detail']);
+        $this->assertArrayNotHasKey('outcome_reference', $payload);
+        $this->assertFalse($payload['detail']['do_not_perform']);
     }
 
     public function test_build_activity_cancel_sign_payload_adds_status_reason_to_full_snapshot(): void
     {
-        $statusReason = [
-            'coding' => [
-                [
-                    'system' => 'eHealth/care_plan_activity_cancel_reasons',
-                    'code' => 'typo',
-                ],
-            ],
-        ];
-
-        $base = [
-            'id' => 'f5ad4f67-7066-4d0d-bcff-c17a11a723e4',
-            'author' => [
-                'identifier' => [
-                    'type' => [
-                        'coding' => [
-                            ['system' => 'eHealth/resources', 'code' => 'employee'],
-                        ],
-                    ],
-                    'value' => '1766ae9e-828d-4daa-bba8-48da3a13393a',
-                ],
-            ],
-            'care_plan' => [
-                'identifier' => [
-                    'type' => [
-                        'coding' => [
-                            ['system' => 'eHealth/resources', 'code' => 'care_plan'],
-                        ],
-                    ],
-                    'value' => '63e74515-13cd-43c5-9e8e-9742854ad949',
-                ],
-            ],
-            'detail' => [
-                'kind' => 'medication_request',
-                'status' => 'scheduled',
-                'do_not_perform' => false,
-                'quantity' => ['value' => 1.0, 'code' => 'PIECE', 'system' => 'MEDICATION_UNIT', 'unit' => 'шт'],
-                'program' => ['identifier' => ['value' => '1318eabc-1a1a-42f6-8450-61e11c19eede']],
-            ],
-        ];
-
-        $signed = app(CarePlanActivityRepository::class)->buildActivityCancelSignPayload($base, $statusReason);
-
-        $this->assertSame($statusReason, $signed['detail']['status_reason']);
-
-        // API-007-006-0005 compares the signed content with the activity as eHealth renders it,
-        // so everything except detail.status_reason has to survive byte for byte. Dropping a
-        // field here — quantity.unit for instance — earns a 422 "Signed content doesn't match
-        // with previously created activity".
-        $withoutStatusReason = $signed;
-        unset($withoutStatusReason['detail']['status_reason']);
-
-        $this->assertSame($base, $withoutStatusReason);
-        $this->assertSame('шт', $signed['detail']['quantity']['unit']);
+        $base = Arr::toSnakeCase($this->fixture());
+        $base['remote_extension'] = ['false' => false, 'zero' => 0, 'empty' => []];
+        $reason = ['coding' => [['system' => 'eHealth/care_plan_activity_cancel_reasons', 'code' => 'TEST']]];
+        $signed = app(ActivityApi::class)->buildCancelContent($base, $reason);
+        $this->assertSame($reason, $signed['detail']['status_reason']);
+        unset($signed['detail']['status_reason']);
+        $this->assertSame($base, $signed);
     }
 
-    public function test_normalize_ehealth_activity_wraps_author_object_as_list(): void
+    public function test_normalized_read_wraps_author_object_as_list(): void
     {
-        $raw = [
-            'id' => 'f5ad4f67-7066-4d0d-bcff-c17a11a723e4',
-            'author' => [
-                'identifier' => [
-                    'type' => [
-                        'coding' => [
-                            ['code' => 'employee', 'system' => 'eHealth/resources'],
-                        ],
-                    ],
-                    'value' => '1766ae9e-828d-4daa-bba8-48da3a13393a',
-                ],
-            ],
-            'detail' => [
-                'kind' => 'service_request',
-                'status' => 'scheduled',
-                'do_not_perform' => false,
-            ],
-        ];
-
-        $normalized = app(CarePlanActivityRepository::class)->normalizeEHealthActivityForSigning($raw);
-
+        $raw = Arr::toSnakeCase($this->fixture());
+        $raw['author'] = $raw['author'][0];
+        $api = new class extends ActivityApi
+        {
+            public function normalize(EHealthResponse $response): array
+            {
+                return $this->validateDetails($response);
+            }
+        };
+        $normalized = $api->normalize(new EHealthResponse(new Response(200, [], json_encode(['data' => $raw], JSON_THROW_ON_ERROR))));
         $this->assertTrue(array_is_list($normalized['author']));
-        $this->assertArrayHasKey('identifier', $normalized['author'][0]);
+        $this->assertSame($raw['author']['identifier']['value'], $normalized['author'][0]['identifier']['value']);
     }
 
     public function test_build_activity_cancel_sign_payload_leaves_the_ehealth_author_shape_alone(): void
     {
-        $statusReason = [
-            'coding' => [
-                [
-                    'system' => 'eHealth/care_plan_activity_cancel_reasons',
-                    'code' => 'typo',
-                ],
-            ],
-        ];
-
-        $base = [
-            'id' => 'f5ad4f67-7066-4d0d-bcff-c17a11a723e4',
-            'author' => [
-                'identifier' => [
-                    'type' => [
-                        'coding' => [
-                            ['system' => 'eHealth/resources', 'code' => 'employee'],
-                        ],
-                    ],
-                    'value' => '1766ae9e-828d-4daa-bba8-48da3a13393a',
-                ],
-            ],
-            'detail' => [
-                'kind' => 'medication_request',
-                'status' => 'scheduled',
-                'do_not_perform' => false,
-            ],
-        ];
-
-        $signed = app(CarePlanActivityRepository::class)->buildActivityCancelSignPayload($base, $statusReason);
-
-        // Get Care Plan Activity by ID returns author as an object, and cancel has to sign back
-        // exactly what it was given. Wrapping it as a list is a create/complete concern and
-        // would make the comparison fail here.
+        $base = Arr::toSnakeCase($this->fixture());
+        $base['author'] = $base['author'][0];
+        $reason = ['coding' => [['system' => 'eHealth/care_plan_activity_cancel_reasons', 'code' => 'TEST']]];
+        $signed = app(ActivityApi::class)->buildCancelContent($base, $reason);
         $this->assertFalse(array_is_list($signed['author']));
-        $this->assertSame('1766ae9e-828d-4daa-bba8-48da3a13393a', $signed['author']['identifier']['value']);
-        $this->assertSame($statusReason, $signed['detail']['status_reason']);
+        $this->assertSame($base['author'], $signed['author']);
+    }
+
+    private function fixture(): array
+    {
+        return json_decode(file_get_contents(base_path('tests/Fixtures/CarePlan/activity.json')), true, flags: JSON_THROW_ON_ERROR);
     }
 }

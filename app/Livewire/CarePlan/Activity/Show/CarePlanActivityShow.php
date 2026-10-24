@@ -29,15 +29,13 @@ class CarePlanActivityShow extends CarePlanComponent
     {
         $this->bootCarePlan($carePlan);
 
-        $this->activity = $activity->load(['kindConcept.coding', 'reasonReferences', 'author.party']);
-        $this->activityProductLabel = $this->resolveActivityProductLabel($activity);
-        $this->scopeDocumentsToActivity($activity->uuid);
+        $this->activity = $this->ownedActivity($activity->id);
+        $this->activityProductLabel = $this->resolveActivityProductLabel($this->activity);
+        $this->scopeDocumentsToActivity($this->activity->uuid);
     }
 
     protected function renderCarePlan()
     {
-        $this->carePlan->load(['person', 'author.party', 'categoryConcept']);
-
         return view('livewire.care-plan.activity.show.care-plan-activity-show');
     }
 

@@ -1,5 +1,6 @@
 @use('App\Enums\CarePlanStatus')
-<x-layouts.patient :personId="$personId" :patientFullName="$patientFullName">
+<x-layouts.patient :showLegacyMessages="false" :personId="$personId" :patientFullName="$patientFullName">
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     <x-slot name="headerActions">
         @can('create', \App\Models\CarePlan::class)
             <a
@@ -17,6 +18,8 @@
 
         <button
             wire:click.prevent="sync"
+            wire:loading.attr="disabled"
+            wire:target="sync"
             type="button"
             class="button-sync flex items-center gap-2 px-5 py-2 text-sm whitespace-nowrap shadow-sm"
         >
@@ -247,6 +250,11 @@
                                 <div class="record-inner-label">{{ __('care-plan.name') }}</div>
                                 <div class="record-inner-value text-[17px] font-semibold text-gray-900 dark:text-gray-100">
                                     {{ $plan->title }}
+                                    @if ($plan->requiresFhirImport())
+                                        <p class="mt-2 text-sm font-normal text-gray-600 dark:text-gray-300">
+                                            {{ $plan->status === 'draft' ? __('care-plan.draft_backfill_required') : __('care-plan.full_sync_required') }}
+                                        </p>
+                                    @endif
                                 </div>
                             </div>
 
@@ -263,6 +271,7 @@
                                 </div>
                             </div>
 
+                            @if (!$plan->requiresFhirImport())
                             <div class="record-inner-action-col">
                                 <div
                                     x-data="{
@@ -325,6 +334,7 @@
                                     </div>
                                 </div>
                             </div>
+                            @endif
                         </div>
 
                         <div class="record-inner-body">

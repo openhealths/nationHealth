@@ -8,14 +8,15 @@
         @php
             $encounterLocalId = $this->encounterId ?? null;
         @endphp
+        @if($personId !== null && $encounterLocalId !== null)
         <a
-            href="{{ route('care-plans.create-by-encounter', [legalEntity(), $encounterLocalId]) }}"
-            target="_blank"
+            href="{{ route('care-plans.create-by-encounter', ['legalEntity' => legalEntity(), 'person' => $personId, 'encounter' => $encounterLocalId]) }}"
             class="button-primary-outline flex items-center gap-2"
         >
             @icon('plus', 'w-4 h-4')
             {{ __('care-plan.new_care_plan') }}
         </a>
+        @endif
     </div>
 
     {{-- List existing care plans linked to this patient (filtering by encounter if possible) --}}

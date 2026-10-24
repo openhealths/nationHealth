@@ -523,4 +523,10 @@ class ApprovalRepository extends BaseRepository
 
         return !Carbon::parse($timestamp)->addMinutes(self::SMS_CODE_ALIVE_MINUTES)->isPast();
     }
+
+    public function replaceResolvedUuid(Approval $approval, string $uuid): void
+    {
+        $approval->uuid = $uuid;
+        $approval->save();
+    }
 }

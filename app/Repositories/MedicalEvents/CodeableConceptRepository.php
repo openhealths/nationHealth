@@ -10,6 +10,55 @@ use InvalidArgumentException;
 
 class CodeableConceptRepository extends BaseRepository
 {
+    /** Persist the complete concept without truncating its coding collection. */
+    public function replaceComplete(?SqlCodeableConcept $concept, array $data): SqlCodeableConcept
+    {
+        $concept ??= new SqlCodeableConcept();
+        $concept->text = $data['text'] ?? null;
+        $concept->save();
+        $existing = $concept->coding()->orderBy('id')->get();
+        $keptIds = [];
+        foreach (array_values($data['coding'] ?? []) as $index => $coding) {
+            $row = $existing->get($index) ?? $concept->coding()->make();
+            $row->forceFill([
+                'system' => $coding['system'],
+                'code' => $coding['code'],
+                'display' => $coding['display'] ?? null,
+                'version' => $coding['version'] ?? null,
+                'user_selected' => $coding['userSelected'] ?? null,
+            ])->save();
+            $keptIds[] = $row->id;
+        }
+        $concept->coding()->whereNotIn('id', $keptIds)->delete();
+
+        return $concept;
+    }
+
+    /** The caller must eager-load coding; serialization itself performs no query. */
+    public function toResource(SqlCodeableConcept $concept): array
+    {
+        $data = ['coding' => []];
+        if ($concept->text !== null) {
+            $data['text'] = $concept->text;
+        }
+        foreach ($concept->getRelation('coding')->sortBy('id') as $coding) {
+            $item = ['system' => $coding->system, 'code' => $coding->code];
+            foreach (['display', 'version', 'userSelected'] as $field) {
+                $attribute = $field === 'userSelected' ? 'user_selected' : $field;
+                if (!array_key_exists($attribute, $coding->getAttributes())) {
+                    continue;
+                }
+                $value = $coding->getAttribute($attribute);
+                if ($value !== null) {
+                    $item[$field] = $field === 'userSelected' ? (bool) $value : $value;
+                }
+            }
+            $data['coding'][] = $item;
+        }
+
+        return $data;
+    }
+
     /**
      * Create codeable concept in DB by provided data and attach coding.
      *

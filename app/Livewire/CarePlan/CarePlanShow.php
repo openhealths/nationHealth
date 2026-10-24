@@ -62,8 +62,6 @@ class CarePlanShow extends CarePlanComponent
 
     protected function renderCarePlan()
     {
-        $this->carePlan->load(['person', 'author.party', 'categoryConcept', 'activities.kindConcept.coding']);
-
         return view('livewire.care-plan.care-plan-show');
     }
 

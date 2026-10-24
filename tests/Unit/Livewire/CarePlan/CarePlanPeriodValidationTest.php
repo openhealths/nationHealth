@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Unit\Livewire\CarePlan;
 
 use App\Livewire\CarePlan\Forms\CarePlanForm;
-use App\Repositories\CarePlanRepository;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -45,9 +44,10 @@ class CarePlanPeriodValidationTest extends TestCase
         $rules = array_intersect_key($form->rulesForSigning(), array_flip(['periodStart', 'periodEnd']));
         $this->assertTrue(Validator::make($form->toArray(), $rules)->passes());
 
-        $payload = (new CarePlanRepository())->formatCarePlanRequest(array_replace($form->toArray(), [
+        $payload = \App\Services\MedicalEvents\Fhir::carePlan()->toFhir(array_replace($form->toArray(), [
+            'uuid' => '11111111-1111-4111-8111-111111111111',
             'periodStart' => $form->periodStartIsoDate(), 'periodEnd' => $form->periodEndIsoDate(),
-        ]), null, ['addresses' => []], '11111111-1111-4111-8111-111111111111');
+        ]), ['timezone' => config('app.timezone')]);
         $this->assertSame('2026-11-10', CarbonImmutable::parse($payload['period']['start'])->setTimezone(config('app.timezone'))->toDateString());
         $this->assertSame('2026-11-11', CarbonImmutable::parse($payload['period']['end'])->setTimezone(config('app.timezone'))->toDateString());
     }

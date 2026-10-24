@@ -31,6 +31,7 @@ use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -38,6 +39,48 @@ use Throwable;
  */
 class EncounterRepository extends BaseRepository
 {
+    public function findForStandaloneDocument(int $id, Person|Preperson $patient): Encounter
+    {
+        return Encounter::forPatient($patient)
+            ->with(['episode', 'class', 'performer', 'hospitalization.dischargeDisposition', 'hospitalization.destination'])
+            ->findOrFail($id);
+    }
+
+    /** @return \Illuminate\Support\Collection<int, Condition> */
+    public function primaryDiagnosisConditions(Encounter $encounter): \Illuminate\Support\Collection
+    {
+        $encounter->loadMissing(['diagnoses.role.coding']);
+        $primaryDiagnoses = $encounter->diagnoses->filter(
+            static fn (EncounterDiagnose $diagnosis): bool => $diagnosis->role?->coding->contains('code', 'primary') === true
+        );
+        if ($primaryDiagnoses->count() !== 1) {
+            return collect();
+        }
+
+        $diagnosis = $primaryDiagnoses->first();
+        if ($diagnosis->relationLoaded('conditionModel')) {
+            $condition = $diagnosis->getRelation('conditionModel');
+        } else {
+            $diagnosis->loadMissing('condition');
+            $conditionUuid = $diagnosis->getRelation('condition')?->value;
+            if (!is_string($conditionUuid) || !Str::isUuid($conditionUuid)) {
+                return collect();
+            }
+
+            // Identifier values are varchar; resolve the UUID without a mixed-type join.
+            $condition = Condition::with('code.coding')
+                ->whereUuid($conditionUuid)
+                ->wherePersonId($encounter->person_id)
+                ->first();
+        }
+        if (!$condition instanceof Condition || (int) $condition->personId !== (int) $encounter->person_id) {
+            return collect();
+        }
+        $condition->loadMissing('code.coding');
+
+        return collect([$condition]);
+    }
+
     /**
      * Create encounter in DB for the patient (person or preperson) with related data.
      *

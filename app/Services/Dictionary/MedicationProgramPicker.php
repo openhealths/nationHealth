@@ -24,22 +24,55 @@ final class MedicationProgramPicker
      */
     public static function forCurrentUser(Collection $programs): Collection
     {
+        $filtered = $programs->where('is_active', '=', true);
         $user = Auth::user();
         if (!$user) {
-            return $programs->where('is_active', '=', true);
+            return $filtered;
         }
 
+        $roles = $user->allowedRoles;
         $mainSpeciality = $user->getMainSpeciality(legalEntity());
-        $filtered = $programs->where('is_active', '=', true);
+        $checkSpeciality = $user->hasAllowedRole(Role::SPECIALIST) || $user->hasAllowedRole(Role::DOCTOR);
 
-        if ($user->hasAllowedRole(Role::SPECIALIST) || $user->hasAllowedRole(Role::DOCTOR)) {
-            $filtered = $filtered->filter(function (array $program) use ($mainSpeciality): bool {
-                $allowedSpecialities = Arr::get($program, 'medical_program_settings.speciality_types_allowed', []);
+        return $filtered->filter(static function (array $program) use ($roles, $mainSpeciality, $checkSpeciality): bool {
+            $employeeTypes = Arr::get($program, 'medical_program_settings.employee_types_to_create_request', []);
+            if (!empty($employeeTypes) && $roles->intersect($employeeTypes)->isEmpty()) {
+                return false;
+            }
 
-                return $mainSpeciality->intersect($allowedSpecialities)->isNotEmpty();
-            });
+            $requestSpecialities = Arr::get($program, 'medical_program_settings.speciality_types_request_allowed');
+            $carePlanSpecialities = Arr::get($program, 'medical_program_settings.speciality_types_care_plan_activity_allowed');
+            if (!$checkSpeciality || $requestSpecialities === null || $carePlanSpecialities === null) {
+                return true;
+            }
+
+            return $mainSpeciality->intersect([...$requestSpecialities, ...$carePlanSpecialities])->isNotEmpty();
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $program
+     * @param  array<int, array{system?: string, code?: string}>  $codings
+     */
+    public static function matchesDiagnosis(array $program, array $codings): bool
+    {
+        $allowedIcd10 = Arr::get($program, 'medical_program_settings.conditions_icd10_am_allowed') ?? [];
+        $allowedIcpc2 = Arr::get($program, 'medical_program_settings.conditions_icpc2_allowed') ?? [];
+        if ($allowedIcd10 === [] && $allowedIcpc2 === []) {
+            return true;
         }
 
-        return $filtered;
+        foreach ($codings as $coding) {
+            $allowed = match ($coding['system'] ?? '') {
+                'eHealth/ICD10_AM/condition_codes' => $allowedIcd10,
+                'eHealth/ICPC2/condition_codes' => $allowedIcpc2,
+                default => [],
+            };
+            if (in_array($coding['code'] ?? '', $allowed, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

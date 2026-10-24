@@ -107,9 +107,9 @@ class DeviceRequestComplianceTest extends TestCase
         $user = Mockery::mock(\App\Models\User::class);
         $user->shouldReceive('can')->once()->with('view', $plan)->andReturnTrue();
         \Illuminate\Support\Facades\Auth::shouldReceive('user')->once()->andReturn($user);
-        $service = Mockery::mock(\App\Services\MedicalEvents\CarePlanLifecycleService::class);
-        $service->shouldReceive('getDetails')->once()->with($this->person->uuid, $plan->uuid)->andReturn($record);
-        $this->instance(\App\Services\MedicalEvents\CarePlanLifecycleService::class, $service);
+        $service = Mockery::mock(\App\Classes\eHealth\Api\CarePlan::class);
+        $service->shouldReceive('getRawDetails')->once()->with($this->person->uuid, $plan->uuid)->andReturn($record);
+        $this->instance(\App\Classes\eHealth\Api\CarePlan::class, $service);
         $component = new \App\Livewire\CarePlan\CarePlanShow();
         $component->carePlan = $plan;
         $component->refreshDisplayedDetails();
@@ -133,9 +133,9 @@ class DeviceRequestComplianceTest extends TestCase
         $user = Mockery::mock(\App\Models\User::class);
         $user->shouldReceive('can')->once()->with('view', $plan)->andReturnFalse();
         \Illuminate\Support\Facades\Auth::shouldReceive('user')->once()->andReturn($user);
-        $service = Mockery::mock(\App\Services\MedicalEvents\CarePlanLifecycleService::class);
-        $service->shouldNotReceive('getDetails');
-        $this->instance(\App\Services\MedicalEvents\CarePlanLifecycleService::class, $service);
+        $service = Mockery::mock(\App\Classes\eHealth\Api\CarePlan::class);
+        $service->shouldNotReceive('getRawDetails');
+        $this->instance(\App\Classes\eHealth\Api\CarePlan::class, $service);
         $component = new \App\Livewire\CarePlan\CarePlanShow();
         $component->carePlan = $plan;
         $component->remotePlanDetails = ['requisition' => 'stale'];

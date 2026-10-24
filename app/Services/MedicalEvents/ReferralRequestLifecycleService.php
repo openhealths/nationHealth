@@ -56,9 +56,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
      */
     public function createCarePlanDraft(CarePlan $carePlan, array $formData, float $qty, array $employeeContext): string
     {
-        $activity = CarePlanActivity::query()
-            ->with('carePlan')
-            ->findOrFail($formData['activity_id']);
+        $activity = app(\App\Repositories\CarePlanActivityRepository::class)->findOwned($carePlan->id, (int) $formData['activity_id']);
 
         $resolvedKind = $activity->resolvedKind();
         if (!in_array($resolvedKind, ['service_request', 'device_request'], true)) {
@@ -67,23 +65,27 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
 
         $formData['kind'] = $resolvedKind;
 
+        $existingDraft = $resolvedKind === 'service_request'
+            ? Repository::serviceRequest()->findDraftByActivity((string) $activity->uuid)
+            : null;
+        if ($existingDraft && (int) $existingDraft->personId !== (int) $carePlan->personId) {
+            throw new \InvalidArgumentException(__('care-plan.document_context_unavailable'));
+        }
+
         app(ActivityRemainingQuantityGuard::class)->assertCanIssue(
             (int) $activity->id,
             $qty,
-            function (int $activityId) use ($resolvedKind, $activity): float {
-                $query = $resolvedKind === 'service_request'
-                    ? ServiceRequestRequest::query()
-                    : DeviceRequestRequest::query();
+            function (int $activityId) use ($resolvedKind, $activity, $existingDraft): float {
+                $repository = $resolvedKind === 'service_request' ? Repository::serviceRequest() : Repository::deviceRequest();
 
-                return (float) $query
-                    ->whereHas('basedOn', fn ($q) => $q->where('value', $activity->uuid))
-                    ->whereNotIn('status', ActivityRemainingQuantityGuard::occupyingStatusesExcluded())
-                    ->sum('quantity');
+                return $resolvedKind === 'service_request'
+                    ? $repository->sumIssuedQuantityByActivity((string) $activity->uuid, ActivityRemainingQuantityGuard::occupyingStatusesExcluded(), $existingDraft?->uuid)
+                    : $repository->sumIssuedQuantityByActivity((string) $activity->uuid, ActivityRemainingQuantityGuard::occupyingStatusesExcluded());
             }
         );
 
         $dbData = [
-            'uuid' => (string) Str::uuid(),
+            'uuid' => $existingDraft?->uuid ?? (string) Str::uuid(),
             'employee_id' => $employeeContext['employee_id'] ?? null,
             'person_id' => $carePlan->personId,
             'division_id' => $employeeContext['division_id'] ?? null,

@@ -22,11 +22,13 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Mockery;
 use ReflectionMethod;
+use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\TestCase;
 
 class MedicationRequestSignPayloadTest extends TestCase
 {
     use DatabaseTransactions;
+    use CreatesFhirCarePlans;
 
     protected function migrateDatabases(): void
     {
@@ -104,7 +106,7 @@ class MedicationRequestSignPayloadTest extends TestCase
             'ehealth_inserted_at' => now(),
         ]);
 
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $person->id,
             'author_id' => $employee->id,
@@ -114,7 +116,7 @@ class MedicationRequestSignPayloadTest extends TestCase
             'status' => 'active',
         ]);
 
-        $activity = CarePlanActivity::create([
+        $activity = $this->createFhirCarePlanActivity([
             'uuid' => (string) Str::uuid(),
             'care_plan_id' => $carePlan->id,
             'author_id' => $employee->id,

@@ -9,7 +9,6 @@ use App\Classes\eHealth\Api\MedicalProgram;
 use App\Classes\eHealth\Api\Person as PersonApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
-use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
@@ -32,6 +31,8 @@ use Tests\TestCase;
  */
 class CarePlanEPrescriptionMedicationIdDiagnosticTest extends TestCase
 {
+    use \Tests\Concerns\CreatesFhirCarePlans;
+
     use DatabaseTransactions;
     use GrantsMedicalEventAbilities;
 
@@ -46,6 +47,8 @@ class CarePlanEPrescriptionMedicationIdDiagnosticTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        config(['cipher.api.domain' => 'https://cipher.invalid']);
+        \Illuminate\Support\Facades\Cache::put('knedp_certificate_authority', [], 60);
 
         $this->person = Person::create([
             'uuid' => (string) Str::uuid(),
@@ -125,7 +128,7 @@ class CarePlanEPrescriptionMedicationIdDiagnosticTest extends TestCase
         }
         $this->grantMedicalEventAbilities($this->user);
 
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
             'author_id' => $this->employee->id,
@@ -136,7 +139,7 @@ class CarePlanEPrescriptionMedicationIdDiagnosticTest extends TestCase
         ]);
 
         $innmDosageId = 'aaaaaaaa-bbbb-cccc-dddd-111111111111';
-        $this->carePlanActivity = CarePlanActivity::create([
+        $this->carePlanActivity = $this->createFhirCarePlanActivity([
             'uuid' => (string) Str::uuid(),
             'care_plan_id' => $carePlan->id,
             'author_id' => $this->employee->id,

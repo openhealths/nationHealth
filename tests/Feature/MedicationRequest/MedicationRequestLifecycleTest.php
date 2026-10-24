@@ -18,6 +18,7 @@ use Illuminate\Support\Str;
 use Mockery;
 use Tests\Concerns\CreatesFhirRequestIdentifiers;
 use Tests\Concerns\MocksBasicDictionaries;
+use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\TestCase;
 use Livewire\Livewire;
 use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
@@ -25,6 +26,7 @@ use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
 class MedicationRequestLifecycleTest extends TestCase
 {
     use DatabaseTransactions;
+    use CreatesFhirCarePlans;
     use CreatesFhirRequestIdentifiers;
     use MocksBasicDictionaries;
 
@@ -50,6 +52,9 @@ class MedicationRequestLifecycleTest extends TestCase
     {
         parent::setUp();
         $this->mockBasicDictionaries();
+        $signatureService = Mockery::mock(\App\Services\SignatureService::class);
+        $signatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
+        $this->instance(\App\Services\SignatureService::class, $signatureService);
 
         // 1. Create Patient
         $this->person = Person::create([
@@ -142,7 +147,7 @@ class MedicationRequestLifecycleTest extends TestCase
         $this->grantMedicalEventAbilities($this->user);
 
         // 5. Create Care Plan & Medication Care Plan Activity
-        $carePlan = \App\Models\CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
             'author_id' => $this->employee->id,
@@ -152,7 +157,7 @@ class MedicationRequestLifecycleTest extends TestCase
             'status' => 'active',
         ]);
 
-        $this->carePlanActivity = CarePlanActivity::create([
+        $this->carePlanActivity = $this->createFhirCarePlanActivity([
             'uuid' => (string) Str::uuid(),
             'care_plan_id' => $carePlan->id,
             'author_id' => $this->employee->id,

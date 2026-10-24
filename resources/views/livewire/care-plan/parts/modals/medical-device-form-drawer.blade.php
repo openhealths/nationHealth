@@ -118,8 +118,9 @@
                                     ?? '')
                                 : '';
                             if ($deviceDisplayName === '') {
-                                $deviceDisplayName = $activityForm['product_reference']
-                                    ?: ($activityForm['product_codeable_concept'] ?? '');
+                                $deviceDisplayName = !empty($activityForm['product_reference'])
+                                    ? __('care-plan.device_name_unavailable')
+                                    : ($activityForm['product_codeable_concept'] ?? '');
                             }
                         @endphp
                         <input
@@ -139,6 +140,11 @@
                             </button>
                         @endif
                     </div>
+                    @if (!empty($activityForm['product_reference']))
+                        <p class="mt-1 break-all text-xs text-gray-500 dark:text-gray-400">
+                            {{ __('care-plan.uuid') }}: {{ $activityForm['product_reference'] }}
+                        </p>
+                    @endif
                     <input type="hidden" wire:model="activityForm.product_reference" />
                 </div>
             </div>

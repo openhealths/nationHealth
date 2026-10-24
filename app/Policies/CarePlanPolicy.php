@@ -70,7 +70,7 @@ class CarePlanPolicy
         }
 
         $status = CarePlanStatus::fromStored($carePlan->status);
-        if (!in_array($status, [CarePlanStatus::DRAFT, CarePlanStatus::PENDING], true)) {
+        if ($status !== CarePlanStatus::DRAFT) {
             return Response::denyWithStatus(404);
         }
 
