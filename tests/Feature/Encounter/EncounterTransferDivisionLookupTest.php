@@ -57,7 +57,9 @@ class EncounterTransferDivisionLookupTest extends TestCase
         $this->assertSame($destination, $query['legal_entity_id']);
         $this->assertSame('1', $query['page']);
         $this->assertSame('100', $query['page_size']);
-        $this->assertSame(['90', '180', '-90', '-180'], [$query['north'], $query['east'], $query['south'], $query['west']]);
+        foreach (['north', 'east', 'south', 'west'] as $coordinate) {
+            $this->assertArrayNotHasKey($coordinate, $query);
+        }
         $this->assertArrayNotHasKey('status', $query);
         $this->assertTrue($request->hasHeader('Authorization', 'Bearer source-facility-token'));
     }
@@ -91,6 +93,32 @@ class EncounterTransferDivisionLookupTest extends TestCase
         $this->assertSame([$divisionId], $harness->encounterReferralAllowedDivisionIds);
     }
 
+    public function test_nested_reporting_entries_are_loaded_across_pages(): void
+    {
+        $destination = (string) Str::uuid();
+        $divisionId = (string) Str::uuid();
+        $pages = [];
+        $api = new Division();
+        $api->preventStrayRequests();
+        $api->stub(function (Request $request) use (&$pages, $divisionId) {
+            parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+            $page = (int) $query['page'];
+            $pages[] = $page;
+
+            return Http::response(['data' => [
+                'page' => $page,
+                'total_pages' => 2,
+                'entries' => $page === 1 ? [] : [['id' => $divisionId, 'name' => 'Destination clinic', 'type' => 'CLINIC']],
+            ]]);
+        });
+        $this->instance(Division::class, $api);
+        $harness = new TransferDivisionLookupHarness();
+
+        $this->assertTrue($harness->loadDestination($destination));
+        $this->assertSame([1, 2], $pages);
+        $this->assertSame([$divisionId], $harness->encounterReferralAllowedDivisionIds);
+    }
+
     public function test_failed_lookup_clears_stale_permissions_and_returns_loading_error(): void
     {
         $api = new Division();
@@ -105,6 +133,7 @@ class EncounterTransferDivisionLookupTest extends TestCase
         $this->assertSame([], $harness->encounterReferralAllowedDivisionIds);
         $this->assertSame([], $harness->encounterReferralDivisions);
         $this->assertSame(__('Не вдалося завантажити підрозділи закладу, до якого переводять пацієнта.'), $harness->encounterReferralWarningMessage);
+        $this->assertSame($harness->encounterReferralWarningMessage, session('error'));
     }
 
     public function test_empty_successful_lookup_is_distinct_from_request_failure(): void
@@ -117,7 +146,8 @@ class EncounterTransferDivisionLookupTest extends TestCase
 
         $this->assertTrue($harness->loadDestination((string) Str::uuid()));
         $this->assertSame([], $harness->encounterReferralAllowedDivisionIds);
-        $this->assertSame('', $harness->encounterReferralWarningMessage);
+        $this->assertSame(__('encounters.referral_no_eligible_divisions'), $harness->encounterReferralWarningMessage);
+        $this->assertSame($harness->encounterReferralWarningMessage, session('warning'));
     }
 }
 

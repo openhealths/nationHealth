@@ -5,182 +5,199 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\MedicalEvents\Mappers;
 
 use App\Services\MedicalEvents\Mappers\MedicationRequestMapper;
+use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
-/**
- * The mapper is a pure transformation over arrays, so these tests need neither the
- * database nor model factories.
- */
 class MedicationRequestMapperTest extends TestCase
 {
-    private const array UUIDS = [
-        'person_uuid' => 'pat-123',
-        'employee_uuid' => 'emp-123',
-        'division_uuid' => 'div-123',
-        'legal_entity_uuid' => 'le-123',
-    ];
-
-    public function test_create_request_payload_carries_the_core_prescription_fields(): void
+    private function detail(): array
     {
-        $payload = (new MedicationRequestMapper())->toCreateRequestPayload([
-            'uuid' => 'req-123',
-            'started_at' => '2026-01-01',
-            'ended_at' => '2026-02-01',
-            'medication_id' => 'med-123',
-            'medication_qty' => 10,
-            'medication_program_id' => 'prog-123',
-            'intent' => 'order',
-            'category' => 'inpatient',
-        ], self::UUIDS);
-
-        $request = $payload['medication_request_request'];
-
-        $this->assertSame('pat-123', $request['person_id']);
-        $this->assertSame('emp-123', $request['employee_id']);
-        $this->assertSame('div-123', $request['division_id']);
-        $this->assertSame('2026-01-01', $request['started_at']);
-        $this->assertSame('2026-02-01', $request['ended_at']);
-        $this->assertSame('med-123', $request['medication_id']);
-        $this->assertSame(10.0, $request['medication_qty']);
-        $this->assertSame('prog-123', $request['medical_program_id']);
-        $this->assertSame('order', $request['intent']);
-        $this->assertSame('inpatient', $request['category']);
+        return json_decode(file_get_contents(base_path('tests/Fixtures/medication-request-detail.json')), true, flags: JSON_THROW_ON_ERROR);
     }
 
-    public function test_create_request_payload_defaults_the_category_to_community(): void
+    public function test_complete_native_detail_survives_form_round_trip(): void
     {
-        $payload = (new MedicationRequestMapper())->toCreateRequestPayload([
-            'medication_id' => 'med-123',
-            'medication_qty' => 1,
-        ], self::UUIDS);
-
-        $this->assertSame('community', $payload['medication_request_request']['category']);
-        $this->assertSame('order', $payload['medication_request_request']['intent']);
+        $mapper = new MedicationRequestMapper();
+        $resource = $mapper->fromEHealth($this->detail());
+        $this->assertEquals($resource, $mapper->toFhir($mapper->fromFhir($resource), ['resource' => $resource]));
+        $this->assertFalse($resource['dosageInstruction'][0]['asNeededBoolean']);
+        $this->assertSame(0, $resource['dosageInstruction'][0]['doseAndRate'][0]['doseRange']['low']['value']);
+        $this->assertArrayNotHasKey('seed', $resource);
+        $this->assertSame('88888888-8888-4888-8888-888888888888', $mapper->fromFhir($resource)['based_on_uuid']);
+        $this->assertSame('33333333-3333-4333-8333-333333333333', $resource['requester']['identifier']['value']);
+        $this->assertSame(0.123456789, $resource['quantity']['value']);
     }
 
-    public function test_a_care_plan_prescription_is_linked_to_both_the_plan_and_the_activity(): void
+    public function test_native_create_preserves_all_dosage_datatypes_and_uses_object_dose_and_rate(): void
     {
-        $payload = (new MedicationRequestMapper())->toCreateRequestPayload([
-            'medication_id' => 'med-123',
-            'medication_qty' => 1,
-            'based_on_uuid' => 'act-123',
-        ], self::UUIDS, 'cp-123');
-
-        $basedOn = $payload['medication_request_request']['based_on'];
-
-        $this->assertCount(2, $basedOn);
-        $this->assertSame('care_plan', $basedOn[0]['identifier']['type']['coding'][0]['code']);
-        $this->assertSame('cp-123', $basedOn[0]['identifier']['value']);
-        $this->assertSame('activity', $basedOn[1]['identifier']['type']['coding'][0]['code']);
-        $this->assertSame('act-123', $basedOn[1]['identifier']['value']);
+        $mapper = new MedicationRequestMapper();
+        $detail = $this->detail();
+        $resource = $mapper->fromEHealth($detail);
+        $wire = $mapper->toCreateRequestPayload($mapper->fromFhir($resource), ['resource' => $resource])['medication_request_request'];
+        $this->assertEquals($detail['dosage_instruction'], $wire['dosage_instruction']);
+        $this->assertSame($detail['based_on'], $wire['based_on']);
+        $this->assertSame($detail['container_dosage'], $wire['container_dosage']);
+        $this->assertSame($detail['person']['id'], $wire['person_id']);
+        $this->assertSame($detail['medication_info']['medication_id'], $wire['medication_id']);
+        $this->assertArrayNotHasKey('id', $wire);
+        $this->assertArrayNotHasKey('seed', $wire);
+        $this->assertArrayNotHasKey('medicationReference', $wire);
     }
 
-    public function test_a_standalone_prescription_is_not_linked_to_a_care_plan(): void
+    public function test_multiple_instructions_and_as_needed_concept_are_preserved(): void
     {
-        $payload = (new MedicationRequestMapper())->toCreateRequestPayload([
-            'medication_id' => 'med-123',
-            'medication_qty' => 1,
-        ], self::UUIDS);
-
-        $this->assertArrayNotHasKey('based_on', $payload['medication_request_request']);
+        $mapper = new MedicationRequestMapper();
+        $detail = $this->detail();
+        $second = $detail['dosage_instruction'][0];
+        unset($second['as_needed_boolean']);
+        $second['as_needed_codeable_concept'] = ['coding' => [['system' => 'eHealth/SNOMED/medication_as_needed_reason_codes', 'code' => '144008']]];
+        $second['sequence'] = 2;
+        $second['dose_and_rate'] = ['dose_quantity' => ['value' => 0.01, 'unit' => 'mg', 'system' => 'eHealth/ucum/units', 'code' => 'mg'], 'rate_range' => ['low' => ['value' => 0, 'unit' => 'mg'], 'high' => ['value' => 1, 'unit' => 'mg']]];
+        $detail['dosage_instruction'][] = $second;
+        $resource = $mapper->fromEHealth($detail);
+        $wire = $mapper->toCreateRequestPayload($mapper->fromFhir($resource), ['resource' => $resource])['medication_request_request'];
+        $this->assertEquals($detail['dosage_instruction'], $wire['dosage_instruction']);
     }
 
-    public function test_inform_with_is_reduced_to_the_authentication_method_id(): void
+    public function test_editing_note_preserves_unrepresented_timing_and_reference_codings(): void
     {
-        $payload = (new MedicationRequestMapper())->toCreateRequestPayload([
-            'medication_id' => 'med-123',
-            'medication_qty' => 1,
-            'inform_with' => 'auth-method-1|OTP|+380991112233',
-        ], self::UUIDS);
-
-        $this->assertSame('auth-method-1', $payload['medication_request_request']['inform_with']);
+        $mapper = new MedicationRequestMapper();
+        $resource = $mapper->fromEHealth($this->detail());
+        $edited = $mapper->toFhir(['note' => 'Updated'], ['resource' => $resource]);
+        $this->assertSame('Updated', $edited['note']);
+        unset($edited['note'], $resource['note']);
+        $this->assertSame($resource, $edited);
     }
 
-    public function test_container_dosage_is_expanded_from_its_pipe_encoded_form(): void
+    public function test_mapping_does_not_allocate_identity(): void
     {
-        $payload = (new MedicationRequestMapper())->toCreateRequestPayload([
-            'medication_id' => 'med-123',
-            'medication_qty' => 1,
-            'container_dosage' => '2.5|мл|MILLILITER',
-        ], self::UUIDS);
-
-        $this->assertSame([
-            'system' => 'MEDICATION_UNIT',
-            'code' => 'MILLILITER',
-            'value' => 2.5,
-        ], $payload['medication_request_request']['container_dosage']);
+        $this->expectException(InvalidArgumentException::class);
+        (new MedicationRequestMapper())->toFhir(['medication_id' => 'medication']);
     }
 
-    public function test_dosage_instructions_are_mapped_with_dose_and_maximum_per_administration(): void
+    public function test_create_does_not_invent_date_text_route_or_units(): void
     {
-        $payload = (new MedicationRequestMapper())->toCreateRequestPayload([
-            'medication_id' => 'med-123',
-            'medication_qty' => 1,
-            'dosage_instructions' => [
-                [
-                    'sequence' => 1,
-                    'text' => 'Приймати 1 таблетку',
-                    'max_dose_per_administration' => 1,
-                    'dose_and_rate' => [
-                        ['dose_quantity_value' => 2, 'dose_quantity_unit' => 'мг'],
-                    ],
-                ],
-            ],
-        ], self::UUIDS);
-
-        $dosage = $payload['medication_request_request']['dosage_instruction'][0];
-
-        $this->assertSame('Приймати 1 таблетку', $dosage['text']);
-        $this->assertSame('Приймати 1 таблетку', $dosage['patient_instruction']);
-        $this->assertSame(2.0, $dosage['dose_and_rate']['dose_quantity']['value']);
-        $this->assertSame('мг', $dosage['dose_and_rate']['dose_quantity']['unit']);
-        $this->assertSame(1.0, $dosage['max_dose_per_administration']['value']);
-        $this->assertSame('мг', $dosage['max_dose_per_administration']['unit']);
+        $mapper = new MedicationRequestMapper();
+        $wire = $mapper->toCreateRequestPayload(['medication_id' => 'medication', 'medication_qty' => 0], []);
+        $this->assertArrayNotHasKey('created_at', $wire['medication_request_request']);
+        $this->assertArrayNotHasKey('dosage_instruction', $wire['medication_request_request']);
+        $this->assertSame(0.0, $wire['medication_request_request']['medication_qty']);
     }
 
-    public function test_a_dosage_instruction_without_text_falls_back_to_the_doctor_wording(): void
+    public function test_scalar_daily_dose_reports_a_ukrainian_message_with_the_field_name(): void
     {
-        $payload = (new MedicationRequestMapper())->toCreateRequestPayload([
-            'medication_id' => 'med-123',
-            'medication_qty' => 1,
-            'dosage_instructions' => [['sequence' => 1]],
-        ], self::UUIDS);
+        $this->app->setLocale('uk');
+        $mapper = new MedicationRequestMapper();
+        $resource = $mapper->fromEHealth($this->detail());
+        $resource['dosageInstruction'][0]['maxDosePerPeriod'] = 1;
 
-        $this->assertSame(
-            'За призначенням лікаря',
-            $payload['medication_request_request']['dosage_instruction'][0]['text']
-        );
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(__('care-plan.medication_dosage_structure_required', [
+            'field' => 'Максимальна добова доза',
+        ]));
+
+        $mapper->toCreateRequestPayload($mapper->fromFhir($resource), ['resource' => $resource]);
     }
 
-    public function test_fhir_representation_identifies_the_patient_employee_and_legal_entity(): void
+    public function test_scalar_form_doses_use_catalog_quantity_units_and_a_one_day_ratio(): void
     {
-        $fhir = (new MedicationRequestMapper())->toFhir([
-            'uuid' => 'req-123',
-            'medication_id' => 'med-123',
-            'category' => 'community',
-        ], self::UUIDS);
+        $mapper = new MedicationRequestMapper();
+        $form = [
+            'signature_text' => 'Synthetic instruction',
+            'patient_instruction' => '',
+            'max_dose_per_administration' => '0.5',
+            'max_dose_per_period' => '1.5',
+            'medication_unit' => 'untrusted display unit',
+            'route' => 'oral',
+        ];
+        $medication = [
+            'form' => 'SOLUTION',
+            'ingredients' => [['name' => 'Synthetic ingredient', 'dosage' => ['denumerator_unit' => 'ML']]],
+        ];
+        $form['dosage_instructions'] = $mapper->dosageInstructionsFromForm($form, $medication);
+        $wire = $mapper->toCreateRequestPayload($form, [])['medication_request_request']['dosage_instruction'][0];
 
-        $this->assertSame('req-123', $fhir['id']);
-        $this->assertSame('draft', $fhir['status']);
-        $this->assertSame('order', $fhir['intent']);
-        $this->assertSame('med-123', $fhir['medicationCodeableConcept']['coding'][0]['code']);
-        $this->assertSame('pat-123', $fhir['subject']['identifier']['value']);
-        $this->assertSame('emp-123', $fhir['requester']['agent']['identifier']['value']);
-        $this->assertSame('le-123', $fhir['requester']['onBehalfOf']['identifier']['value']);
+        $this->assertSame(0.5, $wire['max_dose_per_administration']['value']);
+        $this->assertSame('ML', $wire['max_dose_per_administration']['unit']);
+        $this->assertSame(1.5, $wire['max_dose_per_period']['numerator']['value']);
+        $this->assertSame('ML', $wire['max_dose_per_period']['numerator']['unit']);
+        $this->assertSame(['value' => 1, 'unit' => 'd', 'system' => 'eHealth/ucum/units', 'code' => 'd'], $wire['max_dose_per_period']['denominator']);
+        $this->assertFalse($wire['as_needed_boolean']);
+        $this->assertArrayNotHasKey('patient_instruction', $wire);
+        $this->assertSame('Synthetic instruction', $wire['text']);
     }
 
-    public function test_fhir_representation_links_the_originating_activity(): void
+    public function test_medication_unit_can_use_the_catalog_package_numerator_unit(): void
     {
-        $fhir = (new MedicationRequestMapper())->toFhir([
-            'uuid' => 'req-123',
-            'medication_id' => 'med-123',
-            'based_on_uuid' => 'act-123',
-        ], self::UUIDS);
+        $this->assertSame('ML', (new MedicationRequestMapper())->medicationUnit([
+            'form' => 'SOLUTION',
+            'packages' => [['container_dosage' => ['numerator_unit' => 'ML']]],
+        ]));
+    }
 
-        $this->assertSame('act-123', $fhir['basedOn'][0]['identifier']['value']);
-        $this->assertSame(
-            'care_plan_activity',
-            $fhir['basedOn'][0]['identifier']['type']['coding'][0]['code']
-        );
+    public function test_dosage_without_catalog_units_is_rejected_instead_of_using_the_form_name(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(__('care-plan.medication_dosage_unit_unavailable'));
+        (new MedicationRequestMapper())->dosageInstructionsFromForm([
+            'signature_text' => 'Synthetic instruction',
+            'medication_unit' => 'SOLUTION',
+            'max_dose_per_administration' => '1',
+            'max_dose_per_period' => '1',
+        ], ['form' => 'SOLUTION']);
+    }
+
+    public static function unsafeDosages(): array
+    {
+        return [
+            'missing required instruction text' => ['text', null],
+            'scalar maximum without quantity units' => ['maxDosePerAdministration', 1],
+            'scalar maximum without ratio denominator' => ['maxDosePerPeriod', 1],
+            'two incompatible asNeeded choices' => ['asNeededCodeableConcept', ['text' => 'reason']],
+            'two dose choices' => ['doseAndRate', [['doseQuantity' => ['value' => 1], 'doseRange' => ['low' => ['value' => 1]]]]],
+            'multiple dose objects cannot be collapsed' => ['doseAndRate', [['doseQuantity' => ['value' => 1]], ['doseQuantity' => ['value' => 2]]]],
+        ];
+    }
+
+    #[DataProvider('unsafeDosages')]
+    public function test_ambiguous_dosage_is_rejected_before_api(string $field, mixed $value): void
+    {
+        $mapper = new MedicationRequestMapper();
+        $resource = $mapper->fromEHealth($this->detail());
+        if ($value === null) {
+            unset($resource['dosageInstruction'][0][$field]);
+        } else {
+            $resource['dosageInstruction'][0][$field] = $value;
+        }
+        $this->expectException(InvalidArgumentException::class);
+        $mapper->toCreateRequestPayload(['uuid' => $resource['id']], ['resource' => $resource]);
+    }
+
+    public static function invalidDates(): array
+    {
+        return [['2026-02-30'], ['2026-10-19T23:00:00-07:00'], ['19.10.2026']];
+    }
+
+    #[DataProvider('invalidDates')]
+    public function test_calendar_dates_are_not_guessed_or_timezone_shifted(string $value): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        (new MedicationRequestMapper())->toCreateRequestPayload(['created_at' => $value], []);
+    }
+
+    public function test_local_payload_cannot_be_reconstructed_for_signing(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        (new MedicationRequestMapper())->toCreateSignedContent([], []);
+    }
+
+    public function test_prequalify_moves_only_program_id_outside_request(): void
+    {
+        $mapper = new MedicationRequestMapper();
+        $resource = $mapper->fromEHealth($this->detail());
+        $wire = $mapper->toPrequalifyPayload($mapper->fromFhir($resource), ['resource' => $resource]);
+        $this->assertSame([['id' => '66666666-6666-4666-8666-666666666666']], $wire['programs']);
+        $this->assertArrayNotHasKey('medical_program_id', $wire['medication_request_request']);
     }
 }

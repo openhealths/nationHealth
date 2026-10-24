@@ -4,168 +4,120 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\MedicalEvents;
 
-use App\Models\CarePlan;
-use App\Models\CarePlanActivity;
-use App\Models\Employee\Employee;
-use App\Models\LegalEntity;
-use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\MedicalEvents\Sql\Identifier;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
-use App\Models\MedicalEvents\Sql\Coding;
 use App\Classes\eHealth\Api\Patient\MedicationRequest as MedicationRequestApi;
+use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\Person\Person;
-use App\Models\User;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
-use Mockery;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionMethod;
+use RuntimeException;
 use Tests\TestCase;
 
 class MedicationRequestSignPayloadTest extends TestCase
 {
     use DatabaseTransactions;
 
-    protected function migrateDatabases(): void
+    private function detail(): array
     {
-        $this->artisan('migrate:fresh', [
-            '--path' => [
-                database_path('migrations'),
-                database_path('migrations/install'),
-                database_path('migrations/update/0_1'),
-            ],
-            '--realpath' => true,
-        ]);
+        return json_decode(file_get_contents(base_path('tests/Fixtures/medication-request-sign-detail.json')), true, flags: JSON_THROW_ON_ERROR);
     }
 
-    public function test_build_sign_payload_fallback_resolves_activity_and_care_plan_without_stored_ehealth_payload(): void
+    private function prepare(array $response, int $httpStatus = 200): array
     {
-        $person = Person::create([
-            'uuid' => (string) Str::uuid(),
-            'birth_date' => '1990-01-01',
-            'gender' => 'MALE',
-            'patient_signed' => true,
-            'process_disclosure_data_consent' => true,
-        ]);
+        $native = $this->detail();
+        $person = Person::create(['uuid' => $native['person']['id'], 'birth_date' => '1990-01-01', 'gender' => 'MALE']);
+        $record = MedicationRequestRequest::create(['uuid' => $native['id'], 'person_id' => $person->id, 'status' => 'NEW', 'ehealth_payload' => array_replace($native, ['seed' => 'stale-cache'])]);
+        $encounter = new Encounter(['person_id' => $person->id]);
+        Http::preventStrayRequests();
+        Http::fake(['*' => Http::response(['data' => $response], $httpStatus)]);
+        $factory = Http::getFacadeRoot();
+        $api = new MedicationRequestApi($factory);
+        $api->stub((function () {
+            return $this->stubCallbacks;
+        })->call($factory));
+        $this->instance(MedicationRequestApi::class, $api);
 
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        return [$encounter, $record];
+    }
 
-        $legalEntity = LegalEntity::create([
-            'uuid' => (string) Str::uuid(),
-            'status' => 'ACTIVE',
-            'sync_status' => 'COMPLETED',
-            'legal_entity_type_id' => $typeId,
-            'is_active' => true,
-        ]);
+    public function test_sign_payload_is_exact_fresh_native_detail_even_when_cache_exists(): void
+    {
+        $native = $this->detail();
+        [$encounter, $record] = $this->prepare($native);
+        $method = new ReflectionMethod(MedicationRequestLifecycleService::class, 'buildSignPayload');
+        $payload = $method->invoke(app(MedicationRequestLifecycleService::class), $encounter, $record, 'different-form-auth-method');
+        $this->assertSame($native, $payload);
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request) => $request->method() === 'GET'
+            && str_ends_with($request->url(), '/api/persons/'.$native['person']['id'].'/medication_request_requests/'.$native['id']));
+    }
 
-        $party = \App\Models\Relations\Party::create([
-            'uuid' => (string) Str::uuid(),
-            'first_name' => 'Тест',
-            'last_name' => 'Лікар',
-            'tax_id' => '1234567890',
-            'birth_date' => '1980-01-01',
-            'gender' => 'MALE',
-        ]);
+    public function test_a_seed_returned_by_the_server_is_preserved_unchanged(): void
+    {
+        $native = array_replace($this->detail(), ['seed' => 'fresh-server-seed']);
+        [$encounter, $record] = $this->prepare($native);
+        $payload = (new ReflectionMethod(MedicationRequestLifecycleService::class, 'buildSignPayload'))
+            ->invoke(app(MedicationRequestLifecycleService::class), $encounter, $record, '');
 
-        $user = User::create([
-            'uuid' => (string) Str::uuid(),
-            'email' => 'sign_fallback_' . Str::random(6) . '@example.com',
-            'password' => Hash::make('password'),
-            'party_id' => $party->id,
-        ]);
+        $this->assertSame($native, $payload);
+    }
 
-        $employee = Employee::create([
-            'uuid' => (string) Str::uuid(),
-            'full_name' => 'Тест Лікар',
-            'employee_type' => 'DOCTOR',
-            'status' => 'APPROVED',
-            'legal_entity_id' => $legalEntity->id,
-            'is_active' => true,
-            'position' => 'Doctor',
-            'start_date' => now()->format('Y-m-d'),
-            'user_id' => $user->id,
-            'party_id' => $party->id,
-        ]);
+    public function test_a_short_summary_with_valid_identity_and_seed_cannot_be_signed(): void
+    {
+        $native = $this->detail();
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(__('medication-requests.signing_details_incomplete'));
+        MedicationRequestApi::signableDetail([
+            'id' => $native['id'],
+            'person' => $native['person'],
+            'status' => 'NEW',
+            'seed' => 'fresh-server-seed',
+        ], $native['person']['id'], $native['id']);
+    }
 
-        $identifierId = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => (string) Str::uuid()])->id;
-        $codingId = \App\Models\MedicalEvents\Sql\Coding::create(['code' => 'AMB', 'system' => 'eHealth/encounter_classes'])->id;
-        $ccId = \App\Models\MedicalEvents\Sql\CodeableConcept::create()->id;
+    public static function invalidDetails(): array
+    {
+        return [
+            'wrong identity' => ['id', '00000000-0000-4000-8000-000000000000'],
+            'wrong patient' => ['person', ['id' => '00000000-0000-4000-8000-000000000000']],
+            'not NEW' => ['status', 'SIGNED'],
+            'invalid null seed' => ['seed', null],
+            'empty seed' => ['seed', ''],
+            'missing medication details' => ['medication_info', []],
+            'missing dosage' => ['dosage_instruction', []],
+        ];
+    }
 
-        $encounter = Encounter::create([
-            'uuid' => (string) Str::uuid(),
-            'person_id' => $person->id,
-            'status' => 'finished',
-            'episode_id' => $identifierId,
-            'class_id' => $codingId,
-            'type_id' => $ccId,
-            'ehealth_inserted_at' => now(),
-        ]);
+    #[DataProvider('invalidDetails')]
+    public function test_inconsistent_details_fail_before_signing(string $field, mixed $value): void
+    {
+        $native = $this->detail();
+        $native[$field] = $value;
+        [$encounter, $record] = $this->prepare($native);
+        $this->expectException(RuntimeException::class);
+        (new ReflectionMethod(MedicationRequestLifecycleService::class, 'buildSignPayload'))->invoke(app(MedicationRequestLifecycleService::class), $encounter, $record, '');
+    }
 
-        $carePlan = CarePlan::create([
-            'uuid' => (string) Str::uuid(),
-            'person_id' => $person->id,
-            'author_id' => $employee->id,
-            'legal_entity_id' => $legalEntity->id,
-            'period_start' => now()->format('Y-m-d'),
-            'title' => 'Sign fallback plan',
-            'status' => 'active',
-        ]);
+    public function test_failed_get_cannot_fall_back_to_cached_or_local_content(): void
+    {
+        [$encounter, $record] = $this->prepare([], 403);
+        $this->expectException(\App\Exceptions\EHealth\EHealthResponseException::class);
+        (new ReflectionMethod(MedicationRequestLifecycleService::class, 'buildSignPayload'))->invoke(app(MedicationRequestLifecycleService::class), $encounter, $record, '');
+    }
 
-        $activity = CarePlanActivity::create([
-            'uuid' => (string) Str::uuid(),
-            'care_plan_id' => $carePlan->id,
-            'author_id' => $employee->id,
-            'status' => 'scheduled',
-            'kind' => 'medication_request',
-            'product_reference' => 'INN-101',
-            'quantity' => 10.0,
-            'program' => 'program-1',
-        ]);
+    public static function unconfirmedTransitions(): array
+    {
+        return [[[]], [['status' => 'pending']], [['error' => ['message' => 'rejected']]], [['id' => '11111111-1111-4111-8111-111111111111', 'status' => 'processing']], [['status' => 'pending', 'data' => ['id' => '11111111-1111-4111-8111-111111111111', 'status' => 'ACTIVE']]]];
+    }
 
-        $requestRecord = MedicationRequestRequest::create([
-            'uuid' => (string) Str::uuid(),
-            'employee_id' => $employee->id,
-            'person_id' => $person->id,
-            'status' => 'new',
-            'medication_id' => 'INN-101',
-            'medication_qty' => 10.0,
-            'intent_id' => Coding::create(['code' => 'order', 'system' => 'http://hl7.org/fhir/request-intent'])->id,
-            'category_id' => CodeableConcept::create(['text' => 'community'])->id,
-            'based_on_id' => Identifier::create(['value' => $activity->uuid])->id,
-            'context_id' => Identifier::create(['value' => $encounter->uuid])->id,
-            'ehealth_payload' => null,
-            'started_at' => now()->toDateString(),
-            'ended_at' => now()->addDays(14)->toDateString(),
-        ]);
-
-        $requestRecord->dosageInstructions()->create([
-            'sequence' => 1,
-            'text' => 'По 1 таблетці',
-            'patient_instruction' => 'По 1 таблетці',
-            'route' => 'oral',
-            'dose_and_rate' => json_encode([
-                ['dose_quantity_value' => 1.0, 'dose_quantity_unit' => 'од.'],
-            ]),
-            'max_dose_per_administration' => 1.0,
-            'max_dose_per_period' => 1.0,
-        ]);
-
-        $mockApi = Mockery::mock(MedicationRequestApi::class);
-        $mockApi->shouldReceive('getRequestsBySearchParams')
-            ->andThrow(new \RuntimeException('remote payload unavailable'));
-        $this->instance(MedicationRequestApi::class, $mockApi);
-
-        $service = app(MedicationRequestLifecycleService::class);
-        $method = new ReflectionMethod($service, 'buildSignPayload');
-        $method->setAccessible(true);
-
-        $payload = $method->invoke($service, $carePlan->fresh(['person']), $requestRecord->fresh(['dosageInstructions']), '');
-
-        $this->assertIsArray($payload);
-        $this->assertNotEmpty($payload);
-        $this->assertSame('INN-101', data_get($payload, 'medication_id') ?? data_get($payload, 'medication.identifier.value'));
+    #[DataProvider('unconfirmedTransitions')]
+    public function test_unconfirmed_mutation_cannot_advance_local_state(array $response): void
+    {
+        $this->expectException(RuntimeException::class);
+        MedicationRequestApi::mutationResult($response, ['ACTIVE']);
     }
 }

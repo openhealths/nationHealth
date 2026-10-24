@@ -1,0 +1,17 @@
+{
+    "id": "8d08ce22-82dd-4ac4-bdb9-432fd5aad5dd",
+    "title": "Synthetic care plan",
+    "intent": "order",
+    "status": "new",
+    "category": {"coding": [{"system": "eHealth/care_plan_categories", "code": "TEST", "display": "Synthetic category"}], "text": "Keep category text"},
+    "termsOfService": {"coding": [{"system": "PROVIDING_CONDITION", "code": "OUTPATIENT"}], "text": "Keep terms text"},
+    "period": {"start": "2026-10-19T10:20:30.123Z", "end": null},
+    "author": {"identifier": {"type": {"coding": [{"system": "eHealth/resources", "code": "employee"}]}, "value": "47ee824a-eb47-48ef-8d30-1109e3c89f0c"}, "displayValue": "Synthetic author"},
+    "encounter": {"identifier": {"type": {"coding": [{"system": "eHealth/resources", "code": "encounter"}]}, "value": "f0579e07-58aa-40c2-a2c7-5ee5e7e820ee"}},
+    "contributor": [{"identifier": {"type": {"coding": [{"system": "eHealth/resources", "code": "employee"}]}, "value": "8ae23990-0133-4fbb-a50d-181a80e780cc"}, "displayValue": "Synthetic contributor"}],
+    "addresses": [{"coding": [{"system": "eHealth/ICD10_AM/condition_codes", "code": "A00"}]}],
+    "supportingInfo": [
+        {"identifier": {"type": {"coding": [{"system": "eHealth/resources", "code": "episode_of_care"}]}, "value": "19de152b-eead-4b3d-acef-8b5eaf1c5d0f"}, "displayValue": "Synthetic episode"},
+        {"identifier": {"type": {"coding": [{"system": "eHealth/resources", "code": "procedure"}]}, "value": "915c394e-656a-4adf-b199-f94c3253032b"}}
+    ]
+}

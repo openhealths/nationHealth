@@ -10,6 +10,13 @@ return [
     'placeholder_status' => 'Активні, Відмінені',
     'btn_reset' => 'Скинути фільтри',
 
+    'period_fields' => [
+        'start_time' => 'Час початку',
+        'end_time' => 'Час завершення',
+        'date_placeholder' => 'дд.мм.рррр',
+        'time_placeholder' => 'гг:хх',
+    ],
+
     'registry' => [
         'from' => 'З',
         'to' => 'По',

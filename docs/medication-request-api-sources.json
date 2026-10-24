@@ -1,0 +1,91 @@
+{
+  "retrievedAt": "2026-10-19",
+  "api": {
+    "url": "https://docs.ehealth.gov.ua/scalar-docs/general-mis.json",
+    "version": "9.15.3",
+    "sha256": "d3ad2c8bb7a8e086186c52f41ad8cdaf30ff932cb0647b1c9ed1e471a3535837"
+  },
+  "confluence": [
+    {
+      "id": "17570693379",
+      "title": "REST API Create Medication Request Request [API-005-044-0002]",
+      "url": "https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17570693379",
+      "retrieved_at": "2026-10-19T19:03:43.963251+00:00",
+      "page_version": 51,
+      "page_updated_at": "2026-10-15T14:26:47.589Z",
+      "sha256": "b37e7114542a93eb35d3222386dcb1b35b327e48790efe59ddb8e2273a93488f"
+    },
+    {
+      "id": "17570660609",
+      "title": "REST API PreQualify Medication Request Request [API-005-044-0001]",
+      "url": "https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17570660609",
+      "retrieved_at": "2026-10-19T19:03:43.659037+00:00",
+      "page_version": 42,
+      "page_updated_at": "2026-10-15T14:26:46.538Z",
+      "sha256": "f9f2a7174b64ad8e775196779a6074ba5dedfe8111e6ad775dfa0347f4d1ad39"
+    },
+    {
+      "id": "17570824338",
+      "title": "REST API Sign Medication Request Request [API-005-044-0006]",
+      "url": "https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17570824338",
+      "retrieved_at": "2026-10-19T19:03:43.885740+00:00",
+      "page_version": 39,
+      "page_updated_at": "2026-10-18T11:01:35.262Z",
+      "sha256": "d0364c2a41393580e7326c535f59160c9ddb17676c8f71ba17029b159b6a96e6"
+    },
+    {
+      "id": "17570529446",
+      "title": "REST API Get Medication Request Requests Details [API-005-044-0005]",
+      "url": "https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17570529446",
+      "retrieved_at": "2026-10-19T19:03:43.894767+00:00",
+      "page_version": 37,
+      "page_updated_at": "2026-10-15T14:26:47.156Z",
+      "sha256": "2e6bad4babca8375962d101c03345e78e6547e8021edd6e60f76a656a49078ab"
+    },
+    {
+      "id": "17570103587",
+      "title": "REST API Get Medication Requests Details [API-005-043-0005]",
+      "url": "https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17570103587",
+      "retrieved_at": "2026-10-19T19:03:44.349354+00:00",
+      "page_version": 38,
+      "page_updated_at": "2026-10-15T14:26:55.579Z",
+      "sha256": "d4e65206d042e99510d8f79a4654234dffa877096d0f5026d37e3211783ee09e"
+    },
+    {
+      "id": "17570758873",
+      "title": "REST API Reject Medication Request [API-005-043-0006]",
+      "url": "https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17570758873",
+      "retrieved_at": "2026-10-19T19:03:44.482167+00:00",
+      "page_version": 31,
+      "page_updated_at": "2026-10-15T14:26:55.900Z",
+      "sha256": "80fba89ff15f446d8a3755249d2c3f49d73daea7a4abbab9b47a36f7ca45bac0"
+    },
+    {
+      "id": "17570529463",
+      "title": "REST API Reject Medication Request Request [API-005-044-0007]",
+      "url": "https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17570529463",
+      "retrieved_at": "2026-10-19T19:03:44.610704+00:00",
+      "page_version": 35,
+      "page_updated_at": "2026-10-15T14:26:47.644Z",
+      "sha256": "3124d4e827179506dbd412be4569eca71bca85831756d359f5baa55d59b3ad35"
+    },
+    {
+      "id": "17358782570",
+      "title": "Medication Request Request [ENT-044]",
+      "url": "https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17358782570",
+      "retrieved_at": "2026-10-19T19:03:44.815644+00:00",
+      "page_version": 55,
+      "page_updated_at": "2026-06-03T08:13:48.355Z",
+      "sha256": "b1fc0c6808202b468207fe2a49fbfaceb4f01507929176376620191ae99fa6a6"
+    },
+    {
+      "id": "17359110269",
+      "title": "Medication Request [ENT-043]",
+      "url": "https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17359110269",
+      "retrieved_at": "2026-10-19T19:03:45.022157+00:00",
+      "page_version": 55,
+      "page_updated_at": "2026-10-05T08:08:43.208Z",
+      "sha256": "1a34bd047d92297c99b0779aca5e2e3f80aff50fbb24c65c8bf22310bf7a89f2"
+    }
+  ]
+}

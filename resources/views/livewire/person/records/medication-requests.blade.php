@@ -1,4 +1,4 @@
-﻿<x-layouts.patient :showLegacyMessages="false" :personId="$personId" :patientFullName="$patientFullName">
+<x-layouts.patient :showLegacyMessages="false" :personId="$personId" :patientFullName="$patientFullName">
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
 
     <x-slot name="headerActions">
@@ -67,6 +67,9 @@
             @if (!$isSearchMode)
                 <div class="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
                     <p>{{ __('medication-requests.legacy_import_note') }}</p>
+                    <button type="button" wire:click="synchronizeSignedPrescriptions" wire:loading.attr="disabled" class="mt-2 mr-4 underline">
+                        {{ __('medication-requests.synchronize_signed_details') }}
+                    </button>
                     <button type="button" wire:click="searchInEHealth" wire:loading.attr="disabled" class="mt-2 underline">
                         {{ __('medication-requests.refresh_from_ehealth') }}
                     </button>

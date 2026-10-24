@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Mockery;
-use Spatie\Permission\Models\Permission;
+use App\Models\Permission;
 
 /**
  * Shared setup for the medical conclusion tests.

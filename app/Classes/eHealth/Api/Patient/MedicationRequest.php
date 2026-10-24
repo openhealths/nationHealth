@@ -14,6 +14,66 @@ use Illuminate\Support\Facades\Validator;
 
 class MedicationRequest extends PatientApiBase
 {
+    /** Details are mandatory before signing; list results do not carry the signing snapshot. */
+    public function getRequestById(string $patientId, string $id): PromiseInterface|EHealthResponse
+    {
+        $this->setValidator($this->validateDetails(...));
+
+        return $this->get("/api/persons/{$patientId}/medication_request_requests/{$id}", []);
+    }
+
+    /** Validate the fresh native signing snapshot without changing its content. */
+    public static function signableDetail(array $detail, string $personUuid, string $requestUuid): array
+    {
+        $requiredFields = [
+            'request_number', 'created_at', 'started_at', 'ended_at',
+            'dispense_valid_from', 'dispense_valid_to', 'legal_entity', 'division',
+            'employee', 'person', 'medication_info', 'medical_program',
+            'intent', 'category', 'dosage_instruction',
+        ];
+        $checks = [
+            'requestIdMatches' => ($detail['id'] ?? null) === $requestUuid,
+            'patientIdMatches' => data_get($detail, 'person.id') === $personUuid
+                && (!array_key_exists('person_id', $detail) || $detail['person_id'] === $personUuid),
+            'statusIsNew' => strtoupper((string) ($detail['status'] ?? '')) === 'NEW',
+            'detailIsComplete' => array_diff($requiredFields, array_keys($detail)) === []
+                && is_array($detail['medication_info'] ?? null) && $detail['medication_info'] !== []
+                && is_array($detail['dosage_instruction'] ?? null) && $detail['dosage_instruction'] !== [],
+            'seedIsValidWhenPresent' => !array_key_exists('seed', $detail)
+                || (is_string($detail['seed']) && trim($detail['seed']) !== ''),
+        ];
+        $messages = [
+            'requestIdMatches' => 'signing_details_wrong_request',
+            'patientIdMatches' => 'signing_details_wrong_patient',
+            'statusIsNew' => 'signing_details_not_new',
+            'detailIsComplete' => 'signing_details_incomplete',
+            'seedIsValidWhenPresent' => 'signing_details_invalid_seed',
+        ];
+        foreach ($checks as $check => $valid) {
+            if (!$valid) {
+                Log::warning('Medication request signing snapshot rejected', $checks);
+
+                throw new \RuntimeException(__('medication-requests.' . $messages[$check]));
+            }
+        }
+
+        return $detail;
+    }
+
+    public static function mutationResult(array $response, array $statuses, ?string $expectedId = null): array
+    {
+        $result = $response['data'] ?? $response;
+        if (!is_array($result) || !\Illuminate\Support\Str::isUuid($result['id'] ?? '')
+            || !in_array(strtoupper((string) ($result['status'] ?? '')), $statuses, true)
+            || isset($response['error']) || isset($result['error'])
+            || in_array(strtolower((string) ($response['status'] ?? '')), ['pending', 'processing', 'accepted', 'queued', 'failed', 'error'], true)
+            || ($expectedId !== null && $result['id'] !== $expectedId)) {
+            throw new \RuntimeException('ESOZ did not confirm the medication transition; local state was not advanced.');
+        }
+
+        return $result;
+    }
+
     /**
      * Create a Medication Request Request (Заявка на виписування рецепту).
      *

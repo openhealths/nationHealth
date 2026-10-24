@@ -312,7 +312,7 @@ class PatientMedicationRequestsPhase6Test extends TestCase
 
         $request = $repo->findByUuid($uuid);
         $this->assertSame($this->employee->id, $request->employeeId);
-        $this->assertSame('7.00', $request->medicationQty);
+        $this->assertSame('7.0000000000', $request->medicationQty);
         $this->assertSame('INN-1', $request->medicationId);
         $this->assertSame('Existing name', $request->ehealthPayload['medication_name']);
         $this->assertSame(MedicationRequestRequest::SOURCE_LOCAL, $request->source);

@@ -33,7 +33,7 @@ if (!function_exists('convertToLocalTimezone')) {
             return '';
         }
 
-        return CarbonImmutable::parse($dateString)->setTimezone(config('app.timezone'))->toDateTimeString();
+        return CarbonImmutable::parse($dateString, 'UTC')->setTimezone(config('app.timezone'))->toDateTimeString();
     }
 }
 
@@ -67,7 +67,7 @@ if (!function_exists('convertToEHealthISO8601')) {
             return '';
         }
 
-        return CarbonImmutable::parse($dateString)->utc()->toIso8601ZuluString();
+        return CarbonImmutable::parse($dateString, config('app.timezone'))->utc()->toIso8601ZuluString();
     }
 }
 

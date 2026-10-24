@@ -19,6 +19,7 @@ use App\Enums\LegalEntity\States;
 use App\Models\Employee\Employee;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Auth;
 use App\Enums\License\Type as LicenseType;
 use Illuminate\Database\Eloquent\Builder;
@@ -98,17 +99,19 @@ class LegalEntityRepository
      * ]
      *
      * @param  array  $legalEntityIds  // Optional filter by specific legal entity IDs
+     * @param  bool  $activeOnly  Limit the list to active legal entities.
      * @return array
      */
-    public function getLegalEntitiesList(array $legalEntityIds = []): array
+    public function getLegalEntitiesList(array $legalEntityIds = [], bool $activeOnly = false): array
     {
         $typesById = LegalEntityType::pluck('name', 'id');
 
         // Get list of Legal Entities grouped by their name
-        $legalEntityList = LegalEntityModel::listByFields()
+        $legalEntityList = LegalEntityModel::listByFields(['id', 'uuid', 'status', 'edr', 'beneficiary', 'legal_entity_type_id'])
+            ->when($activeOnly, fn (Builder $query) => $query->active())
             ->when(!empty($legalEntityIds), fn (Builder $query) => $query->whereIn('id', $legalEntityIds))
             ->get()
-            ->groupBy(fn (LegalEntityModel $item) => data_get($item, 'edr.name') ?: (data_get($item, 'edr.public_name') ?? $item->uuid))
+            ->groupBy(fn (LegalEntityModel $item) => data_get($item, 'edr.name') ?: (data_get($item, 'edr.public_name') ?? $item->beneficiary ?? $item->uuid))
             ->map(fn (Collection $group) => $group->each->makeHidden(['edr'])) // Hide unnecessary fields
             ->toArray();
 
@@ -120,6 +123,10 @@ class LegalEntityRepository
 
             foreach ($legalEntityList[$key] as $data) {
                 $legalEntityTypeName = $typesById[$data['legalEntityTypeId']] ?? '';
+                $typeTranslationKey = 'legal-entity.types.' . strtolower($legalEntityTypeName);
+                if (Lang::has($typeTranslationKey)) {
+                    $legalEntityTypeName = __($typeTranslationKey);
+                }
                 $name = $key;
 
                 // If there are multiple Legal Entities with the same name - add Legal Entity Type to distinguish them
@@ -140,6 +147,17 @@ class LegalEntityRepository
         }
 
         return $result;
+    }
+
+    public function displayNameByUuid(string $legalEntityUuid): string
+    {
+        foreach ($this->getLegalEntitiesList() as $legalEntity) {
+            if ($legalEntity['uuid'] === $legalEntityUuid) {
+                return $legalEntity['name'];
+            }
+        }
+
+        return $legalEntityUuid;
     }
 
     /**

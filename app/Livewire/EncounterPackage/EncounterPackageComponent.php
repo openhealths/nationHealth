@@ -32,7 +32,6 @@ use App\Livewire\EncounterPackage\Forms\EncounterForm as Form;
 use App\Models\Employee\Employee;
 use App\Models\Equipment;
 use App\Models\Icd10;
-use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Immunization;
@@ -898,8 +897,7 @@ class EncounterPackageComponent extends Component
 
         $this->divisions = legalEntity()->divisions()->whereStatus(Status::ACTIVE)->get()->toArray();
 
-        $this->destinationLegalEntities = LegalEntity::active()
-            ->get(['uuid', 'edr', 'beneficiary'])
+        $this->destinationLegalEntities = collect(Repository::legalEntity()->getLegalEntitiesList(activeOnly: true))
             ->pluck('name', 'uuid')
             ->all();
 

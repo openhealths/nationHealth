@@ -70,10 +70,6 @@ class Division extends Request
 
         return parent::get(self::SEARCH_URL, [
             'legal_entity_id' => $legalEntityUuid,
-            'north' => 90,
-            'east' => 180,
-            'south' => -90,
-            'west' => -180,
             'page' => $page,
             'page_size' => 100,
         ]);

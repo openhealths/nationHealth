@@ -1,14 +1,24 @@
 @php
     $additionalActionLinks = [
-        'prescriptions' => ['label' => __('encounters.add_prescription'), 'method' => 'openEncounterEPrescriptionDrawer'],
-        'outgoing-referrals' => ['label' => __('encounters.add_referral'), 'method' => 'openEncounterReferralDrawer'],
+        'prescriptions' => [
+            'label' => __('encounters.add_prescription'),
+            'unavailable' => __('Електронний рецепт можна створити лише для завершеної взаємодії і за наявності права на виписування.'),
+            'href' => $personId !== null && $this->isFinished && Auth::user()->can('medication_request_request:write')
+                ? route('encounter.eprescription.create', ['legalEntity' => legalEntity(), 'person' => $personId, 'encounter' => $encounterId]) : null,
+        ],
+        'outgoing-referrals' => [
+            'label' => __('encounters.add_referral'),
+            'unavailable' => __('Направлення можна створити лише для завершеної взаємодії і за наявності права на виписування.'),
+            'href' => $personId !== null && $this->isFinished && Auth::user()->can('service_request:write')
+                ? route('encounter.referral.create', ['legalEntity' => legalEntity(), 'person' => $personId, 'encounter' => $encounterId]) : null,
+        ],
         'medical-reports' => [
             'label' => __('encounters.add_medical_report'),
             'href' => $this->createCompositionFromEncounterUrl,
         ],
         'care-plans' => [
             'label' => __('encounters.add_care_plan'),
-            'href' => route('care-plans.create-by-encounter', [legalEntity(), 'encounter' => $encounterId]),
+            'href' => $personId !== null ? route('care-plans.create-by-encounter', ['legalEntity' => legalEntity(), 'person' => $personId, 'encounter' => $encounterId]) : null,
         ],
         'device-requests' => [
             'label' => __('encounters.open_device_requests'),
@@ -77,7 +87,7 @@
                             <button
                                 type="button"
                                 disabled
-                                title="{{ __('encounters.medical_report_creation_unavailable') }}"
+                                title="{{ $action['unavailable'] ?? __('encounters.medical_report_creation_unavailable') }}"
                                 class="inline-flex cursor-not-allowed items-center gap-1.5 text-xs font-medium text-gray-400 dark:text-gray-500"
                             >
                                 @icon('plus', 'w-3.5 h-3.5')

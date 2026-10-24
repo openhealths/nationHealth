@@ -19,7 +19,10 @@ class Coding extends Model
         'codeable_type',
         'codeable_id',
         'created_at',
-        'updated_at'
+        'updated_at',
+        'display',
+        'version',
+        'user_selected',
     ];
 
     public function codeable(): MorphTo

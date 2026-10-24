@@ -82,14 +82,17 @@ class ReviewFlashMessagesTest extends TestCase
         foreach (['draft' => 'success', 'active' => 'error'] as $status => $type) {
             $plan = Mockery::mock(CarePlan::class)->makePartial();
             $plan->exists = true;
+            $plan->id = 1;
             $plan->status = $status;
             $plan->setRelation('encounter', null);
-            $plan->shouldReceive('delete')->times($status === 'draft' ? 1 : 0)->andReturn(true);
+            $repository = Mockery::mock(CarePlanRepository::class);
+            $repository->shouldReceive('deleteDraft')->once()->with(1)->andReturn($status === 'draft');
+            \Illuminate\Support\Facades\Gate::define('update', static fn (?\App\Models\User $user) => true);
             $component = new ReviewCarePlanDeleteHarness();
             $component->carePlan = $plan;
             $component->personId = 1;
 
-            $component->delete(app(CarePlanRepository::class));
+            $component->delete($repository);
 
             $this->assertSame('persons.care-plans', $component->redirectedRoute);
             $message = $status === 'draft'

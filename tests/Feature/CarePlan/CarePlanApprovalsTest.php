@@ -19,6 +19,8 @@ use Illuminate\Support\Str;
 
 class CarePlanApprovalsTest extends TestCase
 {
+    use \Tests\Concerns\CreatesFhirCarePlans;
+
     use DatabaseTransactions;
 
     protected function migrateDatabases()
@@ -111,7 +113,7 @@ class CarePlanApprovalsTest extends TestCase
         ]);
 
         // Care plan of the current legal entity (another LE's employees still exist in DB).
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $person->id,
             'author_id' => $employeeActive->id,
@@ -213,7 +215,7 @@ class CarePlanApprovalsTest extends TestCase
         ]);
 
         // Care plan owned by active legal entity
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $person->id,
             'author_id' => $employeeActive->id,
@@ -352,7 +354,7 @@ class CarePlanApprovalsTest extends TestCase
         ]);
 
         // Care plan owned by other legal entity
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $person->id,
             'author_id' => $employeeActive->id,
@@ -426,7 +428,7 @@ class CarePlanApprovalsTest extends TestCase
             'process_disclosure_data_consent' => true,
         ]);
 
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $person->id,
             'author_id' => $employee->id,

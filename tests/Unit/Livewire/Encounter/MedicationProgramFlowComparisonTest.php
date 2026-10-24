@@ -106,6 +106,27 @@ class MedicationProgramFlowComparisonTest extends TestCase
         $this->assertCount(1, $component->encounterEPrescriptionSearchResults);
         Http::assertNothingSent();
     }
+    public function test_encounter_search_keeps_v3_ingredient_matches_and_uses_the_catalog_dosage_unit(): void
+    {
+        $this->drugApi->shouldReceive('getMany')->once()
+            ->andReturn(new EHealthResponse(new Response(200, [], json_encode(['data' => [[
+                'id' => 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+                'name' => 'Synthetic brand',
+                'form' => 'SOLUTION',
+                'ingredients' => [['name' => 'Metformin', 'dosage' => ['denumerator_unit' => 'ML']]],
+            ]]], JSON_THROW_ON_ERROR))));
+        $component = new EncounterMedicationProgramHarness();
+        $component->encounterEPrescriptionSearchQuery = 'Metformin';
+
+        $component->searchEncounterEPrescriptionMedications();
+        $component->selectEncounterEPrescriptionMedication('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee');
+
+        $this->assertSame('Synthetic brand', $component->encounterEPrescriptionSelectedMedication['name']);
+        $this->assertSame('Metformin', $component->encounterEPrescriptionSelectedMedication['innm_name']);
+        $this->assertSame('ML', $component->encounterEPrescriptionForm['medication_unit']);
+        Http::assertNothingSent();
+    }
+
     public function test_encounter_programs_exclude_inactive_disallowed_and_care_plan_only_programs(): void
     {
         $programs = collect([
@@ -148,12 +169,13 @@ class MedicationProgramFlowComparisonTest extends TestCase
     {
         $this->app->instance('legalEntity', new LegalEntity());
         $user = Mockery::mock(User::class);
+        $user->shouldReceive('getAttribute')->with('allowedRoles')->twice()->andReturn(collect(['SPECIALIST']));
         $user->shouldReceive('getMainSpeciality')->twice()->andReturn(collect(['CARDIOLOGY']));
         $user->shouldReceive('hasAllowedRole')->with(Role::SPECIALIST)->twice()->andReturn(true);
         Auth::shouldReceive('user')->twice()->andReturn($user);
         $programs = collect([
-            ['id' => 'allowed', 'name' => 'Allowed', 'type' => 'MEDICATION', 'is_active' => true, 'medical_program_settings' => ['speciality_types_allowed' => ['CARDIOLOGY']]],
-            ['id' => 'other-speciality', 'name' => 'Other', 'type' => 'MEDICATION', 'is_active' => true, 'medical_program_settings' => ['speciality_types_allowed' => ['ENDOCRINOLOGY']]],
+            ['id' => 'allowed', 'name' => 'Allowed', 'type' => 'MEDICATION', 'is_active' => true, 'medical_program_settings' => ['speciality_types_request_allowed' => ['CARDIOLOGY'], 'speciality_types_care_plan_activity_allowed' => ['CARDIOLOGY']]],
+            ['id' => 'other-speciality', 'name' => 'Other', 'type' => 'MEDICATION', 'is_active' => true, 'medical_program_settings' => ['speciality_types_request_allowed' => ['ENDOCRINOLOGY'], 'speciality_types_care_plan_activity_allowed' => ['ENDOCRINOLOGY']]],
         ]);
         $manager = Mockery::mock(DictionaryManager::class);
         $manager->shouldReceive('medicalPrograms')->once()->andReturn($programs);
@@ -205,9 +227,10 @@ class MedicationProgramFlowComparisonTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_drawer_offers_the_default_and_keeps_search_enabled_when_the_program_dictionary_is_empty(): void
+    public function test_form_offers_the_default_and_keeps_search_enabled_when_the_program_dictionary_is_empty(): void
     {
-        $html = view('livewire.encounter-package.parts.encounter-eprescription-drawer', [
+        $html = view('livewire.encounter-package.parts.encounter-eprescription-form', [
+            'encounterReturnUrl' => '/dashboard/1/persons/1/encounter/21',
             'showEncounterEPrescriptionDrawer' => true,
             'encounterUuid' => 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
             'encounterId' => 21,
@@ -224,8 +247,17 @@ class MedicationProgramFlowComparisonTest extends TestCase
         $search = $document->getElementById('encounterEPrescriptionSearch');
         $program = $document->getElementById('encounterEPrescriptionProgram');
 
+        foreach (['StartedAt', 'EndedAt'] as $dateField) {
+            $dateInput = $document->getElementById('encounterEPrescription'.$dateField);
+            $this->assertSame('text', $dateInput->getAttribute('type'));
+            $this->assertStringContainsString('datepicker-input', $dateInput->getAttribute('class'));
+            $this->assertSame(frontendDateFormat(), $dateInput->getAttribute('datepicker-format'));
+        }
         $this->assertNotNull($search);
         $this->assertFalse($search->hasAttribute('disabled'));
+        $searchButtons = (new \DOMXPath($document))->query("//button[@*[name()='wire:click' and .='searchEncounterEPrescriptionMedications']]");
+        $this->assertCount(1, $searchButtons);
+        $this->assertFalse($searchButtons->item(0)->hasAttribute('disabled'));
         $this->assertNotNull($program);
         $this->assertSame('', $program->getElementsByTagName('option')->item(0)->getAttribute('value'));
         $this->assertSame(__('care-plan.prescription_medication'), $program->getElementsByTagName('option')->item(0)->textContent);

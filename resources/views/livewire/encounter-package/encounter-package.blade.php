@@ -496,8 +496,6 @@
     @endif
 
     @if ($this instanceof EncounterPackageEdit)
-        @include('livewire.encounter-package.parts.encounter-eprescription-drawer')
-        @include('livewire.encounter-package.parts.encounter-referral-drawer')
     @endif
 
     <x-forms.loading />

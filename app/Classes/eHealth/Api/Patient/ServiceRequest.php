@@ -16,6 +16,76 @@ use Illuminate\Validation\ValidationException;
 
 class ServiceRequest extends PatientApiBase
 {
+    public function buildCreateContent(array $resource): array
+    {
+        Validator::make($resource, ['id' => ['required', 'uuid'], 'code.identifier.value' => ['required'], 'requesterEmployee.identifier.value' => ['required', 'uuid'], 'requesterLegalEntity.identifier.value' => ['required', 'uuid']])->validate();
+
+        return \App\Services\MedicalEvents\Fhir::serviceRequest()->createContent($resource);
+    }
+
+    /** Fetch and return the raw signed contract, before any application normalization. */
+    public function fetchSignedSnapshot(string $patientUuid, string $requestUuid): array
+    {
+        $resource = $this->getById($patientUuid, $requestUuid)->getData();
+        Validator::make($resource, ['id' => ['required', 'in:'.$requestUuid], 'status' => ['required', 'in:active'], 'subject.identifier.value' => ['sometimes', 'required', 'in:'.$patientUuid]])->validate();
+
+        return $resource;
+    }
+
+    public function buildStatusContent(array $snapshot, string $reason, string $explanatoryLetter): array
+    {
+        Validator::make(['snapshot' => $snapshot, 'reason' => $reason, 'letter' => trim($explanatoryLetter)], ['snapshot.id' => ['required', 'uuid'], 'reason' => ['required', 'string'], 'letter' => ['required', 'string']])->validate();
+        $snapshot['status_reason'] = $reason;
+        $snapshot['explanatory_letter'] = $explanatoryLetter;
+
+        return $snapshot;
+    }
+
+    public function submitSignedCreate(string $patientUuid, string $signedContent): array
+    {
+        return $this->resolveMutation($this->createSigned($patientUuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64'])->getData());
+    }
+
+    public function cancelAndResolve(string $patientUuid, string $requestUuid, array $payload): array
+    {
+        return $this->resolveMutation($this->cancel($patientUuid, $requestUuid, $this->signedEnvelope($payload))->getData());
+    }
+
+    public function recallAndResolve(string $patientUuid, string $requestUuid, array $payload): array
+    {
+        return $this->resolveMutation($this->recall($patientUuid, $requestUuid, $this->signedEnvelope($payload))->getData());
+    }
+
+    /** A pending/error response without a job link must not become local success. */
+    public function resolveMutation(array $response): array
+    {
+        $resolved = app(\App\Services\MedicalEvents\EHealthJobResolver::class)->resolve($response);
+        if (in_array(strtolower((string) ($resolved['status'] ?? '')), ['pending', 'processing', 'accepted', 'queued', 'failed', 'rejected', 'error'], true) || !empty($resolved['error'])) {
+            throw new EHealthValidationException(['error' => ['message' => __('errors.ehealth.messages.request_error')]]);
+        }
+
+        return $resolved;
+    }
+
+    public function buildUseContent(array $context, mixed $programId): array
+    {
+        return $this->executorApi()->buildUseContent($context, $programId);
+    }
+
+    public function buildCompleteContent(string $resourceUuid, string $resourceType, array $optional = []): array
+    {
+        Validator::make(['uuid' => $resourceUuid, 'type' => $resourceType], ['uuid' => ['required', 'uuid'], 'type' => ['required', 'in:encounter,procedure,diagnostic_report']])->validate();
+
+        return array_intersect_key($optional, array_flip(['program_service', 'status_reason'])) + ['completed_with' => ['identifier' => ['type' => ['coding' => [['system' => 'eHealth/resources', 'code' => $resourceType]]], 'value' => $resourceUuid]]];
+    }
+
+    private function signedEnvelope(array $payload): array
+    {
+        Validator::make($payload, ['signed_data' => ['required', 'string']])->validate();
+
+        return ['signed_data' => $payload['signed_data'], 'signed_data_encoding' => 'base64'];
+    }
+
     /**
      * Create a signed Service Request in eHealth (PKCS#7).
      *

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CarePlan;
 
-use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
@@ -20,6 +19,8 @@ use Tests\TestCase;
 
 class CarePlanActivityValidationsTest extends TestCase
 {
+    use \Tests\Concerns\CreatesFhirCarePlans;
+
     use DatabaseTransactions;
 
     protected Person $person;
@@ -118,7 +119,7 @@ class CarePlanActivityValidationsTest extends TestCase
     {
         $this->actingAs($this->user);
 
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
             'author_id' => $this->employee->id,
@@ -169,7 +170,7 @@ class CarePlanActivityValidationsTest extends TestCase
     {
         $this->actingAs($this->user);
 
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
             'author_id' => $this->employee->id,
@@ -210,18 +211,18 @@ class CarePlanActivityValidationsTest extends TestCase
             ->call('saveActivity')
             ->assertHasNoErrors();
 
-        $this->assertDatabaseHas('care_plan_activities', [
-            'care_plan_id' => $carePlan->id,
-            'product_reference' => $medicationId,
-            'program' => $programId,
-        ]);
+        $activity = CarePlanActivity::whereCarePlanId($carePlan->id)->firstOrFail();
+        $resource = app(\App\Repositories\CarePlanActivityRepository::class)->getResource($activity->id);
+        $this->assertSame($medicationId, data_get($resource, 'detail.productReference.identifier.value'));
+        $this->assertSame($programId, data_get($resource, 'detail.program.identifier.value'));
+        $this->assertNull($activity->getRawOriginal('product_reference'));
     }
 
     public function test_blocks_activity_without_reason_reference_on_rehab_plan(): void
     {
         $this->actingAs($this->user);
 
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
             'author_id' => $this->employee->id,
@@ -253,7 +254,7 @@ class CarePlanActivityValidationsTest extends TestCase
     {
         $this->actingAs($this->user);
 
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
             'author_id' => $this->employee->id,
@@ -280,14 +281,16 @@ class CarePlanActivityValidationsTest extends TestCase
 
         $activity = CarePlanActivity::where('care_plan_id', $carePlan->id)->first();
         $this->assertNotNull($activity);
-        $this->assertContains('Observation/' . $observationUuid, $activity->reasonReference ?? []);
+        $resource = app(\App\Repositories\CarePlanActivityRepository::class)->getResource($activity->id);
+        $this->assertSame('observation', data_get($resource, 'detail.reasonReference.0.identifier.type.coding.0.code'));
+        $this->assertSame($observationUuid, data_get($resource, 'detail.reasonReference.0.identifier.value'));
     }
 
     public function test_activity_detail_card_renders_tv_fields(): void
     {
         $this->actingAs($this->user);
 
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
             'author_id' => $this->employee->id,
@@ -297,7 +300,7 @@ class CarePlanActivityValidationsTest extends TestCase
             'status' => 'active',
         ]);
 
-        $activity = CarePlanActivity::create([
+        $activity = $this->createFhirCarePlanActivity([
             'uuid' => (string) Str::uuid(),
             'care_plan_id' => $carePlan->id,
             'author_id' => $this->employee->id,
@@ -337,11 +340,45 @@ class CarePlanActivityValidationsTest extends TestCase
             ->assertSee('TV detail coverage');
     }
 
+    public function test_edit_device_activity_loads_its_name_by_uuid_and_signs_integer_after_database_roundtrip(): void
+    {
+        $this->actingAs($this->user);
+        $plan = $this->createFhirCarePlan([
+            'person_id' => $this->person->id, 'author_id' => $this->employee->id,
+            'legal_entity_id' => $this->legalEntity->id, 'status' => 'active',
+        ]);
+        $deviceUuid = (string) Str::uuid();
+        $activity = $this->createFhirCarePlanActivity([
+            'care_plan_id' => $plan->id, 'author_id' => $this->employee->id,
+            'kind' => 'device_request', 'status' => 'draft', 'product_reference' => $deviceUuid,
+            'quantity' => 1, 'quantity_system' => 'device_unit', 'quantity_code' => 'piece',
+        ]);
+        $api = \Mockery::mock(\App\Classes\eHealth\Api\DeviceDefinition::class);
+        $response = \Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $response->shouldReceive('getData')->andReturn([
+            'id' => $deviceUuid, 'device_names' => [['name' => 'Тестова система контролю глюкози']],
+        ]);
+        $api->shouldReceive('getById')->once()->with($deviceUuid)->andReturn($response);
+        $api->shouldNotReceive('getMany');
+        $this->instance(\App\Classes\eHealth\Api\DeviceDefinition::class, $api);
+        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $plan])
+            ->call('editActivity', $activity->id)
+            ->assertSet('selectedProduct.name', 'Тестова система контролю глюкози')
+            ->assertSee('Тестова система контролю глюкози')
+            ->assertSee('UUID: '.$deviceUuid);
+
+        $resource = app(\App\Repositories\CarePlanActivityRepository::class)->getResource($activity->id);
+        $payload = app(\App\Classes\eHealth\Api\CarePlanActivity::class)->buildCreateContent($resource);
+        $decoded = json_decode(json_encode($payload, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame(1, $decoded['detail']['quantity']['value']);
+        $this->assertSame($deviceUuid, $decoded['detail']['product_reference']['identifier']['value']);
+    }
+
     public function test_blocks_device_activity_when_providing_conditions_mismatch(): void
     {
         $this->actingAs($this->user);
 
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
             'author_id' => $this->employee->id,
@@ -379,7 +416,7 @@ class CarePlanActivityValidationsTest extends TestCase
     {
         $this->actingAs($this->user);
 
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
             'author_id' => $this->employee->id,
