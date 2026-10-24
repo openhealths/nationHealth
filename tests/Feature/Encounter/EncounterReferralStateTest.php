@@ -11,6 +11,7 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Services\SignatureService;
+use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -163,6 +164,82 @@ class EncounterReferralStateTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_referral_date_and_time_are_preserved_through_utc_mapping(): void
+    {
+        $this->travelTo(now()->setDate(2026, 10, 22)->setTime(12, 0));
+
+        $component = Livewire::test(EncounterReferralPeriodHarness::class)
+            ->set('encounterReferralForm', [
+                'started_at' => '23.10.2026', 'start_time' => '00:30',
+                'ended_at' => '23.10.2026', 'end_time' => '10:45',
+            ])
+            ->call('buildPeriod')
+            ->assertHasNoErrors()
+            ->assertSet('builtPeriod.started_at', '2026-10-23T00:30:00+03:00')
+            ->assertSet('builtPeriod.ended_at', '2026-10-23T10:45:00+03:00');
+
+        $mapper = new ServiceRequestMapper();
+        $resource = $mapper->toFhir(['uuid' => 'bf112058-af5d-45c4-aea0-f6ee6783fcb7'] + $component->get('builtPeriod'));
+        $this->assertSame('2026-10-22T21:30:00.000000Z', $resource['occurrencePeriod']['start']);
+        $this->assertSame('2026-10-23T07:45:00.000000Z', $resource['occurrencePeriod']['end']);
+        $roundTrip = $mapper->toFhir($mapper->fromFhir($resource), ['resource' => $resource]);
+        $this->assertSame($resource['occurrencePeriod'], $roundTrip['occurrencePeriod']);
+        Http::assertNothingSent();
+    }
+
+    public function test_future_end_does_not_allow_a_start_in_the_past(): void
+    {
+        $this->travelTo(now()->setDate(2026, 10, 22)->setTime(12, 0));
+        Livewire::test(EncounterReferralPeriodHarness::class)
+            ->set('encounterReferralForm', [
+                'started_at' => '22.10.2026', 'start_time' => '11:59',
+                'ended_at' => '23.10.2026', 'end_time' => '12:00',
+            ])
+            ->call('buildPeriod')
+            ->assertHasErrors(['encounterReferralForm.start_time'])
+            ->assertSet('builtPeriod', []);
+        Http::assertNothingSent();
+    }
+
+    public function test_end_before_start_on_same_day_is_rejected(): void
+    {
+        $this->travelTo(now()->setDate(2026, 10, 22)->setTime(12, 0));
+        Livewire::test(EncounterReferralPeriodHarness::class)
+            ->set('encounterReferralForm', [
+                'started_at' => '23.10.2026', 'start_time' => '10:00',
+                'ended_at' => '23.10.2026', 'end_time' => '09:59',
+            ])
+            ->call('buildPeriod')
+            ->assertHasErrors(['encounterReferralForm.ended_at'])
+            ->assertSet('builtPeriod', []);
+        Http::assertNothingSent();
+    }
+
+    public function test_cleared_period_fields_are_required(): void
+    {
+        Livewire::test(EncounterReferralPeriodHarness::class)
+            ->set('encounterReferralForm', ['started_at' => '', 'start_time' => '', 'ended_at' => '', 'end_time' => ''])
+            ->call('buildPeriod')
+            ->assertHasErrors([
+                'encounterReferralForm.started_at' => 'required',
+                'encounterReferralForm.ended_at' => 'required',
+                'encounterReferralForm.start_time' => 'required',
+                'encounterReferralForm.end_time' => 'required',
+            ]);
+        Http::assertNothingSent();
+    }
+
+    public function test_new_referral_defaults_to_a_future_time(): void
+    {
+        $this->travelTo(now()->setDate(2026, 10, 22)->setTime(23, 50, 30));
+        Livewire::test(EncounterReferralPeriodHarness::class)
+            ->call('openEncounterReferralDrawer')
+            ->assertSet('encounterReferralForm.started_at', '23.10.2026')
+            ->assertSet('encounterReferralForm.start_time', '00:20')
+            ->call('buildPeriod')
+            ->assertHasNoErrors();
+    }
+
     private function service(): array
     {
         return ['id' => 'bf112058-af5d-45c4-aea0-f6ee6783fcb7', 'code' => '12515-00', 'name' => 'Обстеження', 'category' => 'laboratory_procedure'];
@@ -173,6 +250,13 @@ class EncounterPackageReferralStateHarness extends EncounterPackageEdit
 {
     public string $signedAction = '';
 
+    public array $builtPeriod = [];
+
+    public function buildPeriod(): void
+    {
+        $this->builtPeriod = $this->encounterReferralPeriod();
+    }
+
     public function boot(): void
     {
     }
@@ -180,6 +264,8 @@ class EncounterPackageReferralStateHarness extends EncounterPackageEdit
     public function mount(?LegalEntity $legalEntity = null, ?Encounter $encounter = null, ?Person $person = null, ?Preperson $preperson = null): void
     {
         $this->isReadonly = true;
+        $this->form->encounter['periodDate'] = '22.10.2026';
+        $this->dictionaries['eHealth/encounter_classes'] = [];
     }
 
     public function seedError(string $key): void
@@ -194,7 +280,9 @@ class EncounterPackageReferralStateHarness extends EncounterPackageEdit
 
     protected function resolveEncounterModelForStandalone(): ?Encounter
     {
-        return new Encounter(['status' => EncounterStatus::FINISHED->value]);
+        return (new Encounter(['status' => EncounterStatus::FINISHED->value]))
+            ->setRelation('class', null)
+            ->setRelation('hospitalization', null);
     }
 
     protected function loadEncounterReferralAuthMethods(Encounter $encounter): void
@@ -208,5 +296,13 @@ class EncounterPackageReferralStateHarness extends EncounterPackageEdit
     public function render(): View
     {
         return view()->file(__DIR__.'/Fixtures/referral-signature.blade.php');
+    }
+}
+
+class EncounterReferralPeriodHarness extends EncounterPackageReferralStateHarness
+{
+    public function getFormObjects(): array
+    {
+        return [];
     }
 }

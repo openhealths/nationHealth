@@ -255,7 +255,7 @@ class CarePlanApprovalService
                 'new_uuid' => $realApprovalId,
                 'linkable_id' => $link->linkable->id,
             ]);
-            $link->linkable->update(['uuid' => $realApprovalId]);
+            \App\Repositories\MedicalEvents\Repository::approval()->replaceResolvedUuid($link->linkable, $realApprovalId);
         }
 
         $authMethod = $this->extractAuthMethod($jobResult);
@@ -265,7 +265,7 @@ class CarePlanApprovalService
         if ($link->linkable instanceof Approval) {
             $carePlan = $link->linkable->approvable;
             if (!$carePlan instanceof CarePlan && $link->linkable->approvableId) {
-                $carePlan = CarePlan::query()->find($link->linkable->approvableId);
+                $carePlan = app(\App\Repositories\CarePlanRepository::class)->findById($link->linkable->approvableId);
             }
         }
         if ($carePlan instanceof CarePlan && $this->skipsPatientOtp($carePlan, legalEntity() ?? $carePlan->legalEntity)) {

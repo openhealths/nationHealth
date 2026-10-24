@@ -6,7 +6,6 @@ namespace App\Livewire\CarePlan;
 
 use App\Classes\eHealth\EHealth;
 use App\Enums\CarePlanStatus;
-use App\Enums\User\Role;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\CarePlan;
@@ -89,18 +88,7 @@ class CarePlanApprovals extends Component
         // that the granted employee belongs to the requesting clinic.
         $legalEntityId = legalEntity()?->id ?? $legalEntity->id;
         if ($legalEntityId) {
-            $this->employees = Employee::where('legal_entity_id', $legalEntityId)
-                ->where('status', 'APPROVED')
-                ->where('is_active', true)
-                ->whereIn('employee_type', [Role::DOCTOR->value, Role::SPECIALIST->value])
-                ->with('party:id,first_name,last_name,second_name')
-                ->select(['id', 'uuid', 'party_id', 'employee_type', 'position'])
-                ->get()
-                ->map(fn ($e) => [
-                    'uuid' => $e->uuid,
-                    'label' => trim($e->fullName) . ' (' . $e->employee_type . ')',
-                ])
-                ->toArray();
+            $this->employees = app(\App\Repositories\CarePlanRepository::class)->approvalEmployees($legalEntityId);
 
             $writerUuid = Auth::user()?->getCarePlanWriterEmployee($carePlan->termsOfService)?->uuid;
             if ($writerUuid && collect($this->employees)->contains(fn (array $employee): bool => $employee['uuid'] === $writerUuid)) {
@@ -132,7 +120,7 @@ class CarePlanApprovals extends Component
         $this->isLoading = true;
 
         try {
-            $carePlan = CarePlan::findOrFail($this->carePlanId);
+            $carePlan = $this->currentCarePlan();
             app(CarePlanApprovalService::class)->syncForCarePlan($carePlan);
             $this->approvals = $carePlan->approvals()
                 ->withAllRelations()
@@ -158,7 +146,7 @@ class CarePlanApprovals extends Component
             'newApproval.employee_uuid' => 'required|uuid',
         ]);
 
-        $carePlan = CarePlan::findOrFail($this->carePlanId);
+        $carePlan = $this->currentCarePlan();
         $this->authorize('manage', $carePlan);
         $this->isReadOnly = CarePlanStatus::fromStored($carePlan->status)->isTerminal();
 
@@ -311,7 +299,7 @@ class CarePlanApprovals extends Component
                 }
             }
 
-            $carePlan = CarePlan::findOrFail($this->carePlanId);
+            $carePlan = $this->currentCarePlan();
             $oldApproval = $carePlan->approvals()->with('grantedTo')->where('uuid', $oldApprovalUuid)->first();
             $employeeUuid = $oldApproval?->grantedTo?->value
                 ?? Auth::user()?->getCarePlanWriterEmployee($carePlan->termsOfService)?->uuid;
@@ -425,7 +413,7 @@ class CarePlanApprovals extends Component
             Log::error('CarePlanApprovals: failed to verify: ' . $e->getMessage());
 
             if ($e->getCode() === 404 || str_contains($e->getMessage(), '404')) {
-                $this->approvalsOfCurrentPlan()->where('uuid', $this->approvalId)->delete();
+                app(\App\Repositories\CarePlanRepository::class)->removeApproval($this->currentCarePlan(), $this->approvalId);
                 Session::flash('error', __('care-plan.approval_expired_404'));
                 $this->closeAuthModal();
                 $this->fetchApprovals();
@@ -457,7 +445,7 @@ class CarePlanApprovals extends Component
             Log::error('CarePlanApprovals: failed to resend SMS: ' . $e->getMessage());
 
             if ($e->getCode() === 404 || str_contains($e->getMessage(), '404')) {
-                $this->approvalsOfCurrentPlan()->where('uuid', $this->approvalId)->delete();
+                app(\App\Repositories\CarePlanRepository::class)->removeApproval($this->currentCarePlan(), $this->approvalId);
                 Session::flash('error', __('care-plan.approval_expired_404'));
                 $this->closeAuthModal();
                 $this->fetchApprovals();
@@ -501,17 +489,12 @@ class CarePlanApprovals extends Component
 
     protected function currentCarePlan(): CarePlan
     {
-        return CarePlan::query()->findOrFail($this->carePlanId);
-    }
-
-    protected function approvalsOfCurrentPlan()
-    {
-        return $this->currentCarePlan()->approvals();
+        return app(\App\Repositories\CarePlanRepository::class)->findById($this->carePlanId) ?? abort(404);
     }
 
     protected function guardReadOnlyApprovals(): bool
     {
-        $carePlan = CarePlan::findOrFail($this->carePlanId);
+        $carePlan = $this->currentCarePlan();
         $this->isReadOnly = CarePlanStatus::fromStored($carePlan->status)->isTerminal();
         $this->statusLabel = CarePlanStatus::labelFor($carePlan->status);
 

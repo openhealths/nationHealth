@@ -148,12 +148,13 @@ class MedicationProgramFlowComparisonTest extends TestCase
     {
         $this->app->instance('legalEntity', new LegalEntity());
         $user = Mockery::mock(User::class);
+        $user->shouldReceive('getAttribute')->with('allowedRoles')->twice()->andReturn(collect(['SPECIALIST']));
         $user->shouldReceive('getMainSpeciality')->twice()->andReturn(collect(['CARDIOLOGY']));
         $user->shouldReceive('hasAllowedRole')->with(Role::SPECIALIST)->twice()->andReturn(true);
         Auth::shouldReceive('user')->twice()->andReturn($user);
         $programs = collect([
-            ['id' => 'allowed', 'name' => 'Allowed', 'type' => 'MEDICATION', 'is_active' => true, 'medical_program_settings' => ['speciality_types_allowed' => ['CARDIOLOGY']]],
-            ['id' => 'other-speciality', 'name' => 'Other', 'type' => 'MEDICATION', 'is_active' => true, 'medical_program_settings' => ['speciality_types_allowed' => ['ENDOCRINOLOGY']]],
+            ['id' => 'allowed', 'name' => 'Allowed', 'type' => 'MEDICATION', 'is_active' => true, 'medical_program_settings' => ['speciality_types_request_allowed' => ['CARDIOLOGY'], 'speciality_types_care_plan_activity_allowed' => ['CARDIOLOGY']]],
+            ['id' => 'other-speciality', 'name' => 'Other', 'type' => 'MEDICATION', 'is_active' => true, 'medical_program_settings' => ['speciality_types_request_allowed' => ['ENDOCRINOLOGY'], 'speciality_types_care_plan_activity_allowed' => ['ENDOCRINOLOGY']]],
         ]);
         $manager = Mockery::mock(DictionaryManager::class);
         $manager->shouldReceive('medicalPrograms')->once()->andReturn($programs);

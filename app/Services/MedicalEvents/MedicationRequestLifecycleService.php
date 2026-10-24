@@ -96,10 +96,7 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
                 (int) $activity->id,
                 (float) ($formData['medication_qty'] ?? 1),
                 function (int $activityId) use ($activity): float {
-                    return (float) MedicationRequestRequest::query()
-                        ->whereHas('basedOn', fn ($q) => $q->where('value', $activity->uuid))
-                        ->whereNotIn('status', ActivityRemainingQuantityGuard::occupyingStatusesExcluded())
-                        ->sum('medication_qty');
+                    return app(MedicationRequestRepository::class)->issuedCarePlanQuantity($activity->uuid, ActivityRemainingQuantityGuard::occupyingStatusesExcluded());
                 }
             );
         }
@@ -304,17 +301,15 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
 
         $activityUuid = $requestRecord->basedOn?->value;
         if ($activityUuid) {
-            $activityForQty = CarePlanActivity::query()->where('uuid', $activityUuid)->first();
+            $activityForQty = $contextModel instanceof CarePlan
+                ? app(\App\Repositories\CarePlanActivityRepository::class)->findOwnedByUuid($contextModel->id, $activityUuid)
+                : app(\App\Repositories\CarePlanActivityRepository::class)->findForPatient($activityUuid, (int) $requestRecord->personId, legalEntity()?->id);
             if ($activityForQty !== null) {
                 app(ActivityRemainingQuantityGuard::class)->assertCanIssue(
                     (int) $activityForQty->id,
                     (float) ($requestRecord->medicationQty ?? 0),
                     function (int $activityId) use ($requestRecord, $activityUuid): float {
-                        return (float) MedicationRequestRequest::query()
-                            ->whereHas('basedOn', fn ($q) => $q->where('value', $activityUuid))
-                            ->where('uuid', '!=', $requestRecord->uuid)
-                            ->whereNotIn('status', ActivityRemainingQuantityGuard::occupyingStatusesExcluded())
-                            ->sum('medication_qty');
+                        return app(MedicationRequestRepository::class)->issuedCarePlanQuantity($activityUuid, ActivityRemainingQuantityGuard::occupyingStatusesExcluded(), $requestRecord->uuid);
                     }
                 );
             }
@@ -559,7 +554,9 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
             ? Encounter::query()->where('uuid', $requestRecord->context->value)->first()
             : null;
         $activity = $requestRecord->basedOn?->value
-            ? CarePlanActivity::query()->where('uuid', $requestRecord->basedOn->value)->first()
+            ? ($contextModel instanceof CarePlan
+                ? app(\App\Repositories\CarePlanActivityRepository::class)->findOwnedByUuid($contextModel->id, $requestRecord->basedOn->value)
+                : app(\App\Repositories\CarePlanActivityRepository::class)->findForPatient($requestRecord->basedOn->value, (int) $requestRecord->personId, legalEntity()?->id))
             : null;
 
         $carePlanUuid = $contextModel instanceof CarePlan

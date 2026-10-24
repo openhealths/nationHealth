@@ -8,6 +8,7 @@ use App\Enums\Person\MedicationRequestStatus;
 use App\Models\CarePlanActivity;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
+use App\Models\Person\Person;
 use App\Repositories\MedicalEvents\Concerns\ResolvesRequestFhirRefs;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -409,5 +410,130 @@ class MedicationRequestRepository extends BaseRepository
         return $this->searchByPersonId($personId, array_merge($filters, [
             'resource_type' => MedicationRequestRequest::TYPE_PRESCRIPTION,
         ]));
+    }
+
+    /** Prefer the linked MR's current status and quantity over its signed MRR. */
+    private function quantityRecords(string $activityUuid): \Illuminate\Database\Eloquent\Builder
+    {
+        return $this->model->newQuery()->whereHas('basedOn', fn ($query) => $query->whereValue($activityUuid))
+            ->where(function ($query) use ($activityUuid): void {
+                $query->where('resource_type', MedicationRequestRequest::TYPE_PRESCRIPTION)
+                    ->orWhereNotExists(function ($prescription) use ($activityUuid): void {
+                        $prescription->selectRaw('1')->from('medication_request_requests as prescription')
+                            ->join('identifiers as basis', 'basis.id', '=', 'prescription.based_on_id')
+                            ->whereRaw("medication_request_requests.ehealth_payload->>'active_id' = prescription.uuid::text")
+                            ->whereColumn('prescription.person_id', 'medication_request_requests.person_id')
+                            ->where('prescription.resource_type', MedicationRequestRequest::TYPE_PRESCRIPTION)
+                            ->where('basis.value', $activityUuid);
+                    });
+            });
+    }
+
+    public function issuedCarePlanQuantity(string $activityUuid, array $excludedStatuses = MedicalEventsRequestStatuses::EXCLUDED_FROM_ISSUED_SUM, ?string $exceptUuid = null): float
+    {
+        $query = $this->quantityRecords($activityUuid)->whereNotIn('status', $excludedStatuses);
+        if ($exceptUuid !== null) {
+            $query->where('uuid', '!=', $exceptUuid);
+        }
+
+        return (float) $query->sum('medication_qty');
+    }
+
+    public function lastActiveForTreatment(int $personId, string $medicationUuid): ?MedicationRequestRequest
+    {
+        return $this->model->newQuery()->wherePersonId($personId)->whereMedicationId($medicationUuid)->whereIn('status', ['active', 'signed'])->orderByDesc('ended_at')->first();
+    }
+
+    public function saveStatus(MedicationRequestRequest $record, string $status): void
+    {
+        $record->status = $status;
+        $record->save();
+    }
+
+    public function synchronizeCarePlanDocuments(\Illuminate\Support\Collection $localRequests, array $activeItems, array $draftItems): int
+    {
+        return DB::transaction(function () use ($localRequests, $activeItems, $draftItems): int {
+            $records = $this->model->newQuery()->whereKey($localRequests->pluck('id')->all())
+                ->with('basedOn.type.coding')->lockForUpdate()->get();
+            $updatedCount = 0;
+
+            foreach ($activeItems as $item) {
+                if (empty($item['id']) || empty($item['status'])) {
+                    continue;
+                }
+                $match = $records->firstWhere('uuid', $item['id'])
+                    ?? $records->first(fn ($record) => ($record->ehealthPayload['active_id'] ?? null) === $item['id']);
+                if ($match === null && !empty($item['request_number'])) {
+                    $candidates = $records->filter(fn ($record) => $record->resourceType === MedicationRequestRequest::TYPE_REQUEST
+                        && $record->requestNumber === $item['request_number']
+                        && empty($record->ehealthPayload['active_id']));
+                    $match = $candidates->count() === 1 ? $candidates->first() : null;
+                }
+                if ($match === null) {
+                    continue;
+                }
+                $remotePersonUuid = data_get($item, 'person.id') ?? ($item['person_id'] ?? null);
+                if ($remotePersonUuid !== null && $remotePersonUuid !== (string) Person::findOrFail($match->personId)->uuid) {
+                    throw new InvalidArgumentException('The medication sync belongs to another patient.');
+                }
+                $status = MedicationRequestStatus::resolve($item['status']);
+                if ($status === null || !in_array($status, [MedicationRequestStatus::ACTIVE, MedicationRequestStatus::BLOCKED, MedicationRequestStatus::COMPLETED, MedicationRequestStatus::EXPIRED, MedicationRequestStatus::REJECTED, MedicationRequestStatus::ENTERED_IN_ERROR], true)) {
+                    throw new InvalidArgumentException('The prescription list returned an invalid MR status.');
+                }
+                if ($match->resourceType === MedicationRequestRequest::TYPE_REQUEST && $match->uuid === $item['id']) {
+                    throw new InvalidArgumentException('An MRR and its prescription must have separate identities.');
+                }
+                $existing = $this->model->newQuery()->whereUuid($item['id'])->lockForUpdate()->first();
+                if ($existing !== null && $existing->resourceType !== MedicationRequestRequest::TYPE_PRESCRIPTION) {
+                    throw new InvalidArgumentException('A prescription cannot overwrite a medication request.');
+                }
+                $prescription = $this->upsertFromEHealth(
+                    array_replace($item, ['status' => $status->value]),
+                    (int) $match->personId,
+                    MedicationRequestRequest::TYPE_PRESCRIPTION
+                );
+                if ($existing === null || $existing->status !== $prescription->status) {
+                    $updatedCount++;
+                }
+                if ($match->resourceType === MedicationRequestRequest::TYPE_REQUEST) {
+                    // A known signing link supplies a local basis for the partial MR cache.
+                    // It remains noncanonical until its complete details are imported.
+                    if ($prescription->basedOnId === null && $match->basedOn !== null) {
+                        $basis = Repository::identifier()->replaceReference(null, Repository::identifier()->toReference($match->basedOn));
+                        $prescription->basedOnId = $basis->id;
+                    }
+                    $prescription->medicationQty ??= $match->medicationQty;
+                    $prescription->save();
+                    if (strtolower($match->status) !== MedicationRequestStatus::SIGNED->value) {
+                        $updatedCount++;
+                    }
+                    $match->fill(['status' => MedicationRequestStatus::SIGNED->value,
+                        'ehealth_payload' => array_replace($match->ehealthPayload ?? [], ['active_id' => $item['id']])])->save();
+                }
+            }
+
+            foreach ($draftItems as $item) {
+                $match = empty($item['id']) ? null : $records->firstWhere('uuid', $item['id']);
+                if ($match === null || $match->resourceType !== MedicationRequestRequest::TYPE_REQUEST
+                    || !in_array(strtolower($match->status), [MedicationRequestStatus::DRAFT->value, MedicationRequestStatus::NEW->value, MedicationRequestStatus::PENDING->value, MedicationRequestStatus::PROCESSING->value], true)
+                    || !empty($match->ehealthPayload['active_id']) || empty($item['status'])) {
+                    continue;
+                }
+                $remotePersonUuid = data_get($item, 'person.id') ?? ($item['person_id'] ?? null);
+                if ($remotePersonUuid !== null && $remotePersonUuid !== (string) Person::findOrFail($match->personId)->uuid) {
+                    throw new InvalidArgumentException('The medication sync belongs to another patient.');
+                }
+                $status = MedicationRequestStatus::resolve($item['status']);
+                if ($status === null || !in_array($status, [MedicationRequestStatus::NEW, MedicationRequestStatus::SIGNED, MedicationRequestStatus::REJECTED], true)) {
+                    throw new InvalidArgumentException('The request list returned an invalid MRR status.');
+                }
+                if ($match->status !== $status->value) {
+                    $match->update(['status' => $status->value]);
+                    $updatedCount++;
+                }
+            }
+
+            return $updatedCount;
+        });
     }
 }

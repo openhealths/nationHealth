@@ -1,0 +1,24 @@
+{
+    "id": "86cd9064-7be2-4596-a87e-bf989e4d388e",
+    "carePlan": {"identifier": {"type": {"coding": [{"system": "eHealth/resources", "code": "care_plan"}]}, "value": "8d08ce22-82dd-4ac4-bdb9-432fd5aad5dd"}},
+    "author": [
+        {"identifier": {"type": {"coding": [{"system": "eHealth/resources", "code": "employee"}]}, "value": "47ee824a-eb47-48ef-8d30-1109e3c89f0c"}},
+        {"identifier": {"type": {"coding": [{"system": "eHealth/resources", "code": "employee"}]}, "value": "8ae23990-0133-4fbb-a50d-181a80e780cc"}}
+    ],
+    "detail": {
+        "kind": "medication_request",
+        "status": "scheduled",
+        "doNotPerform": false,
+        "productReference": {"identifier": {"type": {"coding": [{"system": "eHealth/resources", "code": "medication"}]}, "value": "a3968b0d-ab41-4121-b295-6684ebc3e5b2"}},
+        "quantity": {"value": 1.2345, "system": "MEDICATION_UNIT", "code": "ML", "unit": "ml"},
+        "dailyAmount": {"value": 0.1234, "system": "MEDICATION_UNIT", "code": "ML", "unit": "ml"},
+        "remainingQuantity": {"value": 0, "system": "MEDICATION_UNIT", "code": "ML", "unit": "ml"},
+        "remainingQuantityType": "for_request",
+        "scheduledPeriod": {"start": "2026-10-19T10:20:30.123Z", "end": "2026-11-01T21:59:59Z"},
+        "reasonCode": [{"coding": [{"system": "eHealth/ICD10_AM/condition_codes", "code": "A00"}], "text": "Keep all coding"}],
+        "reasonReference": [{"identifier": {"type": {"coding": [{"system": "eHealth/resources", "code": "observation"}]}, "value": "90da1323-42b8-4abe-8777-c39864179d3b"}}],
+        "goal": [{"coding": [{"system": "eHealth/care_plan_activity_goals", "code": "SYNTHETIC_A"}]}, {"coding": [{"system": "eHealth/care_plan_activity_goals", "code": "SYNTHETIC_B"}]}]
+    },
+    "outcomeReference": [],
+    "outcomeCodeableConcept": []
+}

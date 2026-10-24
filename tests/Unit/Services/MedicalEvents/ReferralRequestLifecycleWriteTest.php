@@ -23,7 +23,7 @@ class ReferralRequestLifecycleWriteTest extends TestCase
 
         $serviceResponse = Mockery::mock(EHealthResponse::class);
         $serviceResponse->shouldReceive('getData')->once()->andReturn(['job_id' => 'job-sr']);
-        $serviceApi = Mockery::mock(ServiceRequestApi::class);
+        $serviceApi = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $serviceApi->shouldReceive('createSigned')->once()->with('person-uuid', $payload)->andReturn($serviceResponse);
         $this->instance(ServiceRequestApi::class, $serviceApi);
 
@@ -63,9 +63,9 @@ class ReferralRequestLifecycleWriteTest extends TestCase
         $recallResponse = Mockery::mock(EHealthResponse::class);
         $recallResponse->shouldReceive('getData')->once()->andReturn(['job_id' => 'job-recall']);
 
-        $api = Mockery::mock(ServiceRequestApi::class);
-        $api->shouldReceive('cancel')->once()->with('person-uuid', 'sr-uuid', $cancelPayload)->andReturn($cancelResponse);
-        $api->shouldReceive('recall')->once()->with('person-uuid', 'sr-uuid', $recallPayload)->andReturn($recallResponse);
+        $api = Mockery::mock(ServiceRequestApi::class)->makePartial();
+        $api->shouldReceive('cancel')->once()->with('person-uuid', 'sr-uuid', array_intersect_key($cancelPayload, array_flip(['signed_data', 'signed_data_encoding'])))->andReturn($cancelResponse);
+        $api->shouldReceive('recall')->once()->with('person-uuid', 'sr-uuid', array_intersect_key($recallPayload, array_flip(['signed_data', 'signed_data_encoding'])))->andReturn($recallResponse);
         $this->instance(ServiceRequestApi::class, $api);
 
         $resolver = Mockery::mock(EHealthJobResolver::class);

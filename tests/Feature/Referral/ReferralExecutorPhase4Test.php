@@ -122,10 +122,27 @@ class ReferralExecutorPhase4Test extends TestCase
         $this->instance(PatientServiceRequestApi::class, $patientApi);
     }
 
+    public function test_care_plan_scope_uses_the_typed_collection_and_keeps_legacy_access(): void
+    {
+        $organization = Identifier::create(['value' => $this->legalEntity->uuid]);
+        $plan = \App\Models\CarePlan::create(['uuid' => (string) Str::uuid(), 'person_id' => $this->person->id, 'author_id' => $this->employee->id, 'legal_entity_id' => $this->legalEntity->id, 'period_start' => '2026-10-01', 'title' => 'Synthetic scope plan', 'status' => 'active', 'managing_organization_id' => $organization->id]);
+        $resource = json_decode(file_get_contents(base_path('tests/Fixtures/ServiceRequest/resource.json')), true, flags: JSON_THROW_ON_ERROR);
+        $resource['basedOn'][0]['identifier']['value'] = $plan->uuid;
+        $repo = app(\App\Repositories\MedicalEvents\ServiceRequestRequestRepository::class);
+        $record = $repo->storeResource($resource, $this->person->id);
+        $this->assertTrue(ServiceRequestRequest::basedOnCarePlanOfLegalEntity($this->person)->whereKey($record->id)->exists());
+        $resource['basedOn'][0]['identifier']['type']['coding'][0]['code'] = 'encounter';
+        $repo->storeResource($resource, $this->person->id);
+        $this->assertFalse(ServiceRequestRequest::basedOnCarePlanOfLegalEntity($this->person)->whereKey($record->id)->exists());
+        $legacy = $this->createActiveReferral();
+        $legacy->forceFill(['basedOnId' => Identifier::create(['value' => $plan->uuid])->id])->save();
+        $this->assertTrue(ServiceRequestRequest::basedOnCarePlanOfLegalEntity($this->person)->whereKey($legacy->id)->exists());
+    }
+
     public function test_qualify_sends_a_medical_program_identifier_before_use(): void
     {
         $record = $this->createActiveReferral();
-        $api = Mockery::mock(ServiceRequestApi::class);
+        $api = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $api->shouldReceive('qualify')->once()->ordered()->with($record->uuid, [
             'programs' => [[
                 'identifier' => [
@@ -150,7 +167,7 @@ class ReferralExecutorPhase4Test extends TestCase
             'used_by_legal_entity' => ['identifier' => ['value' => $this->legalEntity->uuid]],
         ]);
         app(PatientServiceRequestApi::class)->shouldReceive('getById')->once()->andReturn($this->remoteResponse($remote));
-        $api = Mockery::mock(ServiceRequestApi::class);
+        $api = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $api->shouldNotReceive('qualify', 'process');
         $this->instance(ServiceRequestApi::class, $api);
 
@@ -170,7 +187,7 @@ class ReferralExecutorPhase4Test extends TestCase
                 'used_by_legal_entity' => ['identifier' => ['value' => (string) Str::uuid()]],
             ])
         ));
-        $api = Mockery::mock(ServiceRequestApi::class);
+        $api = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $api->shouldReceive('qualify')->once()->andReturn($this->remoteResponse([['status' => 'VALID']]));
         $api->shouldReceive('process')->once()->andThrow(new \RuntimeException('Reuse is temporarily blocked'));
         $this->instance(ServiceRequestApi::class, $api);
@@ -185,7 +202,7 @@ class ReferralExecutorPhase4Test extends TestCase
         app(PatientServiceRequestApi::class)->shouldReceive('getById')->once()->andReturn($this->remoteResponse(
             $this->remoteReferral($record, ['status' => 'recalled'])
         ));
-        $api = Mockery::mock(ServiceRequestApi::class);
+        $api = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $api->shouldNotReceive('qualify', 'process');
         $this->instance(ServiceRequestApi::class, $api);
 
@@ -199,7 +216,7 @@ class ReferralExecutorPhase4Test extends TestCase
         app(PatientServiceRequestApi::class)->shouldReceive('getById')->once()->andReturn($this->remoteResponse(
             $this->remoteReferral($record, ['subject' => ['identifier' => ['value' => (string) Str::uuid()]]])
         ));
-        $api = Mockery::mock(ServiceRequestApi::class);
+        $api = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $api->shouldNotReceive('qualify', 'process');
         $this->instance(ServiceRequestApi::class, $api);
 
@@ -239,7 +256,7 @@ class ReferralExecutorPhase4Test extends TestCase
         $this->actingAs($this->user);
         $record = $this->createActiveReferral();
         $component = $this->encounterCreateComponent($record);
-        $api = Mockery::mock(ServiceRequestApi::class);
+        $api = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $api->shouldReceive('qualify')->once()->andReturn($this->remoteResponse([['status' => 'VALID']]));
         $api->shouldReceive('process')->once()->andReturn($this->remoteResponse(['status' => 'active']));
         $this->instance(ServiceRequestApi::class, $api);
@@ -292,7 +309,7 @@ class ReferralExecutorPhase4Test extends TestCase
         $record = $this->createActiveReferral();
         $component = $this->encounterCreateComponent($record);
         $encounter = $this->finishedEncounterForReferral($record);
-        $api = Mockery::mock(ServiceRequestApi::class);
+        $api = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $api->shouldReceive('qualify')->once()->ordered()->with($record->uuid, [
             'programs' => [[
                 'identifier' => [
@@ -303,12 +320,12 @@ class ReferralExecutorPhase4Test extends TestCase
         ])->andReturn($this->remoteResponse([['status' => 'VALID']]));
         $api->shouldReceive('process')->once()->ordered()->andReturn($this->remoteResponse(['status' => 'active']));
         $api->shouldReceive('complete')->once()->ordered()->with($record->uuid, [
-            'based_on' => [[
+            'completed_with' => [
                 'identifier' => [
                     'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'encounter']]],
                     'value' => $encounter->uuid,
                 ],
-            ]],
+            ],
         ])->andReturn($this->remoteResponse(['status' => 'completed']));
         $this->instance(ServiceRequestApi::class, $api);
         app(PatientServiceRequestApi::class)->shouldReceive('getById')->once()
@@ -342,7 +359,7 @@ class ReferralExecutorPhase4Test extends TestCase
         $component->referralToRedeemId = $record->uuid;
         $component->encounterUuid = $encounter->uuid;
         $component->showReferralRedeemModal = true;
-        $api = Mockery::mock(ServiceRequestApi::class);
+        $api = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $api->shouldNotReceive('qualify', 'process', 'complete');
         $this->instance(ServiceRequestApi::class, $api);
         app(PatientServiceRequestApi::class)->shouldNotReceive('getById');
@@ -432,7 +449,7 @@ class ReferralExecutorPhase4Test extends TestCase
             'priority' => 'routine',
         ]);
 
-        $mockApi = Mockery::mock(ServiceRequestApi::class);
+        $mockApi = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $mockApi->shouldReceive('qualify')
             ->once()
             ->andThrow(new EHealthValidationException([
@@ -466,7 +483,7 @@ class ReferralExecutorPhase4Test extends TestCase
             'priority' => 'routine',
         ]);
 
-        $mockApi = Mockery::mock(ServiceRequestApi::class);
+        $mockApi = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $qualifyResponse = Mockery::mock(EHealthResponse::class);
         $qualifyResponse->shouldReceive('getData')->andReturn([
             'data' => [
@@ -509,13 +526,14 @@ class ReferralExecutorPhase4Test extends TestCase
         $mockPatientApi->shouldReceive('recall')
             ->once()
             ->with($this->person->uuid, $referralUuid, Mockery::on(static function (array $payload): bool {
-                return ($payload['explanatory_letter'] ?? '') === 'Пацієнт більше не потребує послуги';
+                return ($payload['signed_data'] ?? '') === 'signed-payload' && !isset($payload['explanatory_letter']);
             }))
             ->andReturn($recallResponse);
         $this->app->instance(PatientServiceRequestApi::class, $mockPatientApi);
 
         $service = app(ReferralRequestLifecycleService::class);
         $result = $service->recallReferral($this->person->uuid, $referralUuid, [
+            'signed_data' => 'signed-payload',
             'explanatory_letter' => 'Пацієнт більше не потребує послуги',
         ]);
 
@@ -526,7 +544,7 @@ class ReferralExecutorPhase4Test extends TestCase
         ]);
     }
 
-    public function test_complete_referral_builds_based_on_for_encounter(): void
+    public function test_complete_referral_builds_completed_with_for_encounter(): void
     {
         $referralUuid = (string) Str::uuid();
         $encounterUuid = (string) Str::uuid();
@@ -551,12 +569,12 @@ class ReferralExecutorPhase4Test extends TestCase
         $completeResponse = Mockery::mock(EHealthResponse::class);
         $completeResponse->shouldReceive('getData')->andReturn(['status' => 'completed']);
 
-        $mockApi = Mockery::mock(ServiceRequestApi::class);
+        $mockApi = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $mockApi->shouldReceive('complete')
             ->once()
             ->with($referralUuid, Mockery::on(static function (array $payload) use ($encounterUuid): bool {
-                return data_get($payload, 'based_on.0.identifier.type.coding.0.code') === 'encounter'
-                    && data_get($payload, 'based_on.0.identifier.value') === $encounterUuid;
+                return data_get($payload, 'completed_with.identifier.type.coding.0.code') === 'encounter'
+                    && data_get($payload, 'completed_with.identifier.value') === $encounterUuid;
             }))
             ->andReturn($completeResponse);
         $this->app->instance(ServiceRequestApi::class, $mockApi);

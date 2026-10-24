@@ -64,7 +64,7 @@
                             </div>
                             @if (!empty($referral['started_at']) && !empty($referral['ended_at']))
                                 <div class="text-xs text-gray-400 dark:text-gray-500">
-                                    Діє з {{ \Carbon\Carbon::parse($referral['started_at'])->format('d.m.Y') }} по {{ \Carbon\Carbon::parse($referral['ended_at'])->format('d.m.Y') }}
+                                    Діє з {{ \Carbon\Carbon::parse($referral['started_at'], 'UTC')->setTimezone(config('app.timezone'))->format($referralKind === 'service_request' ? 'd.m.Y H:i' : 'd.m.Y') }} по {{ \Carbon\Carbon::parse($referral['ended_at'], 'UTC')->setTimezone(config('app.timezone'))->format($referralKind === 'service_request' ? 'd.m.Y H:i' : 'd.m.Y') }}
                                 </div>
                             @endif
                             @if (!empty($referral['employee_name']))
@@ -98,7 +98,11 @@
                                     type="button"
                                     class="flex items-center gap-1 text-green-500 transition-colors hover:text-green-600 dark:text-green-400 dark:hover:text-green-300"
                                     title="Підписати КЕП"
-                                    wire:click="openSignatureModal('{{ $signAction }}', null, '{{ $referral['uuid'] }}')"
+                                    @if ($referralKind === 'service_request' && $status === \App\Enums\Person\ServiceRequestStatus::DRAFT)
+                                        wire:click="initReferralForm({{ $activity->id }})"
+                                    @else
+                                        wire:click="openSignatureModal('{{ $signAction }}', null, '{{ $referral['uuid'] }}')"
+                                    @endif
                                 >
                                     @icon('key', 'w-4 h-4')
                                     <span class="text-xs">Підписати</span>
