@@ -96,7 +96,7 @@ class MedicationRequestRepositoryFhirRefsTest extends TestCase
         $this->assertSame($activityUuid, $request->basedOn->value);
         $this->assertSame($encounterUuid, $request->context?->value);
         $this->assertSame('order', $request->intent?->code);
-        $this->assertSame('community', $request->category?->text);
+        $this->assertSame('community', $request->category?->coding->first()?->code);
         $this->assertSame(MedicationRequestRequest::SOURCE_LOCAL, $request->source);
     }
 

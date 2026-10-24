@@ -54,6 +54,7 @@ class LegalEntity extends Model
     public const string ENTITY_EQUIPMENT = 'equipment_';
     public const string ENTITY_EPISODE = 'episode_';
     public const string ENTITY_ENCOUNTER = 'encounter_';
+    public const string ENTITY_CARE_PLAN = 'care_plan_';
     public const string ENTITY_CLINICAL_IMPRESSION = 'clinical_impression_';
     public const string ENTITY_IMMUNIZATION = 'immunization_';
     public const string ENTITY_OBSERVATION = 'observation_';

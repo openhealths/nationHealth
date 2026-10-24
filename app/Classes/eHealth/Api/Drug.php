@@ -15,6 +15,24 @@ class Drug extends Request
 {
     public const string URL = '/api/v3/drugs';
 
+    public function getPrescriptionMedication(string $medicationId, string $programId): array
+    {
+        $medications = $this->getMany([
+            'innm_dosage_id' => $medicationId,
+            'medical_program_id' => $programId,
+            'page' => 1,
+            'page_size' => 20,
+        ])->getData();
+
+        foreach ($medications as $medication) {
+            if (($medication['id'] ?? null) === $medicationId) {
+                return $medication;
+            }
+        }
+
+        throw new \InvalidArgumentException(__('care-plan.medication_not_available_for_program'));
+    }
+
     /**
      * Receives a list of drugs.
      *

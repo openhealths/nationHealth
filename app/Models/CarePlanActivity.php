@@ -56,22 +56,80 @@ class CarePlanActivity extends Model
         'product_reference_id',
         'quantity_id',
         'daily_amount_id',
+        'remaining_quantity_id',
+        'remaining_quantity_type',
+        'location_identifier_id',
+        'performer_identifier_id',
+        'program_identifier_id',
+        'status_reason_concept_id',
+        'scheduled_timing',
+        'scheduled_string',
+        'fhir_metadata',
+        'fhir_version',
     ];
 
     protected $casts = [
         'do_not_perform' => 'boolean',
-        'quantity' => 'integer',
-        'daily_amount' => 'decimal:4',
-        'remaining_quantity' => 'decimal:4',
+        'quantity' => 'float',
+        'daily_amount' => 'float',
+        'remaining_quantity' => 'float',
         'reason_reference' => 'array',
         'goal' => 'array',
         'scheduled_period_start' => 'date',
         'scheduled_period_end' => 'date',
+        'scheduled_timing' => 'array',
+        'fhir_metadata' => 'array',
+        'fhir_version' => 'integer',
     ];
 
     public function quantityQuantity(): BelongsTo
     {
         return $this->belongsTo(Quantity::class, 'quantity_id');
+    }
+
+    public function remainingQuantityQuantity(): BelongsTo
+    {
+        return $this->belongsTo(Quantity::class, 'remaining_quantity_id');
+    }
+
+    public function locationIdentifier(): BelongsTo
+    {
+        return $this->belongsTo(Identifier::class, 'location_identifier_id');
+    }
+
+    public function performerIdentifier(): BelongsTo
+    {
+        return $this->belongsTo(Identifier::class, 'performer_identifier_id');
+    }
+
+    public function programIdentifier(): BelongsTo
+    {
+        return $this->belongsTo(Identifier::class, 'program_identifier_id');
+    }
+
+    public function statusReasonConcept(): BelongsTo
+    {
+        return $this->belongsTo(CodeableConcept::class, 'status_reason_concept_id');
+    }
+
+    public function authorReferences(): BelongsToMany
+    {
+        return $this->belongsToMany(Identifier::class, 'care_plan_activity_authors', 'activity_id', 'identifier_id')->withPivot('position')->orderByPivot('position');
+    }
+
+    public function reasonConcepts(): BelongsToMany
+    {
+        return $this->belongsToMany(CodeableConcept::class, 'care_plan_activity_reason_codes', 'activity_id', 'concept_id')->withPivot('position')->orderByPivot('position');
+    }
+
+    public function goalConcepts(): BelongsToMany
+    {
+        return $this->belongsToMany(CodeableConcept::class, 'care_plan_activity_goal_concepts', 'activity_id', 'concept_id')->withPivot('position')->orderByPivot('position');
+    }
+
+    public function outcomeConcepts(): BelongsToMany
+    {
+        return $this->belongsToMany(CodeableConcept::class, 'care_plan_activity_outcome_concepts', 'activity_id', 'concept_id')->withPivot('position')->orderByPivot('position');
     }
 
     public function dailyAmountQuantity(): BelongsTo
@@ -151,7 +209,7 @@ class CarePlanActivity extends Model
             };
         }
 
-        $conceptCode = strtolower(trim((string) ($this->kindConcept?->coding?->first()?->code ?? '')));
+        $conceptCode = $this->relationLoaded('kindConcept') ? strtolower(trim((string) ($this->kindConcept?->coding?->first()?->code ?? ''))) : '';
 
         return match ($conceptCode) {
             'servicerequest', 'service_request' => 'service_request',

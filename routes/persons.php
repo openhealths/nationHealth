@@ -26,6 +26,8 @@ use App\Livewire\DiagnosticReport\DiagnosticReportIndex;
 use App\Livewire\DiagnosticReport\DiagnosticReportView;
 use App\Livewire\Encounter\EncounterIndex;
 use App\Livewire\Encounter\EncounterView;
+use App\Livewire\EncounterPackage\EncounterEPrescriptionCreate;
+use App\Livewire\EncounterPackage\EncounterReferralCreate;
 use App\Livewire\EncounterPackage\EncounterPackageCreate;
 use App\Livewire\EncounterPackage\EncounterPackageEdit;
 use App\Livewire\EncounterPackage\EncounterPackageView;
@@ -249,7 +251,23 @@ Route::prefix('persons')->whereNumber('person')
                 ->whereNumber('declarationRequest');
         });
 
+        Route::get('/{person}/encounter/{encounter}/care-plan/create', CarePlanCreate::class)
+            ->can('create', CarePlan::class)
+            ->whereNumber('encounter')
+            ->name('care-plans.create-by-encounter');
+
         Route::prefix('{person}')->name('encounter.')->group(function () {
+            Route::get('/encounter/{encounter}/eprescription/create', EncounterEPrescriptionCreate::class)
+                ->can('view', ['encounter', 'person'])
+                ->middleware('permission:medication_request_request:write')
+                ->whereNumber('encounter')
+                ->name('eprescription.create');
+            Route::get('/encounter/{encounter}/referral/create', EncounterReferralCreate::class)
+                ->can('view', ['encounter', 'person'])
+                ->middleware('permission:service_request:write')
+                ->whereNumber('encounter')
+                ->name('referral.create');
+
             Route::get('/encounter/create', EncounterPackageCreate::class)
                 ->can('create', Encounter::class)
                 ->name('create');

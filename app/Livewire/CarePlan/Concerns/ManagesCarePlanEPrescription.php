@@ -9,11 +9,9 @@ use App\Enums\CarePlanStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\CarePlanActivity;
-use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Repositories\CarePlanActivityRepository;
-use App\Repositories\MedicalEvents\MedicalEventsRequestStatuses;
 use App\Services\MedicalEvents\CarePlanActivityEHealthGuard;
-use App\Services\MedicalEvents\CarePlanActivityLifecycleService;
+use App\Classes\eHealth\Api\CarePlanActivity as CarePlanActivityApi;
 use App\Services\MedicalEvents\MedicalRequestOwnership;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use Carbon\Carbon;
@@ -134,9 +132,7 @@ trait ManagesCarePlanEPrescription
             return;
         }
 
-        $issuedQty = MedicationRequestRequest::whereHas('basedOn', fn ($q) => $q->where('value', $activity->uuid))
-            ->whereNotIn('status', MedicalEventsRequestStatuses::EXCLUDED_FROM_ISSUED_SUM)
-            ->sum('medication_qty');
+        $issuedQty = \App\Repositories\MedicalEvents\Repository::medicationRequest()->issuedCarePlanQuantity($activity->uuid);
 
         $activityQty = $activity->quantity;
         $this->ePrescriptionRemainingQty = $activityQty === null
@@ -144,7 +140,7 @@ trait ManagesCarePlanEPrescription
             : max(0.0, (float) $activityQty - (float) $issuedQty);
 
         try {
-            $eHealthActivity = app(CarePlanActivityLifecycleService::class)->getDetails(
+            $eHealthActivity = app(CarePlanActivityApi::class)->getRawDetails(
                 (string) $this->carePlan->person->uuid,
                 (string) $this->carePlan->uuid,
                 (string) $activity->uuid
@@ -383,11 +379,7 @@ trait ManagesCarePlanEPrescription
         }
 
         if (!$this->ePrescriptionSkipTreatmentPeriod) {
-            $lastActivePrescription = MedicationRequestRequest::where('person_id', $this->carePlan->person_id)
-                ->where('medication_id', $this->ePrescriptionForm['medication_id'])
-                ->whereIn('status', ['active', 'signed'])
-                ->orderBy('ended_at', 'desc')
-                ->first();
+            $lastActivePrescription = \App\Repositories\MedicalEvents\Repository::medicationRequest()->lastActiveForTreatment($this->carePlan->personId, $this->ePrescriptionForm['medication_id']);
 
             if ($lastActivePrescription && $lastActivePrescription->endedAt) {
                 $lastEnd = Carbon::parse($lastActivePrescription->endedAt);
@@ -494,7 +486,7 @@ trait ManagesCarePlanEPrescription
             }
 
             $activityUuids = $this->carePlan->activities->pluck('uuid')->toArray();
-            $localRequests = MedicationRequestRequest::whereHas('basedOn', fn ($q) => $q->whereIn('value', $activityUuids))->get();
+            $localRequests = app(CarePlanActivityRepository::class)->linkedDocuments($activityUuids, 'medication_request');
 
             if ($localRequests->isEmpty()) {
                 Session::flash('info', __('Немає виписаних рецептів для синхронізації у цьому плані лікування'));
@@ -502,59 +494,9 @@ trait ManagesCarePlanEPrescription
                 return;
             }
 
-            $updatedCount = 0;
-
-            // Check active/completed medication requests in eHealth
             $activeItems = EHealth::medicationRequest()->getBySearchParams((string) $personUuid, [])->getData();
-
-            if (is_array($activeItems)) {
-                foreach ($activeItems as $item) {
-                    if (empty($item['id'])) {
-                        continue;
-                    }
-                    $match = $localRequests->firstWhere('uuid', $item['id'])
-                        ?? (!empty($item['request_number']) ? $localRequests->firstWhere('request_number', $item['request_number']) : null);
-
-                    if ($match) {
-                        $payload = is_array($match->ehealth_payload) ? $match->ehealth_payload : [];
-                        $needsUpdate = false;
-
-                        if (!empty($item['status']) && strtolower((string) $item['status']) !== $match->status) {
-                            $match->status = strtolower((string) $item['status']);
-                            $needsUpdate = true;
-                            $updatedCount++;
-                        }
-
-                        if ($item['id'] !== $match->uuid && ($payload['active_id'] ?? null) !== $item['id']) {
-                            $payload['active_id'] = $item['id'];
-                            $match->ehealth_payload = $payload;
-                            $needsUpdate = true;
-                        }
-
-                        if ($needsUpdate) {
-                            $match->save();
-                        }
-                    }
-                }
-            }
-
-            // Check draft/rejected requests in eHealth
             $draftItems = EHealth::medicationRequest()->getRequestsBySearchParams((string) $personUuid, [])->getData();
-
-            if (is_array($draftItems)) {
-                foreach ($draftItems as $item) {
-                    if (empty($item['id'])) {
-                        continue;
-                    }
-                    $match = $localRequests->firstWhere('uuid', $item['id'])
-                        ?? (!empty($item['request_number']) ? $localRequests->firstWhere('request_number', $item['request_number']) : null);
-
-                    if ($match && !in_array($match->status, ['active', 'completed', 'expired'], true) && !empty($item['status']) && strtolower((string) $item['status']) !== $match->status) {
-                        $match->update(['status' => strtolower((string) $item['status'])]);
-                        $updatedCount++;
-                    }
-                }
-            }
+            $updatedCount = \App\Repositories\MedicalEvents\Repository::medicationRequest()->synchronizeCarePlanDocuments($localRequests, $activeItems, $draftItems);
 
             $this->refreshCarePlan();
             Session::flash('success', __('Синхронізовано з ЕСОЗ. Оновлено статусів: :count', ['count' => $updatedCount]));
@@ -855,7 +797,7 @@ trait ManagesCarePlanEPrescription
             app(MedicationRequestLifecycleService::class)->block($this->carePlan->person->uuid, $prescriptionId, [
                 'status_reason' => 'Призупинення або блокування призначення',
             ]);
-            $requestRecord->update(['status' => 'blocked']);
+            \App\Repositories\MedicalEvents\Repository::medicationRequest()->saveStatus($requestRecord, 'blocked');
             $this->refreshCarePlan();
             Session::flash('success', __('Рецепт успішно заблоковано в ЕСОЗ.'));
         } catch (ModelNotFoundException) {
@@ -879,7 +821,7 @@ trait ManagesCarePlanEPrescription
                 ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
 
             app(MedicationRequestLifecycleService::class)->unblock($this->carePlan->person->uuid, $prescriptionId, []);
-            $requestRecord->update(['status' => 'active']);
+            \App\Repositories\MedicalEvents\Repository::medicationRequest()->saveStatus($requestRecord, 'active');
             $this->refreshCarePlan();
             Session::flash('success', __('Рецепт успішно розблоковано в ЕСОЗ.'));
         } catch (ModelNotFoundException) {

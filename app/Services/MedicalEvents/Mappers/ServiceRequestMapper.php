@@ -5,431 +5,259 @@ declare(strict_types=1);
 namespace App\Services\MedicalEvents\Mappers;
 
 use App\Contracts\FhirMapperContract;
-use App\Services\MedicalEvents\FhirResource;
+use App\Core\Arr;
 use App\Services\MedicalEvents\InformWith;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Str;
+use InvalidArgumentException;
 
 class ServiceRequestMapper implements FhirMapperContract
 {
     private const CATEGORY_SYSTEM = 'eHealth/SNOMED/service_request_categories';
 
-    /**
-     * Convert database/form data to FHIR structure for eHealth API.
-     *
-     * @param  array  $data
-     * @param  mixed  ...$context  [0] array $uuids (person_uuid, encounter_uuid, employee_uuid, legal_entity_uuid)
-     * @return array
-     */
+    public const CREATE_FIELDS = ['id', 'status', 'intent', 'priority', 'basedOn', 'category', 'code', 'program', 'context', 'requesterEmployee', 'requesterLegalEntity', 'reasonReference', 'supportingInfo', 'note', 'patientInstruction', 'permittedResources', 'performer', 'locationReference', 'performerType', 'quantity', 'specimens', 'focus', 'informWith', 'occurrencePeriod', 'occurrenceDateTime'];
+
+    /** Pure form projection over the original ESOZ resource; no generated identity or clock. */
     public function toFhir(array $data, mixed ...$context): array
     {
-        [$uuids] = $context;
-
-        $result = [
-            'id' => $data['uuid'] ?? Str::uuid()->toString(),
-            'status' => $data['status'] ?? 'draft',
-            'intent' => $data['intent'] ?? 'order',
-            'code' => FhirResource::make()
-                ->coding('eHealth/services', $data['service_id'])
-                ->toCodeableConcept(),
-            'subject' => FhirResource::make()
-                ->coding('eHealth/resources', 'patient')
-                ->toIdentifier($uuids['person_uuid']),
-            'requester' => [
-                'agent' => FhirResource::make()
-                    ->coding('eHealth/resources', 'employee')
-                    ->toIdentifier($uuids['employee_uuid']),
-                'onBehalfOf' => FhirResource::make()
-                    ->coding('eHealth/resources', 'legal_entity')
-                    ->toIdentifier($uuids['legal_entity_uuid'])
-            ]
-        ];
-
-        if (!empty($uuids['encounter_uuid'])) {
-            $result['context'] = FhirResource::make()
-                ->coding('eHealth/resources', 'encounter')
-                ->toIdentifier($uuids['encounter_uuid']);
+        $input = Arr::toCamelCase($data);
+        $options = Arr::toCamelCase($context[0] ?? []);
+        $resource = $this->normalize($options['resource'] ?? $data['_fhir'] ?? []);
+        foreach (['uuid' => 'id', 'status' => 'status', 'intent' => 'intent', 'priority' => 'priority', 'requestNumber' => 'requisition', 'note' => 'note', 'patientInstruction' => 'patientInstruction'] as $source => $target) {
+            if (array_key_exists($source, $input)) {
+                $this->set($resource, $target, $input[$source]);
+            }
         }
-
-        if (!empty($data['based_on_uuid'])) {
-            $result['basedOn'] = [
-                FhirResource::make()
-                    ->coding('eHealth/resources', 'care_plan_activity')
-                    ->toIdentifier($data['based_on_uuid'])
-            ];
+        foreach (['requesterEmployee' => ['employeeUuid', 'employee'], 'requesterLegalEntity' => ['legalEntityUuid', 'legal_entity'], 'subject' => ['personUuid', 'patient']] as $field => [$key, $type]) {
+            if (!empty($options[$key])) {
+                $resource[$field] = $this->reference((string) $options[$key], $type, $resource[$field] ?? null);
+            }
         }
-
-        if (!empty($data['category'])) {
-            $result['category'] = [
-                FhirResource::make()
-                    ->coding(self::CATEGORY_SYSTEM, $data['category'])
-                    ->toCodeableConcept()
-            ];
+        if (empty($resource['id']) && !($options['allowMissingId'] ?? false)) {
+            throw new InvalidArgumentException('A Service Request UUID must be allocated before mapping.');
         }
-
-        if (!empty($data['priority'])) {
-            $result['priority'] = $data['priority'];
+        $resource['status'] ??= 'draft';
+        $resource['intent'] ??= 'order';
+        foreach (['code' => ['serviceId', 'service', 'serviceType'], 'program' => ['programId', 'medical_program', null], 'performer' => ['performer', 'legal_entity', null], 'locationReference' => ['locationReference', 'division', null]] as $field => [$key, $defaultType, $typeKey]) {
+            if (!array_key_exists($key, $input)) {
+                continue;
+            }
+            $value = $input[$key];
+            if (is_array($value)) {
+                $resource[$field] = $value;
+            } elseif ($value === null || $value === '') {
+                unset($resource[$field]);
+            } else {
+                $existing = $resource[$field] ?? null;
+                $type = $typeKey !== null ? ($input[$typeKey] ?? null) : null;
+                $sameValue = data_get($existing, 'identifier.value') === (string) $value;
+                $type ??= $sameValue ? data_get($existing, 'identifier.type.coding.0.code', $defaultType) : $defaultType;
+                $resource[$field] = $this->reference((string) $value, $type, $sameValue ? $existing : null);
+            }
         }
-
-        if (!empty($data['note'])) {
-            $result['note'] = [['text' => $data['note']]];
-        }
-
-        if (!empty($data['program_id'])) {
-            $result['program'] = FhirResource::make()
-                ->coding('eHealth/medical_programs', $data['program_id'])
-                ->toIdentifier($data['program_id']);
-        }
-
-        if (isset($data['quantity'])) {
-            $result['quantityInteger'] = (int) $data['quantity'];
-        }
-
-        if (!empty($data['started_at']) || !empty($data['ended_at'])) {
-            $result['occurrencePeriod'] = [
-                'start' => $data['started_at'] ? CarbonImmutable::parse($data['started_at'])->toIso8601String() : null,
-                'end' => $data['ended_at'] ? CarbonImmutable::parse($data['ended_at'])->toIso8601String() : null,
-            ];
-            $result['occurrencePeriod'] = array_filter($result['occurrencePeriod']);
-        }
-
-        if (!empty($data['supporting_info'])) {
-            $result['supportingInfo'] = [];
-            foreach ($data['supporting_info'] as $ref) {
-                if (!empty($ref['uuid']) && !empty($ref['type'])) {
-                    $result['supportingInfo'][] = FhirResource::make()
-                        ->coding('eHealth/resources', strtolower($ref['type']))
-                        ->toIdentifier($ref['uuid']);
+        foreach (['category' => self::CATEGORY_SYSTEM, 'performerType' => 'SPECIALITY_TYPE'] as $field => $system) {
+            if (array_key_exists($field, $input)) {
+                $value = $input[$field];
+                if (is_array($value)) {
+                    $resource[$field] = $value;
+                } elseif ($value === null || $value === '') {
+                    unset($resource[$field]);
+                } elseif (data_get($resource, "$field.coding.0.code") !== $value) {
+                    $resource[$field] = ['coding' => [['system' => $system, 'code' => $value]]];
                 }
             }
+        }
+        if (array_key_exists('contextUuid', $input) || isset($options['encounterUuid']) || isset($options['episodeUuid'])) {
+            $value = $input['contextUuid'] ?? $options['encounterUuid'] ?? $options['episodeUuid'] ?? null;
+            $type = $input['contextType'] ?? (isset($options['encounterUuid']) ? 'encounter' : (isset($options['episodeUuid']) ? 'episode_of_care' : data_get($resource, 'context.identifier.type.coding.0.code')));
+            $this->set($resource, 'context', $value ? $this->reference($value, $type, $resource['context'] ?? null) : null);
+        }
+        if (array_key_exists('basedOnUuid', $input)) {
+            $items = $resource['basedOn'] ?? [];
+            $previousActivity = collect($items)->first(fn (array $ref): bool => in_array(data_get($ref, 'identifier.type.coding.0.code'), ['activity', 'care_plan_activity'], true));
+            $items = array_values(array_filter($items, static fn (array $ref): bool => !in_array(data_get($ref, 'identifier.type.coding.0.code'), ['activity', 'care_plan_activity'], true)));
+            if (!empty($input['basedOnUuid'])) {
+                $old = collect($resource['basedOn'] ?? [])->first(fn (array $ref): bool => data_get($ref, 'identifier.value') === $input['basedOnUuid']);
+                $items[] = $this->reference($input['basedOnUuid'], 'activity', $old);
+            }
+            if (data_get($previousActivity, 'identifier.value') !== ($input['basedOnUuid'] ?: null)) {
+                $resource['basedOn'] = $items;
+            }
+        }
+        $previousCarePlan = collect($resource['basedOn'] ?? [])->first(fn (array $ref): bool => data_get($ref, 'identifier.type.coding.0.code') === 'care_plan');
+        if (!empty($options['carePlanUuid']) && data_get($previousCarePlan, 'identifier.value') !== $options['carePlanUuid']) {
+            $items = array_values(array_filter($resource['basedOn'] ?? [], static fn (array $ref): bool => data_get($ref, 'identifier.type.coding.0.code') !== 'care_plan'));
+            array_unshift($items, $this->reference($options['carePlanUuid'], 'care_plan', collect($resource['basedOn'] ?? [])->first(fn (array $ref): bool => data_get($ref, 'identifier.type.coding.0.code') === 'care_plan')));
+            $resource['basedOn'] = $items;
+        }
+        if (array_key_exists('quantity', $input)) {
+            if ($input['quantity'] === null || $input['quantity'] === '') {
+                unset($resource['quantity']);
+            } elseif (is_array($input['quantity'])) {
+                $resource['quantity'] = $input['quantity'];
+            } else {
+                if (!is_numeric($input['quantity']) || !is_finite((float) $input['quantity'])) {
+                    throw new InvalidArgumentException('Quantity must be a finite number.');
+                }
+                if (!\Brick\Math\BigDecimal::of((string) $input['quantity'])->isEqualTo((string) (float) $input['quantity'])) {
+                    throw new InvalidArgumentException('Quantity cannot be represented without loss in the JSON numeric contract.');
+                }
+                $resource['quantity'] = array_replace($resource['quantity'] ?? [], ['value' => (float) $input['quantity']]);
+                $resource['quantity']['system'] ??= 'SERVICE_UNIT';
+                $resource['quantity']['code'] ??= 'PIECE';
+            }
+        }
+        foreach (['system', 'code', 'unit', 'comparator'] as $key) {
+            if (array_key_exists('quantity'.ucfirst($key), $input) && isset($resource['quantity'])) {
+                $this->set($resource['quantity'], $key, $input['quantity'.ucfirst($key)]);
+            }
+        }
+        foreach (['startedAt' => 'start', 'endedAt' => 'end'] as $source => $target) {
+            if (!array_key_exists($source, $input)) {
+                continue;
+            }
+            $value = $input[$source];
+            if ($value === null || $value === '') {
+                if (isset($resource['occurrencePeriod'])) {
+                    unset($resource['occurrencePeriod'][$target]);
+                }
+            } else {
+                $existing = $resource['occurrencePeriod'][$target] ?? null;
+                if ($existing !== $value) {
+                    $resource['occurrencePeriod'][$target] = $this->dateTime((string) $value, $options['timezone'] ?? 'UTC');
+                }
+            }
+        }
+        foreach (['supportingInfo', 'reasonReference', 'permittedResources', 'specimens', 'focus', 'basedOn'] as $field) {
+            if (array_key_exists($field, $input)) {
+                $items = $input[$field];
+                $items = is_string($items) ? json_decode($items, true, flags: JSON_THROW_ON_ERROR) : ($items ?? []);
+                $resource[$field] = array_map(function (array $item) use ($resource, $field): array {
+                    if (isset($item['identifier'])) {
+                        return $item;
+                    }
+                    $old = collect($resource[$field] ?? [])->first(fn (array $ref): bool => data_get($ref, 'identifier.value') === ($item['uuid'] ?? null));
+
+                    return $this->reference($item['uuid'] ?? '', $item['type'] ?? null, $old);
+                }, $items);
+            }
+        }
+        if (array_key_exists('informWith', $input)) {
+            $id = is_array($input['informWith']) ? ($input['informWith']['authMethodId'] ?? InformWith::authMethodId($input['informWith'])) : InformWith::authMethodId($input['informWith']);
+            $this->set($resource, 'informWith', $id === null ? null : ['authMethodId' => $id]);
+        }
+        foreach (['occurrenceDateTime', 'occurrencePeriod'] as $field) {
+            if (array_key_exists($field, $input)) {
+                $this->set($resource, $field, $input[$field]);
+            }
+        }
+        if (!empty($resource['occurrencePeriod']) && !empty($resource['occurrenceDateTime'])) {
+            throw new InvalidArgumentException('Only one occurrence variant is allowed.');
+        }
+
+        return $resource;
+    }
+
+    public function normalize(array $resource): array
+    {
+        $resource = Arr::toCamelCase($resource);
+        if (isset($resource['uuid']) && !isset($resource['id'])) {
+            $resource['id'] = $resource['uuid'];
+            unset($resource['uuid']);
+        }
+
+        if (isset($resource['requestNumber']) && !isset($resource['requisition'])) {
+            $resource['requisition'] = $resource['requestNumber'];
+            unset($resource['requestNumber']);
+        }
+
+        return $resource;
+    }
+
+    public function toPrequalifyPayload(array $data, array $uuids, ?string $carePlanUuid = null, ?string $activityUuid = null): array
+    {
+        if ($activityUuid !== null) {
+            $data['based_on_uuid'] = $activityUuid;
+        }
+        $resource = $this->toFhir($data, $uuids + ['allowMissingId' => true, 'carePlanUuid' => $carePlanUuid]);
+        $content = $this->createContent($resource);
+        unset($content['id'], $content['program']);
+
+        return ['service_request' => $content, 'programs' => isset($resource['program']) ? [Arr::toSnakeCase($resource['program'])] : []];
+    }
+
+    /** Compatibility for callers that still inspect the prequalify-shaped wrapper. */
+    public function toCreateSignedPayload(array $data, array $uuids, ?string $carePlanUuid = null, ?string $activityUuid = null): array
+    {
+        $payload = $this->toPrequalifyPayload($data, $uuids, $carePlanUuid, $activityUuid);
+        if (empty($data['uuid'])) {
+            throw new InvalidArgumentException('A Service Request UUID must be allocated before signing.');
+        }
+        $payload['service_request']['id'] = $data['uuid'];
+
+        return $payload;
+    }
+
+    public function toCreateSignedContent(array $data, array $uuids, ?string $carePlanUuid = null, ?string $activityUuid = null): array
+    {
+        if ($activityUuid !== null) {
+            $data['based_on_uuid'] = $activityUuid;
+        }
+
+        return $this->createContent($this->toFhir($data, $uuids + ['carePlanUuid' => $carePlanUuid]));
+    }
+
+    public function createContent(array $resource): array
+    {
+        $content = array_intersect_key($resource, array_flip(self::CREATE_FIELDS));
+        $content['status'] = 'active';
+        $content['intent'] ??= 'order';
+        $content['priority'] ??= 'routine';
+        if (data_get($content, 'category.coding.0.code') !== 'transfer_of_care') {
+            unset($content['performer'], $content['locationReference'], $content['performerType']);
+        }
+
+        return Arr::toSnakeCase(array_filter($content, static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []));
+    }
+
+    public function fromFhir(array $data, mixed ...$context): array
+    {
+        $resource = $this->normalize($data);
+        $activity = collect($resource['basedOn'] ?? [])->first(fn (array $ref): bool => in_array(data_get($ref, 'identifier.type.coding.0.code'), ['activity', 'care_plan_activity'], true));
+        $result = ['_fhir' => $resource];
+        foreach (['uuid' => 'id', 'status' => 'status', 'request_number' => 'requisition', 'started_at' => 'occurrencePeriod.start', 'ended_at' => 'occurrencePeriod.end', 'service_id' => 'code.identifier.value', 'service_type' => 'code.identifier.type.coding.0.code', 'quantity' => 'quantity.value', 'quantity_system' => 'quantity.system', 'quantity_code' => 'quantity.code', 'quantity_unit' => 'quantity.unit', 'quantity_comparator' => 'quantity.comparator', 'program_id' => 'program.identifier.value', 'intent' => 'intent', 'category' => 'category.coding.0.code', 'context_uuid' => 'context.identifier.value', 'context_type' => 'context.identifier.type.coding.0.code', 'priority' => 'priority', 'note' => 'note', 'patient_instruction' => 'patientInstruction', 'inform_with' => 'informWith', 'performer' => 'performer.identifier.value', 'location_reference' => 'locationReference.identifier.value', 'performer_type' => 'performerType.coding.0.code'] as $key => $path) {
+            $result[$key] = data_get($resource, $path);
+        }
+        $result['based_on_uuid'] = data_get($activity, 'identifier.value');
+        foreach (['supportingInfo' => 'supporting_info', 'reasonReference' => 'reason_reference'] as $field => $key) {
+            $result[$key] = array_map(static fn (array $ref): array => ['uuid' => data_get($ref, 'identifier.value'), 'type' => data_get($ref, 'identifier.type.coding.0.code')], $resource[$field] ?? []);
         }
 
         return $result;
     }
 
-    /**
-     * Build payload for PreQualify Service Request API.
-     *
-     * @param  array<string, mixed>  $data
-     * @param  array<string, string|null>  $uuids
-     * @return array{service_request: array<string, mixed>}
-     */
-    public function toPrequalifyPayload(array $data, array $uuids, ?string $carePlanUuid = null, ?string $activityUuid = null): array
+    private function reference(string $value, ?string $type, ?array $original = null): array
     {
-        $serviceRequest = [
-            'status' => 'active',
-            'intent' => $data['intent'] ?? 'order',
-            'priority' => $data['priority'] ?? 'routine',
-            'code' => [
-                'identifier' => [
-                    'type' => [
-                        'coding' => [[
-                            'system' => 'eHealth/resources',
-                            'code' => 'service',
-                        ]],
-                    ],
-                    'value' => $data['service_id'],
-                ],
-            ],
-            'requester_employee' => $this->resourceIdentifier('employee', (string) $uuids['employee_uuid']),
-            'requester_legal_entity' => $this->resourceIdentifier('legal_entity', (string) $uuids['legal_entity_uuid']),
-        ];
-
-        if (!empty($carePlanUuid) && !empty($activityUuid)) {
-            $serviceRequest['based_on'] = [
-                $this->resourceIdentifier('care_plan', $carePlanUuid),
-                $this->resourceIdentifier('activity', $activityUuid),
-            ];
+        if ($value === '' || $type === null || $type === '') {
+            throw new InvalidArgumentException('A reference requires an explicit resource type and value.');
+        }
+        if (data_get($original, 'identifier.value') === $value && data_get($original, 'identifier.type.coding.0.code') === $type) {
+            return $original;
         }
 
-        if (!empty($uuids['encounter_uuid'])) {
-            $serviceRequest['context'] = $this->resourceIdentifier('encounter', (string) $uuids['encounter_uuid']);
-        } elseif (!empty($uuids['episode_uuid'])) {
-            $serviceRequest['context'] = $this->resourceIdentifier('episode_of_care', (string) $uuids['episode_uuid']);
-        }
-
-        if (!empty($data['category'])) {
-            $serviceRequest['category'] = [
-                'coding' => [
-                    $this->mapCategoryCoding((string) $data['category']),
-                ],
-            ];
-        }
-
-        if (($data['category'] ?? '') === 'transfer_of_care') {
-            if (!empty($data['performer'])) {
-                $serviceRequest['performer'] = $this->resourceIdentifier('legal_entity', (string) $data['performer']);
-            }
-
-            if (!empty($data['location_reference'])) {
-                $serviceRequest['location_reference'] = $this->resourceIdentifier('division', (string) $data['location_reference']);
-            }
-
-            if (!empty($data['performer_type'])) {
-                $serviceRequest['performer_type'] = [
-                    'coding' => [[
-                        'system' => 'SPECIALITY_TYPE',
-                        'code' => (string) $data['performer_type'],
-                    ]],
-                ];
-            }
-        }
-
-        if (isset($data['quantity'])) {
-            $serviceRequest['quantity'] = $this->mapQuantity(
-                (float) $data['quantity'],
-                $data['quantity_system'] ?? null,
-                $data['quantity_code'] ?? null,
-            );
-        }
-
-        $occurrence = $this->mapOccurrence($data);
-        if ($occurrence !== null) {
-            $serviceRequest = array_merge($serviceRequest, $occurrence);
-        }
-
-        $supportingInfo = $this->normalizeSupportingInfo($data['supporting_info'] ?? null);
-        if (!empty($supportingInfo)) {
-            $serviceRequest['supporting_info'] = $this->mapSupportingInfo($supportingInfo);
-        }
-
-        $reasonReference = $this->normalizeSupportingInfo($data['reason_reference'] ?? null);
-        if (!empty($reasonReference)) {
-            $serviceRequest['reason_reference'] = $this->mapSupportingInfo($reasonReference);
-        }
-
-        if (!empty($data['patient_instruction'])) {
-            $serviceRequest['patient_instruction'] = (string) $data['patient_instruction'];
-        }
-
-        $authMethodId = InformWith::authMethodId($data['inform_with'] ?? null);
-        if ($authMethodId !== null) {
-            $serviceRequest['inform_with'] = ['auth_method_id' => $authMethodId];
-        }
-
-        $payload = [
-            'service_request' => array_filter($serviceRequest, static fn ($value) => $value !== null),
-            'programs' => [],
-        ];
-
-        if (!empty($data['program_id'])) {
-            $payload['programs'] = [
-                $this->resourceIdentifier('medical_program', (string) $data['program_id']),
-            ];
-        }
-
-        return $payload;
+        return ['identifier' => ['type' => ['coding' => [['system' => 'eHealth/resources', 'code' => $type]]], 'value' => $value]];
     }
 
-    /**
-     * Build payload for Create Service Request API (signed PKCS#7 content).
-     *
-     * @param  array<string, mixed>  $data
-     * @param  array<string, string|null>  $uuids
-     * @return array{service_request: array<string, mixed>, programs?: list<array<string, mixed>>}
-     *
-     */
-    public function toCreateSignedPayload(array $data, array $uuids, ?string $carePlanUuid = null, ?string $activityUuid = null): array
+    private function dateTime(string $value, string $timezone): string
     {
-        $payload = $this->toPrequalifyPayload($data, $uuids, $carePlanUuid, $activityUuid);
-        $payload['service_request']['id'] = $data['uuid'];
-        $payload['service_request']['authored_on'] = CarbonImmutable::now('UTC')->format('Y-m-d\TH:i:s.000\Z');
-
-        return $payload;
+        return CarbonImmutable::parse($value, $timezone)->utc()->format('Y-m-d\TH:i:s.u\Z');
     }
 
-    /**
-     * Flat Service Request for PKCS#7 signing (API-007-062-0002).
-     *
-     * PreQualify uses the envelope `{service_request, programs[]}`. Create signs the
-     * Service Request itself, so `programs` is an illegal additional property.
-     * Medical program goes as singular `program` Reference, like Device Request.
-     *
-     * @param  array<string, mixed>  $data
-     * @param  array<string, string|null>  $uuids
-     * @return array<string, mixed>
-     */
-    public function toCreateSignedContent(array $data, array $uuids, ?string $carePlanUuid = null, ?string $activityUuid = null): array
+    private function set(array &$resource, string $field, mixed $value): void
     {
-        $wrapped = $this->toCreateSignedPayload($data, $uuids, $carePlanUuid, $activityUuid);
-        $content = $wrapped['service_request'];
-        unset($content['authored_on'], $content['programs']);
-
-        if (!empty($data['program_id'])) {
-            $content['program'] = $this->resourceIdentifier('medical_program', (string) $data['program_id']);
+        if ($value === null || $value === '') {
+            unset($resource[$field]);
+        } else {
+            $resource[$field] = $value;
         }
-
-        return $content;
-    }
-
-    /**
-     * @return array{system: string, code: string}
-     */
-    private function mapCategoryCoding(string $category): array
-    {
-        return [
-            'system' => self::CATEGORY_SYSTEM,
-            'code' => $category,
-        ];
-    }
-
-    /**
-     * @return array{value: float, system: string, code: string}
-     */
-    private function mapQuantity(float $quantity, ?string $system = null, ?string $code = null): array
-    {
-        return [
-            'value' => $quantity,
-            'system' => $system ?: 'SERVICE_UNIT',
-            'code' => $code ?: 'PIECE',
-        ];
-    }
-
-    /**
-     * @param  list<array{type?: string, uuid?: string}>  $supportingInfo
-     * @return list<array<string, mixed>>
-     */
-    private function mapSupportingInfo(array $supportingInfo): array
-    {
-        $mapped = [];
-
-        foreach ($supportingInfo as $ref) {
-            if (!empty($ref['uuid']) && !empty($ref['type'])) {
-                $mapped[] = $this->resourceIdentifier(strtolower($ref['type']), $ref['uuid']);
-            }
-        }
-
-        return $mapped;
-    }
-
-    /**
-     * @return list<array{type?: string, uuid?: string}>
-     */
-    private function normalizeSupportingInfo(mixed $supportingInfo): array
-    {
-        if (is_string($supportingInfo)) {
-            $decoded = json_decode($supportingInfo, true);
-            $supportingInfo = is_array($decoded) ? $decoded : [];
-        }
-
-        if (!is_array($supportingInfo)) {
-            return [];
-        }
-
-        return array_values(array_filter($supportingInfo, static fn (mixed $item): bool => is_array($item)));
-    }
-
-    /**
-     * @return array{identifier: array{type: array{coding: list<array<string, string>>}, value: string}}
-     */
-    private function resourceIdentifier(string $code, string $value): array
-    {
-        return [
-            'identifier' => [
-                'type' => [
-                    'coding' => [[
-                        'system' => 'eHealth/resources',
-                        'code' => $code,
-                    ]],
-                ],
-                'value' => $value,
-            ],
-        ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     * @return array{occurrence_period: array{start: string, end: string}}|null
-     */
-    private function mapOccurrence(array $data): ?array
-    {
-        if (empty($data['started_at']) && empty($data['ended_at'])) {
-            return null;
-        }
-
-        $minStart = CarbonImmutable::now()->addHour();
-        $start = !empty($data['started_at'])
-            ? CarbonImmutable::parse($data['started_at'])
-            : $minStart;
-
-        if ($start->lessThan($minStart)) {
-            $start = $minStart;
-        }
-
-        $end = !empty($data['ended_at'])
-            ? CarbonImmutable::parse($data['ended_at'])
-            : $start->addMonths(3);
-
-        if ($end->lessThanOrEqualTo($start)) {
-            $end = $start->addDay();
-        }
-
-        return [
-            'occurrence_period' => [
-                'start' => $start->utc()->format('Y-m-d\TH:i:s.000\Z'),
-                'end' => $end->endOfDay()->utc()->format('Y-m-d\TH:i:s.000\Z'),
-            ],
-        ];
-    }
-
-    /**
-     * Convert FHIR structure (from eHealth) to flat application format.
-     */
-    public function fromFhir(array $data, mixed ...$context): array
-    {
-        $supportingInfo = [];
-        if (!empty($data['supportingInfo'])) {
-            foreach ($data['supportingInfo'] as $si) {
-                $supportingInfo[] = [
-                    'uuid' => data_get($si, 'identifier.value'),
-                    'type' => data_get($si, 'identifier.type.coding.0.code'),
-                ];
-            }
-        }
-
-        return [
-            'uuid' => data_get($data, 'uuid') ?? data_get($data, 'id'),
-            'status' => data_get($data, 'status'),
-            'request_number' => data_get($data, 'requisition') ?? data_get($data, 'requestNumber') ?? data_get($data, 'request_number'),
-            'started_at' => data_get($data, 'occurrencePeriod.start') ?? data_get($data, 'started_at'),
-            'ended_at' => data_get($data, 'occurrencePeriod.end') ?? data_get($data, 'ended_at'),
-            'service_id' => data_get($data, 'code.identifier.value') ?? data_get($data, 'code.coding.0.code') ?? data_get($data, 'service.id'),
-            'quantity' => data_get($data, 'quantity.value') ?? data_get($data, 'quantityInteger'),
-            'program_id' => data_get($data, 'program.identifier.value'),
-            'intent' => data_get($data, 'intent'),
-            'category' => data_get($data, 'category.0.coding.0.code'),
-            'based_on_uuid' => data_get($data, 'basedOn.0.identifier.value'),
-            'context_uuid' => data_get($data, 'context.identifier.value'),
-            'priority' => data_get($data, 'priority'),
-            'note' => data_get($data, 'note.0.text'),
-            'patient_instruction' => data_get($data, 'patientInstruction') ?? data_get($data, 'patient_instruction'),
-            'reason_reference' => $this->extractIdentifierList($data['reasonReference'] ?? $data['reason_reference'] ?? []),
-            'inform_with' => data_get($data, 'informWith') ?? data_get($data, 'inform_with'),
-            'supporting_info' => $supportingInfo
-        ];
-    }
-
-    /**
-     * @param  mixed  $items
-     * @return list<array{type?: string, uuid?: string}>
-     */
-    private function extractIdentifierList(mixed $items): array
-    {
-        if (!is_array($items)) {
-            return [];
-        }
-
-        $out = [];
-        foreach ($items as $item) {
-            if (!is_array($item)) {
-                continue;
-            }
-            $out[] = [
-                'uuid' => data_get($item, 'identifier.value'),
-                'type' => data_get($item, 'identifier.type.coding.0.code'),
-            ];
-        }
-
-        return $out;
     }
 }

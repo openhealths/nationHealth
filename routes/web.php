@@ -331,10 +331,17 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
             Route::get('/care-plans/create/{personId?}', \App\Livewire\CarePlan\CarePlanCreate::class)
                 ->name('care-plans.create')
                 ->can('create', \App\Models\CarePlan::class);
-            Route::get('/encounters/{encounter}/care-plan/create', \App\Livewire\CarePlan\CarePlanCreate::class)
-                ->name('care-plans.create-by-encounter')
+            $redirectEncounterCarePlan = static function (\App\Models\LegalEntity $legalEntity, \App\Models\MedicalEvents\Sql\Encounter $encounter) {
+                $person = app(\App\Repositories\CarePlanRepository::class)->findPatient((int) $encounter->person_id) ?? abort(404);
+                \Illuminate\Support\Facades\Gate::authorize('view', [$encounter, $person]);
+
+                return redirect()->route('care-plans.create-by-encounter', ['legalEntity' => $legalEntity, 'person' => $person, 'encounter' => $encounter]);
+            };
+            Route::get('/encounters/{encounter}/care-plan/create', $redirectEncounterCarePlan)
+                ->whereNumber('encounter')
                 ->can('create', \App\Models\CarePlan::class);
-            Route::get('/encounter/{encounter}/care-plan/create', \App\Livewire\CarePlan\CarePlanCreate::class)
+            Route::get('/encounter/{encounter}/care-plan/create', $redirectEncounterCarePlan)
+                ->whereNumber('encounter')
                 ->can('create', \App\Models\CarePlan::class);
             Route::get('/care-plans/{carePlan}', \App\Livewire\CarePlan\CarePlanShow::class)
                 ->whereNumber('carePlan')

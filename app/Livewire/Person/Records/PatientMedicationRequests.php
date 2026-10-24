@@ -214,6 +214,24 @@ class PatientMedicationRequests extends BasePatientComponent
         $this->authorize($this->activeTab === 'requests' ? 'medication_request_request:read' : 'medication_request:read');
     }
 
+    public function synchronizeSignedPrescriptions(): void
+    {
+        $this->authorize('medication_request:read');
+        if ($this->personId === null) {
+            return;
+        }
+        try {
+            foreach (app(MedicationRequestRepository::class)->pendingSignedPrescriptions($this->personId) as $request) {
+                app(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class)->synchronizeSignedPrescription($request);
+            }
+            Session::flash('success', __('medication-requests.signed_details_synchronized'));
+        } catch (Throwable $exception) {
+            Log::warning('Signed prescription synchronization failed', ['exceptionType' => $exception::class]);
+            Session::flash('error', __('medication-requests.signed_details_pending'));
+        }
+        $this->loadLocalData();
+    }
+
     public function resetSearch(): void
     {
         $this->isSearchMode = false;

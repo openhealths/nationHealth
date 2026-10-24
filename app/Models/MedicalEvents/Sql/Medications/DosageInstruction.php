@@ -19,6 +19,8 @@ class DosageInstruction extends Model
         'medication_request_request_id',
         'medication_request_id',
         'sequence',
+        'position',
+        'fhir_data',
         'text',
         'additional_instruction_id',
         'patient_instruction',
@@ -32,6 +34,8 @@ class DosageInstruction extends Model
         'max_dose_per_administration',
         'max_dose_per_lifetime'
     ];
+
+    protected $casts = ['fhir_data' => 'array', 'position' => 'integer'];
 
     public function medicationRequestRequest(): BelongsTo
     {

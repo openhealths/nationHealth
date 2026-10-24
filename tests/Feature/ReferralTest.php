@@ -97,7 +97,7 @@ class ReferralTest extends TestCase
         $mockResponse = Mockery::mock(EHealthResponse::class);
         $mockResponse->shouldReceive('getData')->andReturn($payload);
 
-        $mockApi = Mockery::mock(ServiceRequestApi::class);
+        $mockApi = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $mockApi->shouldReceive('searchForServiceRequestsByParams')
             ->once()
             ->with(['requisition' => '1234-5678-9012-3456'])
@@ -154,13 +154,13 @@ class ReferralTest extends TestCase
             'ehealth_inserted_at' => now(),
         ]);
 
-        $mockApi = Mockery::mock(ServiceRequestApi::class);
+        $mockApi = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $mockApi->shouldReceive('complete')
             ->once()
             ->with($uuid, Mockery::on(static function (array $sent) use ($encounterUuid): bool {
                 return !array_key_exists('status', $sent)
                     && !array_key_exists('injected', $sent)
-                    && data_get($sent, 'based_on.0.identifier.value') === $encounterUuid;
+                    && data_get($sent, 'completed_with.identifier.value') === $encounterUuid;
             }))
             ->andReturn($mockResponse);
         $this->app->instance(ServiceRequestApi::class, $mockApi);
@@ -238,41 +238,28 @@ class ReferralTest extends TestCase
             ->assertNotDispatched('notify');
     }
 
-    public function testCancelUsageUpdatesDatabaseAfterApiSuccessAndShowsFlashOnce(): void
+    public function testUnavailableCancelUsageKeepsDatabaseAndModalState(): void
     {
         $this->actingAs($this->user);
         [$referral, $person] = $this->createInProgressReferral();
-        $response = Mockery::mock(EHealthResponse::class);
-        $response->shouldReceive('getData')->once()->andReturn(['status' => 'active']);
-        $api = Mockery::mock(ServiceRequestApi::class);
-        $api->shouldReceive('cancelUsage')->once()->with($referral->uuid, $person->uuid, [
-            'explanatory_letter' => 'Пацієнт звернувся до іншого закладу',
-        ])->andReturn($response);
-        $this->instance(ServiceRequestApi::class, $api);
-
+        \Illuminate\Support\Facades\Http::preventStrayRequests();
         Livewire::test(ReferralIndex::class, ['legalEntity' => $this->legalEntity])
             ->set('hasSearched', true)
             ->set('searchResults', [$this->searchRow($referral, $person)])
             ->call('openCancelModal', $referral->uuid)
-            ->set('cancelExplanatoryLetter', '  Пацієнт звернувся до іншого закладу  ')
+            ->set('cancelExplanatoryLetter', 'Synthetic release explanation')
             ->call('confirmCancelUsage')
-            ->assertSet('showCancelModal', false)
-            ->assertSet('searchResults.0.status', 'active')
-            ->assertSee('Взяти в роботу')
-            ->assertDontSee('Погасити направлення')
-            ->assertSee(__('referrals.messages.cancel_usage_success'))
-            ->assertNotDispatched('notify')
-            ->call('$refresh')
-            ->assertDontSee(__('referrals.messages.cancel_usage_success'));
-
-        $this->assertSame('active', $referral->refresh()->status);
+            ->assertSet('showCancelModal', true)
+            ->assertSet('searchResults.0.status', 'in_progress');
+        $this->assertSame('in_progress', $referral->refresh()->status);
+        \Illuminate\Support\Facades\Http::assertNothingSent();
     }
 
     public function testFailedCancelUsageKeepsModalAndDatabaseState(): void
     {
         $this->actingAs($this->user);
         [$referral, $person] = $this->createInProgressReferral();
-        $api = Mockery::mock(ServiceRequestApi::class);
+        $api = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $api->shouldReceive('cancelUsage')->once()->andThrow(new RuntimeException('API rejected cancellation'));
         $this->instance(ServiceRequestApi::class, $api);
 
@@ -335,7 +322,7 @@ class ReferralTest extends TestCase
             'type_id' => CodeableConcept::create()->id,
             'incoming_referral_id' => $incoming->id,
         ]);
-        $api = Mockery::mock(ServiceRequestApi::class);
+        $api = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $api->shouldReceive('complete')->once()->andThrow(new RuntimeException('API rejected completion'));
         $this->instance(ServiceRequestApi::class, $api);
 

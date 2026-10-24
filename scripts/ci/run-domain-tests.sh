@@ -23,6 +23,7 @@ DOMAIN_PATHS=(
   tests/Unit/Livewire/CarePlanLockedStateTest.php
   tests/Unit/CarePlan
   tests/Unit/Exceptions/EHealthValidationExceptionCarePlanMessageTest.php
+  tests/Unit/Helpers/ClinicalTimezoneConversionTest.php
   tests/Unit/Models/CarePlanActivityResolvedKindTest.php
   tests/Unit/Repositories/CarePlanActivityRepositoryTest.php
   tests/Unit/Repositories/RepositoryCarePlanTest.php
@@ -31,8 +32,11 @@ DOMAIN_PATHS=(
   tests/Unit/Services/MedicalEvents/CarePlanActivityLifecycleServiceTest.php
   tests/Unit/Services/MedicalEvents/CarePlanLifecycleServiceTest.php
   tests/Unit/Services/MedicalEvents/MedicationRequestSignPayloadTest.php
+  tests/Unit/Services/MedicalEvents/Mappers/CarePlanMapperTest.php
+  tests/Unit/Services/MedicalEvents/Mappers/CarePlanActivityMapperTest.php
   tests/Unit/Services/MedicalEvents/Mappers/MedicationRequestMapperTest.php
   tests/Unit/Services/MedicalEvents/ServiceRequestMapperTest.php
+  tests/Unit/Services/MedicalEvents/ServiceRequestFhirRoundTripTest.php
   tests/Unit/Services/MedicalEvents/ResolvesEmployeeContextTest.php
   tests/Unit/Services/MedicalEvents/ReferralSignPayloadTest.php
   tests/Unit/Services/MedicalEvents/ReferralRequestLifecycleWriteTest.php
@@ -46,6 +50,8 @@ DOMAIN_PATHS=(
   tests/Feature/Party
   tests/Feature/CarePlan
   tests/Feature/CarePlanActivityPayloadTest.php
+  tests/Feature/Encounter/EncounterDocumentPagesTest.php
+  tests/Feature/Encounter/EncounterTransferDivisionLookupTest.php
   tests/Feature/Livewire/CarePlan
   tests/Feature/MedicationRequest
   tests/Feature/DeviceRequest
@@ -59,7 +65,18 @@ DOMAIN_PATHS=(
   tests/Feature/Person/PatientMedicationRequestsPhase6Test.php
   tests/Feature/Person/PatientReferralsPhase6Test.php
   tests/Feature/Services/MedicalEvents/MedicationRequestLifecycleServiceTest.php
+  tests/Feature/Services/MedicalEvents/MedicationRequestFhirStorageTest.php
 )
+
+# Composition is a later module in the review stack; run its regressions once that slice is present.
+if [[ -f tests/Feature/Composition/CompositionFhirFidelityTest.php ]]; then
+  DOMAIN_PATHS+=(
+    tests/Feature/Composition/CompositionFhirFidelityTest.php
+    tests/Feature/Composition/CompositionReadRelationsTest.php
+    tests/Feature/Composition/CompositionTempDisabilityCreateTest.php
+    tests/Feature/Person/PatientRegistryUatTest.php
+  )
+fi
 
 echo "==> Running domain PHPUnit paths (${#DOMAIN_PATHS[@]} entries)"
 ./vendor/bin/phpunit \

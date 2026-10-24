@@ -1,0 +1,266 @@
+{
+  "id": "10050000-0000-4000-8000-000000000001",
+  "status": "active",
+  "intent": "order",
+  "priority": "routine",
+  "category": {
+    "coding": [
+      {
+        "system": "eHealth/SNOMED/service_request_categories",
+        "code": "diagnostic_procedure",
+        "display": "Synthetic category",
+        "version": "v1",
+        "userSelected": false
+      },
+      {
+        "system": "synthetic/category",
+        "code": "extra"
+      }
+    ],
+    "text": "Synthetic category"
+  },
+  "quantity": {
+    "value": 1.23456789,
+    "system": "SERVICE_UNIT",
+    "code": "PIECE",
+    "unit": "Synthetic unit"
+  },
+  "occurrencePeriod": {
+    "start": "2026-11-01T10:20:30.123456Z",
+    "end": "2026-11-02T10:20:30.654321Z"
+  },
+  "note": "Synthetic instruction",
+  "patientInstruction": "Synthetic patient instruction",
+  "remainingQuantity": {
+    "value": 0,
+    "system": "SERVICE_UNIT",
+    "code": "PIECE"
+  },
+  "remoteExtension": {
+    "zero": 0,
+    "flag": false,
+    "empty": []
+  },
+  "code": {
+    "identifier": {
+      "value": "10050000-0000-4000-8000-000000000002",
+      "type": {
+        "coding": [
+          {
+            "system": "eHealth/resources",
+            "code": "service_group"
+          }
+        ],
+        "text": "service_group"
+      }
+    },
+    "displayValue": "Synthetic service_group"
+  },
+  "context": {
+    "identifier": {
+      "value": "10050000-0000-4000-8000-000000000003",
+      "type": {
+        "coding": [
+          {
+            "system": "eHealth/resources",
+            "code": "episode_of_care"
+          }
+        ],
+        "text": "episode_of_care"
+      }
+    },
+    "displayValue": "Synthetic episode_of_care"
+  },
+  "requesterEmployee": {
+    "identifier": {
+      "value": "10050000-0000-4000-8000-000000000004",
+      "type": {
+        "coding": [
+          {
+            "system": "eHealth/resources",
+            "code": "employee"
+          }
+        ],
+        "text": "employee"
+      }
+    },
+    "displayValue": "Synthetic employee"
+  },
+  "requesterLegalEntity": {
+    "identifier": {
+      "value": "10050000-0000-4000-8000-000000000005",
+      "type": {
+        "coding": [
+          {
+            "system": "eHealth/resources",
+            "code": "legal_entity"
+          }
+        ],
+        "text": "legal_entity"
+      }
+    },
+    "displayValue": "Synthetic legal_entity"
+  },
+  "program": {
+    "identifier": {
+      "value": "10050000-0000-4000-8000-000000000006",
+      "type": {
+        "coding": [
+          {
+            "system": "eHealth/resources",
+            "code": "medical_program"
+          }
+        ],
+        "text": "medical_program"
+      }
+    },
+    "displayValue": "Synthetic medical_program"
+  },
+  "basedOn": [
+    {
+      "identifier": {
+        "value": "10050000-0000-4000-8000-000000000007",
+        "type": {
+          "coding": [
+            {
+              "system": "eHealth/resources",
+              "code": "care_plan"
+            }
+          ],
+          "text": "care_plan"
+        }
+      },
+      "displayValue": "Synthetic care_plan"
+    },
+    {
+      "identifier": {
+        "value": "10050000-0000-4000-8000-000000000008",
+        "type": {
+          "coding": [
+            {
+              "system": "eHealth/resources",
+              "code": "activity"
+            }
+          ],
+          "text": "activity"
+        }
+      },
+      "displayValue": "Synthetic activity"
+    }
+  ],
+  "supportingInfo": [
+    {
+      "identifier": {
+        "value": "10050000-0000-4000-8000-000000000009",
+        "type": {
+          "coding": [
+            {
+              "system": "eHealth/resources",
+              "code": "diagnostic_report"
+            }
+          ],
+          "text": "diagnostic_report"
+        }
+      },
+      "displayValue": "Synthetic diagnostic_report"
+    },
+    {
+      "identifier": {
+        "value": "10050000-0000-4000-8000-000000000010",
+        "type": {
+          "coding": [
+            {
+              "system": "eHealth/resources",
+              "code": "episode_of_care"
+            }
+          ],
+          "text": "episode_of_care"
+        }
+      },
+      "displayValue": "Synthetic episode_of_care"
+    }
+  ],
+  "reasonReference": [
+    {
+      "identifier": {
+        "value": "10050000-0000-4000-8000-000000000011",
+        "type": {
+          "coding": [
+            {
+              "system": "eHealth/resources",
+              "code": "condition"
+            }
+          ],
+          "text": "condition"
+        }
+      },
+      "displayValue": "Synthetic condition"
+    },
+    {
+      "identifier": {
+        "value": "10050000-0000-4000-8000-000000000012",
+        "type": {
+          "coding": [
+            {
+              "system": "eHealth/resources",
+              "code": "observation"
+            }
+          ],
+          "text": "observation"
+        }
+      },
+      "displayValue": "Synthetic observation"
+    }
+  ],
+  "focus": [
+    {
+      "identifier": {
+        "value": "10050000-0000-4000-8000-000000000013",
+        "type": {
+          "coding": [
+            {
+              "system": "eHealth/resources",
+              "code": "specimen"
+            }
+          ],
+          "text": "specimen"
+        }
+      },
+      "displayValue": "Synthetic specimen"
+    }
+  ],
+  "specimens": [
+    {
+      "identifier": {
+        "value": "10050000-0000-4000-8000-000000000013",
+        "type": {
+          "coding": [
+            {
+              "system": "eHealth/resources",
+              "code": "specimen"
+            }
+          ],
+          "text": "specimen"
+        }
+      },
+      "displayValue": "Synthetic specimen"
+    }
+  ],
+  "permittedResources": [
+    {
+      "identifier": {
+        "value": "10050000-0000-4000-8000-000000000010",
+        "type": {
+          "coding": [
+            {
+              "system": "eHealth/resources",
+              "code": "episode_of_care"
+            }
+          ],
+          "text": "episode_of_care"
+        }
+      },
+      "displayValue": "Synthetic episode_of_care"
+    }
+  ]
+}

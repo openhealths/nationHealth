@@ -1,15 +1,5 @@
-@if ($showEncounterReferralDrawer)
-    <div x-data="{ open: $wire.entangle('showEncounterReferralDrawer').live, openServiceCatalog: false }" @encounter-referral-service-catalog-close.window="openServiceCatalog = false">
-        <x-dialog-drawer
-            x-model="open"
-            maxWidth="4/5"
-            overlayWidth="100%"
-            :stopClickPropagation="true"
-            zIndex="46"
-            onCloseClick="$wire.closeEncounterReferralDrawer()"
-        >
-            <x-slot name="title">{{ __('encounters.referral_drawer.title') }}</x-slot>
-        <form wire:submit.prevent="validateEncounterReferral" class="space-y-6">
+<div x-data="{ openServiceCatalog: false }" @encounter-referral-service-catalog-close.window="openServiceCatalog = false">
+<form wire:submit.prevent="validateEncounterReferral" class="space-y-6">
             <fieldset class="fieldset-card p-6 sm:p-8">
                 <legend class="legend">{{ __('encounters.service') }}</legend>
                 <div class="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -125,6 +115,9 @@
                                 value="{{ $encounterReferralPerformerName }}"
                                 readonly
                             />
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                {{ __('encounters.referral_destination_from_discharge') }}
+                            </p>
                         </div>
                         <div class="form-group group">
                             <label for="encounterReferralLocation" class="label required">{{ __('encounters.referral_performer_division') }}</label>
@@ -153,6 +146,9 @@
                                     </option>
                                 @endforeach
                             </select>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                {{ __('encounters.referral_recipient_speciality_help') }}
+                            </p>
                         </div>
                     @endif
                     <div class="form-group group">
@@ -174,26 +170,44 @@
             <fieldset class="fieldset-card p-6 sm:p-8">
                 <legend class="legend">{{ __('encounters.referral_drawer.validity_and_quantity') }}</legend>
                 <div class="mb-4 grid grid-cols-1 gap-6 md:grid-cols-3">
-                    <div class="form-group group">
-                        <label for="encounterReferralStartedAt" class="label required">{{ __('forms.start_date') }}</label>
-                        <input
-                            type="text"
-                            id="encounterReferralStartedAt"
-                            class="input peer"
-                            placeholder="dd.mm.yyyy"
-                            wire:model="encounterReferralForm.started_at"
-                        />
-                    </div>
-                    <div class="form-group group">
-                        <label for="encounterReferralEndedAt" class="label required">{{ __('forms.end_date') }}</label>
-                        <input
-                            type="text"
-                            id="encounterReferralEndedAt"
-                            class="input peer"
-                            placeholder="dd.mm.yyyy"
-                            wire:model="encounterReferralForm.ended_at"
-                        />
-                    </div>
+                    @foreach (['started_at' => 'start', 'ended_at' => 'end'] as $field => $period)
+                        <div class="grid grid-cols-1 gap-6">
+                            <div class="form-group">
+                                <div class="datepicker-wrapper" wire:key="referral-date-{{ $field }}" x-data>
+                                    <input
+                                        type="text"
+                                        id="encounterReferral-{{ $field }}"
+                                        wire:model.lazy="encounterReferralForm.{{ $field }}"
+                                        class="datepicker-input with-leading-icon input peer @error('encounterReferralForm.'.$field) input-error @enderror"
+                                        placeholder="{{ __('referrals.period_fields.date_placeholder') }}"
+                                        autocomplete="off"
+                                        datepicker-autohide
+                                        datepicker-format="{{ frontendDateFormat() }}"
+                                        datepicker-min-date="{{ today()->format(config('app.date_format')) }}"
+                                        x-on:change-date.camel="$el.dispatchEvent(new Event('change', { bubbles: true }))"
+                                    />
+                                    <label for="encounterReferral-{{ $field }}" class="wrapped-label required">
+                                        {{ $period === 'start' ? __('forms.start_date') : __('forms.end_date') }}
+                                    </label>
+                                </div>
+                                <x-input-error for="encounterReferralForm.{{ $field }}" />
+                            </div>
+                            <div class="form-group">
+                                <input
+                                    id="encounterReferral-{{ $period }}Time"
+                                    type="text"
+                                    wire:model.blur="encounterReferralForm.{{ $period }}_time"
+                                    class="timepicker-uk input peer"
+                                    autocomplete="off"
+                                    placeholder="{{ __('referrals.period_fields.time_placeholder') }}"
+                                />
+                                <label for="encounterReferral-{{ $period }}Time" class="label required">
+                                    {{ __('referrals.period_fields.'.$period.'_time') }}
+                                </label>
+                                <x-input-error for="encounterReferralForm.{{ $period }}_time" />
+                            </div>
+                        </div>
+                    @endforeach
                     <div class="form-group group">
                         <label for="encounterReferralQuantity" class="label required">{{ __('care-plan.quantity') }}</label>
                         <input
@@ -268,12 +282,11 @@
             @endif
 
             <div class="flex justify-start gap-3">
-                <button type="button" class="button-minor" wire:click="closeEncounterReferralDrawer">{{ __('forms.cancel') }}</button>
+                <a href="{{ $encounterReturnUrl }}" class="button-minor">{{ __('forms.cancel') }}</a>
                 <button type="submit" class="button-primary">{{ __('forms.create_and_sign') }}</button>
             </div>
         </form>
-        </x-dialog-drawer>
-        <x-dialog-drawer
+<x-dialog-drawer
             x-model="openServiceCatalog"
             x-bind:aria-hidden="!openServiceCatalog"
             onCloseClick="openServiceCatalog = false"
@@ -300,5 +313,4 @@
                 </button>
             </div>
         </x-dialog-drawer>
-    </div>
-@endif
+</div>

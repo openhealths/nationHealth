@@ -6,13 +6,8 @@ namespace App\Livewire\CarePlan;
 
 use App\Classes\eHealth\EHealth;
 use App\Repositories\CarePlanRepository;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
-use App\Models\Declaration;
-use App\Models\Person\Person;
-use App\Models\CarePlan;
-use App\Enums\User\Role;
 use App\Repositories\DeclarationRepository;
 
 class CarePlanIndex extends Component
@@ -57,15 +52,7 @@ class CarePlanIndex extends Component
         }
 
         try {
-            $response = EHealth::carePlan()->getMany(['requisition' => $this->searchRequisition]);
-            $data = $response->validate();
-
-            // Sync with local DB if found
-            app(CarePlanRepository::class)->syncCarePlans(
-                $data,
-                null,
-                Auth::user()?->getCarePlanWriterEmployee()?->id
-            );
+            EHealth::carePlan()->synchronizeSearch(['requisition' => $this->searchRequisition], (int) legalEntity()->id);
         } catch (\Throwable $e) {
             Log::error('CarePlan search error: ' . $e->getMessage());
             session()->flash('error', __('care-plan.search_error') . ': ' . $e->getMessage());
@@ -85,33 +72,9 @@ class CarePlanIndex extends Component
                 return;
             }
 
-            // Find all patient IDs from active declarations for this doctor/legal entity
-            $query = Declaration::query()
-                ->active()
-                ->filterByLegalEntityId($legalEntity->id);
+            $persons = app(CarePlanRepository::class)->patientsForSync($legalEntity->id, auth()->user());
 
-            // Filter by employees of the logged-in user if they are not OWNER
-            if (!auth()->user()->hasAllowedRole(Role::OWNER)) {
-                $employeeIds = auth()->user()->party->employees()
-                    ->where('legal_entity_id', $legalEntity->id)
-                    ->pluck('id')
-                    ->all();
-                $query->forEmployees($employeeIds);
-            }
-
-            $personIds = $query->pluck('person_id')->unique()->all();
-
-            // Also include patients of existing care plans in the database
-            $existingCarePlanPersonIds = CarePlan::where('legal_entity_id', $legalEntity->id)
-                ->pluck('person_id')
-                ->unique()
-                ->all();
-
-            $allPersonIds = array_unique(array_merge($personIds, $existingCarePlanPersonIds));
-
-            $persons = Person::whereIn('id', $allPersonIds)->get();
-
-            $allValidatedData = [];
+            $failedPatients = [];
             foreach ($persons as $person) {
                 try {
                     // Sync patient's declarations first to support auto-activation logic (like in PersonCarePlans)
@@ -129,22 +92,17 @@ class CarePlanIndex extends Component
                         ]);
                     }
 
-                    $response = EHealth::carePlan()->getBySearchParams($person->uuid, []);
-                    $validated = $response->validate();
-                    if (!empty($validated)) {
-                        $allValidatedData = array_merge($allValidatedData, $validated);
-                    }
+                    EHealth::carePlan()->synchronizePatient($person->uuid, $person->id, $legalEntity->id);
                 } catch (\Throwable $ex) {
+                    $failedPatients[] = $person->uuid;
                     Log::warning("Failed to sync care plans for patient {$person->uuid}: " . $ex->getMessage());
                 }
             }
 
-            if (!empty($allValidatedData)) {
-                app(CarePlanRepository::class)->syncCarePlans(
-                    $allValidatedData,
-                    null,
-                    Auth::user()?->getCarePlanWriterEmployee()?->id
-                );
+            if ($failedPatients !== []) {
+                session()->flash('error', __('care-plan.sync_error').': '.implode(', ', $failedPatients));
+
+                return;
             }
 
             session()->flash('success', __('care-plan.sync_success'));
@@ -156,40 +114,8 @@ class CarePlanIndex extends Component
 
     public function render()
     {
-        $legalEntity = legalEntity();
-        $carePlans = collect();
+        $carePlans = legalEntity() ? app(CarePlanRepository::class)->listing(legalEntity()->id, ['status' => $this->filterStatus, 'name' => $this->filterName, 'startDate' => $this->filterStartDateRange, 'endDate' => $this->filterEndDateRange, 'encounterId' => $this->filterEncounterId, 'requisition' => $this->searchRequisition]) : collect();
 
-        if ($legalEntity) {
-            $query = \App\Models\CarePlan::where('legal_entity_id', $legalEntity->id)
-                ->with(['person', 'person.names', 'author.party', 'encounter.episode', 'encounter.diagnoses.condition', 'encounterIdentifier']);
-
-            if (!empty($this->filterStatus)) {
-                $query->whereRaw('LOWER(care_plans.status) = LOWER(?)', [$this->filterStatus]);
-            }
-
-            if (!empty($this->filterStartDateRange)) {
-                $query->whereDate('period_start', '>=', \Carbon\Carbon::parse($this->filterStartDateRange));
-            }
-
-            if (!empty($this->filterEndDateRange)) {
-                $query->whereDate('period_end', '<=', \Carbon\Carbon::parse($this->filterEndDateRange));
-            }
-
-            if (!empty($this->filterEncounterId)) {
-                $query->where('encounter_id', 'like', "%{$this->filterEncounterId}%");
-            }
-
-            // Requisition search uses searchByRequisition which syncs with API,
-            // but we can also filter locally by requisition.
-            if (!empty($this->searchRequisition)) {
-                $query->where('requisition', 'like', "%{$this->searchRequisition}%");
-            }
-
-            $carePlans = $query->latest()->get();
-        }
-
-        return view('livewire.care-plan.care-plan-index', [
-            'carePlans' => $carePlans,
-        ]);
+        return view('livewire.care-plan.care-plan-index', ['carePlans' => $carePlans]);
     }
 }

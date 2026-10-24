@@ -186,6 +186,41 @@ class CompositionTempDisabilityCreateTest extends TestCase
             ->assertSet('step', CompositionTempDisabilityCreate::STEP_AUTH_METHOD);
     }
 
+    public function test_selected_encounter_is_visible_without_reopening_the_picker_and_can_be_changed(): void
+    {
+        ['legalEntity' => $legalEntity, 'employee' => $employee] = $this->fixture();
+        $firstUuid = (string) Str::uuid();
+        $secondUuid = (string) Str::uuid();
+        $this->fakeEncounters([
+            $this->encounter($firstUuid, 'finished', $employee->uuid),
+            $this->encounter($secondUuid, 'finished', $employee->uuid),
+        ]);
+
+        Livewire::withQueryParams(['encounter' => $firstUuid])
+            ->test(CompositionTempDisabilityCreate::class, [
+                'legalEntity' => $legalEntity,
+                'preperson' => $this->preperson(),
+            ])
+            ->assertSet('step', CompositionTempDisabilityCreate::STEP_AUTH_METHOD)
+            ->assertSet('showEncounterPicker', false)
+            ->assertSet('selectedEncounter.period.start', '2026-08-01T09:00:00Z')
+            ->assertSet('selectedEncounter.class.code', 'AMB')
+            ->assertSee(__('compositions.wizard.encounter_selected_hint'))
+            ->assertSee(__('compositions.wizard.change_encounter'))
+            ->assertSee($firstUuid)
+            ->assertDontSee($secondUuid)
+            ->set('showEncounterPicker', true)
+            ->assertSee($secondUuid)
+            ->call('selectEncounter', $secondUuid)
+            ->assertSet('form.encounterUuid', $secondUuid)
+            ->assertSet('showEncounterPicker', false)
+            ->assertDontSee($firstUuid)
+            ->assertDispatched('scroll-to-element', selector: '#composition-auth-method')
+            ->call('skipAuthMethod')
+            ->assertSet('step', CompositionTempDisabilityCreate::STEP_DETAILS)
+            ->assertDispatched('scroll-to-element', selector: '#composition-details');
+    }
+
     public function test_selecting_an_encounter_that_is_not_on_offer_is_refused(): void
     {
         ['legalEntity' => $legalEntity] = $this->fixture();

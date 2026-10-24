@@ -10,6 +10,7 @@ use App\Enums\Person\EncounterStatus;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Services\Dictionary\MedicationProgramPicker;
 use App\Services\MedicalEvents\MedicalRequestOwnership;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
@@ -80,8 +81,8 @@ trait ManagesEncounterEPrescription
             'route' => 'oral',
             'max_dose_per_administration' => '1',
             'max_dose_per_period' => '1',
-            'started_at' => now()->toDateString(),
-            'ended_at' => now()->addDays(30)->toDateString(),
+            'started_at' => now()->format((string) config('app.date_format')),
+            'ended_at' => now()->addDays(30)->format((string) config('app.date_format')),
             'note' => '',
             'inform_with' => $this->encounterEPrescriptionAuthMethods[0]['value'] ?? '',
         ];
@@ -141,19 +142,13 @@ trait ManagesEncounterEPrescription
         try {
             $response = EHealth::drug()->getMany($filters)->getData();
             $this->encounterEPrescriptionSearchResults = collect(is_array($response) ? $response : [])
-                ->filter(function (array $drug) use ($query): bool {
-                    $name = mb_strtolower((string) ($drug['name'] ?? ''));
-                    $innmName = mb_strtolower((string) ($drug['innm_name'] ?? ''));
-                    $needle = mb_strtolower($query);
-
-                    return str_contains($name, $needle) || str_contains($innmName, $needle);
-                })
                 ->map(static function (array $drug): array {
                     return [
                         'id' => (string) ($drug['id'] ?? ''),
                         'name' => (string) ($drug['name'] ?? ''),
-                        'innm_name' => (string) ($drug['innm_name'] ?? ''),
-                        'innm_dosage_form' => (string) ($drug['innm_dosage_form'] ?? ''),
+                        'innm_name' => collect($drug['ingredients'] ?? [])->pluck('name')->filter()->implode(', ') ?: (string) ($drug['innm_name'] ?? ''),
+                        'innm_dosage_form' => (string) ($drug['form'] ?? $drug['innm_dosage_form'] ?? ''),
+                        'ingredients' => is_array($drug['ingredients'] ?? null) ? $drug['ingredients'] : [],
                         'packages' => is_array($drug['packages'] ?? null) ? $drug['packages'] : [],
                     ];
                 })
@@ -182,8 +177,13 @@ trait ManagesEncounterEPrescription
         $this->encounterEPrescriptionForm['medication_id'] = $medicationId;
         $this->resetValidation('encounterEPrescriptionForm.medication_id');
         $this->encounterEPrescriptionSelectedMedication = $selectedMedication;
-        if (($selectedMedication['innm_dosage_form'] ?? '') !== '') {
-            $this->encounterEPrescriptionForm['medication_unit'] = (string) $selectedMedication['innm_dosage_form'];
+        try {
+            $this->encounterEPrescriptionForm['medication_unit'] = (new \App\Services\MedicalEvents\Mappers\MedicationRequestMapper())->medicationUnit($selectedMedication);
+        } catch (\InvalidArgumentException $exception) {
+            $this->encounterEPrescriptionForm['medication_unit'] = '';
+            $this->encounterEPrescriptionWarningMessage = $exception->getMessage();
+
+            return;
         }
 
         $packageStep = $this->resolveEncounterMedicationPackageStep($selectedMedication);
@@ -200,13 +200,25 @@ trait ManagesEncounterEPrescription
 
     public function updatedEncounterEPrescriptionFormProgramId(): void
     {
+        $this->resetValidation('encounterEPrescriptionForm.program_id');
+        $this->encounterEPrescriptionWarningMessage = '';
         $this->encounterEPrescriptionForm['medication_id'] = '';
         $this->encounterEPrescriptionSelectedMedication = null;
         $this->encounterEPrescriptionSearchResults = [];
+        $encounter = $this->resolveEncounterModelForStandalone();
+        if ($encounter !== null) {
+            $this->validateEncounterEPrescriptionProgram($encounter);
+        }
     }
 
     public function validateEncounterEPrescription(): void
     {
+        if ($this->encounterEPrescriptionRequestIdToSign !== null) {
+            $this->prepareEncounterEPrescriptionSigning();
+
+            return;
+        }
+
         $this->encounterEPrescriptionWarningMessage = '';
 
         $this->validate([
@@ -244,6 +256,10 @@ trait ManagesEncounterEPrescription
         }
 
         try {
+            if (!$this->validateEncounterEPrescriptionProgram($encounter)) {
+                return;
+            }
+
             $employeeContext = app(MedicationRequestLifecycleService::class)->resolveEncounterEmployeeContext(
                 $encounter,
                 Auth::user()?->activeDoctorEmployee()?->id
@@ -257,8 +273,7 @@ trait ManagesEncounterEPrescription
 
             $this->actionType = 'sign_eprescription';
             $this->showSignatureModal = true;
-            $infoMessage = __('Заявку на е-рецепт створено. Підпишіть КЕП.');
-            Session::flash('success', $infoMessage);
+            Session::flash('success', __('Заявку на е-рецепт створено. Підпишіть КЕП.'));
         } catch (EHealthValidationException $exception) {
             $exception->report();
             $this->encounterEPrescriptionWarningMessage = $exception->getTranslatedMessage();
@@ -266,6 +281,36 @@ trait ManagesEncounterEPrescription
         } catch (Throwable $exception) {
             Log::error('EncounterEdit: failed to create encounter eRx: '.$exception->getMessage());
             $this->encounterEPrescriptionWarningMessage = __('Не вдалося створити заявку на рецепт: ').$exception->getMessage();
+            Session::flash('error', $this->encounterEPrescriptionWarningMessage);
+        }
+    }
+
+    public function prepareEncounterEPrescriptionSigning(): void
+    {
+        $this->encounterEPrescriptionWarningMessage = '';
+        $this->showSignatureModal = false;
+        $this->actionType = null;
+        $encounter = $this->resolveEncounterModelForStandalone();
+        if ($encounter === null || $this->encounterEPrescriptionRequestIdToSign === null) {
+            return;
+        }
+
+        try {
+            $requestRecord = app(MedicalRequestOwnership::class)->medicationForEncounter(
+                $this->encounterEPrescriptionRequestIdToSign,
+                $encounter
+            );
+            app(MedicationRequestLifecycleService::class)->buildSignPayload($encounter, $requestRecord, '');
+            $this->actionType = 'sign_eprescription';
+            $this->showSignatureModal = true;
+            Session::flash('success', __('Заявку на е-рецепт створено. Підпишіть КЕП.'));
+        } catch (Throwable $exception) {
+            Log::warning('Encounter eRx signing preflight failed', ['exceptionType' => $exception::class]);
+            $this->encounterEPrescriptionWarningMessage = $exception instanceof EHealthValidationException
+                ? $exception->getTranslatedMessage()
+                : ($exception instanceof ModelNotFoundException
+                    ? __('care-plan.document_context_unavailable')
+                    : $exception->getMessage());
             Session::flash('error', $this->encounterEPrescriptionWarningMessage);
         }
     }
@@ -328,10 +373,14 @@ trait ManagesEncounterEPrescription
             $message = $result['success_message']
                 ?? __('Електронний рецепт успішно створено без плану лікування.');
             Session::flash('success', $message);
+            if (!empty($result['warning_message'])) {
+                Session::flash('warning', $result['warning_message']);
+            }
             $this->showEncounterEPrescriptionDrawer = false;
             $this->encounterEPrescriptionForm = [];
             $this->encounterEPrescriptionSearchResults = [];
             $this->encounterEPrescriptionSelectedMedication = null;
+            $this->afterEncounterEPrescriptionSigned();
         } catch (ModelNotFoundException) {
             Session::flash('error', __('care-plan.document_context_unavailable'));
             $this->showSignatureModal = false;
@@ -391,6 +440,44 @@ trait ManagesEncounterEPrescription
         }
     }
 
+    protected function validateEncounterEPrescriptionProgram(Encounter $encounter): bool
+    {
+        $programId = $this->encounterEPrescriptionForm['program_id'] ?? '';
+        if (!filled($programId)) {
+            return true;
+        }
+
+        try {
+            $program = dictionary()->medicalPrograms()->firstWhere('id', $programId);
+            $available = $program !== null && MedicationProgramPicker::forCurrentUser(collect([$program]))->isNotEmpty();
+        } catch (Throwable $exception) {
+            $available = false;
+        }
+
+        $message = null;
+        if (!$available) {
+            $message = __('medication-programs.unavailable');
+        } elseif (!MedicationProgramPicker::matchesDiagnosis($program, [])) {
+            $codings = MedicalEventsRepository::encounter()->primaryDiagnosisConditions($encounter)
+                ->flatMap(static fn ($condition) => $condition->code?->coding ?? collect())
+                ->map(static fn ($coding): array => ['system' => $coding->system, 'code' => $coding->code])
+                ->all();
+            if (!MedicationProgramPicker::matchesDiagnosis($program, $codings)) {
+                $message = __('medication-programs.diagnosis_mismatch');
+            }
+        }
+
+        if ($message !== null) {
+            $this->encounterEPrescriptionWarningMessage = $message;
+            $this->addError('encounterEPrescriptionForm.program_id', $message);
+            Session::flash('error', $message);
+
+            return false;
+        }
+
+        return true;
+    }
+
     protected function loadEncounterEPrescriptionPrograms(): void
     {
         try {
@@ -447,4 +534,8 @@ trait ManagesEncounterEPrescription
 
         return abs($quotient - round($quotient)) < 1e-6;
     }
+    protected function afterEncounterEPrescriptionSigned(): void
+    {
+    }
+
 }

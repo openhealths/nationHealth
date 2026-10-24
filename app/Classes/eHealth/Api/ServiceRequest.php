@@ -6,15 +6,29 @@ namespace App\Classes\eHealth\Api;
 
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
 
 class ServiceRequest extends Request
 {
     protected const string ENDPOINT_SERVICE_REQUESTS = '/api/service_requests';
     protected const string ENDPOINT_MEDICAL_EVENTS_SERVICE_REQUESTS = '/api/medical_events/service_requests';
+
+    public function buildUseContent(array $context, mixed $programId): array
+    {
+        $payload = [];
+        $references = ['used_by_employee' => ['employee_uuid', 'employee'], 'used_by_division' => ['division_uuid', 'division'], 'used_by_legal_entity' => ['legal_entity_uuid', 'legal_entity']];
+        if ($programId !== null && $programId !== '') {
+            $context['program_uuid'] = (string) $programId;
+            $references['program'] = ['program_uuid', 'medical_program'];
+        }
+        foreach ($references as $field => [$key, $type]) {
+            if (!empty($context[$key])) {
+                $payload[$field] = ['identifier' => ['type' => ['coding' => [['system' => 'eHealth/resources', 'code' => $type]]], 'value' => $context[$key]]];
+            }
+        }
+
+        return $payload;
+    }
 
     /**
      * Create Draft Service Request.
@@ -77,7 +91,7 @@ class ServiceRequest extends Request
      */
     public function cancelUsage(string $id, string $patientId, array $payload = []): PromiseInterface|EHealthResponse
     {
-        return $this->patch("/api/patients/{$patientId}/service_requests/{$id}/actions/cancel", $payload);
+        throw new \LogicException('Cancelling usage has no verified PROD endpoint. A clinical Cancel requires a signed resource and cannot be used as Release.');
     }
 
     /**

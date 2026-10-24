@@ -28,6 +28,7 @@ class Composition extends Model
 
     protected $fillable = [
         'uuid',
+        'fhir_metadata',
         'person_id',
         'preperson_id',
         'status',
@@ -68,6 +69,7 @@ class Composition extends Model
     {
         return [
             'status' => CompositionStatus::class,
+            'fhir_metadata' => 'array',
             'date' => EHealthTimestampCast::class,
             'is_accident' => 'boolean',
             'is_intoxicated' => 'boolean',
@@ -283,7 +285,8 @@ class Composition extends Model
     /** Local presentation only. Signing always uses a fresh eHealth response. */
     public function toDetail(): array
     {
-        $this->loadMissing(['typeConcept.coding', 'categoryConcept.coding']);
+        $this->loadMissing(['typeConcept.coding', 'categoryConcept.coding', 'sectionFocus.type.coding',
+            'encounter.type.coding', 'author.type.coding', 'custodian.type.coding', 'subject.type.coding', 'relatesToTarget.type.coding', 'eventPeriod']);
         $extensions = [];
         foreach (CompositionExtension::cases() as $field) {
             $value = $this->getAttribute($field->column());
@@ -295,25 +298,34 @@ class Composition extends Model
                 $field->valueKey() => $value instanceof \DateTimeInterface ? $value->format('Y-m-d') : $value,
             ];
         }
+        $metadata = $this->fhirMetadata ?? [];
+        $identifier = static fn (?Identifier $value): ?array => $value === null ? null
+            : \App\Repositories\MedicalEvents\Repository::identifier()->toReference($value)['identifier'];
         $detail = [
             'identifier' => ['value' => $this->uuid],
             'status' => $this->status->value,
             'title' => $this->title,
             'date' => $this->isoDate($this->getRawOriginal('date')),
-            'type' => $this->typeConcept?->toArray(),
-            'category' => $this->categoryConcept?->toArray(),
-            'section' => ['focus' => $this->sectionFocus?->identifier],
+            'type' => $this->typeConcept === null ? null : \App\Repositories\MedicalEvents\Repository::codeableConcept()->toResource($this->typeConcept),
+            'category' => $this->categoryConcept === null ? null : \App\Repositories\MedicalEvents\Repository::codeableConcept()->toResource($this->categoryConcept),
+            'section' => ['focus' => $identifier($this->sectionFocus)],
             'event' => [['period' => [
                 'start' => $this->isoDate($this->eventPeriod?->getRawOriginal('start')),
                 'end' => $this->isoDate($this->eventPeriod?->getRawOriginal('end')),
             ]]],
-            'extension' => $extensions,
+            'extension' => $metadata['extension'] ?? $extensions,
         ];
+        if (array_key_exists('event', $metadata)) {
+            $detail['event'] = $metadata['event'];
+            if (isset($detail['event'][0]['period']) && $this->eventPeriod !== null) {
+                $detail['event'][0]['period'] = \App\Repositories\MedicalEvents\Repository::period()->toResource($this->eventPeriod);
+            }
+        }
         foreach (['encounter', 'author', 'custodian', 'subject'] as $reference) {
-            $detail[$reference] = $this->{$reference}?->identifier;
+            $detail[$reference] = $identifier($this->{$reference});
         }
         if ($this->relatesToCode !== null) {
-            $detail['relatesTo'] = ['code' => $this->relatesToCode, 'targetIdentifier' => $this->relatesToTarget?->identifier];
+            $detail['relatesTo'] = ['code' => $this->relatesToCode, 'targetIdentifier' => $identifier($this->relatesToTarget)];
         }
 
         return $detail;
@@ -321,7 +333,7 @@ class Composition extends Model
 
     private function isoDate(?string $value): ?string
     {
-        return $value ? CarbonImmutable::parse($value, 'UTC')->toIso8601ZuluString() : null;
+        return $value ? rtrim(rtrim(CarbonImmutable::parse($value, 'UTC')->utc()->format('Y-m-d\TH:i:s.u'), '0'), '.').'Z' : null;
     }
 
     private function erlnIntegration(): ?CompositionIntegration

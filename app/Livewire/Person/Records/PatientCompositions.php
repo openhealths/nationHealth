@@ -160,6 +160,17 @@ class PatientCompositions extends BasePatientComponent
         unset($this->paginatedCompositions);
     }
 
+    public function sync(): void
+    {
+        $this->resetPage();
+
+        if ($this->refreshFromEHealth(applyFilters: false)) {
+            Session::flash('success', __('compositions.messages.sync_success'));
+        }
+
+        unset($this->paginatedCompositions);
+    }
+
     public function resetFilters(): void
     {
         $this->reset([
@@ -647,48 +658,20 @@ class PatientCompositions extends BasePatientComponent
      */
     private function paginateLocalCompositions(): LengthAwarePaginator
     {
-        $query = Composition::forPatient($this->patient())
-            ->with([
-                'typeConcept.coding',
-                'categoryConcept.coding',
-                'encounter',
-                'episodeOfCare',
-                'eventPeriod',
-                'integrations',
-            ])
-            ->recentlyUpdatedFirst();
-
-        if ($this->filterType) {
-            $query->whereRelation('typeConcept.coding', 'code', $this->filterType);
-        }
-
-        if ($this->filterStatus) {
-            $query->where('status', $this->filterStatus);
-        }
-
-        if ($this->filterEncounterId) {
-            $query->forEncounter($this->filterEncounterId);
-        }
-
-        if ($this->filterEpisodeOfCareId) {
-            $query->whereHas(
-                'episodeOfCare',
-                fn ($episode) => $episode->where('value', $this->filterEpisodeOfCareId)
-            );
-        }
-
-        if ($this->filterSectionFocusUuid) {
-            $query->forFocus($this->filterSectionFocusUuid);
-        }
-
-        return $query->paginate(config('ehealth.api.page_size', 15));
+        return Repository::composition()->paginateForPatient($this->patient(), [
+            'type' => $this->filterType,
+            'status' => $this->filterStatus,
+            'encounterUuid' => $this->filterEncounterId,
+            'episodeUuid' => $this->filterEpisodeOfCareId,
+            'focusUuid' => $this->filterSectionFocusUuid,
+        ], (int) config('ehealth.api.page_size', 15));
     }
 
     /**
      * Pull matching compositions from eHealth into the local table.
      * ТЗ 3.8.1.9 / 3.8.2.11
      */
-    private function refreshFromEHealth(): void
+    private function refreshFromEHealth(bool $applyFilters = true): bool
     {
         // TV 3.8.1.9 / 3.8.2.11 — searching is its own capability, and a user who may not
         // see conclusions here must not be able to pull them into the local table either.
@@ -697,16 +680,16 @@ class PatientCompositions extends BasePatientComponent
         try {
             // `subject` and `focus` are mutually exclusive, so searching by an explicit
             // focus replaces the implicit search by the patient being viewed.
-            $searchByFocus = filled($this->filterSectionFocusUuid);
+            $searchByFocus = $applyFilters && filled($this->filterSectionFocusUuid);
             $limit = (int) config('ehealth.api.page_size', 15);
 
             $query = array_filter([
                 'subject' => $searchByFocus ? null : $this->uuid,
                 'focus' => $searchByFocus ? $this->filterSectionFocusUuid : null,
-                'type' => $this->filterType ?: null,
-                'status' => $this->filterStatus ?: null,
-                'encounter' => $this->filterEncounterId ?: null,
-                'episodeOfCare' => $this->filterEpisodeOfCareId ?: null,
+                'type' => $applyFilters ? ($this->filterType ?: null) : null,
+                'status' => $applyFilters ? ($this->filterStatus ?: null) : null,
+                'encounter' => $applyFilters ? ($this->filterEncounterId ?: null) : null,
+                'episodeOfCare' => $applyFilters ? ($this->filterEpisodeOfCareId ?: null) : null,
                 // Synchronize remote pages before applying local pagination.
                 'offset' => 0,
                 'limit' => $limit,
@@ -723,14 +706,18 @@ class PatientCompositions extends BasePatientComponent
                 if ($newItems === []) {
                     break;
                 }
-                $this->syncLocalCompositions($newItems);
+                $this->syncLocalCompositions($newItems, $searchByFocus);
                 foreach ($newItems as $item) {
                     $seen[data_get($item, 'identifier.value')] = true;
                 }
                 $query['offset'] = ($query['offset'] ?? 0) + $limit;
             } while (count($items) === $limit);
+
+            return true;
         } catch (EHealthConnectionException | EHealthException $exception) {
             $exception->handle('Error searching compositions');
+
+            return false;
         }
     }
 
@@ -778,7 +765,7 @@ class PatientCompositions extends BasePatientComponent
      *
      * Search rows are merged into the local record, then enriched when read context is available.
      */
-    private function syncLocalCompositions(array $compositions): void
+    private function syncLocalCompositions(array $compositions, bool $searchByFocus): void
     {
         $patient = $this->patient();
         $repository = Repository::composition();
@@ -793,7 +780,7 @@ class PatientCompositions extends BasePatientComponent
             if ($subjectUuid && $subjectUuid !== $this->uuid) {
                 continue;
             }
-            if (!$subjectUuid && filled($this->filterSectionFocusUuid)) {
+            if (!$subjectUuid && $searchByFocus) {
                 continue;
             }
             if (!$subjectUuid) {
@@ -826,7 +813,7 @@ class PatientCompositions extends BasePatientComponent
      */
     private function findLocalComposition(string $uuid): ?Composition
     {
-        return Composition::forPatient($this->patient())->whereUuid($uuid)->first();
+        return Repository::composition()->findForPatient($this->patient(), $uuid);
     }
 
     // Render

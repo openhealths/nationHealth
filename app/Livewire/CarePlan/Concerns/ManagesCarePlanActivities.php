@@ -13,10 +13,9 @@ use App\Services\Dictionary\Collections\BasicDictionaryCollection;
 use App\Services\Dictionary\ServiceSearch;
 use App\Services\Dictionary\MedicationProgramPicker;
 use App\Services\MedicalEvents\CarePlanActivityValidationService;
-use App\Services\MedicalEvents\CarePlanLifecycleService;
+use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
 use App\Services\MedicalEvents\DeviceProgramParticipationGuard;
 use Exception;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -100,14 +99,14 @@ trait ManagesCarePlanActivities
 
     public function editActivity(int $activityId, CarePlanActivityRepository $repository): void
     {
-        $activity = $repository->findById($activityId);
+        $activity = $this->ownedActivity($activityId);
         if (!$activity) {
             return;
         }
 
         $this->activityForm = [
             'id' => $activity->id,
-            'kind' => is_array($activity->kind) ? ($activity->kind['coding'][0]['code'] ?? ($activity->kind['text'] ?? '')) : ($activity->kindConcept?->coding?->first()?->code ?? $activity->kind),
+            'kind' => $activity->resolvedKind(),
             'program' => $activity->program ?? '',
             'quantity' => is_array($activity->quantity) ? ($activity->quantity['value'] ?? '') : $activity->quantity,
             'quantity_system' => is_array($activity->quantity) ? ($activity->quantity['unit'] ?? '') : $activity->quantitySystem,
@@ -122,6 +121,7 @@ trait ManagesCarePlanActivities
             'scheduled_period_start' => $activity->scheduledPeriodStart?->format('d.m.Y') ?? '',
             'scheduled_period_end' => $activity->scheduledPeriodEnd?->format('d.m.Y') ?? '',
             'product_reference' => $activity->productReference ?? '',
+            'product_reference_type' => $activity->productReferenceType,
             'product_codeable_concept' => $activity->productCodeableConcept ?? '',
         ];
 
@@ -153,21 +153,15 @@ trait ManagesCarePlanActivities
                     }
                 } elseif (str_contains($kindLower, 'device')) {
                     $programId = $this->activityForm['program'] ?? $activity->program;
-                    $filters = ['page_size' => 50];
-                    if (!empty($programId)) {
-                        $filters['medical_program_id'] = $programId;
-                    }
-                    $response = EHealth::deviceDefinition()->getMany($filters);
-                    $data = $response->getData();
+                    $filters = !empty($programId) ? ['medical_program_id' => $programId] : [];
                     $reference = (string) $activity->productReference;
-                    $this->selectedProduct = collect($data)->first(
-                        fn (array $item): bool => (string) ($item['id'] ?? $item['uuid'] ?? '') === $reference
-                    );
+                    $devices = $this->resolveDevicesByExactUuid($reference, $filters);
+                    $this->selectedProduct = isset($devices[0]) ? $this->compactDeviceForState($devices[0]) : null;
                     if ($this->selectedProduct === null && $reference !== '') {
                         $this->selectedProduct = [
                             'id' => $reference,
                             'uuid' => $reference,
-                            'name' => $reference,
+                            'name' => __('care-plan.device_name_unavailable'),
                         ];
                     }
                 }
@@ -283,6 +277,7 @@ trait ManagesCarePlanActivities
 
     public function deleteActivity(int $activityId, CarePlanActivityRepository $repository): void
     {
+        $this->authorizeCarePlanWrite();
         $activity = $repository->findById($activityId);
         if (!$activity || $activity->carePlanId !== $this->carePlan->id) {
             Session::flash('error', __('care-plan.activity_not_found'));
@@ -298,7 +293,7 @@ trait ManagesCarePlanActivities
             ? ($statusVal['coding'][0]['code'] ?? ($statusVal['text'] ?? ''))
             : (string) $statusVal);
 
-        if (!in_array($activityStatus, ['draft', 'new'], true)) {
+        if ($activityStatus !== CarePlanStatus::DRAFT->value) {
             Session::flash('error', __('care-plan.activity_delete_only_draft'));
             $this->cancelDeleteActivity();
 
@@ -335,6 +330,17 @@ trait ManagesCarePlanActivities
      */
     protected function persistActivityDraft(CarePlanActivityRepository $repository, bool $andSign): void
     {
+        $this->authorizeCarePlanWrite();
+        $usesAlternativeSchedule = false;
+        if (!empty($this->activityForm['id'])) {
+            $activity = $this->ownedActivity((int) $this->activityForm['id']);
+            $usesAlternativeSchedule = $activity->scheduledTiming !== null || $activity->scheduledString !== null;
+            if ($activity->status !== CarePlanStatus::DRAFT->value) {
+                Session::flash('error', __('care-plan.activity_delete_only_draft'));
+
+                return;
+            }
+        }
         $kindLower = strtolower((string) ($this->activityForm['kind'] ?? ''));
         if (str_contains($kindLower, 'medication')) {
             $this->activityForm['program'] = $this->resolveMedicationProgramId();
@@ -348,7 +354,7 @@ trait ManagesCarePlanActivities
         $this->syncDeviceProductReferenceFromSelection();
 
         $programId = $this->activityForm['program'] ?? $this->selectedProgram ?? null;
-        $periodRule = !empty($programId) ? 'required|string' : 'nullable|string';
+        $periodRule = !empty($programId) && !$usesAlternativeSchedule ? 'required|string' : 'nullable|string';
 
         $rules = [
             'activityForm.kind' => 'required|string',
@@ -378,6 +384,7 @@ trait ManagesCarePlanActivities
 
             if ($requiresClassificationOnly) {
                 $rules['activityForm.product_codeable_concept'] = 'required|string';
+                $rules['activityForm.product_reference'] = 'prohibited';
             } else {
                 $rules['activityForm.product_codeable_concept'] = 'nullable|string|required_without:activityForm.product_reference';
             }
@@ -400,39 +407,15 @@ trait ManagesCarePlanActivities
                 return;
             }
 
-            $program = $programPayload;
-            $allowedIcd10 = Arr::get($program, 'medical_program_settings.conditions_icd10_am_allowed', []);
-            $allowedIcpc2 = Arr::get($program, 'medical_program_settings.conditions_icpc2_allowed', []);
+            $codings = collect($this->carePlan->addresses ?? [])->flatMap(
+                static fn (array $address): array => $address['coding'] ?? []
+            )->all();
+            if (!MedicationProgramPicker::matchesDiagnosis($programPayload, $codings)) {
+                $message = __('care-plan.medical_program_diagnosis_mismatch');
+                Session::flash('error', $message);
+                $this->addError('activityForm.program', $message);
 
-            if (!empty($allowedIcd10) || !empty($allowedIcpc2)) {
-                $addresses = $this->carePlan->addresses ?? [];
-                $hasValidDiagnosis = false;
-
-                foreach ($addresses as $address) {
-                    $codings = $address['coding'] ?? [];
-                    foreach ($codings as $coding) {
-                        $system = $coding['system'] ?? '';
-                        $code = $coding['code'] ?? '';
-
-                        if (str_contains($system, 'ICD10_AM') && in_array($code, $allowedIcd10, true)) {
-                            $hasValidDiagnosis = true;
-                            break 2;
-                        }
-
-                        if (str_contains($system, 'ICPC2') && in_array($code, $allowedIcpc2, true)) {
-                            $hasValidDiagnosis = true;
-                            break 2;
-                        }
-                    }
-                }
-
-                if (!$hasValidDiagnosis) {
-                    $message = __('care-plan.medical_program_diagnosis_mismatch');
-                    Session::flash('error', $message);
-                    $this->addError('activityForm.program', $message);
-
-                    return;
-                }
+                return;
             }
         }
 
@@ -455,7 +438,8 @@ trait ManagesCarePlanActivities
 
         $activityStart = convertToYmd($validated['activityForm']['scheduled_period_start']);
         $activityEnd = convertToYmd($validated['activityForm']['scheduled_period_end']);
-        $periodError = $this->validateActivityPeriodAgainstCarePlan($activityStart, $activityEnd);
+        $periodError = $usesAlternativeSchedule && $activityStart === '' && $activityEnd === ''
+            ? null : $this->validateActivityPeriodAgainstCarePlan($activityStart, $activityEnd);
         if ($periodError !== null) {
             Session::flash('error', $periodError);
             $this->addError('activityForm.scheduled_period_start', $periodError);
@@ -589,6 +573,7 @@ trait ManagesCarePlanActivities
             'daily_amount_code' => $medicationUnit,
             'description' => !empty($validated['activityForm']['description']) ? $validated['activityForm']['description'] : null,
             'product_reference' => !empty($validated['activityForm']['product_reference']) ? $validated['activityForm']['product_reference'] : null,
+            'product_reference_type' => $this->activityForm['product_reference_type'] ?? null,
             'product_codeable_concept' => !empty($this->activityForm['product_codeable_concept']) ? $this->activityForm['product_codeable_concept'] : null,
             'program' => $program,
             'reason_code' => !empty($validated['activityForm']['reason_code']) ? $validated['activityForm']['reason_code'] : null,
@@ -600,11 +585,13 @@ trait ManagesCarePlanActivities
             'scheduled_period_end' => $activityEnd,
         ];
 
-        // Local drafts: remaining quantity starts equal to planned quantity until eHealth sync.
-        if (!empty($activityData['quantity']) && empty($this->activityForm['id'])) {
-            $activityData['remaining_quantity'] = $activityData['quantity'];
-            $activityData['remaining_quantity_system'] = $activityData['quantity_system'];
-            $activityData['remaining_quantity_code'] = $activityData['quantity_code'];
+        if ($usesAlternativeSchedule) {
+            if ($activityStart !== '' || $activityEnd !== '') {
+                $this->addError('activityForm.scheduled_period_start', __('Збережено інший тип розкладу. Зміна типу розкладу потребує окремого редактора.'));
+
+                return;
+            }
+            unset($activityData['scheduled_period_start'], $activityData['scheduled_period_end']);
         }
 
         if (!empty($this->activityForm['id'])) {
@@ -1118,7 +1105,8 @@ trait ManagesCarePlanActivities
         }
 
         if ($kind === 'service_request') {
-            $this->activityForm['product_codeable_concept'] = $product['code'] ?? '';
+            $this->activityForm['product_codeable_concept'] = '';
+            $this->activityForm['product_reference_type'] = ($product['type'] ?? '') === 'service_group' || ($product['is_group'] ?? false) ? 'service_group' : 'service';
             $this->activityForm['quantity_system'] = 'SERVICE_UNIT';
             $this->activityForm['quantity_code'] = 'PIECE';
             $this->showServiceSearchDrawer = false;
@@ -1248,21 +1236,17 @@ trait ManagesCarePlanActivities
 
     protected function ensureCarePlanEffectivePeriodSynced(CarePlanRepository $repository): void
     {
-        $this->carePlan->loadMissing('effectivePeriod');
+        $this->carePlan = app(\App\Repositories\CarePlanRepository::class)->findById($this->carePlan->id);
 
         if ($this->carePlan->effectivePeriod && $repository->resolveEHealthPeriodBounds($this->carePlan)['start']) {
             return;
         }
 
         try {
-            $planData = app(CarePlanLifecycleService::class)
-                ->getDetails($this->carePlan->person->uuid, $this->carePlan->uuid);
-            $repository->syncCarePlans(
-                ['data' => [$planData]],
-                $this->carePlan->person_id,
-                Auth::user()?->getCarePlanWriterEmployee($this->carePlan->terms_of_service)?->id
-            );
-            $this->carePlan->refresh()->load('effectivePeriod');
+            $planData = app(CarePlanApi::class)
+                ->getRawDetails($this->carePlan->person->uuid, $this->carePlan->uuid);
+            EHealth::carePlan()->synchronizeResources(['data' => [$planData]], $this->carePlan->person_id, (int) legalEntity()->id);
+            $this->carePlan = $repository->findById($this->carePlan->id);
         } catch (Exception $e) {
             Log::warning('CarePlanShow: failed to sync effective period before activity sign: ' . $e->getMessage());
         }

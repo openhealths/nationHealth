@@ -17,6 +17,11 @@ use App\Classes\eHealth\Exceptions\ApiException;
  */
 class MedicationRequest
 {
+    public static function getRequestById(string $patientId, string $id): array
+    {
+        return EHealth::medicationRequest()->getRequestById($patientId, $id)->getData();
+    }
+
     /**
      * PreQualify Medication Request (API-005-044-0001).
      *

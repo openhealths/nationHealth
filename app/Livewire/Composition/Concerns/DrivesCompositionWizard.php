@@ -53,6 +53,8 @@ trait DrivesCompositionWizard
 
     public int $step = self::STEP_ENCOUNTER;
 
+    public bool $showEncounterPicker = false;
+
     /** Episode of the chosen encounter; needed to read the conclusion back. */
     #[Locked]
     public ?string $episodeUuid = null;
@@ -196,14 +198,18 @@ trait DrivesCompositionWizard
         $this->episodeUuid = data_get($encounter, 'episode.identifier.value');
         $this->selectedEncounter = [
             'uuid' => $encounterUuid,
+            'period' => $encounter['period'] ?? null,
+            'class' => $encounter['class'] ?? null,
             'subjectUuid' => $this->encounterSubjectUuid(),
             'authorUuid' => data_get($encounter, 'performer.identifier.value'),
             'authorName' => $encounter['authorName'],
             'authorPosition' => $encounter['authorPosition'],
         ];
 
+        $this->showEncounterPicker = false;
         $this->loadAuthMethods();
         $this->step = self::STEP_AUTH_METHOD;
+        $this->dispatch('scroll-to-element', selector: '#composition-auth-method');
     }
 
     /**
@@ -289,6 +295,8 @@ trait DrivesCompositionWizard
         if (method_exists($this, 'applyDefaultPeriodDates')) {
             $this->applyDefaultPeriodDates();
         }
+
+        $this->dispatch('scroll-to-element', selector: '#composition-details');
     }
 
     /**
@@ -319,6 +327,8 @@ trait DrivesCompositionWizard
         if (method_exists($this, 'applyDefaultPeriodDates')) {
             $this->applyDefaultPeriodDates();
         }
+
+        $this->dispatch('scroll-to-element', selector: '#composition-details');
     }
 
     /**
@@ -658,6 +668,7 @@ trait DrivesCompositionWizard
         $this->form->resetSigningFields();
         $this->reset(array_merge([
             'step',
+            'showEncounterPicker',
             'episodeUuid',
             'selectedEncounter',
             'authMethods',

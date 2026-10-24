@@ -18,6 +18,7 @@ use Illuminate\Support\Str;
 use Mockery;
 use Tests\Concerns\CreatesFhirRequestIdentifiers;
 use Tests\Concerns\MocksBasicDictionaries;
+use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\TestCase;
 use Livewire\Livewire;
 use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
@@ -25,6 +26,7 @@ use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
 class MedicationRequestLifecycleTest extends TestCase
 {
     use DatabaseTransactions;
+    use CreatesFhirCarePlans;
     use CreatesFhirRequestIdentifiers;
     use MocksBasicDictionaries;
 
@@ -34,22 +36,13 @@ class MedicationRequestLifecycleTest extends TestCase
     protected \App\Models\User $user;
     protected CarePlanActivity $carePlanActivity;
 
-    protected function migrateDatabases()
-    {
-        $this->artisan('migrate:fresh', [
-            '--path' => [
-                database_path('migrations'),
-                database_path('migrations/install'),
-                database_path('migrations/update/0_1'),
-            ],
-            '--realpath' => true,
-        ]);
-    }
-
     protected function setUp(): void
     {
         parent::setUp();
         $this->mockBasicDictionaries();
+        $signatureService = Mockery::mock(\App\Services\SignatureService::class);
+        $signatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
+        $this->instance(\App\Services\SignatureService::class, $signatureService);
 
         // 1. Create Patient
         $this->person = Person::create([
@@ -142,7 +135,7 @@ class MedicationRequestLifecycleTest extends TestCase
         $this->grantMedicalEventAbilities($this->user);
 
         // 5. Create Care Plan & Medication Care Plan Activity
-        $carePlan = \App\Models\CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
             'author_id' => $this->employee->id,
@@ -152,7 +145,7 @@ class MedicationRequestLifecycleTest extends TestCase
             'status' => 'active',
         ]);
 
-        $this->carePlanActivity = CarePlanActivity::create([
+        $this->carePlanActivity = $this->createFhirCarePlanActivity([
             'uuid' => (string) Str::uuid(),
             'care_plan_id' => $carePlan->id,
             'author_id' => $this->employee->id,
@@ -213,7 +206,7 @@ class MedicationRequestLifecycleTest extends TestCase
         $this->assertDatabaseHas('dosage_instructions', [
             'medication_request_request_id' => $id,
             'sequence' => 1,
-            'route' => 'oral',
+            'route' => '26643006',
             'patient_instruction' => 'Take with water'
         ]);
     }
@@ -257,10 +250,10 @@ class MedicationRequestLifecycleTest extends TestCase
 
         $this->assertEquals($payload['uuid'], $fhir['id']);
         $this->assertEquals('draft', $fhir['status']);
-        $this->assertEquals('INN-101', $fhir['medicationCodeableConcept']['coding'][0]['code']);
+        $this->assertEquals('INN-101', $fhir['medicationReference']['identifier']['value']);
         $this->assertEquals('program-affordable-medicines', $fhir['program']['identifier']['value']);
         $this->assertEquals($this->carePlanActivity->uuid, $fhir['basedOn'][0]['identifier']['value']);
-        $this->assertEquals('Take in the morning', $fhir['note'][0]['text']);
+        $this->assertEquals('Take in the morning', $fhir['note']);
         $this->assertEquals(1.0, $fhir['dosageInstruction'][0]['doseAndRate'][0]['doseQuantity']['value']);
     }
 
@@ -280,14 +273,17 @@ class MedicationRequestLifecycleTest extends TestCase
                         'sequence' => 1,
                         'text' => '1 tablet daily',
                         'route' => 'oral',
+                        'as_needed_boolean' => false,
                         'dose_and_rate' => [
                             [
                                 'dose_quantity_value' => 1.0,
                                 'dose_quantity_unit' => 'tab',
+                                'type' => ['coding' => [['system' => 'eHealth/dose_and_rate', 'code' => 'ordered']]],
+                                'rate_ratio' => ['numerator' => ['value' => 1, 'unit' => 'tab'], 'denominator' => ['value' => 1, 'unit' => 'd']],
                             ],
                         ],
-                        'max_dose_per_administration' => 1.0,
-                        'max_dose_per_period' => 1.0,
+                        'max_dose_per_administration' => ['value' => 1.0, 'unit' => 'tab'],
+                        'max_dose_per_period' => ['numerator' => ['value' => 1.0, 'unit' => 'tab'], 'denominator' => ['value' => 1.0, 'unit' => 'd']],
                     ],
                 ],
             ],
@@ -506,6 +502,7 @@ class MedicationRequestLifecycleTest extends TestCase
             'employee_id' => $this->employee->id,
             'person_id' => $this->person->id,
             'status' => 'active',
+            'resource_type' => \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::TYPE_PRESCRIPTION,
             'medication_id' => 'INN-101',
             'medication_qty' => 30.0,
             'intent' => 'order',

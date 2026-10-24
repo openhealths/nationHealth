@@ -1,8 +1,26 @@
 {{-- Both ids are forwarded: the layout switches its whole navigation between the person
      and preperson route families based on which one is set. --}}
-<x-layouts.patient :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName">
+<x-layouts.patient :showLegacyMessages="false" :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName">
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     <x-slot name="headerActions">
         <div class="flex flex-wrap gap-2">
+            @can('viewAny', \App\Models\MedicalEvents\Sql\Composition::class)
+                <button
+                    type="button"
+                    wire:click="sync"
+                    wire:loading.attr="disabled"
+                    wire:target="sync,search"
+                    class="button-sync flex items-center gap-2 px-5 py-2 text-sm whitespace-nowrap"
+                >
+                    <span wire:loading.remove wire:target="sync">
+                        @icon('refresh', 'w-4 h-4')
+                    </span>
+                    <span wire:loading wire:target="sync" class="animate-spin">
+                        @icon('refresh', 'w-4 h-4')
+                    </span>
+                    {{ __('forms.synchronise_with_eHealth') }}
+                </button>
+            @endcan
             @can('createNewborn', \App\Models\MedicalEvents\Sql\Composition::class)
                 <a
                     href="{{ $this->createNewbornUrl }}"
@@ -91,7 +109,7 @@
                     <span>{{ __('forms.search') }}</span>
                 </button>
                 <button type="button" wire:click="resetFilters" class="button-primary-outline-red px-5 py-2.5 text-sm">
-                    {{ __('patients.reset_filters') }}
+                    {{ __('forms.reset_all_filters') }}
                 </button>
             </div>
 
@@ -144,7 +162,7 @@
                                             class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
                                         >
                                             @icon('eye', 'w-5 h-5 text-gray-500')
-                                            {{ __('patients.view_details') }}
+                                            {{ __('forms.view_details') }}
                                         </button>
 
                                         <button

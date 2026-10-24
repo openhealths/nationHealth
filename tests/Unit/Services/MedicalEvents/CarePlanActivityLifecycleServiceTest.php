@@ -6,7 +6,6 @@ namespace Tests\Unit\Services\MedicalEvents;
 
 use App\Classes\eHealth\Api\CarePlanActivity as CarePlanActivityApi;
 use App\Classes\eHealth\EHealthResponse;
-use App\Services\MedicalEvents\CarePlanActivityLifecycleService;
 use App\Services\MedicalEvents\EHealthJobResolver;
 use Mockery;
 use Tests\TestCase;
@@ -18,7 +17,7 @@ class CarePlanActivityLifecycleServiceTest extends TestCase
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('getData')->once()->andReturn(['job_id' => 'job-a']);
 
-        $api = Mockery::mock(CarePlanActivityApi::class);
+        $api = Mockery::mock(CarePlanActivityApi::class)->makePartial();
         $api->shouldReceive('create')
             ->once()
             ->with('person-uuid', 'plan-uuid', [
@@ -35,7 +34,7 @@ class CarePlanActivityLifecycleServiceTest extends TestCase
         ]);
         $this->app->instance(EHealthJobResolver::class, $resolver);
 
-        $result = app(CarePlanActivityLifecycleService::class)
+        $result = app(CarePlanActivityApi::class)
             ->submitSignedCreate('person-uuid', 'plan-uuid', 'signed');
 
         $this->assertSame('activity-uuid', $result['id']);
@@ -47,7 +46,7 @@ class CarePlanActivityLifecycleServiceTest extends TestCase
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('getData')->twice()->andReturn(['job_id' => 'job-b'], ['job_id' => 'job-c']);
 
-        $api = Mockery::mock(CarePlanActivityApi::class);
+        $api = Mockery::mock(CarePlanActivityApi::class)->makePartial();
         $api->shouldReceive('cancel')
             ->once()
             ->with('person-uuid', 'plan-uuid', 'activity-uuid', $payload)
@@ -64,15 +63,15 @@ class CarePlanActivityLifecycleServiceTest extends TestCase
             ->andReturn(['status' => 'cancelled'], ['status' => 'completed']);
         $this->app->instance(EHealthJobResolver::class, $resolver);
 
-        $service = app(CarePlanActivityLifecycleService::class);
+        $service = app(CarePlanActivityApi::class);
 
-        $this->assertSame('cancelled', $service->cancel(
+        $this->assertSame('cancelled', $service->cancelAndResolve(
             'person-uuid',
             'plan-uuid',
             'activity-uuid',
             $payload
         )['status']);
-        $this->assertSame('completed', $service->complete(
+        $this->assertSame('completed', $service->completeAndResolve(
             'person-uuid',
             'plan-uuid',
             'activity-uuid',

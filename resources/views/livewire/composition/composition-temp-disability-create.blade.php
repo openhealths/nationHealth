@@ -15,7 +15,7 @@
     <div class="breadcrumb-form shift-content p-4">
         <div class="mt-6 w-full max-w-screen-xl space-y-8">
             @php
-                $encounterOptions = $step >= Wizard::STEP_AWAITING_JOB
+                $encounterOptions = $step >= Wizard::STEP_AWAITING_JOB || ($selectedEncounter !== null && !$showEncounterPicker)
                     ? collect(array_filter([$selectedEncounter]))
                     : $this->availableEncounters
                         ->sortByDesc(fn (array $encounter): bool => $encounter['uuid'] === $form->encounterUuid)
@@ -24,7 +24,7 @@
             <fieldset
                 class="fieldset-card p-6 sm:p-8"
                 x-data="{ visibleEncounterCount: 3 }"
-                wire:key="composition-encounter-options-{{ $asyncJobId ?? 'editing' }}"
+                wire:key="composition-encounter-options-{{ $showEncounterPicker ? 'picker' : ($form->encounterUuid ?: 'editing') }}"
                 @disabled($step >= Wizard::STEP_AWAITING_JOB)
             >
                 <legend class="legend">
@@ -32,7 +32,7 @@
                 </legend>
                 <div class="mt-6">
                     <div class="mb-4 font-semibold text-gray-900 dark:text-gray-100">
-                        {{ __('compositions.create_temp_disability.encounter_hint') }}
+                        {{ __($selectedEncounter !== null && !$showEncounterPicker ? 'compositions.wizard.encounter_selected_hint' : 'compositions.create_temp_disability.encounter_hint') }}
                     </div>
 
                     <div class="space-y-4">
@@ -72,9 +72,12 @@
                                         <button
                                             type="button"
                                             wire:click="selectEncounter('{{ $encounter['uuid'] }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="selectEncounter"
+                                            @disabled($form->encounterUuid === $encounter['uuid'])
                                             class="button-primary px-4 py-2 text-sm whitespace-nowrap"
                                         >
-                                            {{ __('forms.select') }}
+                                            {{ __($form->encounterUuid === $encounter['uuid'] ? 'compositions.wizard.selected' : 'forms.select') }}
                                         </button>
                                     </div>
                                 </div>
@@ -107,6 +110,11 @@
                             {{ __('general.show_more') }}
                         </button>
                     @endif
+                    @if($selectedEncounter !== null && $step < Wizard::STEP_AWAITING_JOB)
+                        <button type="button" wire:click="$toggle('showEncounterPicker')" class="button-minor mt-4 px-4 py-2 text-sm">
+                            {{ __($showEncounterPicker ? 'compositions.wizard.keep_encounter' : 'compositions.wizard.change_encounter') }}
+                        </button>
+                    @endif
                     @error('form.encounterUuid')
                         <p class="text-error">
                             {{ $message }}
@@ -114,7 +122,7 @@
                     @enderror
                 </div>
             </fieldset>
-            <fieldset class="fieldset-card p-6 sm:p-8" @disabled($step < Wizard::STEP_AUTH_METHOD || $step >= Wizard::STEP_AWAITING_JOB)>
+            <fieldset id="composition-auth-method" class="fieldset-card p-6 sm:p-8" @disabled($step < Wizard::STEP_AUTH_METHOD || $step >= Wizard::STEP_AWAITING_JOB)>
                 <legend class="legend">
                     {{ __('compositions.create_temp_disability.steps.auth_method') }}
                 </legend>
@@ -167,9 +175,12 @@
                                         <button
                                             type="button"
                                             wire:click="selectAuthMethod('{{ $method['uuid'] ?? $method['id'] }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="selectAuthMethod"
+                                            @disabled($form->informWithUuid === ($method['uuid'] ?? $method['id']))
                                             class="button-primary px-3 py-1.5 text-sm whitespace-nowrap"
                                         >
-                                            {{ __('forms.select') }}
+                                            {{ __($form->informWithUuid === ($method['uuid'] ?? $method['id']) ? 'compositions.wizard.selected' : 'forms.select') }}
                                         </button>
                                     </div>
                                 </div>
@@ -202,7 +213,7 @@
                     @enderror
                 </div>
             </fieldset>
-            <fieldset class="fieldset-card p-6 sm:p-8" @disabled($step < Wizard::STEP_DETAILS || $step >= Wizard::STEP_AWAITING_JOB)>
+            <fieldset id="composition-details" class="fieldset-card p-6 sm:p-8" @disabled($step < Wizard::STEP_DETAILS || $step >= Wizard::STEP_AWAITING_JOB)>
                 <legend class="legend">
                     {{ __('compositions.create_temp_disability.steps.details') }}
                 </legend>

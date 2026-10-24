@@ -28,6 +28,11 @@ class MedicationRequestRequest extends Model
 
     public const TYPE_PRESCRIPTION = RequestResourceType::PRESCRIPTION->value;
 
+    protected $attributes = [
+        'source' => self::SOURCE_LOCAL,
+        'resource_type' => self::TYPE_REQUEST,
+    ];
+
     /**
      * Add real attributes you allow for mass assignment.
      */
@@ -55,14 +60,24 @@ class MedicationRequestRequest extends Model
         'ehealth_payload',
         'source',
         'resource_type',
+        'fhir_version',
+        'fhir_metadata',
     ];
 
     protected $casts = [
         'started_at' => 'datetime',
         'ended_at' => 'datetime',
-        'medication_qty' => 'decimal:2',
+        'medication_qty' => 'decimal:10',
+        'fhir_version' => 'integer',
+        'fhir_metadata' => 'array',
         'ehealth_payload' => 'array',
     ];
+
+    public function fhirReferences(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Identifier::class, 'medication_request_fhir_references', 'medication_request_id', 'identifier_id')
+            ->withPivot(['field', 'position'])->orderByPivot('position');
+    }
 
     public function dosageInstructions(): HasMany
     {

@@ -8,7 +8,6 @@ use App\Core\EHealthJob;
 use App\Core\PatientEHealthJob;
 use App\Models\LegalEntity;
 use App\Classes\eHealth\EHealth;
-use App\Repositories\CarePlanRepository;
 use GuzzleHttp\Promise\PromiseInterface;
 use App\Classes\eHealth\EHealthResponse;
 use Illuminate\Queue\Middleware\RateLimited;
@@ -45,7 +44,7 @@ class CarePlanFullSync extends PatientEHealthJob
             return;
         }
 
-        app(CarePlanRepository::class)->syncCarePlans($validatedData, $this->personId);
+        EHealth::carePlan()->synchronizeResources($validatedData, $this->personId, $this->legalEntity->id, $this->patientUuid, $this->token);
     }
 
     protected function getNextEntityJob(): ?EHealthJob

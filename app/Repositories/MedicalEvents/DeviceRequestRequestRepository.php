@@ -310,11 +310,11 @@ class DeviceRequestRequestRepository extends BaseRepository
         return $this->model->newQuery()->where('uuid', $uuid)->first();
     }
 
-    public function sumIssuedQuantityByActivity(string $activityUuid): float
+    public function sumIssuedQuantityByActivity(string $activityUuid, array $excludedStatuses = MedicalEventsRequestStatuses::EXCLUDED_FROM_ISSUED_SUM): float
     {
         return (float) $this->model->newQuery()
             ->whereHas('basedOn', fn ($q) => $q->where('value', $activityUuid))
-            ->whereNotIn('status', MedicalEventsRequestStatuses::EXCLUDED_FROM_ISSUED_SUM)
+            ->whereNotIn('status', $excludedStatuses)
             ->sum('quantity');
     }
 
@@ -325,5 +325,16 @@ class DeviceRequestRequestRepository extends BaseRepository
             ->whereIn('status', ['draft', 'DRAFT'])
             ->latest('id')
             ->first();
+    }
+
+    public function saveStatus(DeviceRequestRequest $record, string $status): void
+    {
+        $record->status = $status;
+        $record->save();
+    }
+
+    public function refreshRecord(DeviceRequestRequest $record): void
+    {
+        $record->refresh();
     }
 }
