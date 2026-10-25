@@ -1,0 +1,374 @@
+{
+    "minimal": {
+        "signedJson": "{\"id\":\"immunization\",\"status\":\"completed\",\"not_given\":false,\"vaccine_code\":{\"coding\":[{\"system\":\"eHealth\\\/vaccine_codes\",\"code\":\"COVID19\"}],\"text\":\"\"},\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"date\":\"2026-10-05T07:15:00Z\",\"primary_source\":true,\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"explanation\":{\"reasons\":[]}}",
+        "form": {
+            "uuid": null,
+            "status": "completed",
+            "primarySource": null,
+            "performerEmployeeId": "",
+            "notGiven": false,
+            "vaccineCode": null,
+            "date": "05.10.2026",
+            "time": "10:15",
+            "reasons": [
+                {
+                    "code": ""
+                }
+            ],
+            "reasonNotGivenCode": "",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "manufacturer": "",
+            "lotNumber": "",
+            "expirationDate": "",
+            "expirationTime": "",
+            "siteCode": "",
+            "routeCode": "",
+            "doseQuantityValue": null,
+            "doseQuantityCode": "",
+            "doseQuantityUnit": "",
+            "vaccinationProtocols": []
+        }
+    },
+    "full sparse duplicate disease": {
+        "signedJson": "{\"id\":\"immunization\",\"status\":\"completed\",\"not_given\":false,\"vaccine_code\":{\"coding\":[{\"system\":\"eHealth\\\/vaccine_codes\",\"code\":\"COVID19\"}],\"text\":\"\"},\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"date\":\"2026-10-05T07:15:00Z\",\"primary_source\":true,\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}},\"manufacturer\":\"\\u0412\\u0438\\u0440\\u043e\\u0431\\u043d\\u0438\\u043a\",\"lot_number\":\"001\",\"expiration_date\":\"2026-11-05T07:32:00Z\",\"site\":{\"coding\":[{\"system\":\"eHealth\\\/immunization_body_sites\",\"code\":\"arm\"}],\"text\":\"\"},\"route\":{\"coding\":[{\"system\":\"eHealth\\\/vaccination_routes\",\"code\":\"injection\"}],\"text\":\"\"},\"dose_quantity\":{\"value\":1.5,\"unit\":\"ml\",\"system\":\"eHealth\\\/immunization_dosage_units\",\"code\":\"ml\"},\"explanation\":{\"reasons\":[{\"coding\":[{\"system\":\"eHealth\\\/reason_explanations\",\"code\":\"medical\"}],\"text\":\"\"}]},\"vaccination_protocols\":[{\"authority\":{\"coding\":[{\"system\":\"eHealth\\\/vaccination_authorities\",\"code\":\"WHO\"}],\"text\":\"\"},\"target_diseases\":[{\"coding\":[{\"system\":\"eHealth\\\/vaccination_target_diseases\",\"code\":\"COVID19\"}],\"text\":\"\"},{\"coding\":[{\"system\":\"eHealth\\\/vaccination_target_diseases\",\"code\":\"COVID19\"}],\"text\":\"\"}],\"dose_sequence\":2,\"series\":\"\\u0421\\u0435\\u0440\\u0456\\u044f\",\"series_doses\":3,\"description\":\"\\u041e\\u043f\\u0438\\u0441\"}]}",
+        "form": {
+            "uuid": "immunization",
+            "status": "completed",
+            "primarySource": true,
+            "performerEmployeeId": "",
+            "notGiven": false,
+            "vaccineCode": "COVID19",
+            "date": "05.10.2026",
+            "time": "10:15",
+            "reasons": [
+                {
+                    "code": "medical"
+                }
+            ],
+            "reasonNotGivenCode": "",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "manufacturer": "",
+            "lotNumber": "",
+            "expirationDate": "05.11.2026",
+            "expirationTime": "09:32",
+            "siteCode": "",
+            "routeCode": "",
+            "doseQuantityValue": null,
+            "doseQuantityCode": "",
+            "doseQuantityUnit": "",
+            "vaccinationProtocols": {
+                "42": {
+                    "authorityCode": "WHO",
+                    "targetDiseaseCodes": [
+                        "COVID19",
+                        "COVID19"
+                    ],
+                    "doseSequence": 2,
+                    "series": "Серія",
+                    "seriesDoses": 3,
+                    "description": "Опис"
+                }
+            }
+        }
+    },
+    "external source": {
+        "signedJson": "{\"id\":\"immunization\",\"status\":\"completed\",\"not_given\":false,\"vaccine_code\":{\"coding\":[{\"system\":\"eHealth\\\/vaccine_codes\",\"code\":\"COVID19\"}],\"text\":\"\"},\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"date\":\"2026-10-05T07:15:00Z\",\"primary_source\":false,\"report_origin\":{\"coding\":[{\"system\":\"eHealth\\\/immunization_report_origins\",\"code\":\"other\"}],\"text\":\"\\u041e\\u043f\\u0438\\u0441\"},\"explanation\":{\"reasons\":[]}}",
+        "form": {
+            "uuid": null,
+            "status": "completed",
+            "primarySource": false,
+            "performerEmployeeId": "",
+            "notGiven": false,
+            "vaccineCode": null,
+            "date": "05.10.2026",
+            "time": "10:15",
+            "reasons": [
+                {
+                    "code": ""
+                }
+            ],
+            "reasonNotGivenCode": "",
+            "reportOriginCode": "other",
+            "reportOriginText": "Опис",
+            "manufacturer": "",
+            "lotNumber": "",
+            "expirationDate": "",
+            "expirationTime": "",
+            "siteCode": "",
+            "routeCode": "",
+            "doseQuantityValue": null,
+            "doseQuantityCode": "",
+            "doseQuantityUnit": "",
+            "vaccinationProtocols": []
+        }
+    },
+    "not given": {
+        "signedJson": "{\"id\":\"immunization\",\"status\":\"completed\",\"not_given\":true,\"vaccine_code\":{\"coding\":[{\"system\":\"eHealth\\\/vaccine_codes\",\"code\":\"COVID19\"}],\"text\":\"\"},\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"date\":\"2026-10-05T07:15:00Z\",\"primary_source\":true,\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"explanation\":{\"reasons_not_given\":[{\"coding\":[{\"system\":\"eHealth\\\/reason_not_given_explanations\",\"code\":\"contraindication\"}],\"text\":\"\"}]}}",
+        "form": {
+            "uuid": null,
+            "status": "completed",
+            "primarySource": null,
+            "performerEmployeeId": "",
+            "notGiven": true,
+            "vaccineCode": null,
+            "date": "05.10.2026",
+            "time": "10:15",
+            "reasons": [],
+            "reasonNotGivenCode": "contraindication",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "manufacturer": "",
+            "lotNumber": "",
+            "expirationDate": "",
+            "expirationTime": "",
+            "siteCode": "",
+            "routeCode": "",
+            "doseQuantityValue": null,
+            "doseQuantityCode": "",
+            "doseQuantityUnit": "",
+            "vaccinationProtocols": []
+        }
+    },
+    "expiration caller fallback": {
+        "signedJson": "{\"id\":\"immunization\",\"status\":\"completed\",\"not_given\":false,\"vaccine_code\":{\"coding\":[{\"system\":\"eHealth\\\/vaccine_codes\",\"code\":\"COVID19\"}],\"text\":\"\"},\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"date\":\"2026-10-05T07:15:00Z\",\"primary_source\":true,\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"expiration_date\":\"2026-11-05T10:00:00Z\",\"explanation\":{\"reasons\":[]}}",
+        "form": {
+            "uuid": null,
+            "status": "completed",
+            "primarySource": null,
+            "performerEmployeeId": "",
+            "notGiven": false,
+            "vaccineCode": null,
+            "date": "05.10.2026",
+            "time": "10:15",
+            "reasons": [
+                {
+                    "code": ""
+                }
+            ],
+            "reasonNotGivenCode": "",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "manufacturer": "",
+            "lotNumber": "",
+            "expirationDate": "05.11.2026",
+            "expirationTime": "12:00",
+            "siteCode": "",
+            "routeCode": "",
+            "doseQuantityValue": null,
+            "doseQuantityCode": "",
+            "doseQuantityUnit": "",
+            "vaccinationProtocols": []
+        }
+    },
+    "null performer fallback": {
+        "signedJson": "{\"id\":\"immunization\",\"status\":\"completed\",\"not_given\":false,\"vaccine_code\":{\"coding\":[{\"system\":\"eHealth\\\/vaccine_codes\",\"code\":\"COVID19\"}],\"text\":\"\"},\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"date\":\"2026-10-05T07:15:00Z\",\"primary_source\":true,\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"explanation\":{\"reasons\":[]}}",
+        "form": {
+            "uuid": null,
+            "status": "completed",
+            "primarySource": null,
+            "performerEmployeeId": null,
+            "notGiven": false,
+            "vaccineCode": null,
+            "date": "05.10.2026",
+            "time": "10:15",
+            "reasons": [
+                {
+                    "code": ""
+                }
+            ],
+            "reasonNotGivenCode": "",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "manufacturer": "",
+            "lotNumber": "",
+            "expirationDate": "",
+            "expirationTime": "",
+            "siteCode": "",
+            "routeCode": "",
+            "doseQuantityValue": null,
+            "doseQuantityCode": "",
+            "doseQuantityUnit": "",
+            "vaccinationProtocols": []
+        }
+    },
+    "empty performer retained": {
+        "signedJson": "{\"id\":\"immunization\",\"status\":\"completed\",\"not_given\":false,\"vaccine_code\":{\"coding\":[{\"system\":\"eHealth\\\/vaccine_codes\",\"code\":\"COVID19\"}],\"text\":\"\"},\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"date\":\"2026-10-05T07:15:00Z\",\"primary_source\":true,\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"\"}},\"explanation\":{\"reasons\":[]}}",
+        "form": {
+            "uuid": null,
+            "status": "completed",
+            "primarySource": null,
+            "performerEmployeeId": "",
+            "notGiven": false,
+            "vaccineCode": null,
+            "date": "05.10.2026",
+            "time": "10:15",
+            "reasons": [
+                {
+                    "code": ""
+                }
+            ],
+            "reasonNotGivenCode": "",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "manufacturer": "",
+            "lotNumber": "",
+            "expirationDate": "",
+            "expirationTime": "",
+            "siteCode": "",
+            "routeCode": "",
+            "doseQuantityValue": null,
+            "doseQuantityCode": "",
+            "doseQuantityUnit": "",
+            "vaccinationProtocols": []
+        }
+    },
+    "null scalars": {
+        "signedJson": "{\"id\":\"immunization\",\"status\":\"completed\",\"not_given\":false,\"vaccine_code\":{\"coding\":[{\"system\":\"eHealth\\\/vaccine_codes\",\"code\":\"COVID19\"}],\"text\":\"\"},\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"date\":\"2026-10-05T07:15:00Z\",\"primary_source\":true,\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"explanation\":{\"reasons\":[]}}",
+        "form": {
+            "uuid": null,
+            "status": null,
+            "primarySource": null,
+            "performerEmployeeId": "",
+            "notGiven": null,
+            "vaccineCode": null,
+            "date": "05.10.2026",
+            "time": "10:15",
+            "reasons": [
+                {
+                    "code": ""
+                }
+            ],
+            "reasonNotGivenCode": "",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "manufacturer": null,
+            "lotNumber": "",
+            "expirationDate": "",
+            "expirationTime": "",
+            "siteCode": "",
+            "routeCode": "",
+            "doseQuantityValue": null,
+            "doseQuantityCode": "",
+            "doseQuantityUnit": "",
+            "vaccinationProtocols": {
+                "42": {
+                    "authorityCode": "",
+                    "targetDiseaseCodes": [
+                        ""
+                    ],
+                    "doseSequence": null,
+                    "series": "",
+                    "seriesDoses": 0,
+                    "description": ""
+                }
+            }
+        }
+    },
+    "empty filtered reasons": {
+        "signedJson": "{\"id\":\"immunization\",\"status\":\"completed\",\"not_given\":false,\"vaccine_code\":{\"coding\":[{\"system\":\"eHealth\\\/vaccine_codes\",\"code\":\"COVID19\"}],\"text\":\"\"},\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"date\":\"2026-10-05T07:15:00Z\",\"primary_source\":true,\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"explanation\":{\"reasons\":[]}}",
+        "form": {
+            "uuid": null,
+            "status": "completed",
+            "primarySource": null,
+            "performerEmployeeId": "",
+            "notGiven": false,
+            "vaccineCode": null,
+            "date": "05.10.2026",
+            "time": "10:15",
+            "reasons": [
+                {
+                    "code": ""
+                }
+            ],
+            "reasonNotGivenCode": "",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "manufacturer": "",
+            "lotNumber": "",
+            "expirationDate": "",
+            "expirationTime": "",
+            "siteCode": "",
+            "routeCode": "",
+            "doseQuantityValue": null,
+            "doseQuantityCode": "",
+            "doseQuantityUnit": "",
+            "vaccinationProtocols": []
+        }
+    },
+    "false-like optional values": {
+        "signedJson": "{\"id\":\"immunization\",\"status\":\"completed\",\"not_given\":false,\"vaccine_code\":{\"coding\":[{\"system\":\"eHealth\\\/vaccine_codes\",\"code\":\"COVID19\"}],\"text\":\"\"},\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"date\":\"2026-10-05T07:15:00Z\",\"primary_source\":true,\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"employee\"}},\"explanation\":{\"reasons\":[]},\"vaccination_protocols\":[{\"authority\":{\"coding\":[{\"system\":\"eHealth\\\/vaccination_authorities\",\"code\":\"WHO\"}],\"text\":\"\"},\"target_diseases\":[]}]}",
+        "form": {
+            "uuid": null,
+            "status": "completed",
+            "primarySource": null,
+            "performerEmployeeId": "",
+            "notGiven": false,
+            "vaccineCode": null,
+            "date": "05.10.2026",
+            "time": "10:15",
+            "reasons": [
+                {
+                    "code": ""
+                }
+            ],
+            "reasonNotGivenCode": "",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "manufacturer": "",
+            "lotNumber": "",
+            "expirationDate": "",
+            "expirationTime": "",
+            "siteCode": "",
+            "routeCode": "",
+            "doseQuantityValue": 0,
+            "doseQuantityCode": "",
+            "doseQuantityUnit": "",
+            "vaccinationProtocols": []
+        }
+    },
+    "DST": {
+        "signedJson": "{\"id\":\"immunization\",\"status\":\"completed\",\"not_given\":false,\"vaccine_code\":{\"coding\":[{\"system\":\"eHealth\\\/vaccine_codes\",\"code\":\"COVID19\"}],\"text\":\"\"},\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"date\":\"2026-10-25T02:15:00Z\",\"primary_source\":true,\"performer\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"performer\"}},\"manufacturer\":\"\\u0412\\u0438\\u0440\\u043e\\u0431\\u043d\\u0438\\u043a\",\"lot_number\":\"001\",\"expiration_date\":\"2026-11-05T07:32:00Z\",\"site\":{\"coding\":[{\"system\":\"eHealth\\\/immunization_body_sites\",\"code\":\"arm\"}],\"text\":\"\"},\"route\":{\"coding\":[{\"system\":\"eHealth\\\/vaccination_routes\",\"code\":\"injection\"}],\"text\":\"\"},\"dose_quantity\":{\"value\":1.5,\"unit\":\"ml\",\"system\":\"eHealth\\\/immunization_dosage_units\",\"code\":\"ml\"},\"explanation\":{\"reasons\":[{\"coding\":[{\"system\":\"eHealth\\\/reason_explanations\",\"code\":\"medical\"}],\"text\":\"\"}]},\"vaccination_protocols\":[{\"authority\":{\"coding\":[{\"system\":\"eHealth\\\/vaccination_authorities\",\"code\":\"WHO\"}],\"text\":\"\"},\"target_diseases\":[{\"coding\":[{\"system\":\"eHealth\\\/vaccination_target_diseases\",\"code\":\"COVID19\"}],\"text\":\"\"},{\"coding\":[{\"system\":\"eHealth\\\/vaccination_target_diseases\",\"code\":\"COVID19\"}],\"text\":\"\"}],\"dose_sequence\":2,\"series\":\"\\u0421\\u0435\\u0440\\u0456\\u044f\",\"series_doses\":3,\"description\":\"\\u041e\\u043f\\u0438\\u0441\"}]}",
+        "form": {
+            "uuid": "immunization",
+            "status": "completed",
+            "primarySource": true,
+            "performerEmployeeId": "",
+            "notGiven": false,
+            "vaccineCode": "COVID19",
+            "date": "05.10.2026",
+            "time": "10:15",
+            "reasons": [
+                {
+                    "code": "medical"
+                }
+            ],
+            "reasonNotGivenCode": "",
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "manufacturer": "",
+            "lotNumber": "",
+            "expirationDate": "05.11.2026",
+            "expirationTime": "09:32",
+            "siteCode": "",
+            "routeCode": "",
+            "doseQuantityValue": null,
+            "doseQuantityCode": "",
+            "doseQuantityUnit": "",
+            "vaccinationProtocols": {
+                "42": {
+                    "authorityCode": "WHO",
+                    "targetDiseaseCodes": [
+                        "COVID19",
+                        "COVID19"
+                    ],
+                    "doseSequence": 2,
+                    "series": "Серія",
+                    "seriesDoses": 3,
+                    "description": "Опис"
+                }
+            }
+        }
+    }
+}

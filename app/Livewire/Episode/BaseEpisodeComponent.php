@@ -5,15 +5,17 @@ declare(strict_types=1);
 namespace App\Livewire\Episode;
 
 use App\Core\Arr;
+use App\Dto\Episode\Ehealth as EpisodeEhealth;
+
 use App\Enums\Episode\Status;
 use App\Enums\Status as EmployeeStatus;
 use App\Livewire\Episode\Forms\EpisodeForm as Form;
 use App\Livewire\Person\Records\BasePatientComponent;
 use App\Models\Employee\Employee;
-use App\Services\MedicalEvents\Fhir;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 
 abstract class BaseEpisodeComponent extends BasePatientComponent
 {
@@ -83,13 +85,17 @@ abstract class BaseEpisodeComponent extends BasePatientComponent
      */
     protected function formatEpisode(array $validated, Status $status): array
     {
-        return Fhir::episode()->toFhir(
-            $validated,
-            ['episode' => $validated['id'], 'employee' => $validated['careManagerId']],
-            $validated['startDate'],
-            $validated['startTime'],
-            $status
-        );
+        $source = clone $this->form;
+        $source->fill($validated);
+
+        return Arr::toCamelCase(app(ObjectMapperInterface::class)->map($source, new EpisodeEhealth(
+            id: $validated['id'],
+            status: $status,
+            legalEntity: legalEntity()->uuid,
+            employee: $validated['careManagerId'],
+            periodDate: $validated['startDate'],
+            periodStart: $validated['startTime'],
+        ))->toArray());
     }
 
     /**

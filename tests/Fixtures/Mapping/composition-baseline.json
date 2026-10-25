@@ -1,0 +1,1198 @@
+{
+    "newborn open end": {
+        "payload": {
+            "type": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_TYPES",
+                        "code": "NEWBORN"
+                    }
+                ]
+            },
+            "category": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_CATEGORIES",
+                        "code": "LIVE_BIRTH"
+                    }
+                ]
+            },
+            "event": [
+                {
+                    "code": {
+                        "coding": [
+                            {
+                                "system": "COMPOSITION_EVENTS",
+                                "code": "COMPOSITION_VALIDITY_PERIOD"
+                            }
+                        ]
+                    },
+                    "period": {
+                        "start": "2026-08-13T00:00:01Z",
+                        "end": null
+                    }
+                }
+            ],
+            "subject": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "preperson"
+                        }
+                    ],
+                    "text": "preperson"
+                },
+                "value": "10000000-0000-4000-8000-000000000001"
+            },
+            "encounter": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "encounter"
+                        }
+                    ],
+                    "text": "encounter"
+                },
+                "value": "30000000-0000-4000-8000-000000000003"
+            },
+            "author": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "employee"
+                        }
+                    ],
+                    "text": "employee"
+                },
+                "value": "80000000-0000-4000-8000-000000000008"
+            },
+            "section": {
+                "focus": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "person"
+                            }
+                        ],
+                        "text": "person"
+                    },
+                    "value": "20000000-0000-4000-8000-000000000002"
+                }
+            },
+            "extension": [
+                {
+                    "valueCode": "NEWBORN_BIRTH_DATE",
+                    "valueDate": "2026-08-13"
+                },
+                {
+                    "valueCode": "NEWBORN_SEX",
+                    "valueString": "FEMALE"
+                }
+            ]
+        },
+        "json": "{\"type\":{\"coding\":[{\"system\":\"COMPOSITION_TYPES\",\"code\":\"NEWBORN\"}]},\"category\":{\"coding\":[{\"system\":\"COMPOSITION_CATEGORIES\",\"code\":\"LIVE_BIRTH\"}]},\"event\":[{\"code\":{\"coding\":[{\"system\":\"COMPOSITION_EVENTS\",\"code\":\"COMPOSITION_VALIDITY_PERIOD\"}]},\"period\":{\"start\":\"2026-08-13T00:00:01Z\",\"end\":null}}],\"subject\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"preperson\"}],\"text\":\"preperson\"},\"value\":\"10000000-0000-4000-8000-000000000001\"},\"encounter\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"encounter\"},\"value\":\"30000000-0000-4000-8000-000000000003\"},\"author\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"employee\"},\"value\":\"80000000-0000-4000-8000-000000000008\"},\"section\":{\"focus\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"extension\":[{\"valueCode\":\"NEWBORN_BIRTH_DATE\",\"valueDate\":\"2026-08-13\"},{\"valueCode\":\"NEWBORN_SEX\",\"valueString\":\"FEMALE\"}]}"
+    },
+    "newborn auth and UI fields": {
+        "payload": {
+            "type": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_TYPES",
+                        "code": "NEWBORN"
+                    }
+                ]
+            },
+            "category": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_CATEGORIES",
+                        "code": "LIVE_BIRTH"
+                    }
+                ]
+            },
+            "event": [
+                {
+                    "code": {
+                        "coding": [
+                            {
+                                "system": "COMPOSITION_EVENTS",
+                                "code": "COMPOSITION_VALIDITY_PERIOD"
+                            }
+                        ]
+                    },
+                    "period": {
+                        "start": "2026-08-13T00:00:01Z",
+                        "end": null
+                    }
+                }
+            ],
+            "subject": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "preperson"
+                        }
+                    ],
+                    "text": "preperson"
+                },
+                "value": "10000000-0000-4000-8000-000000000001"
+            },
+            "encounter": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "encounter"
+                        }
+                    ],
+                    "text": "encounter"
+                },
+                "value": "30000000-0000-4000-8000-000000000003"
+            },
+            "author": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "employee"
+                        }
+                    ],
+                    "text": "employee"
+                },
+                "value": "80000000-0000-4000-8000-000000000008"
+            },
+            "section": {
+                "focus": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "person"
+                            }
+                        ],
+                        "text": "person"
+                    },
+                    "value": "20000000-0000-4000-8000-000000000002"
+                }
+            },
+            "extension": [
+                {
+                    "valueCode": "INFORM_WITH",
+                    "valueUuid": "40000000-0000-4000-8000-000000000004"
+                },
+                {
+                    "valueCode": "NEWBORN_BIRTH_DATE",
+                    "valueDate": "2026-08-13"
+                },
+                {
+                    "valueCode": "NEWBORN_SEX",
+                    "valueString": "FEMALE"
+                }
+            ]
+        },
+        "json": "{\"type\":{\"coding\":[{\"system\":\"COMPOSITION_TYPES\",\"code\":\"NEWBORN\"}]},\"category\":{\"coding\":[{\"system\":\"COMPOSITION_CATEGORIES\",\"code\":\"LIVE_BIRTH\"}]},\"event\":[{\"code\":{\"coding\":[{\"system\":\"COMPOSITION_EVENTS\",\"code\":\"COMPOSITION_VALIDITY_PERIOD\"}]},\"period\":{\"start\":\"2026-08-13T00:00:01Z\",\"end\":null}}],\"subject\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"preperson\"}],\"text\":\"preperson\"},\"value\":\"10000000-0000-4000-8000-000000000001\"},\"encounter\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"encounter\"},\"value\":\"30000000-0000-4000-8000-000000000003\"},\"author\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"employee\"},\"value\":\"80000000-0000-4000-8000-000000000008\"},\"section\":{\"focus\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"extension\":[{\"valueCode\":\"INFORM_WITH\",\"valueUuid\":\"40000000-0000-4000-8000-000000000004\"},{\"valueCode\":\"NEWBORN_BIRTH_DATE\",\"valueDate\":\"2026-08-13\"},{\"valueCode\":\"NEWBORN_SEX\",\"valueString\":\"FEMALE\"}]}"
+    },
+    "disability empty optional lists": {
+        "payload": {
+            "type": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_TYPES",
+                        "code": "TEMP_DISABILITY"
+                    }
+                ]
+            },
+            "category": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_CATEGORIES",
+                        "code": "SICKNESS"
+                    }
+                ]
+            },
+            "event": [
+                {
+                    "code": {
+                        "coding": [
+                            {
+                                "system": "COMPOSITION_EVENTS",
+                                "code": "COMPOSITION_VALIDITY_PERIOD"
+                            }
+                        ]
+                    },
+                    "period": {
+                        "start": "2026-10-25T00:00:01Z",
+                        "end": "2026-10-26T20:59:59Z"
+                    }
+                }
+            ],
+            "subject": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "person"
+                        }
+                    ],
+                    "text": "person"
+                },
+                "value": "20000000-0000-4000-8000-000000000002"
+            },
+            "encounter": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "encounter"
+                        }
+                    ],
+                    "text": "encounter"
+                },
+                "value": "30000000-0000-4000-8000-000000000003"
+            },
+            "author": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "employee"
+                        }
+                    ],
+                    "text": "employee"
+                },
+                "value": "80000000-0000-4000-8000-000000000008"
+            },
+            "section": {
+                "focus": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "person"
+                            }
+                        ],
+                        "text": "person"
+                    },
+                    "value": "20000000-0000-4000-8000-000000000002"
+                }
+            },
+            "extension": []
+        },
+        "json": "{\"type\":{\"coding\":[{\"system\":\"COMPOSITION_TYPES\",\"code\":\"TEMP_DISABILITY\"}]},\"category\":{\"coding\":[{\"system\":\"COMPOSITION_CATEGORIES\",\"code\":\"SICKNESS\"}]},\"event\":[{\"code\":{\"coding\":[{\"system\":\"COMPOSITION_EVENTS\",\"code\":\"COMPOSITION_VALIDITY_PERIOD\"}]},\"period\":{\"start\":\"2026-10-25T00:00:01Z\",\"end\":\"2026-10-26T20:59:59Z\"}}],\"subject\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"},\"encounter\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"encounter\"},\"value\":\"30000000-0000-4000-8000-000000000003\"},\"author\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"employee\"},\"value\":\"80000000-0000-4000-8000-000000000008\"},\"section\":{\"focus\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"extension\":[]}"
+    },
+    "disability all flags and violation": {
+        "payload": {
+            "type": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_TYPES",
+                        "code": "TEMP_DISABILITY"
+                    }
+                ]
+            },
+            "category": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_CATEGORIES",
+                        "code": "SICKNESS"
+                    }
+                ]
+            },
+            "event": [
+                {
+                    "code": {
+                        "coding": [
+                            {
+                                "system": "COMPOSITION_EVENTS",
+                                "code": "COMPOSITION_VALIDITY_PERIOD"
+                            }
+                        ]
+                    },
+                    "period": {
+                        "start": "2026-10-25T00:00:01Z",
+                        "end": "2026-10-26T20:59:59Z"
+                    }
+                }
+            ],
+            "subject": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "person"
+                        }
+                    ],
+                    "text": "person"
+                },
+                "value": "20000000-0000-4000-8000-000000000002"
+            },
+            "encounter": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "encounter"
+                        }
+                    ],
+                    "text": "encounter"
+                },
+                "value": "30000000-0000-4000-8000-000000000003"
+            },
+            "author": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "employee"
+                        }
+                    ],
+                    "text": "employee"
+                },
+                "value": "80000000-0000-4000-8000-000000000008"
+            },
+            "section": {
+                "focus": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "person"
+                            }
+                        ],
+                        "text": "person"
+                    },
+                    "value": "20000000-0000-4000-8000-000000000002"
+                }
+            },
+            "extension": [
+                {
+                    "valueCode": "INFORM_WITH",
+                    "valueUuid": "40000000-0000-4000-8000-000000000004"
+                },
+                {
+                    "valueCode": "IS_ACCIDENT",
+                    "valueBoolean": true
+                },
+                {
+                    "valueCode": "IS_INTOXICATED",
+                    "valueBoolean": true
+                },
+                {
+                    "valueCode": "IS_FOREIGN_TREATMENT",
+                    "valueBoolean": true
+                },
+                {
+                    "valueCode": "IS_FORCE_RENEW",
+                    "valueBoolean": true
+                },
+                {
+                    "valueCode": "TREATMENT_VIOLATION",
+                    "valueString": "reject_recommendation"
+                },
+                {
+                    "valueCode": "TREATMENT_VIOLATION_DATE",
+                    "valueDate": "2026-10-25"
+                }
+            ]
+        },
+        "json": "{\"type\":{\"coding\":[{\"system\":\"COMPOSITION_TYPES\",\"code\":\"TEMP_DISABILITY\"}]},\"category\":{\"coding\":[{\"system\":\"COMPOSITION_CATEGORIES\",\"code\":\"SICKNESS\"}]},\"event\":[{\"code\":{\"coding\":[{\"system\":\"COMPOSITION_EVENTS\",\"code\":\"COMPOSITION_VALIDITY_PERIOD\"}]},\"period\":{\"start\":\"2026-10-25T00:00:01Z\",\"end\":\"2026-10-26T20:59:59Z\"}}],\"subject\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"},\"encounter\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"encounter\"},\"value\":\"30000000-0000-4000-8000-000000000003\"},\"author\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"employee\"},\"value\":\"80000000-0000-4000-8000-000000000008\"},\"section\":{\"focus\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"extension\":[{\"valueCode\":\"INFORM_WITH\",\"valueUuid\":\"40000000-0000-4000-8000-000000000004\"},{\"valueCode\":\"IS_ACCIDENT\",\"valueBoolean\":true},{\"valueCode\":\"IS_INTOXICATED\",\"valueBoolean\":true},{\"valueCode\":\"IS_FOREIGN_TREATMENT\",\"valueBoolean\":true},{\"valueCode\":\"IS_FORCE_RENEW\",\"valueBoolean\":true},{\"valueCode\":\"TREATMENT_VIOLATION\",\"valueString\":\"reject_recommendation\"},{\"valueCode\":\"TREATMENT_VIOLATION_DATE\",\"valueDate\":\"2026-10-25\"}]}"
+    },
+    "disability preperson and different focus": {
+        "payload": {
+            "type": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_TYPES",
+                        "code": "TEMP_DISABILITY"
+                    }
+                ]
+            },
+            "category": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_CATEGORIES",
+                        "code": "SICKNESS"
+                    }
+                ]
+            },
+            "event": [
+                {
+                    "code": {
+                        "coding": [
+                            {
+                                "system": "COMPOSITION_EVENTS",
+                                "code": "COMPOSITION_VALIDITY_PERIOD"
+                            }
+                        ]
+                    },
+                    "period": {
+                        "start": "2026-10-25T00:00:01Z",
+                        "end": "2026-10-26T20:59:59Z"
+                    }
+                }
+            ],
+            "subject": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "preperson"
+                        }
+                    ],
+                    "text": "preperson"
+                },
+                "value": "20000000-0000-4000-8000-000000000002"
+            },
+            "encounter": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "encounter"
+                        }
+                    ],
+                    "text": "encounter"
+                },
+                "value": "30000000-0000-4000-8000-000000000003"
+            },
+            "author": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "employee"
+                        }
+                    ],
+                    "text": "employee"
+                },
+                "value": "80000000-0000-4000-8000-000000000008"
+            },
+            "section": {
+                "focus": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "preperson"
+                            }
+                        ],
+                        "text": "preperson"
+                    },
+                    "value": "50000000-0000-4000-8000-000000000005"
+                }
+            },
+            "extension": []
+        },
+        "json": "{\"type\":{\"coding\":[{\"system\":\"COMPOSITION_TYPES\",\"code\":\"TEMP_DISABILITY\"}]},\"category\":{\"coding\":[{\"system\":\"COMPOSITION_CATEGORIES\",\"code\":\"SICKNESS\"}]},\"event\":[{\"code\":{\"coding\":[{\"system\":\"COMPOSITION_EVENTS\",\"code\":\"COMPOSITION_VALIDITY_PERIOD\"}]},\"period\":{\"start\":\"2026-10-25T00:00:01Z\",\"end\":\"2026-10-26T20:59:59Z\"}}],\"subject\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"preperson\"}],\"text\":\"preperson\"},\"value\":\"20000000-0000-4000-8000-000000000002\"},\"encounter\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"encounter\"},\"value\":\"30000000-0000-4000-8000-000000000003\"},\"author\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"employee\"},\"value\":\"80000000-0000-4000-8000-000000000008\"},\"section\":{\"focus\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"preperson\"}],\"text\":\"preperson\"},\"value\":\"50000000-0000-4000-8000-000000000005\"}},\"extension\":[]}"
+    },
+    "disability violation without date": {
+        "payload": {
+            "type": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_TYPES",
+                        "code": "TEMP_DISABILITY"
+                    }
+                ]
+            },
+            "category": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_CATEGORIES",
+                        "code": "SICKNESS"
+                    }
+                ]
+            },
+            "event": [
+                {
+                    "code": {
+                        "coding": [
+                            {
+                                "system": "COMPOSITION_EVENTS",
+                                "code": "COMPOSITION_VALIDITY_PERIOD"
+                            }
+                        ]
+                    },
+                    "period": {
+                        "start": "2026-10-25T00:00:01Z",
+                        "end": "2026-10-26T20:59:59Z"
+                    }
+                }
+            ],
+            "subject": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "person"
+                        }
+                    ],
+                    "text": "person"
+                },
+                "value": "20000000-0000-4000-8000-000000000002"
+            },
+            "encounter": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "encounter"
+                        }
+                    ],
+                    "text": "encounter"
+                },
+                "value": "30000000-0000-4000-8000-000000000003"
+            },
+            "author": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "employee"
+                        }
+                    ],
+                    "text": "employee"
+                },
+                "value": "80000000-0000-4000-8000-000000000008"
+            },
+            "section": {
+                "focus": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "person"
+                            }
+                        ],
+                        "text": "person"
+                    },
+                    "value": "20000000-0000-4000-8000-000000000002"
+                }
+            },
+            "extension": [
+                {
+                    "valueCode": "TREATMENT_VIOLATION",
+                    "valueString": "reject_recommendation"
+                }
+            ]
+        },
+        "json": "{\"type\":{\"coding\":[{\"system\":\"COMPOSITION_TYPES\",\"code\":\"TEMP_DISABILITY\"}]},\"category\":{\"coding\":[{\"system\":\"COMPOSITION_CATEGORIES\",\"code\":\"SICKNESS\"}]},\"event\":[{\"code\":{\"coding\":[{\"system\":\"COMPOSITION_EVENTS\",\"code\":\"COMPOSITION_VALIDITY_PERIOD\"}]},\"period\":{\"start\":\"2026-10-25T00:00:01Z\",\"end\":\"2026-10-26T20:59:59Z\"}}],\"subject\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"},\"encounter\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"encounter\"},\"value\":\"30000000-0000-4000-8000-000000000003\"},\"author\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"employee\"},\"value\":\"80000000-0000-4000-8000-000000000008\"},\"section\":{\"focus\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"extension\":[{\"valueCode\":\"TREATMENT_VIOLATION\",\"valueString\":\"reject_recommendation\"}]}"
+    },
+    "disability date without violation": {
+        "payload": {
+            "type": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_TYPES",
+                        "code": "TEMP_DISABILITY"
+                    }
+                ]
+            },
+            "category": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_CATEGORIES",
+                        "code": "SICKNESS"
+                    }
+                ]
+            },
+            "event": [
+                {
+                    "code": {
+                        "coding": [
+                            {
+                                "system": "COMPOSITION_EVENTS",
+                                "code": "COMPOSITION_VALIDITY_PERIOD"
+                            }
+                        ]
+                    },
+                    "period": {
+                        "start": "2026-10-25T00:00:01Z",
+                        "end": "2026-10-26T20:59:59Z"
+                    }
+                }
+            ],
+            "subject": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "person"
+                        }
+                    ],
+                    "text": "person"
+                },
+                "value": "20000000-0000-4000-8000-000000000002"
+            },
+            "encounter": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "encounter"
+                        }
+                    ],
+                    "text": "encounter"
+                },
+                "value": "30000000-0000-4000-8000-000000000003"
+            },
+            "author": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "employee"
+                        }
+                    ],
+                    "text": "employee"
+                },
+                "value": "80000000-0000-4000-8000-000000000008"
+            },
+            "section": {
+                "focus": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "person"
+                            }
+                        ],
+                        "text": "person"
+                    },
+                    "value": "20000000-0000-4000-8000-000000000002"
+                }
+            },
+            "extension": []
+        },
+        "json": "{\"type\":{\"coding\":[{\"system\":\"COMPOSITION_TYPES\",\"code\":\"TEMP_DISABILITY\"}]},\"category\":{\"coding\":[{\"system\":\"COMPOSITION_CATEGORIES\",\"code\":\"SICKNESS\"}]},\"event\":[{\"code\":{\"coding\":[{\"system\":\"COMPOSITION_EVENTS\",\"code\":\"COMPOSITION_VALIDITY_PERIOD\"}]},\"period\":{\"start\":\"2026-10-25T00:00:01Z\",\"end\":\"2026-10-26T20:59:59Z\"}}],\"subject\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"},\"encounter\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"encounter\"},\"value\":\"30000000-0000-4000-8000-000000000003\"},\"author\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"employee\"},\"value\":\"80000000-0000-4000-8000-000000000008\"},\"section\":{\"focus\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"extension\":[]}"
+    },
+    "disability default replacement": {
+        "payload": {
+            "type": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_TYPES",
+                        "code": "TEMP_DISABILITY"
+                    }
+                ]
+            },
+            "category": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_CATEGORIES",
+                        "code": "SICKNESS"
+                    }
+                ]
+            },
+            "event": [
+                {
+                    "code": {
+                        "coding": [
+                            {
+                                "system": "COMPOSITION_EVENTS",
+                                "code": "COMPOSITION_VALIDITY_PERIOD"
+                            }
+                        ]
+                    },
+                    "period": {
+                        "start": "2026-10-25T00:00:01Z",
+                        "end": "2026-10-26T20:59:59Z"
+                    }
+                }
+            ],
+            "subject": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "person"
+                        }
+                    ],
+                    "text": "person"
+                },
+                "value": "20000000-0000-4000-8000-000000000002"
+            },
+            "encounter": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "encounter"
+                        }
+                    ],
+                    "text": "encounter"
+                },
+                "value": "30000000-0000-4000-8000-000000000003"
+            },
+            "author": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "employee"
+                        }
+                    ],
+                    "text": "employee"
+                },
+                "value": "80000000-0000-4000-8000-000000000008"
+            },
+            "section": {
+                "focus": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "person"
+                            }
+                        ],
+                        "text": "person"
+                    },
+                    "value": "20000000-0000-4000-8000-000000000002"
+                }
+            },
+            "extension": [],
+            "relatesTo": {
+                "code": "replaces",
+                "targetIdentifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "composition"
+                            }
+                        ],
+                        "text": "composition"
+                    },
+                    "value": "60000000-0000-4000-8000-000000000006"
+                }
+            }
+        },
+        "json": "{\"type\":{\"coding\":[{\"system\":\"COMPOSITION_TYPES\",\"code\":\"TEMP_DISABILITY\"}]},\"category\":{\"coding\":[{\"system\":\"COMPOSITION_CATEGORIES\",\"code\":\"SICKNESS\"}]},\"event\":[{\"code\":{\"coding\":[{\"system\":\"COMPOSITION_EVENTS\",\"code\":\"COMPOSITION_VALIDITY_PERIOD\"}]},\"period\":{\"start\":\"2026-10-25T00:00:01Z\",\"end\":\"2026-10-26T20:59:59Z\"}}],\"subject\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"},\"encounter\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"encounter\"},\"value\":\"30000000-0000-4000-8000-000000000003\"},\"author\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"employee\"},\"value\":\"80000000-0000-4000-8000-000000000008\"},\"section\":{\"focus\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"extension\":[],\"relatesTo\":{\"code\":\"replaces\",\"targetIdentifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"composition\"}],\"text\":\"composition\"},\"value\":\"60000000-0000-4000-8000-000000000006\"}}}"
+    },
+    "disability continuation": {
+        "payload": {
+            "type": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_TYPES",
+                        "code": "TEMP_DISABILITY"
+                    }
+                ]
+            },
+            "category": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_CATEGORIES",
+                        "code": "SICKNESS"
+                    }
+                ]
+            },
+            "event": [
+                {
+                    "code": {
+                        "coding": [
+                            {
+                                "system": "COMPOSITION_EVENTS",
+                                "code": "COMPOSITION_VALIDITY_PERIOD"
+                            }
+                        ]
+                    },
+                    "period": {
+                        "start": "2026-10-25T00:00:01Z",
+                        "end": "2026-10-26T20:59:59Z"
+                    }
+                }
+            ],
+            "subject": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "person"
+                        }
+                    ],
+                    "text": "person"
+                },
+                "value": "20000000-0000-4000-8000-000000000002"
+            },
+            "encounter": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "encounter"
+                        }
+                    ],
+                    "text": "encounter"
+                },
+                "value": "30000000-0000-4000-8000-000000000003"
+            },
+            "author": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "employee"
+                        }
+                    ],
+                    "text": "employee"
+                },
+                "value": "80000000-0000-4000-8000-000000000008"
+            },
+            "section": {
+                "focus": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "person"
+                            }
+                        ],
+                        "text": "person"
+                    },
+                    "value": "20000000-0000-4000-8000-000000000002"
+                }
+            },
+            "extension": [],
+            "relatesTo": {
+                "code": "appends",
+                "targetIdentifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "composition"
+                            }
+                        ],
+                        "text": "composition"
+                    },
+                    "value": "60000000-0000-4000-8000-000000000006"
+                }
+            }
+        },
+        "json": "{\"type\":{\"coding\":[{\"system\":\"COMPOSITION_TYPES\",\"code\":\"TEMP_DISABILITY\"}]},\"category\":{\"coding\":[{\"system\":\"COMPOSITION_CATEGORIES\",\"code\":\"SICKNESS\"}]},\"event\":[{\"code\":{\"coding\":[{\"system\":\"COMPOSITION_EVENTS\",\"code\":\"COMPOSITION_VALIDITY_PERIOD\"}]},\"period\":{\"start\":\"2026-10-25T00:00:01Z\",\"end\":\"2026-10-26T20:59:59Z\"}}],\"subject\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"},\"encounter\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"encounter\"},\"value\":\"30000000-0000-4000-8000-000000000003\"},\"author\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"employee\"},\"value\":\"80000000-0000-4000-8000-000000000008\"},\"section\":{\"focus\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"extension\":[],\"relatesTo\":{\"code\":\"appends\",\"targetIdentifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"composition\"}],\"text\":\"composition\"},\"value\":\"60000000-0000-4000-8000-000000000006\"}}}"
+    },
+    "disability empty relation preserved": {
+        "payload": {
+            "type": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_TYPES",
+                        "code": "TEMP_DISABILITY"
+                    }
+                ]
+            },
+            "category": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_CATEGORIES",
+                        "code": "SICKNESS"
+                    }
+                ]
+            },
+            "event": [
+                {
+                    "code": {
+                        "coding": [
+                            {
+                                "system": "COMPOSITION_EVENTS",
+                                "code": "COMPOSITION_VALIDITY_PERIOD"
+                            }
+                        ]
+                    },
+                    "period": {
+                        "start": "2026-10-25T00:00:01Z",
+                        "end": "2026-10-26T20:59:59Z"
+                    }
+                }
+            ],
+            "subject": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "person"
+                        }
+                    ],
+                    "text": "person"
+                },
+                "value": "20000000-0000-4000-8000-000000000002"
+            },
+            "encounter": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "encounter"
+                        }
+                    ],
+                    "text": "encounter"
+                },
+                "value": "30000000-0000-4000-8000-000000000003"
+            },
+            "author": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "employee"
+                        }
+                    ],
+                    "text": "employee"
+                },
+                "value": "80000000-0000-4000-8000-000000000008"
+            },
+            "section": {
+                "focus": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "person"
+                            }
+                        ],
+                        "text": "person"
+                    },
+                    "value": "20000000-0000-4000-8000-000000000002"
+                }
+            },
+            "extension": [],
+            "relatesTo": {
+                "code": "",
+                "targetIdentifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "composition"
+                            }
+                        ],
+                        "text": "composition"
+                    },
+                    "value": "60000000-0000-4000-8000-000000000006"
+                }
+            }
+        },
+        "json": "{\"type\":{\"coding\":[{\"system\":\"COMPOSITION_TYPES\",\"code\":\"TEMP_DISABILITY\"}]},\"category\":{\"coding\":[{\"system\":\"COMPOSITION_CATEGORIES\",\"code\":\"SICKNESS\"}]},\"event\":[{\"code\":{\"coding\":[{\"system\":\"COMPOSITION_EVENTS\",\"code\":\"COMPOSITION_VALIDITY_PERIOD\"}]},\"period\":{\"start\":\"2026-10-25T00:00:01Z\",\"end\":\"2026-10-26T20:59:59Z\"}}],\"subject\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"},\"encounter\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"encounter\"},\"value\":\"30000000-0000-4000-8000-000000000003\"},\"author\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"employee\"},\"value\":\"80000000-0000-4000-8000-000000000008\"},\"section\":{\"focus\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"extension\":[],\"relatesTo\":{\"code\":\"\",\"targetIdentifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"composition\"}],\"text\":\"composition\"},\"value\":\"60000000-0000-4000-8000-000000000006\"}}}"
+    },
+    "disability UTC calendar": {
+        "payload": {
+            "type": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_TYPES",
+                        "code": "TEMP_DISABILITY"
+                    }
+                ]
+            },
+            "category": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_CATEGORIES",
+                        "code": "SICKNESS"
+                    }
+                ]
+            },
+            "event": [
+                {
+                    "code": {
+                        "coding": [
+                            {
+                                "system": "COMPOSITION_EVENTS",
+                                "code": "COMPOSITION_VALIDITY_PERIOD"
+                            }
+                        ]
+                    },
+                    "period": {
+                        "start": "2026-03-29T00:00:01Z",
+                        "end": "2026-03-30T20:59:59Z"
+                    }
+                }
+            ],
+            "subject": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "person"
+                        }
+                    ],
+                    "text": "person"
+                },
+                "value": "20000000-0000-4000-8000-000000000002"
+            },
+            "encounter": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "encounter"
+                        }
+                    ],
+                    "text": "encounter"
+                },
+                "value": "30000000-0000-4000-8000-000000000003"
+            },
+            "author": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "employee"
+                        }
+                    ],
+                    "text": "employee"
+                },
+                "value": "80000000-0000-4000-8000-000000000008"
+            },
+            "section": {
+                "focus": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "person"
+                            }
+                        ],
+                        "text": "person"
+                    },
+                    "value": "20000000-0000-4000-8000-000000000002"
+                }
+            },
+            "extension": []
+        },
+        "json": "{\"type\":{\"coding\":[{\"system\":\"COMPOSITION_TYPES\",\"code\":\"TEMP_DISABILITY\"}]},\"category\":{\"coding\":[{\"system\":\"COMPOSITION_CATEGORIES\",\"code\":\"SICKNESS\"}]},\"event\":[{\"code\":{\"coding\":[{\"system\":\"COMPOSITION_EVENTS\",\"code\":\"COMPOSITION_VALIDITY_PERIOD\"}]},\"period\":{\"start\":\"2026-03-29T00:00:01Z\",\"end\":\"2026-03-30T20:59:59Z\"}}],\"subject\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"},\"encounter\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"encounter\"},\"value\":\"30000000-0000-4000-8000-000000000003\"},\"author\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"employee\"},\"value\":\"80000000-0000-4000-8000-000000000008\"},\"section\":{\"focus\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"extension\":[]}"
+    },
+    "newborn UTC calendar": {
+        "payload": {
+            "type": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_TYPES",
+                        "code": "NEWBORN"
+                    }
+                ]
+            },
+            "category": {
+                "coding": [
+                    {
+                        "system": "COMPOSITION_CATEGORIES",
+                        "code": "LIVE_BIRTH"
+                    }
+                ]
+            },
+            "event": [
+                {
+                    "code": {
+                        "coding": [
+                            {
+                                "system": "COMPOSITION_EVENTS",
+                                "code": "COMPOSITION_VALIDITY_PERIOD"
+                            }
+                        ]
+                    },
+                    "period": {
+                        "start": "2026-03-29T00:00:01Z",
+                        "end": null
+                    }
+                }
+            ],
+            "subject": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "preperson"
+                        }
+                    ],
+                    "text": "preperson"
+                },
+                "value": "10000000-0000-4000-8000-000000000001"
+            },
+            "encounter": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "encounter"
+                        }
+                    ],
+                    "text": "encounter"
+                },
+                "value": "30000000-0000-4000-8000-000000000003"
+            },
+            "author": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "eHealth/resources",
+                            "code": "employee"
+                        }
+                    ],
+                    "text": "employee"
+                },
+                "value": "80000000-0000-4000-8000-000000000008"
+            },
+            "section": {
+                "focus": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "person"
+                            }
+                        ],
+                        "text": "person"
+                    },
+                    "value": "20000000-0000-4000-8000-000000000002"
+                }
+            },
+            "extension": [
+                {
+                    "valueCode": "NEWBORN_BIRTH_DATE",
+                    "valueDate": "2026-03-29"
+                },
+                {
+                    "valueCode": "NEWBORN_SEX",
+                    "valueString": "FEMALE"
+                }
+            ]
+        },
+        "json": "{\"type\":{\"coding\":[{\"system\":\"COMPOSITION_TYPES\",\"code\":\"NEWBORN\"}]},\"category\":{\"coding\":[{\"system\":\"COMPOSITION_CATEGORIES\",\"code\":\"LIVE_BIRTH\"}]},\"event\":[{\"code\":{\"coding\":[{\"system\":\"COMPOSITION_EVENTS\",\"code\":\"COMPOSITION_VALIDITY_PERIOD\"}]},\"period\":{\"start\":\"2026-03-29T00:00:01Z\",\"end\":null}}],\"subject\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"preperson\"}],\"text\":\"preperson\"},\"value\":\"10000000-0000-4000-8000-000000000001\"},\"encounter\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"encounter\"},\"value\":\"30000000-0000-4000-8000-000000000003\"},\"author\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"employee\"},\"value\":\"80000000-0000-4000-8000-000000000008\"},\"section\":{\"focus\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"person\"}],\"text\":\"person\"},\"value\":\"20000000-0000-4000-8000-000000000002\"}},\"extension\":[{\"valueCode\":\"NEWBORN_BIRTH_DATE\",\"valueDate\":\"2026-03-29\"},{\"valueCode\":\"NEWBORN_SEX\",\"valueString\":\"FEMALE\"}]}"
+    },
+    "cancel newborn": {
+        "payload": {
+            "id": "70000000-0000-4000-8000-000000000007",
+            "reason": {
+                "coding": [
+                    {
+                        "system": "eHealth/COMPOSITION_CANCELLATION_REASONS_NEWBORN",
+                        "code": "incorrect_data"
+                    }
+                ],
+                "text": "Виправлення даних: тест"
+            }
+        },
+        "json": "{\"id\":\"70000000-0000-4000-8000-000000000007\",\"reason\":{\"coding\":[{\"system\":\"eHealth\\/COMPOSITION_CANCELLATION_REASONS_NEWBORN\",\"code\":\"incorrect_data\"}],\"text\":\"\\u0412\\u0438\\u043f\\u0440\\u0430\\u0432\\u043b\\u0435\\u043d\\u043d\\u044f \\u0434\\u0430\\u043d\\u0438\\u0445: \\u0442\\u0435\\u0441\\u0442\"}}"
+    },
+    "cancel disability": {
+        "payload": {
+            "id": "70000000-0000-4000-8000-000000000007",
+            "reason": {
+                "coding": [
+                    {
+                        "system": "eHealth/COMPOSITION_CANCELLATION_REASONS_TEMP_DISABILITY",
+                        "code": "0"
+                    }
+                ],
+                "text": "0"
+            }
+        },
+        "json": "{\"id\":\"70000000-0000-4000-8000-000000000007\",\"reason\":{\"coding\":[{\"system\":\"eHealth\\/COMPOSITION_CANCELLATION_REASONS_TEMP_DISABILITY\",\"code\":\"0\"}],\"text\":\"0\"}}"
+    }
+}

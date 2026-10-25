@@ -13,8 +13,10 @@ use App\Models\MedicalEvents\Sql\Device;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\Fhir;
+use App\Dto\Procedure\Form as ProcedureFormData;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Locked;
@@ -82,7 +84,7 @@ class ProcedureEdit extends ProcedureComponent
             Repository::observation()->getDetailsMapByUuids($observationUuids)
         );
 
-        $this->form->procedure = Fhir::procedure()->fromFhir($procedureData, $detailsMap);
+        $this->form->procedure = app(ObjectMapperInterface::class)->map(new Collection($procedureData), new ProcedureFormData($detailsMap))->toArray();
 
         // A draft keeps no outcome status of its own, so it is picked again before signing
         if ($procedure->status === ProcedureStatus::DRAFT->value) {

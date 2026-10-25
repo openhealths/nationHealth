@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace App\Classes\eHealth\Api\Patient;
 
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\EHealth;
+use App\Dto\MedicationRequest\DraftResult;
+use App\Dto\MedicationRequest\EhealthDocument;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use RuntimeException;
+use Throwable;
 
 class MedicationRequest extends PatientApiBase
 {
@@ -381,5 +386,53 @@ class MedicationRequest extends PatientApiBase
         }
 
         return $response->getData();
+    }
+
+    public function getForRejectSigning(string $personUuid, string $activeId): array
+    {
+        try {
+            $data = EhealthDocument::unwrap($this->getById($personUuid, $activeId)->getData());
+            if ($data !== []) {
+                return $data;
+            }
+        } catch (EHealthResponseException $exception) {
+            if (in_array($exception->getCode(), [401, 403], true)) {
+                throw new RuntimeException(
+                    __('care-plan.eprescription_reject_wrong_legal_entity'),
+                    $exception->getCode(),
+                    $exception
+                );
+            }
+
+            Log::warning('Could not fetch Medication Request by id for reject signing: '.$exception->getMessage());
+        } catch (Throwable $exception) {
+            Log::warning('Could not fetch Medication Request by id for reject signing: '.$exception->getMessage());
+        }
+
+        throw new RuntimeException(__('care-plan.eprescription_reject_fetch_failed'));
+    }
+
+    public function prequalifyAndValidate(array $payload): void
+    {
+        $data = $this->prequalify($payload)->getData();
+        $job = EHealth::job();
+        $job->assertPrequalifyValid($job->resolve($data));
+    }
+
+    public function createAndResolve(array $payload): DraftResult
+    {
+        $response = $this->createRequest($payload)->getData();
+
+        return new DraftResult($response, EHealth::job()->resolve($response));
+    }
+
+    public function signAndResolve(string $id, array $payload): array
+    {
+        return EHealth::job()->resolve($this->signRequest($id, $payload)->getData());
+    }
+
+    public function rejectAndResolve(string $personUuid, string $id, array $payload): array
+    {
+        return EHealth::job()->resolve($this->reject($personUuid, $id, $payload)->getData());
     }
 }

@@ -13,7 +13,6 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\User;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -297,11 +296,21 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
         $patientApi = Mockery::mock(PatientServiceRequest::class)->makePartial();
         $patientApi->shouldReceive('prequalify')
             ->once()
+            ->withArgs(function (string $personUuid, array $payload) use ($serviceId, $programId): bool {
+                $this->assertSame($this->person->uuid, $personUuid);
+                $this->assertSame($serviceId, $payload['service_request']['code']['identifier']['value']);
+                $this->assertSame($this->encounter->uuid, $payload['service_request']['context']['identifier']['value']);
+                $this->assertSame($programId, $payload['programs'][0]['identifier']['value']);
+                $this->assertArrayNotHasKey('based_on', $payload['service_request']);
+                $this->assertArrayNotHasKey('id', $payload['service_request']);
+
+                return true;
+            })
             ->andReturn($prequalifyResponse);
         $this->app->instance(PatientServiceRequest::class, $patientApi);
 
-        $lifecycle = app(ReferralRequestLifecycleService::class);
-        $employeeContext = $lifecycle->resolveEncounterEmployeeContext($this->encounter, $this->employee->id);
+        $lifecycle = new \Tests\Support\EncounterReferralDraftHarness();
+        $employeeContext = app(\App\Repositories\EmployeeRepository::class)->resolveEncounterEmployeeContext($this->encounter, $this->employee->id);
 
         $this->assertSame($this->employee->id, $employeeContext['employee_id']);
 
@@ -337,6 +346,7 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
         $this->assertNotNull($local);
         $this->assertSame($this->encounter->uuid, $local->context?->value);
         $this->assertNull($local->basedOnId);
+        $this->assertSame($this->encounter->uuid, $local->context->value);
     }
 
     private function transferUpgradePath(): string

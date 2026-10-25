@@ -6,7 +6,9 @@ namespace App\Livewire\DiagnosticReport;
 
 use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
+
 use App\Core\Arr;
+use App\Dto\DiagnosticReport\EhealthCancellation as DiagnosticReportEhealthCancellation;
 use App\Enums\JobStatus;
 use App\Enums\Person\DiagnosticReportStatus;
 use App\Enums\Person\ObservationStatus;
@@ -23,8 +25,6 @@ use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\Fhir;
-use App\Services\MedicalEvents\FhirResource;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -37,13 +37,17 @@ use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 use Throwable;
 
 class DiagnosticReportIndex extends BasePatientComponent
 {
     use BatchLegalEntityQueries;
+
     use HandlesSyncBatch;
+
     use WithFileUploads;
+
     use WithPagination;
 
     public Form $form;
@@ -401,12 +405,6 @@ class DiagnosticReportIndex extends BasePatientComponent
             $this->form->resetSigningFields();
         }
 
-        $cancellationReason = FhirResource::make()
-            ->coding('eHealth/cancellation_reasons', $validated['cancellationReason'])
-            ->toCodeableConcept(
-                data_get($this->dictionaries, 'eHealth/cancellation_reasons.' . $validated['cancellationReason'], '')
-            );
-
         try {
             EHealth::diagnosticReport()->cancel($this->uuid, [
                 'signed_data' => $signedContent->getBase64Data(),
@@ -415,7 +413,7 @@ class DiagnosticReportIndex extends BasePatientComponent
 
             Repository::diagnosticReport()->markAsEnteredInError(
                 $diagnosticReport,
-                $cancellationReason,
+                $signedPayload['diagnostic_report']['cancellation_reason'],
                 $explanatoryLetter
             );
         } catch (EHealthException|EHealthConnectionException $exception) {
@@ -504,13 +502,10 @@ class DiagnosticReportIndex extends BasePatientComponent
                 ->toArray();
         }
 
-        return Fhir::diagnosticReport()->toCancellationPackage(
-            $reportRaw,
-            $observationsRaw,
-            $cancellationReason,
-            $explanatoryLetter,
-            data_get($this->dictionaries, 'eHealth/cancellation_reasons.' . $cancellationReason)
-        );
+        return app(ObjectMapperInterface::class)->map(new Collection([
+            'observations' => $observationsRaw, 'cancellationReason' => $cancellationReason, 'explanatoryLetter' => $explanatoryLetter,
+            'cancellationReasonText' => data_get($this->dictionaries, 'eHealth/cancellation_reasons.'.$cancellationReason),
+        ]), new DiagnosticReportEhealthCancellation($reportRaw))->toArray();
     }
 
     private function loadObservationRawData(string $diagnosticReportUuid, bool $onlyActive = false): array

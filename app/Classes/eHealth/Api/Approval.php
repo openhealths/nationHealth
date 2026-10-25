@@ -18,6 +18,27 @@ class Approval extends Request
 
     protected const string APPROVAL_URL = '/api/patients';
 
+    public function confirmWithoutOtp(string $patientUuid, string $approvalId): EHealthResponse
+    {
+        return $this->requireSuccessfulResponse($this->verify($patientUuid, $approvalId, []));
+    }
+
+    public function deactivate(string $patientUuid, string $approvalId): EHealthResponse
+    {
+        return $this->requireSuccessfulResponse($this->verify($patientUuid, $approvalId, [
+            'status' => 'inactive',
+        ]));
+    }
+
+    protected function requireSuccessfulResponse(EHealthResponse $response): EHealthResponse
+    {
+        if (!$response->successful()) {
+            throw new EHealthResponseException($response);
+        }
+
+        return $response;
+    }
+
     /**
      * Get Approvals by search parameters.
      *

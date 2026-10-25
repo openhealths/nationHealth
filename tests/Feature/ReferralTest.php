@@ -122,11 +122,6 @@ class ReferralTest extends TestCase
             'status' => 'completed',
         ]);
 
-        $payload = [
-            'status' => 'completed',
-            'injected' => 'must-not-reach-ehealth',
-        ];
-
         $person = \App\Models\Person\Person::create([
             'uuid' => (string) \Illuminate\Support\Str::uuid(),
             'first_name' => 'Complete',
@@ -165,8 +160,8 @@ class ReferralTest extends TestCase
             ->andReturn($mockResponse);
         $this->app->instance(ServiceRequestApi::class, $mockApi);
 
-        $service = app(ReferralRequestLifecycleService::class);
-        $result = $service->completeReferral($uuid, $encounterUuid, 'encounter', $payload);
+        $service = new \Tests\Support\ReferralExecutionHarness();
+        $result = $service->completeReferral($uuid, $encounterUuid, 'encounter');
 
         $this->assertEquals('completed', $result['status']);
     }

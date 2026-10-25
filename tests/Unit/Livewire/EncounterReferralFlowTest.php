@@ -8,7 +8,7 @@ use App\Enums\Person\EncounterStatus;
 use App\Livewire\EncounterPackage\Concerns\ManagesEncounterReferrals;
 use App\Livewire\Referral\ReferralIndex;
 use App\Models\MedicalEvents\Sql\Encounter;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
+use App\Repositories\EmployeeRepository;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Validator;
@@ -74,19 +74,20 @@ class EncounterReferralFlowTest extends TestCase
         Auth::shouldReceive('user')->once()->andReturnNull();
 
         $employeeContext = ['employee_id' => 10];
-        $lifecycle = Mockery::mock(ReferralRequestLifecycleService::class);
-        $lifecycle->shouldReceive('resolveEncounterEmployeeContext')->once()
-            ->with($component->encounter, null)->andReturn($employeeContext);
-        $lifecycle->shouldReceive('createEncounterDraft')->once()->with(
-            $component->encounter,
-            Mockery::on(static fn (array $formData): bool =>
-                $formData['service_id'] === 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
-                && $formData['kind'] === 'service_request'
-                && $formData['program_id'] === null),
-            1.0,
-            $employeeContext
-        )->andReturn('11111111-2222-4333-8444-555555555555');
-        $this->instance(ReferralRequestLifecycleService::class, $lifecycle);
+        $employees = $this->createMock(EmployeeRepository::class);
+        $employees->expects($this->once())->method('resolveEncounterEmployeeContext')
+            ->with($component->encounter, null)->willReturn($employeeContext);
+        $component->draftHandler = function (Encounter $encounter, array $data, float $quantity, array $context) use ($component, $employeeContext): string {
+            $this->assertSame($component->encounter, $encounter);
+            $this->assertSame('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', $data['service_id']);
+            $this->assertSame('service_request', $data['kind']);
+            $this->assertNull($data['program_id']);
+            $this->assertSame(1.0, $quantity);
+            $this->assertSame($employeeContext, $context);
+
+            return '11111111-2222-4333-8444-555555555555';
+        };
+        $this->instance(EmployeeRepository::class, $employees);
 
         $component->validateEncounterReferral();
 
@@ -100,9 +101,9 @@ class EncounterReferralFlowTest extends TestCase
     {
         $component = $this->finishedEncounterComponent();
         $component->openEncounterReferralDrawer();
-        $lifecycle = Mockery::mock(ReferralRequestLifecycleService::class);
-        $lifecycle->shouldNotReceive('createEncounterDraft');
-        $this->instance(ReferralRequestLifecycleService::class, $lifecycle);
+        $employees = $this->createMock(EmployeeRepository::class);
+        $employees->expects($this->never())->method('resolveEncounterEmployeeContext');
+        $this->instance(EmployeeRepository::class, $employees);
 
         try {
             $component->validateEncounterReferral();
@@ -122,10 +123,10 @@ class EncounterReferralFlowTest extends TestCase
         $component->openEncounterReferralDrawer();
         $component->encounterReferralForm['service_id'] = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
         Auth::shouldReceive('user')->once()->andReturnNull();
-        $lifecycle = Mockery::mock(ReferralRequestLifecycleService::class);
-        $lifecycle->shouldReceive('resolveEncounterEmployeeContext')->once()->andReturn([]);
-        $lifecycle->shouldReceive('createEncounterDraft')->once()->andThrow(new RuntimeException('Draft failed'));
-        $this->instance(ReferralRequestLifecycleService::class, $lifecycle);
+        $employees = $this->createMock(EmployeeRepository::class);
+        $employees->expects($this->once())->method('resolveEncounterEmployeeContext')->willReturn([]);
+        $component->draftHandler = static fn (): string => throw new RuntimeException('Draft failed');
+        $this->instance(EmployeeRepository::class, $employees);
 
         $component->validateEncounterReferral();
 
@@ -158,6 +159,18 @@ class EncounterReferralHarness extends Component
     use ManagesEncounterReferrals;
 
     public Encounter $encounter;
+
+    public ?\Closure $draftHandler = null;
+
+    protected function createEncounterReferralDraft(Encounter $encounter, array $formData, float $qty, array $employeeContext): string
+    {
+        if ($this->draftHandler === null) {
+            throw new RuntimeException('Draft creation was not expected.');
+        }
+
+        return ($this->draftHandler)($encounter, $formData, $qty, $employeeContext);
+    }
+
 
     public ?int $prepersonId = null;
 

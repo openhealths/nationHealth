@@ -1,0 +1,256 @@
+{
+    "capturedFrom": "606d2c94:CarePlanManager::signPlan and CarePlanUpdate::mount assignments",
+    "cases": {
+        "minimal": {
+            "payload": {
+                "intent": "order",
+                "status": "draft",
+                "title": "Draft",
+                "care_manager": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "signingJson": "{\"intent\":\"order\",\"status\":\"draft\",\"title\":\"Draft\",\"care_manager\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}]}}}}",
+            "form": {
+                "patient": "",
+                "medical_number": "",
+                "author": "",
+                "coAuthors": [],
+                "category": "",
+                "context": "",
+                "title": "Draft",
+                "intent": "order",
+                "periodStart": "",
+                "periodStartTime": "",
+                "periodEnd": "",
+                "periodEndTime": "",
+                "encounter": "",
+                "description": "",
+                "note": "",
+                "informWith": "",
+                "episodes": [],
+                "medicalRecords": [],
+                "knedp": "",
+                "keyContainerUpload": null,
+                "keyContainerFileName": "",
+                "password": ""
+            }
+        },
+        "full": {
+            "payload": {
+                "intent": "order",
+                "status": "draft",
+                "category": "CLASS_23",
+                "context": {
+                    "identifier": {
+                        "type_code": "context-code"
+                    }
+                },
+                "title": "План \"А\"\nПродовження",
+                "period": {
+                    "start": "2026-03-29",
+                    "end": "2026-10-25"
+                },
+                "addresses": [
+                    {
+                        "coding": [
+                            {
+                                "code": "A01",
+                                "system": "literalSystem"
+                            }
+                        ]
+                    }
+                ],
+                "supporting_info": [
+                    {
+                        "display": "Епізод"
+                    },
+                    {
+                        "display": "Документ"
+                    }
+                ],
+                "encounter": {
+                    "identifier": {
+                        "value": "33333333-3333-4333-8333-333333333333"
+                    }
+                },
+                "care_manager": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "22222222-2222-4222-8222-222222222222"
+                    }
+                },
+                "description": "Опис",
+                "note": "Note",
+                "inform_with": "SMS"
+            },
+            "signingJson": "{\"intent\":\"order\",\"status\":\"draft\",\"category\":\"CLASS_23\",\"context\":{\"identifier\":{\"type_code\":\"context-code\"}},\"title\":\"\\u041f\\u043b\\u0430\\u043d \\\"\\u0410\\\"\\n\\u041f\\u0440\\u043e\\u0434\\u043e\\u0432\\u0436\\u0435\\u043d\\u043d\\u044f\",\"period\":{\"start\":\"2026-03-29\",\"end\":\"2026-10-25\"},\"addresses\":[{\"coding\":[{\"code\":\"A01\",\"system\":\"literalSystem\"}]}],\"supporting_info\":[{\"display\":\"\\u0415\\u043f\\u0456\\u0437\\u043e\\u0434\"},{\"display\":\"\\u0414\\u043e\\u043a\\u0443\\u043c\\u0435\\u043d\\u0442\"}],\"encounter\":{\"identifier\":{\"value\":\"33333333-3333-4333-8333-333333333333\"}},\"care_manager\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}]},\"value\":\"22222222-2222-4222-8222-222222222222\"}},\"description\":\"\\u041e\\u043f\\u0438\\u0441\",\"note\":\"Note\",\"inform_with\":\"SMS\"}",
+            "form": {
+                "patient": "",
+                "medical_number": "17",
+                "author": "",
+                "coAuthors": [],
+                "category": "CLASS_23",
+                "context": "context-code",
+                "title": "План \"А\"\nПродовження",
+                "intent": "order",
+                "periodStart": "29.03.2026",
+                "periodStartTime": "00:00",
+                "periodEnd": "25.10.2026",
+                "periodEndTime": "00:00",
+                "encounter": "33333333-3333-4333-8333-333333333333",
+                "description": "Опис",
+                "note": "Note",
+                "informWith": "SMS",
+                "episodes": {
+                    "3": {
+                        "name": "Епізод",
+                        "uuid": "episode"
+                    }
+                },
+                "medicalRecords": {
+                    "9": {
+                        "name": "Документ",
+                        "uuid": "record"
+                    }
+                },
+                "knedp": "",
+                "keyContainerUpload": null,
+                "keyContainerFileName": "",
+                "password": ""
+            }
+        },
+        "empty_values": {
+            "payload": {
+                "intent": "order",
+                "status": "draft",
+                "addresses": [
+                    {
+                        "keepFalse": false
+                    }
+                ],
+                "care_manager": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "signingJson": "{\"intent\":\"order\",\"status\":\"draft\",\"addresses\":[{\"keep_false\":false}],\"care_manager\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}]}}}}",
+            "form": {
+                "patient": "",
+                "medical_number": "",
+                "author": "",
+                "coAuthors": [],
+                "category": "0",
+                "context": "0",
+                "title": "0",
+                "intent": "order",
+                "periodStart": "",
+                "periodStartTime": "",
+                "periodEnd": "",
+                "periodEndTime": "",
+                "encounter": "",
+                "description": "0",
+                "note": "",
+                "informWith": "0",
+                "episodes": [
+                    {
+                        "name": "0"
+                    },
+                    {
+                        "name": ""
+                    }
+                ],
+                "medicalRecords": [],
+                "knedp": "",
+                "keyContainerUpload": null,
+                "keyContainerFileName": "",
+                "password": ""
+            }
+        },
+        "missing_category_code": {
+            "payload": {
+                "intent": "order",
+                "status": "draft",
+                "title": "Draft",
+                "period": {
+                    "start": "2026-10-05"
+                },
+                "supporting_info": [
+                    {
+                        "display": "Report"
+                    }
+                ],
+                "encounter": {
+                    "identifier": {
+                        "value": "33333333-3333-4333-8333-333333333333"
+                    }
+                },
+                "care_manager": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "signingJson": "{\"intent\":\"order\",\"status\":\"draft\",\"title\":\"Draft\",\"period\":{\"start\":\"2026-10-05\"},\"supporting_info\":[{\"display\":\"Report\"}],\"encounter\":{\"identifier\":{\"value\":\"33333333-3333-4333-8333-333333333333\"}},\"care_manager\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}]}}}}",
+            "form": {
+                "patient": "",
+                "medical_number": "",
+                "author": "",
+                "coAuthors": [],
+                "category": "",
+                "context": "",
+                "title": "Draft",
+                "intent": "order",
+                "periodStart": "05.10.2026",
+                "periodStartTime": "00:00",
+                "periodEnd": "",
+                "periodEndTime": "",
+                "encounter": "33333333-3333-4333-8333-333333333333",
+                "description": "",
+                "note": "",
+                "informWith": "",
+                "episodes": [],
+                "medicalRecords": [
+                    {
+                        "name": "Report"
+                    }
+                ],
+                "knedp": "",
+                "keyContainerUpload": null,
+                "keyContainerFileName": "",
+                "password": ""
+            }
+        }
+    }
+}

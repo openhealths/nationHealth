@@ -6,6 +6,9 @@ namespace App\Livewire\Episode;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Dto\Episode\EhealthUpdate as EpisodeEhealthUpdate;
+use App\Dto\Episode\Form as EpisodeForm;
+
 use App\Enums\Episode\Status;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
@@ -14,11 +17,12 @@ use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\Fhir;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Locked;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 use Throwable;
 
 class EpisodeEdit extends BaseEpisodeComponent
@@ -79,7 +83,7 @@ class EpisodeEdit extends BaseEpisodeComponent
 
         $episode = $this->episode()->load(['type', 'careManager', 'period']);
 
-        $this->form->fill(array_merge(Fhir::episode()->fromFhir($episode->toArray()), ['episodeId' => $episode->id]));
+        $this->form->fill(array_merge(app(ObjectMapperInterface::class)->map(new Collection($episode->toArray()), EpisodeForm::class)->toArray(), ['episodeId' => $episode->id]));
     }
 
     /**
@@ -220,7 +224,9 @@ class EpisodeEdit extends BaseEpisodeComponent
             return;
         }
 
-        $formattedData = Fhir::episode()->toUpdateFhir($validated);
+        $source = clone $this->form;
+        $source->fill($validated);
+        $formattedData = Arr::toCamelCase(app(ObjectMapperInterface::class)->map($source, EpisodeEhealthUpdate::class)->toArray());
 
         try {
             EHealth::episode()->update($this->uuid, $episode->uuid, Arr::toSnakeCase($formattedData));

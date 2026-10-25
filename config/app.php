@@ -74,7 +74,9 @@ return [
     |
     */
 
-    'timezone' => 'Europe/Kyiv',
+    // Legacy UI and calendar rules still use the application timezone.
+    // UTC timestamp conversion is explicit at API and repository boundaries.
+    'timezone' => env('APP_DISPLAY_TIMEZONE', 'Europe/Kyiv'),
 
     /*
     |--------------------------------------------------------------------------
@@ -180,6 +182,7 @@ return [
          * Application Service Providers...
          */
         App\Providers\AppServiceProvider::class,
+        App\Providers\ObjectMapperServiceProvider::class,
         App\Providers\AuthServiceProvider::class,
         // App\Providers\BroadcastServiceProvider::class,
         App\Providers\EventServiceProvider::class,

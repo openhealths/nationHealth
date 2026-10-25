@@ -31,6 +31,7 @@ use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -38,6 +39,48 @@ use Throwable;
  */
 class EncounterRepository extends BaseRepository
 {
+    public function findForStandaloneDocument(int $id, Person|Preperson $patient): Encounter
+    {
+        return Encounter::forPatient($patient)
+            ->with(['episode', 'class', 'performer', 'hospitalization.dischargeDisposition', 'hospitalization.destination'])
+            ->findOrFail($id);
+    }
+
+    /** @return \Illuminate\Support\Collection<int, Condition> */
+    public function primaryDiagnosisConditions(Encounter $encounter): \Illuminate\Support\Collection
+    {
+        $encounter->loadMissing(['diagnoses.role.coding']);
+        $primaryDiagnoses = $encounter->diagnoses->filter(
+            static fn (EncounterDiagnose $diagnosis): bool => $diagnosis->role?->coding->contains('code', 'primary') === true
+        );
+        if ($primaryDiagnoses->count() !== 1) {
+            return collect();
+        }
+
+        $diagnosis = $primaryDiagnoses->first();
+        if ($diagnosis->relationLoaded('conditionModel')) {
+            $condition = $diagnosis->getRelation('conditionModel');
+        } else {
+            $diagnosis->loadMissing('condition');
+            $conditionUuid = $diagnosis->getRelation('condition')?->value;
+            if (!is_string($conditionUuid) || !Str::isUuid($conditionUuid)) {
+                return collect();
+            }
+
+            // Identifier values are varchar; resolve the UUID without a mixed-type join.
+            $condition = Condition::with('code.coding')
+                ->whereUuid($conditionUuid)
+                ->wherePersonId($encounter->person_id)
+                ->first();
+        }
+        if (!$condition instanceof Condition || (int) $condition->personId !== (int) $encounter->person_id) {
+            return collect();
+        }
+        $condition->loadMissing('code.coding');
+
+        return collect([$condition]);
+    }
+
     /**
      * Create encounter in DB for the patient (person or preperson) with related data.
      *
@@ -718,5 +761,45 @@ class EncounterRepository extends BaseRepository
         } else {
             $encounter->hospitalization()->create($hospitalizationData);
         }
+    }
+
+    public function findEligibleEncountersForEPrescription(int $personId, ?string $employeeUuid): \Illuminate\Support\Collection
+    {
+        if ($employeeUuid === null || $employeeUuid === '') {
+            return collect();
+        }
+
+        return Encounter::query()
+            ->where('person_id', $personId)
+            ->where('status', EncounterStatus::FINISHED)
+            ->whereHas('performer', static function ($query) use ($employeeUuid): void {
+                $query->where('value', $employeeUuid);
+            })
+            ->whereHas('period', static function ($query): void {
+                $query->whereDate('end', today());
+            })
+            ->with(['period', 'performer'])
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    public function resolveEligibleEncounterForCreate(int $personId, ?string $employeeUuid, ?int $selectedEncounterId): Encounter
+    {
+        $eligible = $this->findEligibleEncountersForEPrescription($personId, $employeeUuid);
+
+        if ($eligible->isEmpty()) {
+            throw new \RuntimeException(__('care-plan.eprescription_encounter_none'));
+        }
+
+        if ($selectedEncounterId === null || $selectedEncounterId <= 0) {
+            throw new \InvalidArgumentException(__('care-plan.eprescription_encounter_required'));
+        }
+
+        $selected = $eligible->firstWhere('id', $selectedEncounterId);
+        if (!$selected instanceof Encounter) {
+            throw new \InvalidArgumentException(__('care-plan.eprescription_encounter_invalid'));
+        }
+
+        return $selected;
     }
 }

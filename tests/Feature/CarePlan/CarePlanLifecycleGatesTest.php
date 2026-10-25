@@ -4,23 +4,23 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CarePlan;
 
-use App\Models\CarePlan;
-use App\Models\CarePlanActivity;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\User;
-use App\Services\MedicalEvents\CarePlanLifecycleGateService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Tests\Support\CarePlanStatusChangeHarness;
 use Tests\TestCase;
 
 class CarePlanLifecycleGatesTest extends TestCase
 {
+    use \Tests\Concerns\CreatesFhirCarePlans;
+
     use DatabaseTransactions;
 
     protected Person $person;
@@ -102,7 +102,7 @@ class CarePlanLifecycleGatesTest extends TestCase
     {
         $this->actingAs($this->user);
 
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
             'author_id' => $this->employee->id,
@@ -112,7 +112,7 @@ class CarePlanLifecycleGatesTest extends TestCase
             'status' => 'active',
         ]);
 
-        $activity = CarePlanActivity::create([
+        $activity = $this->createFhirCarePlanActivity([
             'uuid' => (string) Str::uuid(),
             'care_plan_id' => $carePlan->id,
             'status' => 'scheduled',
@@ -145,7 +145,7 @@ class CarePlanLifecycleGatesTest extends TestCase
         // The block is flashed to the user; Livewire ages flash data at the end of its request,
         // so the reason itself is asserted at its source.
         $this->assertNotNull(
-            app(CarePlanLifecycleGateService::class)
+            (new CarePlanStatusChangeHarness())
                 ->activityStatusChangeBlockReason($activity->fresh(), 'cancel_activity')
         );
     }
@@ -154,7 +154,7 @@ class CarePlanLifecycleGatesTest extends TestCase
     {
         $this->actingAs($this->user);
 
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
             'author_id' => $this->employee->id,
@@ -164,7 +164,7 @@ class CarePlanLifecycleGatesTest extends TestCase
             'status' => 'active',
         ]);
 
-        $activity = CarePlanActivity::create([
+        $activity = $this->createFhirCarePlanActivity([
             'uuid' => (string) Str::uuid(),
             'care_plan_id' => $carePlan->id,
             'status' => 'scheduled',
@@ -196,7 +196,7 @@ class CarePlanLifecycleGatesTest extends TestCase
             ->assertSet('showSignatureModal', false);
 
         $this->assertNotNull(
-            app(CarePlanLifecycleGateService::class)
+            (new CarePlanStatusChangeHarness())
                 ->activityStatusChangeBlockReason($activity->fresh(), 'complete_activity')
         );
     }
@@ -205,7 +205,7 @@ class CarePlanLifecycleGatesTest extends TestCase
     {
         $this->actingAs($this->user);
 
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
             'author_id' => $this->employee->id,
@@ -215,7 +215,7 @@ class CarePlanLifecycleGatesTest extends TestCase
             'status' => 'active',
         ]);
 
-        CarePlanActivity::create([
+        $this->createFhirCarePlanActivity([
             'uuid' => (string) Str::uuid(),
             'care_plan_id' => $carePlan->id,
             'status' => 'scheduled',
@@ -230,7 +230,7 @@ class CarePlanLifecycleGatesTest extends TestCase
             ->assertNotDispatched('flashMessage');
 
         $this->assertNotNull(
-            app(CarePlanLifecycleGateService::class)->planCancelBlockReason($carePlan->fresh('activities'))
+            (new CarePlanStatusChangeHarness())->planCancelBlockReason($carePlan->fresh('activities'))
         );
     }
 
@@ -238,7 +238,7 @@ class CarePlanLifecycleGatesTest extends TestCase
     {
         $this->actingAs($this->user);
 
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
             'author_id' => $this->employee->id,
@@ -248,7 +248,7 @@ class CarePlanLifecycleGatesTest extends TestCase
             'status' => 'active',
         ]);
 
-        $activity = CarePlanActivity::create([
+        $activity = $this->createFhirCarePlanActivity([
             'uuid' => (string) Str::uuid(),
             'care_plan_id' => $carePlan->id,
             'status' => 'scheduled',
@@ -284,7 +284,7 @@ class CarePlanLifecycleGatesTest extends TestCase
     {
         $this->actingAs($this->user);
 
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
             'author_id' => $this->employee->id,
@@ -294,7 +294,7 @@ class CarePlanLifecycleGatesTest extends TestCase
             'status' => 'active',
         ]);
 
-        CarePlanActivity::create([
+        $this->createFhirCarePlanActivity([
             'uuid' => (string) Str::uuid(),
             'care_plan_id' => $carePlan->id,
             'status' => 'processed',
@@ -314,7 +314,7 @@ class CarePlanLifecycleGatesTest extends TestCase
     {
         $this->actingAs($this->user);
 
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
             'author_id' => $this->employee->id,
@@ -324,7 +324,7 @@ class CarePlanLifecycleGatesTest extends TestCase
             'status' => 'active',
         ]);
 
-        CarePlanActivity::create([
+        $this->createFhirCarePlanActivity([
             'uuid' => (string) Str::uuid(),
             'care_plan_id' => $carePlan->id,
             'status' => 'completed',

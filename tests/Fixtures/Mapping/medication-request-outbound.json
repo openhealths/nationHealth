@@ -1,0 +1,1451 @@
+{
+    "minimal": {
+        "data": {
+            "medication_id": "medication-id",
+            "medication_qty": 2,
+            "started_at": "2026-10-05",
+            "ended_at": "2026-11-05"
+        },
+        "uuids": {
+            "person_uuid": "patient-id",
+            "employee_uuid": "employee-id",
+            "division_uuid": "division-id",
+            "encounter_uuid": "encounter-id"
+        },
+        "carePlanUuid": null,
+        "create": {
+            "medication_request_request": {
+                "person_id": "patient-id",
+                "employee_id": "employee-id",
+                "division_id": "division-id",
+                "created_at": "2026-10-05",
+                "started_at": "2026-10-05",
+                "ended_at": "2026-11-05",
+                "medication_id": "medication-id",
+                "medication_qty": 2.0,
+                "intent": "order",
+                "category": "community",
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "encounter"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "value": "encounter-id"
+                    }
+                }
+            }
+        },
+        "prequalify": {
+            "medication_request_request": {
+                "person_id": "patient-id",
+                "employee_id": "employee-id",
+                "division_id": "division-id",
+                "created_at": "2026-10-05",
+                "started_at": "2026-10-05",
+                "ended_at": "2026-11-05",
+                "medication_id": "medication-id",
+                "medication_qty": 2.0,
+                "intent": "order",
+                "category": "community",
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "encounter"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "value": "encounter-id"
+                    }
+                }
+            },
+            "programs": []
+        },
+        "signedContent": {
+            "person_id": "patient-id",
+            "employee_id": "employee-id",
+            "division_id": "division-id",
+            "created_at": "2026-10-05",
+            "started_at": "2026-10-05",
+            "ended_at": "2026-11-05",
+            "medication_id": "medication-id",
+            "medication_qty": 2.0,
+            "intent": "order",
+            "category": "community",
+            "context": {
+                "identifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "encounter"
+                            }
+                        ],
+                        "text": ""
+                    },
+                    "value": "encounter-id"
+                }
+            }
+        }
+    },
+    "optional absent": {
+        "data": {
+            "medication_id": "medication-id",
+            "medication_qty": 2,
+            "started_at": "2026-10-05",
+            "ended_at": "2026-11-05"
+        },
+        "uuids": {
+            "person_uuid": "patient-id",
+            "employee_uuid": "employee-id",
+            "division_uuid": null,
+            "encounter_uuid": null
+        },
+        "carePlanUuid": null,
+        "create": {
+            "medication_request_request": {
+                "person_id": "patient-id",
+                "employee_id": "employee-id",
+                "created_at": "2026-10-05",
+                "started_at": "2026-10-05",
+                "ended_at": "2026-11-05",
+                "medication_id": "medication-id",
+                "medication_qty": 2.0,
+                "intent": "order",
+                "category": "community"
+            }
+        },
+        "prequalify": {
+            "medication_request_request": {
+                "person_id": "patient-id",
+                "employee_id": "employee-id",
+                "created_at": "2026-10-05",
+                "started_at": "2026-10-05",
+                "ended_at": "2026-11-05",
+                "medication_id": "medication-id",
+                "medication_qty": 2.0,
+                "intent": "order",
+                "category": "community"
+            },
+            "programs": []
+        },
+        "signedContent": {
+            "person_id": "patient-id",
+            "employee_id": "employee-id",
+            "created_at": "2026-10-05",
+            "started_at": "2026-10-05",
+            "ended_at": "2026-11-05",
+            "medication_id": "medication-id",
+            "medication_qty": 2.0,
+            "intent": "order",
+            "category": "community"
+        }
+    },
+    "full dosage": {
+        "data": {
+            "medication_id": "medication-id",
+            "medication_qty": 2,
+            "started_at": "2026-10-05",
+            "ended_at": "2026-11-05",
+            "created_at": "2026-10-04T23:20:00+03:00",
+            "medication_program_id": "program-id",
+            "based_on_uuid": "activity-id",
+            "container_dosage": "12|tablet|TAB",
+            "inform_with": "auth-id|OTP",
+            "note": "Примітка",
+            "dosage_instructions": [
+                {
+                    "sequence": 2,
+                    "text": "Щодня",
+                    "patient_instruction": "Після їжі",
+                    "route": "oral",
+                    "as_needed_boolean": true,
+                    "dose_and_rate": [
+                        {
+                            "dose_quantity_value": 2.5,
+                            "dose_quantity_unit": "mg",
+                            "dose_quantity_code": "MG"
+                        }
+                    ],
+                    "max_dose_per_administration": 5,
+                    "max_dose_per_period": 10
+                }
+            ]
+        },
+        "uuids": {
+            "person_uuid": "patient-id",
+            "employee_uuid": "employee-id",
+            "division_uuid": "division-id",
+            "encounter_uuid": "encounter-id"
+        },
+        "carePlanUuid": "care-plan-id",
+        "create": {
+            "medication_request_request": {
+                "person_id": "patient-id",
+                "employee_id": "employee-id",
+                "division_id": "division-id",
+                "created_at": "2026-10-04",
+                "started_at": "2026-10-05",
+                "ended_at": "2026-11-05",
+                "medication_id": "medication-id",
+                "medication_qty": 2.0,
+                "intent": "order",
+                "category": "community",
+                "medical_program_id": "program-id",
+                "based_on": [
+                    {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth/resources",
+                                        "code": "care_plan"
+                                    }
+                                ],
+                                "text": ""
+                            },
+                            "value": "care-plan-id"
+                        }
+                    },
+                    {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth/resources",
+                                        "code": "activity"
+                                    }
+                                ],
+                                "text": ""
+                            },
+                            "value": "activity-id"
+                        }
+                    }
+                ],
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "encounter"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "value": "encounter-id"
+                    }
+                },
+                "dosage_instruction": [
+                    {
+                        "sequence": 2,
+                        "text": "Щодня",
+                        "patient_instruction": "Після їжі",
+                        "as_needed_boolean": true,
+                        "route": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/SNOMED/route_codes",
+                                    "code": "26643006"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "dose_and_rate": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth/dose_and_rate",
+                                        "code": "ordered"
+                                    }
+                                ],
+                                "text": ""
+                            },
+                            "dose_quantity": {
+                                "value": 2.5,
+                                "unit": "mg",
+                                "system": "eHealth/ucum/units",
+                                "code": "MG"
+                            }
+                        },
+                        "max_dose_per_administration": {
+                            "value": 5.0,
+                            "unit": "mg",
+                            "system": "eHealth/ucum/units",
+                            "code": "mg"
+                        },
+                        "max_dose_per_period": {
+                            "numerator": {
+                                "value": 10.0,
+                                "unit": "mg",
+                                "system": "eHealth/ucum/units",
+                                "code": "mg"
+                            },
+                            "denominator": {
+                                "value": 1,
+                                "unit": "d",
+                                "system": "eHealth/ucum/units",
+                                "code": "d"
+                            }
+                        }
+                    }
+                ],
+                "inform_with": "auth-id",
+                "container_dosage": {
+                    "system": "MEDICATION_UNIT",
+                    "code": "TAB",
+                    "value": 12.0
+                },
+                "note": "Примітка"
+            }
+        },
+        "prequalify": {
+            "medication_request_request": {
+                "person_id": "patient-id",
+                "employee_id": "employee-id",
+                "division_id": "division-id",
+                "created_at": "2026-10-04",
+                "started_at": "2026-10-05",
+                "ended_at": "2026-11-05",
+                "medication_id": "medication-id",
+                "medication_qty": 2.0,
+                "intent": "order",
+                "category": "community",
+                "based_on": [
+                    {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth/resources",
+                                        "code": "care_plan"
+                                    }
+                                ],
+                                "text": ""
+                            },
+                            "value": "care-plan-id"
+                        }
+                    },
+                    {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth/resources",
+                                        "code": "activity"
+                                    }
+                                ],
+                                "text": ""
+                            },
+                            "value": "activity-id"
+                        }
+                    }
+                ],
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "encounter"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "value": "encounter-id"
+                    }
+                },
+                "dosage_instruction": [
+                    {
+                        "sequence": 2,
+                        "text": "Щодня",
+                        "patient_instruction": "Після їжі",
+                        "as_needed_boolean": true,
+                        "route": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/SNOMED/route_codes",
+                                    "code": "26643006"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "dose_and_rate": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth/dose_and_rate",
+                                        "code": "ordered"
+                                    }
+                                ],
+                                "text": ""
+                            },
+                            "dose_quantity": {
+                                "value": 2.5,
+                                "unit": "mg",
+                                "system": "eHealth/ucum/units",
+                                "code": "MG"
+                            }
+                        },
+                        "max_dose_per_administration": {
+                            "value": 5.0,
+                            "unit": "mg",
+                            "system": "eHealth/ucum/units",
+                            "code": "mg"
+                        },
+                        "max_dose_per_period": {
+                            "numerator": {
+                                "value": 10.0,
+                                "unit": "mg",
+                                "system": "eHealth/ucum/units",
+                                "code": "mg"
+                            },
+                            "denominator": {
+                                "value": 1,
+                                "unit": "d",
+                                "system": "eHealth/ucum/units",
+                                "code": "d"
+                            }
+                        }
+                    }
+                ],
+                "inform_with": "auth-id",
+                "container_dosage": {
+                    "system": "MEDICATION_UNIT",
+                    "code": "TAB",
+                    "value": 12.0
+                },
+                "note": "Примітка"
+            },
+            "programs": [
+                {
+                    "id": "program-id"
+                }
+            ]
+        },
+        "signedContent": {
+            "person_id": "patient-id",
+            "employee_id": "employee-id",
+            "division_id": "division-id",
+            "created_at": "2026-10-04",
+            "started_at": "2026-10-05",
+            "ended_at": "2026-11-05",
+            "medication_id": "medication-id",
+            "medication_qty": 2.0,
+            "intent": "order",
+            "category": "community",
+            "medical_program_id": "program-id",
+            "based_on": [
+                {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "care_plan"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "value": "care-plan-id"
+                    }
+                },
+                {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "activity"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "value": "activity-id"
+                    }
+                }
+            ],
+            "context": {
+                "identifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "encounter"
+                            }
+                        ],
+                        "text": ""
+                    },
+                    "value": "encounter-id"
+                }
+            },
+            "dosage_instruction": [
+                {
+                    "sequence": 2,
+                    "text": "Щодня",
+                    "patient_instruction": "Після їжі",
+                    "as_needed_boolean": true,
+                    "route": {
+                        "coding": [
+                            {
+                                "system": "eHealth/SNOMED/route_codes",
+                                "code": "26643006"
+                            }
+                        ],
+                        "text": ""
+                    },
+                    "dose_and_rate": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/dose_and_rate",
+                                    "code": "ordered"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "dose_quantity": {
+                            "value": 2.5,
+                            "unit": "mg",
+                            "system": "eHealth/ucum/units",
+                            "code": "MG"
+                        }
+                    },
+                    "max_dose_per_administration": {
+                        "value": 5.0,
+                        "unit": "mg",
+                        "system": "eHealth/ucum/units",
+                        "code": "mg"
+                    },
+                    "max_dose_per_period": {
+                        "numerator": {
+                            "value": 10.0,
+                            "unit": "mg",
+                            "system": "eHealth/ucum/units",
+                            "code": "mg"
+                        },
+                        "denominator": {
+                            "value": 1,
+                            "unit": "d",
+                            "system": "eHealth/ucum/units",
+                            "code": "d"
+                        }
+                    }
+                }
+            ],
+            "inform_with": "auth-id",
+            "container_dosage": {
+                "system": "MEDICATION_UNIT",
+                "code": "TAB",
+                "value": 12.0
+            },
+            "note": "Примітка"
+        }
+    },
+    "defaults and zero": {
+        "data": {
+            "medication_id": "medication-id",
+            "medication_qty": 0,
+            "started_at": "",
+            "ended_at": null,
+            "intent": "",
+            "category": "",
+            "container_dosage": "0||",
+            "inform_with": "",
+            "note": "",
+            "dosage_instructions": [
+                {
+                    "text": "",
+                    "patient_instruction": "",
+                    "route": "ORAL",
+                    "dose_and_rate": {
+                        "dose_quantity_value": 0
+                    },
+                    "max_dose_per_administration": 0,
+                    "max_dose_per_period": 0
+                }
+            ]
+        },
+        "uuids": {
+            "person_uuid": "patient-id",
+            "employee_uuid": "employee-id",
+            "division_uuid": "division-id",
+            "encounter_uuid": "encounter-id"
+        },
+        "carePlanUuid": "care-plan-id",
+        "create": {
+            "medication_request_request": {
+                "person_id": "patient-id",
+                "employee_id": "employee-id",
+                "division_id": "division-id",
+                "created_at": "2026-10-05",
+                "medication_id": "medication-id",
+                "medication_qty": 0.0,
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "encounter"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "value": "encounter-id"
+                    }
+                },
+                "dosage_instruction": [
+                    {
+                        "sequence": 1,
+                        "text": "За призначенням лікаря",
+                        "patient_instruction": "За призначенням лікаря",
+                        "as_needed_boolean": false,
+                        "route": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/SNOMED/route_codes",
+                                    "code": "26643006"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "dose_and_rate": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth/dose_and_rate",
+                                        "code": "ordered"
+                                    }
+                                ],
+                                "text": ""
+                            },
+                            "dose_quantity": {
+                                "value": 0.0,
+                                "unit": null,
+                                "system": "eHealth/ucum/units",
+                                "code": null
+                            }
+                        },
+                        "max_dose_per_administration": {
+                            "value": 0.0,
+                            "unit": "од.",
+                            "system": "eHealth/ucum/units",
+                            "code": "од."
+                        },
+                        "max_dose_per_period": {
+                            "numerator": {
+                                "value": 0.0,
+                                "unit": "од.",
+                                "system": "eHealth/ucum/units",
+                                "code": "од."
+                            },
+                            "denominator": {
+                                "value": 1,
+                                "unit": "d",
+                                "system": "eHealth/ucum/units",
+                                "code": "d"
+                            }
+                        }
+                    }
+                ],
+                "container_dosage": {
+                    "system": "MEDICATION_UNIT",
+                    "code": "PIECE",
+                    "value": 0.0
+                }
+            }
+        },
+        "prequalify": {
+            "medication_request_request": {
+                "person_id": "patient-id",
+                "employee_id": "employee-id",
+                "division_id": "division-id",
+                "created_at": "2026-10-05",
+                "medication_id": "medication-id",
+                "medication_qty": 0.0,
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "encounter"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "value": "encounter-id"
+                    }
+                },
+                "dosage_instruction": [
+                    {
+                        "sequence": 1,
+                        "text": "За призначенням лікаря",
+                        "patient_instruction": "За призначенням лікаря",
+                        "as_needed_boolean": false,
+                        "route": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/SNOMED/route_codes",
+                                    "code": "26643006"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "dose_and_rate": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth/dose_and_rate",
+                                        "code": "ordered"
+                                    }
+                                ],
+                                "text": ""
+                            },
+                            "dose_quantity": {
+                                "value": 0.0,
+                                "unit": null,
+                                "system": "eHealth/ucum/units",
+                                "code": null
+                            }
+                        },
+                        "max_dose_per_administration": {
+                            "value": 0.0,
+                            "unit": "од.",
+                            "system": "eHealth/ucum/units",
+                            "code": "од."
+                        },
+                        "max_dose_per_period": {
+                            "numerator": {
+                                "value": 0.0,
+                                "unit": "од.",
+                                "system": "eHealth/ucum/units",
+                                "code": "од."
+                            },
+                            "denominator": {
+                                "value": 1,
+                                "unit": "d",
+                                "system": "eHealth/ucum/units",
+                                "code": "d"
+                            }
+                        }
+                    }
+                ],
+                "container_dosage": {
+                    "system": "MEDICATION_UNIT",
+                    "code": "PIECE",
+                    "value": 0.0
+                }
+            },
+            "programs": []
+        },
+        "signedContent": {
+            "person_id": "patient-id",
+            "employee_id": "employee-id",
+            "division_id": "division-id",
+            "created_at": "2026-10-05",
+            "medication_id": "medication-id",
+            "medication_qty": 0.0,
+            "context": {
+                "identifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "encounter"
+                            }
+                        ],
+                        "text": ""
+                    },
+                    "value": "encounter-id"
+                }
+            },
+            "dosage_instruction": [
+                {
+                    "sequence": 1,
+                    "text": "За призначенням лікаря",
+                    "patient_instruction": "За призначенням лікаря",
+                    "as_needed_boolean": false,
+                    "route": {
+                        "coding": [
+                            {
+                                "system": "eHealth/SNOMED/route_codes",
+                                "code": "26643006"
+                            }
+                        ],
+                        "text": ""
+                    },
+                    "dose_and_rate": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/dose_and_rate",
+                                    "code": "ordered"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "dose_quantity": {
+                            "value": 0.0,
+                            "unit": null,
+                            "system": "eHealth/ucum/units",
+                            "code": null
+                        }
+                    },
+                    "max_dose_per_administration": {
+                        "value": 0.0,
+                        "unit": "од.",
+                        "system": "eHealth/ucum/units",
+                        "code": "од."
+                    },
+                    "max_dose_per_period": {
+                        "numerator": {
+                            "value": 0.0,
+                            "unit": "од.",
+                            "system": "eHealth/ucum/units",
+                            "code": "од."
+                        },
+                        "denominator": {
+                            "value": 1,
+                            "unit": "d",
+                            "system": "eHealth/ucum/units",
+                            "code": "d"
+                        }
+                    }
+                }
+            ],
+            "container_dosage": {
+                "system": "MEDICATION_UNIT",
+                "code": "PIECE",
+                "value": 0.0
+            }
+        }
+    },
+    "sparse dosage and raw container": {
+        "data": {
+            "medication_id": "medication-id",
+            "medication_qty": 2,
+            "started_at": "2026-10-05",
+            "ended_at": "2026-11-05",
+            "medication_program_id": "program-id",
+            "based_on_uuid": "activity-id",
+            "inform_with": {
+                "id": "auth-id"
+            },
+            "container_dosage": {
+                "system": "MEDICATION_UNIT",
+                "value": 3,
+                "code": "ML"
+            },
+            "dosage_instructions": {
+                "2": {
+                    "route": "123456",
+                    "dose_and_rate": [
+                        {
+                            "dose_quantity_value": 3,
+                            "dose_quantity_unit": "ml"
+                        }
+                    ]
+                },
+                "5": {
+                    "sequence": 0,
+                    "as_needed_boolean": false
+                }
+            }
+        },
+        "uuids": {
+            "person_uuid": "patient-id",
+            "employee_uuid": "employee-id",
+            "division_uuid": "division-id",
+            "encounter_uuid": "encounter-id"
+        },
+        "carePlanUuid": null,
+        "create": {
+            "medication_request_request": {
+                "person_id": "patient-id",
+                "employee_id": "employee-id",
+                "division_id": "division-id",
+                "created_at": "2026-10-05",
+                "started_at": "2026-10-05",
+                "ended_at": "2026-11-05",
+                "medication_id": "medication-id",
+                "medication_qty": 2.0,
+                "intent": "order",
+                "category": "community",
+                "medical_program_id": "program-id",
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "encounter"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "value": "encounter-id"
+                    }
+                },
+                "dosage_instruction": [
+                    {
+                        "sequence": 3,
+                        "text": "За призначенням лікаря",
+                        "patient_instruction": "За призначенням лікаря",
+                        "as_needed_boolean": false,
+                        "route": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/SNOMED/route_codes",
+                                    "code": "123456"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "dose_and_rate": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth/dose_and_rate",
+                                        "code": "ordered"
+                                    }
+                                ],
+                                "text": ""
+                            },
+                            "dose_quantity": {
+                                "value": 3.0,
+                                "unit": "ml",
+                                "system": "eHealth/ucum/units",
+                                "code": "ml"
+                            }
+                        }
+                    },
+                    {
+                        "sequence": 0,
+                        "text": "За призначенням лікаря",
+                        "patient_instruction": "За призначенням лікаря",
+                        "as_needed_boolean": false
+                    }
+                ],
+                "container_dosage": {
+                    "system": "MEDICATION_UNIT",
+                    "value": 3,
+                    "code": "ML"
+                }
+            }
+        },
+        "prequalify": {
+            "medication_request_request": {
+                "person_id": "patient-id",
+                "employee_id": "employee-id",
+                "division_id": "division-id",
+                "created_at": "2026-10-05",
+                "started_at": "2026-10-05",
+                "ended_at": "2026-11-05",
+                "medication_id": "medication-id",
+                "medication_qty": 2.0,
+                "intent": "order",
+                "category": "community",
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "encounter"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "value": "encounter-id"
+                    }
+                },
+                "dosage_instruction": [
+                    {
+                        "sequence": 3,
+                        "text": "За призначенням лікаря",
+                        "patient_instruction": "За призначенням лікаря",
+                        "as_needed_boolean": false,
+                        "route": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/SNOMED/route_codes",
+                                    "code": "123456"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "dose_and_rate": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth/dose_and_rate",
+                                        "code": "ordered"
+                                    }
+                                ],
+                                "text": ""
+                            },
+                            "dose_quantity": {
+                                "value": 3.0,
+                                "unit": "ml",
+                                "system": "eHealth/ucum/units",
+                                "code": "ml"
+                            }
+                        }
+                    },
+                    {
+                        "sequence": 0,
+                        "text": "За призначенням лікаря",
+                        "patient_instruction": "За призначенням лікаря",
+                        "as_needed_boolean": false
+                    }
+                ],
+                "container_dosage": {
+                    "system": "MEDICATION_UNIT",
+                    "value": 3,
+                    "code": "ML"
+                }
+            },
+            "programs": [
+                {
+                    "id": "program-id"
+                }
+            ]
+        },
+        "signedContent": {
+            "person_id": "patient-id",
+            "employee_id": "employee-id",
+            "division_id": "division-id",
+            "created_at": "2026-10-05",
+            "started_at": "2026-10-05",
+            "ended_at": "2026-11-05",
+            "medication_id": "medication-id",
+            "medication_qty": 2.0,
+            "intent": "order",
+            "category": "community",
+            "medical_program_id": "program-id",
+            "context": {
+                "identifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "encounter"
+                            }
+                        ],
+                        "text": ""
+                    },
+                    "value": "encounter-id"
+                }
+            },
+            "dosage_instruction": [
+                {
+                    "sequence": 3,
+                    "text": "За призначенням лікаря",
+                    "patient_instruction": "За призначенням лікаря",
+                    "as_needed_boolean": false,
+                    "route": {
+                        "coding": [
+                            {
+                                "system": "eHealth/SNOMED/route_codes",
+                                "code": "123456"
+                            }
+                        ],
+                        "text": ""
+                    },
+                    "dose_and_rate": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/dose_and_rate",
+                                    "code": "ordered"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "dose_quantity": {
+                            "value": 3.0,
+                            "unit": "ml",
+                            "system": "eHealth/ucum/units",
+                            "code": "ml"
+                        }
+                    }
+                },
+                {
+                    "sequence": 0,
+                    "text": "За призначенням лікаря",
+                    "patient_instruction": "За призначенням лікаря",
+                    "as_needed_boolean": false
+                }
+            ],
+            "container_dosage": {
+                "system": "MEDICATION_UNIT",
+                "value": 3,
+                "code": "ML"
+            }
+        }
+    },
+    "empty lists and unpaired care plan": {
+        "data": {
+            "medication_id": "medication-id",
+            "medication_qty": 2,
+            "started_at": "2026-10-05",
+            "ended_at": "2026-11-05",
+            "dosage_instructions": [],
+            "medication_program_id": "0",
+            "inform_with": {
+                "value": "auth-id"
+            }
+        },
+        "uuids": {
+            "person_uuid": "patient-id",
+            "employee_uuid": "employee-id",
+            "division_uuid": "division-id",
+            "encounter_uuid": "encounter-id"
+        },
+        "carePlanUuid": "care-plan-id",
+        "create": {
+            "medication_request_request": {
+                "person_id": "patient-id",
+                "employee_id": "employee-id",
+                "division_id": "division-id",
+                "created_at": "2026-10-05",
+                "started_at": "2026-10-05",
+                "ended_at": "2026-11-05",
+                "medication_id": "medication-id",
+                "medication_qty": 2.0,
+                "intent": "order",
+                "category": "community",
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "encounter"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "value": "encounter-id"
+                    }
+                },
+                "inform_with": "auth-id"
+            }
+        },
+        "prequalify": {
+            "medication_request_request": {
+                "person_id": "patient-id",
+                "employee_id": "employee-id",
+                "division_id": "division-id",
+                "created_at": "2026-10-05",
+                "started_at": "2026-10-05",
+                "ended_at": "2026-11-05",
+                "medication_id": "medication-id",
+                "medication_qty": 2.0,
+                "intent": "order",
+                "category": "community",
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "encounter"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "value": "encounter-id"
+                    }
+                },
+                "inform_with": "auth-id"
+            },
+            "programs": []
+        },
+        "signedContent": {
+            "person_id": "patient-id",
+            "employee_id": "employee-id",
+            "division_id": "division-id",
+            "created_at": "2026-10-05",
+            "started_at": "2026-10-05",
+            "ended_at": "2026-11-05",
+            "medication_id": "medication-id",
+            "medication_qty": 2.0,
+            "intent": "order",
+            "category": "community",
+            "context": {
+                "identifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "encounter"
+                            }
+                        ],
+                        "text": ""
+                    },
+                    "value": "encounter-id"
+                }
+            },
+            "inform_with": "auth-id"
+        }
+    },
+    "sequence and numeric dosage strings": {
+        "data": {
+            "medication_id": "medication-id",
+            "medication_qty": "2.5",
+            "started_at": "2026-10-05",
+            "ended_at": "2026-11-05",
+            "dosage_instructions": [
+                {
+                    "sequence": "3",
+                    "text": "Щодня",
+                    "dose_and_rate": [
+                        {
+                            "dose_quantity_value": "0.5",
+                            "dose_quantity_unit": "ml"
+                        }
+                    ],
+                    "max_dose_per_administration": "0.5",
+                    "max_dose_per_period": "1.5"
+                }
+            ]
+        },
+        "uuids": {
+            "person_uuid": "patient-id",
+            "employee_uuid": "employee-id",
+            "division_uuid": "division-id",
+            "encounter_uuid": "encounter-id"
+        },
+        "carePlanUuid": null,
+        "create": {
+            "medication_request_request": {
+                "person_id": "patient-id",
+                "employee_id": "employee-id",
+                "division_id": "division-id",
+                "created_at": "2026-10-05",
+                "started_at": "2026-10-05",
+                "ended_at": "2026-11-05",
+                "medication_id": "medication-id",
+                "medication_qty": 2.5,
+                "intent": "order",
+                "category": "community",
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "encounter"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "value": "encounter-id"
+                    }
+                },
+                "dosage_instruction": [
+                    {
+                        "sequence": "3",
+                        "text": "Щодня",
+                        "patient_instruction": "Щодня",
+                        "as_needed_boolean": false,
+                        "dose_and_rate": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth/dose_and_rate",
+                                        "code": "ordered"
+                                    }
+                                ],
+                                "text": ""
+                            },
+                            "dose_quantity": {
+                                "value": 0.5,
+                                "unit": "ml",
+                                "system": "eHealth/ucum/units",
+                                "code": "ml"
+                            }
+                        },
+                        "max_dose_per_administration": {
+                            "value": 0.5,
+                            "unit": "ml",
+                            "system": "eHealth/ucum/units",
+                            "code": "ml"
+                        },
+                        "max_dose_per_period": {
+                            "numerator": {
+                                "value": 1.5,
+                                "unit": "ml",
+                                "system": "eHealth/ucum/units",
+                                "code": "ml"
+                            },
+                            "denominator": {
+                                "value": 1,
+                                "unit": "d",
+                                "system": "eHealth/ucum/units",
+                                "code": "d"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        "prequalify": {
+            "medication_request_request": {
+                "person_id": "patient-id",
+                "employee_id": "employee-id",
+                "division_id": "division-id",
+                "created_at": "2026-10-05",
+                "started_at": "2026-10-05",
+                "ended_at": "2026-11-05",
+                "medication_id": "medication-id",
+                "medication_qty": 2.5,
+                "intent": "order",
+                "category": "community",
+                "context": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/resources",
+                                    "code": "encounter"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "value": "encounter-id"
+                    }
+                },
+                "dosage_instruction": [
+                    {
+                        "sequence": "3",
+                        "text": "Щодня",
+                        "patient_instruction": "Щодня",
+                        "as_needed_boolean": false,
+                        "dose_and_rate": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth/dose_and_rate",
+                                        "code": "ordered"
+                                    }
+                                ],
+                                "text": ""
+                            },
+                            "dose_quantity": {
+                                "value": 0.5,
+                                "unit": "ml",
+                                "system": "eHealth/ucum/units",
+                                "code": "ml"
+                            }
+                        },
+                        "max_dose_per_administration": {
+                            "value": 0.5,
+                            "unit": "ml",
+                            "system": "eHealth/ucum/units",
+                            "code": "ml"
+                        },
+                        "max_dose_per_period": {
+                            "numerator": {
+                                "value": 1.5,
+                                "unit": "ml",
+                                "system": "eHealth/ucum/units",
+                                "code": "ml"
+                            },
+                            "denominator": {
+                                "value": 1,
+                                "unit": "d",
+                                "system": "eHealth/ucum/units",
+                                "code": "d"
+                            }
+                        }
+                    }
+                ]
+            },
+            "programs": []
+        },
+        "signedContent": {
+            "person_id": "patient-id",
+            "employee_id": "employee-id",
+            "division_id": "division-id",
+            "created_at": "2026-10-05",
+            "started_at": "2026-10-05",
+            "ended_at": "2026-11-05",
+            "medication_id": "medication-id",
+            "medication_qty": 2.5,
+            "intent": "order",
+            "category": "community",
+            "context": {
+                "identifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth/resources",
+                                "code": "encounter"
+                            }
+                        ],
+                        "text": ""
+                    },
+                    "value": "encounter-id"
+                }
+            },
+            "dosage_instruction": [
+                {
+                    "sequence": "3",
+                    "text": "Щодня",
+                    "patient_instruction": "Щодня",
+                    "as_needed_boolean": false,
+                    "dose_and_rate": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth/dose_and_rate",
+                                    "code": "ordered"
+                                }
+                            ],
+                            "text": ""
+                        },
+                        "dose_quantity": {
+                            "value": 0.5,
+                            "unit": "ml",
+                            "system": "eHealth/ucum/units",
+                            "code": "ml"
+                        }
+                    },
+                    "max_dose_per_administration": {
+                        "value": 0.5,
+                        "unit": "ml",
+                        "system": "eHealth/ucum/units",
+                        "code": "ml"
+                    },
+                    "max_dose_per_period": {
+                        "numerator": {
+                            "value": 1.5,
+                            "unit": "ml",
+                            "system": "eHealth/ucum/units",
+                            "code": "ml"
+                        },
+                        "denominator": {
+                            "value": 1,
+                            "unit": "d",
+                            "system": "eHealth/ucum/units",
+                            "code": "d"
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}

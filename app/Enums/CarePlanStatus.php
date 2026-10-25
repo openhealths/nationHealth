@@ -34,7 +34,7 @@ enum CarePlanStatus: string
             : null;
 
         if (!is_string($entityStatus) || $entityStatus === '') {
-            return $fallback;
+            $entityStatus = $finalResponse['status'] ?? '';
         }
 
         $resolved = self::fromStored($entityStatus);

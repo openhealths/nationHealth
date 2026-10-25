@@ -229,6 +229,11 @@
                                 <div class="record-inner-label">{{ __('forms.name') }}</div>
                                 <div class="record-inner-value text-[17px] font-semibold text-gray-900 dark:text-gray-100">
                                     {{ $plan->title }}
+                                    @if ($plan->requiresFhirImport())
+                                        <p class="mt-2 text-sm font-normal text-gray-600 dark:text-gray-300">
+                                            {{ $plan->status === 'draft' ? __('care-plan.draft_backfill_required') : __('care-plan.full_sync_required') }}
+                                        </p>
+                                    @endif
                                 </div>
                                 <div class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
                                     {{ __('care-plan.patient') }}: {{ $plan->person?->fullName }}
@@ -242,6 +247,7 @@
                                 </div>
                             </div>
 
+                            @if (!$plan->requiresFhirImport())
                             <div class="record-inner-action-col">
                                 <div
                                     x-data="{
@@ -306,6 +312,7 @@
                                     </div>
                                 </div>
                             </div>
+                            @endif
                         </div>
 
                         <div class="record-inner-body">

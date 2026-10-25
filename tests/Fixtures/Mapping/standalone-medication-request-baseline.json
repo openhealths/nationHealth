@@ -1,0 +1,102 @@
+{
+    "captured_from": "a58ca2c1",
+    "entrypoint": "MedicationRequestForm::preQualify/createDraft",
+    "cases": {
+        "normal": {
+            "prequalify": {
+                "person_id": "person-id",
+                "medical_program_id": "program-id",
+                "programs": [
+                    {
+                        "id": "program-id"
+                    }
+                ]
+            },
+            "create": {
+                "person_id": "person-id",
+                "medical_program_id": "program-id",
+                "dosage_instruction": "Take 1 pill",
+                "dispense_request": {
+                    "expected_supply_duration": {
+                        "value": 30,
+                        "system": "http://unitsofmeasure.org",
+                        "code": "d"
+                    }
+                }
+            },
+            "createJson": "{\"person_id\":\"person-id\",\"medical_program_id\":\"program-id\",\"dosage_instruction\":\"Take 1 pill\",\"dispense_request\":{\"expected_supply_duration\":{\"value\":30,\"system\":\"http:\\/\\/unitsofmeasure.org\",\"code\":\"d\"}}}"
+        },
+        "fractional_duration": {
+            "prequalify": {
+                "person_id": "person-id",
+                "medical_program_id": "program-id",
+                "programs": [
+                    {
+                        "id": "program-id"
+                    }
+                ]
+            },
+            "create": {
+                "person_id": "person-id",
+                "medical_program_id": "program-id",
+                "dosage_instruction": "Приймати після їжі",
+                "dispense_request": {
+                    "expected_supply_duration": {
+                        "value": 3,
+                        "system": "http://unitsofmeasure.org",
+                        "code": "d"
+                    }
+                }
+            },
+            "createJson": "{\"person_id\":\"person-id\",\"medical_program_id\":\"program-id\",\"dosage_instruction\":\"\\u041f\\u0440\\u0438\\u0439\\u043c\\u0430\\u0442\\u0438 \\u043f\\u0456\\u0441\\u043b\\u044f \\u0457\\u0436\\u0456\",\"dispense_request\":{\"expected_supply_duration\":{\"value\":3,\"system\":\"http:\\/\\/unitsofmeasure.org\",\"code\":\"d\"}}}"
+        },
+        "scientific_duration": {
+            "prequalify": {
+                "person_id": "person-id",
+                "medical_program_id": "program-id",
+                "programs": [
+                    {
+                        "id": "program-id"
+                    }
+                ]
+            },
+            "create": {
+                "person_id": "person-id",
+                "medical_program_id": "program-id",
+                "dosage_instruction": "Line 1\nLine 2",
+                "dispense_request": {
+                    "expected_supply_duration": {
+                        "value": 100,
+                        "system": "http://unitsofmeasure.org",
+                        "code": "d"
+                    }
+                }
+            },
+            "createJson": "{\"person_id\":\"person-id\",\"medical_program_id\":\"program-id\",\"dosage_instruction\":\"Line 1\\nLine 2\",\"dispense_request\":{\"expected_supply_duration\":{\"value\":100,\"system\":\"http:\\/\\/unitsofmeasure.org\",\"code\":\"d\"}}}"
+        },
+        "leading_zero_duration": {
+            "prequalify": {
+                "person_id": "person-id",
+                "medical_program_id": "program-id",
+                "programs": [
+                    {
+                        "id": "program-id"
+                    }
+                ]
+            },
+            "create": {
+                "person_id": "person-id",
+                "medical_program_id": "program-id",
+                "dosage_instruction": "Keep / and \"quotes\"",
+                "dispense_request": {
+                    "expected_supply_duration": {
+                        "value": 3,
+                        "system": "http://unitsofmeasure.org",
+                        "code": "d"
+                    }
+                }
+            },
+            "createJson": "{\"person_id\":\"person-id\",\"medical_program_id\":\"program-id\",\"dosage_instruction\":\"Keep \\/ and \\\"quotes\\\"\",\"dispense_request\":{\"expected_supply_duration\":{\"value\":3,\"system\":\"http:\\/\\/unitsofmeasure.org\",\"code\":\"d\"}}}"
+        }
+    }
+}

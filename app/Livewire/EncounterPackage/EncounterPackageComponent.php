@@ -6,11 +6,11 @@ namespace App\Livewire\EncounterPackage;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Enums\ClinicalImpression\Status as ClinicalImpressionStatus;
 use App\Enums\Episode\Status as EpisodeStatus;
 use App\Enums\Equipment\AvailabilityStatus;
-use App\Enums\ClinicalImpression\Status as ClinicalImpressionStatus;
-use App\Enums\Person\ImmunizationStatus;
 use App\Enums\Person\DeviceRequestStatus;
+use App\Enums\Person\ImmunizationStatus;
 use App\Enums\Person\ServiceRequestStatus;
 use App\Enums\Status;
 use App\Enums\User\Role;
@@ -35,20 +35,20 @@ use App\Models\Icd10;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\MedicalEvents\Sql\Immunization;
-use App\Models\MedicalEvents\Sql\Specimen;
-use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
-use App\Models\Person\Person;
-use App\Models\Preperson;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\EpisodeCurrentDiagnosis;
-use App\Repositories\Repository;
+use App\Models\MedicalEvents\Sql\Immunization;
+use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+use App\Models\MedicalEvents\Sql\Specimen;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
-use App\Services\MedicalEvents\Fhir;
+use App\Repositories\Repository;
 use App\Services\Dictionary\Mappers\ImmunizationDictionaryMapper;
 use App\Services\MedData\MedData;
 use App\Traits\FormTrait;
 use App\Traits\SearchesElectronicReferrals;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -64,7 +64,13 @@ use Throwable;
 class EncounterPackageComponent extends Component
 {
     use FormTrait;
+
+    use \App\Livewire\EncounterPackage\Concerns\BuildsEncounterPackage;
+
+    use \App\Livewire\EncounterPackage\Concerns\LoadsEncounterPackage;
+
     use SearchesElectronicReferrals;
+
     use WithFileUploads;
 
     public Form $form;
@@ -1130,7 +1136,7 @@ class EncounterPackageComponent extends Component
 
         // The encounter references the condition the episode already holds instead of registering a copy of it
         $episodeCondition = [
-            ...Fhir::condition()->fromFhir($condition, $detailsMap),
+            ...app(\Symfony\Component\ObjectMapper\ObjectMapperInterface::class)->map(new \Illuminate\Support\Collection($condition), new \App\Dto\Condition\Form($detailsMap, CarbonImmutable::now()->format('H:i')))->toArray(),
             'isRegistered' => true,
             'fromEpisode' => true,
             'episodeName' => $episode->name

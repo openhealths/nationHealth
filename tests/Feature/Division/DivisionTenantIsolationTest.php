@@ -21,7 +21,7 @@ use App\Livewire\Division\HealthcareService\HealthcareServiceCreate;
 use App\Livewire\Division\HealthcareService\HealthcareServiceEdit;
 use App\Livewire\Division\HealthcareService\HealthcareServiceIndex;
 use App\Livewire\Division\HealthcareService\HealthcareServiceUpdate;
-use App\Livewire\Encounter\EncounterComponent;
+use App\Livewire\EncounterPackage\EncounterPackageComponent as EncounterComponent;
 use App\Models\Division;
 use App\Models\HealthcareService;
 use App\Models\LegalEntity;

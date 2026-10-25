@@ -11,6 +11,13 @@ use App\Enums\Episode\Status as EpisodeStatus;
 use App\Enums\Person\EncounterStatus;
 use App\Enums\Person\ServiceRequestStatus;
 use App\Livewire\EncounterPackage\Forms\EncounterCancellationForm;
+use App\Exceptions\Cipher\CipherConnectionException;
+use App\Exceptions\Cipher\CipherException;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
+use App\Livewire\EncounterPackage\Concerns\ManagesEncounterEPrescription;
+use App\Livewire\EncounterPackage\Concerns\ManagesEncounterReferrals;
+use App\Livewire\EncounterPackage\Concerns\ResolvesEncounterStandaloneContext;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\ClinicalImpression;
 use App\Models\MedicalEvents\Sql\Condition;
@@ -29,20 +36,12 @@ use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\Fhir;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use App\Traits\HandlesEncounterCancellation;
-use App\Exceptions\Cipher\CipherConnectionException;
-use App\Exceptions\Cipher\CipherException;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthException;
+use App\Traits\MedicalEvents\UpdatesReferralExecution;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
-use App\Livewire\EncounterPackage\Concerns\ManagesEncounterEPrescription;
-use App\Livewire\EncounterPackage\Concerns\ManagesEncounterReferrals;
-use App\Livewire\EncounterPackage\Concerns\ResolvesEncounterStandaloneContext;
 use Exception;
 use App\Models\MedicalEvents\Sql\Composition;
 use Livewire\Attributes\Computed;
@@ -55,8 +54,12 @@ use Throwable;
 class EncounterPackageEdit extends EncounterPackageComponent
 {
     use HandlesEncounterCancellation;
+    use UpdatesReferralExecution;
+
     use ResolvesEncounterStandaloneContext;
+
     use ManagesEncounterEPrescription;
+
     use ManagesEncounterReferrals;
 
     #[Locked]
@@ -226,7 +229,7 @@ class EncounterPackageEdit extends EncounterPackageComponent
 
         $this->initializeComponent(loadEpisodes: !$this->isReadonly);
 
-        $package = Fhir::encounterPackageLoader()->load($encounter);
+        $package = $this->loadEncounterPackage($encounter);
 
         $reactionIds = collect($package['observations'])->pluck('reactionOn')->filter()->unique();
         $packageImmunizationIds = collect($package['immunizations'])->pluck('uuid')->filter()->unique();
@@ -338,16 +341,20 @@ class EncounterPackageEdit extends EncounterPackageComponent
         ];
 
         $fhirEpisode = $this->episodeType === 'new' && $this->draftEpisodeId !== null
-            ? Fhir::episode()->toFhir(
-                $validated['episode'],
-                $uuids,
-                $validated['encounter']['periodDate'],
-                $validated['encounter']['periodStart'],
-                EpisodeStatus::DRAFT
-            )
+            ? Arr::toCamelCase(app(\Symfony\Component\ObjectMapper\ObjectMapperInterface::class)->map(
+                new \App\Dto\FormCollection($validated['episode']),
+                new \App\Dto\Episode\Ehealth(
+                    id: $uuids['episode'],
+                    status: EpisodeStatus::DRAFT,
+                    legalEntity: legalEntity()->uuid,
+                    employee: $uuids['employee'],
+                    periodDate: $validated['encounter']['periodDate'],
+                    periodStart: $validated['encounter']['periodStart'],
+                ),
+            )->toArray())
             : null;
 
-        $fhir = Fhir::encounterPackage()->toFhir($validated, $uuids);
+        $fhir = $this->mapEncounterPackage($validated, $uuids);
         $fhirEncounter = $fhir['encounter'];
         $fhirEncounter['status'] = EncounterStatus::DRAFT->value;
         $fhirConditions = $fhir['conditions'];
@@ -559,10 +566,9 @@ class EncounterPackageEdit extends EncounterPackageComponent
     /**
      * Redeem the electronic referral the accepted encounter was based on.
      *
-     * @param  ReferralRequestLifecycleService  $service
      * @return void
      */
-    public function redeemReferral(ReferralRequestLifecycleService $service): void
+    public function redeemReferral(): void
     {
         $this->showReferralRedeemModal = false;
 
@@ -574,7 +580,7 @@ class EncounterPackageEdit extends EncounterPackageComponent
                 throw new RuntimeException(__('Направлення не було підтверджено перед підписанням взаємодії.'));
             }
 
-            $service->completeReferral($this->referralToRedeemId, $this->encounterUuid);
+            $this->completeReferral($this->referralToRedeemId, $this->encounterUuid);
             Session::flash('success', __('encounters.messages.referral_redeemed'));
         } catch (Exception $exception) {
             Session::flash('error', __('encounters.messages.referral_redeem_error', ['message' => $exception->getMessage()]));
@@ -664,7 +670,7 @@ class EncounterPackageEdit extends EncounterPackageComponent
     {
         // The picks arrive from the browser, so only known sections holding record ids survive
         return array_filter(array_map(
-            static fn (mixed $recordIds): array => array_filter((array)$recordIds, 'is_string'),
+            static fn (mixed $recordIds): array => array_filter((array) $recordIds, 'is_string'),
             array_intersect_key($this->selectedRecords, self::NO_RECORDS_SELECTED)
         ));
     }

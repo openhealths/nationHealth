@@ -1,0 +1,710 @@
+{
+    "full sparse lists": {
+        "json": "{\"id\":\"device-fixed\",\"status\":\"inactive\",\"primarySource\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[{\"type\":\"user-friendly-name\",\"value\":\"\\u041d\\u0430\\u0437\\u0432\\u0430\"},{\"type\":\"manufacturer-name\",\"value\":\"Brand\"}],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"identifier\":[{\"type\":{\"coding\":[{\"system\":\"external_system\",\"code\":\"system\"}],\"text\":\"\\u0421\\u0438\\u0441\\u0442\\u0435\\u043c\\u0430\"},\"value\":\"external-id\"}],\"property\":[{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"power\"}],\"text\":\"\"},\"valueBoolean\":false,\"valueInteger\":0,\"valueString\":\"\"}],\"modelNumber\":\"MODEL\",\"lotNumber\":\"LOT\",\"manufacturer\":\"\\u0412\\u0438\\u0440\\u043e\\u0431\\u043d\\u0438\\u043a\",\"serialNumber\":\"SERIAL\",\"manufactureDate\":\"2026-10-05T07:15:00Z\",\"expirationDate\":\"2026-10-25T02:15:00Z\",\"note\":\"\\u041f\\u0440\\u0438\\u0441\\u0442\\u0440\\u0456\\u0439\\n\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"definition\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device_definition\"}],\"text\":\"\"},\"value\":\"definition\"}},\"parent\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"parent\"}}}",
+        "signedJson": "{\"id\":\"device-fixed\",\"status\":\"inactive\",\"primary_source\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[{\"type\":\"user-friendly-name\",\"value\":\"\\u041d\\u0430\\u0437\\u0432\\u0430\"},{\"type\":\"manufacturer-name\",\"value\":\"Brand\"}],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"identifier\":[{\"type\":{\"coding\":[{\"system\":\"external_system\",\"code\":\"system\"}],\"text\":\"\\u0421\\u0438\\u0441\\u0442\\u0435\\u043c\\u0430\"},\"value\":\"external-id\"}],\"property\":[{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"power\"}],\"text\":\"\"},\"value_boolean\":false,\"value_integer\":0,\"value_string\":\"\"}],\"model_number\":\"MODEL\",\"lot_number\":\"LOT\",\"manufacturer\":\"\\u0412\\u0438\\u0440\\u043e\\u0431\\u043d\\u0438\\u043a\",\"serial_number\":\"SERIAL\",\"manufacture_date\":\"2026-10-05T07:15:00Z\",\"expiration_date\":\"2026-10-25T02:15:00Z\",\"note\":\"\\u041f\\u0440\\u0438\\u0441\\u0442\\u0440\\u0456\\u0439\\n\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"definition\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device_definition\"}],\"text\":\"\"},\"value\":\"definition\"}},\"parent\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"parent\"}}}",
+        "form": {
+            "uuid": "stored",
+            "status": "inactive",
+            "typeCode": "device-type",
+            "modelNumber": "MODEL",
+            "lotNumber": "LOT",
+            "manufacturer": "Виробник",
+            "serialNumber": "SERIAL",
+            "manufactureDate": "05.10.2026",
+            "expirationDate": "25.10.2026",
+            "note": "Примітка",
+            "primarySource": true,
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "properties": [
+                {
+                    "code": "power",
+                    "valueCodeableConceptSystem": null,
+                    "valueCodeableConceptCode": null,
+                    "valueQuantityValue": null,
+                    "valueQuantityComparator": null,
+                    "valueQuantityUnit": null,
+                    "valueQuantitySystem": null,
+                    "valueQuantityCode": null,
+                    "valueRangeLowValue": null,
+                    "valueRangeLowUnit": null,
+                    "valueRangeLowSystem": null,
+                    "valueRangeLowCode": null,
+                    "valueRangeHighValue": null,
+                    "valueRangeHighUnit": null,
+                    "valueRangeHighSystem": null,
+                    "valueRangeHighCode": null,
+                    "valueBoolean": false,
+                    "valueInteger": 0,
+                    "valueString": ""
+                }
+            ],
+            "names": [
+                {
+                    "type": "user-friendly-name",
+                    "value": "Назва"
+                },
+                {
+                    "type": "manufacturer-name",
+                    "value": "Brand"
+                }
+            ],
+            "definitionId": "definition",
+            "parentId": "parent",
+            "identifiers": [
+                {
+                    "code": "system",
+                    "text": "Система",
+                    "value": "external-id"
+                }
+            ]
+        }
+    },
+    "minimal": {
+        "json": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primarySource\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}",
+        "signedJson": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primary_source\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}",
+        "form": {
+            "uuid": null,
+            "status": "active",
+            "typeCode": "",
+            "modelNumber": "",
+            "lotNumber": "",
+            "manufacturer": "",
+            "serialNumber": "",
+            "manufactureDate": "",
+            "expirationDate": "",
+            "note": "",
+            "primarySource": null,
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "properties": [],
+            "names": [],
+            "definitionId": "",
+            "parentId": "",
+            "identifiers": []
+        }
+    },
+    "secondary source": {
+        "json": "{\"id\":\"device-fixed\",\"status\":\"inactive\",\"primarySource\":false,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[{\"type\":\"user-friendly-name\",\"value\":\"\\u041d\\u0430\\u0437\\u0432\\u0430\"},{\"type\":\"manufacturer-name\",\"value\":\"Brand\"}],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"identifier\":[{\"type\":{\"coding\":[{\"system\":\"external_system\",\"code\":\"system\"}],\"text\":\"\\u0421\\u0438\\u0441\\u0442\\u0435\\u043c\\u0430\"},\"value\":\"external-id\"}],\"property\":[{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"power\"}],\"text\":\"\"},\"valueBoolean\":false,\"valueInteger\":0,\"valueString\":\"\"}],\"reportOrigin\":{\"coding\":[{\"system\":\"eHealth\\\/report_origins\",\"code\":\"patient\"}],\"text\":\"\\u041f\\u0430\\u0446\\u0456\\u0454\\u043d\\u0442\"},\"modelNumber\":\"MODEL\",\"lotNumber\":\"LOT\",\"manufacturer\":\"\\u0412\\u0438\\u0440\\u043e\\u0431\\u043d\\u0438\\u043a\",\"serialNumber\":\"SERIAL\",\"manufactureDate\":\"2026-10-05T07:15:00Z\",\"expirationDate\":\"2026-10-25T02:15:00Z\",\"note\":\"\\u041f\\u0440\\u0438\\u0441\\u0442\\u0440\\u0456\\u0439\\n\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"definition\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device_definition\"}],\"text\":\"\"},\"value\":\"definition\"}},\"parent\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"parent\"}}}",
+        "signedJson": "{\"id\":\"device-fixed\",\"status\":\"inactive\",\"primary_source\":false,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[{\"type\":\"user-friendly-name\",\"value\":\"\\u041d\\u0430\\u0437\\u0432\\u0430\"},{\"type\":\"manufacturer-name\",\"value\":\"Brand\"}],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"identifier\":[{\"type\":{\"coding\":[{\"system\":\"external_system\",\"code\":\"system\"}],\"text\":\"\\u0421\\u0438\\u0441\\u0442\\u0435\\u043c\\u0430\"},\"value\":\"external-id\"}],\"property\":[{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"power\"}],\"text\":\"\"},\"value_boolean\":false,\"value_integer\":0,\"value_string\":\"\"}],\"report_origin\":{\"coding\":[{\"system\":\"eHealth\\\/report_origins\",\"code\":\"patient\"}],\"text\":\"\\u041f\\u0430\\u0446\\u0456\\u0454\\u043d\\u0442\"},\"model_number\":\"MODEL\",\"lot_number\":\"LOT\",\"manufacturer\":\"\\u0412\\u0438\\u0440\\u043e\\u0431\\u043d\\u0438\\u043a\",\"serial_number\":\"SERIAL\",\"manufacture_date\":\"2026-10-05T07:15:00Z\",\"expiration_date\":\"2026-10-25T02:15:00Z\",\"note\":\"\\u041f\\u0440\\u0438\\u0441\\u0442\\u0440\\u0456\\u0439\\n\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"definition\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device_definition\"}],\"text\":\"\"},\"value\":\"definition\"}},\"parent\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"parent\"}}}",
+        "form": {
+            "uuid": "stored",
+            "status": "inactive",
+            "typeCode": "device-type",
+            "modelNumber": "MODEL",
+            "lotNumber": "LOT",
+            "manufacturer": "Виробник",
+            "serialNumber": "SERIAL",
+            "manufactureDate": "05.10.2026",
+            "expirationDate": "25.10.2026",
+            "note": "Примітка",
+            "primarySource": false,
+            "reportOriginCode": "patient",
+            "reportOriginText": "Пацієнт",
+            "properties": [
+                {
+                    "code": "power",
+                    "valueCodeableConceptSystem": null,
+                    "valueCodeableConceptCode": null,
+                    "valueQuantityValue": null,
+                    "valueQuantityComparator": null,
+                    "valueQuantityUnit": null,
+                    "valueQuantitySystem": null,
+                    "valueQuantityCode": null,
+                    "valueRangeLowValue": null,
+                    "valueRangeLowUnit": null,
+                    "valueRangeLowSystem": null,
+                    "valueRangeLowCode": null,
+                    "valueRangeHighValue": null,
+                    "valueRangeHighUnit": null,
+                    "valueRangeHighSystem": null,
+                    "valueRangeHighCode": null,
+                    "valueBoolean": false,
+                    "valueInteger": 0,
+                    "valueString": ""
+                }
+            ],
+            "names": [
+                {
+                    "type": "user-friendly-name",
+                    "value": "Назва"
+                },
+                {
+                    "type": "manufacturer-name",
+                    "value": "Brand"
+                }
+            ],
+            "definitionId": "definition",
+            "parentId": "parent",
+            "identifiers": [
+                {
+                    "code": "system",
+                    "text": "Система",
+                    "value": "external-id"
+                }
+            ]
+        }
+    },
+    "null status falls back only outbound": {
+        "json": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primarySource\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}",
+        "signedJson": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primary_source\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}",
+        "form": {
+            "uuid": null,
+            "status": null,
+            "typeCode": "",
+            "modelNumber": "",
+            "lotNumber": "",
+            "manufacturer": "",
+            "serialNumber": "",
+            "manufactureDate": "",
+            "expirationDate": "",
+            "note": null,
+            "primarySource": null,
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "properties": [],
+            "names": [],
+            "definitionId": "",
+            "parentId": "",
+            "identifiers": []
+        }
+    },
+    "required false and zero values": {
+        "json": "{\"id\":\"device-fixed\",\"status\":\"0\",\"primarySource\":0,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[{\"type\":null,\"value\":false}],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"reportOrigin\":{\"coding\":[{\"system\":\"eHealth\\\/report_origins\",\"code\":\"0\"}],\"text\":\"0\"}}",
+        "signedJson": "{\"id\":\"device-fixed\",\"status\":\"0\",\"primary_source\":0,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[{\"type\":null,\"value\":false}],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"report_origin\":{\"coding\":[{\"system\":\"eHealth\\\/report_origins\",\"code\":\"0\"}],\"text\":\"0\"}}",
+        "form": {
+            "uuid": null,
+            "status": "0",
+            "typeCode": "",
+            "modelNumber": "",
+            "lotNumber": "",
+            "manufacturer": "",
+            "serialNumber": "",
+            "manufactureDate": "",
+            "expirationDate": "",
+            "note": "",
+            "primarySource": 0,
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "properties": [],
+            "names": [
+                {
+                    "type": null,
+                    "value": false
+                }
+            ],
+            "definitionId": "",
+            "parentId": "",
+            "identifiers": []
+        }
+    },
+    "null primary source": {
+        "json": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primarySource\":null,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"reportOrigin\":{\"coding\":[{\"system\":\"eHealth\\\/report_origins\",\"code\":\"patient\"}],\"text\":\"\"}}",
+        "signedJson": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primary_source\":null,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"report_origin\":{\"coding\":[{\"system\":\"eHealth\\\/report_origins\",\"code\":\"patient\"}],\"text\":\"\"}}",
+        "form": {
+            "uuid": null,
+            "status": "active",
+            "typeCode": "",
+            "modelNumber": "",
+            "lotNumber": "",
+            "manufacturer": "",
+            "serialNumber": "",
+            "manufactureDate": "",
+            "expirationDate": "",
+            "note": "",
+            "primarySource": null,
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "properties": [],
+            "names": [],
+            "definitionId": "",
+            "parentId": "",
+            "identifiers": []
+        }
+    },
+    "zero and empty optional fields omitted": {
+        "json": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primarySource\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}",
+        "signedJson": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primary_source\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}",
+        "form": {
+            "uuid": null,
+            "status": "active",
+            "typeCode": "",
+            "modelNumber": "0",
+            "lotNumber": "",
+            "manufacturer": "",
+            "serialNumber": "",
+            "manufactureDate": "",
+            "expirationDate": "",
+            "note": false,
+            "primarySource": null,
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "properties": [],
+            "names": [],
+            "definitionId": "",
+            "parentId": null,
+            "identifiers": []
+        }
+    },
+    "all identifiers filtered": {
+        "json": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primarySource\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}",
+        "signedJson": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primary_source\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}",
+        "form": {
+            "uuid": null,
+            "status": "active",
+            "typeCode": "",
+            "modelNumber": "",
+            "lotNumber": "",
+            "manufacturer": "",
+            "serialNumber": "",
+            "manufactureDate": "",
+            "expirationDate": "",
+            "note": "",
+            "primarySource": null,
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "properties": [],
+            "names": [],
+            "definitionId": "",
+            "parentId": "",
+            "identifiers": [
+                {
+                    "code": "",
+                    "text": "",
+                    "value": ""
+                },
+                {
+                    "code": null,
+                    "text": null,
+                    "value": null
+                }
+            ]
+        }
+    },
+    "null collections": {
+        "json": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primarySource\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}",
+        "signedJson": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primary_source\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}",
+        "form": {
+            "uuid": null,
+            "status": "active",
+            "typeCode": "",
+            "modelNumber": "",
+            "lotNumber": "",
+            "manufacturer": "",
+            "serialNumber": "",
+            "manufactureDate": "",
+            "expirationDate": "",
+            "note": "",
+            "primarySource": null,
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "properties": [],
+            "names": [],
+            "definitionId": "",
+            "parentId": "",
+            "identifiers": []
+        }
+    },
+    "nullable property metadata": {
+        "json": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primarySource\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"property\":[{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"quantity\"}],\"text\":\"\"},\"valueQuantity\":{\"value\":0,\"comparator\":null,\"unit\":\"g\",\"system\":null,\"code\":null}},{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"range\"}],\"text\":\"\"},\"valueRange\":{\"low\":{\"value\":0,\"unit\":\"g\",\"system\":null,\"code\":null},\"high\":{\"value\":10,\"unit\":\"g\",\"system\":null,\"code\":null}}}]}",
+        "signedJson": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primary_source\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"property\":[{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"quantity\"}],\"text\":\"\"},\"value_quantity\":{\"value\":0,\"comparator\":null,\"unit\":\"g\",\"system\":null,\"code\":null}},{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"range\"}],\"text\":\"\"},\"value_range\":{\"low\":{\"value\":0,\"unit\":\"g\",\"system\":null,\"code\":null},\"high\":{\"value\":10,\"unit\":\"g\",\"system\":null,\"code\":null}}}]}",
+        "form": {
+            "uuid": null,
+            "status": "active",
+            "typeCode": "",
+            "modelNumber": "",
+            "lotNumber": "",
+            "manufacturer": "",
+            "serialNumber": "",
+            "manufactureDate": "",
+            "expirationDate": "",
+            "note": "",
+            "primarySource": null,
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "properties": [
+                {
+                    "code": "quantity",
+                    "valueCodeableConceptSystem": null,
+                    "valueCodeableConceptCode": null,
+                    "valueQuantityValue": 0,
+                    "valueQuantityComparator": null,
+                    "valueQuantityUnit": "g",
+                    "valueQuantitySystem": null,
+                    "valueQuantityCode": null,
+                    "valueRangeLowValue": null,
+                    "valueRangeLowUnit": null,
+                    "valueRangeLowSystem": null,
+                    "valueRangeLowCode": null,
+                    "valueRangeHighValue": null,
+                    "valueRangeHighUnit": null,
+                    "valueRangeHighSystem": null,
+                    "valueRangeHighCode": null,
+                    "valueBoolean": null,
+                    "valueInteger": null,
+                    "valueString": null
+                },
+                {
+                    "code": "",
+                    "valueCodeableConceptSystem": null,
+                    "valueCodeableConceptCode": null,
+                    "valueQuantityValue": null,
+                    "valueQuantityComparator": null,
+                    "valueQuantityUnit": null,
+                    "valueQuantitySystem": null,
+                    "valueQuantityCode": null,
+                    "valueRangeLowValue": 0,
+                    "valueRangeLowUnit": "g",
+                    "valueRangeLowSystem": null,
+                    "valueRangeLowCode": null,
+                    "valueRangeHighValue": 10,
+                    "valueRangeHighUnit": "g",
+                    "valueRangeHighSystem": null,
+                    "valueRangeHighCode": null,
+                    "valueBoolean": null,
+                    "valueInteger": null,
+                    "valueString": null
+                }
+            ],
+            "names": [],
+            "definitionId": "",
+            "parentId": "",
+            "identifiers": []
+        }
+    },
+    "complete quantity range and concept": {
+        "json": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primarySource\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"property\":[{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"quantity\"}],\"text\":\"\"},\"valueQuantity\":{\"value\":0,\"comparator\":\"<\",\"unit\":\"g\",\"system\":\"ucum\",\"code\":\"g\"}},{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"range\"}],\"text\":\"\"},\"valueRange\":{\"low\":{\"value\":0,\"unit\":\"g\",\"system\":\"ucum\",\"code\":\"g\"},\"high\":{\"value\":10,\"unit\":\"g\",\"system\":\"ucum\",\"code\":\"g\"}}},{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"concept\"}],\"text\":\"\"},\"valueCodeableConcept\":{\"coding\":[{\"system\":\"dictionary_with_underscore\",\"code\":\"0\"}],\"text\":\"\"}}]}",
+        "signedJson": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primary_source\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"property\":[{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"quantity\"}],\"text\":\"\"},\"value_quantity\":{\"value\":0,\"comparator\":\"<\",\"unit\":\"g\",\"system\":\"ucum\",\"code\":\"g\"}},{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"range\"}],\"text\":\"\"},\"value_range\":{\"low\":{\"value\":0,\"unit\":\"g\",\"system\":\"ucum\",\"code\":\"g\"},\"high\":{\"value\":10,\"unit\":\"g\",\"system\":\"ucum\",\"code\":\"g\"}}},{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"concept\"}],\"text\":\"\"},\"value_codeable_concept\":{\"coding\":[{\"system\":\"dictionary_with_underscore\",\"code\":\"0\"}],\"text\":\"\"}}]}",
+        "form": {
+            "uuid": null,
+            "status": "active",
+            "typeCode": "",
+            "modelNumber": "",
+            "lotNumber": "",
+            "manufacturer": "",
+            "serialNumber": "",
+            "manufactureDate": "",
+            "expirationDate": "",
+            "note": "",
+            "primarySource": null,
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "properties": [
+                {
+                    "code": "concept",
+                    "valueCodeableConceptSystem": "dictionary_with_underscore",
+                    "valueCodeableConceptCode": "0",
+                    "valueQuantityValue": null,
+                    "valueQuantityComparator": null,
+                    "valueQuantityUnit": null,
+                    "valueQuantitySystem": null,
+                    "valueQuantityCode": null,
+                    "valueRangeLowValue": null,
+                    "valueRangeLowUnit": null,
+                    "valueRangeLowSystem": null,
+                    "valueRangeLowCode": null,
+                    "valueRangeHighValue": null,
+                    "valueRangeHighUnit": null,
+                    "valueRangeHighSystem": null,
+                    "valueRangeHighCode": null,
+                    "valueBoolean": null,
+                    "valueInteger": null,
+                    "valueString": null
+                }
+            ],
+            "names": [],
+            "definitionId": "",
+            "parentId": "",
+            "identifiers": []
+        }
+    },
+    "null variant triggers omitted": {
+        "json": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primarySource\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"property\":[{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"empty\"}],\"text\":\"\"}}]}",
+        "signedJson": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primary_source\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"property\":[{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"empty\"}],\"text\":\"\"}}]}",
+        "form": {
+            "uuid": null,
+            "status": "active",
+            "typeCode": "",
+            "modelNumber": "",
+            "lotNumber": "",
+            "manufacturer": "",
+            "serialNumber": "",
+            "manufactureDate": "",
+            "expirationDate": "",
+            "note": "",
+            "primarySource": null,
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "properties": [
+                {
+                    "code": null,
+                    "valueCodeableConceptSystem": null,
+                    "valueCodeableConceptCode": null,
+                    "valueQuantityValue": null,
+                    "valueQuantityComparator": null,
+                    "valueQuantityUnit": null,
+                    "valueQuantitySystem": null,
+                    "valueQuantityCode": null,
+                    "valueRangeLowValue": null,
+                    "valueRangeLowUnit": null,
+                    "valueRangeLowSystem": null,
+                    "valueRangeLowCode": null,
+                    "valueRangeHighValue": null,
+                    "valueRangeHighUnit": null,
+                    "valueRangeHighSystem": null,
+                    "valueRangeHighCode": null,
+                    "valueBoolean": null,
+                    "valueInteger": null,
+                    "valueString": null
+                }
+            ],
+            "names": [],
+            "definitionId": "",
+            "parentId": "",
+            "identifiers": []
+        }
+    },
+    "individual scalar property variants": {
+        "json": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primarySource\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"property\":[{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"boolean\"}],\"text\":\"\"},\"valueBoolean\":false},{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"integer\"}],\"text\":\"\"},\"valueInteger\":0},{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"string\"}],\"text\":\"\"},\"valueString\":\"\"}]}",
+        "signedJson": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primary_source\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"property\":[{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"boolean\"}],\"text\":\"\"},\"value_boolean\":false},{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"integer\"}],\"text\":\"\"},\"value_integer\":0},{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"string\"}],\"text\":\"\"},\"value_string\":\"\"}]}",
+        "form": {
+            "uuid": null,
+            "status": "active",
+            "typeCode": "",
+            "modelNumber": "",
+            "lotNumber": "",
+            "manufacturer": "",
+            "serialNumber": "",
+            "manufactureDate": "",
+            "expirationDate": "",
+            "note": "",
+            "primarySource": null,
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "properties": [
+                {
+                    "code": "",
+                    "valueCodeableConceptSystem": null,
+                    "valueCodeableConceptCode": null,
+                    "valueQuantityValue": null,
+                    "valueQuantityComparator": null,
+                    "valueQuantityUnit": null,
+                    "valueQuantitySystem": null,
+                    "valueQuantityCode": null,
+                    "valueRangeLowValue": null,
+                    "valueRangeLowUnit": null,
+                    "valueRangeLowSystem": null,
+                    "valueRangeLowCode": null,
+                    "valueRangeHighValue": null,
+                    "valueRangeHighUnit": null,
+                    "valueRangeHighSystem": null,
+                    "valueRangeHighCode": null,
+                    "valueBoolean": false,
+                    "valueInteger": null,
+                    "valueString": null
+                },
+                {
+                    "code": "",
+                    "valueCodeableConceptSystem": null,
+                    "valueCodeableConceptCode": null,
+                    "valueQuantityValue": null,
+                    "valueQuantityComparator": null,
+                    "valueQuantityUnit": null,
+                    "valueQuantitySystem": null,
+                    "valueQuantityCode": null,
+                    "valueRangeLowValue": null,
+                    "valueRangeLowUnit": null,
+                    "valueRangeLowSystem": null,
+                    "valueRangeLowCode": null,
+                    "valueRangeHighValue": null,
+                    "valueRangeHighUnit": null,
+                    "valueRangeHighSystem": null,
+                    "valueRangeHighCode": null,
+                    "valueBoolean": null,
+                    "valueInteger": 0,
+                    "valueString": null
+                },
+                {
+                    "code": "",
+                    "valueCodeableConceptSystem": null,
+                    "valueCodeableConceptCode": null,
+                    "valueQuantityValue": null,
+                    "valueQuantityComparator": null,
+                    "valueQuantityUnit": null,
+                    "valueQuantitySystem": null,
+                    "valueQuantityCode": null,
+                    "valueRangeLowValue": null,
+                    "valueRangeLowUnit": null,
+                    "valueRangeLowSystem": null,
+                    "valueRangeLowCode": null,
+                    "valueRangeHighValue": null,
+                    "valueRangeHighUnit": null,
+                    "valueRangeHighSystem": null,
+                    "valueRangeHighCode": null,
+                    "valueBoolean": null,
+                    "valueInteger": null,
+                    "valueString": ""
+                }
+            ],
+            "names": [],
+            "definitionId": "",
+            "parentId": "",
+            "identifiers": []
+        }
+    },
+    "all property variants remain ordered": {
+        "json": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primarySource\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"property\":[{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"quantity\"}],\"text\":\"\"},\"valueCodeableConcept\":{\"coding\":[{\"system\":\"dictionary_with_underscore\",\"code\":\"0\"}],\"text\":\"\"},\"valueQuantity\":{\"value\":0,\"comparator\":null,\"unit\":\"g\",\"system\":null,\"code\":null},\"valueRange\":{\"low\":{\"value\":0,\"unit\":\"g\",\"system\":null,\"code\":null},\"high\":{\"value\":10,\"unit\":\"g\",\"system\":null,\"code\":null}},\"valueBoolean\":false,\"valueInteger\":0,\"valueString\":\"\"}]}",
+        "signedJson": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primary_source\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"property\":[{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"quantity\"}],\"text\":\"\"},\"value_codeable_concept\":{\"coding\":[{\"system\":\"dictionary_with_underscore\",\"code\":\"0\"}],\"text\":\"\"},\"value_quantity\":{\"value\":0,\"comparator\":null,\"unit\":\"g\",\"system\":null,\"code\":null},\"value_range\":{\"low\":{\"value\":0,\"unit\":\"g\",\"system\":null,\"code\":null},\"high\":{\"value\":10,\"unit\":\"g\",\"system\":null,\"code\":null}},\"value_boolean\":false,\"value_integer\":0,\"value_string\":\"\"}]}",
+        "form": {
+            "uuid": "stored",
+            "status": "inactive",
+            "typeCode": "device-type",
+            "modelNumber": "MODEL",
+            "lotNumber": "LOT",
+            "manufacturer": "Виробник",
+            "serialNumber": "SERIAL",
+            "manufactureDate": "05.10.2026",
+            "expirationDate": "25.10.2026",
+            "note": "Примітка",
+            "primarySource": true,
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "properties": [
+                {
+                    "code": "power",
+                    "valueCodeableConceptSystem": null,
+                    "valueCodeableConceptCode": null,
+                    "valueQuantityValue": null,
+                    "valueQuantityComparator": null,
+                    "valueQuantityUnit": null,
+                    "valueQuantitySystem": null,
+                    "valueQuantityCode": null,
+                    "valueRangeLowValue": null,
+                    "valueRangeLowUnit": null,
+                    "valueRangeLowSystem": null,
+                    "valueRangeLowCode": null,
+                    "valueRangeHighValue": null,
+                    "valueRangeHighUnit": null,
+                    "valueRangeHighSystem": null,
+                    "valueRangeHighCode": null,
+                    "valueBoolean": false,
+                    "valueInteger": 0,
+                    "valueString": ""
+                }
+            ],
+            "names": [
+                {
+                    "type": "user-friendly-name",
+                    "value": "Назва"
+                },
+                {
+                    "type": "manufacturer-name",
+                    "value": "Brand"
+                }
+            ],
+            "definitionId": "definition",
+            "parentId": "parent",
+            "identifiers": [
+                {
+                    "code": "system",
+                    "text": "Система",
+                    "value": "external-id"
+                }
+            ]
+        }
+    },
+    "unknown fields excluded": {
+        "json": "{\"id\":\"device-fixed\",\"status\":\"inactive\",\"primarySource\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[{\"type\":\"user-friendly-name\",\"value\":\"\\u041d\\u0430\\u0437\\u0432\\u0430\"},{\"type\":\"manufacturer-name\",\"value\":\"Brand\"}],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"identifier\":[{\"type\":{\"coding\":[{\"system\":\"external_system\",\"code\":\"system\"}],\"text\":\"\\u0421\\u0438\\u0441\\u0442\\u0435\\u043c\\u0430\"},\"value\":\"external-id\"}],\"property\":[{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"power\"}],\"text\":\"\"},\"valueBoolean\":false,\"valueInteger\":0,\"valueString\":\"\"}],\"modelNumber\":\"MODEL\",\"lotNumber\":\"LOT\",\"manufacturer\":\"\\u0412\\u0438\\u0440\\u043e\\u0431\\u043d\\u0438\\u043a\",\"serialNumber\":\"SERIAL\",\"manufactureDate\":\"2026-10-05T07:15:00Z\",\"expirationDate\":\"2026-10-25T02:15:00Z\",\"note\":\"\\u041f\\u0440\\u0438\\u0441\\u0442\\u0440\\u0456\\u0439\\n\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"definition\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device_definition\"}],\"text\":\"\"},\"value\":\"definition\"}},\"parent\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"parent\"}}}",
+        "signedJson": "{\"id\":\"device-fixed\",\"status\":\"inactive\",\"primary_source\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[{\"type\":\"user-friendly-name\",\"value\":\"\\u041d\\u0430\\u0437\\u0432\\u0430\"},{\"type\":\"manufacturer-name\",\"value\":\"Brand\"}],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"identifier\":[{\"type\":{\"coding\":[{\"system\":\"external_system\",\"code\":\"system\"}],\"text\":\"\\u0421\\u0438\\u0441\\u0442\\u0435\\u043c\\u0430\"},\"value\":\"external-id\"}],\"property\":[{\"code\":{\"coding\":[{\"system\":\"device_properties\",\"code\":\"power\"}],\"text\":\"\"},\"value_boolean\":false,\"value_integer\":0,\"value_string\":\"\"}],\"model_number\":\"MODEL\",\"lot_number\":\"LOT\",\"manufacturer\":\"\\u0412\\u0438\\u0440\\u043e\\u0431\\u043d\\u0438\\u043a\",\"serial_number\":\"SERIAL\",\"manufacture_date\":\"2026-10-05T07:15:00Z\",\"expiration_date\":\"2026-10-25T02:15:00Z\",\"note\":\"\\u041f\\u0440\\u0438\\u0441\\u0442\\u0440\\u0456\\u0439\\n\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\",\"definition\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device_definition\"}],\"text\":\"\"},\"value\":\"definition\"}},\"parent\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"parent\"}}}",
+        "form": {
+            "uuid": "stored",
+            "status": "inactive",
+            "typeCode": "device-type",
+            "modelNumber": "MODEL",
+            "lotNumber": "LOT",
+            "manufacturer": "Виробник",
+            "serialNumber": "SERIAL",
+            "manufactureDate": "05.10.2026",
+            "expirationDate": "25.10.2026",
+            "note": "Примітка",
+            "primarySource": true,
+            "reportOriginCode": "",
+            "reportOriginText": "",
+            "properties": [
+                {
+                    "code": "power",
+                    "valueCodeableConceptSystem": null,
+                    "valueCodeableConceptCode": null,
+                    "valueQuantityValue": null,
+                    "valueQuantityComparator": null,
+                    "valueQuantityUnit": null,
+                    "valueQuantitySystem": null,
+                    "valueQuantityCode": null,
+                    "valueRangeLowValue": null,
+                    "valueRangeLowUnit": null,
+                    "valueRangeLowSystem": null,
+                    "valueRangeLowCode": null,
+                    "valueRangeHighValue": null,
+                    "valueRangeHighUnit": null,
+                    "valueRangeHighSystem": null,
+                    "valueRangeHighCode": null,
+                    "valueBoolean": false,
+                    "valueInteger": 0,
+                    "valueString": ""
+                }
+            ],
+            "names": [
+                {
+                    "type": "user-friendly-name",
+                    "value": "Назва"
+                },
+                {
+                    "type": "manufacturer-name",
+                    "value": "Brand"
+                }
+            ],
+            "definitionId": "definition",
+            "parentId": "parent",
+            "identifiers": [
+                {
+                    "code": "system",
+                    "text": "Система",
+                    "value": "external-id"
+                }
+            ]
+        }
+    },
+    "missing and null nested form fields": {
+        "json": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primarySource\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"identifier\":[{\"type\":{\"coding\":[{\"system\":\"external_system\",\"code\":\"system\"}],\"text\":\"\"},\"value\":\"external\"}]}",
+        "signedJson": "{\"id\":\"device-fixed\",\"status\":\"active\",\"primary_source\":true,\"type\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"device-type\"}],\"text\":\"\"},\"name\":[],\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"identifier\":[{\"type\":{\"coding\":[{\"system\":\"external_system\",\"code\":\"system\"}],\"text\":\"\"},\"value\":\"external\"}]}",
+        "form": {
+            "uuid": null,
+            "status": "active",
+            "typeCode": null,
+            "modelNumber": "",
+            "lotNumber": "",
+            "manufacturer": "",
+            "serialNumber": "",
+            "manufactureDate": "",
+            "expirationDate": "",
+            "note": "",
+            "primarySource": null,
+            "reportOriginCode": null,
+            "reportOriginText": null,
+            "properties": [],
+            "names": [
+                {
+                    "type": "",
+                    "value": ""
+                },
+                {
+                    "type": null,
+                    "value": null
+                }
+            ],
+            "definitionId": null,
+            "parentId": "",
+            "identifiers": []
+        }
+    }
+}

@@ -8,7 +8,7 @@ use App\Models\MedicalEvents\Sql\DeviceDispense;
 use App\Models\MedicalEvents\Sql\Quantity;
 use App\Models\Person\Person;
 use App\Models\Preperson;
-use App\Services\MedicalEvents\FhirResource;
+use App\Mapping\Transforms\FhirReference;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -36,9 +36,7 @@ class DeviceDispenseRepository extends BaseRepository
                     : null;
                 $performer = $this->storeIdentifier($datum['performer']);
                 $location = $this->storeIdentifier($datum['location']);
-                $performerLegalEntityData = FhirResource::make()
-                    ->coding('eHealth/resources', 'legal_entity')
-                    ->toIdentifier(legalEntity()->uuid);
+                $performerLegalEntityData = new FhirReference('legal_entity', includeText: true)(legalEntity()->uuid, (object) [], null);
                 $performerLegalEntityData['displayValue'] = legalEntity()->name;
                 $performerLegalEntity = $this->storeIdentifier($performerLegalEntityData);
                 $program = isset($datum['program'])

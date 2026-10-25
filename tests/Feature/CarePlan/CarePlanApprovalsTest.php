@@ -10,7 +10,7 @@ use App\Models\Employee\Employee;
 use App\Models\Relations\Party;
 use App\Models\User;
 use App\Models\Person\Person;
-use App\Services\MedicalEvents\CarePlanApprovalService;
+use Tests\Support\CarePlanApprovals as CarePlanApprovalHarness;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -19,6 +19,8 @@ use Illuminate\Support\Str;
 
 class CarePlanApprovalsTest extends TestCase
 {
+    use \Tests\Concerns\CreatesFhirCarePlans;
+
     use DatabaseTransactions;
 
     protected function migrateDatabases()
@@ -111,7 +113,7 @@ class CarePlanApprovalsTest extends TestCase
         ]);
 
         // Care plan of the current legal entity (another LE's employees still exist in DB).
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $person->id,
             'author_id' => $employeeActive->id,
@@ -213,7 +215,7 @@ class CarePlanApprovalsTest extends TestCase
         ]);
 
         // Care plan owned by active legal entity
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $person->id,
             'author_id' => $employeeActive->id,
@@ -352,7 +354,7 @@ class CarePlanApprovalsTest extends TestCase
         ]);
 
         // Care plan owned by other legal entity
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $person->id,
             'author_id' => $employeeActive->id,
@@ -367,7 +369,7 @@ class CarePlanApprovalsTest extends TestCase
         $this->assertTrue(\Illuminate\Support\Facades\Gate::forUser($user)->denies('view', $carePlan));
         $this->assertSame(
             'read',
-            app(\App\Services\MedicalEvents\CarePlanApprovalService::class)
+            app(CarePlanApprovalHarness::class)
                 ->resolveAccessLevel($carePlan, $activeLegalEntity)
         );
     }
@@ -426,7 +428,7 @@ class CarePlanApprovalsTest extends TestCase
             'process_disclosure_data_consent' => true,
         ]);
 
-        $carePlan = CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $person->id,
             'author_id' => $employee->id,
@@ -447,11 +449,6 @@ class CarePlanApprovalsTest extends TestCase
             'status' => 'pending',
             'is_verified' => false,
         ]);
-
-        $approvalService = Mockery::mock(CarePlanApprovalService::class)->makePartial();
-        $approvalService->shouldReceive('syncForCarePlan')->andReturnNull();
-        $approvalService->shouldReceive('skipsPatientOtp')->andReturn(true);
-        $this->instance(CarePlanApprovalService::class, $approvalService);
 
         $mockPatientApi = Mockery::mock(\App\Classes\eHealth\Api\Person::class);
         $this->instance(\App\Classes\eHealth\Api\Person::class, $mockPatientApi);

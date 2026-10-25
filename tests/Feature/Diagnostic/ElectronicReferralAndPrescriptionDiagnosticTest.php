@@ -20,7 +20,6 @@ use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\User;
 use App\Services\Dictionary\DictionaryManager;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -142,7 +141,7 @@ class ElectronicReferralAndPrescriptionDiagnosticTest extends TestCase
             'process' => ['status' => ServiceRequestStatus::IN_PROGRESS->value],
         ]);
 
-        $service = app(ReferralRequestLifecycleService::class);
+        $service = new \Tests\Support\ReferralExecutionHarness();
         $result = $service->takeIntoWork($referralUuid, $this->employee, $this->person->uuid);
 
         $this->assertSame(ServiceRequestStatus::IN_PROGRESS->value, $result['status'] ?? null);
@@ -169,7 +168,7 @@ class ElectronicReferralAndPrescriptionDiagnosticTest extends TestCase
             'complete' => ['status' => ServiceRequestStatus::COMPLETED->value],
         ]);
 
-        $service = app(ReferralRequestLifecycleService::class);
+        $service = new \Tests\Support\ReferralExecutionHarness();
         $result = $service->completeReferral($referralUuid, $encounterUuid);
 
         $this->assertSame(ServiceRequestStatus::COMPLETED->value, $result['status'] ?? null);
@@ -203,7 +202,7 @@ class ElectronicReferralAndPrescriptionDiagnosticTest extends TestCase
             ]));
         $this->app->instance(ExecutorServiceRequest::class, $mock);
 
-        $service = app(ReferralRequestLifecycleService::class);
+        $service = new \Tests\Support\ReferralExecutionHarness();
         $service->takeIntoWork($referralUuid, $this->employee, $this->person->uuid, [
             'program_id' => $programId,
         ]);
@@ -273,14 +272,14 @@ class ElectronicReferralAndPrescriptionDiagnosticTest extends TestCase
             ],
         ]);
 
-        $jobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class);
+        $jobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class)->makePartial();
         $jobApi->shouldReceive('getDetails')
             ->andReturn($this->responseWithData(['status' => 'pending']));
         $jobApi->shouldReceive('getDetailsByHref')
             ->andReturn($this->responseWithData(['status' => 'pending']));
         $this->app->instance(\App\Classes\eHealth\Api\Job::class, $jobApi);
 
-        $service = app(ReferralRequestLifecycleService::class);
+        $service = new \Tests\Support\ReferralExecutionHarness();
 
         try {
             $service->completeReferral($referralUuid, $encounterUuid);

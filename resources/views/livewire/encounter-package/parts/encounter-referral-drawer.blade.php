@@ -235,7 +235,7 @@
                         >
                             <option value="">{{ __('encounters.referral_drawer.not_selected') }}</option>
                             @foreach ($encounterReferralAuthMethods as $method)
-                                <option value="{{ \App\Services\MedicalEvents\InformWith::formValue($method) }}">
+                                <option value="{{ $method['raw'] ?? $method['uuid'] ?? '' }}">
                                     {{ $method['label'] ?? '' }}
                                 </option>
                             @endforeach

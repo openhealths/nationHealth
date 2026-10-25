@@ -7,24 +7,26 @@ namespace Tests\Feature\MedicationRequest;
 use App\Classes\eHealth\Api\Patient\MedicationRequest as MedicationRequestApi;
 use App\Classes\eHealth\Api\Person as PersonApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
 use App\Models\CarePlanActivity;
-use App\Models\Person\Person;
 use App\Models\Employee\Employee;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\Person\Person;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\Mappers\MedicationRequestMapper;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
 use Mockery;
+use Tests\Support\MedicationRequestPayloads;
 use Tests\Concerns\CreatesFhirRequestIdentifiers;
 use Tests\Concerns\MocksBasicDictionaries;
+use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\TestCase;
-use Livewire\Livewire;
-use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
 
 class MedicationRequestLifecycleTest extends TestCase
 {
     use DatabaseTransactions;
+    use CreatesFhirCarePlans;
     use CreatesFhirRequestIdentifiers;
     use MocksBasicDictionaries;
 
@@ -50,6 +52,9 @@ class MedicationRequestLifecycleTest extends TestCase
     {
         parent::setUp();
         $this->mockBasicDictionaries();
+        $signatureService = Mockery::mock(\App\Services\SignatureService::class);
+        $signatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
+        $this->instance(\App\Services\SignatureService::class, $signatureService);
 
         // 1. Create Patient
         $this->person = Person::create([
@@ -142,7 +147,7 @@ class MedicationRequestLifecycleTest extends TestCase
         $this->grantMedicalEventAbilities($this->user);
 
         // 5. Create Care Plan & Medication Care Plan Activity
-        $carePlan = \App\Models\CarePlan::create([
+        $carePlan = $this->createFhirCarePlan([
             'uuid' => (string) Str::uuid(),
             'person_id' => $this->person->id,
             'author_id' => $this->employee->id,
@@ -152,7 +157,7 @@ class MedicationRequestLifecycleTest extends TestCase
             'status' => 'active',
         ]);
 
-        $this->carePlanActivity = CarePlanActivity::create([
+        $this->carePlanActivity = $this->createFhirCarePlanActivity([
             'uuid' => (string) Str::uuid(),
             'care_plan_id' => $carePlan->id,
             'author_id' => $this->employee->id,
@@ -218,57 +223,11 @@ class MedicationRequestLifecycleTest extends TestCase
         ]);
     }
 
-    public function test_can_map_to_fhir_payload(): void
-    {
-        $mapper = new MedicationRequestMapper();
-
-        $payload = [
-            'uuid' => (string) Str::uuid(),
-            'status' => 'draft',
-            'intent' => 'order',
-            'medication_id' => 'INN-101',
-            'medication_qty' => 30.0,
-            'medication_program_id' => 'program-affordable-medicines',
-            'based_on_uuid' => $this->carePlanActivity->uuid,
-            'note' => 'Take in the morning',
-            'dosage_instructions' => [
-                [
-                    'sequence' => 1,
-                    'text' => '1 tablet daily',
-                    'route' => 'oral',
-                    'as_needed_boolean' => false,
-                    'dose_and_rate' => [
-                        [
-                            'dose_quantity_value' => 1.0
-                        ]
-                    ]
-                ]
-            ]
-        ];
-
-        $uuids = [
-            'person_uuid' => $this->person->uuid,
-            'encounter_uuid' => $this->encounter->uuid,
-            'employee_uuid' => $this->employee->uuid,
-            'legal_entity_uuid' => (string) Str::uuid()
-        ];
-
-        $fhir = $mapper->toFhir($payload, $uuids);
-
-        $this->assertEquals($payload['uuid'], $fhir['id']);
-        $this->assertEquals('draft', $fhir['status']);
-        $this->assertEquals('INN-101', $fhir['medicationCodeableConcept']['coding'][0]['code']);
-        $this->assertEquals('program-affordable-medicines', $fhir['program']['identifier']['value']);
-        $this->assertEquals($this->carePlanActivity->uuid, $fhir['basedOn'][0]['identifier']['value']);
-        $this->assertEquals('Take in the morning', $fhir['note'][0]['text']);
-        $this->assertEquals(1.0, $fhir['dosageInstruction'][0]['doseAndRate'][0]['doseQuantity']['value']);
-    }
-
     public function test_create_request_payload_uses_snomed_route_and_object_dose_and_rate(): void
     {
-        $mapper = new MedicationRequestMapper();
+        $mapper = app(MedicationRequestPayloads::class);
 
-        $payload = $mapper->toCreateRequestPayload(
+        $payload = $mapper->create(
             [
                 'medication_id' => 'INN-101',
                 'medication_qty' => 10.0,
@@ -296,7 +255,8 @@ class MedicationRequestLifecycleTest extends TestCase
                 'employee_uuid' => $this->employee->uuid,
                 'division_uuid' => (string) Str::uuid(),
             ],
-            $this->carePlanActivity->carePlan->uuid,
+            \Carbon\CarbonImmutable::now(),
+            $this->carePlanActivity->carePlan->uuid
         );
 
         $dosage = $payload['medication_request_request']['dosage_instruction'][0];
@@ -450,17 +410,16 @@ class MedicationRequestLifecycleTest extends TestCase
             'inform_with' => 'otp-method-uuid|OTP|+380991112233'
         ]);
 
-        // Avoid Mockery alias mocks — they break when the API class is already loaded by earlier suites.
-        $lifecycle = Mockery::mock(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class);
-        $lifecycle->shouldIgnoreMissing();
-        $lifecycle->shouldReceive('rejectPrescription')
-            ->once()
-            ->andReturnUsing(function ($carePlan, $requestRecord, array $formData = [], string $statusReason = '') {
-                $requestRecord->update(['status' => 'rejected']);
-
-                return ['status' => 'rejected'];
-            });
-        $this->instance(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class, $lifecycle);
+        // Mock eHealth reject API
+        $mockApi = Mockery::mock(\App\Classes\eHealth\Api\Patient\MedicationRequest::class)->makePartial();
+        $this->instance(\App\Classes\eHealth\Api\Patient\MedicationRequest::class, $mockApi);
+        $mockApi->shouldReceive('getBySearchParams')->andReturn($this->responseWithData([]));
+        $mockApi->shouldReceive('getById')->andReturn($this->responseWithData([
+            'id' => $uuid,
+            'status' => 'ACTIVE',
+            'request_number' => 'MR-777777',
+        ]));
+        $mockApi->shouldReceive('reject')->once()->andReturn($this->responseWithData(['status' => 'rejected']));
 
         // Mock SignatureService (KEP modal still fills form fields before signRejectPrescription).
         $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
@@ -534,5 +493,18 @@ class MedicationRequestLifecycleTest extends TestCase
             ->call('loadPrintoutForm', $uuid)
             ->assertSet('printableContent', '<div>Official eHealth printout</div>')
             ->assertDispatched('printoutLoaded');
+    }
+
+    private function identifierId(string $uuid): int
+    {
+        return (int) \App\Models\MedicalEvents\Sql\Identifier::firstOrCreate(['value' => $uuid])->id;
+    }
+
+    private function responseWithData(array $data): \App\Classes\eHealth\EHealthResponse
+    {
+        $response = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $response->shouldReceive('getData')->andReturn($data);
+
+        return $response;
     }
 }

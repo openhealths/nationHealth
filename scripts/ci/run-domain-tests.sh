@@ -21,23 +21,21 @@ DOMAIN_PATHS=(
   tests/Unit/Livewire/Party
   tests/Unit/Livewire/CarePlan
   tests/Unit/Livewire/CarePlanLockedStateTest.php
+  tests/Unit/Livewire/EncounterReferralFlowTest.php
   tests/Unit/CarePlan
+  tests/Unit/Mapping
+  tests/Unit/Composition/CompositionPayloadTest.php
   tests/Unit/Exceptions/EHealthValidationExceptionCarePlanMessageTest.php
   tests/Unit/Models/CarePlanActivityResolvedKindTest.php
-  tests/Unit/Repositories/CarePlanActivityRepositoryTest.php
   tests/Unit/Repositories/RepositoryCarePlanTest.php
   tests/Unit/Repositories/MedicalEvents/MedicationRequestRepositoryFhirRefsTest.php
   tests/Unit/Services/Party
-  tests/Unit/Services/MedicalEvents/CarePlanActivityLifecycleServiceTest.php
-  tests/Unit/Services/MedicalEvents/CarePlanLifecycleServiceTest.php
+  tests/Unit/Classes/EHealth/Api
   tests/Unit/Services/MedicalEvents/MedicationRequestSignPayloadTest.php
-  tests/Unit/Services/MedicalEvents/Mappers/MedicationRequestMapperTest.php
-  tests/Unit/Services/MedicalEvents/ServiceRequestMapperTest.php
   tests/Unit/Services/MedicalEvents/ResolvesEmployeeContextTest.php
   tests/Unit/Services/MedicalEvents/ReferralSignPayloadTest.php
   tests/Unit/Services/MedicalEvents/ReferralRequestLifecycleWriteTest.php
   tests/Unit/Services/MedicalEvents/ReferralPrintoutCode128Test.php
-  tests/Unit/Services/MedicalEvents/DeviceRequestMapperTest.php
   tests/Unit/Services/MedicalEvents/DeviceRequestPrescribingTest.php
   tests/Unit/Services/MedicalEvents/EncounterReferralDisplayTest.php
   tests/Unit/eHealth/Api/Patient/MedicationRequestRejectPayloadTest.php
@@ -45,6 +43,10 @@ DOMAIN_PATHS=(
   tests/Feature/Employee
   tests/Feature/Party
   tests/Feature/CarePlan
+  tests/Feature/Composition/CompositionFormTest.php
+  tests/Feature/Composition/CompositionTempDisabilityFormTest.php
+  tests/Feature/Composition/CompositionApiTest.php
+  tests/Feature/Composition/CompositionResponseValidationTest.php
   tests/Feature/CarePlanActivityPayloadTest.php
   tests/Feature/Livewire/CarePlan
   tests/Feature/MedicationRequest

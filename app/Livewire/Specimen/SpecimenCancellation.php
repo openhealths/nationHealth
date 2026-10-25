@@ -7,13 +7,13 @@ namespace App\Livewire\Specimen;
 use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Dto\Specimen\EhealthCancellation;
 use App\Exceptions\Cipher\CipherConnectionException;
 use App\Exceptions\Cipher\CipherException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\Specimen\Forms\SpecimenCancellationForm;
 use App\Models\MedicalEvents\Sql\Specimen;
-use App\Services\MedicalEvents\Fhir;
 use App\Traits\FormTrait;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
@@ -22,6 +22,7 @@ use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 
 /**
  * Marking a specimen as entered in error with a signed package. Embedded once into a page, which opens it for
@@ -122,7 +123,7 @@ class SpecimenCancellation extends Component
 
         try {
             $signedContent = new CipherRequest()->signData(
-                Fhir::specimen()->toCancellationPackage($response->getData(), $validated['cancellationReason']),
+                app(ObjectMapperInterface::class)->map($this->form, new EhealthCancellation($response->getData()))->toArray(),
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
                 $validated['password'],

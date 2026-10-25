@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Exceptions\EHealth\EHealthValidationException;
-use App\Models\CarePlanActivity;
-use App\Repositories\CarePlanActivityRepository;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
@@ -16,19 +14,10 @@ class CarePlanActivityPayloadTest extends TestCase
 
     public function test_care_plan_activity_payload_contains_correct_daily_amount_code()
     {
-        $activity = new CarePlanActivity([
-            'kind' => 'medication_request',
-            'quantity' => 10,
-            'quantity_system' => 'MEDICATION_UNIT',
-            'quantity_code' => 'ml',
-            'daily_amount' => 5,
-            'daily_amount_system' => 'MEDICATION_UNIT',
-            'daily_amount_code' => 'MG',
-            'uuid' => 'test-uuid-1234',
-        ]);
-
-        $repository = new CarePlanActivityRepository();
-        $payload = $repository->formatCarePlanActivityRequest($activity);
+        $resource = json_decode(file_get_contents(base_path('tests/Fixtures/CarePlan/activity.json')), true, flags: JSON_THROW_ON_ERROR);
+        $resource['detail']['kind'] = 'medication_request';
+        $resource['detail']['dailyAmount'] = ['value' => 5, 'system' => 'MEDICATION_UNIT', 'code' => 'MG'];
+        $payload = app(\App\Classes\eHealth\Api\CarePlanActivity::class)->buildCreateContent($resource);
 
         $this->assertEquals(5, $payload['detail']['daily_amount']['value']);
         $this->assertEquals('MEDICATION_UNIT', $payload['detail']['daily_amount']['system']);

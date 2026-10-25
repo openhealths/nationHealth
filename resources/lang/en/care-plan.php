@@ -3,6 +3,19 @@
 declare(strict_types=1);
 
 return [
+    'medication_not_available_for_program' => 'The selected medication was not found in the selected program. Refresh the search and select it again.',
+    'medication_dosage_unit_unavailable' => 'The eHealth catalog does not provide a dosage unit for the selected medication. Refresh the search or contact support.',
+
+    'medication_dosage_structure_required' => 'The :field field must include complete dosage details with units; a daily dose must also specify its period. Check the prescription dosage details.',
+    'medication_dosage_fields' => [
+        'maxDosePerPeriod' => 'Maximum daily dose',
+        'maxDosePerAdministration' => 'Maximum dose per administration',
+        'maxDosePerLifetime' => 'Maximum lifetime dose',
+    ],
+
+    'device_name_unavailable' => 'Medical device name unavailable',
+    'full_sync_required' => 'Full synchronization with eHealth is required before details and clinical actions are available.',
+    'draft_backfill_required' => 'This legacy draft requires review and conversion before details and editing are available.',
     'activity_updated' => 'Care plan activity draft updated successfully.',
     'activity_completed' => 'Care plan activity completed successfully.',
     'activity_cancelled' => 'Care plan activity cancelled successfully.',
@@ -17,6 +30,7 @@ return [
     'prequalify_passed' => 'PreQualify passed. You can create a draft.',
     'draft_created_awaiting_signature' => 'Draft created (ID: :id). Awaiting KEP signature.',
     'draft_missing_identifier' => 'eHealth did not return a draft identifier. Please try again.',
+    'draft_missing_document' => 'eHealth did not return the draft document for signing. Please try again.',
     'draft_required_before_signing' => 'Create a draft first.',
     'prescription_signed' => 'Prescription signed with KEP and submitted to eHealth.',
     'device_request_signed' => 'Device request signed with KEP and submitted to eHealth.',

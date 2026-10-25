@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
+use App\Dto\CarePlan\Ehealth as CarePlanCreateData;
+use App\Dto\FormCollection;
+
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
 use App\Exceptions\EHealth\EHealthConnectionException;
@@ -12,12 +15,128 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
-use App\Core\Arr;
 use Illuminate\Validation\ValidationException;
+use App\Classes\eHealth\MapsCarePlanResources;
+use App\Classes\eHealth\EHealth;
+use App\Repositories\CarePlanRepository;
 
 class CarePlan extends Request
 {
+    use MapsCarePlanResources;
+
     protected const string URL = '/api/care_plans';
+
+    public function buildCreateContent(array $resource): array
+    {
+        Validator::make($resource, [
+            'id' => ['required', 'uuid'], 'title' => ['required', 'string'],
+            'category.coding' => ['required', 'array', 'min:1'],
+            'period.start' => ['required', 'date'],
+            'encounter.identifier.value' => ['required', 'uuid'],
+            'author.identifier.value' => ['required', 'uuid'],
+            'addresses' => ['required', 'array', 'min:1'],
+            'termsOfService.coding' => ['required', 'array', 'min:1'],
+        ])->validate();
+
+        return $this->resourcePayload(CarePlanCreateData::fromSource(new FormCollection($resource))->toArray());
+    }
+
+    public function buildCancelContent(array $snapshot, array $statusReason): array
+    {
+        Validator::make($snapshot, ['id' => ['required', 'uuid']])->validate();
+        unset($snapshot['activities']);
+        $snapshot['status_reason'] = $statusReason;
+
+        return $snapshot;
+    }
+
+    public function fetchCancelSnapshot(string $patientUuid, string $planUuid): array
+    {
+        $snapshot = $this->getDetails($patientUuid, $planUuid)->getData();
+        Validator::make($snapshot, ['id' => ['required', 'in:'.$planUuid]])->validate();
+
+        return $snapshot;
+    }
+
+    public function submitSignedCreate(string $patientUuid, string $signedContent): array
+    {
+        return $this->resolveWriteResponse($this->create($patientUuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']));
+    }
+
+    public function cancelAndResolve(string $patientUuid, string $planUuid, array $payload): array
+    {
+        return $this->resolveWriteResponse($this->cancel($patientUuid, $planUuid, $payload));
+    }
+
+    public function completeAndResolve(string $patientUuid, string $planUuid, array $payload): array
+    {
+        return $this->resolveWriteResponse($this->complete($patientUuid, $planUuid, $payload));
+    }
+
+    /** Fetch full details and the entire activity collection before opening a SQL transaction. */
+    public function synchronizeResources(array $summaries, ?int $personId, int $legalEntityId, ?string $patientUuid = null, ?string $token = null): void
+    {
+        $summaries = $summaries['data'] ?? $summaries;
+        $repository = app(CarePlanRepository::class);
+        foreach ($summaries as $summary) {
+            $summary = $this->resourceFromResponse($summary);
+            $patient = $repository->resolvePatientContext($personId, $patientUuid ?? data_get($summary, 'subject.identifier.value'));
+            if ($token !== null) {
+                $this->withToken($token);
+            }
+            $resource = $this->getDetails($patient['uuid'], $summary['id'])->validate();
+            if ($resource['id'] !== $summary['id']) {
+                throw ValidationException::withMessages(['id' => 'Care Plan details do not match the requested resource.']);
+            }
+            $activityApi = EHealth::carePlanActivity();
+            if ($token !== null) {
+                $activityApi->withToken($token);
+            }
+            $activities = $activityApi->fetchAllResources($patient['uuid'], $resource['id']);
+            $repository->storeAggregate($resource, $activities, $patient['id'], $legalEntityId);
+        }
+    }
+
+    public function getRawDetails(string $patientUuid, string $planUuid): array
+    {
+        return $this->getDetails($patientUuid, $planUuid)->getData();
+    }
+
+    public function synchronizePatient(string $patientUuid, int $personId, int $legalEntityId, array $query = []): void
+    {
+        $summaries = $this->collectSummaries(fn (int $page) => $this->getBySearchParams($patientUuid, array_replace($query, ['page' => $page])));
+        $this->synchronizeResources($summaries, $personId, $legalEntityId, $patientUuid);
+    }
+
+    public function synchronizeSearch(array $query, int $legalEntityId): void
+    {
+        $summaries = $this->collectSummaries(fn (int $page) => $this->getMany(array_replace($query, ['page' => $page])));
+        $this->synchronizeResources($summaries, null, $legalEntityId);
+    }
+
+    private function collectSummaries(callable $fetch): array
+    {
+        $summaries = [];
+        $seen = [];
+        for ($page = 1; ; $page++) {
+            $response = $fetch($page);
+            $items = $response->getData();
+            foreach ($items as $item) {
+                $item = $this->resourceFromResponse($item);
+                if (isset($seen[$item['id']])) {
+                    throw ValidationException::withMessages(['paging' => 'Care Plan pagination repeated a resource.']);
+                }
+                $seen[$item['id']] = true;
+                $summaries[] = $item;
+            }
+            $lastPage = $response->getPaging()['total_pages'] ?? null;
+            if ($items === [] || ($lastPage !== null && $page >= (int) $lastPage)) {
+                break;
+            }
+        }
+
+        return $summaries;
+    }
 
     /**
      * Create a new Care Plan in eHealth.
@@ -130,10 +249,10 @@ class CarePlan extends Request
 
     protected function validateDetails(EHealthResponse $response): array
     {
-        $data = $this->replaceEHealthPropNames($response->getData());
+        $data = $this->resourceFromResponse($response->getData());
 
         $validator = Validator::make($data, [
-            'uuid' => 'required|uuid',
+            'id' => 'required|uuid',
             'status' => 'required|string',
             'title' => 'required|string',
         ]);
@@ -152,17 +271,17 @@ class CarePlan extends Request
     {
         $transformedData = [];
         foreach ($response->getData() as $item) {
-            $transformedData[] = $this->replaceEHealthPropNames($item);
+            $transformedData[] = $this->resourceFromResponse($item);
         }
 
         $validator = Validator::make($transformedData, [
             '*' => 'array',
-            '*.uuid' => 'required|uuid',
+            '*.id' => 'required|uuid',
             '*.status' => 'required|string',
             '*.title' => 'nullable|string',
-            '*.managing_organization' => ['required', 'array'],
-            '*.managing_organization.identifier.value' => ['required', 'uuid'],
-            '*.managing_organization.display_value' => ['required', 'string']
+            '*.managingOrganization' => ['required', 'array'],
+            '*.managingOrganization.identifier.value' => ['required', 'uuid'],
+            '*.managingOrganization.displayValue' => ['required', 'string']
         ]);
 
         if ($validator->fails()) {
@@ -175,31 +294,4 @@ class CarePlan extends Request
         return $transformedData;
     }
 
-    protected function replaceEHealthPropNames(array $properties): array
-    {
-        // Only replace for associative arrays (objects)
-        if (!Arr::isAssoc($properties)) {
-            $result = [];
-            foreach ($properties as $item) {
-                $result[] = is_array($item) ? $this->replaceEHealthPropNames($item) : $item;
-            }
-
-            return $result;
-        }
-
-        $mapping = [
-            'id' => 'uuid',
-            'inserted_at' => 'ehealth_inserted_at',
-            'inserted_by' => 'ehealth_inserted_by',
-            'updated_at' => 'ehealth_updated_at'
-        ];
-
-        $replaced = [];
-        foreach ($properties as $name => $value) {
-            $newName = $mapping[$name] ?? $name;
-            $replaced[$newName] = is_array($value) ? $this->replaceEHealthPropNames($value) : $value;
-        }
-
-        return $replaced;
-    }
 }

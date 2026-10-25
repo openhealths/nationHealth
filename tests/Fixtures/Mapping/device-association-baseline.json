@@ -1,0 +1,190 @@
+{
+    "rows": {
+        "full": {
+            "json": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primarySource\":true,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"associationDate\":\"2026-10-04\",\"bodySite\":{\"coding\":[{\"system\":\"eHealth\\/body_structures\",\"code\":\"site\"}],\"text\":\"\\u0414\\u0456\\u043b\\u044f\\u043d\\u043a\\u0430\"}}",
+            "signedJson": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primary_source\":true,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"association_date\":\"2026-10-04\",\"body_site\":{\"coding\":[{\"system\":\"eHealth\\/body_structures\",\"code\":\"site\"}],\"text\":\"\\u0414\\u0456\\u043b\\u044f\\u043d\\u043a\\u0430\"}}",
+            "form": {
+                "uuid": "stored",
+                "deviceId": "device",
+                "status": "attached",
+                "associationDate": "04.10.2026",
+                "bodySiteCode": "site",
+                "bodySiteText": "Ділянка",
+                "recorded": "2026-10-05T07:15:00Z",
+                "primarySource": true,
+                "reportOriginCode": "patient",
+                "reportOriginText": "Пацієнт"
+            }
+        },
+        "minimal": {
+            "json": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primarySource\":true,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}",
+            "signedJson": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primary_source\":true,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}",
+            "form": {
+                "uuid": null,
+                "deviceId": "",
+                "status": "",
+                "associationDate": "",
+                "bodySiteCode": "",
+                "bodySiteText": "",
+                "recorded": "",
+                "primarySource": null,
+                "reportOriginCode": "",
+                "reportOriginText": ""
+            }
+        },
+        "secondary with texts": {
+            "json": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primarySource\":false,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"associationDate\":\"2026-10-04\",\"bodySite\":{\"coding\":[{\"system\":\"eHealth\\/body_structures\",\"code\":\"site\"}],\"text\":\"\\u0414\\u0456\\u043b\\u044f\\u043d\\u043a\\u0430\"},\"reportOrigin\":{\"coding\":[{\"system\":\"eHealth\\/report_origins\",\"code\":\"patient\"}],\"text\":\"\\u041f\\u0430\\u0446\\u0456\\u0454\\u043d\\u0442\"}}",
+            "signedJson": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primary_source\":false,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"association_date\":\"2026-10-04\",\"body_site\":{\"coding\":[{\"system\":\"eHealth\\/body_structures\",\"code\":\"site\"}],\"text\":\"\\u0414\\u0456\\u043b\\u044f\\u043d\\u043a\\u0430\"},\"report_origin\":{\"coding\":[{\"system\":\"eHealth\\/report_origins\",\"code\":\"patient\"}],\"text\":\"\\u041f\\u0430\\u0446\\u0456\\u0454\\u043d\\u0442\"}}",
+            "form": {
+                "uuid": "stored",
+                "deviceId": "device",
+                "status": "attached",
+                "associationDate": "04.10.2026",
+                "bodySiteCode": "site",
+                "bodySiteText": "Ділянка",
+                "recorded": "2026-10-05T07:15:00Z",
+                "primarySource": false,
+                "reportOriginCode": "patient",
+                "reportOriginText": "Пацієнт"
+            }
+        },
+        "secondary without texts": {
+            "json": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primarySource\":false,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"bodySite\":{\"coding\":[{\"system\":\"eHealth\\/body_structures\",\"code\":\"site\"}],\"text\":\"\"},\"reportOrigin\":{\"coding\":[{\"system\":\"eHealth\\/report_origins\",\"code\":\"patient\"}],\"text\":\"\"}}",
+            "signedJson": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primary_source\":false,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"body_site\":{\"coding\":[{\"system\":\"eHealth\\/body_structures\",\"code\":\"site\"}],\"text\":\"\"},\"report_origin\":{\"coding\":[{\"system\":\"eHealth\\/report_origins\",\"code\":\"patient\"}],\"text\":\"\"}}",
+            "form": {
+                "uuid": null,
+                "deviceId": "",
+                "status": "",
+                "associationDate": "",
+                "bodySiteCode": "",
+                "bodySiteText": "",
+                "recorded": "",
+                "primarySource": null,
+                "reportOriginCode": "",
+                "reportOriginText": ""
+            }
+        },
+        "empty optional values": {
+            "json": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primarySource\":true,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}",
+            "signedJson": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primary_source\":true,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}",
+            "form": {
+                "uuid": null,
+                "deviceId": "",
+                "status": "",
+                "associationDate": "",
+                "bodySiteCode": "",
+                "bodySiteText": "",
+                "recorded": "",
+                "primarySource": null,
+                "reportOriginCode": "",
+                "reportOriginText": ""
+            }
+        },
+        "null texts": {
+            "json": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primarySource\":false,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"associationDate\":\"2026-10-04\",\"bodySite\":{\"coding\":[{\"system\":\"eHealth\\/body_structures\",\"code\":\"site\"}],\"text\":\"\"},\"reportOrigin\":{\"coding\":[{\"system\":\"eHealth\\/report_origins\",\"code\":\"patient\"}],\"text\":\"\"}}",
+            "signedJson": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primary_source\":false,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"association_date\":\"2026-10-04\",\"body_site\":{\"coding\":[{\"system\":\"eHealth\\/body_structures\",\"code\":\"site\"}],\"text\":\"\"},\"report_origin\":{\"coding\":[{\"system\":\"eHealth\\/report_origins\",\"code\":\"patient\"}],\"text\":\"\"}}",
+            "form": {
+                "uuid": null,
+                "deviceId": null,
+                "status": null,
+                "associationDate": "",
+                "bodySiteCode": null,
+                "bodySiteText": null,
+                "recorded": null,
+                "primarySource": null,
+                "reportOriginCode": null,
+                "reportOriginText": null
+            }
+        },
+        "zero primary and report code": {
+            "json": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primarySource\":0,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"reportOrigin\":{\"coding\":[{\"system\":\"eHealth\\/report_origins\",\"code\":\"0\"}],\"text\":\"0\"}}",
+            "signedJson": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primary_source\":0,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"report_origin\":{\"coding\":[{\"system\":\"eHealth\\/report_origins\",\"code\":\"0\"}],\"text\":\"0\"}}",
+            "form": {
+                "uuid": null,
+                "deviceId": "",
+                "status": "",
+                "associationDate": "",
+                "bodySiteCode": "",
+                "bodySiteText": "0",
+                "recorded": "0",
+                "primarySource": 0,
+                "reportOriginCode": "",
+                "reportOriginText": ""
+            }
+        },
+        "timezone date": {
+            "json": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primarySource\":true,\"recorded\":\"2026-10-25T02:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"associationDate\":\"2026-10-25\",\"bodySite\":{\"coding\":[{\"system\":\"eHealth\\/body_structures\",\"code\":\"site\"}],\"text\":\"\\u0414\\u0456\\u043b\\u044f\\u043d\\u043a\\u0430\"}}",
+            "signedJson": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primary_source\":true,\"recorded\":\"2026-10-25T02:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"association_date\":\"2026-10-25\",\"body_site\":{\"coding\":[{\"system\":\"eHealth\\/body_structures\",\"code\":\"site\"}],\"text\":\"\\u0414\\u0456\\u043b\\u044f\\u043d\\u043a\\u0430\"}}",
+            "form": {
+                "uuid": "stored",
+                "deviceId": "device",
+                "status": "attached",
+                "associationDate": "25.10.2026",
+                "bodySiteCode": "site",
+                "bodySiteText": "Ділянка",
+                "recorded": "2026-10-05T07:15:00Z",
+                "primarySource": true,
+                "reportOriginCode": "patient",
+                "reportOriginText": "Пацієнт"
+            }
+        },
+        "unknown fields": {
+            "json": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primarySource\":true,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"associationDate\":\"2026-10-04\",\"bodySite\":{\"coding\":[{\"system\":\"eHealth\\/body_structures\",\"code\":\"site\"}],\"text\":\"\\u0414\\u0456\\u043b\\u044f\\u043d\\u043a\\u0430\"}}",
+            "signedJson": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primary_source\":true,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"association_date\":\"2026-10-04\",\"body_site\":{\"coding\":[{\"system\":\"eHealth\\/body_structures\",\"code\":\"site\"}],\"text\":\"\\u0414\\u0456\\u043b\\u044f\\u043d\\u043a\\u0430\"}}",
+            "form": {
+                "uuid": "stored",
+                "deviceId": "device",
+                "status": "attached",
+                "associationDate": "04.10.2026",
+                "bodySiteCode": "site",
+                "bodySiteText": "Ділянка",
+                "recorded": "2026-10-05T07:15:00Z",
+                "primarySource": true,
+                "reportOriginCode": "patient",
+                "reportOriginText": "Пацієнт"
+            }
+        },
+        "null required scalar fields": {
+            "json": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":null,\"primarySource\":null,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"reportOrigin\":{\"coding\":[{\"system\":\"eHealth\\/report_origins\",\"code\":\"patient\"}],\"text\":\"\"}}",
+            "signedJson": "{\"id\":\"association-fixed\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":null,\"primary_source\":null,\"recorded\":\"2026-10-05T07:15:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}},\"report_origin\":{\"coding\":[{\"system\":\"eHealth\\/report_origins\",\"code\":\"patient\"}],\"text\":\"\"}}",
+            "form": {
+                "uuid": null,
+                "deviceId": "",
+                "status": null,
+                "associationDate": "",
+                "bodySiteCode": "",
+                "bodySiteText": "",
+                "recorded": "",
+                "primarySource": null,
+                "reportOriginCode": "",
+                "reportOriginText": ""
+            }
+        }
+    },
+    "groups": {
+        "opening and closing sparse pair": {
+            "json": "[{\"id\":\"opening\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primarySource\":true,\"recorded\":\"2026-10-05T07:14:37Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}},{\"id\":\"closing\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"unattached\",\"primarySource\":true,\"recorded\":\"2026-10-05T07:15:37Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}]",
+            "signedJson": "[{\"id\":\"opening\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primary_source\":true,\"recorded\":\"2026-10-05T07:14:37Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}},{\"id\":\"closing\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"unattached\",\"primary_source\":true,\"recorded\":\"2026-10-05T07:15:37Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}]"
+        },
+        "implanted pair plus another device": {
+            "json": "[{\"id\":\"opening\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"implanted\",\"primarySource\":true,\"recorded\":\"2026-10-05T07:14:37Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}},{\"id\":\"closing\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"explanted\",\"primarySource\":true,\"recorded\":\"2026-10-05T07:15:37Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}},{\"id\":\"other\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"other-device\"}},\"status\":\"attached\",\"primarySource\":true,\"recorded\":\"2026-10-05T07:15:37Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}]",
+            "signedJson": "[{\"id\":\"opening\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"implanted\",\"primary_source\":true,\"recorded\":\"2026-10-05T07:14:37Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}},{\"id\":\"closing\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"explanted\",\"primary_source\":true,\"recorded\":\"2026-10-05T07:15:37Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}},{\"id\":\"other\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"other-device\"}},\"status\":\"attached\",\"primary_source\":true,\"recorded\":\"2026-10-05T07:15:37Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}]"
+        },
+        "existing recorded is untouched and counted in pair": {
+            "json": "[{\"id\":\"existing\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primarySource\":true,\"recorded\":\"2026-10-01T07:10:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}},{\"id\":\"new\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"implanted\",\"primarySource\":true,\"recorded\":\"2026-10-05T07:14:37Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}]",
+            "signedJson": "[{\"id\":\"existing\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primary_source\":true,\"recorded\":\"2026-10-01T07:10:00Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}},{\"id\":\"new\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"implanted\",\"primary_source\":true,\"recorded\":\"2026-10-05T07:14:37Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}]"
+        },
+        "single opening uses current time": {
+            "json": "[{\"id\":\"single\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primarySource\":true,\"recorded\":\"2026-10-05T07:15:37Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}]",
+            "signedJson": "[{\"id\":\"single\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"attached\",\"primary_source\":true,\"recorded\":\"2026-10-05T07:15:37Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}]"
+        },
+        "zero time and entered in error": {
+            "json": "[{\"id\":\"error\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"entered_in_error\",\"primarySource\":true,\"recorded\":\"2026-10-05T07:15:37Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}]",
+            "signedJson": "[{\"id\":\"error\",\"device\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"device\"}],\"text\":\"\"},\"value\":\"device\"}},\"status\":\"entered_in_error\",\"primary_source\":true,\"recorded\":\"2026-10-05T07:15:37Z\",\"context\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"encounter\"}],\"text\":\"\"},\"value\":\"encounter\"}},\"recorder\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\/resources\",\"code\":\"employee\"}],\"text\":\"\"},\"value\":\"recorder\"}}}]"
+        },
+        "empty": {
+            "json": "[]",
+            "signedJson": "[]"
+        }
+    }
+}

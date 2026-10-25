@@ -118,7 +118,7 @@ class CarePlanLifecycleGateService
      */
     public function findActivitiesBlockingPlanCancel(CarePlan $carePlan): Collection
     {
-        $carePlan->loadMissing('activities');
+        app(\App\Repositories\CarePlanActivityRepository::class)->loadActivities($carePlan);
 
         return $carePlan->activities
             ->filter(function (CarePlanActivity $activity): bool {
@@ -168,7 +168,7 @@ class CarePlanLifecycleGateService
             ]);
         }
 
-        $carePlan->loadMissing('activities');
+        app(\App\Repositories\CarePlanActivityRepository::class)->loadActivities($carePlan);
 
         $open = $carePlan->activities
             ->filter(fn (CarePlanActivity $activity): bool => !$this->isFinalActivityStatus((string) $activity->status))
@@ -208,9 +208,7 @@ class CarePlanLifecycleGateService
      */
     private function openMedicationDocuments(CarePlanActivity $activity): array
     {
-        return MedicationRequestRequest::query()
-            ->whereHas('basedOn', fn ($q) => $q->where('value', $activity->uuid))
-            ->get(['uuid', 'status'])
+        return app(\App\Repositories\CarePlanActivityRepository::class)->linkedDocuments([$activity->uuid], 'medication_request')
             ->filter(fn (MedicationRequestRequest $row): bool => $this->isOpenDocumentStatus((string) $row->status))
             ->map(fn (MedicationRequestRequest $row): array => [
                 'type' => $this->medicationDocumentType((string) $row->status),
@@ -226,9 +224,7 @@ class CarePlanLifecycleGateService
      */
     private function openServiceDocuments(CarePlanActivity $activity): array
     {
-        return ServiceRequestRequest::query()
-            ->whereHas('basedOn', fn ($q) => $q->where('value', $activity->uuid))
-            ->get(['uuid', 'status'])
+        return app(\App\Repositories\CarePlanActivityRepository::class)->linkedDocuments([$activity->uuid], 'service_request')
             ->filter(fn (ServiceRequestRequest $row): bool => $this->isOpenDocumentStatus((string) $row->status))
             ->map(fn (ServiceRequestRequest $row): array => [
                 'type' => 'service_request',
@@ -244,9 +240,7 @@ class CarePlanLifecycleGateService
      */
     private function openDeviceDocuments(CarePlanActivity $activity): array
     {
-        return DeviceRequestRequest::query()
-            ->whereHas('basedOn', fn ($q) => $q->where('value', $activity->uuid))
-            ->get(['uuid', 'status'])
+        return app(\App\Repositories\CarePlanActivityRepository::class)->linkedDocuments([$activity->uuid], 'device_request')
             ->filter(fn (DeviceRequestRequest $row): bool => $this->isOpenDocumentStatus((string) $row->status))
             ->map(fn (DeviceRequestRequest $row): array => [
                 'type' => 'device_request',

@@ -19,9 +19,8 @@ use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\EncounterPackageBuilder;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use App\Traits\EnsuresEntityExists;
+use App\Traits\MedicalEvents\UpdatesReferralExecution;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -36,8 +35,7 @@ use Throwable;
 class EncounterPackageCreate extends EncounterPackageComponent
 {
     use EnsuresEntityExists;
-
-    private EncounterPackageBuilder $packageBuilder;
+    use UpdatesReferralExecution;
 
     public ?int $prepersonId = null;
 
@@ -49,12 +47,6 @@ class EncounterPackageCreate extends EncounterPackageComponent
 
     #[Locked]
     public ?string $confirmedElectronicReferralUuid = null;
-
-    public function boot(): void
-    {
-        parent::boot();
-        $this->packageBuilder = app(EncounterPackageBuilder::class);
-    }
 
     public function mount(LegalEntity $legalEntity, ?Person $person = null, ?Preperson $preperson = null): void
     {
@@ -79,7 +71,7 @@ class EncounterPackageCreate extends EncounterPackageComponent
      * Called when the doctor picks an electronic referral from the dropdown.
      * Runs eHealth use/qualify here so signing the encounter stays on Cipher only.
      */
-    public function selectElectronicReferral(string $referralUuid, ReferralRequestLifecycleService $lifecycle): void
+    public function selectElectronicReferral(string $referralUuid): void
     {
         $this->authorize('use', ServiceRequestRequest::class);
         $this->preparedElectronicReferralUuid = null;
@@ -104,7 +96,7 @@ class EncounterPackageCreate extends EncounterPackageComponent
         $this->form->encounter['referralNumber'] = (string) ($referral['requisition'] ?? $referralUuid);
 
         try {
-            $this->ensureReferralTakenIntoWork($lifecycle, $referralUuid);
+            $this->ensureReferralTakenIntoWork($referralUuid);
             $this->preparedElectronicReferralUuid = $referralUuid;
             $this->confirmedElectronicReferralUuid = $referralUuid;
         } catch (Throwable $exception) {
@@ -149,7 +141,8 @@ class EncounterPackageCreate extends EncounterPackageComponent
             return;
         }
 
-        $formattedData = $this->packageBuilder->build($validated, $this->episodeType, Status::DRAFT);
+        $formattedData = $this->buildEncounterPackage($validated, $this->episodeType, Status::DRAFT);
+        $formattedData['encounter']['status'] = EncounterStatus::DRAFT->value;
 
         try {
             $this->syncRegisteredConditions($validated['conditions'] ?? []);
@@ -232,7 +225,7 @@ class EncounterPackageCreate extends EncounterPackageComponent
             return;
         }
 
-        $formattedData = $this->packageBuilder->build($validatedData, $this->episodeType);
+        $formattedData = $this->buildEncounterPackage($validatedData, $this->episodeType);
 
         try {
             $this->syncRegisteredConditions($validatedData['conditions'] ?? []);
@@ -458,9 +451,9 @@ class EncounterPackageCreate extends EncounterPackageComponent
 
     /**
      * Take an active electronic referral into work (eHealth use / qualify).
-     * The lifecycle verifies current eHealth processing status and executor.
+     * The shared execution concern verifies current eHealth processing status and executor.
      */
-    private function ensureReferralTakenIntoWork(ReferralRequestLifecycleService $service, string $referralUuid): void
+    private function ensureReferralTakenIntoWork(string $referralUuid): void
     {
         $local = Repository::serviceRequest()->findByUuid($referralUuid);
         if ($local === null || (int) $local->personId !== $this->personId) {
@@ -468,14 +461,14 @@ class EncounterPackageCreate extends EncounterPackageComponent
         }
 
         $employee = Auth::user()?->employees()
-            ->where('legal_entity_id', legalEntity()->id)
+            ->whereLegalEntityId(legalEntity()->id)
             ->first();
 
         if ($employee === null) {
             throw new RuntimeException(__('Не знайдено співробітника для взяття направлення в роботу.'));
         }
 
-        $service->takeIntoWork(
+        $this->takeReferralIntoWork(
             $referralUuid,
             $employee,
             $this->patientUuid ?: null,

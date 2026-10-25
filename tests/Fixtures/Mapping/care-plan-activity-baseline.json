@@ -1,0 +1,849 @@
+{
+    "service references": {
+        "payload": {
+            "author": [
+                {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "employee"
+                    }
+                }
+            ],
+            "care_plan": {
+                "identifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth\/resources",
+                                "code": "care_plan"
+                            }
+                        ]
+                    },
+                    "value": "care-plan"
+                }
+            },
+            "detail": {
+                "kind": "service_request",
+                "status": "scheduled",
+                "do_not_perform": true,
+                "description": "Test",
+                "product_reference": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "service"
+                                }
+                            ]
+                        },
+                        "value": "service"
+                    }
+                },
+                "scheduled_period": {
+                    "start": "2026-10-01T06:15:30Z",
+                    "end": "2026-10-20T20:59:59Z"
+                },
+                "quantity": {
+                    "value": 3.0,
+                    "system": "SERVICE_UNIT",
+                    "code": "piece"
+                },
+                "reason_code": [
+                    {
+                        "coding": [
+                            {
+                                "code": "A"
+                            }
+                        ]
+                    }
+                ],
+                "reason_reference": [
+                    {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "condition"
+                                    }
+                                ]
+                            },
+                            "value": "condition"
+                        }
+                    },
+                    {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "diagnostic_report"
+                                    }
+                                ]
+                            },
+                            "value": "report"
+                        }
+                    },
+                    {
+                        "identifier": {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "eHealth\/resources",
+                                        "code": "condition"
+                                    }
+                                ]
+                            },
+                            "value": "bare-uuid"
+                        }
+                    }
+                ],
+                "goal": [
+                    {
+                        "coding": [
+                            {
+                                "system": "eHealth\/care_plan_activity_goals",
+                                "code": "goal-a"
+                            }
+                        ]
+                    },
+                    {
+                        "coding": [
+                            {
+                                "system": "eHealth\/care_plan_activity_goals",
+                                "code": "goal-b"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        "json": "{\"author\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"employee\"}}],\"care_plan\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"care_plan\"}]},\"value\":\"care-plan\"}},\"detail\":{\"kind\":\"service_request\",\"status\":\"scheduled\",\"do_not_perform\":true,\"description\":\"Test\",\"product_reference\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"service\"}]},\"value\":\"service\"}},\"scheduled_period\":{\"start\":\"2026-10-01T06:15:30Z\",\"end\":\"2026-10-20T20:59:59Z\"},\"quantity\":{\"value\":3.0,\"system\":\"SERVICE_UNIT\",\"code\":\"piece\"},\"reason_code\":[{\"coding\":[{\"code\":\"A\"}]}],\"reason_reference\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}]},\"value\":\"condition\"}},{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"diagnostic_report\"}]},\"value\":\"report\"}},{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"condition\"}]},\"value\":\"bare-uuid\"}}],\"goal\":[{\"coding\":[{\"system\":\"eHealth\\\/care_plan_activity_goals\",\"code\":\"goal-a\"}]},{\"coding\":[{\"system\":\"eHealth\\\/care_plan_activity_goals\",\"code\":\"goal-b\"}]}]}}",
+        "form": {
+            "id": null,
+            "kind": "service_request",
+            "program": "",
+            "quantity": 3,
+            "quantity_system": "SERVICE_UNIT",
+            "quantity_code": "piece",
+            "daily_amount": "",
+            "daily_amount_system": "",
+            "daily_amount_code": "",
+            "reason_code": "A",
+            "reason_reference": [
+                "Condition\/condition",
+                "DiagnosticReport\/report",
+                "bare-uuid"
+            ],
+            "goal": "goal-a",
+            "description": "Test",
+            "scheduled_period_start": "01.10.2026",
+            "scheduled_period_end": "20.10.2026",
+            "product_reference": "service",
+            "product_codeable_concept": ""
+        }
+    },
+    "medication amount": {
+        "payload": {
+            "author": [
+                {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "employee"
+                    }
+                }
+            ],
+            "care_plan": {
+                "identifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth\/resources",
+                                "code": "care_plan"
+                            }
+                        ]
+                    },
+                    "value": "care-plan"
+                }
+            },
+            "detail": {
+                "kind": "medication_request",
+                "status": "scheduled",
+                "do_not_perform": false,
+                "product_reference": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "medication"
+                                }
+                            ]
+                        },
+                        "value": "drug"
+                    }
+                },
+                "scheduled_period": {
+                    "start": "2026-10-01T06:15:30Z",
+                    "end": "2026-10-20T20:59:59Z"
+                },
+                "quantity": {
+                    "value": 3.0,
+                    "system": "MEDICATION_UNIT",
+                    "code": "ML"
+                },
+                "daily_amount": {
+                    "value": 1.25,
+                    "system": "MEDICATION_UNIT",
+                    "code": "MG"
+                },
+                "program": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "medical_program"
+                                }
+                            ]
+                        },
+                        "value": "program"
+                    }
+                }
+            }
+        },
+        "json": "{\"author\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"employee\"}}],\"care_plan\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"care_plan\"}]},\"value\":\"care-plan\"}},\"detail\":{\"kind\":\"medication_request\",\"status\":\"scheduled\",\"do_not_perform\":false,\"product_reference\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"medication\"}]},\"value\":\"drug\"}},\"scheduled_period\":{\"start\":\"2026-10-01T06:15:30Z\",\"end\":\"2026-10-20T20:59:59Z\"},\"quantity\":{\"value\":3.0,\"system\":\"MEDICATION_UNIT\",\"code\":\"ML\"},\"daily_amount\":{\"value\":1.25,\"system\":\"MEDICATION_UNIT\",\"code\":\"MG\"},\"program\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"medical_program\"}]},\"value\":\"program\"}}}}",
+        "form": {
+            "id": null,
+            "kind": "medication_request",
+            "program": "program",
+            "quantity": 3,
+            "quantity_system": "MEDICATION_UNIT",
+            "quantity_code": "ML",
+            "daily_amount": "1.2500",
+            "daily_amount_system": "MEDICATION_UNIT",
+            "daily_amount_code": "MG",
+            "reason_code": "",
+            "reason_reference": "",
+            "goal": "",
+            "description": "",
+            "scheduled_period_start": "01.10.2026",
+            "scheduled_period_end": "20.10.2026",
+            "product_reference": "drug",
+            "product_codeable_concept": ""
+        }
+    },
+    "registered periods and quantities": {
+        "payload": {
+            "id": "remote-activity",
+            "author": [
+                {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "employee"
+                    }
+                }
+            ],
+            "care_plan": {
+                "identifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth\/resources",
+                                "code": "care_plan"
+                            }
+                        ]
+                    },
+                    "value": "care-plan"
+                }
+            },
+            "detail": {
+                "kind": "service_request",
+                "status": "scheduled",
+                "do_not_perform": false,
+                "quantity": {
+                    "value": 1.25,
+                    "system": "SERVICE_UNIT",
+                    "code": "piece",
+                    "unit": "units"
+                }
+            }
+        },
+        "json": "{\"id\":\"remote-activity\",\"author\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"employee\"}}],\"care_plan\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"care_plan\"}]},\"value\":\"care-plan\"}},\"detail\":{\"kind\":\"service_request\",\"status\":\"scheduled\",\"do_not_perform\":false,\"quantity\":{\"value\":1.25,\"system\":\"SERVICE_UNIT\",\"code\":\"piece\",\"unit\":\"units\"}}}",
+        "form": {
+            "id": null,
+            "kind": "service_request",
+            "program": "",
+            "quantity": 3,
+            "quantity_system": "SERVICE_UNIT",
+            "quantity_code": "piece",
+            "daily_amount": "",
+            "daily_amount_system": "",
+            "daily_amount_code": "",
+            "reason_code": "",
+            "reason_reference": "",
+            "goal": "",
+            "description": "",
+            "scheduled_period_start": "01.10.2026",
+            "scheduled_period_end": "20.10.2026",
+            "product_reference": "",
+            "product_codeable_concept": ""
+        }
+    },
+    "device uuid priority": {
+        "payload": {
+            "author": [
+                {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "employee"
+                    }
+                }
+            ],
+            "care_plan": {
+                "identifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth\/resources",
+                                "code": "care_plan"
+                            }
+                        ]
+                    },
+                    "value": "care-plan"
+                }
+            },
+            "detail": {
+                "kind": "device_request",
+                "status": "scheduled",
+                "do_not_perform": false,
+                "product_reference": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "device_definition"
+                                }
+                            ]
+                        },
+                        "value": "0b70715d-0e6e-4a89-889f-815cf429cb87"
+                    }
+                },
+                "scheduled_period": {
+                    "start": "2026-10-01T06:15:30Z",
+                    "end": "2026-10-20T20:59:59Z"
+                },
+                "quantity": {
+                    "value": 3,
+                    "system": "device_unit",
+                    "code": "piece"
+                },
+                "program": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "medical_program"
+                                }
+                            ]
+                        },
+                        "value": "program"
+                    }
+                }
+            }
+        },
+        "json": "{\"author\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"employee\"}}],\"care_plan\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"care_plan\"}]},\"value\":\"care-plan\"}},\"detail\":{\"kind\":\"device_request\",\"status\":\"scheduled\",\"do_not_perform\":false,\"product_reference\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device_definition\"}]},\"value\":\"0b70715d-0e6e-4a89-889f-815cf429cb87\"}},\"scheduled_period\":{\"start\":\"2026-10-01T06:15:30Z\",\"end\":\"2026-10-20T20:59:59Z\"},\"quantity\":{\"value\":3,\"system\":\"device_unit\",\"code\":\"piece\"},\"program\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"medical_program\"}]},\"value\":\"program\"}}}}",
+        "form": {
+            "id": null,
+            "kind": "device_request",
+            "program": "program",
+            "quantity": 3,
+            "quantity_system": "device_unit",
+            "quantity_code": "piece",
+            "daily_amount": "",
+            "daily_amount_system": "",
+            "daily_amount_code": "",
+            "reason_code": "",
+            "reason_reference": "",
+            "goal": "",
+            "description": "",
+            "scheduled_period_start": "01.10.2026",
+            "scheduled_period_end": "20.10.2026",
+            "product_reference": "0b70715d-0e6e-4a89-889f-815cf429cb87",
+            "product_codeable_concept": "18_09_03"
+        }
+    },
+    "classification only program": {
+        "payload": {
+            "author": [
+                {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "employee"
+                    }
+                }
+            ],
+            "care_plan": {
+                "identifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth\/resources",
+                                "code": "care_plan"
+                            }
+                        ]
+                    },
+                    "value": "care-plan"
+                }
+            },
+            "detail": {
+                "kind": "device_request",
+                "status": "scheduled",
+                "do_not_perform": false,
+                "product_codeable_concept": {
+                    "coding": [
+                        {
+                            "system": "device_definition_classification_type",
+                            "code": "18_09_03"
+                        }
+                    ]
+                },
+                "scheduled_period": {
+                    "start": "2026-10-01T06:15:30Z",
+                    "end": "2026-10-20T20:59:59Z"
+                },
+                "quantity": {
+                    "value": 3,
+                    "system": "device_unit",
+                    "code": "piece"
+                },
+                "program": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "medical_program"
+                                }
+                            ]
+                        },
+                        "value": "program"
+                    }
+                }
+            }
+        },
+        "json": "{\"author\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"employee\"}}],\"care_plan\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"care_plan\"}]},\"value\":\"care-plan\"}},\"detail\":{\"kind\":\"device_request\",\"status\":\"scheduled\",\"do_not_perform\":false,\"product_codeable_concept\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"18_09_03\"}]},\"scheduled_period\":{\"start\":\"2026-10-01T06:15:30Z\",\"end\":\"2026-10-20T20:59:59Z\"},\"quantity\":{\"value\":3,\"system\":\"device_unit\",\"code\":\"piece\"},\"program\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"medical_program\"}]},\"value\":\"program\"}}}}",
+        "form": {
+            "id": null,
+            "kind": "device_request",
+            "program": "program",
+            "quantity": 3,
+            "quantity_system": "device_unit",
+            "quantity_code": "piece",
+            "daily_amount": "",
+            "daily_amount_system": "",
+            "daily_amount_code": "",
+            "reason_code": "",
+            "reason_reference": "",
+            "goal": "",
+            "description": "",
+            "scheduled_period_start": "01.10.2026",
+            "scheduled_period_end": "20.10.2026",
+            "product_reference": "0b70715d-0e6e-4a89-889f-815cf429cb87",
+            "product_codeable_concept": "18_09_03"
+        }
+    },
+    "definition only program": {
+        "payload": {
+            "author": [
+                {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "employee"
+                    }
+                }
+            ],
+            "care_plan": {
+                "identifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth\/resources",
+                                "code": "care_plan"
+                            }
+                        ]
+                    },
+                    "value": "care-plan"
+                }
+            },
+            "detail": {
+                "kind": "device_request",
+                "status": "scheduled",
+                "do_not_perform": false,
+                "product_reference": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "device_definition"
+                                }
+                            ]
+                        },
+                        "value": "0b70715d-0e6e-4a89-889f-815cf429cb87"
+                    }
+                },
+                "scheduled_period": {
+                    "start": "2026-10-01T06:15:30Z",
+                    "end": "2026-10-20T20:59:59Z"
+                },
+                "quantity": {
+                    "value": 3,
+                    "system": "device_unit",
+                    "code": "piece"
+                },
+                "program": {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "medical_program"
+                                }
+                            ]
+                        },
+                        "value": "program"
+                    }
+                }
+            }
+        },
+        "json": "{\"author\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"employee\"}}],\"care_plan\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"care_plan\"}]},\"value\":\"care-plan\"}},\"detail\":{\"kind\":\"device_request\",\"status\":\"scheduled\",\"do_not_perform\":false,\"product_reference\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"device_definition\"}]},\"value\":\"0b70715d-0e6e-4a89-889f-815cf429cb87\"}},\"scheduled_period\":{\"start\":\"2026-10-01T06:15:30Z\",\"end\":\"2026-10-20T20:59:59Z\"},\"quantity\":{\"value\":3,\"system\":\"device_unit\",\"code\":\"piece\"},\"program\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"medical_program\"}]},\"value\":\"program\"}}}}",
+        "form": {
+            "id": null,
+            "kind": "device_request",
+            "program": "program",
+            "quantity": 3,
+            "quantity_system": "device_unit",
+            "quantity_code": "piece",
+            "daily_amount": "",
+            "daily_amount_system": "",
+            "daily_amount_code": "",
+            "reason_code": "",
+            "reason_reference": "",
+            "goal": "",
+            "description": "",
+            "scheduled_period_start": "01.10.2026",
+            "scheduled_period_end": "20.10.2026",
+            "product_reference": "0b70715d-0e6e-4a89-889f-815cf429cb87",
+            "product_codeable_concept": "18_09_03"
+        }
+    },
+    "classification fallback": {
+        "payload": {
+            "author": [
+                {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "employee"
+                    }
+                }
+            ],
+            "care_plan": {
+                "identifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth\/resources",
+                                "code": "care_plan"
+                            }
+                        ]
+                    },
+                    "value": "care-plan"
+                }
+            },
+            "detail": {
+                "kind": "device_request",
+                "status": "scheduled",
+                "do_not_perform": false,
+                "product_codeable_concept": {
+                    "coding": [
+                        {
+                            "system": "device_definition_classification_type",
+                            "code": "18_09_03"
+                        }
+                    ]
+                },
+                "scheduled_period": {
+                    "start": "2026-10-01T06:15:30Z",
+                    "end": "2026-10-20T20:59:59Z"
+                },
+                "quantity": {
+                    "value": 3,
+                    "system": "device_unit",
+                    "code": "piece"
+                }
+            }
+        },
+        "json": "{\"author\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"employee\"}}],\"care_plan\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"care_plan\"}]},\"value\":\"care-plan\"}},\"detail\":{\"kind\":\"device_request\",\"status\":\"scheduled\",\"do_not_perform\":false,\"product_codeable_concept\":{\"coding\":[{\"system\":\"device_definition_classification_type\",\"code\":\"18_09_03\"}]},\"scheduled_period\":{\"start\":\"2026-10-01T06:15:30Z\",\"end\":\"2026-10-20T20:59:59Z\"},\"quantity\":{\"value\":3,\"system\":\"device_unit\",\"code\":\"piece\"}}}",
+        "form": {
+            "id": null,
+            "kind": "device_request",
+            "program": "",
+            "quantity": 3,
+            "quantity_system": "device_unit",
+            "quantity_code": "piece",
+            "daily_amount": "",
+            "daily_amount_system": "",
+            "daily_amount_code": "",
+            "reason_code": "",
+            "reason_reference": "",
+            "goal": "",
+            "description": "",
+            "scheduled_period_start": "01.10.2026",
+            "scheduled_period_end": "20.10.2026",
+            "product_reference": "not-a-uuid",
+            "product_codeable_concept": "18_09_03"
+        }
+    },
+    "empty values": {
+        "payload": {
+            "author": [
+                {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "employee"
+                    }
+                }
+            ],
+            "care_plan": {
+                "identifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth\/resources",
+                                "code": "care_plan"
+                            }
+                        ]
+                    },
+                    "value": "care-plan"
+                }
+            },
+            "detail": {
+                "kind": "service_request",
+                "status": "scheduled",
+                "do_not_perform": false
+            }
+        },
+        "json": "{\"author\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"employee\"}}],\"care_plan\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"care_plan\"}]},\"value\":\"care-plan\"}},\"detail\":{\"kind\":\"service_request\",\"status\":\"scheduled\",\"do_not_perform\":false}}",
+        "form": {
+            "id": null,
+            "kind": "service_request",
+            "program": "",
+            "quantity": 0,
+            "quantity_system": null,
+            "quantity_code": "",
+            "daily_amount": "0.0000",
+            "daily_amount_system": "",
+            "daily_amount_code": "",
+            "reason_code": "",
+            "reason_reference": [],
+            "goal": "",
+            "description": "0",
+            "scheduled_period_start": "",
+            "scheduled_period_end": "",
+            "product_reference": "",
+            "product_codeable_concept": ""
+        }
+    },
+    "future plan clipping": {
+        "payload": {
+            "author": [
+                {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "employee"
+                    }
+                }
+            ],
+            "care_plan": {
+                "identifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth\/resources",
+                                "code": "care_plan"
+                            }
+                        ]
+                    },
+                    "value": "care-plan"
+                }
+            },
+            "detail": {
+                "kind": "service_request",
+                "status": "scheduled",
+                "do_not_perform": false,
+                "scheduled_period": {
+                    "start": "2026-10-09T21:00:00Z",
+                    "end": "2026-10-20T20:59:59Z"
+                },
+                "quantity": {
+                    "value": 3.0,
+                    "system": "SERVICE_UNIT",
+                    "code": "piece"
+                }
+            }
+        },
+        "json": "{\"author\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"employee\"}}],\"care_plan\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"care_plan\"}]},\"value\":\"care-plan\"}},\"detail\":{\"kind\":\"service_request\",\"status\":\"scheduled\",\"do_not_perform\":false,\"scheduled_period\":{\"start\":\"2026-10-09T21:00:00Z\",\"end\":\"2026-10-20T20:59:59Z\"},\"quantity\":{\"value\":3.0,\"system\":\"SERVICE_UNIT\",\"code\":\"piece\"}}}",
+        "form": {
+            "id": null,
+            "kind": "service_request",
+            "program": "",
+            "quantity": 3,
+            "quantity_system": "SERVICE_UNIT",
+            "quantity_code": "piece",
+            "daily_amount": "",
+            "daily_amount_system": "",
+            "daily_amount_code": "",
+            "reason_code": "",
+            "reason_reference": "",
+            "goal": "",
+            "description": "",
+            "scheduled_period_start": "01.10.2026",
+            "scheduled_period_end": "20.10.2026",
+            "product_reference": "",
+            "product_codeable_concept": ""
+        }
+    },
+    "non draft midday": {
+        "payload": {
+            "author": [
+                {
+                    "identifier": {
+                        "type": {
+                            "coding": [
+                                {
+                                    "system": "eHealth\/resources",
+                                    "code": "employee"
+                                }
+                            ]
+                        },
+                        "value": "employee"
+                    }
+                }
+            ],
+            "care_plan": {
+                "identifier": {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "eHealth\/resources",
+                                "code": "care_plan"
+                            }
+                        ]
+                    },
+                    "value": "care-plan"
+                }
+            },
+            "detail": {
+                "kind": "service_request",
+                "status": "scheduled",
+                "do_not_perform": false,
+                "scheduled_period": {
+                    "start": "2026-10-01T09:00:00Z",
+                    "end": "2026-10-20T20:59:59Z"
+                },
+                "quantity": {
+                    "value": 3.0,
+                    "system": "SERVICE_UNIT",
+                    "code": "piece"
+                }
+            }
+        },
+        "json": "{\"author\":[{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"employee\"}]},\"value\":\"employee\"}}],\"care_plan\":{\"identifier\":{\"type\":{\"coding\":[{\"system\":\"eHealth\\\/resources\",\"code\":\"care_plan\"}]},\"value\":\"care-plan\"}},\"detail\":{\"kind\":\"service_request\",\"status\":\"scheduled\",\"do_not_perform\":false,\"scheduled_period\":{\"start\":\"2026-10-01T09:00:00Z\",\"end\":\"2026-10-20T20:59:59Z\"},\"quantity\":{\"value\":3.0,\"system\":\"SERVICE_UNIT\",\"code\":\"piece\"}}}",
+        "form": {
+            "id": null,
+            "kind": "service_request",
+            "program": "",
+            "quantity": 3,
+            "quantity_system": "SERVICE_UNIT",
+            "quantity_code": "piece",
+            "daily_amount": "",
+            "daily_amount_system": "",
+            "daily_amount_code": "",
+            "reason_code": "",
+            "reason_reference": "",
+            "goal": "",
+            "description": "",
+            "scheduled_period_start": "01.10.2026",
+            "scheduled_period_end": "20.10.2026",
+            "product_reference": "",
+            "product_codeable_concept": ""
+        }
+    }
+}

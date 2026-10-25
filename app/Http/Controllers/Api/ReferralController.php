@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Classes\eHealth\Api\ServiceRequest;
+use App\Enums\MedicalEvents\ReferralCompletionResourceType;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Http\Controllers\Controller;
 use App\Models\Employee\Employee;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
+use App\Traits\MedicalEvents\UpdatesReferralExecution;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,10 +21,7 @@ use Throwable;
 
 class ReferralController extends Controller
 {
-    /**
-     * Electronic medical record types a referral may be completed against.
-     */
-    private const array COMPLETION_RESOURCE_TYPES = ['encounter', 'procedure', 'diagnostic_report'];
+    use UpdatesReferralExecution;
 
     /**
      * Search for a ServiceRequest by requisition number.
@@ -46,7 +44,7 @@ class ReferralController extends Controller
     /**
      * Take a ServiceRequest into work (process).
      */
-    public function process(Request $request, ReferralRequestLifecycleService $lifecycleService): JsonResponse
+    public function process(Request $request): JsonResponse
     {
         $uuid = $this->referralUuid($request);
 
@@ -69,7 +67,7 @@ class ReferralController extends Controller
 
         return $this->respond(
             'process',
-            fn (): array => $lifecycleService->takeIntoWork(
+            fn (): array => $this->takeReferralIntoWork(
                 $uuid,
                 $employee,
                 $patientUuid,
@@ -83,14 +81,14 @@ class ReferralController extends Controller
     /**
      * Complete (redeem) a ServiceRequest against an electronic medical record.
      */
-    public function complete(Request $request, ReferralRequestLifecycleService $lifecycleService): JsonResponse
+    public function complete(Request $request): JsonResponse
     {
         $uuid = $this->referralUuid($request);
 
         $validated = $request->validate([
             'resource_uuid' => ['required_without:encounter_uuid', 'string', 'max:255'],
             'encounter_uuid' => ['required_without:resource_uuid', 'string', 'max:255'],
-            'resource_type' => ['sometimes', Rule::in(self::COMPLETION_RESOURCE_TYPES)],
+            'resource_type' => ['sometimes', Rule::in(array_column(ReferralCompletionResourceType::cases(), 'value'))],
             'payload' => ['sometimes', 'array'],
         ]);
 
@@ -99,11 +97,10 @@ class ReferralController extends Controller
 
         return $this->respond(
             'complete',
-            fn (): array => $lifecycleService->completeReferral(
+            fn (): array => $this->completeReferral(
                 $uuid,
                 $resourceUuid,
-                $resourceType,
-                $validated['payload'] ?? []
+                $resourceType
             ),
             ['referral_uuid' => $uuid, 'resource_type' => $resourceType],
             __('care-plan.referral_api_completed')
@@ -113,7 +110,7 @@ class ReferralController extends Controller
     /**
      * Cancel usage of a ServiceRequest.
      */
-    public function cancelUsage(Request $request, ReferralRequestLifecycleService $lifecycleService): JsonResponse
+    public function cancelUsage(Request $request): JsonResponse
     {
         $uuid = $this->referralUuid($request);
 
@@ -134,7 +131,7 @@ class ReferralController extends Controller
 
         return $this->respond(
             'cancel-usage',
-            fn (): array => $lifecycleService->cancelUsage($uuid, $patientId, $payload),
+            fn (): array => $this->cancelReferralUsage($uuid, $patientId, $payload),
             ['referral_uuid' => $uuid],
             __('care-plan.referral_api_usage_cancelled')
         );

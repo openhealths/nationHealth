@@ -6,6 +6,8 @@ namespace App\Classes\eHealth\Api;
 
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\EHealth;
+use App\Dto\DeviceRequest\DraftResult;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -84,5 +86,23 @@ class DeviceRequest extends Request
     public function getDeviceRequest(string $id): PromiseInterface|EHealthResponse
     {
         return $this->get('/api/device_requests/' . $id);
+    }
+
+    public function prequalifyAndValidate(array $payload): void
+    {
+        $job = EHealth::job();
+        $job->assertPrequalifyValid($job->resolve($this->preQualify($payload)->getData()));
+    }
+
+    public function createAndResolve(array $payload): DraftResult
+    {
+        $response = $this->createDeviceRequest($payload)->getData();
+
+        return new DraftResult($response, EHealth::job()->resolve($response));
+    }
+
+    public function signAndResolve(string $id, array $payload): array
+    {
+        return EHealth::job()->resolve($this->signDeviceRequest($id, $payload)->getData());
     }
 }

@@ -16,7 +16,7 @@ use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\User;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
+use Tests\Support\ReferralSigningHarness;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
@@ -109,7 +109,7 @@ class ReferralSignPayloadTest extends TestCase
         $request = $this->createDraft();
         $serviceId = $request->serviceId;
 
-        $payload = app(ReferralRequestLifecycleService::class)->buildSignDbData(
+        $payload = (new ReferralSigningHarness())->buildSignDbData(
             $request,
             null,
             $this->encounter,
@@ -162,7 +162,7 @@ class ReferralSignPayloadTest extends TestCase
             'service_id' => $productId,
         ]);
 
-        $payload = app(ReferralRequestLifecycleService::class)->buildSignDbData(
+        $payload = (new ReferralSigningHarness())->buildSignDbData(
             $request,
             $activity,
             $carePlan,

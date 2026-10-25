@@ -1,0 +1,20 @@
+{
+    "process DST": {
+        "processJson": "{\"received_time\":\"2026-10-25T02:15:00Z\"}",
+        "rejectJson": "{\"status_reason\":{\"coding\":[{\"system\":\"specimen_reject_reasons\",\"code\":\"0\"}],\"text\":\"\"}}",
+        "invalidateJson": "{\"status_reason\":{\"coding\":[{\"system\":\"specimen_invalidate_reasons\",\"code\":\"used\"}],\"text\":\"\"}}",
+        "cancelJson": "{\"id\":\"remote\",\"unknown\":{\"literal_key\":null,\"empty_list\":[],\"value\":false},\"status\":\"entered_in_error\",\"status_reason\":{\"coding\":[{\"system\":\"specimen_cancel_reasons\",\"code\":\"0\"}],\"text\":\"\"}}"
+    },
+    "empty reason and sparse raw lists": {
+        "processJson": "{\"received_time\":\"2026-10-05T08:00:00Z\"}",
+        "rejectJson": "{\"status_reason\":{\"coding\":[{\"system\":\"specimen_reject_reasons\",\"code\":\"\"}],\"text\":\"\"}}",
+        "invalidateJson": "{\"status_reason\":{\"coding\":[{\"system\":\"specimen_invalidate_reasons\",\"code\":\"0\"}],\"text\":\"\"}}",
+        "cancelJson": "{\"uuid\":\"remote\",\"extension\":{\"8\":{\"value\":0},\"42\":{\"value\":false}},\"opaque\":{},\"status\":\"entered_in_error\",\"status_reason\":{\"coding\":[{\"system\":\"specimen_cancel_reasons\",\"code\":\"\"}],\"text\":\"\"}}"
+    },
+    "unicode reason and raw null": {
+        "processJson": "{\"received_time\":\"2026-10-05T08:00:00Z\"}",
+        "rejectJson": "{\"status_reason\":{\"coding\":[{\"system\":\"specimen_reject_reasons\",\"code\":\"reason\"}],\"text\":\"\"}}",
+        "invalidateJson": "{\"status_reason\":{\"coding\":[{\"system\":\"specimen_invalidate_reasons\",\"code\":\"other\"}],\"text\":\"\"}}",
+        "cancelJson": "{\"id\":\"remote\",\"status\":\"entered_in_error\",\"status_reason\":{\"coding\":[{\"system\":\"specimen_cancel_reasons\",\"code\":\"\\u041f\\u0440\\u0438\\u0447\\u0438\\u043d\\u0430\"}],\"text\":\"\"},\"note\":\"\\u0417\\u0440\\u0430\\u0437\\u043e\\u043a\\n\\u041f\\u0440\\u0438\\u043c\\u0456\\u0442\\u043a\\u0430\"}"
+    }
+}
