@@ -6,21 +6,27 @@ namespace App\Repositories\MedicalEvents;
 
 use Throwable;
 use Carbon\Carbon;
-use App\Enums\Person\ApprovalStatus;
-use App\Classes\eHealth\EHealth;
+use App\Models\User;
+use App\Enums\JobStatus;
 use App\Models\EhealthJob;
+use App\Models\LegalEntity;
 use App\Models\EhealthLink;
-use App\Models\Person\Person;
-use App\Models\Employee\Employee;
-use App\Models\MedicalEvents\Mongo\Approval as MongoApproval;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use App\Models\Person\Person;
+use App\Classes\eHealth\EHealth;
+use App\Models\Employee\Employee;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Enums\Person\ApprovalStatus;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Relations\AuthenticationMethod;
+use App\Repositories\Repository as GeneralRepository;
+use App\Models\MedicalEvents\Mongo\Approval as MongoApproval;
+use App\Exceptions\MedicalEvents\ApprovalVerificationException;
 
 /**
  * @property Approval $model
@@ -201,6 +207,89 @@ class ApprovalRepository extends BaseRepository
     public function __construct(Model $model)
     {
         parent::__construct($model);
+    }
+
+    public function hasPendingCreation(Model $model, ?string $employeeUuid): bool
+    {
+        return Approval::getByModel($model)
+            ->whereHas('grantedTo', fn ($query) => $query->whereValue($employeeUuid))
+            ->whereNull('uuid')
+            ->whereIn('status', [ApprovalStatus::PENDING->value, ApprovalStatus::NEW->value])
+            ->where('is_verified', false)
+            ->exists();
+    }
+
+    public function hasVerifiedPersonApproval(Person $person, User $user, LegalEntity $legalEntity): bool
+    {
+        return Approval::getByModel($person)
+            ->whereHas('grantedTo', static fn ($query) => $query->whereIn(
+                'value',
+                $user->employees()->whereLegalEntityId($legalEntity->id)->active()->pluck('uuid')
+            ))
+            ->whereNotNull('uuid')
+            ->whereFuture('expires_at')
+            ->whereIn('status', [ApprovalStatus::ACTIVE->value, ApprovalStatus::APPROVED->value])
+            ->isVerified()
+            ->exists();
+    }
+
+    /**
+     * Resolve an unverified approval for verification or SMS resend.
+     * Select by current employee when given an approvable model.
+     *
+     * @throws ApprovalVerificationException When the approval is unavailable for verification or SMS resend.
+     * @return Approval
+     */
+    public function findApprovalForVerification(Model $model): Approval
+    {
+        if ($model instanceof Approval) {
+            $approval = $model;
+        } else {
+            $employee = GeneralRepository::employee()->forApproval(Auth::user(), legalEntity());
+            $approvals = Approval::getByModel($model)
+                ->whereHas('grantedTo', fn ($query) => $query->whereValue($employee->uuid))
+                ->latest('id');
+
+            $approval = (clone $approvals)
+                ->whereNotNull('uuid')
+                ->whereFuture('expires_at')
+                ->whereIn('status', [ApprovalStatus::PENDING->value, ApprovalStatus::NEW->value, ApprovalStatus::ACTIVE->value, ApprovalStatus::APPROVED->value])
+                ->where('is_verified', false)
+                ->first() ?? $approvals->first();
+        }
+
+        if ($approval === null) {
+            throw new ApprovalVerificationException(ApprovalVerificationException::NOT_FOUND);
+        }
+
+        if ($approval->status === JobStatus::FAILED->value) {
+            $link = $approval->ehealthLinks()
+                ->where('status', JobStatus::FAILED->value)
+                ->latest('id')
+                ->first();
+
+            throw new ApprovalVerificationException(ApprovalVerificationException::CREATION_FAILED, error: $link?->error);
+        }
+
+        if (!$approval->uuid) {
+            throw new ApprovalVerificationException(ApprovalVerificationException::CREATION_PENDING);
+        }
+
+        $status = ApprovalStatus::resolve($approval->status);
+
+        if ($status === null || $status === ApprovalStatus::INACTIVE) {
+            throw new ApprovalVerificationException(ApprovalVerificationException::UNAVAILABLE, status: $approval->status);
+        }
+
+        if ($approval->expiresAt?->isPast() === true) {
+            throw new ApprovalVerificationException(ApprovalVerificationException::EXPIRED);
+        }
+
+        if ($approval->getAttribute('is_verified')) {
+            throw new ApprovalVerificationException(ApprovalVerificationException::ALREADY_VERIFIED);
+        }
+
+        return $approval;
     }
 
     /**
@@ -413,7 +502,7 @@ class ApprovalRepository extends BaseRepository
 
         return $payload;
     }
-    
+
     public function storePending(Person $person, array $payload, Employee $creator): Approval
     {
         return DB::transaction(function () use ($person, $payload, $creator): Approval {
