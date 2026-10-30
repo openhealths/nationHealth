@@ -14,7 +14,6 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Rules\Email;
 use App\Rules\InDictionary;
 use App\Rules\PhoneNumber;
-use App\Rules\TaxId;
 use App\Rules\Zip;
 use App\Models\Person\Person as PersonModel;
 use GuzzleHttp\Promise\PromiseInterface;
@@ -228,7 +227,7 @@ class PersonRequest extends Request
             'person.phones.*.type' => ['required', new InDictionary('PHONE_TYPE')],
             'person.phones.*.number' => ['required', 'regex:/^\+[0-9]{11,12}$/'],
             'person.secret' => ['required', 'string', 'max:255'],
-            'person.tax_id' => ['nullable', new TaxId()],
+            'person.tax_id' => ['nullable', 'digits:10'],
             'person.confidant_person' => ['sometimes', 'array'],
             'person.confidant_person.person_id' => ['sometimes', 'uuid'],
             'person.confidant_person.documents_relationship' => ['sometimes', 'array'],
