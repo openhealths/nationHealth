@@ -18,16 +18,6 @@
     ]"
 >
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
-    @if (!$this->canManageActivities && !$this->isTerminalCarePlan && $carePlan->status !== CarePlanStatus::DRAFT->value && !$carePlan->requiresFhirImport())
-        <p class="mt-4 text-sm text-amber-700 dark:text-amber-300" role="status">
-            {{ __('care-plan.prescribing_patient_access_required') }}
-        </p>
-    @endif
-    @if ($carePlan->requiresFhirImport())
-        <p class="mt-4 text-sm text-amber-700 dark:text-amber-300" role="status">
-            {{ $carePlan->status === CarePlanStatus::DRAFT->value ? __('care-plan.draft_backfill_required') : __('care-plan.full_sync_required') }}
-        </p>
-    @endif
 
     <x-slot name="headerActions"></x-slot>
 
@@ -63,6 +53,23 @@
         wire:key="care-plan-show-container"
     >
         <div class="w-full max-w-screen-xl">
+            @if (!$this->canManageActivities && !$this->isTerminalCarePlan && $carePlan->status !== CarePlanStatus::DRAFT->value && !$carePlan->requiresFhirImport())
+                <p
+                    class="mb-6 rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-900 dark:bg-gray-800 dark:text-yellow-300"
+                    role="status"
+                >
+                    {{ __('care-plan.prescribing_patient_access_required') }}
+                </p>
+            @endif
+            @if ($carePlan->requiresFhirImport())
+                <p
+                    class="mb-6 rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-900 dark:bg-gray-800 dark:text-yellow-300"
+                    role="status"
+                >
+                    {{ $carePlan->status === CarePlanStatus::DRAFT->value ? __('care-plan.draft_backfill_required') : __('care-plan.full_sync_required') }}
+                </p>
+            @endif
+
             @php
                 $status = is_array($carePlan->status) ? ($carePlan->status['coding'][0]['code'] ?? ($carePlan->status['text'] ?? '')) : $carePlan->status;
                 $statusEnum = CarePlanStatus::fromStored($status);

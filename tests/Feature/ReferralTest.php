@@ -18,10 +18,13 @@ use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
+use DOMDocument;
+use DOMXPath;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Tests\Concerns\GrantsMedicalEventAbilities;
 use Tests\TestCase;
@@ -178,7 +181,8 @@ class ReferralTest extends TestCase
 
         Livewire::test(\App\Livewire\Referral\ReferralIndex::class, ['legalEntity' => $this->legalEntity])
             ->assertStatus(200)
-            ->assertSee('Знайти направлення');
+            ->assertSee(__('referrals.title'))
+            ->assertSee(__('referrals.search'));
     }
 
     public function testIndexSearchRequiresNumberAndShowsOnlyApiResults(): void
@@ -287,6 +291,55 @@ class ReferralTest extends TestCase
         $this->assertSame('in_progress', $referral->refresh()->status);
     }
 
+    #[DataProvider('referralMenuActionCases')]
+    public function testReferralMenuKeepsAllowedUsageActions(string $status, string $programStatus, bool $isIssuedByOurFacility, array $deniedAbilities, array $expectedActions): void
+    {
+        foreach ($deniedAbilities as $ability) {
+            $this->user->revokePermissionTo($ability);
+            $this->assertFalse($this->user->can($ability));
+        }
+        $this->actingAs($this->user);
+
+        $component = Livewire::test(ReferralIndex::class, ['legalEntity' => $this->legalEntity])
+            ->set('searchResults', [[
+                'id' => (string) Str::uuid(),
+                'status' => $status,
+                'program_processing_status' => $programStatus,
+                'subject' => ['identifier' => ['value' => (string) Str::uuid()]],
+                'requesterLegalEntity' => ['identifier' => ['value' => $isIssuedByOurFacility ? $this->legalEntity->uuid : (string) Str::uuid()]],
+            ]]);
+
+        $document = new DOMDocument();
+        $document->loadHTML('<meta charset="utf-8">'.$component->html(), LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_NONET);
+        $xpath = new DOMXPath($document);
+        $menuButtons = $xpath->query("//tbody//button[@*[name()='wire:click']]");
+        $actions = [];
+        foreach ($menuButtons as $button) {
+            $this->assertFalse($button->hasAttribute('disabled'));
+            $actions[] = Str::before($button->getAttribute('wire:click'), '(');
+        }
+        $this->assertEqualsCanonicalizing($expectedActions, $actions);
+        $this->assertCount(1, $xpath->query('//tbody//button[normalize-space(.) = "'.__('forms.view_details').'"]'));
+    }
+
+    public static function referralMenuActionCases(): array
+    {
+        $issuerActions = ['openRecallModal', 'openErrorModal'];
+
+        return [
+            'own active referral ready for use' => ['active', 'new', true, [], [...$issuerActions, 'process']],
+            'own new referral ready for use' => ['new', 'new', true, [], [...$issuerActions, 'process']],
+            'own active referral in progress' => ['active', 'in_progress', true, [], [...$issuerActions, 'openCompleteModal', 'openCancelModal']],
+            'own new referral in progress' => ['new', 'in_progress', true, [], [...$issuerActions, 'openCompleteModal', 'openCancelModal']],
+            'own referral without take permission' => ['active', 'new', true, ['service_request:makeinprogress'], $issuerActions],
+            'own referral with only complete permission' => ['active', 'in_progress', true, ['service_request:use'], [...$issuerActions, 'openCompleteModal']],
+            'own referral with only release permission' => ['active', 'in_progress', true, ['service_request:complete'], [...$issuerActions, 'openCancelModal']],
+            'own referral without usage permissions' => ['active', 'in_progress', true, ['service_request:complete', 'service_request:use'], $issuerActions],
+            'foreign active referral ready for use' => ['active', 'new', false, [], ['process']],
+            'foreign new referral in progress' => ['new', 'in_progress', false, [], ['openCompleteModal', 'openCancelModal']],
+        ];
+    }
+
     public function testDraftAndTerminalReferralsCannotRunUsageActions(): void
     {
         $this->actingAs($this->user);
@@ -298,18 +351,31 @@ class ReferralTest extends TestCase
 
         foreach (['draft', 'completed', 'entered-in-error', 'revoked'] as $status) {
             $referralUuid = (string) Str::uuid();
-            Livewire::test(ReferralIndex::class, ['legalEntity' => $this->legalEntity])
+            $component = Livewire::test(ReferralIndex::class, ['legalEntity' => $this->legalEntity])
                 ->set('hasSearched', true)
                 ->set('searchResults', [[
                     'id' => $referralUuid,
                     'status' => $status,
                     'program_processing_status' => 'in_progress',
+                    'requesterLegalEntity' => ['identifier' => ['value' => $this->legalEntity->uuid]],
                 ]])
                 ->assertDontSee('Взяти в роботу')
                 ->assertDontSee('Погасити направлення')
                 ->assertDontSee('Відмінити використання')
-                ->assertDontSee('Видалити заявку')
-                ->assertDontSee('Позначити помилковим')
+                ->assertDontSee('Позначити помилковим');
+
+            if ($status === 'draft') {
+                $document = new DOMDocument();
+                $document->loadHTML('<meta charset="utf-8">'.$component->html(), LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_NONET);
+                $deleteButtons = (new DOMXPath($document))->query('//button[normalize-space(.) = "'.__('referrals.actions.delete_request').'"]');
+                $this->assertCount(1, $deleteButtons);
+                $this->assertTrue($deleteButtons->item(0)->hasAttribute('disabled'));
+                $this->assertFalse($deleteButtons->item(0)->hasAttribute('wire:click'));
+            } else {
+                $component->assertDontSee(__('referrals.actions.delete_request'));
+            }
+
+            $component
                 ->call('process', $referralUuid, (string) Str::uuid())
                 ->call('openCancelModal', $referralUuid)
                 ->assertSet('showCancelModal', false)

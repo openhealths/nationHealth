@@ -3,57 +3,135 @@
     <x-forms.loading />
 
     <x-header-navigation class="items-start">
-        <x-slot name="title">{{ __('patients.referrals') }}</x-slot>
+        <x-slot name="title">{{ __('referrals.title') }}</x-slot>
+
+        <x-slot name="actions">
+            @can('service_request:read')
+                <button
+                    type="button"
+                    wire:click="search"
+                    wire:loading.attr="disabled"
+                    wire:target="search"
+                    class="button-sync gap-2 whitespace-nowrap disabled:cursor-default disabled:opacity-50"
+                    @disabled(blank($requisition))
+                >
+                    @icon('refresh', 'w-4 h-4')
+                    <span>{{ __('forms.synchronise_with_eHealth') }}</span>
+                </button>
+            @endcan
+        </x-slot>
 
         <x-slot name="navigation">
-            <div class="-my-4 flex flex-col">
-                <form wire:submit.prevent="search">
-                    <div class="flex flex-col gap-2">
-                        <label for="requisition" class="text-sm font-medium text-gray-900 dark:text-white">
-                            {{ __('referrals.search_requisition_required') }}
-                        </label>
-                        <div class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-                            <div class="form-group group w-full sm:w-96">
-                                <input
-                                    type="text"
-                                    id="requisition"
-                                    placeholder=" "
-                                    class="input peer"
-                                    wire:model.defer="requisition"
-                                    x-data
-                                    x-on:input="
-                                        $event.target.value = $event.target.value
-                                            .replace(/[^A-Za-z0-9]/g, '')
-                                            .replace(/(.{4})(?! $)/g, '$1-')
-                                            .toUpperCase()
-                                            .slice(0, 19)
-                                    "
-                                    autocomplete="off"
-                                    required
-                                />
-                                <label for="requisition" class="label"> XXXX-XXXX-XXXX-XXXX </label>
-                                @error('requisition')
-                                    <p class="text-error">{{ $message }}</p>
-                                @enderror
-                            </div>
+            <form wire:submit="search" class="-my-4">
+                <div class="mb-6 flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                    @icon('search-outline', 'w-4.5 h-4.5')
+                    <span>{{ __('referrals.search') }}</span>
+                </div>
 
-                            <button
-                                type="submit"
-                                class="button-primary flex items-center justify-center gap-2 self-stretch whitespace-nowrap sm:self-auto"
-                            >
-                                @icon('search', 'w-4 h-4')
-                                <span>Знайти направлення</span>
-                            </button>
-                        </div>
+                <div class="form-row-3" wire:key="referral-search-fields-{{ $filterResetKey }}">
+                    <div class="form-group group">
+                        <input
+                            type="text"
+                            id="requisition"
+                            placeholder=" "
+                            class="input peer pr-8"
+                            wire:model.live.debounce.300ms="requisition"
+                            x-data
+                            x-on:input="
+                                $event.target.value = (
+                                    $event.target.value
+                                        .replace(/[^A-Za-z0-9]/g, '')
+                                        .toUpperCase()
+                                        .slice(0, 16)
+                                        .match(/.{1,4}/g) || []
+                                ).join('-')
+                            "
+                            autocomplete="off"
+                            maxlength="19"
+                            required
+                        />
+                        <label for="requisition" class="label">{{ __('referrals.requisition') }}</label>
+                        <button
+                            type="button"
+                            wire:click="$set('requisition', '')"
+                            class="absolute top-3 right-0 text-gray-400 hover:text-gray-700 dark:hover:text-white"
+                            aria-label="{{ __('referrals.clear_requisition') }}"
+                        >
+                            @icon('close', 'w-4 h-4')
+                        </button>
+                        @error('requisition')
+                            <p class="text-error">{{ $message }}</p>
+                        @enderror
                     </div>
-                </form>
-            </div>
+
+                    <div class="form-group group">
+                        <input
+                            type="text"
+                            id="patient"
+                            placeholder=" "
+                            class="input peer pr-8"
+                            wire:model.live.debounce.300ms="patient"
+                            autocomplete="off"
+                        />
+                        <label for="patient" class="label">{{ __('referrals.patient') }}</label>
+                        <button
+                            type="button"
+                            wire:click="$set('patient', '')"
+                            class="absolute top-3 right-0 text-gray-400 hover:text-gray-700 dark:hover:text-white"
+                            aria-label="{{ __('referrals.clear_patient') }}"
+                        >
+                            @icon('close', 'w-4 h-4')
+                        </button>
+                    </div>
+                </div>
+
+                <div
+                    class="form-row-3 mt-4"
+                    x-data="{ statusOpen: false }"
+                    @open-changed.stop="statusOpen = $event.detail.open"
+                    :class="{ 'pb-60': statusOpen }"
+                >
+                    <div class="form-group group" wire:key="referral-status-filter-{{ $filterResetKey }}">
+                        <x-forms.multiselect
+                            bind="status"
+                            :initial="$status"
+                            :options="[
+                                'active' => __('referrals.statuses.active'),
+                                'completed' => __('referrals.statuses.completed'),
+                                'entered_in_error' => __('referrals.statuses.entered_in_error'),
+                                'revoked' => __('referrals.statuses.revoked'),
+                                'draft' => __('forms.status.drafts'),
+                                'in_progress' => __('referrals.statuses.in_progress'),
+                            ]"
+                            :label="__('referrals.show')"
+                            :placeholder="__('referrals.registry.all')"
+                            :live="true"
+                        />
+                    </div>
+                </div>
+
+                <div class="mt-6 mb-9 flex flex-col gap-2 sm:flex-row">
+                    @can('service_request:read')
+                        <button
+                            type="submit"
+                            class="button-primary gap-2"
+                            wire:loading.attr="disabled"
+                            wire:target="search"
+                        >
+                            @icon('search', 'w-4 h-4')
+                            <span>{{ __('forms.search') }}</span>
+                        </button>
+                    @endcan
+                    <button type="button" wire:click="resetFilters" class="button-primary-outline-red">
+                        {{ __('referrals.btn_reset') }}
+                    </button>
+                </div>
+            </form>
         </x-slot>
     </x-header-navigation>
 
     <div class="shift-content mt-8 flow-root pl-3.5">
         <div class="max-w-screen-xl">
-            <!-- Error Message -->
             @if ($errorMessage)
                 <div
                     class="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-800 dark:bg-gray-800 dark:text-red-400"
@@ -63,125 +141,15 @@
                 </div>
             @endif
 
-            <!-- Search Results -->
-            @if ($hasSearched && empty($errorMessage) && !empty($searchResults))
-                @php
-                    $statuses = [
-                        'active' => 'Активне',
-                        'completed' => 'Погашене',
-                        'entered_in_error' => 'Введено помилково',
-                        'entered-in-error' => 'Введено помилково',
-                        'draft' => 'Чернетка',
-                        'revoked' => 'Відкликане',
-                        'recalled' => 'Відкликане',
-                        'new' => 'Нове',
-                        'in_progress' => 'В роботі',
-                        'in_queue' => 'В черзі',
-                    ];
-
-                    $categories = [
-                        'hospitalization' => __('care-plan.referral_category.hospitalization'),
-                        'consultation' => __('care-plan.referral_category.consultation'),
-                        'imaging' => __('care-plan.referral_category.imaging'),
-                        'laboratory_procedure' => __('care-plan.referral_category.laboratory_procedure'),
-                        'surgical_procedure' => __('care-plan.referral_category.surgical_procedure'),
-                        'diagnostic_procedure' => __('care-plan.referral_category.diagnostic_procedure'),
-                        'procedure' => __('care-plan.referral_category.procedure'),
-                        'transfer' => __('care-plan.referral_category.transfer'),
-                        'treatment' => __('care-plan.referral_category.treatment'),
-                        'diagnostic' => __('care-plan.referral_category.diagnostic'),
-                        'education' => __('care-plan.referral_category.education'),
-                        'counseling' => __('care-plan.referral_category.counseling'),
-                        'hospital_referral' => __('care-plan.referral_category.hospital_referral'),
-                        'evaluation' => __('care-plan.referral_category.evaluation'),
-                    ];
-                @endphp
-                <div class="mt-2">
-                    <h3 class="mb-4 text-lg font-medium text-gray-900 dark:text-white">Результати пошуку</h3>
-
-                    <div class="grid gap-4">
-                        @foreach ($searchResults as $referral)
-                            <div
-                                class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800"
-                                wire:key="referral-{{ $referral['id'] ?? $loop->index }}"
-                            >
-                                <div class="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-                                    <div class="space-y-1.5">
-                                        <p class="text-sm text-gray-500 dark:text-gray-400">
-                                            ID:
-                                            <span class="font-mono text-gray-700 dark:text-gray-300">{{ $referral['id'] ?? 'Невідомо' }}</span>
-                                        </p>
-                                        <h4 class="text-base font-semibold text-gray-900 dark:text-white">
-                                            Категорія: {{ $categories[$referral['category']['coding'][0]['code'] ?? ''] ?? ($referral['category']['coding'][0]['code'] ?? 'Не вказана') }}
-                                        </h4>
-                                        <p class="text-sm text-gray-900 dark:text-white">
-                                            {{ __('referrals.search_patient') }}:
-                                            {{ trim(($referral['identity']['last_name'] ?? '') . ' ' . \Illuminate\Support\Str::substr($referral['identity']['first_name'] ?? '', 0, 1) . (empty($referral['identity']['first_name']) ? '' : '.') . ' ' . \Illuminate\Support\Str::substr($referral['identity']['second_name'] ?? '', 0, 1) . (empty($referral['identity']['second_name']) ? '' : '.')) ?: '—' }}
-                                            @if (isset($referral['identity']['age']))
-                                                · {{ __('referrals.search_age', ['age' => $referral['identity']['age']]) }}
-                                            @endif
-                                        </p>
-                                        <p class="text-sm font-semibold text-gray-900 dark:text-white">
-                                            {{ __('referrals.search_priority') }}:
-                                            {{ __('referrals.priorities.' . ($referral['priority'] ?? 'unknown')) }}
-                                        </p>
-                                        <div class="flex flex-wrap items-center gap-2 pt-1">
-                                            <span class="text-sm font-medium text-gray-900 dark:text-white">
-                                                Статус:
-                                            </span>
-                                            <span class="rounded bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                                                {{ $statuses[$referral['status'] ?? ''] ?? ($referral['status'] ?? 'Невідомо') }}
-                                            </span>
-                                            @if (isset($referral['program_processing_status']))
-                                                <span class="ml-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                    Статус за програмою:
-                                                </span>
-                                                <span class="rounded bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800 dark:bg-purple-900 dark:text-purple-300">
-                                                    {{ $referral['program_processing_status'] }}
-                                                </span>
-                                            @endif
-                                        </div>
-                                    </div>
-                                    <div class="flex shrink-0 flex-wrap items-center gap-2">
-                                        @if ($this->canTakeIntoWork($referral) && auth()->user()?->can('service_request:makeinprogress'))
-                                            <button
-                                                wire:click="process('{{ $referral['id'] }}', '{{ $referral['subject']['identifier']['value'] ?? '' }}')"
-                                                type="button"
-                                                class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-4 focus:ring-green-300 dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800"
-                                            >
-                                                Взяти в роботу
-                                            </button>
-                                        @endif
-
-                                        @if ($this->canManageUsage($referral))
-                                            @can('service_request:complete')
-                                            <button
-                                                wire:click="openCompleteModal('{{ $referral['id'] }}')"
-                                                type="button"
-                                                class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-                                            >
-                                                Погасити направлення
-                                            </button>
-                                            @endcan
-                                            @can('service_request:use')
-                                            <button
-                                                wire:click="openCancelModal('{{ $referral['id'] }}')"
-                                                type="button"
-                                                class="inline-flex items-center rounded-lg border border-red-600 px-4 py-2 text-center text-sm font-medium text-red-600 hover:bg-red-600 hover:text-white focus:ring-4 focus:ring-red-300 focus:outline-none dark:border-red-500 dark:text-red-500 dark:hover:bg-red-600 dark:hover:text-white dark:focus:ring-red-900"
-                                            >
-                                                Відмінити використання
-                                            </button>
-                                            @endcan
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
+            @if (!empty($this->filteredReferrals))
+                @include('livewire.referral.parts.referrals-table', ['referrals' => $this->filteredReferrals])
+            @else
+                <x-nothing-found />
             @endif
         </div>
     </div>
+
+    @include('livewire.referral.parts.referral-status-modals')
 
     <!-- Cancel Usage Modal -->
     @if ($showCancelModal)

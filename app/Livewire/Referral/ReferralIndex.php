@@ -13,6 +13,7 @@ use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -22,6 +23,12 @@ class ReferralIndex extends Component
     public LegalEntity $legalEntity;
 
     public string $requisition = '';
+
+    public string $patient = '';
+
+    public array $status = [];
+
+    public int $filterResetKey = 0;
 
     public array $searchResults = [];
 
@@ -48,6 +55,93 @@ class ReferralIndex extends Component
 
     /** @var list<string> */
     public array $emzTypes = ['encounter', 'procedure', 'diagnostic_report'];
+
+    public bool $showRecallModal = false;
+
+    public bool $showErrorModal = false;
+
+    #[Locked]
+    public ?string $pendingStatusReferral = null;
+
+    #[Locked]
+    public ?string $pendingStatusAction = null;
+
+    public string $statusExplanatoryLetter = '';
+
+    public string $errorReason = '';
+
+    public function canManageIssuedReferral(array $referral): bool
+    {
+        $requesterUuid = data_get($referral, 'requester.legal_entity.identifier.value')
+            ?? data_get($referral, 'requester_legal_entity.identifier.value')
+            ?? data_get($referral, 'requesterLegalEntity.identifier.value');
+
+        return in_array($referral['status'] ?? '', ['active', 'new'], true)
+            && filled($requesterUuid)
+            && $requesterUuid === $this->legalEntity->uuid;
+    }
+
+    public function openRecallModal(string $uuid): void
+    {
+        $this->openReferralStatusModal($uuid, 'recall');
+    }
+
+    public function openErrorModal(string $uuid): void
+    {
+        $this->openReferralStatusModal($uuid, 'error');
+    }
+
+    private function openReferralStatusModal(string $uuid, string $action): void
+    {
+        abort_unless(auth()->user()?->can('service_request:read'), 403);
+        $referral = collect($this->searchResults)->firstWhere('id', $uuid);
+        abort_unless($referral && $this->canManageIssuedReferral($referral), 404);
+
+        $this->cancelStatusChange();
+        $this->pendingStatusReferral = $uuid;
+        $this->pendingStatusAction = $action;
+        $this->showRecallModal = $action === 'recall';
+        $this->showErrorModal = $action === 'error';
+    }
+
+    public function cancelStatusChange(): void
+    {
+        $this->reset(['showRecallModal', 'showErrorModal', 'pendingStatusReferral', 'pendingStatusAction', 'statusExplanatoryLetter', 'errorReason']);
+        $this->resetValidation(['statusExplanatoryLetter', 'errorReason']);
+    }
+
+    #[Computed]
+    public function filteredReferrals(): array
+    {
+        $patientSearch = mb_strtolower(trim($this->patient));
+
+        return array_values(array_filter($this->searchResults, function (array $referral) use ($patientSearch): bool {
+            $patientName = implode(' ', array_filter([
+                data_get($referral, 'identity.last_name'),
+                data_get($referral, 'identity.first_name'),
+                data_get($referral, 'identity.second_name'),
+                data_get($referral, 'subject.display'),
+            ]));
+
+            if ($patientSearch !== '' && !str_contains(mb_strtolower($patientName), $patientSearch)) {
+                return false;
+            }
+
+            $status = str_replace('-', '_', $referral['status'] ?? '');
+            $status = $status === 'recalled' ? 'revoked' : $status;
+
+            return empty($this->status)
+                || in_array($status, $this->status, true)
+                || (in_array('in_progress', $this->status, true) && $this->canManageUsage($referral));
+        }));
+    }
+
+    public function resetFilters(): void
+    {
+        $this->reset(['requisition', 'patient', 'status', 'errorMessage']);
+        $this->resetValidation();
+        $this->filterResetKey++;
+    }
 
     public function search(): void
     {
