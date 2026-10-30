@@ -1,6 +1,6 @@
 <fieldset class="fieldset !mb-6 !max-w-full">
     <legend class="legend">{{ __('device-requests.plan.remote_details') }}</legend>
-    <button type="button" wire:click="sync" wire:loading.attr="disabled" class="button-minor">
+    <button type="button" wire:click="sync" wire:loading.attr="disabled" class="button-primary-outline">
         {{ __('device-requests.plan.refresh') }}
     </button>
     <dl class="mt-4 grid gap-4 md:grid-cols-2">

@@ -18,6 +18,9 @@ return [
     'show' => 'Показувати',
     'placeholder_status' => 'Активні, Відмінені',
     'btn_reset' => 'Скинути фільтри',
+    'clear_requisition' => 'Очистити номер направлення',
+    'clear_patient' => 'Очистити пацієнта',
+    'row_actions' => 'Дії з направленням',
 
     'period_fields' => [
         'start_time' => 'Час початку',
@@ -72,11 +75,16 @@ return [
         'entered_in_error' => 'Позначене помилковим',
         'revoked' => 'Відкликане',
         'new' => 'Нове',
-        'in_progress' => 'В роботі',
+        'in_progress' => 'У роботі',
         'in_queue' => 'В черзі',
     ],
 
+    'state_labels' => [
+        'in_progress' => 'У роботі',
+    ],
+
     'actions' => [
+        'complete' => 'Погасити направлення',
         'recall' => 'Відкликати',
         'save' => 'Зберегти',
         'create_en' => 'Створити Направлення',
