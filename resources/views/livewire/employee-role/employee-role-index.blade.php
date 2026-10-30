@@ -211,6 +211,6 @@
         </div>
     </div>
 
-    <livewire:components.x-message :key="time()" />
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     <x-forms.loading />
 </div>

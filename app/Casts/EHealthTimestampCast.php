@@ -31,6 +31,8 @@ class EHealthTimestampCast implements CastsAttributes
             return null;
         }
 
-        return Carbon::parse($value)->format('Y-m-d H:i:s');
+        // get() treats stored timestamps as UTC. Normalize before dropping the offset,
+        // otherwise local evening values can be read back as the following calendar day.
+        return Carbon::parse($value, config('app.timezone'))->utc()->format('Y-m-d H:i:s');
     }
 }

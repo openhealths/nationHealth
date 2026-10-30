@@ -162,7 +162,11 @@ trait HandlesSyncBatch
         $user = Auth::user();
         $token = Session::get(config('ehealth.api.oauth.bearer_token'));
 
-        $this->resumeSynchronization($entityType, $user, $token);
+        if (!$this->resumeSynchronization($entityType, $user, $token)) {
+            Session::flash('error', __('forms.errors.sync_resume_failed'));
+
+            return;
+        }
         Session::flash('success', __($this->syncLangGroup($entityType) . '.messages.sync_resume_started'));
         $user->notify(new SyncNotification($entityType, 'resumed'));
     }
@@ -195,9 +199,9 @@ trait HandlesSyncBatch
      * @param  string  $entityType
      * @param  User  $user
      * @param  string  $token
-     * @return void
+     * @return bool
      */
-    private function resumeSynchronization(string $entityType, User $user, string $token): void
+    private function resumeSynchronization(string $entityType, User $user, string $token): bool
     {
         $encryptedToken = Crypt::encryptString($token);
         $batchName = $this->getBatchName($entityType);
@@ -209,12 +213,18 @@ trait HandlesSyncBatch
             if ($batch->name === $batchName . '_' . $this->uuid) {
                 Log::info('Resuming ' . ucfirst($entityType) . ' sync batch: ' . $batch->name . ' id: ' . $batch->id);
 
+                if (!$this->restartBatch($batch, $user, $encryptedToken, legalEntity())) {
+                    return false;
+                }
+
                 legalEntity()->setEntityStatus(JobStatus::PROCESSING, $entityConstant);
                 $this->onSyncStatusChanged($entityType, JobStatus::PROCESSING);
-                $this->restartBatch($batch, $user, $encryptedToken, legalEntity());
-                break;
+
+                return true;
             }
         }
+
+        return false;
     }
 
     /**

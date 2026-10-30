@@ -5,7 +5,7 @@
 @use('App\Models\Employee\EmployeeRequest')
 
 <div>
-    <livewire:components.x-message :key="now()->timestamp" />
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     @php
         $currentUser = auth()->user();
         // We cache the hospital ID so as not to call the legalEntity() function 100 times in a loop

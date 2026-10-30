@@ -550,12 +550,15 @@ class EmployeeIndex extends EmployeeComponent
 
         // Try to resume previous sync if it was paused or failed
         if ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value) {
-
-            if ($this->resumeSynchronization($user, $token)) {
-                $user->notify(new SyncNotification('employee', 'resumed'));
+            if (!$this->resumeSynchronization($user, $token)) {
+                Session::flash('error', __('forms.errors.sync_resume_failed'));
 
                 return;
             }
+
+            $user->notify(new SyncNotification('employee', 'resumed'));
+
+            return;
         }
 
         $user->notify(new SyncNotification('employee', 'started'));
@@ -657,7 +660,7 @@ class EmployeeIndex extends EmployeeComponent
      *
      * @param  User  $user  The user instance for whom synchronization should be resumed
      * @param  string  $token  The authentication or session token used to resume the sync process
-     * @return void
+     * @return bool
      */
     protected function resumeSynchronization(User $user, string $token): bool
     {
@@ -670,14 +673,13 @@ class EmployeeIndex extends EmployeeComponent
             if ($batch->name === self::BATCH_NAME || $batch->name === self::DEPENDENT_BATCH_NAME) {
                 Log::info('Resuming Employee sync batch: ' . $batch->name . ' id: ' . $batch->id);
 
+                if (!$this->restartBatch($batch, $user, $encryptedToken, legalEntity())) {
+                    return false;
+                }
+
                 legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_EMPLOYEE);
 
-                $this->restartBatch($batch, $user, $encryptedToken, legalEntity());
-
-                $this->dispatch('flashMessage', [
-                    'message' => __('forms.success.sync_resumed'),
-                    'type' => 'success'
-                ]);
+                Session::flash('success', __('forms.success.sync_resumed'));
 
                 return true;
             }

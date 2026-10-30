@@ -130,7 +130,7 @@ class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
     {
         config(['app.timezone' => 'Europe/Kyiv']);
         $encounter = $this->encounter();
-        $encounter->update(['ehealth_inserted_at' => '2026-10-22 22:30:00']);
+        $encounter->update(['ehealth_inserted_at' => '2026-10-22T22:30:00Z']);
         $undated = $this->encounter();
         $undated->update(['person_id' => $encounter->person_id, 'ehealth_inserted_at' => null]);
         $unfinished = $this->encounter();
@@ -158,7 +158,7 @@ class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
         config(['app.timezone' => 'Europe/Kyiv']);
         $encounter = $this->encounter();
         $encounter->update(['ehealth_inserted_at' => null]);
-        $encounter->period()->create(['start' => '2026-10-22 22:30:00']);
+        $encounter->period()->create(['start' => '2026-10-22T22:30:00Z']);
         Episode::create([
             'uuid' => $encounter->episode->value, 'person_id' => $encounter->person_id,
             'status' => 'active', 'name' => 'Контроль лікування',

@@ -1,6 +1,7 @@
 @use('App\Enums\JobStatus')
 
 <div>
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     @php
         $permissions = $this->indexPermissions;
     @endphp

@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunClassInSeparateProcess;
 use Tests\Concerns\CreatesFhirRequestIdentifiers;
@@ -44,6 +45,12 @@ class MedicationRequestLifecycleServiceTest extends TestCase
     protected Encounter $encounter;
 
     protected User $user;
+
+    protected function tearDown(): void
+    {
+        $this->travelBack();
+        parent::tearDown();
+    }
 
     protected function setUp(): void
     {
@@ -363,8 +370,10 @@ class MedicationRequestLifecycleServiceTest extends TestCase
         $this->assertStringContainsString('—', $html);
     }
 
-    public function test_find_eligible_encounters_requires_today_period_and_current_performer(): void
+    #[DataProvider('encounterClocks')]
+    public function test_find_eligible_encounters_requires_today_period_and_current_performer(string $clock): void
     {
+        $this->travelTo($clock);
         $performer = \App\Models\MedicalEvents\Sql\Identifier::create([
             'value' => $this->employee->uuid,
         ]);
@@ -407,14 +416,38 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'end' => now()->subDay()->utc(),
         ]);
 
+        $lateEncounter = $yesterdayEncounter->replicate();
+        $lateEncounter->uuid = (string) Str::uuid();
+        $lateEncounter->save();
+        $lateEncounter->period()->create([
+            'start' => today()->setTime(23, 45),
+            'end' => today()->setTime(23, 45),
+        ]);
+        $tomorrowEncounter = $yesterdayEncounter->replicate();
+        $tomorrowEncounter->uuid = (string) Str::uuid();
+        $tomorrowEncounter->save();
+        $tomorrowEncounter->period()->create([
+            'start' => today()->addDay(),
+            'end' => today()->addDay(),
+        ]);
+
         $service = app(MedicationRequestLifecycleService::class);
         $eligible = $service->findEligibleEncountersForEPrescription(
             (int) $this->person->id,
             $this->employee->uuid
         );
 
-        $this->assertCount(1, $eligible);
-        $this->assertSame($this->encounter->id, $eligible->first()->id);
+        $this->assertEqualsCanonicalizing([$this->encounter->id, $lateEncounter->id], $eligible->modelKeys());
+    }
+
+    public static function encounterClocks(): array
+    {
+        return [
+            'summer midnight' => ['2026-08-13T00:15:00+03:00'],
+            'winter midnight' => ['2026-01-15T00:15:00+02:00'],
+            '23 hour spring day' => ['2026-03-29T00:15:00+02:00'],
+            '25 hour autumn day' => ['2026-10-25T00:15:00+03:00'],
+        ];
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('localCalendarDays')]
@@ -429,18 +462,18 @@ class MedicationRequestLifecycleServiceTest extends TestCase
         $this->travelTo(\Carbon\Carbon::parse($localNow, $timezone));
         $performer = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $this->employee->uuid]);
         $this->encounter->update(['performer_id' => $performer->id]);
-        $period = $this->encounter->period()->create(['start' => $startUtc, 'end' => $startUtc]);
+        $period = $this->encounter->period()->create(['start' => $startUtc . 'Z', 'end' => $startUtc . 'Z']);
         $repository = app(\App\Repositories\MedicalEvents\MedicationRequestRepository::class);
 
         $this->assertTrue($repository->eligibleEncounters($this->person->id, $this->employee->uuid)
             ->contains('id', $this->encounter->id));
-        $period->update(['end' => $lastUtc]);
+        $period->update(['end' => $lastUtc . 'Z']);
         $this->assertTrue($repository->eligibleEncounters($this->person->id, $this->employee->uuid)
             ->contains('id', $this->encounter->id));
-        $period->update(['end' => $nextStartUtc]);
+        $period->update(['end' => $nextStartUtc . 'Z']);
         $this->assertFalse($repository->eligibleEncounters($this->person->id, $this->employee->uuid)
             ->contains('id', $this->encounter->id));
-        $period->update(['end' => \Carbon\CarbonImmutable::parse($startUtc, 'UTC')->subSecond()->format('Y-m-d H:i:s')]);
+        $period->update(['end' => \Carbon\CarbonImmutable::parse($startUtc, 'UTC')->subSecond()->toIso8601ZuluString()]);
         $this->assertFalse($repository->eligibleEncounters($this->person->id, $this->employee->uuid)
             ->contains('id', $this->encounter->id));
     }

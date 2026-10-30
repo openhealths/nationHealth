@@ -12,6 +12,7 @@ use Illuminate\Bus\Batch;
 use App\Traits\FormTrait;
 use App\Jobs\CompleteSync;
 use App\Models\LegalEntity;
+use App\Repositories\Repository;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,8 @@ use Illuminate\Queue\InteractsWithQueue;
 use App\Classes\eHealth\EHealthResponse;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Exceptions\EHealth\EHealthResponseException;
+use App\Jobs\Middleware\UseEHealthPermissionContext;
 
 abstract class EHealthJob implements ShouldQueue
 {
@@ -57,6 +60,9 @@ abstract class EHealthJob implements ShouldQueue
      * @var string
      */
     protected string $token = '';
+
+    /** @var list<string> Token fingerprints rejected during this automatic retry sequence. */
+    protected array $rejectedTokenHashes = [];
 
     /**
      * The user associated with the job, if has an active session
@@ -99,7 +105,7 @@ abstract class EHealthJob implements ShouldQueue
         // Ensure the job has a user with an active session
         $this->user ??= $this->batch()->options['user'];
 
-        return $this->getAdditionalMiddleware();
+        return [new UseEHealthPermissionContext(), ...$this->getAdditionalMiddleware()];
     }
 
     public function __construct(
@@ -124,7 +130,19 @@ abstract class EHealthJob implements ShouldQueue
 
         $this->token = Crypt::decryptString($this->batch()->options['token'] ?? '');
 
-        $response = $this->sendRequest($this->token);
+        try {
+            $response = $this->sendRequest($this->token);
+        } catch (EHealthResponseException $exception) {
+            if (!in_array($exception->getCode(), [401, 403], true) || $this->job === null) {
+                throw $exception;
+            }
+
+            // A denied token cannot recover through backoff. Enter the shared failure lifecycle
+            // immediately; temporary failures and rate limits retain the worker's delayed retries.
+            $this->fail($exception);
+
+            return;
+        }
 
         $this->processResponse($response);
 
@@ -173,7 +191,7 @@ abstract class EHealthJob implements ShouldQueue
     public function failed(?Throwable $exception): void
     {
         // It is need because if job is failed the middleware doesn't called
-        $olduser = $this->user ?? ($this->batch()->options['user'] ?? null);
+        $oldUser = $this->user ?? ($this->batch()->options['user'] ?? null);
 
         Log::channel('e_health_errors')->error('Sync job failed: ', [
             'EXCEPTION' => $exception::class,
@@ -181,7 +199,7 @@ abstract class EHealthJob implements ShouldQueue
             'attempts' => $this->attempts(),
             'batch_id' => $this->batch()?->id,
             'batch_name' => static::BATCH_NAME,
-            'user_id' => $olduser?->id,
+            'user_id' => $oldUser?->id,
         ]);
 
         echo "Job FAILED: " . static::BATCH_NAME . " Exception type: " . $exception::class . " Code: " . $exception->getCode() . " Error: " . $exception->getMessage() . PHP_EOL;
@@ -190,16 +208,25 @@ abstract class EHealthJob implements ShouldQueue
         if (!in_array($exception->getCode(), static::ERR_TO_RETRY, true)) {
             $this->setEntityStatus(JobStatus::FAILED);
 
-            $olduser?->notify(new SyncNotification('legal_entity', 'failed'));
+            $oldUser?->notify(new SyncNotification('legal_entity', 'failed'));
 
             return;
         }
 
-        $this->user = $this->getUserWithActiveSession($olduser);
+        $this->rejectedTokenHashes = $this->batch()?->options['rejected_token_hashes'] ?? [];
+        if (in_array($exception->getCode(), [401, 403], true)) {
+            $failedToken = Crypt::decryptString($this->batch()->options['token']);
+            $this->rejectedTokenHashes[] = hash('sha256', $failedToken);
+        }
+
+        $this->user = $oldUser === null || !$this->shouldRetryWithAnotherUser($exception)
+            ? null
+            : $this->getUserWithActiveSession($oldUser);
         echo "Retrying with new user: " . ($this->user ? $this->user->id : 'No user found') . PHP_EOL;
 
-        if ($this->user) {
-            $this->token = $this->getToken();
+        $this->token = $this->getToken();
+
+        if ($this->user && $this->token !== '') {
 
             $reflection = new ReflectionClass(static::class);
 
@@ -217,6 +244,7 @@ abstract class EHealthJob implements ShouldQueue
             }
 
             $retryJob = new static(...$args);
+            $retryJob->setUserContext($this->user);
 
             $failedJobUuids = $this->batch()?->failedJobIds ?? [];
             $failedBatchId = $this->batch()?->id;
@@ -229,6 +257,7 @@ abstract class EHealthJob implements ShouldQueue
                 ->withOption('legal_entity_id', $this->legalEntity->id)
                 ->withOption('token', Crypt::encryptString($this->token)) // Passing the same token to the next job
                 ->withOption('user', $this->user)
+                ->withOption('rejected_token_hashes', array_values(array_unique($this->rejectedTokenHashes)))
                 ->withOption('sync_entity', $this->batch()?->options['sync_entity'] ?? null)
                 ->withOption('patient_uuid', $this->batch()?->options['patient_uuid'] ?? null)
                 ->withOption('person_id', $this->batch()?->options['person_id'] ?? null)
@@ -252,8 +281,14 @@ abstract class EHealthJob implements ShouldQueue
 
             // Notifications should be last in the failed() method beacuse it stopped job working
             // TODO: find out why notification stopped job's working
-            $olduser->notify(new SyncNotification('legal_entity', 'paused'));
+            $oldUser?->notify(new SyncNotification('legal_entity', 'paused'));
         }
+    }
+
+    /** Allow jobs to pause on a definitive denial while reusing the common failed() lifecycle. */
+    protected function shouldRetryWithAnotherUser(?Throwable $exception): bool
+    {
+        return true;
     }
 
     /**
@@ -267,15 +302,25 @@ abstract class EHealthJob implements ShouldQueue
             return '';
         }
 
-        $session = DB::table('sessions')->where('user_id', $this->user->id)->first();
+        return $this->syncSessionToken($this->user);
+    }
 
-        if (!$session) {
+    private function syncSessionToken(User $user): string
+    {
+        $payload = Repository::user()->getSyncSessionPayload($user);
+        $token = $payload[config('ehealth.api.oauth.bearer_token')] ?? null;
+        $scopes = $payload[config('ehealth.api.oauth.token_scopes')] ?? [];
+        $expiresAt = $payload['auth_token_expires_at'] ?? null;
+
+        if (!is_string($token) || $token === '' || !is_array($scopes)
+            || !$this->hasRequiredScopes($scopes)
+            || ($payload['ehealth_legal_entity_uuid'] ?? null) !== $this->legalEntity->uuid
+            || ($expiresAt !== null && (!is_numeric($expiresAt) || (int) $expiresAt <= now()->timestamp))
+        ) {
             return '';
         }
 
-        $payload = unserialize(base64_decode($session->payload));
-
-        return $payload['auth_token'] ?? '';
+        return $token;
     }
 
     /**
@@ -318,56 +363,55 @@ abstract class EHealthJob implements ShouldQueue
         $this->user->notify(new SyncNotification($entityType, $action));
     }
 
-    /**
-     * Get user with active session for the legal entity
-     *
-     * This method performs a complex database query to find users that meet two specific criteria:
-     * 1. User must not be the current user (to avoid reusing the same user)
-     * 2. User must be an employee of the specified legal entity
-     * 3. User must have an active session (record exists in sessions table)
-     *
-     * The query uses Eloquent's whereHas() and whereExists() methods for performance optimization:
-     * - whereHas('employees'): Uses LEFT JOIN to check user-employee relationship through employees table
-     * - whereExists(): Uses EXISTS subquery to check for session records without joining session data
-     *
-     * @return User|null
-     */
+    /** Find a different employee whose bound session can execute the saved chain. */
     protected function getUserWithActiveSession(User $user): ?User
     {
-        $legalEntity = $this->legalEntity;
+        // The serialized job retains its legal entity, but Spatie reads its team from a separate,
+        // process-wide resolver. A long-running worker may still hold the preceding job's team
+        // (or no team). Set it before eager-loading permissions so their pivot is scoped to this LE.
+        $previousTeamId = getPermissionsTeamId();
+        setPermissionsTeamId($this->legalEntity->id);
 
-        setPermissionsTeamId($legalEntity->id);
+        try {
+            // The repository narrows the search to other employees with a current bound session.
+            // Direct eHealth permissions are required for every saved step; role permissions alone
+            // do not prove that OAuth granted these scopes to the candidate's actual access token.
+            return Repository::user()->getSyncRetryCandidates($user, $this->legalEntity->id)
+                ->first(function (User $candidate): bool {
+                    $permissions = $candidate->permissions->where('guard_name', 'ehealth')->pluck('name')->all();
 
-        // Execute complex query to find users matching three criteria
-        $users = User::with('roles', 'permissions')
-            // FIRST CRITERIA: Exclude current user's party from search (if it still logined but if here (error occurs), we need to find another user)
-            ->whereNot('users.party_id', $user->party_id ?? 0)
-            // SECOND CRITERIA: User must be employee of this legal entity
-            // This uses nested whereHas to check User -> Employee relationship
-            // SQL equivalent: EXISTS (SELECT 1 FROM employees WHERE employees.user_id = users.id AND employees.legal_entity_id = ?)
-            ->whereHas('employees', fn ($query) => $query->where('legal_entity_id', $legalEntity->id))
-            // THIRD CRITERIA: User must have active session
-            // This creates an EXISTS subquery to check sessions table
-            // Using SELECT 1 for performance - we only need to verify existence, not retrieve data
-            // SQL equivalent: EXISTS (SELECT 1 FROM sessions WHERE sessions.user_id = users.id)
-            ->whereExists(
-                fn ($query) => $query->select(DB::raw(1))
-                    ->from('sessions')
-                    // whereColumn creates correlation between main query and subquery
-                    // This ensures we check sessions for the specific user from outer query
-                    ->whereColumn('sessions.user_id', 'users.id')
-            )
-            ->get();
+                    // Read the token and its scopes together from the current database binding.
+                    // Reject missing/expired sessions, a token for another LE, or insufficient scopes.
+                    // first() returns null when none qualify, without treating search(false) as key 0.
+                    if (!$this->hasRequiredScopes($permissions)) {
+                        return false;
+                    }
 
-        echo "Found " . $users->count() . " users with active sessions for legal entity {$legalEntity->id}" . PHP_EOL;
+                    $token = $this->syncSessionToken($candidate);
 
-        // $users here is a Collection of User models. $userKey is the key/index of the first user that has the required scope/permission
-        $userKey = empty($this->requiredScope())
-            ? $users->keys()->first()
-            : $users->search(fn (User $user) => $user->hasPermissionTo($this->requiredScope(), 'ehealth'));
+                    // Never rotate back to an API-rejected token, even if its local session is
+                    // still active. A later login starts a new sequence with fresh credentials.
+                    return $token !== ''
+                        && !in_array(hash('sha256', $token), $this->rejectedTokenHashes, true);
+                });
+        } finally {
+            // Do not leak this job's permission context into the caller or the worker's next job,
+            // including when the query or session decoding fails with an exception.
+            setPermissionsTeamId($previousTeamId);
+        }
+    }
 
-        // If no user found with required scope, return null
-        return $users->get($userKey);
+    /** Check only saved steps; creating dynamic next jobs may have side effects. */
+    public function hasRequiredScopes(array $scopes): bool
+    {
+        return ($this->requiredScope() === '' || in_array($this->requiredScope(), $scopes, true))
+            && ($this->nextEntity?->hasRequiredScopes($scopes) ?? true);
+    }
+
+    public function setUserContext(User $user): void
+    {
+        $this->user = $user;
+        $this->nextEntity?->setUserContext($user);
     }
 
     /**

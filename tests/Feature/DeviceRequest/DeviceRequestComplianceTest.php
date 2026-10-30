@@ -362,6 +362,14 @@ class DeviceRequestComplianceTest extends TestCase
             'late evening' => ['2026-10-27 23:30:00'],
             'after midnight' => ['2026-10-28 00:30:00'],
             'summer offset' => ['2026-08-13 23:30:00'],
+            'summer midnight' => ['2026-08-13T00:15:00+03:00'],
+            'summer evening' => ['2026-08-13T23:30:00+03:00'],
+            'winter midnight' => ['2026-01-15T00:15:00+02:00'],
+            'winter evening' => ['2026-01-15T23:30:00+02:00'],
+            'spring transition' => ['2026-03-29T23:30:00+03:00'],
+            'autumn transition' => ['2026-10-25T21:37:24+02:00'],
+            'first repeated hour' => ['2026-10-25T03:30:00+03:00'],
+            'second repeated hour' => ['2026-10-25T03:30:00+02:00'],
         ];
     }
 

@@ -242,18 +242,15 @@ class DivisionIndex extends DivisionComponent
         // Try to resume previous sync if it was paused or failed
         if ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value) {
 
-            $this->resumeSynchronization($user, $token);
+            if (!$this->resumeSynchronization($user, $token)) {
+                Session::flash('error', __('forms.errors.sync_resume_failed'));
+
+                return;
+            }
 
             Session::flash('success', __('forms.success.sync_resumed'));
 
             $user->notify(new SyncNotification('division', 'resumed'));
-
-            return;
-        }
-
-        // Try to resume if previous batch failed or was paused
-        if ($this->syncStatus === JobStatus::FAILED->value || $this->syncStatus === JobStatus::PAUSED->value) {
-            $this->resumeSynchronization($user, $token);
 
             return;
         }
@@ -332,9 +329,9 @@ class DivisionIndex extends DivisionComponent
      *
      * @param  User  $user  The user instance for whom synchronization should be resumed
      * @param  string  $token  The authentication or session token used to resume the sync process
-     * @return void
+     * @return bool
      */
-    protected function resumeSynchronization(User $user, string $token): void
+    protected function resumeSynchronization(User $user, string $token): bool
     {
         $encryptedToken = Crypt::encryptString($token);
 
@@ -345,13 +342,17 @@ class DivisionIndex extends DivisionComponent
             if ($batch->name === self::BATCH_NAME) {
                 Log::info('Resuming Division sync batch: ' . $batch->name . ' id: ' . $batch->id);
 
+                if (!$this->restartBatch($batch, $user, $encryptedToken, legalEntity())) {
+                    return false;
+                }
+
                 legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_DIVISION);
 
-                $this->restartBatch($batch, $user, $encryptedToken, legalEntity());
-
-                break;
+                return true;
             }
         }
+
+        return false;
     }
 
     public function render(): View

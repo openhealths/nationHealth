@@ -9,7 +9,7 @@
 @endphp
 
 <div x-data="{ isDisabled: true, isEdit: @json($isEdit), activeStep: 0}">
-    <livewire:components.x-message :key="now()->timestamp"/>
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
 
     <x-header-navigation class="items-start" x-data="{ showFilter: false }">
 

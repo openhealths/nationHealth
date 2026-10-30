@@ -16,6 +16,7 @@ DOMAIN_PATHS=(
   tests/Unit/Models/CodingSerializationTest.php
   tests/Unit/Models/EmployeeDisplayLabelsTest.php
   tests/Unit/Employee
+  tests/Unit/Casts/EHealthTimestampCastTest.php
   tests/Unit/Config/PartyVerificationScopesTest.php
   tests/Unit/Config/PrepersonPolicyConfigurationTest.php
   tests/Unit/Enums/Party

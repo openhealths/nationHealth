@@ -17,7 +17,8 @@ return [
     'edrpou' => 'Edrpou',
     'step' => 'Step :currentSteep with :totalSteps',
     'errors' => [
-        'update_data' => 'An error has occurs during data update'
+        'update_data' => 'An error has occurs during data update',
+        'sync_resume_failed' => 'Synchronization could not be resumed. Try again. If the error persists, contact an administrator.',
     ],
     'enter' => 'Login',
     'to_enter' => 'Login',

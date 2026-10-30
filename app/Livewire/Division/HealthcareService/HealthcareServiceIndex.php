@@ -245,7 +245,11 @@ class HealthcareServiceIndex extends Component
 
         // Try to resume previous sync if it was paused or failed
         if ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value) {
-            $this->resumeSynchronization($user, $token);
+            if (!$this->resumeSynchronization($user, $token)) {
+                Session::flash('error', __('forms.errors.sync_resume_failed'));
+
+                return;
+            }
 
             Session::flash('success', __('forms.success.sync_resumed'));
 
@@ -303,9 +307,9 @@ class HealthcareServiceIndex extends Component
      *
      * @param  User  $user  The user instance for whom synchronization should be resumed
      * @param  string  $token  The authentication or session token used to resume the sync process
-     * @return void
+     * @return bool
      */
-    protected function resumeSynchronization(User $user, string $token): void
+    protected function resumeSynchronization(User $user, string $token): bool
     {
         $encryptedToken = Crypt::encryptString($token);
 
@@ -316,13 +320,17 @@ class HealthcareServiceIndex extends Component
             if ($batch->name === self::BATCH_NAME) {
                 Log::info('Resuming Division sync batch: ' . $batch->name . ' id: ' . $batch->id);
 
+                if (!$this->restartBatch($batch, $user, $encryptedToken, legalEntity())) {
+                    return false;
+                }
+
                 legalEntity()->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_HEALTHCARE_SERVICE);
 
-                $this->restartBatch($batch, $user, $encryptedToken, legalEntity());
-
-                break;
+                return true;
             }
         }
+
+        return false;
     }
 
     #[Computed]

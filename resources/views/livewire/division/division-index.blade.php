@@ -22,7 +22,7 @@
          actionButtonText: ''
      }"
 >
-    <livewire:components.x-message :key="now()->timestamp"/>
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
 
     <x-header-navigation class="items-start" x-data="{ showFilter: false }">
         <x-slot name="title">{{ __('forms.divisions') }}</x-slot>

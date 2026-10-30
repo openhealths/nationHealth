@@ -12,7 +12,7 @@
         actionButtonText: '',
     }"
 >
-    <livewire:components.x-message :key="now()->timestamp" />
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     <x-forms.loading />
 
     <x-header-navigation x-data="{ showFilter: false }" class="items-start">

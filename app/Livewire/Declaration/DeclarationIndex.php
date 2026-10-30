@@ -527,7 +527,11 @@ class DeclarationIndex extends Component
 
         // Try to resume previous sync if it was paused or failed
         if ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value) {
-            $this->resumeSynchronization($user, $token);
+            if (!$this->resumeSynchronization($user, $token)) {
+                Session::flash('error', __('forms.errors.sync_resume_failed'));
+
+                return;
+            }
 
             Session::flash('success', __('forms.success.sync_resumed'));
 
@@ -634,9 +638,9 @@ class DeclarationIndex extends Component
      *
      * @param  User  $user  The user instance for whom synchronization should be resumed
      * @param  string  $token  The authentication or session token used to resume the sync process
-     * @return void
+     * @return bool
      */
-    protected function resumeSynchronization(User $user, string $token): void
+    protected function resumeSynchronization(User $user, string $token): bool
     {
         $encryptedToken = Crypt::encryptString($token);
 
@@ -652,13 +656,17 @@ class DeclarationIndex extends Component
             ) {
                 Log::info('Resuming Declaration sync batch: ' . $batch->name . ' id: ' . $batch->id);
 
+                if (!$this->restartBatch($batch, $user, $encryptedToken, legalEntity())) {
+                    return false;
+                }
+
                 legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_DECLARATION);
 
-                $this->restartBatch($batch, $user, $encryptedToken, legalEntity());
-
-                break;
+                return true;
             }
         }
+
+        return false;
     }
 
     public function approve(int $personId, int $declarationRequestId): void

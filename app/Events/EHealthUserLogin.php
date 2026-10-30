@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Foundation\Events\Dispatchable;
 use App\Auth\EHealth\Services\TokenStorage;
+use Illuminate\Bus\BatchRepository;
+use App\Repositories\EHealthDatabaseBatchRepository;
 
 /**
  * Dispatched right before an eHealth user is logged into the application.
@@ -21,6 +23,13 @@ class EHealthUserLogin
     use SerializesModels;
 
     public string $token = '';
+
+    /** @var list<string> Failed/running batches present at login; replacements require a later login. */
+    public array $failedSyncBatchIds = [];
+
+    public bool $syncResumed = false;
+
+    public ?string $sessionId = null;
 
     /**
      * @param  User  $user  The user model.
@@ -36,5 +45,10 @@ class EHealthUserLogin
         public string $guard = 'ehealth'
     ) {
         $this->token = Crypt::encryptString(app(TokenStorage::class)->getBearerToken());
+        $this->sessionId = $user->sessionId;
+
+        /** @var EHealthDatabaseBatchRepository $repository */
+        $repository = app(BatchRepository::class);
+        $this->failedSyncBatchIds = $repository->getSyncResumeBatchIds($legalEntity->id);
     }
 }

@@ -9,7 +9,7 @@
 @endphp
 
 <div>
-    <livewire:components.x-message :key="now()->timestamp" />
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
 
     <x-header-navigation x-data="{ showFilter: false }">
         <x-slot name="title">{{ __('forms.declarations') }}</x-slot>
@@ -295,6 +295,5 @@
         </div>
     </div>
 
-    <livewire:components.x-message :key="time()" />
     <x-forms.loading />
 </div>

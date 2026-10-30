@@ -7,6 +7,11 @@ namespace App\Listeners;
 use Throwable;
 use App\Enums\JobStatus;
 use App\Events\EHealthUserLogin;
+use App\Repositories\Repository;
+use Illuminate\Bus\BatchRepository;
+use Illuminate\Events\CallQueuedListener;
+use Illuminate\Support\Facades\Crypt;
+use App\Repositories\EHealthDatabaseBatchRepository;
 use Illuminate\Support\Facades\Log;
 use App\Notifications\SyncNotification;
 use App\Traits\BatchLegalEntityQueries;
@@ -20,6 +25,8 @@ class OnRegularLoginSyncronization implements ShouldQueue
 
     protected const string FIRST_LOGIN_BATCH_NAME = 'FirstLoginSync';
 
+    public const int BATCHES_PER_RUN = 10;
+
     /**
      * This listener will be placed on the 'sync' queue
      *
@@ -32,33 +39,62 @@ class OnRegularLoginSyncronization implements ShouldQueue
      */
     public function handle(EHealthUserLogin $event): void
     {
-        // Skip if this is the first login
-        if ($event->isFirstLogin) {
+        // A user's first local login can still resume an existing legal entity's failures.
+        if ($event->failedSyncBatchIds === [] || !$this->hasCurrentSession($event)) {
             return;
         }
 
         echo 'Regular login synchronization checking for ' . 'legalEntity:' . $event->legalEntity->id . PHP_EOL;
 
-        // Find all failed batches for this legal entity and retry them
-        $failedBatches = $this->findFailedBatchesByLegalEntity($event->legalEntity->id, 'ASC');
+        // Bound each delivery's work. Do not scan failures created by this login's own jobs.
+        /** @var EHealthDatabaseBatchRepository $repository */
+        $repository = app(BatchRepository::class);
+        $failedBatches = $repository->getFailedSyncBatches(
+            $event->legalEntity->id,
+            array_slice($event->failedSyncBatchIds, 0, self::BATCHES_PER_RUN)
+        );
 
-        if ($failedBatches->isEmpty()) {
-            echo 'No failed batches found for legal entity: ' . $event->legalEntity->id . PHP_EOL;
-
-            return;
-        }
+        $resumed = $event->syncResumed;
 
         foreach ($failedBatches as $batch) {
+            if (!$this->hasCurrentSession($event)) {
+                return;
+            }
+
             echo 'Found related batch: ' . $batch->name . ' id: ' . $batch->id . PHP_EOL;
+
+            if (!$this->restartBatch($batch, $event->user, $event->token, $event->legalEntity, $event->scopes)) {
+                continue;
+            }
+
+            $resumed = true;
 
             if ($batch->name === self::FIRST_LOGIN_BATCH_NAME) {
                 $event->legalEntity?->setEntityStatus(JobStatus::PROCESSING);
             }
-
-            $this->restartBatch($batch, $event->user, $event->token, $event->legalEntity);
         }
 
-        $event->user->notify(new SyncNotification('legal_entity', 'resumed'));
+        $remainingIds = array_slice($event->failedSyncBatchIds, self::BATCHES_PER_RUN);
+        if ($remainingIds !== []) {
+            // Reuse the queued listener with an immutable remainder. Database batch locking makes
+            // redelivery safe; completed IDs are gone and cannot produce duplicate replacements.
+            $continuation = clone $event;
+            $continuation->failedSyncBatchIds = $remainingIds;
+            $continuation->syncResumed = $resumed;
+            dispatch((new CallQueuedListener(self::class, 'handle', [$continuation]))->onQueue($this->queue));
+        } elseif ($resumed) {
+            $event->user->notify(new SyncNotification('legal_entity', 'resumed'));
+        }
+    }
+
+    private function hasCurrentSession(EHealthUserLogin $event): bool
+    {
+        return Repository::user()->hasSyncSessionToken(
+            $event->user,
+            $event->legalEntity,
+            Crypt::decryptString($event->token),
+            $event->sessionId
+        );
     }
 
     /**
@@ -70,13 +106,13 @@ class OnRegularLoginSyncronization implements ShouldQueue
      */
     public function failed(EHealthUserLogin $event, Throwable $exception): void
     {
-        $errorMessage = "FirstLoginOwnerSyncronization failed for legal entity ID: {$event->legalEntity->id}";
+        $errorMessage = "OnRegularLoginSyncronization failed for legal entity ID: {$event->legalEntity->id}";
         $errorDetails = "Error: {$exception->getMessage()}";
 
         // Log the error
         Log::error($errorMessage, [
-            'legal_entity_id' => $event->legalEntity->id,
-            'error_message' => $exception->getMessage(),
+            'legalEntityId' => $event->legalEntity->id,
+            'errorMessage' => $exception->getMessage(),
             'trace' => $exception->getTraceAsString(),
             'listener' => self::class,
         ]);
