@@ -7,25 +7,27 @@
          x-transition:enter-end="opacity-100 scale-100"
     >
         <div class="form-group group pb-5">
-            <input
-                wire:model="password"
-                type="password"
-                placeholder=" "
-                autocomplete="off"
-                id="password"
-                aria-describedby="@error('password') hasPasswordErrorHelp @enderror"
-                class="input @error('password') input-error border-red-500 focus:border-red-500 @enderror peer"
-            />
+            <x-password-field>
+                <input
+                    wire:model="password"
+                    type="password"
+                    placeholder=" "
+                    autocomplete="off"
+                    id="password"
+                    aria-describedby="@error('password') hasPasswordErrorHelp @enderror"
+                    class="input @error('password') input-error border-red-500 focus:border-red-500 @enderror peer"
+                />
 
-            @error('password')
-                <p id="hasPasswordErrorHelp" class="text-error">
-                    {{ $message }}
-                </p>
-            @enderror
+                @error('password')
+                    <p id="hasPasswordErrorHelp" class="text-error">
+                        {{ $message }}
+                    </p>
+                @enderror
 
-            <label for="password" class="label z-10">
-                {{ __('forms.password') }}
-            </label>
+                <label for="password" class="label z-10">
+                    {{ __('forms.password') }}
+                </label>
+            </x-password-field>
 
             <div class="form-group group mt-4">
                 <input

@@ -31,49 +31,53 @@
             </div>
 
             <div class="form-group group mt-6">
-                <input
-                    required
-                    id="password"
-                    type="password"
-                    placeholder=" "
-                    autocomplete="off"
-                    wire:model="password"
-                    aria-describedby="@error('password') hasPasswordErrorHelp @enderror"
-                    class="input @error('password') input-error border-red-500 focus:border-red-500 @enderror peer"
-                />
+                <x-password-field>
+                    <input
+                        required
+                        id="password"
+                        type="password"
+                        placeholder=" "
+                        autocomplete="off"
+                        wire:model="password"
+                        aria-describedby="@error('password') hasPasswordErrorHelp @enderror"
+                        class="input @error('password') input-error border-red-500 focus:border-red-500 @enderror peer"
+                    />
 
-                @error('password')
-                    <p id="hasPasswordErrorHelp" class="text-error">
-                        {{ $message }}
-                    </p>
-                @enderror
+                    @error('password')
+                        <p id="hasPasswordErrorHelp" class="text-error">
+                            {{ $message }}
+                        </p>
+                    @enderror
 
-                <label for="password" class="label z-10">
-                    {{ __('forms.password') }}
-                </label>
+                    <label for="password" class="label z-10">
+                        {{ __('forms.password') }}
+                    </label>
+                </x-password-field>
             </div>
 
             <div class="form-group group mt-6">
-                <input
-                    required
-                    type="password"
-                    placeholder=" "
-                    autocomplete="off"
-                    id="passwordConfirmation"
-                    wire:model="passwordConfirmation"
-                    aria-describedby="@error('passwordConfirmation') hasPasswordConfirmationErrorHelp @enderror"
-                    class="input @error('passwordConfirmation') input-error border-red-500 focus:border-red-500 @enderror peer"
-                />
+                <x-password-field>
+                    <input
+                        required
+                        type="password"
+                        placeholder=" "
+                        autocomplete="off"
+                        id="passwordConfirmation"
+                        wire:model="passwordConfirmation"
+                        aria-describedby="@error('passwordConfirmation') hasPasswordConfirmationErrorHelp @enderror"
+                        class="input @error('passwordConfirmation') input-error border-red-500 focus:border-red-500 @enderror peer"
+                    />
 
-                @error('passwordConfirmation')
-                    <p id="hasPasswordConfirmationErrorHelp" class="text-error">
-                        {{ $message }}
-                    </p>
-                @enderror
+                    @error('passwordConfirmation')
+                        <p id="hasPasswordConfirmationErrorHelp" class="text-error">
+                            {{ $message }}
+                        </p>
+                    @enderror
 
-                <label for="passwordConfirmation" class="label z-10">
-                    {{ __('forms.password_confirmation') }}
-                </label>
+                    <label for="passwordConfirmation" class="label z-10">
+                        {{ __('forms.password_confirmation') }}
+                    </label>
+                </x-password-field>
             </div>
 
             <div class="flex items-center justify-between mt-12 flex-wrap">

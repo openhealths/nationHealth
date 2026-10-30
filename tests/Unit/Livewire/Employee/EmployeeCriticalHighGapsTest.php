@@ -6,7 +6,10 @@ namespace Tests\Unit\Livewire\Employee;
 
 use App\Enums\Employee\RequestStatus;
 use App\Livewire\Employee\EmployeeComponent;
+use App\Livewire\Components\XMessage;
+use Illuminate\Support\Facades\Session;
 use Illuminate\View\View;
+use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -157,14 +160,17 @@ class EmployeeCriticalHighGapsTest extends TestCase
     }
 
     #[Test]
-    public function success_flash_banner_clears_session_after_render(): void
+    public function successFlashBannerClearsSessionAfterRender(): void
     {
-        $blade = file_get_contents(resource_path('views/livewire/components/x-message.blade.php'));
+        $message = __('employees.sign_success');
+        Session::flash('success', $message);
 
-        $this->assertNotFalse($blade);
-        // Current flash component clears success after painting so it does not reappear on the next request.
-        $this->assertStringContainsString("session()->forget('success')", $blade);
-        $this->assertStringContainsString('border-green-200', $blade);
+        $component = Livewire::test(XMessage::class)
+            ->assertSee($message)
+            ->assertSeeHtml('border-green-200');
+
+        $this->assertFalse(Session::has('success'));
+        $component->call('$refresh')->assertDontSee($message);
     }
 
     #[Test]
@@ -177,9 +183,10 @@ class EmployeeCriticalHighGapsTest extends TestCase
         $this->assertNotFalse($layout);
         $this->assertNotFalse($employeeForm);
         $this->assertNotFalse($employeeIndex);
-        $this->assertStringContainsString("@livewire('components.flash-message')", $layout);
+        $this->assertSame(1, substr_count($layout, "@livewire('components.x-message', ['listenAsync' => true])"));
+        $this->assertStringNotContainsString('components.flash-message', $layout);
         $this->assertStringNotContainsString('livewire:components.x-message', $employeeForm);
-        // Index still mounts x-message for page-local flashes (layout flash-message covers redirects).
+        // Index reads page-local flashes; the layout uses the same component for redirects and legacy events.
         $this->assertStringContainsString('livewire:components.x-message', $employeeIndex);
     }
 
