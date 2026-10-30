@@ -58,7 +58,7 @@ class LicenseForm extends Form
                 'after_or_equal:today',
                 'after_or_equal:activeFromDate'
             ],
-            'activeFromDate' => ['required', 'date_format:' . config('app.date_format'), 'before_or_equal:expiryDate'],
+            'activeFromDate' => ['required', 'date_format:' . config('app.date_format')],
             'whatLicensed' => ['required', 'string', 'max:255'],
             'orderNo' => ['required', 'string', 'max:255'],
             'isPrimary' => ['required', Rule::in([false])]
