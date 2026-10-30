@@ -19,8 +19,10 @@ use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Concerns\ResolvesEmployeeContext;
 use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
 {
@@ -173,11 +175,20 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
         return $this->persistLocalDraft($dbData, $carePlan->personId, 'device_request');
     }
 
-    public function createEncounterDraft(\App\Models\MedicalEvents\Sql\Encounter $encounter, array $formData, float $qty, array $employeeContext): string
+    public function createEncounterDraft(\App\Models\MedicalEvents\Sql\Encounter $encounter, array $formData, float $qty, array $employeeContext, ?string $draftUuid = null): string
     {
         $kind = $formData['kind'] ?? 'service_request';
+        $existingDraft = null;
+        if ($draftUuid !== null) {
+            if ($kind !== 'service_request') {
+                throw new \InvalidArgumentException(__('care-plan.referral_wrong_activity_kind'));
+            }
+            $existingDraft = app(MedicalRequestOwnership::class)->serviceForEncounter($draftUuid, $encounter);
+            $this->assertEncounterDraftEditable($existingDraft);
+        }
+
         $dbData = [
-            'uuid' => (string) Str::uuid(),
+            'uuid' => $existingDraft?->uuid ?? (string) Str::uuid(),
             'employee_id' => $employeeContext['employee_id'] ?? null,
             'person_id' => $encounter->person_id,
             'division_id' => $employeeContext['division_id'] ?? null,
@@ -237,7 +248,16 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
                 );
             }
 
-            $this->saveServiceRequest($dbData, (int) $encounter->person_id, $uuids);
+            if ($existingDraft === null) {
+                $this->saveServiceRequest($dbData, (int) $encounter->person_id, $uuids);
+            } else {
+                // Prequalification may outlive another submission; recheck before updating the locked row.
+                DB::transaction(function () use ($existingDraft, $dbData, $encounter, $uuids): void {
+                    $draft = ServiceRequestRequest::whereKey($existingDraft->id)->lockForUpdate()->firstOrFail();
+                    $this->assertEncounterDraftEditable($draft);
+                    $this->saveServiceRequest($dbData, (int) $encounter->person_id, $uuids);
+                });
+            }
 
             return $dbData['uuid'];
         }
@@ -258,6 +278,17 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
         }
 
         return $this->persistLocalDraft($dbData, (int) $encounter->person_id, 'device_request');
+    }
+
+    private function assertEncounterDraftEditable(ServiceRequestRequest $draft): void
+    {
+        if (!in_array(ServiceRequestStatus::resolve((string) $draft->status), [ServiceRequestStatus::DRAFT, ServiceRequestStatus::NEW], true)
+            || filled($draft->requestNumber)) {
+            throw ValidationException::withMessages(['encounterReferralForm' => __('referrals.draft_not_editable')]);
+        }
+        if (Repository::serviceRequest()->hasPendingSubmission($draft)) {
+            throw ValidationException::withMessages(['submission' => __('care-plan.submission_pending')]);
+        }
     }
 
     public function resendSms(string $personUuid, string $requestId, string $kind): EHealthResponse

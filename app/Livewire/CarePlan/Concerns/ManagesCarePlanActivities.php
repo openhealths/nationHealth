@@ -613,6 +613,7 @@ trait ManagesCarePlanActivities
             Session::flash('success', __('care-plan.activity_draft_saved'));
         }
 
+        $this->activityForm['id'] = $activityId;
         $this->refreshCarePlan();
 
         // Close drawers

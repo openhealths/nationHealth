@@ -746,6 +746,42 @@ class CarePlanShowActionsTest extends TestCase
         $this->assertSame('service_group', data_get($groupResource, 'detail.productReference.identifier.type.coding.0.code'));
     }
 
+    public function test_service_activity_save_and_prepare_signature_keep_the_created_identity(): void
+    {
+        $this->actingAs($this->user);
+        $groupId = (string) Str::uuid();
+        $serviceId = (string) Str::uuid();
+        $this->cacheServicePickerCatalog($groupId, $serviceId);
+        $plan = $this->makeSignedNewPlan();
+        $this->grantCarePlanWriteApproval($plan, $this->employee);
+
+        $component = Livewire::test(CarePlanShow::class, ['carePlan' => $plan])
+            ->call('initActivityForm', 'service_request')
+            ->call('selectCarePlanServiceFromCatalog', ['id' => $serviceId])
+            ->call('saveActivity')->assertHasNoErrors();
+        $activityId = $component->get('activityForm.id');
+        $this->assertNotNull($activityId);
+        $activity = \App\Models\CarePlanActivity::findOrFail($activityId);
+        $uuid = $activity->uuid;
+
+        $component->set('activityForm.description', 'Updated before signing')
+            ->call('saveActivityAndSign')->assertHasNoErrors()
+            ->assertSet('activityForm.id', $activityId)
+            ->set('showSignatureModal', false)
+            ->set('activityForm.description', 'Updated after closing KEP')
+            ->call('saveActivity')->assertHasNoErrors()
+            ->assertSet('activityForm.id', $activityId);
+        $this->assertSame(1, \App\Models\CarePlanActivity::whereCarePlanId($plan->id)->count());
+        $this->assertSame($uuid, $activity->fresh()->uuid);
+        $this->assertSame('Updated after closing KEP', app(\App\Repositories\CarePlanActivityRepository::class)->getResource($activityId)['detail']['description']);
+
+        $component->call('initActivityForm', 'service_request')->assertSet('activityForm.id', null)
+            ->call('selectCarePlanServiceFromCatalog', ['id' => $serviceId])
+            ->call('saveActivity')->assertHasNoErrors();
+        $this->assertNotSame($activityId, $component->get('activityForm.id'));
+        $this->assertSame(2, \App\Models\CarePlanActivity::whereCarePlanId($plan->id)->count());
+    }
+
     public function test_active_plan_without_write_approval_cannot_open_status_actions(): void
     {
         $this->actingAs($this->user);

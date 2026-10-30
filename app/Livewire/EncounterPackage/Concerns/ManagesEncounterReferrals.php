@@ -108,6 +108,11 @@ trait ManagesEncounterReferrals
             return;
         }
 
+        $this->encounterReferralRequestIdToSign = null;
+        $this->encounterReferralSubmission = [];
+        $this->showSignatureModal = false;
+        $this->actionType = null;
+
         $this->loadEncounterReferralAuthMethods($encounter);
         $this->loadEncounterReferralPrograms();
 
@@ -325,7 +330,8 @@ trait ManagesEncounterReferrals
                 $encounter,
                 $formData,
                 (float) $formData['quantity'],
-                $employeeContext
+                $employeeContext,
+                $this->encounterReferralRequestIdToSign
             );
 
             $this->showEncounterReferralDrawer = false;
