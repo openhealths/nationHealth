@@ -186,7 +186,11 @@
                                     @forelse (($this->form->doctor['specialities'] ?? []) as $speciality)
                                         <li>
                                             {{ $this->dictionaries['SPECIALITY_TYPE'][$speciality['speciality'] ?? ''] ?? ($speciality['speciality'] ?? '—') }}
-                                            @if (!empty($speciality['specialityOfficio'])) ({{ __('forms.primary') }}) @endif
+                                            @if (!empty($speciality['specialityOfficio']))
+                                                ({{ __('employees.position_speciality') }})
+                                            @else
+                                                ({{ __('employees.additional_person_speciality') }})
+                                            @endif
                                             @if (!empty($speciality['level']))
                                                 — {{ $this->dictionaries['SPECIALITY_LEVEL'][$speciality['level']] ?? $speciality['level'] }}
                                             @endif

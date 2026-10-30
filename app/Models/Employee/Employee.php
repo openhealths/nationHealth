@@ -48,7 +48,7 @@ class Employee extends BaseEmployee
 
     public function specialityLabels(): array
     {
-        return $this->specialities->map(
+        return $this->specialities->where('specialityOfficio', true)->map(
             fn ($speciality): ?string =>
             $this->employeeDictionaryLabel('SPECIALITY_TYPE', $speciality->speciality)
         )->filter()->unique()->values()->all();

@@ -36,6 +36,8 @@ jobs:
         run: npm run build
       - name: Test patient print helper
         run: npm run test:print
+      - name: Test employee speciality controls
+        run: node --test tests/Frontend/employee-select2.test.cjs tests/Frontend/employee-specialities.test.cjs
 
   phpunit:
     name: Owned domain suites

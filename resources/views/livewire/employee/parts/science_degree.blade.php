@@ -7,7 +7,6 @@
         x-data="{
                   scienceDegree: {},
                   employeeType: $wire.entangle('form.employeeType'),
-                  employeeTypeSpecialities: @js($this->employeeTypeSpecialities),
                   openModal: false,
                   modalScienceDegree: new ScienceDegree(),
                   isNew: null,
@@ -18,7 +17,6 @@
                       return this.modalScienceDegree.degree
                           && this.modalScienceDegree.country
                           && this.modalScienceDegree.city
-                          && this.modalScienceDegree.issuedDate
                           && this.modalScienceDegree.institutionName
                           && this.modalScienceDegree.speciality
                           && this.modalScienceDegree.diplomaNumber;
@@ -56,12 +54,12 @@
             <tbody>
                 <template x-if="scienceDegree && scienceDegree.degree">
                     <tr>
-                        <td class="td-input" x-text="degreeDict[scienceDegree.degree]"></td>
+                        <td class="td-input" x-text="degreeDict[scienceDegree.degree] ?? scienceDegree.degree"></td>
                         <td class="td-input" x-text="countryDict[scienceDegree.country]"></td>
                         <td class="td-input" x-text="scienceDegree.city"></td>
                         <td class="td-input" x-text="scienceDegree.issuedDate"></td>
                         <td class="td-input" x-text="scienceDegree.institutionName"></td>
-                        <td class="td-input" x-text="specDict[scienceDegree.speciality]"></td>
+                        <td class="td-input" x-text="specDict[scienceDegree.speciality] ?? scienceDegree.speciality"></td>
                         <td class="td-input" x-text="scienceDegree.diplomaNumber"></td>
                         <td class="td-input">
                             <div
@@ -247,7 +245,7 @@
                                         <path fill-rule="evenodd" d="M6 5V4a1 1 0 1 1 2 0v1h3V4a1 1 0 1 1 2 0v1h3V4a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v2H3V7a2 2 0 0 1 2-2h1ZM3 19v-8h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Zm5-6a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2H8Z" clip-rule="evenodd" />
                                     </svg>
                                     <label for="scienceDegreeIssuedDate" class="label-modal"
-                                        >{{ __('forms.issuedDate') }}<span class="text-red-600"> *</span></label>
+                                        >{{ __('forms.issuedDate') }}</label>
                                     <input
                                         x-model="modalScienceDegree.issuedDate"
                                         datepicker-format="{{ frontendDateFormat() }}"
@@ -272,10 +270,13 @@
                                 <div>
                                     <label for="scienceDegreeSpeciality" class="label-modal"
                                         >{{ __('forms.speciality') }} <span class="text-red-600"> *</span></label>
-                                    <x-select2
-                                        modelPath="modalScienceDegree.speciality"
-                                        dictionaryName="SPECIALITY_TYPE"
+                                    <input
+                                        type="text"
+                                        x-model="modalScienceDegree.speciality"
                                         id="scienceDegreeSpeciality"
+                                        class="input-modal"
+                                        maxlength="255"
+                                        required
                                     />
                                 </div>
                                 <div>

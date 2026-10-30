@@ -21,6 +21,7 @@ use App\Models\Employee\EmployeeRequest;
 use App\Models\LegalEntity;
 use App\Models\Revision;
 use App\Models\User;
+use App\Repositories\Repository;
 use Auth;
 use Carbon\Carbon;
 use Exception;
@@ -46,6 +47,19 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     public ?int $employeeRequestId = null;
     protected ?BaseEmployee $employeeRequest = null;
     protected ?BaseEmployee $employee = null;
+
+    /**
+     * Only server-loaded employees may supply retained certificate values.
+     * A request revision is user-editable and is never an authoritative source.
+     */
+    public function originalEmployeeSpecialities(): array
+    {
+        return Repository::employee()->originalSpecialities(
+            $this->employee ?? $this->employeeRequest,
+            legalEntity()?->id,
+            $this->form->employeeType
+        );
+    }
 
     /**
      * blocking only first_name, last_name, date_of_birth, tax_id

@@ -6,6 +6,7 @@ namespace Tests\Unit\Employee;
 
 use App\Enums\Employee\RequestStatus;
 use App\Models\Employee\EmployeeRequest;
+use App\Models\Employee\Employee;
 use App\Services\Employee\EmployeeRequestMatcher;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -62,7 +63,7 @@ class EmployeeRequestMatcherTest extends TestCase
     }
 
     #[Test]
-    public function pick_from_approved_list_fuzzy_when_only_one_candidate(): void
+    public function pick_from_approved_list_rejects_a_single_candidate_for_another_position(): void
     {
         $matcher = new EmployeeRequestMatcher();
         $request = new EmployeeRequest([
@@ -80,7 +81,29 @@ class EmployeeRequestMatcherTest extends TestCase
             ],
         ]);
 
-        $this->assertSame('only-one', $match['uuid'] ?? null);
+        $this->assertNull($match);
+    }
+
+    #[Test]
+    public function pick_from_approved_list_does_not_apply_a_linked_request_to_another_employee_with_matching_fields(): void
+    {
+        $request = new EmployeeRequest(['position' => 'P8', 'employee_type' => 'SPECIALIST', 'start_date' => '2024-01-10']);
+        $request->setRelation('employee', new Employee(['uuid' => 'actual-employee']));
+        $match = (new EmployeeRequestMatcher())->pickFromApprovedList($request, [[
+            'uuid' => 'other-employee', 'position' => 'P8', 'employee_type' => 'SPECIALIST', 'start_date' => '2024-01-10',
+        ]]);
+        $this->assertNull($match);
+    }
+
+    #[Test]
+    public function pick_from_approved_list_does_not_guess_between_two_positions_with_identical_fields(): void
+    {
+        $request = new EmployeeRequest(['position' => 'P8', 'employee_type' => 'SPECIALIST', 'start_date' => '2024-01-10']);
+        $fields = ['position' => 'P8', 'employee_type' => 'SPECIALIST', 'start_date' => '2024-01-10'];
+        $match = (new EmployeeRequestMatcher())->pickFromApprovedList($request, [
+            ['uuid' => 'first'] + $fields, ['uuid' => 'second'] + $fields,
+        ]);
+        $this->assertNull($match);
     }
 
     #[Test]

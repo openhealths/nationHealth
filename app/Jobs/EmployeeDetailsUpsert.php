@@ -18,7 +18,6 @@ use App\Models\Employee\Employee;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Queue\SerializesModels;
 use App\Classes\eHealth\EHealthResponse;
-use App\Models\Employee\EmployeeRequest;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Middleware\RateLimited;
@@ -86,37 +85,23 @@ class EmployeeDetailsUpsert extends EHealthJob
         $this->employee->setSyncStatus(JobStatus::COMPLETED);
         $this->employee->refresh();
 
-        $roleName = $this->employee->employee_type;
-        $legalEntityId = $this->employee->legal_entity_id;
+        $legalEntityId = $this->employee->legalEntityId;
 
         setPermissionsTeamId($legalEntityId);
 
-        $startdate = $validatedData['employee']['start_date'] ?? null;
+        $startDate = $validatedData['employee']['start_date'] ?? null;
 
-        $employeeEmployeeRequest = EmployeeRequest::where('legal_entity_id', $legalEntityId)
-            ->where("employee_type", $roleName)
-            ->where('position', $this->employee->position)
-            ->when(
-                $divisionUuid === null,
-                fn ($query) => $query->whereNull('division_uuid'),
-                fn ($query) => $query->where('division_uuid', $divisionUuid)
-            )
-            ->when(
-                $startdate === null,
-                fn ($query) => $query->whereNull('start_date'),
-                fn ($query) => $query->where('start_date', $startdate)
-            )
-            ->latest('applied_at')->first();
+        $employeeRequest = Repository::employee()->requestForEmployeeDetails($this->employee, $divisionUuid, $startDate);
 
-        $userID = User::where('email', $employeeEmployeeRequest?->email)->first()?->id ?? null;
+        $userId = $employeeRequest?->email ? User::whereEmail($employeeRequest->email)->toBase()->value('id') : null;
 
-        $employeeEmployeeRequest?->update(['employee_id' => $this->employee->id]);
+        $employeeRequest?->update(['employee_id' => $this->employee->id]);
 
         $this->employee->update([
             'division_uuid' => $divisionUuid,
-            'inserted_at' => Carbon::parse($employeeEmployeeRequest?->appliedAt)->format('Y-m-d H:i:s'),
+            'inserted_at' => $employeeRequest?->appliedAt ?? $this->employee->insertedAt ?? Carbon::now(),
             'division_id' => $divisionId,
-            'user_id' => $this->employee->userId ?? $userID
+            'user_id' => $this->employee->userId ?? $userId
         ]);
 
         Repository::party()->syncUserEmployeesAndRoles($this->employee->party, $this->legalEntity);

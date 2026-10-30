@@ -14,9 +14,15 @@
                   newSpeciality: false,
                   item: null,
                   primaryConflict: false,
+                  additionalSpecialitiesOpen: false,
                   specDict: @js($this->dictionaries['SPECIALITY_TYPE']),
                   levelDict: @js($this->dictionaries['SPECIALITY_LEVEL']),
-                  qualTypeDict: @js($this->dictionaries['QUALIFICATION_TYPE']),
+                  specQualDict: @js($this->dictionaries['SPEC_QUALIFICATION_TYPE']),
+
+                  isLegacySpeciality() {
+                      return this.modalSpeciality.speciality
+                          && !this.employeeTypeSpecialities[this.employeeType]?.[this.modalSpeciality.speciality];
+                  },
 
                   isModalValid() {
                       return this.modalSpeciality.speciality
@@ -27,13 +33,24 @@
                           && this.modalSpeciality.certificateNumber;
                   },
 
+                  isPrimary(speciality) {
+                      const value = speciality.specialityOfficio ?? speciality.speciality_officio;
+                      return value === true || value === 1 || value === '1';
+                  },
+
+                  specialityEntries(primary) {
+                      return this.specialities
+                          .map((speciality, index) => ({ speciality, index }))
+                          .filter(({ speciality }) => this.isPrimary(speciality) === primary);
+                  },
+
                   hasOtherPrimary(excludeIndex = null) {
                       return (this.specialities || []).some((speciality, index) => {
                           if (excludeIndex !== null && index === excludeIndex) {
                               return false;
                           }
 
-                          return !!(speciality.specialityOfficio || speciality.speciality_officio);
+                          return this.isPrimary(speciality);
                       });
                   },
 
@@ -66,6 +83,9 @@
                       } else {
                           this.specialities[this.item] = { ...this.modalSpeciality };
                       }
+                      if (! this.isPrimary(this.modalSpeciality)) {
+                          this.additionalSpecialitiesOpen = true;
+                      }
                       this.openModal = false;
                       this.newSpeciality = null;
                   },
@@ -88,7 +108,32 @@
             <p class="text-error -mt-2 mb-4">{{ $message }}</p>
         @enderror
 
-        <table class="table-input w-full">
+        <p class="text-error mb-4" x-cloak x-show="specialityEntries(true).length > 1">
+            {{ __('employees.multiple_position_specialities') }}
+        </p>
+
+        @foreach ([true, false] as $primaryGroup)
+            @if ($primaryGroup)
+                <h3 class="mb-3 font-semibold">{{ __('employees.position_speciality') }}</h3>
+                <p class="mb-3 text-sm text-gray-500" x-show="specialityEntries(true).length === 0">
+                    {{ __('employees.no_position_speciality') }}
+                </p>
+            @else
+                <details
+                    class="mt-6"
+                    :open="additionalSpecialitiesOpen"
+                    @toggle="additionalSpecialitiesOpen = $el.open"
+                    x-show="specialityEntries(false).length > 0"
+                    x-cloak
+                >
+                    <summary class="mb-3 cursor-pointer font-semibold">
+                        {{ __('employees.additional_person_specialities') }}
+                        (<span x-text="specialityEntries(false).length"></span>)
+                    </summary>
+                    <p class="mb-3 text-sm text-gray-500">{{ __('employees.shared_specialities_notice') }}</p>
+            @endif
+
+        <table class="table-input w-full" data-speciality-group="{{ $primaryGroup ? 'position' : 'person' }}">
             <thead class="thead-input">
                 <tr>
                     <th class="th-input">{{ __('forms.speciality') }}</th>
@@ -102,18 +147,18 @@
                 </tr>
             </thead>
             <tbody>
-                <template x-for="(speciality, index) in specialities" :key="index">
+                <template x-for="{ speciality, index } in specialityEntries(@js($primaryGroup))" :key="index">
                     <tr>
-                        <td class="td-input" x-text="specDict[speciality.speciality]"></td>
+                        <td class="td-input" x-text="specDict[speciality.speciality] ?? speciality.speciality"></td>
                         <td class="td-input" x-text="speciality.attestationName"></td>
-                        <td class="td-input" x-text="levelDict[speciality.level]"></td>
+                        <td class="td-input" x-text="levelDict[speciality.level] ?? speciality.level"></td>
                         <td class="td-input text-left">
-                            <template x-if="speciality.specialityOfficio">
+                            <template x-if="isPrimary(speciality)">
                                 <svg class="h-6 w-6 text-green-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
                                     <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 11.917 9.724 16.5 19 7.5" />
                                 </svg>
                             </template>
-                            <template x-if="! speciality.specialityOfficio">
+                            <template x-if="! isPrimary(speciality)">
                                 <svg class="h-6 w-6 text-red-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
                                     <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6" />
                                 </svg>
@@ -188,6 +233,11 @@
             </tbody>
         </table>
 
+            @if (! $primaryGroup)
+                </details>
+            @endif
+        @endforeach
+
         <div>
             <button type="button" @click.prevent="openAddSpecialityModal()" class="item-add my-5">
                 {{ __('forms.addSpeciality') }}
@@ -257,9 +307,14 @@
                                         <x-select2
                                             modelPath="modalSpeciality.speciality"
                                             dictionaryName="SPECIALITY_TYPE"
+                                            options="employeeTypeSpecialities[$wire.form.employeeType] ?? {}"
+                                            options-watch="form.employeeType"
                                             id="specialitySpeciality"
                                             x-effect="if (! openModal) hideOptions();"
                                         />
+                                        <p x-show="isLegacySpeciality()" class="mt-2 text-sm text-amber-700 dark:text-amber-300">
+                                            {{ __('employees.legacy_speciality_notice') }}
+                                        </p>
                                     </div>
 
                                     <div class="flex flex-col justify-end">
@@ -323,6 +378,9 @@
                                             required
                                         >
                                             <option value="">{{ __('forms.select_level') }}</option>
+                                            <template x-if="modalSpeciality.level && !employeeTypeLevels[employeeType]?.[modalSpeciality.level]">
+                                                <option :value="modalSpeciality.level" x-text="levelDict[modalSpeciality.level] ?? modalSpeciality.level"></option>
+                                            </template>
                                             <template x-if="employeeType && employeeTypeLevels[employeeType]">
                                                 <template
                                                     x-for="(levelName, levelKey) in employeeTypeLevels[employeeType]"
@@ -345,6 +403,9 @@
                                             required
                                         >
                                             <option value="">{{ __('forms.select_qualification_type') }}</option>
+                                            <template x-if="modalSpeciality.qualificationType && !employeeTypeSpecQualifications[employeeType]?.[modalSpeciality.qualificationType]">
+                                                <option :value="modalSpeciality.qualificationType" x-text="specQualDict[modalSpeciality.qualificationType] ?? modalSpeciality.qualificationType"></option>
+                                            </template>
                                             <template x-if="employeeType && employeeTypeSpecQualifications[employeeType]">
                                                 <template
                                                     x-for="
