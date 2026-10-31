@@ -100,13 +100,15 @@
             {{-- Password --}}
             <div>
                 <label for="drawerPassword" class="default-label">{{ __('forms.password') }} *</label>
-                <input wire:model="form.password"
-                       type="password"
-                       class="default-input w-full"
-                       id="drawerPassword"
-                       name="drawerPassword"
-                       autocomplete="current-password"
-                />
+                <x-password-field>
+                    <input wire:model="form.password"
+                           type="password"
+                           class="default-input w-full"
+                           id="drawerPassword"
+                           name="drawerPassword"
+                           autocomplete="current-password"
+                    />
+                </x-password-field>
 
                 @error('form.password') <p class="text-error">{{ $message }}</p> @enderror
             </div>

@@ -57,21 +57,23 @@
         </div>
 
         <div class="form-group group">
-            <input
-                required
-                type="password"
-                placeholder=" "
-                id="publicOfferPassword"
-                wire:model="legalEntityForm.password"
-                aria-describedby="@error('legalEntityForm.password') publicOfferPasswordErrorHelp @enderror"
-                class="input @error('legalEntityForm.password') input-error border-red-500 focus:border-red-500 scroll-to-error @enderror peer"
-            />
+            <x-password-field>
+                <input
+                    required
+                    type="password"
+                    placeholder=" "
+                    id="publicOfferPassword"
+                    wire:model="legalEntityForm.password"
+                    aria-describedby="@error('legalEntityForm.password') publicOfferPasswordErrorHelp @enderror"
+                    class="input @error('legalEntityForm.password') input-error border-red-500 focus:border-red-500 scroll-to-error @enderror peer"
+                />
 
-            @error('legalEntityForm.password')
-                <p id="publicOfferPasswordErrorHelp" class="text-error">{{ $message }}</p>
-            @enderror
+                @error('legalEntityForm.password')
+                    <p id="publicOfferPasswordErrorHelp" class="text-error">{{ $message }}</p>
+                @enderror
 
-            <label for="publicOfferPassword" class="label z-10"> {{ __('forms.password') }} </label>
+                <label for="publicOfferPassword" class="label z-10"> {{ __('forms.password') }} </label>
+            </x-password-field>
         </div>
     </div>
 </fieldset>

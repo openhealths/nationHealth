@@ -233,5 +233,5 @@
     @endif
 
     <x-forms.loading />
-    <livewire:components.x-message :listen-async="true" :key="time()" />
+    <livewire:components.x-message :key="(string) str()->uuid()" />
 </div>

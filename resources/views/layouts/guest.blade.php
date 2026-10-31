@@ -45,7 +45,7 @@
                 @livewireScripts
             @endonce
 
-            @livewire('components.flash-message')
+            @livewire('components.x-message', ['listenAsync' => true])
 
             @stack('scripts')
 

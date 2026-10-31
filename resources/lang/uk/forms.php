@@ -18,6 +18,8 @@ return [
     'back_to_list' => 'Назад до списку',
     'cancel' => 'Скасувати',
     'close' => 'Закрити',
+    'show_password' => 'Показати пароль',
+    'hide_password' => 'Приховати пароль',
     'complete' => 'Завершити',
     'confirm' => 'Підтвердити',
     'continue' => 'Продовжити',

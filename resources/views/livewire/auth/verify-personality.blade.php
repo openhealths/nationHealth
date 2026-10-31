@@ -57,14 +57,16 @@
 
             {{-- Password --}}
             <div class="form-group">
-                <input
-                    wire:model="password"
-                    class="input peer @error('form.patient.firstName') input-error @enderror"
-                    type="password"
-                    id="password"
-                    placeholder=" "
-                >
-                <label for="password" class="label">{{ __('forms.password') }} *</label>
+                <x-password-field>
+                    <input
+                        wire:model="password"
+                        class="input peer @error('form.patient.firstName') input-error @enderror"
+                        type="password"
+                        id="password"
+                        placeholder=" "
+                    >
+                    <label for="password" class="label">{{ __('forms.password') }} *</label>
+                </x-password-field>
             </div>
 
             @error('password') <p class="text-error">{{ $message }}</p> @enderror

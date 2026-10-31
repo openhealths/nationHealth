@@ -41,6 +41,18 @@ Resolve the model from its id inside the component method that needs it instead.
 
 ## Blade + Alpine.js
 
+### Notifications
+
+Flash translated messages through `session()->flash(...)`. Use `XMessage` for
+both page-local session messages and layout notifications. Mount one layout
+instance with `listenAsync => true` for existing `flashMessage` events; page
+instances must not listen for those events. `FlashMessage` is a compatibility
+name for the same implementation, not a second layout component.
+
+Messages are consumed when rendered, including success after owner replacement
+and logout. A redirect must keep its flash until the destination renders.
+Do not add notification events or separate session/event toast renderers.
+
 When an Alpine.js expression spans multiple lines inside a Blade attribute, indent the expression body one level
 **deeper** than the element's attributes, and align the closing `"` with the attribute block. Do not leave the body at 
 the element's own indentation level.
