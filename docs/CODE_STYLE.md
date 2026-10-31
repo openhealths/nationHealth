@@ -6,8 +6,19 @@ Conventions for contributors. Link to a specific rule from code review when need
 
 - View file names: `kebab-case` (e.g. `add-confidant-person.blade.php`).
 - Language keys: `snake_case`.
+- Use camelCase for PHP variables, properties, and Eloquent attribute access (e.g. `$link->linkableType`).
+  Ensure the model supports camelCase access with `HasCamelCasing`; keep database column names and external payload keys
+  in their required format. If an attribute name collides with a relationship or scope, use an explicit
+  `getAttribute('snake_case')` read.
 - Acronyms inside identifiers are treated as a single word — capitalize only the first letter:
   `Uuid`, `Id`, `Url`, `Html`. Write `legalEntityUuid` (not `legalEntityUUID`), `clientId` (not `clientID`).
+
+## Repositories
+
+Keep reusable database lookup and selection logic in repositories or model scopes.
+Livewire components and their traits should delegate these lookups to the repository.
+Repositories should return results and reasons for refusal; the calling component or trait
+forms user-facing feedback and flashes it to the session. Do not flash messages from repositories.
 
 ## Livewire
 

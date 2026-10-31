@@ -6,21 +6,24 @@ namespace App\Repositories\MedicalEvents;
 
 use Throwable;
 use Carbon\Carbon;
-use App\Enums\Person\ApprovalStatus;
-use App\Classes\eHealth\EHealth;
+use App\Enums\JobStatus;
 use App\Models\EhealthJob;
 use App\Models\EhealthLink;
-use App\Models\Person\Person;
-use App\Models\Employee\Employee;
-use App\Models\MedicalEvents\Mongo\Approval as MongoApproval;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use App\Models\Person\Person;
+use App\Classes\eHealth\EHealth;
+use App\Models\Employee\Employee;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Enums\Person\ApprovalStatus;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Relations\AuthenticationMethod;
+use App\Exceptions\EHealth\EHealthValidationException;
+use App\Models\MedicalEvents\Mongo\Approval as MongoApproval;
 
 /**
  * @property Approval $model
@@ -201,6 +204,54 @@ class ApprovalRepository extends BaseRepository
     public function __construct(Model $model)
     {
         parent::__construct($model);
+    }
+
+    /**
+     * Resolve an approval for confirmation, selecting by current employee when given an approvable model.
+     * Return the error when the approval is unavailable.
+     *
+     * @return array{approval: Approval, error: null}|array{approval: null, error: string}
+     */
+    public function findApprovalForConfirmation(Model $model): array
+    {
+        if ($model instanceof Approval) {
+            $approval = $model;
+        } else {
+            $approvals = Approval::getByModel($model)
+                ->whereHas('grantedTo', fn ($query) => $query->whereValue(Auth::user()->activeDoctorEmployee()?->uuid))
+                ->latest('id');
+
+            $approval = (clone $approvals)
+                ->whereNotNull('uuid')
+                ->whereFuture('expires_at')
+                ->whereIn('status', [ApprovalStatus::PENDING->value, ApprovalStatus::NEW->value, ApprovalStatus::ACTIVE->value, ApprovalStatus::APPROVED->value])
+                ->where('is_verified', false)
+                ->first() ?? $approvals->first();
+        }
+
+        $error = match (true) {
+            $approval === null => __('patients.errors.approval_not_found'),
+            $approval->status === JobStatus::FAILED->value => __('patients.errors.approval_not_created'),
+            !$approval->uuid => __('patients.errors.approval_creation_pending'),
+            ApprovalStatus::resolve($approval->status) === null,
+            ApprovalStatus::resolve($approval->status) === ApprovalStatus::INACTIVE => __('patients.errors.approval_unavailable', ['status' => $approval->status]),
+            $approval->expiresAt?->isPast() === true => __('patients.errors.approval_expired'),
+            default => null,
+        };
+
+        if ($error === null) {
+            return ['approval' => $approval, 'error' => null];
+        }
+
+        if ($approval?->status === JobStatus::FAILED->value) {
+            $link = $approval->ehealthLinks()->where('status', JobStatus::FAILED->value)->latest('id')->first();
+
+            if ($link?->error) {
+                $error .= ' '.(new EHealthValidationException(['error' => $link->error]))->getFormattedMessage();
+            }
+        }
+
+        return ['approval' => null, 'error' => $error];
     }
 
     /**

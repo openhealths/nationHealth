@@ -71,6 +71,10 @@ class EHealthResponseException extends EHealthException
             return;
         }
 
+        if ($this->response->status() === 429) {
+            $flashMessage ??= __('errors.ehealth.messages.too_many_requests');
+        }
+
         $extracted = $this->response->json('error.message')
             ?? $this->response->json('details.errorMessage')
             ?? $this->response->json('description');

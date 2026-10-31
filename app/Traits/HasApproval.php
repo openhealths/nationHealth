@@ -15,13 +15,14 @@ use Illuminate\Bus\Batch;
 use App\Models\EhealthJob;
 use App\Models\EhealthLink;
 use App\Enums\ResponseStatus;
+use App\Traits\LogsExceptions;
 use App\Classes\eHealth\EHealth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
-use App\Enums\Person\ApprovalStatus;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\BatchLegalEntityQueries;
 use Illuminate\Support\Facades\Session;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Exceptions\EHealth\EHealthException;
@@ -31,6 +32,9 @@ use App\Notifications\RemoteEHealthLinksNotification;
 
 trait HasApproval
 {
+    use LogsExceptions;
+    use BatchLegalEntityQueries;
+
     protected const string BATCH_NAME = 'RemoteEHealthLinksProcessing';
 
     /**
@@ -160,7 +164,11 @@ trait HasApproval
                 ->withOption('legal_entity_id', legalEntity()->id)
                 ->withOption('token', Crypt::encryptString($token))
                 ->withOption('user', $user)
-                ->then(fn () => $user->notify(new RemoteEHealthLinksNotification(__('approval.messages.created'), 'success')))
+                ->then(function () use ($user, $job): void {
+                    if ($job->fresh()->status === JobStatus::PROCESSED->value) {
+                        $user->notify(new RemoteEHealthLinksNotification(__('approval.messages.created'), 'success'));
+                    }
+                })
                 ->catch(callback: function (Batch $batch, Throwable $e) use ($user) {
                     $message = __('approval.messages.failed');
                     Log::error('Approval job batch failed.', ['batch_id' => $batch->id, 'exception' => $e]);
@@ -195,15 +203,10 @@ trait HasApproval
             return;
         }
 
-        $approval = is_a($model, Approval::class)
-            ? $model
-            : Approval::getByModel($model)
-                ->whereStatus(ApprovalStatus::ACTIVE->value)
-                ->whereNotNull('uuid')
-                ->first();
+        ['approval' => $approval, 'error' => $error] = Repository::approval()->findApprovalForConfirmation($model);
 
-        if (!$approval) {
-            Session::flash('error', __('patients.errors.approval_sms_error'));
+        if ($error !== null) {
+            Session::flash('error', __('patients.errors.approval_sms_error').': '.$error);
 
             return;
         }
@@ -223,9 +226,9 @@ trait HasApproval
     /**
      * Verify the OTP code against the pending approval and sync the result locally.
      *
-     * Looks up the most recent {@see Status::APPROVED} approval for `$approvable`, then
+     * Looks up the most recent approval awaiting confirmation for `$approvable`, then
      * submits `$code` to eHealth via `EHealth::approval()->verify()`.
-     * On a `200` response the approval details are fetched and persisted locally through
+     * On a `200` or `204` response the approval details are fetched and persisted locally through
      * `Repository::approval()->sync()`.
      * Any other status code or caught exception causes an error flash, error logging, and returns `false`.
      *
@@ -241,12 +244,10 @@ trait HasApproval
             return false;
         }
 
-        $approval = Approval::getByModel($approvable)
-            ->whereStatus(ApprovalStatus::ACTIVE->value)
-            ->first();
+        ['approval' => $approval, 'error' => $error] = Repository::approval()->findApprovalForConfirmation($approvable);
 
-        if (!$approval) {
-            Session::flash('error', __('patients.errors.approval_not_found'));
+        if ($error !== null) {
+            Session::flash('error', __('patients.errors.approval_verification_failed').': '.$error);
 
             return false;
         }
@@ -260,7 +261,7 @@ trait HasApproval
             return false;
         }
 
-        if ($verifyResponse->getStatusCode() === 200) {
+        if (\in_array($verifyResponse->getStatusCode(), [200, 204], true)) {
             try {
                 $response = EHealth::approval()->getApprovalDetails($approvable?->uuid, $approval->uuid);
                 $responseData = $response->getData();
@@ -272,6 +273,10 @@ trait HasApproval
                 return false;
             }
         } else {
+            Session::flash('error', __('patients.errors.approval_verification_failed').': '.__('patients.errors.approval_response_status', [
+                'status' => $verifyResponse->getStatusCode(),
+            ]));
+
             Log::error('Approval verification failed', [
                 'approval_uuid' => $approval->uuid,
                 'response_status' => $verifyResponse->getStatusCode(),

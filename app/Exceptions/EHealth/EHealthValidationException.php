@@ -110,6 +110,9 @@ class EHealthValidationException extends EHealthException
                     $entry = $item['entry'] ?? 'unknow field';
                     $description = $item['rules'][0]['description'] ?? 'no description';
 
+                    if (str_contains($entry, 'granted_to.identifier.value') && $description === 'Invalid employee type') {
+                        return __('errors.ehealth.messages.approval_invalid_employee_type');
+                    }
                     if (str_contains($entry, 'product_reference.identifier.value') && str_contains($description, 'Value is not allowed by prescribable_device_codes dictionary configuration')) {
                         return __('Код медичного виробу: Вибраний код не дозволений поточною конфігурацією словника для призначень в ЕСОЗ');
                     }
