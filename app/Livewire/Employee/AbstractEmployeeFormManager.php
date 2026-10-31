@@ -20,7 +20,9 @@ use App\Models\Employee\Employee;
 use App\Models\Employee\EmployeeRequest;
 use App\Models\LegalEntity;
 use App\Models\Revision;
+use App\Models\Relations\Party;
 use App\Models\User;
+use App\Repositories\Repository;
 use Auth;
 use Carbon\Carbon;
 use Exception;
@@ -605,6 +607,37 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             // Allows: division_id
             $this->isCorePositionDataLocked = true;
         }
+    }
+
+    /**
+     * Resolve from the database: partyUsers is public Livewire state, not authorization data.
+     */
+    protected function resolvePositionEmailUser(Party $party): ?User
+    {
+        $email = trim($this->formEmail ?? $this->form->party['email'] ?? '');
+
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw ValidationException::withMessages([
+                'formEmail' => __('validation.email', ['attribute' => __('forms.email')]),
+            ]);
+        }
+
+        $selectedUser = $party->usersWithEmployeeInLegalEntity(legalEntity()->id)->firstWhere('email', $email);
+
+        if (!$selectedUser) {
+            $this->authorize('createAdditionalLogin', EmployeeRequest::class);
+            $selectedUser = Repository::user()->findByEmail($email);
+
+            if ($selectedUser && (int) $selectedUser->partyId !== (int) $party->id) {
+                throw ValidationException::withMessages([
+                    'formEmail' => __('employees.position_add_email_belongs_to_other_party'),
+                ]);
+            }
+        }
+
+        $this->form->party['email'] = $email;
+
+        return $selectedUser;
     }
 
     /**

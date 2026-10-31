@@ -10,7 +10,6 @@ use App\Models\Employee\EmployeeRequest;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
 use App\Repositories\Repository;
-use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 
@@ -65,20 +64,13 @@ class EmployeePositionAdd extends AbstractEmployeeFormManager
      */
     protected function handleDraftPersistence(): EmployeeRequest
     {
+        $selectedUser = $this->resolvePositionEmailUser($this->party);
         $preparedData = $this->form->getPreparedData();
         $nestedDataForRevision = $this->mapRevisionData($preparedData);
 
         $employeeRequestData = Arr::only($preparedData, [
             'position', 'start_date', 'end_date', 'employee_type', 'division_id', 'email',
         ]);
-
-        $selectedUser = $this->partyUsers?->firstWhere('email', $this->formEmail);
-
-        if ($this->formEmail && !$selectedUser) {
-            throw ValidationException::withMessages([
-                'formEmail' => __('employees.position_add_email_not_in_legal_entity'),
-            ]);
-        }
 
         $employeeRequestData['user_id'] = $selectedUser?->id;
         $employeeRequestData['party_id'] = $this->party->id;

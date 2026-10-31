@@ -19,6 +19,11 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 
 readonly class EmployeeRepository
 {
+    public function hasPartyInLegalEntity(int $partyId, int $legalEntityId): bool
+    {
+        return Employee::wherePartyId($partyId)->whereLegalEntityId($legalEntityId)->exists();
+    }
+
     public function activeForLegalEntity(User $user, LegalEntity $legalEntity, array $employeeTypes): ?Employee
     {
         return $user->employees()->whereLegalEntityId($legalEntity->id)->active()->whereIn('employee_type', $employeeTypes)->first();

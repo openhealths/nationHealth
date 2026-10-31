@@ -147,22 +147,43 @@
             @enderror
         </div>
 
-        {{-- 5. Email: Locked based on component state --}}
-        @if (!empty($partyUsers))
-            <div class="form-group" x-transition wire:key="party-user-email-select">
-                <select
-                    name="formEmail"
-                    id="formEmail"
-                    class="peer input appearance-none bg-white text-gray-500 dark:bg-gray-800 dark:text-gray-400"
-                    required
-                    wire:model="formEmail"
-                    :disabled="$wire.isPositionDataLocked"
-                >
-                    <option value="" disabled>{{ __('forms.select_user_email') }}</option>
-                    @foreach ($partyUsers as $user)
-                        <option value="{{ $user->email }}">{{ $user->email }}</option>
-                    @endforeach
-                </select>
+        {{-- 5. Email: additional logins are available only in the local environment. --}}
+        @if ($partyUsers !== null)
+            <div class="form-group" x-transition wire:key="party-user-email">
+                @can('createAdditionalLogin', \App\Models\Employee\EmployeeRequest::class)
+                    <input
+                        type="email"
+                        name="formEmail"
+                        id="formEmail"
+                        list="party-user-emails"
+                        class="peer input text-gray-500 dark:text-gray-400"
+                        required
+                        wire:model="formEmail"
+                        :disabled="$wire.isPositionDataLocked"
+                        placeholder=" "
+                        autocomplete="off"
+                    />
+                    <datalist id="party-user-emails">
+                        @foreach ($partyUsers as $user)
+                            <option value="{{ $user->email }}"></option>
+                        @endforeach
+                    </datalist>
+                    <p class="mt-1 text-xs text-gray-500">{{ __('forms.position_add_email_hint') }}</p>
+                @else
+                    <select
+                        name="formEmail"
+                        id="formEmail"
+                        class="peer input appearance-none bg-white text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                        required
+                        wire:model="formEmail"
+                        :disabled="$wire.isPositionDataLocked"
+                    >
+                        <option value="" disabled>{{ __('forms.select_user_email') }}</option>
+                        @foreach ($partyUsers as $user)
+                            <option value="{{ $user->email }}">{{ $user->email }}</option>
+                        @endforeach
+                    </select>
+                @endcan
                 <label for="formEmail" class="label">{{ __('forms.email') }}</label>
                 @error('formEmail')
                     <p class="text-error">{{ $message }}</p>

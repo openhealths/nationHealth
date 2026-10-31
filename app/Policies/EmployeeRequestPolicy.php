@@ -11,6 +11,11 @@ use Illuminate\Auth\Access\Response;
 
 class EmployeeRequestPolicy
 {
+    public function createAdditionalLogin(User $user): bool
+    {
+        return app()->isLocal() && $this->canManageRequests($user);
+    }
+
     private function canManageRequests(User $user): bool
     {
         return $user->can('employee_request:write') || $user->hasElevatedEmployeeRole();

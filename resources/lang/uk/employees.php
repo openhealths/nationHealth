@@ -83,4 +83,5 @@ return [
     'dismissed_no_edit' => 'Неможливо редагувати звільненого працівника.',
     'add_position_denied_for_draft' => 'Неможливо додати посаду для працівника, який існує лише як чернетка.',
     'position_add_email_not_in_legal_entity' => 'Обраний email не належить працівнику цього закладу. Оберіть email із доступного списку.',
+    'position_add_email_belongs_to_other_party' => 'Цей email уже привʼязаний до іншої особи. Вкажіть інший email або оберіть існуючий зі списку.',
 ];
