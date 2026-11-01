@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\LegalEntity;
 
-use Arr;
 use Throwable;
 use App\Models\User;
 use App\Enums\Status;
@@ -27,7 +26,6 @@ use App\Repositories\AddressRepository;
 use App\Traits\BatchLegalEntityQueries;
 use App\Auth\EHealth\Services\TokenStorage;
 use Spatie\Permission\PermissionRegistrar;
-use App\Enums\License\Type as LicenseType;
 use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthConnectionException;
@@ -92,14 +90,15 @@ class LegalEntityDetails extends LegalEntityComponent
     ): void {
         parent::boot($addressRepository, $phoneRepository);
 
+        // Protected properties must be restored on every Livewire request.
+        $this->legalEntity = $this->getLegalEntity();
+
         // This will ensure that the 'isSync' computed property is not cached between requests
         unset($this->isSync);
     }
 
     public function mount(?LegalEntity $legalEntity = null): void
     {
-        $this->legalEntity = $this->getLegalEntity();
-
         parent::mount();
 
         $this->getLegalEntityForm();
@@ -194,7 +193,7 @@ class LegalEntityDetails extends LegalEntityComponent
     protected function getLegalEntityForm(): void
     {
         $this->setLegalEntity(); // Retrieve basic legal entity data
-        $this->getLicenseForm(); // Get the license form data
+        $this->legalEntityForm->fillLicense($this->legalEntity); // Get the license form data
         $this->getArchiveForm(); // Get the archive form data
         $this->getOwnerLegalEntity(); // Get the owner's legal entity data
         $this->getAccreditationForm(); // Get the accreditation form data status
@@ -202,34 +201,6 @@ class LegalEntityDetails extends LegalEntityComponent
         $this->getReceiverFundsCodeForm(); // Get the receiver funds code form data status
 
         $this->legalEntityForm->residenceAddress = $this->address;
-    }
-
-    /**
-     * Retrieves and sets only specific fields related to the license from the legal entity form.
-     */
-    protected function getLicenseForm(): void
-    {
-        $licenses = $this->legalEntity->licenses()->get();
-
-        $license = $licenses->filter(function ($item) {
-            return $item->type->name === LicenseType::MSP->value || $item->type->name === LicenseType::PHARMACY->value;
-        })->first();
-
-        if ($license) {
-            $this->legalEntityForm->license = Arr::only(
-                $this->convertArrayKeysToCamelCase($license->toArray()),
-                [
-                    'type',
-                    'licenseNumber',
-                    'issuedBy',
-                    'issuedDate',
-                    'expiryDate',
-                    'activeFromDate',
-                    'whatLicensed',
-                    'orderNo'
-                ]
-            );
-        }
     }
 
     /**
@@ -356,17 +327,6 @@ class LegalEntityDetails extends LegalEntityComponent
      */
     public function sync(): void
     {
-        /*
-         * This is need by Livewire behavior.
-         * On the first render, mount() runs and assigns $this->legalEntity.
-         * On subsequent requests (e.g., when clicking synchronize button), Livewire does NOT run mount() again
-         * and does NOT rehydrate protected typed properties.
-         * Code below allows to ensure that property is set before use.
-         */
-        if (!isset($this->legalEntity)) {
-            $this->legalEntity = $this->getLegalEntity();
-        }
-
         if (Auth::user()->cannot('sync', $this->legalEntity)) {
             session()->flash('error', __('legal-entity.policy.deny.sync'));
 
@@ -410,6 +370,8 @@ class LegalEntityDetails extends LegalEntityComponent
             $legalEntityData = $this->filterUnprovidedFields($legalEntityData, $this->legalEntityForm->toArray());
 
             $this->modifyLegalEntity($legalEntityData);
+
+            $this->legalEntityForm->fromUpdate($this->legalEntity);
         } catch (EHealthResponseException $err) {
             Log::channel('e_health_errors')->error(self::class . ':syncLegalEntity', ['error' => $err->getMessage()]);
 

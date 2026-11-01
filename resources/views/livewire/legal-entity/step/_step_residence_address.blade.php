@@ -21,6 +21,7 @@
             :districts="$districts"
             :settlements="$settlements"
             :streets="$streets"
+            :readonly="$isDetails"
             class="mb-4 form-row-3"
         />
     </div>
