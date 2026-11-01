@@ -39,7 +39,22 @@ public CarePlan $carePlan; // Eloquent model as a public property
 
 Resolve the model from its id inside the component method that needs it instead.
 
+If a view uses a protected model, restore it on every Livewire request (for
+example, in `boot()`). Initialization in `mount()` or a single action does not
+cover later property updates, refreshes, or other actions.
+
+### Synchronization
+
+After synchronization, refresh displayed form values from the saved records.
+Preserve the existing filtering and persistence rules.
+For LegalEntity optional sections, do not restore data discarded by `filterUnprovidedFields()` from the raw eHealth response; update values and visibility from the saved data instead.
+Keep form state updates in the form object; keep API calls, persistence, and
+authorization in the component.
+
 ## Blade + Alpine.js
+
+Read-only address components must skip edit and suggestion-search watchers.
+Keep their `entangle` and `x-model` bindings active so saved values still update.
 
 When an Alpine.js expression spans multiple lines inside a Blade attribute, indent the expression body one level
 **deeper** than the element's attributes, and align the closing `"` with the attribute block. Do not leave the body at 

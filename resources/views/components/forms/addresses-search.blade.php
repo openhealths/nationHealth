@@ -202,6 +202,10 @@
             },
             initialized: false,
             init() {
+                if (this.readonly) {
+                    return;
+                }
+
                 // tracking changes of region, but skip first time
                 this.$watch('address.region', value => {
                     if (! this.initialized) {
@@ -334,6 +338,10 @@
             initialized: false,
             exactSearch: $wire.entangle('exactSettlementMatch'),
             init() {
+                if (this.readonly) {
+                    return;
+                }
+
                 this.$watch('address.settlement', value => {
                     // tracking changes of settlement, but skip first time
                     if (! this.initialized) {
@@ -482,6 +490,10 @@
             },
             initialized: false,
             init() {
+                if (this.readonly) {
+                    return;
+                }
+
                 this.$watch('address.street', value => {
                     // tracking changes of settlement, but skip first time
                     if (! this.initialized) {

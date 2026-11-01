@@ -637,6 +637,10 @@ abstract class LegalEntity extends Component
 
         $data = removeEmptyKeys($data);
 
+        if (isset($data['license']) && empty($data['license']['id'])) {
+            $data['license']['license_number'] ??= null;
+        }
+
         $data['website'] ??= "";
 
         return $data;

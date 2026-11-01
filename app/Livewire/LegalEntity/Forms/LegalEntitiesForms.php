@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\LegalEntity\Forms;
 
+use App\Core\Arr;
 use Carbon\Carbon;
 use App\Core\BaseForm;
 use App\Rules\Name;
@@ -11,7 +12,6 @@ use App\Models\User;
 use App\Rules\Email;
 use App\Rules\TaxId;
 use App\Rules\AgeCheck;
-use App\Rules\Cyrillic;
 use App\Rules\BirthDate;
 use App\Rules\DateFormat;
 use App\Rules\ExpiryDate;
@@ -23,6 +23,7 @@ use App\Rules\DocumentNumber;
 use App\Rules\OnlyOneDocument;
 use App\Rules\PhoneDuplicates;
 use Illuminate\Support\Facades\Log;
+use App\Enums\License\Type as LicenseType;
 use App\Exceptions\CustomValidationException;
 use Illuminate\Validation\ValidationException;
 
@@ -71,6 +72,75 @@ class LegalEntitiesForms extends BaseForm
     public ?array $publicOffer = [];
 
     public array $security = [];
+
+    /**
+     * Refresh displayed values and optional section visibility from the saved legal entity.
+     *
+     * @param  LegalEntity  $legalEntity
+     * @return void
+     */
+    public function fromUpdate(LegalEntity $legalEntity): void
+    {
+        $this->fillLicense($legalEntity);
+
+        $this->phones = $legalEntity->phones()->get()->toArray();
+
+        $this->residenceAddress = Arr::toCamelCase($legalEntity->addresses()->first()?->toArray() ?? []);
+
+        if (isset($this->residenceAddress['area'])) {
+            $this->residenceAddress['area'] = mb_strtoupper($this->residenceAddress['area']);
+        }
+
+        $data = Arr::toCamelCase(
+            $legalEntity->only(['accreditation', 'archive', 'beneficiary', 'receiver_funds_code'])
+        );
+
+        $this->reset('accreditation');
+
+        $this->fill([
+            'accreditation' => $data['accreditation'] + $this->accreditation,
+            'archive' => $data['archive'],
+            'beneficiary' => $data['beneficiary'],
+            'receiverFundsCode' => $data['receiverFundsCode'],
+            'accreditationShow' => !empty($data['accreditation']['category']),
+            'archivationShow' => !empty($data['archive']),
+            'beneficiaryShow' => !empty($data['beneficiary']),
+            'receiverFundsCodeShow' => !empty($data['receiverFundsCode']),
+        ]);
+
+        $this->component->address = $this->residenceAddress;
+    }
+
+    /**
+     * Fill the primary license fields from saved records.
+     *
+     * @param  LegalEntity  $legalEntity
+     * @return void
+     */
+    public function fillLicense(LegalEntity $legalEntity): void
+    {
+        $licenses = $legalEntity->licenses()->get();
+
+        $license = $licenses
+            ->filter(fn ($item) => $item->type->name === LicenseType::MSP->value || $item->type->name === LicenseType::PHARMACY->value)
+            ->first();
+
+        if ($license) {
+            $this->license = Arr::only(
+                Arr::toCamelCase($license->toArray()),
+                [
+                    'type',
+                    'licenseNumber',
+                    'issuedBy',
+                    'issuedDate',
+                    'expiryDate',
+                    'activeFromDate',
+                    'whatLicensed',
+                    'orderNo'
+                ]
+            );
+        }
+    }
 
     public function rules(): array
     {
