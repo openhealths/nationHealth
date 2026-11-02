@@ -88,11 +88,11 @@ class PatientData extends BasePatientComponent
 
     public ?string $phoneNumber = null;
 
-    public int $code;
+    public string $code = '';
 
     public string $newPhoneNumber;
 
-    public int $verificationCode;
+    public string $verificationCode = '';
 
     public string $requestId;
 
@@ -100,7 +100,7 @@ class PatientData extends BasePatientComponent
 
     public string $selectedAuthMethodType = '';
 
-    public string $alias;
+    public string $alias = '';
 
     public string $confidantPersonId;
 

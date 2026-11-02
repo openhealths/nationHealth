@@ -237,7 +237,7 @@ trait ManagesConfidantPersonRelationships
             $response = EHealth::person()->approveConfidantPersonRelationshipRequest(
                 $this->uuid,
                 $this->confidantPersonRelationshipRequestId,
-                Arr::toSnakeCase($validated)
+                ['verification_code' => (int) $validated['verificationCode']]
             );
 
             $this->approvedData = $response->getData();

@@ -113,6 +113,7 @@
                     placeholder=" "
                     autocomplete="off"
                     maxlength="4"
+                    x-mask="9999"
                 />
                 <label for="authVerificationCode" class="label"> {{ __('forms.confirmation_code_from_SMS') }} </label>
             </div>
