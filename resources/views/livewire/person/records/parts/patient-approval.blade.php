@@ -183,6 +183,24 @@
                                             <option value="procedure">
                                                 {{ __('approval.create.procedure') }}
                                             </option>
+                                            <option value="condition">
+                                                {{ __('approval.create.condition') }}
+                                            </option>
+                                            <option value="observation">
+                                                {{ __('approval.create.observation') }}
+                                            </option>
+                                            <option value="activity">
+                                                {{ __('approval.create.activity') }}
+                                            </option>
+                                            <option value="clinical_impression">
+                                                {{ __('approval.create.clinical_impression') }}
+                                            </option>
+                                            <option value="immunization">
+                                                {{ __('approval.create.immunization') }}
+                                            </option>
+                                            <option value="device">
+                                                {{ __('approval.create.device') }}
+                                            </option>
                                         </select>
 
                                         <label class="label">
@@ -191,131 +209,202 @@
                                     </div>
                                 @endif
 
-                                <div
-                                    wire:key="approval-record-picker-{{ $mode }}-{{ $mode === 'child' ? $childType : $resourceType }}"
-                                    x-data="{ recordExpanded: false }"
-                                    @pointerdown.window="if (!$el.contains($event.target)) recordExpanded = false"
-                                    @focusin.window="if (!$el.contains($event.target)) recordExpanded = false"
-                                    @keydown.escape.stop="recordExpanded = false"
-                                    class="relative max-w-xl"
-                                >
-                                    <label class="mb-2 block text-sm text-gray-500 dark:text-gray-400">
-                                        {{ __('approval.create.select_record') }}
-                                    </label>
-
-                                    <div class="relative">
-                                        <input
-                                            x-ref="recordInput"
-                                            type="search"
-                                            wire:model.live.debounce.1000ms="search"
-                                            @focus="recordExpanded = true"
-                                            @input="recordExpanded = true"
-                                            autocomplete="off"
-                                            placeholder="{{ __('approval.create.search_record') }}"
-                                            role="combobox"
-                                            aria-autocomplete="list"
-                                            :aria-expanded="recordExpanded.toString()"
-                                            class="input w-full pl-1 pr-9 dark:border-gray-700 dark:bg-gray-800 placeholder:text-gray-500 dark:placeholder:text-gray-400"
-                                        >
-
-                                        <button
-                                            type="button"
-                                            tabindex="-1"
-                                            class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 dark:text-gray-400"
-                                            @click="recordExpanded = !recordExpanded; if (recordExpanded) $nextTick(() => $refs.recordInput.focus())"
-                                            aria-label="{{ __('forms.select') }}"
-                                        >
-                                            <svg
-                                                class="h-4 w-4"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2"
-                                                aria-hidden="true"
-                                            >
-                                                <path d="m6 9 6 6 6-6" />
-                                            </svg>
-                                        </button>
-                                    </div>
-
+                                @if($mode === 'service_request')
                                     <div
-                                        x-show="recordExpanded"
-                                        x-cloak
-                                        class="absolute left-0 right-0 z-50 mt-2 rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+                                        x-data="{ referralExpanded: false }"
+                                        @click.outside="if (!$wire.previewSection) referralExpanded = false"
+                                        @keydown.escape.stop="referralExpanded = false"
+                                        class="max-w-xl space-y-4"
                                     >
-                                        <div class="max-h-80 space-y-2 overflow-y-auto">
+                                        <div class="flex items-end gap-4">
+                                            <div class="min-w-0 flex-1">
+                                                <label class="mb-2 block text-sm text-gray-700 dark:text-gray-300">
+                                                    {{ __('approval.create.referral_number') }}
+                                                </label>
+
+                                                <input
+                                                    type="search"
+                                                    wire:model="search"
+                                                    @input="referralExpanded = false"
+                                                    autocomplete="off"
+                                                    class="input w-full"
+                                                >
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                wire:click="$refresh"
+                                                @click="referralExpanded = true"
+                                                class="button-primary"
+                                            >
+                                                {{ __('approval.create.referral_search') }}
+                                            </button>
+                                        </div>
+
+                                        <div
+                                            x-show="referralExpanded"
+                                            x-cloak
+                                            class="space-y-3"
+                                        >
                                             @forelse($this->availableRecords as $record)
-                                                @php
-                                                    $uuid = $record['uuid'];
-                                                    $disabled = !$record['selectable'];
-
-                                                    $selected = match ($mode) {
-                                                        'child' => $childUuid === $uuid,
-                                                        'service_request' => ($resourceIds[0] ?? null) === $uuid,
-                                                        default => in_array($uuid, $resourceIds, true),
-                                                    };
-                                                @endphp
-
                                                 <div
-                                                    wire:key="approval-record-{{ $mode }}-{{ $uuid }}"
-                                                    class="rounded-lg p-2"
+                                                    wire:key="approval-referral-{{ $record['uuid'] }}"
+                                                    class="rounded-xl border border-gray-200 bg-white p-4 shadow-md dark:border-gray-600 dark:bg-gray-800"
                                                 >
                                                     <button
                                                         type="button"
-                                                        wire:click="selectRecord('{{ $uuid }}')"
-                                                        @click="recordExpanded = {{ $mode === 'resource' ? 'true' : 'false' }}"
-                                                        aria-pressed="{{ $selected ? 'true' : 'false' }}"
-                                                        @disabled($disabled)
+                                                        wire:click="selectRecord('{{ $record['uuid'] }}')"
+                                                        @click="referralExpanded = false"
+                                                        @disabled(!$record['selectable'])
                                                         @class([
-                                                            'flex w-full items-center gap-3 rounded-lg text-left transition-colors',
-                                                            'cursor-not-allowed opacity-50 grayscale' => $disabled,
-                                                            'cursor-pointer bg-blue-500/10' => !$disabled && $selected,
-                                                            'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700' => !$disabled && !$selected,
+                                                            'w-full space-y-1 text-left text-sm',
+                                                            'cursor-pointer hover:text-blue-600 dark:hover:text-blue-400' => $record['selectable'],
+                                                            'cursor-not-allowed opacity-50' => !$record['selectable'],
                                                         ])
                                                     >
-                                                        <span
-                                                            @class([
-                                                                'flex h-5 w-5 shrink-0 items-center justify-center border text-xs font-bold',
-                                                                'rounded-full' => in_array($mode, ['child', 'service_request'], true),
-                                                                'rounded' => $mode === 'resource',
-                                                                'border-blue-600 bg-blue-600 text-white' => $selected && !$disabled,
-                                                                'border-blue-500' => !$selected || $disabled,
-                                                            ])
-                                                        >
-                                                            {{ $selected && !$disabled ? '✓' : '' }}
-                                                        </span>
+                                                        <p class="font-semibold text-base">
+                                                            {{ $record['name'] }}
+                                                        </p>
 
-                                                        <span class="min-w-0 flex-1 space-y-1">
-                                                            <span class="block text-sm text-gray-900 dark:text-gray-100">
-                                                                {{ $record['name'] }}
-                                                            </span>
+                                                        @if($record['date'] !== '')
+                                                            <p>{{ $record['date'] }}</p>
+                                                        @endif
 
-                                                            @if($record['date'] !== '')
-                                                                <span class="block text-sm text-gray-600 dark:text-gray-300">
-                                                                    {{ $record['date'] }}
-                                                                </span>
-                                                            @endif
+                                                        <p>
+                                                            {{ __('approval.create.referral_status') }}:
+                                                            {{ __('care-plan.referral_status.'.$record['status']) }}
+                                                        </p>
 
-                                                            <span class="block break-all text-xs text-gray-500 dark:text-gray-400">
-                                                                ID {{ $uuid }}
-                                                            </span>
-                                                        </span>
+                                                        @if($record['processing_status'])
+                                                            <p>
+                                                                {{ __('approval.create.referral_processing_status') }}:
+                                                                {{ __('care-plan.referral_status.'.$record['processing_status']) }}
+                                                            </p>
+                                                        @endif
+
+                                                        @if($record['category'])
+                                                            <p>
+                                                                {{ __('approval.create.referral_category') }}:
+                                                                {{ __('care-plan.referral_category.'.$record['category']) }}
+                                                            </p>
+                                                        @endif
+
+                                                        @if($record['service_name'])
+                                                            <p>
+                                                                {{ __('approval.create.referral_service') }}:
+                                                                {{ $record['service_code'] }} — {{ $record['service_name'] }}
+                                                            </p>
+                                                        @endif
                                                     </button>
 
-                                                    @if($mode === 'service_request' && $disabled)
-                                                        <p class="mt-2 pl-8 text-xs text-red-600 dark:text-red-400">
+                                                    <button
+                                                        type="button"
+                                                        wire:click="showReferralDetails('{{ $record['uuid'] }}')"
+                                                        @click.stop="referralExpanded = true"
+                                                        class="mt-2 text-left text-sm underline hover:text-blue-600 dark:hover:text-blue-400"
+                                                    >
+                                                        {{ __('approval.create.referral_requested_records') }}
+                                                    </button>
+
+                                                    @if(!$record['selectable'])
+                                                        <p class="mt-2 text-xs text-red-600 dark:text-red-400">
                                                             {{ $record['availability_known'] ? __('approval.create.referral_no_resources') : __('approval.create.referral_check_failed') }}
                                                         </p>
                                                     @endif
                                                 </div>
                                             @empty
-                                                <p class="p-2 text-sm text-gray-500 dark:text-gray-400">
+                                                <p class="text-sm text-gray-500 dark:text-gray-400">
                                                     {{ __('approval.create.no_records') }}
                                                 </p>
                                             @endforelse
                                         </div>
                                     </div>
-                                </div>
+                                @else
+                                    <div
+                                        wire:key="approval-record-picker-{{ $mode }}-{{ $mode === 'child' ? $childType : $resourceType }}"
+                                        x-data="{ recordExpanded: false }"
+                                        @click.outside="recordExpanded = false"
+                                        @keydown.escape.stop="recordExpanded = false"
+                                        class="relative max-w-xl"
+                                    >
+                                        <label class="mb-2 block text-sm text-gray-500 dark:text-gray-400">
+                                            {{ __('approval.create.select_record') }}
+                                        </label>
+
+                                        <div class="relative">
+                                            <input
+                                                x-ref="recordInput"
+                                                type="search"
+                                                wire:model.live.debounce.1000ms="search"
+                                                @focus="recordExpanded = true"
+                                                @input="recordExpanded = true"
+                                                autocomplete="off"
+                                                placeholder="{{ __('approval.create.search_record') }}"
+                                                class="input w-full pr-9"
+                                            >
+
+                                            <button
+                                                type="button"
+                                                class="absolute inset-y-0 right-0 px-3"
+                                                @click="recordExpanded = !recordExpanded"
+                                            >
+                                                <span class="text-gray-500">⌄</span>
+                                            </button>
+                                        </div>
+
+                                        <div
+                                            x-show="recordExpanded"
+                                            x-cloak
+                                            class="absolute left-0 right-0 z-50 mt-2 max-h-80 space-y-2 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+                                        >
+                                            @forelse($this->availableRecords as $record)
+                                                @php
+                                                    $selected = $mode === 'child'
+                                                        ? $childUuid === $record['uuid']
+                                                        : in_array($record['uuid'], $resourceIds, true);
+                                                @endphp
+
+                                                <button
+                                                    type="button"
+                                                    wire:key="approval-record-{{ $record['uuid'] }}"
+                                                    wire:click="selectRecord('{{ $record['uuid'] }}')"
+                                                    @click="recordExpanded = {{ $mode === 'resource' ? 'true' : 'false' }}"
+                                                    @disabled(!$record['selectable'])
+                                                    @class([
+                                                        'flex w-full items-center gap-3 rounded-lg p-2 text-left',
+                                                        'bg-blue-500/10' => $selected,
+                                                        'hover:bg-gray-100 dark:hover:bg-gray-700' => !$selected,
+                                                        'cursor-not-allowed opacity-50' => !$record['selectable'],
+                                                    ])
+                                                >
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-blue-500">
+                                                        {{ $selected ? '✓' : '' }}
+                                                    </span>
+
+                                                    <span class="min-w-0 space-y-1">
+                                                        <span class="block text-sm">
+                                                            {{ $record['name'] }}
+                                                        </span>
+
+                                                        @if($record['date'] !== '')
+                                                            <span class="block text-xs text-gray-500">
+                                                                {{ $record['date'] }}
+                                                            </span>
+                                                        @endif
+
+                                                        <span class="block break-all text-xs text-gray-500">
+                                                            ID {{ $record['uuid'] }}
+                                                        </span>
+                                                    </span>
+                                                </button>
+                                            @empty
+                                                <p class="text-sm text-gray-500">
+                                                    {{ __('approval.create.no_records') }}
+                                                </p>
+                                            @endforelse
+                                        </div>
+                                    </div>
+                                @endif
 
                                 @if($this->selectedRecords !== [])
                                     <div class="max-w-xl space-y-2">
@@ -396,7 +485,7 @@
                                             aria-autocomplete="list"
                                             aria-controls="approval-group-options"
                                             :aria-expanded="groupExpanded.toString()"
-                                            class="w-full border-b-2 border-gray-300 bg-transparent py-2 pr-10 pl-2 text-sm text-gray-900 placeholder-gray-500 focus:border-blue-600 focus:outline-none dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                                            class="input w-full pr-10 placeholder-gray-500 dark:placeholder-gray-400"
                                         >
 
                                         <button
@@ -645,7 +734,7 @@
                                             @if($method['type'] === 'OTP')
                                                 <p class="text-sm">
                                                     {{ __('approval.create.phone_number') }}:
-                                                    {{ $method['phone_number'] ?? '—' }}
+                                                    {{ $method['phoneNumber'] ?? '—' }}
                                                 </p>
                                             @endif
                                         </div>
@@ -702,10 +791,11 @@
                                         {{ __('approval.create.open_leaflet') }}
                                     </a>
 
-                                    <label class="flex items-start gap-2 text-sm">
+                                    <label class="flex cursor-pointer items-center gap-2 text-sm">
                                         <input
                                             type="checkbox"
                                             wire:model="leafletConfirmed"
+                                            class="default-checkbox h-5 w-5 shrink-0 cursor-pointer"
                                         >
                                         {{ __('approval.create.leaflet_confirmed') }}
                                     </label>
@@ -828,6 +918,7 @@
                                     id="approval-verification-code"
                                     type="text"
                                     wire:model="verificationCode"
+                                    x-init="$nextTick(() => $el.focus())"
                                     inputmode="numeric"
                                     maxlength="4"
                                     autocomplete="one-time-code"
@@ -960,26 +1051,48 @@
                 @endif
 
                 <div class="space-y-2 text-sm text-gray-900 dark:text-gray-100">
-                    @forelse($previewRows as $row)
-                        @if(
-                            $previewCodingSystem === 'all'
-                            || ($row['system'] ?? null) === $previewCodingSystem
-                        )
-                            <p wire:key="preview-row-{{ $loop->index }}">
-                                <span class="font-semibold">
-                                    {{ $row['code'] }}
-                                </span>
+                    @if($previewSection === 'referral')
+                        <h3 class="text-lg font-semibold">
+                            {{ __('approval.create.referral_requested_records') }}
+                        </h3>
 
-                                @if($row['name'] !== '')
-                                    — {{ $row['name'] }}
-                                @endif
+                        <ul class="list-disc space-y-6 pl-6">
+                            @forelse($previewRows as $row)
+                                <li wire:key="referral-resource-{{ $loop->index }}">
+                                    <p class="font-semibold">
+                                        {{ __('approval.resource_types.'.$row['code']) }}
+                                    </p>
+
+                                    <p class="mt-1 break-all">
+                                        ID {{ $row['name'] }}
+                                    </p>
+                                </li>
+                            @empty
+                                <li>{{ __('approval.create.referral_no_resources') }}</li>
+                            @endforelse
+                        </ul>
+                    @else
+                        @forelse($previewRows as $row)
+                            @if(
+                                $previewCodingSystem === 'all'
+                                || ($row['system'] ?? null) === $previewCodingSystem
+                            )
+                                <p wire:key="preview-row-{{ $loop->index }}">
+                                    <span class="font-semibold">
+                                        {{ $row['code'] }}
+                                    </span>
+
+                                    @if($row['name'] !== '')
+                                        — {{ $row['name'] }}
+                                    @endif
+                                </p>
+                            @endif
+                        @empty
+                            <p>
+                                {{ __('approval.create.no_group_details') }}
                             </p>
-                        @endif
-                    @empty
-                        <p>
-                            {{ __('approval.create.no_group_details') }}
-                        </p>
-                    @endforelse
+                        @endforelse
+                    @endif
                 </div>
 
                 <button

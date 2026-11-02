@@ -36,7 +36,7 @@ class ApprovalMapper implements FhirMapperContract
 
                 'resources' => [
                     FhirResource::make()
-                        ->coding('eHealth/resources', 'episode_of_care')
+                        ->coding('eHealth/resources', $data['context_type'])
                         ->toIdentifier($data['context_uuid']),
                 ],
             ],
@@ -124,6 +124,7 @@ class ApprovalMapper implements FhirMapperContract
                 'child' => [
                     'child_type' => data_get($data, 'child_resource.identifier.type.coding.0.code'),
                     'child_uuid' => data_get($data, 'child_resource.identifier.value'),
+                    'context_type' => data_get($data, 'resources.0.identifier.type.coding.0.code'),
                     'context_uuid' => data_get($data, 'resources.0.identifier.value'),
                 ],
                 'service_request' => [

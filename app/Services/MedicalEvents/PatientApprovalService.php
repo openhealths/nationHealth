@@ -11,6 +11,12 @@ use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Models\EhealthLink;
 use App\Models\CarePlan;
+use App\Models\CarePlanActivity;
+use App\Models\MedicalEvents\Sql\ClinicalImpression;
+use App\Models\MedicalEvents\Sql\Condition;
+use App\Models\MedicalEvents\Sql\Device;
+use App\Models\MedicalEvents\Sql\Immunization;
+use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
@@ -43,12 +49,28 @@ class PatientApprovalService
         'service_request' => ServiceRequestRequest::class,
     ];
 
+    public const array CHILD_MODELS = [
+        'encounter' => Encounter::class,
+        'diagnostic_report' => DiagnosticReport::class,
+        'procedure' => Procedure::class,
+        'condition' => Condition::class,
+        'observation' => Observation::class,
+        'activity' => CarePlanActivity::class,
+        'clinical_impression' => ClinicalImpression::class,
+        'immunization' => Immunization::class,
+        'device' => Device::class,
+    ];
+
     public const array ALLOWED_STATUSES = [
         'episode_of_care' => ['active', 'closed'],
         'diagnostic_report' => ['final'],
         'encounter' => ['finished'],
         'procedure' => ['completed', 'not_done'],
         'specimen' => [SpecimenStatus::AVAILABLE->value],
+        'observation' => ['valid'],
+        'clinical_impression' => ['completed'],
+        'immunization' => ['completed'],
+        'device' => ['active', 'inactive'],
     ];
 
     public static function approvalStatusAllowed(string $type, ?string $status): bool
@@ -58,9 +80,9 @@ class PatientApprovalService
 
     // прибрати після додавання permitted_resources в ЕН
     /** @return array<string, bool> */
-    public function referralAvailability(Person $person): array
+    public function patientReferrals(Person $person): array
     {
-        $availability = [];
+        $referrals = [];
         $page = 1;
 
         do {
@@ -70,31 +92,57 @@ class PatientApprovalService
             );
 
             foreach ($response->getData() as $referral) {
-                $availability[$referral['id']] = !empty($referral['permitted_resources']);
+                $uuid = $referral['id'];
+
+                $referrals[$uuid] = [
+                    'id' => $uuid,
+                    'requisition' => $referral['requisition'] ?? '',
+                    'status' => $referral['status'],
+                    'authored_on' => $referral['authored_on'] ?? null,
+                    'program_processing_status' => $referral['program_processing_status'] ?? null,
+                    'category' => data_get($referral, 'category.coding.0.code'),
+                    'service_id' => data_get($referral, 'code.identifier.value'),
+                    'selectable' => $referral['status'] === 'active' && !empty($referral['permitted_resources']),
+                ];
             }
 
             $page++;
         } while ($response->isNotLast());
 
-        return $availability;
+        return $referrals;
     }
 
     /** @return array<int, array<string, mixed>> */
     public function availableAuthenticationMethods(Person $person): array
     {
         return $person->authenticationMethods()
-            ->whereNull('ehealth_ended_at')
-            ->whereIn('type', array_column(AuthenticationMethod::cases(), 'value'))
+            ->where(function ($query): void {
+                $query->whereNull('ehealth_ended_at')
+                    ->orWhere('ehealth_ended_at', '>', now());
+            })
+            ->whereIn('type', [
+                AuthenticationMethod::OTP->value,
+                AuthenticationMethod::OFFLINE->value,
+                AuthenticationMethod::THIRD_PERSON->value,
+            ])
+            ->whereNotNull('uuid')
             ->get()
             ->toArray();
     }
 
     //повністю видалити/замінити після додавання permitted_resources в ЕН
-    public function referralHasPermittedResources(Person $person, string $uuid): bool 
+    public function referralHasPermittedResources(Person $person, string $uuid, bool $requireActive = false): array
     {
         $response = EHealth::serviceRequest()->getById($person->uuid, $uuid);
+        $referral = $response->getData();
 
-        return !empty($response->getData()['permitted_resources']);
+        if ($requireActive && ($referral['status'] ?? null) !== 'active') {
+            throw ValidationException::withMessages([
+                'resourceIds' => __('approval.create.referral_not_active'),
+            ]);
+        }
+
+        return $referral['permitted_resources'] ?? [];
     }
 
     /** @return array{approval_id: ?string, link_id: ?int} */
@@ -295,7 +343,7 @@ class PatientApprovalService
 
         return $timestamp->copy()->addMinute()->timestamp;
     }
-    
+
     public function resendSms(Person $person, string $approvalId): void
     {
         $approval = Approval::query()

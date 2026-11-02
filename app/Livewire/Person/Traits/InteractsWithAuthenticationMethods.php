@@ -326,7 +326,7 @@ trait InteractsWithAuthenticationMethods
 
             $this->requestId = $response->validate()['id'];
             $this->uploadedDocuments = $response->validate()['documents'];
-            $this->authStep = AuthStep::CHANGE_FROM_OFFLINE;
+            $this->authStep = AuthStep::ADD_NEW_BY_DOCUMENT;
             // The modal carries the document upload step, so it is opened once the request is actually created
             $this->showAuthMethodModal = true;
         } catch (EHealthException|EHealthConnectionException $exception) {
@@ -819,6 +819,26 @@ trait InteractsWithAuthenticationMethods
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
+
+            return;
+        }
+
+        if (!$this->form->isRepresentedBy($this->confidantPersonId)) {
+            Session::flash('error', __('patients.errors.authMethod.active_confidant_required'));
+
+            return;
+        }
+
+        try {
+            $authMethods = EHealth::person()->getAuthMethods($this->confidantPersonId)->validate();
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting confidant authentication methods');
+
+            return;
+        }
+
+        if (!Person::hasActiveOtpAuthenticationMethod($authMethods)) {
+            Session::flash('error', __('patients.confidant_person_has_no_otp_auth_method'));
 
             return;
         }
